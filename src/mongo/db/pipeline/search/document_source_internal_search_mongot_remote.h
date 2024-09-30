@@ -69,17 +69,7 @@ public:
 
     DocumentSourceInternalSearchMongotRemote(InternalSearchMongotRemoteSpec spec,
                                              const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             std::shared_ptr<executor::TaskExecutor> taskExecutor)
-        : DocumentSource(kStageName, expCtx),
-          _mergingPipeline(spec.getMergingPipeline().has_value()
-                               ? mongo::Pipeline::parse(*spec.getMergingPipeline(), expCtx)
-                               : nullptr),
-          _spec(std::move(spec)),
-          _taskExecutor(taskExecutor) {
-        if (_spec.getSortSpec().has_value()) {
-            _sortKeyGen.emplace(SortPattern{*_spec.getSortSpec(), pExpCtx}, pExpCtx->getCollator());
-        }
-    }
+                                             std::shared_ptr<executor::TaskExecutor> taskExecutor);
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         return getSearchDefaultConstraints();
@@ -192,6 +182,11 @@ protected:
      * Helper serialize method that avoids making mongot call during explain from mongos.
      */
     Value serializeWithoutMergePipeline(const SerializationOptions& opts) const;
+
+    /**
+     * Helper function to add the "mergingPipeline" field to the serialization if it's needed.
+     */
+    Value addMergePipelineIfNeeded(Value innerSpecVal, const SerializationOptions& opts) const;
 
     Value serialize(const SerializationOptions& opts) const override;
 

@@ -60,12 +60,18 @@ public:
      * This is the first stage in the pipeline, but we need to gather responses from all shards in
      * order to set $$SEARCH_META appropriately.
      */
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        DistributedPlanLogic logic;
-        logic.shardsStage = this;
-        tassert(6448011, "Expected merging pipeline to be set already", _mergingPipeline);
-        logic.mergingStages = _mergingPipeline->getSources();
-        return logic;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
+        auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
+        auto executor = executor::getMongotTaskExecutor(expCtx->opCtx->getServiceContext());
+        auto spec = getMongotRemoteSpec();
+        tassert(9497007, "Cannot clone with an initialized cursor - it cannot be shared", !_cursor);
+        if (_mergingPipeline) {
+            spec.setMergingPipeline(_mergingPipeline->serializeToBson());
+        }
+        return make_intrusive<DocumentSourceSearchMeta>(std::move(spec), expCtx, executor);
     }
 
     size_t getRemoteCursorId() {
@@ -87,8 +93,6 @@ public:
     }
 
 protected:
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
-
     std::unique_ptr<executor::TaskExecutorCursor> establishCursor() override;
 
 private:

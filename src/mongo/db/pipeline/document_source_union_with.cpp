@@ -280,8 +280,18 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
             // Attach query settings to the '_pipeline->getContext()' by copying them from the
             // parent query ExpressionContext.
             _pipeline->getContext()->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
+
+            LOGV2_DEBUG(9497002,
+                        5,
+                        "$unionWith before pipeline prep: ",
+                        "pipeline"_attr = _pipeline->serializeToBson());
             _pipeline =
                 pExpCtx->mongoProcessInterface->preparePipelineForExecution(_pipeline.release());
+            LOGV2_DEBUG(9497003,
+                        5,
+                        "$unionWith POST pipeline prep: ",
+                        "pipeline"_attr = _pipeline->serializeToBson());
+
             _executionState = ExecutionProgress::kIteratingSubPipeline;
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             _pipeline = buildPipelineFromViewDefinition(

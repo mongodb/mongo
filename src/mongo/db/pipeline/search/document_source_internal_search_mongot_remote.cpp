@@ -58,8 +58,43 @@ MONGO_FAIL_POINT_DEFINE(failClassicSearch);
 using executor::RemoteCommandRequest;
 using executor::TaskExecutorCursor;
 
+DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemote(
+    InternalSearchMongotRemoteSpec spec,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::shared_ptr<executor::TaskExecutor> taskExecutor)
+    : DocumentSource(kStageName, expCtx),
+      _mergingPipeline(spec.getMergingPipeline().has_value()
+                           ? mongo::Pipeline::parse(*spec.getMergingPipeline(), expCtx)
+                           : nullptr),
+      _spec(std::move(spec)),
+      _taskExecutor(taskExecutor) {
+    LOGV2_DEBUG(9497006,
+                5,
+                "Creating DocumentSourceInternalSearchMongotRemote",
+                "spec"_attr = _spec.toBSON());
+    if (_spec.getSortSpec().has_value()) {
+        _sortKeyGen.emplace(SortPattern{*_spec.getSortSpec(), pExpCtx}, pExpCtx->getCollator());
+    }
+}
+
 const char* DocumentSourceInternalSearchMongotRemote::getSourceName() const {
     return kStageName.rawData();
+}
+
+Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
+    Value innerSpecVal, const SerializationOptions& opts) const {
+    if (!innerSpecVal.isObject()) {
+        // We've redacted the interesting parts of the stage, return early.
+        return innerSpecVal;
+    }
+    if ((!opts.verbosity || pExpCtx->inRouter) &&
+        _spec.getMetadataMergeProtocolVersion().has_value() && _mergingPipeline) {
+        MutableDocument innerSpec{innerSpecVal.getDocument()};
+        innerSpec[InternalSearchMongotRemoteSpec::kMergingPipelineFieldName] =
+            Value(_mergingPipeline->serialize(opts));
+        return innerSpec.freezeToValue();
+    }
+    return innerSpecVal;
 }
 
 Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
@@ -153,17 +188,8 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
 
 Value DocumentSourceInternalSearchMongotRemote::serialize(const SerializationOptions& opts) const {
     auto innerSpecVal = serializeWithoutMergePipeline(opts);
-    if (!innerSpecVal.isObject()) {
-        // We've redacted the interesting parts of the stage, return early.
-        return Value(Document{{getSourceName(), innerSpecVal}});
-    }
-    MutableDocument innerSpec{innerSpecVal.getDocument()};
-    if ((!opts.verbosity || pExpCtx->inRouter) &&
-        _spec.getMetadataMergeProtocolVersion().has_value() && _mergingPipeline) {
-        innerSpec[InternalSearchMongotRemoteSpec::kMergingPipelineFieldName] =
-            Value(_mergingPipeline->serialize(opts));
-    }
-    return Value(Document{{getSourceName(), innerSpec.freezeToValue()}});
+    return Value(
+        Document{{getSourceName(), addMergePipelineIfNeeded(std::move(innerSpecVal), opts)}});
 }
 
 boost::optional<BSONObj> DocumentSourceInternalSearchMongotRemote::_getNext() {
