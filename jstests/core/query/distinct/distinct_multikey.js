@@ -5,7 +5,6 @@
  * ]
  */
 import {getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 let coll = db.jstest_distinct_multikey;
 coll.drop();
@@ -19,11 +18,7 @@ let result = coll.distinct("a");
 assert.eq([1, 2, 3, 4, 5, 6, 7], result.sort());
 let explain = coll.explain("queryPlanner").distinct("a");
 let winningPlan = getWinningPlan(explain.queryPlanner);
-// Sharded suites use '_id' as the shard key, so fetching is required to apply shard filtering.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
-if (!FixtureHelpers.isSharded(coll)) {
-    assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
-}
+assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 
 // Test that distinct can correctly use a multikey index when there is a predicate. This query
@@ -60,11 +55,7 @@ result = coll.distinct("a", {a: {$gte: 2}});
 assert.eq([2, 3], result.sort());
 explain = coll.explain("queryPlanner").distinct("a", {a: {$gte: 2}});
 winningPlan = getWinningPlan(explain.queryPlanner);
-// Sharded suites use '_id' as the shard key, so fetching is required to apply shard filtering.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
-if (!FixtureHelpers.isSharded(coll)) {
-    assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
-}
+assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 
 // Test a distinct which can use a multikey index, where the field being distinct'ed is not
@@ -79,11 +70,7 @@ result = coll.distinct("a", {a: {$gte: 2}});
 assert.eq([7, 8], result.sort());
 explain = coll.explain("queryPlanner").distinct("a", {a: {$gte: 2}});
 winningPlan = getWinningPlan(explain.queryPlanner);
-// Sharded suites use '_id' as the shard key, so fetching is required to apply shard filtering.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
-if (!FixtureHelpers.isSharded(coll)) {
-    assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
-}
+assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 
 // Test distinct over a trailing multikey field.
@@ -105,11 +92,7 @@ result = coll.distinct("b", {a: 3});
 assert.eq([1, 7, 8], result.sort());
 explain = coll.explain("queryPlanner").distinct("b", {a: 3});
 winningPlan = getWinningPlan(explain.queryPlanner);
-// Sharded suites use '_id' as the shard key, so fetching is required to apply shard filtering.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
-if (!FixtureHelpers.isSharded(coll)) {
-    assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
-}
+assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 
 // Test distinct over a trailing non-multikey dotted path where the leading field is multikey.
@@ -123,9 +106,5 @@ result = coll.distinct("b.c", {a: 3});
 assert.eq([1, 7, 8], result.sort());
 explain = coll.explain("queryPlanner").distinct("b.c", {a: 3});
 winningPlan = getWinningPlan(explain.queryPlanner);
-// Sharded suites use '_id' as the shard key, so fetching is required to apply shard filtering.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
-if (!FixtureHelpers.isSharded(coll)) {
-    assert(planHasStage(db, winningPlan, "PROJECTION_DEFAULT"));
-}
+assert(planHasStage(db, winningPlan, "PROJECTION_DEFAULT"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));

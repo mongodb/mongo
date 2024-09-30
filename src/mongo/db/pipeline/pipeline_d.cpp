@@ -1113,8 +1113,7 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
                            const AggregateCommandRequest* aggRequest,
                            const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
                            bool* shouldProduceEmptyDocs,
-                           bool timeseriesBoundedSortOptimization,
-                           std::size_t plannerOpts) {
+                           bool timeseriesBoundedSortOptimization) {
     // We want to do this before createCanonicalQuery() which does the last-minute optimization to
     // 'pipeline' and hence modifies it.
     auto [sortPattern, rewrittenGroupStage] = tryDistinctGroupRewrite(pipeline->getSources());
@@ -1162,11 +1161,7 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         return StatusWith{std::move(cq)};
     }
 
-    // If the feature flag is disabled, preserve the old behavior where we reset planner options
-    // when constructing an executor for distinct.
-    plannerOpts = isDistinctMultiplanningEnabled ? plannerOpts : QueryPlannerParams::DEFAULT;
-    plannerOpts |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
-
+    std::size_t plannerOpts = QueryPlannerParams::DEFAULT;
     if (!*shouldProduceEmptyDocs) {
         plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
@@ -1198,16 +1193,10 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
                 cq->getExpCtx()->opCtx,
                 *cq,
                 collections,
-                plannerOpts | QueryPlannerParams::IGNORE_QUERY_SETTINGS,
+                plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY |
+                    QueryPlannerParams::IGNORE_QUERY_SETTINGS,
                 flipDistinctScanDirection,
             });
-
-        // If the results need to be merged, we need to generate sort key metadata.
-        if (sortPattern && cq->getExpCtx()->needsMerge) {
-            auto sortKeyMetadataDeps = sortPattern->metadataDeps();
-            sortKeyMetadataDeps.set(DocumentMetadataFields::kSortKey);
-            cq->requestAdditionalMetadata(sortKeyMetadataDeps);
-        }
 
         if (plannerParams->mainCollectionInfo.indexes.empty()) {
             // Can't generate a distinct scan plan without indexes.
@@ -1230,10 +1219,16 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
     //    means that for {a: [1, 2]} two distinct values would be returned, but for group keys
     //    arrays shouldn't be traversed.
     auto swQuerySolution =
-        tryGetQuerySolutionForDistinct(collections, plannerOpts, *cq, flipDistinctScanDirection);
+        tryGetQuerySolutionForDistinct(collections,
+                                       plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                                       *cq,
+                                       flipDistinctScanDirection);
     if (swQuerySolution.isOK()) {
-        auto swExecutorGrouped = getExecutorDistinct(
-            collections, plannerOpts, std::move(cq), std::move(swQuerySolution.getValue()));
+        auto swExecutorGrouped =
+            getExecutorDistinct(collections,
+                                plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                                std::move(cq),
+                                std::move(swQuerySolution.getValue()));
         if (!swExecutorGrouped.isOK()) {
             return swExecutorGrouped.getStatus().withContext(
                 "Failed to determine whether query system can provide a DISTINCT_SCAN grouping");
@@ -1308,8 +1303,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
                                                  aggRequest,
                                                  matcherFeatures,
                                                  shouldProduceEmptyDocs,
-                                                 timeseriesBoundedSortOptimization,
-                                                 plannerOpts);
+                                                 timeseriesBoundedSortOptimization);
 
     // This signifies that a non-recoverable error has happened and so we pass through the error.
     if (!swExecOrCq.isOK()) {
@@ -1348,7 +1342,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage = nullptr;
     if (cq->getDistinct()) {
         rewrittenGroupStage = cq->getDistinct()->releaseRewrittenGroupStage();
-        plannerOpts |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
+        plannerOpts = plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY;
     }
 
     // For performance, we pass a null callback instead of 'extractAndAttachPipelineStages' when
@@ -1370,19 +1364,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
                 "The pipeline of an executor that has a distinct scan needs to have a rewritten "
                 "group stage component.",
                 rewrittenGroupStage);
+        pipeline->popFrontWithName(rewrittenGroupStage->originalStageName());
 
-        if (!executor.getValue()->getCanonicalQuery()->metadataDeps().any()) {
-            // $groupByDistinctScan doesn't preserve metadata. Thus we can only apply the rewrite if
-            // no metadata is requested.
-            pipeline->popFrontWithName(rewrittenGroupStage->originalStageName());
-
-            auto groupTransform = make_intrusive<DocumentSourceSingleDocumentTransformation>(
-                expCtx,
-                std::move(rewrittenGroupStage),
-                "$groupByDistinctScan",
-                false /* independentOfAnyCollection */);
-            pipeline->addInitialSource(std::move(groupTransform));
-        }
+        auto groupTransform = make_intrusive<DocumentSourceSingleDocumentTransformation>(
+            expCtx,
+            std::move(rewrittenGroupStage),
+            "$groupByDistinctScan",
+            false /* independentOfAnyCollection */);
+        pipeline->addInitialSource(std::move(groupTransform));
     }
 
     // While constructing the executor, some stages might have been lowered from the 'pipeline' into

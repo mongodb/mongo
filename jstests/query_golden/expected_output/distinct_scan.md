@@ -229,6 +229,14 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
+						"stage" : "PROJECTION_SIMPLE",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
+					},
+					{
 						"stage" : "FETCH"
 					},
 					{

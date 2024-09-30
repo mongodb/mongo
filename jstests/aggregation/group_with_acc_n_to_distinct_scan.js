@@ -22,7 +22,7 @@ import {
     assertPlanUsesDistinctScan,
     assertPlanUsesIndexScan,
     prepareCollection,
-} from "jstests/libs/group_to_distinct_scan_utils.js";
+} from "jstests/aggregation/libs/group_to_distinct_scan_utils.js";
 
 prepareCollection();
 

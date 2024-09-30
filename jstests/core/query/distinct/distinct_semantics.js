@@ -200,17 +200,6 @@ const testCases = [
     },
 ];
 
-/**
- * Asserts that at least one of 'expected1' and 'expected2' is equal to 'actual'.
- */
-function assertEitherArrayEq({actual, expected1, expected2, extraErrorMsg}) {
-    try {
-        assertArrayEq({actual, expected: expected1, extraErrorMsg});
-    } catch (ex) {
-        assertArrayEq({actual, expected: expected2, extraErrorMsg});
-    }
-}
-
 const coll = db.distinct_semantics;
 (function runTests() {
     let result = {};
@@ -250,12 +239,8 @@ const coll = db.distinct_semantics;
                 coll.runCommand("distinct", {"key": testCase.field, "query": testCase.filter}),
                 `Attempted ${testDescription}`);
 
-            // Shard filtering might require fetching, so we may get the correct result even with
-            // the index.
-            // TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
-            assertEitherArrayEq({
-                expected1: testCase.resultWithIndex ? testCase.resultWithIndex : testCase.result,
-                expected2: testCase.result,
+            assertArrayEq({
+                expected: testCase.resultWithIndex ? testCase.resultWithIndex : testCase.result,
                 actual: result.values,
                 extraErrorMsg: `Unexpected result for ${testDescription}`
             });

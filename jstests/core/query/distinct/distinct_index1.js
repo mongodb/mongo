@@ -6,7 +6,6 @@
  * ]
  */
 import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.distinct_index1;
 coll.drop();
@@ -59,11 +58,7 @@ explain = getDistinctExplainWithExecutionStats("a", {a: {$gt: 5}});
 // Only 4 values of a are >= 5 and we use the fast distinct hack.
 assert.eq(4, explain.executionStats.nReturned);
 assert.eq(4, explain.executionStats.totalKeysExamined);
-// Shard filtering might require fetching even when the query could otherwise be covered.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
-if (!FixtureHelpers.isSharded(coll)) {
-    assert.eq(0, explain.executionStats.totalDocsExamined);
-}
+assert.eq(0, explain.executionStats.totalDocsExamined);
 
 explain = getDistinctExplainWithExecutionStats("b", {a: {$gt: 5}});
 // We can't use the fast distinct hack here because we're distinct-ing over 'b'.
@@ -76,11 +71,7 @@ assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 explain = getDistinctExplainWithExecutionStats("b", {a: {$gt: 5}, b: {$gt: 5}});
 assert.lte(explain.executionStats.nReturned, 171);
-// Shard filtering might require fetching even when the query could otherwise be covered.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
-if (!FixtureHelpers.isSharded(coll)) {
-    assert.eq(0, explain.executionStats.totalDocsExamined);
-}
+assert.eq(0, explain.executionStats.totalDocsExamined);
 
 // Should use an index scan over the hashed index.
 assert.commandWorked(coll.dropIndexes());

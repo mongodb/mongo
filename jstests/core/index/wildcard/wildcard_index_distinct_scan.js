@@ -8,7 +8,7 @@
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStages, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
@@ -90,12 +90,8 @@ function assertWildcardDistinctScan(
 
         // Confirm that the $** distinct scan produces the expected results.
         assertArrayEq(coll.distinct(distinctKey, query), expectedResults);
-        // Sharded suites use '_id' as the shard key, so fetching is required to apply shard
-        // filtering for distinct scan.
-        if (!FixtureHelpers.isSharded(coll)) {
-            // Confirm that the $** plan adheres to 'fetchIsExpected' and 'expectedScanType'.
-            assert.eq(planHasStage(coll.getDB(), winningPlan, "FETCH"), fetchIsExpected);
-        }
+        // Confirm that the $** plan adheres to 'fetchIsExpected' and 'expectedScanType'.
+        assert.eq(planHasStage(coll.getDB(), winningPlan, "FETCH"), fetchIsExpected);
         assert(planHasStage(coll.getDB(), winningPlan, expectedScanType));
         assert.docEq(expectedKeyPattern,
                      getPlanStages(winningPlan, expectedScanType).shift().keyPattern);

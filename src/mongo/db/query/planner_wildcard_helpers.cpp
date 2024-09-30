@@ -730,18 +730,14 @@ void finalizeWildcardIndexScanConfiguration(
     }
 }
 
-bool isWildcardObjectSubpathScan(const IndexEntry& index, const IndexBounds& bounds) {
+bool isWildcardObjectSubpathScan(const IndexScanNode* node) {
     // If the node is not a $** index scan, return false immediately.
-    if (index.type != IndexType::INDEX_WILDCARD) {
+    if (!node || node->index.type != IndexType::INDEX_WILDCARD) {
         return false;
     }
 
     // Check the bounds on the query field for any intersections with the object type bracket.
-    return boundsOverlapObjectTypeBracket(bounds.fields[index.wildcardFieldPos]);
-}
-
-bool isWildcardObjectSubpathScan(const IndexScanNode* node) {
-    return node && isWildcardObjectSubpathScan(node->index, node->bounds);
+    return boundsOverlapObjectTypeBracket(node->bounds.fields[node->index.wildcardFieldPos]);
 }
 
 BSONElement getWildcardField(const IndexEntry& index) {

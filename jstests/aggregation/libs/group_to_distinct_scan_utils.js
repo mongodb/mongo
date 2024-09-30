@@ -2,7 +2,7 @@
  * Common utility functions variables for $group to DISTINCT_SCAN optimization.
  */
 
-import {getAggPlanStages, getQueryPlanner} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getQueryPlanner} from "jstests/libs/analyze_plan.js";
 
 export let coll;
 
@@ -66,9 +66,8 @@ export function addIndex(pattern, option) {
 }
 
 // Prepare the 'coll' collection for testing, inserting documents and creating indexes.
-export function prepareCollection(database = null) {
-    database = database || db;
-    coll = database[jsTestName()];
+export function prepareCollection() {
+    coll = db[jsTestName()];
     assert(coll.drop());
 
     createIndexes();
@@ -100,30 +99,30 @@ export function assertResultsMatchWithAndWithoutHintandIndexes(pipeline,
 }
 
 export function assertPlanUsesDistinctScan(explain, keyPattern) {
-    assert.neq(0, getAggPlanStages(explain, "DISTINCT_SCAN").length, explain);
+    assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
 
     if (keyPattern) {
-        assert.eq(keyPattern, getAggPlanStages(explain, "DISTINCT_SCAN")[0].keyPattern, explain);
+        assert.eq(keyPattern, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern, explain);
     }
 
     // Pipelines that use the DISTINCT_SCAN optimization should not also have a blocking sort.
-    assert.eq(0, getAggPlanStages(explain, "SORT").length, explain);
+    assert.eq(null, getAggPlanStage(explain, "SORT"), explain);
 }
 
 export function assertPlanDoesNotUseDistinctScan(explain) {
-    assert.eq(0, getAggPlanStages(explain, "DISTINCT_SCAN").length, explain);
+    assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
 }
 
 export function assertPlanUsesIndexScan(explain, keyPattern) {
     assertPlanDoesNotUseDistinctScan(explain);
-    assert.neq(0, getAggPlanStages(explain, "IXSCAN").length, explain);
-    assert.eq(keyPattern, getAggPlanStages(explain, "IXSCAN")[0].keyPattern);
+    assert.neq(null, getAggPlanStage(explain, "IXSCAN"), explain);
+    assert.eq(keyPattern, getAggPlanStage(explain, "IXSCAN").keyPattern);
 }
 
 export function assertPlanUsesCollScan(explain) {
     assertPlanDoesNotUseDistinctScan(explain);
-    assert.eq(0, getAggPlanStages(explain, "IXSCAN").length, explain);
-    assert.neq(0, getAggPlanStages(explain, "COLLSCAN").length, explain);
+    assert.eq(null, getAggPlanStage(explain, "IXSCAN"), explain);
+    assert.neq(null, getAggPlanStage(explain, "COLLSCAN"), explain);
 }
 
 export function assertPipelineResultsAndExplain({
