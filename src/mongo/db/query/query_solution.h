@@ -1485,7 +1485,7 @@ struct DistinctNode : public QuerySolutionNodeWithSortSet {
     // This stage is created "on top" of normal planning and as such the properties
     // below don't really matter.
     bool fetched() const override {
-        return false;
+        return isFetching;
     }
     FieldAvailability getFieldAvailability(const std::string& field) const override {
         // The distinct scan can return collation keys, but we can still consider the field fully
@@ -1511,6 +1511,9 @@ struct DistinctNode : public QuerySolutionNodeWithSortSet {
     // We are distinct-ing over the 'fieldNo'-th field of 'index.keyPattern'.
     int fieldNo{0};
     int direction{1};
+
+    bool isShardFiltering = false;
+    bool isFetching = false;
 };
 
 /**

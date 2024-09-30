@@ -387,8 +387,20 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                     _opCtx, dn->index.identifier.catalogName);
                 tassert(8862201, "Index descriptor cannot be null", descriptor);
 
-                // We use the node's internal name, keyPattern and multikey details here. For
-                // $** indexes, these may differ from the information recorded in the index's
+                std::unique_ptr<ShardFiltererImpl> shardFilterer;
+                if (dn->isShardFiltering) {
+                    auto shardingFilter = _collection.getShardingFilter(_opCtx);
+                    tassert(
+                        9245806,
+                        "Attempting to use shard filter when there's no shard filter available for "
+                        "the collection",
+                        shardingFilter);
+
+                    shardFilterer = std::make_unique<ShardFiltererImpl>(std::move(*shardingFilter));
+                }
+
+                // We use the node's internal name, keyPattern and multikey details here. For $**
+                // indexes, these may differ from the information recorded in the index's
                 // descriptor.
                 DistinctParams params{descriptor,
                                       dn->index.identifier.catalogName,
@@ -399,7 +411,12 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.scanDirection = dn->direction;
                 params.bounds = dn->bounds;
                 params.fieldNo = dn->fieldNo;
-                return std::make_unique<DistinctScan>(expCtx, _collection, std::move(params), _ws);
+                return std::make_unique<DistinctScan>(expCtx,
+                                                      _collection,
+                                                      std::move(params),
+                                                      _ws,
+                                                      std::move(shardFilterer),
+                                                      dn->isFetching);
             }
             case STAGE_COUNT_SCAN: {
                 const CountScanNode* csn = static_cast<const CountScanNode*>(root);

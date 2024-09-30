@@ -477,7 +477,12 @@ std::unique_ptr<QuerySolutionNode> addSortKeyGeneratorStageIfNeeded(
     const CanonicalQuery& query, bool hasSortStage, std::unique_ptr<QuerySolutionNode> solnRoot) {
     if (!hasSortStage && query.metadataDeps()[DocumentMetadataFields::kSortKey]) {
         auto keyGenNode = std::make_unique<SortKeyGeneratorNode>();
-        keyGenNode->sortSpec = query.getFindCommandRequest().getSort();
+        // If the query has no sort spec, see if the DISTINCT_SCAN still requires a sort.
+        const auto& sortSpec = query.getFindCommandRequest().getSort();
+        keyGenNode->sortSpec =
+            sortSpec.isEmpty() && query.getDistinct() && query.getDistinct()->getSortRequirement()
+            ? query.getDistinct()->getSerializedSortRequirement()
+            : sortSpec;
         keyGenNode->children.push_back(std::move(solnRoot));
         return keyGenNode;
     }
@@ -1337,16 +1342,15 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     // solnRoot finds all our results.  Let's see what transformations we must perform to the
     // data.
 
+    const bool isDistinctScanMultiplanningEnabled =
+        query.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
+
     // If we're answering a query on a sharded system, we need to drop documents that aren't
-    // logically part of our shard. Inserting the sharding filter stage in a canonical query makes
-    // it ineligible to the DISTINCT_SCAN conversion.
+    // logically part of our shard.
     //
-    // In case of a distinct query for the fallback find we want to avoid inserting a sharding
-    // filter since it would block any potential transition to DISTINCT_SCAN.
-    //
-    // TODO SERVER-92458: Remove the restriction when the distinct conversion can accept a sharding
-    // filter.
-    if (!query.getDistinct() &&
+    // See if we need to fetch information for our shard key.
+    // NOTE: Solution nodes only list ordinary, non-transformed index keys for now
+    if ((isDistinctScanMultiplanningEnabled || !query.getDistinct()) &&
         (params.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER)) {
         if (!solnRoot->fetched()) {
             // See if we need to fetch information for our shard key.
@@ -1403,9 +1407,6 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
             LimitSkipParameterization{query.shouldParameterizeLimitSkip()});
         solnRoot = std::move(skip);
     }
-
-    const bool isDistinctScanMultiplanningEnabled =
-        query.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
 
     // Project the results.
     if (findCommand.getReturnKey()) {
