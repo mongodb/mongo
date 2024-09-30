@@ -80,6 +80,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
@@ -722,7 +723,8 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     // If the migration has succeeded, clear the BucketCatalog so that the buckets that got migrated
     // out are no longer updatable.
     if (nss().isTimeseriesBucketsCollection()) {
-        auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(_opCtx);
+        auto& bucketCatalog =
+            timeseries::bucket_catalog::GlobalBucketCatalog::get(_opCtx->getServiceContext());
         clear(bucketCatalog, _collectionUUID.get());
     }
 

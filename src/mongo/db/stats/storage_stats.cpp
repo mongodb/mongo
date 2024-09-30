@@ -62,6 +62,7 @@
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -127,7 +128,8 @@ void _appendRecordStats(OperationContext* opCtx,
         if (numRecords) {
             bob.append("avgBucketSize", collection->averageObjectSize(opCtx));
         }
-        auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+        auto& bucketCatalog =
+            timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
         timeseries::bucket_catalog::appendExecutionStats(bucketCatalog, collection->uuid(), bob);
     } else {
         result->appendNumber("count", numRecords);

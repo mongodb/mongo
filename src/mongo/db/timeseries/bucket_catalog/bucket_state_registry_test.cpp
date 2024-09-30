@@ -53,6 +53,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -66,7 +67,7 @@
 namespace mongo::timeseries::bucket_catalog {
 namespace {
 
-class BucketStateRegistryTest : public BucketCatalog, public CatalogTestFixture {
+class BucketStateRegistryTest : public GlobalBucketCatalog, public CatalogTestFixture {
 public:
     BucketStateRegistryTest() {}
 

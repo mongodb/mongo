@@ -45,6 +45,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction_resources.h"
@@ -161,7 +162,8 @@ repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
                                                     CollectionDropType dropType,
                                                     bool markFromMigrate) {
     if (collectionName.isTimeseriesBucketsCollection()) {
-        auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+        auto& bucketCatalog =
+            timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
         timeseries::bucket_catalog::clear(bucketCatalog, uuid);
     }
 
@@ -177,7 +179,8 @@ void TimeSeriesOpObserver::onReplicationRollback(OperationContext* opCtx,
         return;
     }
 
-    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+    auto& bucketCatalog =
+        timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     tracked_vector<UUID> clearedCollectionUUIDs = make_tracked_vector<UUID>(
         timeseries::bucket_catalog::getTrackingContext(
             bucketCatalog.trackingContexts,

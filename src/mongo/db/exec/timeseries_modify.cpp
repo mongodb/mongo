@@ -61,6 +61,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
@@ -147,7 +148,8 @@ TimeseriesModifyStage::~TimeseriesModifyStage() {
                 *_sideBucketCatalog);
         // Finishes tracking the newly inserted buckets in the main bucket catalog as direct
         // writes when the whole update operation is done.
-        auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx());
+        auto& bucketCatalog =
+            timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx()->getServiceContext());
         for (const auto bucketId : _insertedBucketIds) {
             timeseries::bucket_catalog::directWriteFinish(bucketCatalog.bucketStateRegistry,
                                                           bucketId);

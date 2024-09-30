@@ -55,6 +55,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -179,7 +180,7 @@ void BucketCatalogTest::setUp() {
     CatalogTestFixture::setUp();
 
     _opCtx = operationContext();
-    _bucketCatalog = &BucketCatalog::get(_opCtx);
+    _bucketCatalog = &GlobalBucketCatalog::get(_opCtx->getServiceContext());
 
     for (auto&& [ns, uuid] : std::initializer_list<std::pair<NamespaceString*, UUID*>>{
              {&_ns1, &_uuid1}, {&_ns2, &_uuid2}, {&_ns3, &_uuid3}}) {

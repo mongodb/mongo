@@ -81,6 +81,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_compression.h"
@@ -1339,7 +1340,8 @@ void commitTimeseriesBucketsAtomically(
         std::vector<write_ops::InsertCommandRequest> insertOps;
         std::vector<write_ops::UpdateCommandRequest> updateOps;
 
-        auto& mainBucketCatalog = bucket_catalog::BucketCatalog::get(opCtx);
+        auto& mainBucketCatalog =
+            bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(sideBucketCatalog, batch.get()->bucketId);
             auto prepareCommitStatus =

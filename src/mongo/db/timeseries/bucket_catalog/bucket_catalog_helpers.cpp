@@ -52,6 +52,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/redaction.h"
@@ -273,7 +274,7 @@ void handleDirectWrite(OperationContext* opCtx,
                        const StringDataComparator* comparator,
                        const UUID& collectionUUID,
                        const BSONObj& bucket) {
-    auto& bucketCatalog = BucketCatalog::get(opCtx);
+    auto& bucketCatalog = GlobalBucketCatalog::get(opCtx->getServiceContext());
     const BucketId bucketId =
         extractBucketId(bucketCatalog, options, comparator, collectionUUID, bucket);
 
@@ -286,12 +287,12 @@ void handleDirectWrite(OperationContext* opCtx,
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [svcCtx = opCtx->getServiceContext(), bucketId](OperationContext*,
                                                         boost::optional<Timestamp>) {
-            auto& bucketCatalog = BucketCatalog::get(svcCtx);
+            auto& bucketCatalog = GlobalBucketCatalog::get(svcCtx);
             directWriteFinish(bucketCatalog.bucketStateRegistry, bucketId);
         });
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [svcCtx = opCtx->getServiceContext(), bucketId](OperationContext*) {
-            auto& bucketCatalog = BucketCatalog::get(svcCtx);
+            auto& bucketCatalog = GlobalBucketCatalog::get(svcCtx);
             directWriteFinish(bucketCatalog.bucketStateRegistry, bucketId);
         });
 }

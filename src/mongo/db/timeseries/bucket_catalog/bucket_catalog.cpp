@@ -66,14 +66,11 @@
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
-const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationAfterStart);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeFinish);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningBucket);
 MONGO_FAIL_POINT_DEFINE(runPostCommitDebugChecks);
-
-constexpr std::size_t kDefaultNumberOfStripes = 32;
 
 /**
  * Prepares the batch for commit. Sets min/max appropriately, records the number of
@@ -162,10 +159,6 @@ void updateBucketFetchAndQueryStats(const ReopeningContext& context,
 SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b, ClosedBuckets&& c)
     : batch{std::move(b)}, closedBuckets{std::move(c)} {}
 
-BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
-    return getBucketCatalog(svcCtx);
-}
-
 Stripe::Stripe(TrackingContexts& trackingContexts)
     : openBucketsById(
           make_tracked_unordered_map<BucketId, unique_tracked_ptr<Bucket>, BucketHasher>(
@@ -186,10 +179,6 @@ Stripe::Stripe(TrackingContexts& trackingContexts)
               BucketHasher>(
               getTrackingContext(trackingContexts, TrackingScope::kReopeningRequests))) {}
 
-BucketCatalog::BucketCatalog()
-    : BucketCatalog(kDefaultNumberOfStripes,
-                    getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes) {}
-
 BucketCatalog::BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> memoryUsageThreshold)
     : bucketStateRegistry(
           getTrackingContext(trackingContexts, TrackingScope::kBucketStateRegistry)),
@@ -204,10 +193,6 @@ BucketCatalog::BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> m
         return make_unique_tracked<Stripe>(
             getTrackingContext(trackingContexts, TrackingScope::kMiscellaneous), trackingContexts);
     });
-}
-
-BucketCatalog& BucketCatalog::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
 }
 
 BSONObj getMetadata(BucketCatalog& catalog, const BucketId& bucketId) {

@@ -133,6 +133,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
@@ -1748,7 +1749,8 @@ WriteResult performUpdates(OperationContext* opCtx,
                 // Special case for failed attempt to compress a reopened bucket.
                 throw;
             } else if (source == OperationSource::kTimeseriesUpdate) {
-                auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+                auto& bucketCatalog = timeseries::bucket_catalog::GlobalBucketCatalog::get(
+                    opCtx->getServiceContext());
                 timeseries::bucket_catalog::freeze(
                     bucketCatalog,
                     timeseries::bucket_catalog::BucketId{
@@ -2585,7 +2587,8 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                             std::vector<size_t>* docsToRetry,
                             absl::flat_hash_map<int, int>& retryAttemptsForDup,
                             const write_ops::InsertCommandRequest& request) try {
-    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+    auto& bucketCatalog =
+        timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
 
     auto metadata = getMetadata(bucketCatalog, batch->bucketId);
     auto status = prepareCommit(bucketCatalog, request.getNamespace(), batch);
@@ -2664,7 +2667,8 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     }
     return true;
 } catch (const DBException& ex) {
-    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+    auto& bucketCatalog =
+        timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     abort(bucketCatalog, batch, ex.toStatus());
     throw;
 }
@@ -2680,7 +2684,8 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                                        TimeseriesStmtIds&& stmtIds,
                                        boost::optional<repl::OpTime>* opTime,
                                        boost::optional<OID>* electionId) {
-    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+    auto& bucketCatalog =
+        timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
 
     auto batchesToCommit = timeseries::determineBatchesToCommit(batches, extractFromPair);
     if (batchesToCommit.empty()) {
@@ -2836,7 +2841,8 @@ void getTimeseriesBatchResultsBase(OperationContext* opCtx,
         // error.
         if (itr > indexOfLastProcessedBatch &&
             timeseries::bucket_catalog::claimWriteBatchCommitRights(*batch)) {
-            auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+            auto& bucketCatalog =
+                timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
             abort(bucketCatalog, batch, lastError->getStatus());
             errors->emplace_back(start + index, lastError->getStatus());
             continue;
@@ -2943,7 +2949,8 @@ insertIntoBucketCatalog(OperationContext* opCtx,
                         bool* containsRetry) {
     hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection.pauseWhileSet();
 
-    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+    auto& bucketCatalog =
+        timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     auto bucketsNs = makeTimeseriesBucketsNamespace(ns(request));
 
     // Explicitly hold a refrence to the CollectionCatalog, such that the corresponding
@@ -3158,7 +3165,8 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     auto reportMeasurementsGuard =
         ScopeGuard([&collectionUUID, &handledElsewhere, &request, opCtx]() {
             if (handledElsewhere > 0) {
-                auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+                auto& bucketCatalog = timeseries::bucket_catalog::GlobalBucketCatalog::get(
+                    opCtx->getServiceContext());
                 timeseries::bucket_catalog::reportMeasurementsGroupCommitted(
                     bucketCatalog, collectionUUID, handledElsewhere);
             }
@@ -3189,7 +3197,8 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
                     ex.extraInfo<timeseries::BucketCompressionFailure>()->keySignature();
 
                 timeseries::bucket_catalog::freeze(
-                    timeseries::bucket_catalog::BucketCatalog::get(opCtx),
+                    timeseries::bucket_catalog::GlobalBucketCatalog::get(
+                        opCtx->getServiceContext()),
                     timeseries::bucket_catalog::BucketId{collectionUUID, bucketId, keySignature});
 
                 LOGV2_WARNING(

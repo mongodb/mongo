@@ -190,10 +190,6 @@ struct Stripe {
  */
 class BucketCatalog {
 public:
-    static BucketCatalog& get(ServiceContext* svcCtx);
-    static BucketCatalog& get(OperationContext* opCtx);
-
-    BucketCatalog();
     BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> memoryUsageThreshold);
     BucketCatalog(const BucketCatalog&) = delete;
     BucketCatalog operator=(const BucketCatalog&) = delete;

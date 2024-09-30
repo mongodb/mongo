@@ -38,6 +38,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -79,7 +80,7 @@ public:
     }
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
-        const auto& bucketCatalog = BucketCatalog::get(opCtx);
+        const auto& bucketCatalog = GlobalBucketCatalog::get(opCtx->getServiceContext());
         {
             stdx::lock_guard catalogLock{bucketCatalog.mutex};
             if (bucketCatalog.executionStats.empty()) {
