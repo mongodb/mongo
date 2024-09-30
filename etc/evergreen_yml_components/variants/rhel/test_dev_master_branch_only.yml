@@ -741,6 +741,7 @@ buildvariants:
       - name: implicit_query_settings_fallback
         distros:
           - rhel8.8-medium
+      - name: query_shape_hash_stability
 
   - name: enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
     <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template

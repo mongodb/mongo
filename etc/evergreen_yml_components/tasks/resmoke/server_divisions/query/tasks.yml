@@ -902,6 +902,13 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
+    name: query_shape_hash_stability
+    tags: ["assigned_to_jira_team_server_query_execution", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
     name: index_filters_to_query_settings
     # Not every build variant speaks 'sbe_only' and this suite requires SBE
     # which can be enforced by 'requires_all_feature_flags'

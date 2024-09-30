@@ -316,3 +316,4 @@ buildvariants:
       - name: cursor_hints_to_query_settings_sharded_collections_passthrough_gen
       - name: cursor_hints_to_query_settings_unsharded_collections_passthrough_gen
       - name: implicit_query_settings_fallback
+      - name: query_shape_hash_stability

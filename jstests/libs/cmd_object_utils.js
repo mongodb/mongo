@@ -28,7 +28,10 @@ export function getInnerCommand(cmdObj) {
  */
 export function getExplainCommand(cmdObj) {
     const isAggregateCmd = getCommandName(cmdObj) === "aggregate";
-    return isAggregateCmd ? {explain: {...cmdObj, cursor: {}}} : {explain: cmdObj};
+    // Extract the 'writeConcern' from the command, as it can not be passed to explain.
+    const {writeConcern, ...cmdWithoutWriteConcern} = cmdObj;
+    return isAggregateCmd ? {explain: {...cmdWithoutWriteConcern, cursor: {}}}
+                          : {explain: cmdWithoutWriteConcern};
 }
 
 /**

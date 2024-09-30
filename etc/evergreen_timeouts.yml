@@ -47,6 +47,8 @@ overrides:
       exec_timeout: 240 # 4 hours
     - task: cursor_hints_to_query_settings_unsharded_collections_passthrough
       exec_timeout: 240 # 4 hours
+    - task: query_shape_hash_stability
+      exec_timeout: 240 # 4 hours
 
   enterprise-amazon2-streams:
     - task: aggregation_blockprocessing_fuzzer
