@@ -1039,10 +1039,17 @@ class NinjaState:
 
         ninja_sorted_build(
             ninja,
-            outputs=["set_to_always_run_bazel", "bazel_run_first"]
-            + self.env["NINJA_BAZEL_OUTPUTS"],
+            outputs=["set_to_always_run_bazel", "bazel_run_first"],
             inputs=[],
             rule="RUN_BAZEL_BUILD",
+        )
+
+        ninja_sorted_build(
+            ninja,
+            outputs=self.env["NINJA_BAZEL_OUTPUTS"],
+            inputs=[],
+            implicit=["set_to_always_run_bazel", "bazel_run_first"],
+            rule="phony",
         )
 
         # This sets up a dependency edge between build.ninja.in and build.ninja
