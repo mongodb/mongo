@@ -49,6 +49,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
@@ -117,7 +118,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     size_t plannerOptions,
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    boost::optional<size_t> cachedPlanHash = boost::none);
+    boost::optional<size_t> cachedPlanHash,
+    QueryPlanner::CostBasedRankerResult cbrResult,
+    stage_builder::PlanStageToQsnMap planStageQsnMap,
+    std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages);
 
 /**
  * Constructs a PlanExecutor for the query 'cq' which will execute the SBE plan 'root'. A yield

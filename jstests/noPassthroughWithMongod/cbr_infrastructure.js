@@ -8,6 +8,14 @@ import {
     getWinningPlanFromExplain
 } from "jstests/libs/analyze_plan.js";
 
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+
+// TODO SERVER-92589: Remove this exemption
+if (checkSbeFullyEnabled(db)) {
+    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    quit();
+}
+
 const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
@@ -49,6 +57,16 @@ const q5 = {
     ],
 };
 
+function assertCbrExplain(plan) {
+    assert(plan.hasOwnProperty("cardinalityEstimate"));
+    assert.gt(plan.cardinalityEstimate, 0);
+    assert(plan.hasOwnProperty("costEstimate"));
+    assert.gt(plan.costEstimate, 0);
+    if (plan.hasOwnProperty("inputStage")) {
+        assertCbrExplain(plan.inputStage);
+    }
+}
+
 function checkLastRejectedPlan(query) {
     assert(!(Object.keys(query).length == 1 && Object.keys(query)[0] === "$or"),
            "encountered rooted $or query");
@@ -64,11 +82,16 @@ function checkLastRejectedPlan(query) {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}));
     const e1 = coll.find(query).explain();
     const w1 = getWinningPlanFromExplain(e1);
+    assertCbrExplain(w1);
+    const r1 = getRejectedPlans(e1);
+    assert.gte(r1.length, 1);
 
     const lastMPRejectedPlan = r0[r0.length - 1];
     canonicalizePlan(lastMPRejectedPlan);
     canonicalizePlan(w1);
     assert.eq(lastMPRejectedPlan, w1);
+
+    r1.map((e) => assertCbrExplain(e));
 }
 
 function checkRootedOr(query) {

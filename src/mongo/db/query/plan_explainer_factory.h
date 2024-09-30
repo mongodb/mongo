@@ -37,14 +37,23 @@
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/util/duration.h"
 
 namespace mongo::plan_explainer_factory {
+
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     boost::optional<size_t> cachedPlanHash = boost::none);
+
+std::unique_ptr<PlanExplainer> make(PlanStage* root,
+                                    boost::optional<size_t> cachedPlanHash,
+                                    QueryPlanner::CostBasedRankerResult cbrResult,
+                                    stage_builder::PlanStageToQsnMap planStageQsnMap,
+                                    std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages);
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     const PlanEnumeratorExplainInfo& enumeratorInfo);

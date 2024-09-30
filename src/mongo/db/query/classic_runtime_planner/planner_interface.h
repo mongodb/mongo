@@ -46,6 +46,7 @@
 #include "mongo/db/query/planner_interface.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
 
@@ -58,6 +59,9 @@ namespace mongo::classic_runtime_planner {
 class ClassicPlannerInterface : public PlannerInterface {
 public:
     ClassicPlannerInterface(PlannerData plannerData);
+
+    ClassicPlannerInterface(PlannerData plannerData,
+                            QueryPlanner::CostBasedRankerResult costBasedRankerData);
 
     /**
      * Function which adds the necessary stages for the generated PlanExecutor to perform deletes.
@@ -104,6 +108,10 @@ protected:
     boost::optional<size_t> cachedPlanHash() const;
     WorkingSet* ws() const;
 
+    QueryPlanner::CostBasedRankerResult _costBasedRankerResult;
+    stage_builder::PlanStageToQsnMap _planStageQsnMap;
+    std::vector<std::unique_ptr<PlanStage>> _cbrRejectedPlanStages;
+
 private:
     virtual Status doPlan(PlanYieldPolicy* planYieldPolicy) = 0;
 
@@ -137,7 +145,8 @@ private:
 class SingleSolutionPassthroughPlanner final : public ClassicPlannerInterface {
 public:
     SingleSolutionPassthroughPlanner(PlannerData plannerData,
-                                     std::unique_ptr<QuerySolution> querySolution);
+                                     std::unique_ptr<QuerySolution> querySolution,
+                                     QueryPlanner::CostBasedRankerResult cbrResult);
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
@@ -171,7 +180,9 @@ private:
  */
 class MultiPlanner final : public ClassicPlannerInterface {
 public:
-    MultiPlanner(PlannerData plannerData, std::vector<std::unique_ptr<QuerySolution>> solutions);
+    MultiPlanner(PlannerData plannerData,
+                 std::vector<std::unique_ptr<QuerySolution>> solutions,
+                 QueryPlanner::CostBasedRankerResult cbrResult);
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;

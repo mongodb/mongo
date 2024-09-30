@@ -1226,6 +1226,8 @@ export function checkNWouldDelete(explain, nWouldDelete) {
 export function canonicalizePlan(p) {
     delete p.planNodeId;
     delete p.isCached;
+    delete p.cardinalityEstimate;
+    delete p.costEstimate;
     if (p.hasOwnProperty("inputStage")) {
         canonicalizePlan(p.inputStage);
     } else if (p.hasOwnProperty("inputStages")) {

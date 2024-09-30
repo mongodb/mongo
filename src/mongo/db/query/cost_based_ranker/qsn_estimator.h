@@ -27,26 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/classic_runtime_planner/planner_interface.h"
+#pragma once
 
-namespace mongo::classic_runtime_planner {
+#include "mongo/db/query/cost_based_ranker/estimates.h"
+#include "mongo/db/query/query_solution.h"
 
-SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
-    PlannerData plannerData,
-    std::unique_ptr<QuerySolution> querySolution,
-    QueryPlanner::CostBasedRankerResult cbrResult)
-    : ClassicPlannerInterface(std::move(plannerData), std::move(cbrResult)),
-      _querySolution(std::move(querySolution)) {
-    auto root = buildExecutableTree(*_querySolution);
-    setRoot(std::move(root));
-}
+namespace mongo::cost_based_ranker {
 
-Status SingleSolutionPassthroughPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
-    // Nothing to do.
-    return Status::OK();
-}
+/**
+ * The optimizer's estimate of a single node in the physical plan.
+ */
+struct Estimate {
+    Estimate();
 
-std::unique_ptr<QuerySolution> SingleSolutionPassthroughPlanner::extractQuerySolution() {
-    return std::move(_querySolution);
-}
-}  // namespace mongo::classic_runtime_planner
+    CardinalityEstimate cardinalty;
+    CostEstimate cost;
+};
+
+/**
+ * EstimateMap is a type representing a mapping from QuerySolutionNodes to cost estimates.
+ */
+using EstimateMap = absl::flat_hash_map<const QuerySolutionNode*, Estimate>;
+
+/**
+ * Estimate the costs of the given QuerySolution tree. For every QuerySolutionNode in the tree,
+ * insert an entry into the EstimateMap out-param.
+ */
+void estimatePlanCost(const QuerySolution& plan, EstimateMap* res);
+
+}  // namespace mongo::cost_based_ranker

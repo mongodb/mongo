@@ -1,0 +1,41 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "qsn_estimator",
+    srcs = [
+        "qsn_estimator.cpp",
+    ],
+    hdrs = [
+        "qsn_estimator.h",
+        "//src/mongo/db/query:query_solution.h",
+    ],
+    deps = [
+        "estimates",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/exec:scoped_timer",
+    ],
+)
+
+mongo_cc_library(
+    name = "estimates",
+    srcs = [
+        "estimates.cpp",
+    ],
+    hdrs = [
+        "estimates.h",
+        "//src/mongo/db/query/util:named_enum.h",
+        "//src/mongo/util:fixed_string.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

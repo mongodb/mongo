@@ -80,6 +80,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/cost_based_ranker/qsn_estimator.h"
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/find_command.h"
@@ -1632,12 +1633,24 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
     }
     // This is a temporary stub implementation of CBR which arbitrarily picks the last of the
     // enumerated plans.
-    std::vector<std::unique_ptr<QuerySolution>> soln;
-    soln.push_back(std::move(statusWithMultiPlanSolns.getValue().back()));
-    return QueryPlanner::CostBasedRankerResult{
-        .solutions = std::move(soln),
-        .rejectedPlans = {},
-    };
+
+    cost_based_ranker::EstimateMap estimates;
+    for (auto&& soln : statusWithMultiPlanSolns.getValue()) {
+        cost_based_ranker::estimatePlanCost(*soln, &estimates);
+    }
+
+    std::vector<std::unique_ptr<QuerySolution>> acceptedSoln;
+    std::vector<std::unique_ptr<QuerySolution>> rejectedSoln;
+
+    for (auto it = statusWithMultiPlanSolns.getValue().begin();
+         it != std::prev(statusWithMultiPlanSolns.getValue().end());
+         ++it) {
+        rejectedSoln.push_back(std::move(*it));
+    }
+    acceptedSoln.push_back(std::move(statusWithMultiPlanSolns.getValue().back()));
+    return QueryPlanner::CostBasedRankerResult{.solutions = std::move(acceptedSoln),
+                                               .rejectedPlans = std::move(rejectedSoln),
+                                               .estimates = std::move(estimates)};
 }
 
 /**

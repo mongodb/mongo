@@ -63,6 +63,7 @@
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -201,7 +202,9 @@ size_t getDocsExamined(StageType type, const SpecificStats* specific) {
  *
  * Generates the BSON stats at a verbosity specified by 'verbosity'.
  */
-void statsToBSON(const PlanStageStats& stats,
+void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
+                 const cost_based_ranker::EstimateMap& estimates,
+                 const PlanStageStats& stats,
                  ExplainOptions::Verbosity verbosity,
                  const boost::optional<size_t> planIdx,
                  BSONObjBuilder* bob,
@@ -209,6 +212,7 @@ void statsToBSON(const PlanStageStats& stats,
                  boost::optional<bool> isCached = boost::none) {
     invariant(bob);
     invariant(topLevelBob);
+    tassert(9258801, "encountered unexpected nullptr for planStage", stats.common.planStage);
 
     // Stop as soon as the BSON object we're building exceeds the limit.
     if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
@@ -219,7 +223,14 @@ void statsToBSON(const PlanStageStats& stats,
     if (STAGE_MULTI_PLAN == stats.stageType) {
         tassert(3420003, "Invalid child plan index", planIdx && planIdx < stats.children.size());
         const PlanStageStats* childStage = stats.children[*planIdx].get();
-        statsToBSON(*childStage, verbosity, planIdx, bob, topLevelBob, isCached);
+        statsToBSON(planStageQsnMap,
+                    estimates,
+                    *childStage,
+                    verbosity,
+                    planIdx,
+                    bob,
+                    topLevelBob,
+                    isCached);
         return;
     }
 
@@ -229,6 +240,20 @@ void statsToBSON(const PlanStageStats& stats,
 
     // Stage name.
     bob->append("stage", stats.common.stageTypeStr);
+
+    const QuerySolutionNode* querySolutionNode = nullptr;
+
+    // The subplanner currently does not populate plan stages, so entries maybe missing.
+    if (planStageQsnMap.contains(stats.common.planStage)) {
+        querySolutionNode = planStageQsnMap.at(stats.common.planStage);
+    }
+
+    // Cost and cardinality of the stage.
+    if (querySolutionNode && estimates.contains(querySolutionNode)) {
+        const auto& est = estimates.at(querySolutionNode);
+        bob->append("cardinalityEstimate", est.cardinalty.toDouble());
+        bob->append("costEstimate", est.cost.toDouble());
+    }
 
     // Display the BSON representation of the filter, if there is one.
     if (!stats.common.filter.isEmpty()) {
@@ -585,7 +610,13 @@ void statsToBSON(const PlanStageStats& stats,
     // rather than 'inputStages'.
     if (1 == stats.children.size()) {
         BSONObjBuilder childBob(bob->subobjStart("inputStage"));
-        statsToBSON(*stats.children[0], verbosity, planIdx, &childBob, topLevelBob);
+        statsToBSON(planStageQsnMap,
+                    estimates,
+                    *stats.children[0],
+                    verbosity,
+                    planIdx,
+                    &childBob,
+                    topLevelBob);
         return;
     }
 
@@ -595,7 +626,13 @@ void statsToBSON(const PlanStageStats& stats,
     BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"));
     for (size_t i = 0; i < stats.children.size(); ++i) {
         BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSON(*stats.children[i], verbosity, planIdx, &childBob, topLevelBob);
+        statsToBSON(planStageQsnMap,
+                    estimates,
+                    *stats.children[i],
+                    verbosity,
+                    planIdx,
+                    &childBob,
+                    topLevelBob);
     }
     childrenBob.doneFast();
 }
@@ -864,7 +901,14 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
 
     bool isCached = _cachedPlanHash && _solution && (*_cachedPlanHash == _solution->hash());
     BSONObjBuilder bob;
-    statsToBSON(*stats, verbosity, winningPlanIdx, &bob, &bob, isCached);
+    statsToBSON(_planStageQsnMap,
+                _cbrResult.estimates,
+                *stats,
+                verbosity,
+                winningPlanIdx,
+                &bob,
+                &bob,
+                isCached);
     return {bob.obj(), std::move(summary)};
 }
 
@@ -876,35 +920,54 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
     ExplainOptions::Verbosity verbosity) const {
     std::vector<PlanStatsDetails> res;
     auto mps = getMultiPlanStage(_root);
-    if (nullptr == mps) {
-        return res;
-    }
-    auto bestPlanIdx = mps->bestPlanIdx();
+    // Plan index
+    size_t i = 0;
+    if (mps) {
+        auto bestPlanIdx = mps->bestPlanIdx();
 
-    tassert(3420009, "Trying to get stats of a MultiPlanStage without winning plan", bestPlanIdx);
+        tassert(
+            3420009, "Trying to get stats of a MultiPlanStage without winning plan", bestPlanIdx);
 
-    const auto mpsStats = mps->getStats();
-    // Get the stats from the trial period for all the plans.
-    for (size_t i = 0; i < mpsStats->children.size(); ++i) {
-        if (i != *bestPlanIdx) {
-            const auto& candidate = mps->getCandidate(i);
-            bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidate.solution->hash());
+        const auto mpsStats = mps->getStats();
+        // Get the stats from the trial period for all the plans.
+        for (; i < mpsStats->children.size(); ++i) {
+            if (i != *bestPlanIdx) {
+                const auto& candidate = mps->getCandidate(i);
+                bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidate.solution->hash());
 
-            BSONObjBuilder bob;
-            auto stats = _root->getStats();
-            statsToBSON(*stats, verbosity, i, &bob, &bob, isCached);
-            auto summary = [&]() -> boost::optional<PlanSummaryStats> {
-                if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                    auto summary = collectExecutionStatsSummary(stats.get(), i);
-                    if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
-                        summary.score = mps->getCandidateScore(i);
+                BSONObjBuilder bob;
+                auto stats = _root->getStats();
+                statsToBSON(_planStageQsnMap,
+                            _cbrResult.estimates,
+                            *stats,
+                            verbosity,
+                            i,
+                            &bob,
+                            &bob,
+                            isCached);
+                auto summary = [&]() -> boost::optional<PlanSummaryStats> {
+                    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+                        auto summary = collectExecutionStatsSummary(stats.get(), i);
+                        if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+                            summary.score = mps->getCandidateScore(i);
+                        }
+                        return summary;
                     }
-                    return summary;
-                }
-                return {};
-            }();
-            res.push_back({bob.obj(), summary});
+                    return {};
+                }();
+                res.push_back({bob.obj(), summary});
+            }
         }
+    }
+
+    // For each rejected plan via CBR, explain it, and look up the corresponding cost and CE.
+    for (auto&& rejectedPlan : _cbrRejectedPlanStages) {
+        BSONObjBuilder bob;
+        auto stats = rejectedPlan->getStats();
+        statsToBSON(
+            _planStageQsnMap, _cbrResult.estimates, *stats, verbosity, i, &bob, &bob, false);
+        ++i;
+        res.push_back({bob.obj(), boost::none /*summary*/});
     }
 
     return res;
@@ -935,7 +998,7 @@ std::vector<PlanExplainer::PlanStatsDetails> getCachedPlanStats(
 
     for (auto&& stats : decision.stats.candidatePlanStats) {
         BSONObjBuilder bob;
-        statsToBSON(*stats, verbosity, winningPlanIdx, &bob, &bob);
+        statsToBSON({}, {}, *stats, verbosity, winningPlanIdx, &bob, &bob);
         res.push_back({bob.obj(),
                        {verbosity >= ExplainOptions::Verbosity::kExecStats,
                         collectExecutionStatsSummary(stats.get(), winningPlanIdx)}});

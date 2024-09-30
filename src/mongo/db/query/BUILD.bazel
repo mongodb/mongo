@@ -432,6 +432,7 @@ mongo_cc_library(
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/index:expression_params",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/query/cost_based_ranker:qsn_estimator",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
     ],
 )

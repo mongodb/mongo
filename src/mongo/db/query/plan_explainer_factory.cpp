@@ -38,8 +38,25 @@
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo::plan_explainer_factory {
+
 std::unique_ptr<PlanExplainer> make(PlanStage* root, boost::optional<size_t> cachedPlanHash) {
-    return std::make_unique<PlanExplainerImpl>(root, cachedPlanHash);
+    return make(root,
+                cachedPlanHash,
+                QueryPlanner::CostBasedRankerResult{},
+                stage_builder::PlanStageToQsnMap{},
+                {} /* cbrRejectedPlanStages */);
+}
+
+std::unique_ptr<PlanExplainer> make(PlanStage* root,
+                                    boost::optional<size_t> cachedPlanHash,
+                                    QueryPlanner::CostBasedRankerResult cbrResult,
+                                    stage_builder::PlanStageToQsnMap planStageQsnMap,
+                                    std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages) {
+    return std::make_unique<PlanExplainerImpl>(root,
+                                               cachedPlanHash,
+                                               std::move(cbrResult),
+                                               std::move(planStageQsnMap),
+                                               std::move(cbrRejectedPlanStages));
 }
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root, const PlanEnumeratorExplainInfo& explainInfo) {

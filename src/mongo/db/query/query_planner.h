@@ -43,6 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/cost_based_ranker/qsn_estimator.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
@@ -114,10 +115,17 @@ public:
         // passed along to the multi-planner to pick the best one using runtime planning.
         std::vector<std::unique_ptr<QuerySolution>> solutions;
 
+        // For explain purposes.
+
         // Query solutions which the cost-based ranker rejects from consideration because their cost
         // estimate is higher than another plan. Useful for the implementation of explain to expose
         // why certain plans were not chosen.
         std::vector<std::unique_ptr<QuerySolution>> rejectedPlans;
+
+        // Estimate information for all QuerySolutionNodes in all the plans which we were able to
+        // cost. This may include some plans in 'solutions' and all of the plans in 'rejectedPlans'.
+        // If two plans contain identical QSNs, they are treated as separate entries in this map.
+        cost_based_ranker::EstimateMap estimates;
     };
 
     /**

@@ -42,13 +42,24 @@
 namespace mongo::classic_runtime_planner {
 
 ClassicPlannerInterface::ClassicPlannerInterface(PlannerData plannerData)
-    : _plannerData(std::move(plannerData)) {
+    : ClassicPlannerInterface(std::move(plannerData), QueryPlanner::CostBasedRankerResult{}) {}
+
+ClassicPlannerInterface::ClassicPlannerInterface(
+    PlannerData plannerData, QueryPlanner::CostBasedRankerResult costBasedRankerResult)
+    : _costBasedRankerResult(std::move(costBasedRankerResult)),
+      _plannerData(std::move(plannerData)) {
     if (collections().hasMainCollection()) {
         _nss = collections().getMainCollection()->ns();
     } else {
         invariant(cq());
         const auto nssOrUuid = cq()->getFindCommandRequest().getNamespaceOrUUID();
         _nss = nssOrUuid.isNamespaceString() ? nssOrUuid.nss() : NamespaceString::kEmpty;
+    }
+    if (cq()->getExpCtx()->explain.has_value()) {
+        // Translate CBR rejected plans into PlanStages so they can be explained
+        for (auto&& solution : _costBasedRankerResult.rejectedPlans) {
+            _cbrRejectedPlanStages.push_back(buildExecutableTree(*solution));
+        }
     }
 }
 
@@ -236,12 +247,20 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::ma
                                     plannerOptions(),
                                     std::move(_nss),
                                     yieldPolicy(),
-                                    cachedPlanHash()));
+                                    cachedPlanHash(),
+                                    std::move(_costBasedRankerResult),
+                                    std::move(_planStageQsnMap),
+                                    std::move(_cbrRejectedPlanStages)));
 }
 
 std::unique_ptr<PlanStage> ClassicPlannerInterface::buildExecutableTree(const QuerySolution& qs) {
     return stage_builder::buildClassicExecutableTree(
-        opCtx(), collections().getMainCollectionPtrOrAcquisition(), *cq(), qs, ws());
+        opCtx(),
+        collections().getMainCollectionPtrOrAcquisition(),
+        *cq(),
+        qs,
+        ws(),
+        &_planStageQsnMap);
 }
 
 void ClassicPlannerInterface::setRoot(std::unique_ptr<PlanStage> root) {

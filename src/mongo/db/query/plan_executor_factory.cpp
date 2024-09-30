@@ -76,7 +76,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 plannerOptions,
                 nss,
                 yieldPolicy,
-                cachedPlanHash);
+                cachedPlanHash,
+                QueryPlanner::CostBasedRankerResult{},
+                {} /* planStageQsnMap */,
+                {} /* cbrRejectedPlanStages */);
 }
 
 
@@ -99,7 +102,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 collection,
                 plannerOptions,
                 nss,
-                yieldPolicy);
+                yieldPolicy,
+                boost::none /* cachedPlanHash */,
+                QueryPlanner::CostBasedRankerResult{},
+                {} /* planStageQsnMap */,
+                {} /* cbrRejectedPlanStages */);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
@@ -113,7 +120,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     size_t plannerOptions,
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    boost::optional<size_t> cachedPlanHash) {
+    boost::optional<size_t> cachedPlanHash,
+    QueryPlanner::CostBasedRankerResult cbrResult,
+    stage_builder::PlanStageToQsnMap planStageQsnMap,
+    std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages) {
     visit(OverloadedVisitor{[](const CollectionPtr* ptr) { dassert(ptr); },
                             [](const CollectionAcquisition& acq) {
                             }},
@@ -130,7 +140,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                              plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                              std::move(nss),
                                              yieldPolicy,
-                                             cachedPlanHash);
+                                             cachedPlanHash,
+                                             std::move(cbrResult),
+                                             std::move(planStageQsnMap),
+                                             std::move(cbrRejectedPlanStages));
         PlanExecutor::Deleter planDeleter(opCtx);
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(execImpl, std::move(planDeleter));
         return {std::move(exec)};

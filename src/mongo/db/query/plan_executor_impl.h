@@ -54,6 +54,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/query/write_ops/update_result.h"
@@ -149,7 +150,10 @@ public:
                      bool returnOwnedBson,
                      NamespaceString nss,
                      PlanYieldPolicy::YieldPolicy yieldPolicy,
-                     boost::optional<size_t> cachedPlanHash = boost::none);
+                     boost::optional<size_t> cachedPlanHash,
+                     QueryPlanner::CostBasedRankerResult cbrResult,
+                     stage_builder::PlanStageToQsnMap planStageQsnMap,
+                     std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages);
 
     ~PlanExecutorImpl() override;
     CanonicalQuery* getCanonicalQuery() const final;
