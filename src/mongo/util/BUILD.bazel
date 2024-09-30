@@ -622,3 +622,39 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "signal_handlers",
+    srcs = [
+        "signal_handlers.cpp",
+    ] + select({
+        "@platforms//os:windows": [
+            "signal_win32.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "signal_handlers.h",
+        "signal_win32.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:log_process_details",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "ntservice",
+    srcs = [
+        "ntservice.cpp",
+    ],
+    hdrs = [
+        "ntservice.h",
+    ],
+    deps = [
+        ":signal_handlers",
+        "//src/mongo/util/options_parser",
+    ],
+)

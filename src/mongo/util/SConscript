@@ -254,17 +254,6 @@ else:
         ],
     )
 
-env.Library(
-    target="ntservice",
-    source=[
-        "ntservice.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "signal_handlers",
-    ],
-)
-
 env.Benchmark(
     target="clock_source_bm",
     source=[
@@ -273,22 +262,6 @@ env.Benchmark(
     LIBDEPS=[
         "clock_sources",
         "processinfo",
-    ],
-)
-
-env.Library(
-    target="signal_handlers",
-    source=[
-        "signal_handlers.cpp",
-        "signal_win32.cpp" if env.TargetOSIs("windows") else [],
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/log_process_details",
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 

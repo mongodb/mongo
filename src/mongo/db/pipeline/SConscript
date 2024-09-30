@@ -42,18 +42,6 @@ env.Benchmark(
 )
 
 env.Library(
-    target="change_stream_expired_pre_image_remover",
-    source=[
-        "change_stream_expired_pre_image_remover.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/util/periodic_runner",
-    ],
-)
-
-env.Library(
     target="change_stream_test_helpers",
     source=[
         "change_stream_test_helpers.cpp",

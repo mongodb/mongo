@@ -232,3 +232,73 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_settings",
     ],
 )
+
+mongo_cc_library(
+    name = "bulk_write_command",
+    srcs = [
+        "bulk_write.cpp",
+        "//src/mongo/db/query:command_diagnostic_printer.h",
+    ],
+    hdrs = [
+        "bulk_write.h",
+    ],
+    deps = [
+        ":bulk_write_common",
+        ":bulk_write_parser",
+        ":update_metrics",
+        ":write_commands_common",
+        "//src/mongo/crypto:fle_fields",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:curop_metrics",
+        "//src/mongo/db:fle_crud_mongod",
+        "//src/mongo/db:not_primary_error_tracker",
+        "//src/mongo/db:profile_collection",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/catalog:document_validation",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/pipeline/process_interface:mongod_process_interfaces",
+        "//src/mongo/db/query/client_cursor",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/query/write_ops:write_ops_exec",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
+        "//src/mongo/db/s:analyze_shard_key_util",
+        "//src/mongo/db/s:query_analysis_writer",
+        "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
+        "//src/mongo/db/stats:top",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/transaction",
+        "//src/mongo/logv2:logv2_options",
+        "//src/mongo/s:grid",
+        "//src/mongo/s:query_analysis_sampler",
+        "//src/mongo/util:log_and_backoff",
+    ],
+)
+
+mongo_cc_library(
+    name = "map_reduce_agg",
+    srcs = [
+        "map_reduce_agg.cpp",
+        "//src/mongo/db/query:command_diagnostic_printer.h",
+    ],
+    hdrs = [
+        "map_reduce_agg.h",
+    ],
+    deps = [
+        ":map_reduce_parser",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/commands:servers",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+        "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",
+        "//src/mongo/db/query:map_reduce_output_format",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)

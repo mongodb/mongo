@@ -35,95 +35,6 @@ env.Benchmark(
     ],
 )
 
-env.Library(
-    target="batched_write_context",
-    source=[
-        "batched_write_context.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/db/transaction/transaction_operations",
-    ],
-)
-
-env.Library(
-    target="operation_logger_impl",
-    source=[
-        "operation_logger_impl.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/repl/oplog",
-    ],
-)
-
-env.Library(
-    target="op_observer_impl",
-    source=[
-        "op_observer_impl.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
-        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
-        "$BUILD_DIR/mongo/db/catalog/database_holder",
-        "$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry",
-        "$BUILD_DIR/mongo/db/change_stream_serverless_helpers",
-        "$BUILD_DIR/mongo/db/commands/txn_cmd_request",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
-        "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/read_write_concern_defaults",
-        "$BUILD_DIR/mongo/db/repl/repl_server_parameters",
-        "$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/db/session/session_catalog_mongod",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/transaction/transaction",
-        "$BUILD_DIR/mongo/db/transaction/transaction_operations",
-        "$BUILD_DIR/mongo/s/grid",
-        "batched_write_context",
-        "op_observer",
-        "op_observer_util",
-    ],
-)
-
-env.Library(
-    target="change_stream_pre_images_op_observer",
-    source=[
-        "change_stream_pre_images_op_observer.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager",
-        "$BUILD_DIR/mongo/db/pipeline/change_stream_preimage",
-        "$BUILD_DIR/mongo/db/repl/optime",
-        "$BUILD_DIR/mongo/db/repl/tenant_migration_decoration",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/transaction/transaction_operations",
-        "op_observer",
-    ],
-)
-
-env.Library(
-    target="fcv_op_observer",
-    source=[
-        "fcv_op_observer.cpp",
-    ],
-    LIBDEPS=[
-        "op_observer",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/commands/mongod_fcv",
-        "$BUILD_DIR/mongo/db/session/kill_sessions_local",
-        "$BUILD_DIR/mongo/executor/egress_connection_closer_manager",
-        "op_observer_util",
-    ],
-)
-
 env.CppUnitTest(
     target="db_op_observer_test",
     source=[
@@ -166,26 +77,5 @@ env.CppUnitTest(
         "op_observer_util",
         "operation_logger_impl",
         "user_write_block_mode_op_observer",
-    ],
-)
-
-env.Library(
-    target="fallback_op_observer",
-    source=[
-        "fallback_op_observer.cpp",
-    ],
-    LIBDEPS=[
-        "op_observer",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/read_write_concern_defaults",
-        "$BUILD_DIR/mongo/db/session/session_catalog_mongod",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/db/transaction/transaction",
-        "$BUILD_DIR/mongo/db/vector_clock",
-        "$BUILD_DIR/mongo/db/views/view_catalog_helpers",
-        "batched_write_context",
-        "op_observer_util",
     ],
 )

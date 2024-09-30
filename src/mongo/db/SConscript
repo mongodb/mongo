@@ -6,6 +6,7 @@ Import(
         "get_option",
         "have_sasl_lib",
         "has_option",
+        "http_client",
         "version_extra",
         "version_parts",
         "wiredtiger",
@@ -74,26 +75,6 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
-    target="global_index",
-    source=[
-        "global_index.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "catalog/collection_crud",
-        "catalog/collection_options",
-        "concurrency/exception_util",
-        "dbhelpers",
-        "index_builds_coordinator_interface",
-        "query_exec",
-        "server_base",
-        "session/logical_session_id_helpers",
-        "shard_role",
-        "storage/key_string",
-        "transaction/transaction",
-    ],
-)
-
 env.Benchmark(
     target="profile_filter_bm",
     source=[
@@ -126,40 +107,6 @@ if env.TargetOSIs("windows"):
             "$BUILD_DIR/mongo/util/options_parser/options_parser",
         ],
     )
-
-env.Library(
-    target="serverinit",
-    source=[
-        "initialize_server_global_state.cpp",
-        "initialize_server_global_state_gen.cpp",
-        "server_options_init.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/audit",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/processinfo",
-        "$BUILD_DIR/mongo/util/signal_handlers",
-    ],
-)
-
-env.Library(
-    target="set_change_stream_state_coordinator",
-    source=[
-        "set_change_stream_state_coordinator.cpp",
-        "set_change_stream_state_coordinator_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/change_stream_change_collection_manager",
-        "$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager",
-        "$BUILD_DIR/mongo/db/change_stream_serverless_helpers",
-        "$BUILD_DIR/mongo/db/change_stream_state",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/repl/primary_only_service",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/repl/wait_for_majority_service",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-    ],
-)
 
 env.Library(
     target="change_stream_pre_image_test_helpers",
@@ -282,30 +229,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="fle_crud_mongod",
-    source=[
-        "fle_crud_mongod.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/crypto/fle_crypto",
-        "$BUILD_DIR/mongo/executor/inline_executor",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/task_executor_pool",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "concurrency/exception_util",
-        "fle_crud",
-        "query/query_request",
-        "record_id_helpers",
-        "repl/repl_coordinator_interface",
-        "session/logical_session_id",
-        "session/session_catalog_mongod",
-        "shard_role",
-        "transaction/transaction",
-    ],
-)
-
-env.Library(
     target="fle_mocks",
     source=[
         "fle_query_interface_mock.cpp",
@@ -332,20 +255,6 @@ env.Library(
         "$BUILD_DIR/mongo/s/startup_initialization",
         "service_context",
         "shared_request_handling",
-    ],
-)
-
-env.Library(
-    target="system_index",
-    source=[
-        "system_index.cpp",
-    ],
-    LIBDEPS=[
-        "catalog/index_key_validate",
-        "catalog/multi_index_block",
-        "exec/scoped_timer",
-        "index_builds_coordinator_interface",
-        "shard_role",
     ],
 )
 
@@ -450,37 +359,6 @@ env.Library(
 )
 
 env.Library(
-    target="read_concern_d_impl",
-    source=[
-        "read_concern_mongod.cpp",
-        "read_concern_mongod_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "concurrency/exception_util",
-        "repl/repl_coordinator_interface",
-        "repl/speculative_majority_read_info",
-        "repl/tenant_migration_access_blocker",
-        "server_base",
-        "shard_role",
-    ],
-)
-
-env.Library(
-    target="rebuild_indexes",
-    source=[
-        "rebuild_indexes.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "catalog/collection_catalog",
-        "catalog/index_key_validate",
-        "index_builds_coordinator_interface",
-        "server_base",
-        "shard_role",
-        "shard_role_api",
-    ],
-)
-
-env.Library(
     target="startup_recovery",
     source=[
         "repair.cpp",
@@ -514,18 +392,6 @@ env.Library(
         "storage/storage_util",
         "timeseries/timeseries_extended_range",
         "vector_clock",
-    ],
-)
-
-env.Library(
-    target="periodic_runner_job_abort_expired_transactions",
-    source=[
-        "periodic_runner_job_abort_expired_transactions.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/session/kill_sessions_local",
-        "$BUILD_DIR/mongo/db/transaction/transaction",
-        "$BUILD_DIR/mongo/util/periodic_runner",
     ],
 )
 
@@ -933,7 +799,14 @@ env.Program(
     # TODO(SERVER-95322) Remove sysdeps after converted to Bazel
     SYSLIBDEPS=env.get("MONGO_LDAP_LIB", [])
     + env.get("MONGO_GSSAPI_LIB", [])
-    + (["sasl2"] if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) else []),
+    + (["sasl2"] if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) else [])
+    + (
+        [
+            "winhttp" if env.TargetOSIs("windows") else "curl",
+        ]
+        if http_client == "on"
+        else []
+    ),
 )
 
 env.Library(

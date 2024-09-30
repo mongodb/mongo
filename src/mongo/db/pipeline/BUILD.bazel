@@ -1192,3 +1192,18 @@ mongo_cc_library(
         ":pipeline_visitor",
     ],
 )
+
+mongo_cc_library(
+    name = "change_stream_expired_pre_image_remover",
+    srcs = [
+        "change_stream_expired_pre_image_remover.cpp",
+    ],
+    hdrs = [
+        "change_stream_expired_pre_image_remover.h",
+    ],
+    deps = [
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/util:periodic_runner",
+    ],
+)

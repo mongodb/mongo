@@ -644,3 +644,37 @@ mongo_cc_library(
         "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
     ],
 )
+
+mongo_cc_library(
+    name = "storage_engine_impl",
+    srcs = [
+        "deferred_drop_record_store.cpp",
+        "storage_engine_impl.cpp",
+    ],
+    hdrs = [
+        "deferred_drop_record_store.h",
+        "journal_listener.h",
+        "storage_engine_impl.h",
+    ],
+    deps = [
+        ":backup_block",
+        ":durable_catalog",
+        ":storage_control",
+        ":storage_options",
+        ":storage_repair_observer",
+        ":storage_util",
+        ":two_phase_index_build_knobs_idl",
+        "//src/mongo/db:audit",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:resumable_index_builds_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/catalog:catalog_control",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
+    ],
+)

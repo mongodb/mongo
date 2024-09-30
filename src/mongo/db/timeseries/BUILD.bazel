@@ -217,3 +217,24 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/bucket_catalog",
     ],
 )
+
+mongo_cc_library(
+    name = "timeseries_collmod",
+    srcs = [
+        "timeseries_collmod.cpp",
+    ],
+    hdrs = [
+        "timeseries_collmod.h",
+    ],
+    deps = [
+        ":catalog_helper",
+        ":timeseries_conversion_util",
+        ":timeseries_options",
+        "//src/mongo/db:coll_mod_command_idl",
+        "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/exec:bucket_unpacker",
+    ],
+)

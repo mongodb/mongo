@@ -252,3 +252,78 @@ mongo_cc_library(
         ":mongos_process_interface",
     ],
 )
+
+# This library is the basic mongod functionality, depended on by embedded so
+# designed to exclude large components like sharding and networking.
+mongo_cc_library(
+    name = "mongod_process_interfaces",
+    srcs = [
+        "common_mongod_process_interface.cpp",
+        "non_shardsvr_process_interface.cpp",
+        "replica_set_node_process_interface.cpp",
+    ],
+    hdrs = [
+        "common_mongod_process_interface.h",
+        "non_shardsvr_process_interface.h",
+        "replica_set_node_process_interface.h",
+    ],
+    deps = [
+        ":common_process_interface",
+        "//src/mongo/db:collection_index_usage_tracker",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:index_builds_coordinator_mongod",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:operation_time_tracker",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/query/client_cursor",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/query/write_ops:write_ops_exec",
+        "//src/mongo/db/repl:primary_only_service",
+        "//src/mongo/db/s:query_analysis_writer",
+        "//src/mongo/db/s:transaction_coordinator",
+        "//src/mongo/db/session:session_catalog",
+        "//src/mongo/db/stats:top",
+        "//src/mongo/db/storage:backup_cursor_hooks",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/transaction",
+        "//src/mongo/s:query_analysis_sampler",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "shardsvr_process_interface",
+    srcs = [
+        "shardsvr_process_interface.cpp",
+    ],
+    hdrs = [
+        "shardsvr_process_interface.h",
+    ],
+    deps = [
+        ":mongod_process_interfaces",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/s:sharding_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongod_process_interface_factory",
+    srcs = [
+        "mongod_process_interface_factory.cpp",
+    ],
+    hdrs = [
+        "standalone_process_interface.h",
+    ],
+    deps = [
+        ":mongod_process_interfaces",
+        ":mongos_process_interface",
+        ":shardsvr_process_interface",
+        "//src/mongo/db:shard_role_api",
+    ],
+)

@@ -1537,3 +1537,189 @@ mongo_cc_library(
         "//src/mongo/util:future_util",
     ],
 )
+
+mongo_cc_library(
+    name = "oplog",
+    srcs = [
+        "apply_ops.cpp",
+        "oplog.cpp",
+        "oplog_entry_or_grouped_inserts.cpp",
+        "transaction_oplog_application.cpp",
+    ],
+    hdrs = [
+        "apply_ops.h",
+        "oplog.h",
+        "oplog_entry_or_grouped_inserts.h",
+        "transaction_oplog_application.h",
+    ],
+    deps = [
+        ":apply_ops_command_info",
+        ":dbcheck",
+        ":image_collection_entry",
+        ":oplog_constraint_violation_logger",
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        ":repl_settings",
+        ":tenant_migration_access_blocker",
+        ":tenant_migration_decoration",
+        ":tenant_migration_utils",
+        ":timestamp_block",
+        "//src/mongo/db:change_stream_change_collection_manager",
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db:change_stream_serverless_helpers",
+        "//src/mongo/db:coll_mod_command_idl",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:global_index",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:collection_crud",
+        "//src/mongo/db/catalog:health_log_interface",
+        "//src/mongo/db/catalog:import_collection_oplog_entry",
+        "//src/mongo/db/catalog:index_build_oplog_entry",
+        "//src/mongo/db/catalog:local_oplog_info",
+        "//src/mongo/db/commands:txn_cmd_request",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_util",
+        "//src/mongo/db/pipeline:change_stream_preimage",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/s:sharding_catalog",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/transaction",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/s:common_s",
+    ],
+)
+
+mongo_cc_library(
+    name = "change_stream_oplog_notification",
+    srcs = [
+        "change_stream_oplog_notification.cpp",
+    ],
+    hdrs = [
+        "change_stream_oplog_notification.h",
+        "//src/mongo/db/commands:notify_sharding_event_gen",
+    ],
+    deps = [
+        ":oplog",
+        ":oplog_entry",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/pipeline:change_stream_helpers",
+    ],
+)
+
+mongo_cc_library(
+    name = "oplog_buffer_collection",
+    srcs = [
+        "oplog_buffer_collection.cpp",
+        "//src/mongo/util:queue.h",
+    ],
+    hdrs = [
+        "oplog_buffer_collection.h",
+    ],
+    deps = [
+        ":storage_interface",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/catalog:document_validation",
+        "//src/mongo/db/query/write_ops:write_ops_exec",
+    ],
+)
+
+mongo_cc_library(
+    name = "oplog_interface_local",
+    srcs = [
+        "oplog_interface_local.cpp",
+    ],
+    hdrs = [
+        "oplog_interface.h",
+        "oplog_interface_local.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/transaction",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_interface_impl",
+    srcs = [
+        "collection_bulk_loader_impl.cpp",
+        "storage_interface_impl.cpp",
+    ],
+    hdrs = [
+        "collection_bulk_loader_impl.h",
+        "storage_interface_impl.h",
+    ],
+    deps = [
+        ":oplog",
+        ":repl_server_parameters",
+        ":rollback_idl",
+        ":storage_interface",
+        "//src/mongo/db:change_stream_change_collection_manager",
+        "//src/mongo/db:common",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:collection_crud",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/catalog:local_oplog_info",
+        "//src/mongo/db/catalog:multi_index_block",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/storage:oplog_cap_maintainer_thread",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_control",
+    ],
+)
+
+mongo_cc_library(
+    name = "hello_auth",
+    srcs = [
+        "hello_auth.cpp",
+    ],
+    hdrs = [
+        "hello_auth.h",
+    ],
+    deps = [
+        ":hello_command",
+        "//src/mongo:base",
+        "//src/mongo/db/auth:authentication_session",
+        "//src/mongo/db/auth:sasl_commands",
+        "//src/mongo/db/auth:saslauth",
+        "//src/mongo/db/commands:authentication_commands",
+    ],
+)
+
+mongo_cc_library(
+    name = "isself",
+    srcs = [
+        "isself.cpp",
+    ],
+    hdrs = [
+        "isself.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/util/net:network",
+    ],
+)

@@ -319,3 +319,63 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+config_setting(
+    name = "http_client_enabled_windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//bazel/config:http_client": "True",
+    },
+)
+
+mongo_cc_library(
+    name = "http_client_impl",
+    srcs = select({
+        "//bazel/config:http_client_enabled": [
+            "http_client_options.cpp",
+            ":http_client_options_gen",
+        ],
+        "//conditions:default": [
+            "http_client_none.cpp",
+        ],
+    }) + select({
+        ":http_client_enabled_windows": [
+            "http_client_winhttp.cpp",
+        ],
+        "//bazel/config:http_client_enabled": [
+            "http_client_curl.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "//src/mongo/util:strong_weak_finish_line.h",
+    ] + select({
+        "//bazel/config:http_client_enabled": [
+            "http_client_options.h",
+        ],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        ":http_client_enabled_windows": [
+            "winhttp.lib",
+        ],
+        "//bazel/config:http_client_enabled": [
+            "-lcurl",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":http_client",
+        "//src/mongo:base",
+    ] + select({
+        "//bazel/config:http_client_enabled": [
+            ":network",
+            "//src/mongo/executor:connection_pool_executor",
+            "//src/mongo/util:alarm",
+            "//src/mongo/util/concurrency:thread_pool",
+        ],
+        "//conditions:default": [],
+    }),
+)

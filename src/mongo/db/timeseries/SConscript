@@ -14,24 +14,6 @@ env.SConscript(
     ],
 )
 
-env.Library(
-    target="timeseries_collmod",
-    source=[
-        "timeseries_collmod.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
-        "$BUILD_DIR/mongo/db/coll_mod_command_idl",
-        "$BUILD_DIR/mongo/db/exec/bucket_unpacker",
-        "$BUILD_DIR/mongo/db/index_commands_idl",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "catalog_helper",
-        "timeseries_conversion_util",
-        "timeseries_options",
-    ],
-)
-
 env.CppUnitTest(
     target="db_timeseries_test",
     source=[

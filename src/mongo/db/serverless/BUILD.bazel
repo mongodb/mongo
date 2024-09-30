@@ -57,3 +57,92 @@ mongo_cc_library(
         "//src/mongo/db/repl:tenant_migration_utils",
     ],
 )
+
+mongo_cc_library(
+    name = "serverless_lock",
+    srcs = [
+        "serverless_operation_lock_registry.cpp",
+        "serverless_server_status.cpp",
+        "//src/mongo/db:persistent_task_store.h",
+    ],
+    hdrs = [
+        "serverless_operation_lock_registry.h",
+    ],
+    deps = [
+        ":shard_split_state_machine",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/repl:tenant_migration_state_machine_idl",
+        "//src/mongo/db/repl:tenant_migration_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "shard_split_utils",
+    srcs = [
+        "shard_split_utils.cpp",
+    ],
+    hdrs = [
+        "shard_split_utils.h",
+    ],
+    deps = [
+        ":shard_split_state_machine",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/repl:replica_set_messages",
+    ],
+)
+
+mongo_cc_library(
+    name = "shard_split_donor_service",
+    srcs = [
+        "shard_split_donor_op_observer.cpp",
+        "shard_split_donor_service.cpp",
+        "shard_split_statistics.cpp",
+        "//src/mongo/db/s/resharding:resharding_util.h",
+        "//src/mongo/executor:cancelable_executor.h",
+    ],
+    hdrs = [
+        "shard_split_donor_op_observer.h",
+        "shard_split_donor_service.h",
+        "shard_split_statistics.h",
+        "//src/mongo/db/s/resharding:coordinator_document_gen",
+        "//src/mongo/db/s/resharding:donor_oplog_id_gen",
+    ],
+    tags = ["compile_requires_large_memory"],
+    deps = [
+        ":serverless_lock",
+        ":shard_split_state_machine",
+        ":shard_split_utils",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_crud",
+        "//src/mongo/db/catalog:local_oplog_info",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/repl:primary_only_service",
+        "//src/mongo/db/repl:replica_set_messages",
+        "//src/mongo/db/repl:tenant_migration_access_blocker",
+    ],
+)
+
+mongo_cc_library(
+    name = "shard_split_commands",
+    srcs = [
+        "shard_split_commands.cpp",
+        ":shard_split_commands_gen",
+    ],
+    deps = [
+        ":shard_split_donor_service",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/client:replica_set_monitor_server_parameters",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:global_settings",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/repl:tenant_migration_utils",
+    ],
+)

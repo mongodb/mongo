@@ -208,3 +208,21 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/bucket_catalog",
     ],
 )
+
+mongo_cc_library(
+    name = "change_collection_server_status",
+    srcs = [
+        "change_collection_server_status.cpp",
+        "change_stream_preimages_server_status.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:change_stream_change_collection_manager",
+        "//src/mongo/db:change_stream_pre_image_util",
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db:change_stream_serverless_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)

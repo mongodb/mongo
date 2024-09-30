@@ -711,3 +711,28 @@ mongo_cc_library(
         "//src/mongo/db/concurrency:deferred_writer",
     ],
 )
+
+mongo_cc_library(
+    name = "catalog_control",
+    srcs = [
+        "catalog_control.cpp",
+    ],
+    hdrs = [
+        "catalog_control.h",
+    ],
+    deps = [
+        ":catalog_stats",
+        ":collection_catalog",
+        ":database_holder",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:rebuild_indexes",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/storage:write_unit_of_work",
+        "//src/mongo/db/timeseries:timeseries_extended_range",
+    ],
+)

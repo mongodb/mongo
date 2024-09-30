@@ -16,73 +16,6 @@ env.SConscript(
     ],
 )
 
-# Commands available in all mongodb server processes (mongod, mongos, etc.)
-xray_files = []
-
-if get_option("xray") == "on":
-    xray_files = [
-        "xray_commands.cpp",
-        "xray_commands_gen.cpp",
-    ]
-
-env.Library(
-    target="servers",
-    source=[
-        "conn_pool_stats.cpp",
-        "conn_pool_sync.cpp",
-        "connection_status.cpp",
-        "connection_status_gen.cpp",
-        "cpuload.cpp",
-        "drop_connections_gen.cpp",
-        "drop_connections_command.cpp",
-        "generic_servers.cpp",
-        "generic_servers_gen.cpp",
-        "internal_transactions_test_command_gen.cpp",
-        "isself.cpp",
-        "logical_session_server_status_section.cpp",
-        "query_cmd/mr_common.cpp",
-        "reap_logical_session_cache_now.cpp",
-        "rotate_certificates_gen.cpp",
-        "rotate_certificates_command.cpp",
-        "test_api_version_2_commands.cpp",
-        "test_deprecation_command.cpp",
-        "traffic_recording_cmds.cpp",
-        "user_management_commands_common.cpp",
-    ]
-    + xray_files,
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/clientdriver_minimal",
-        "$BUILD_DIR/mongo/db/auth/address_restriction",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/log_process_details",
-        "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/pipeline/change_stream_pipeline",
-        "$BUILD_DIR/mongo/db/pipeline/document_source_internal_apply_oplog_update",
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
-        "$BUILD_DIR/mongo/db/read_write_concern_defaults",
-        "$BUILD_DIR/mongo/db/repl/isself",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/session/logical_session_cache",
-        "$BUILD_DIR/mongo/db/session/logical_session_id_helpers",
-        "$BUILD_DIR/mongo/db/session/session_catalog",
-        "$BUILD_DIR/mongo/db/shared_request_handling",
-        "$BUILD_DIR/mongo/db/traffic_recorder",
-        "$BUILD_DIR/mongo/executor/egress_connection_closer_manager",
-        "$BUILD_DIR/mongo/executor/task_executor_pool",
-        "$BUILD_DIR/mongo/rpc/client_metadata",
-        "$BUILD_DIR/mongo/scripting/scripting_common",
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-        "$BUILD_DIR/mongo/util/ntservice",
-        "authentication_commands",
-        "core",
-        "query_cmd/query_settings_cmds",
-        "test_commands_enabled",
-        "umc_commands_idl",
-    ],
-)
-
 # Commands that are present in both mongod and embedded
 env.Library(
     target="standalone",
@@ -209,28 +142,6 @@ env.Library(
         "rename_collection_idl",
         "test_commands_enabled",
         "validate_db_metadata_command",
-    ],
-)
-
-env.Library(
-    target="test_commands",
-    source=[
-        "sysprofile_gen.cpp",
-        "test_commands.cpp",
-        "whats_my_uri_cmd.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/dbhelpers",
-        "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_exec",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/util/system_perf",
-        "test_commands_enabled",
     ],
 )
 
@@ -367,58 +278,6 @@ env.Library(
         "test_commands_enabled",
         "txn_cmd_request",
         "umc_commands_idl",
-    ],
-)
-
-env.Library(
-    target="kill_operations_idl",
-    source=[
-        "kill_operations_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="kill_common",
-    source=[
-        "kill_op_cmd_base.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/audit",
-        "$BUILD_DIR/mongo/db/auth/authorization_manager_global",
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/operation_killer",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "kill_operations_idl",
-    ],
-)
-
-env.Library(
-    target="dbcheck_command",
-    source=[
-        "dbcheck_command.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/health_log_interface",
-        "$BUILD_DIR/mongo/db/repl/dbcheck",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/catalog/throttle_cursor",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/dbhelpers",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/repl/oplog",
-        "$BUILD_DIR/mongo/db/repl/repl_server_parameters",
-        "$BUILD_DIR/mongo/db/rw_concern_d",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/md5",
-        "$BUILD_DIR/mongo/util/progress_meter",
     ],
 )
 

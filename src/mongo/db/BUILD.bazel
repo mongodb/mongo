@@ -2852,3 +2852,156 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
 )
+
+mongo_cc_library(
+    name = "read_concern_d_impl",
+    srcs = [
+        "read_concern_mongod.cpp",
+        ":read_concern_mongod_gen",
+    ],
+    deps = [
+        ":server_base",
+        ":shard_role",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:speculative_majority_read_info",
+        "//src/mongo/db/repl:tenant_migration_access_blocker",
+    ],
+)
+
+mongo_cc_library(
+    name = "rebuild_indexes",
+    srcs = [
+        "rebuild_indexes.cpp",
+    ],
+    hdrs = [
+        "rebuild_indexes.h",
+    ],
+    deps = [
+        ":index_builds_coordinator_interface",
+        ":server_base",
+        ":shard_role",
+        ":shard_role_api",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/catalog:index_key_validate",
+    ],
+)
+
+mongo_cc_library(
+    name = "set_change_stream_state_coordinator",
+    srcs = [
+        "set_change_stream_state_coordinator.cpp",
+        ":set_change_stream_state_coordinator_gen",
+    ],
+    hdrs = [
+        "set_change_stream_state_coordinator.h",
+    ],
+    deps = [
+        "//src/mongo/db:change_stream_change_collection_manager",
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db:change_stream_serverless_helpers",
+        "//src/mongo/db:change_stream_state",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db/repl:primary_only_service",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:wait_for_majority_service",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "system_index",
+    srcs = [
+        "system_index.cpp",
+    ],
+    hdrs = [
+        "system_index.h",
+    ],
+    deps = [
+        ":index_builds_coordinator_interface",
+        ":shard_role",
+        "//src/mongo/db/catalog:index_key_validate",
+        "//src/mongo/db/catalog:multi_index_block",
+        "//src/mongo/db/exec:scoped_timer",
+    ],
+)
+
+mongo_cc_library(
+    name = "global_index",
+    srcs = [
+        "global_index.cpp",
+    ],
+    hdrs = [
+        "global_index.h",
+    ],
+    deps = [
+        ":dbhelpers",
+        ":index_builds_coordinator_interface",
+        ":query_exec",
+        ":server_base",
+        ":shard_role",
+        "//src/mongo/db/catalog:collection_crud",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/transaction",
+    ],
+)
+
+mongo_cc_library(
+    name = "fle_crud_mongod",
+    srcs = [
+        "fle_crud_mongod.cpp",
+    ],
+    deps = [
+        ":fle_crud",
+        ":shard_role",
+        "//src/mongo/crypto:fle_crypto",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/transaction",
+        "//src/mongo/executor:inline_executor",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:task_executor_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_library(
+    name = "periodic_runner_job_abort_expired_transactions",
+    srcs = [
+        "periodic_runner_job_abort_expired_transactions.cpp",
+    ],
+    hdrs = [
+        "periodic_runner_job_abort_expired_transactions.h",
+    ],
+    deps = [
+        "//src/mongo/db/session:kill_sessions_local",
+        "//src/mongo/db/transaction",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_library(
+    name = "serverinit",
+    srcs = [
+        "initialize_server_global_state.cpp",
+        "server_options_init.cpp",
+        ":initialize_server_global_state_gen",
+    ],
+    hdrs = [
+        "initialize_server_global_state.h",
+    ],
+    deps = [
+        "//src/mongo/db:audit",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util:signal_handlers",
+    ],
+)

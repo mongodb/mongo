@@ -4,24 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="change_collection_server_status",
-    source=[
-        "change_collection_server_status.cpp",
-        "change_stream_preimages_server_status.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/change_stream_change_collection_manager",
-        "$BUILD_DIR/mongo/db/change_stream_pre_image_util",
-        "$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager",
-        "$BUILD_DIR/mongo/db/change_stream_serverless_helpers",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role",
-    ],
-)
-
 env.CppUnitTest(
     target="db_stats_test",
     source=[

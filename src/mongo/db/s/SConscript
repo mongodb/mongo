@@ -202,42 +202,6 @@ env.Library(
 )
 
 env.Library(
-    target="transaction_coordinator",
-    source=[
-        "server_transaction_coordinators_metrics.cpp",
-        "single_transaction_coordinator_stats.cpp",
-        "transaction_coordinator_catalog.cpp",
-        "transaction_coordinator_curop.cpp",
-        "transaction_coordinator_document_gen.cpp",
-        "transaction_coordinator_futures_util.cpp",
-        "transaction_coordinator_metrics_observer.cpp",
-        "transaction_coordinator_params_gen.cpp",
-        "transaction_coordinator_service.cpp",
-        "transaction_coordinator_structures.cpp",
-        "transaction_coordinator_util.cpp",
-        "transaction_coordinator_worker_curop_repository_mongod.cpp",
-        "transaction_coordinator.cpp",
-        "transaction_coordinators_stats_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/commands/txn_cmd_request",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
-        "$BUILD_DIR/mongo/db/not_primary_error_tracker",
-        "$BUILD_DIR/mongo/db/repl/change_stream_oplog_notification",
-        "$BUILD_DIR/mongo/db/repl/wait_for_majority_service",
-        "$BUILD_DIR/mongo/db/rw_concern_d",
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/db/transaction/transaction",
-        "$BUILD_DIR/mongo/db/vector_clock_mongod",
-        "$BUILD_DIR/mongo/executor/task_executor_pool",
-        "$BUILD_DIR/mongo/s/grid",
-    ],
-)
-
-env.Library(
     target="sharding_catalog_manager",
     source=[
         "add_shard_cmd_gen.cpp",

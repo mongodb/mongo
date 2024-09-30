@@ -41,28 +41,6 @@ env.Benchmark(
 )
 
 env.Library(
-    target="catalog_control",
-    source=[
-        "catalog_control.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",
-        "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/rebuild_indexes",
-        "$BUILD_DIR/mongo/db/repl/oplog",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/storage/write_unit_of_work",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_extended_range",
-        "catalog_stats",
-        "collection_catalog",
-        "database_holder",
-    ],
-)
-
-env.Library(
     target="catalog_impl",
     source=[
         "collection_impl.cpp",

@@ -278,3 +278,38 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "jwt",
+    srcs = [
+        "jwk_manager.cpp",
+        "jwks_fetcher_impl.cpp",
+        "jws_validated_token.cpp",
+        ":jwt_parameters_gen",
+    ] + select({
+        "//bazel/config:ssl_provider_{}".format(provider): [
+            "jws_validator_{}.cpp".format(provider),
+        ]
+        for provider in [
+            "apple",
+            "openssl",
+            "windows",
+            "none",
+        ]
+    }),
+    hdrs = [
+        "jwk_manager.h",
+        "jwks_fetcher.h",
+        "jwks_fetcher_impl.h",
+        "jws_validated_token.h",
+        "jws_validator.h",
+    ],
+    deps = [
+        ":jwt_types",
+        "//src/mongo:base",
+        "//src/mongo/client:native_sasl_client",
+        "//src/mongo/db/auth:sasl_mechanism_protocol",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util/net:http_client_impl",
+    ],
+)

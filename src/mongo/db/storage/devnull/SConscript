@@ -3,19 +3,3 @@
 Import("env")
 
 env = env.Clone()
-
-env.Library(
-    target="storage_devnull",
-    source=[
-        "devnull_init.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/storage/durable_catalog",
-        "$BUILD_DIR/mongo/db/storage/storage_engine_impl",
-        "storage_devnull_core",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/storage/storage_engine_common",
-        "$BUILD_DIR/mongo/db/storage/storage_engine_lock_file",
-    ],
-)

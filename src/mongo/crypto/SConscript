@@ -4,6 +4,7 @@ Import(
     [
         "env",
         "get_option",
+        "http_client",
         "ssl_provider",
     ]
 )
@@ -42,27 +43,15 @@ env.CppUnitTest(
         "jwt",
         "sha_block",
     ],
-)
-
-env.Library(
-    target="jwt",
-    source=[
-        "jwks_fetcher_impl.cpp",
-        "jwk_manager.cpp",
-        "jws_validated_token.cpp",
-        "jws_validator_{}.cpp".format(ssl_provider),
-        "jwt_parameters_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "jwt_types",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/native_sasl_client",
-        "$BUILD_DIR/mongo/db/auth/sasl_mechanism_protocol",
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/util/net/http_client_impl",
-    ],
+    # TODO(SERVER-95322) Remove sys deps after converted to Bazel
+    SYSLIBDEPS=(
+        [
+            "winhttp" if env.TargetOSIs("windows") else "curl",
+        ]
+        if http_client == "on"
+        else []
+    )
+    + (["synchronization"] if env.ToolchainIs("msvc") else []),
 )
 
 if ssl_provider == "openssl":

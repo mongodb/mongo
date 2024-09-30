@@ -261,6 +261,22 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "gcc_x86_64",
+    match_all = [
+        ":compiler_type_gcc",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "gcc_aarch64",
+    match_all = [
+        ":compiler_type_gcc",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
 # ==========
 # opt
 # ==========
@@ -2055,5 +2071,21 @@ config_setting(
     name = "server_js_enabled",
     flag_values = {
         "//bazel/config:server_js": "True",
+    },
+)
+
+# --------------------------------------
+# xray
+# --------------------------------------
+
+bool_flag(
+    name = "xray",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "xray_enabled",
+    flag_values = {
+        "//bazel/config:xray": "True",
     },
 )

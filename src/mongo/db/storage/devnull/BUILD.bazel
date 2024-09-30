@@ -31,3 +31,17 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",
     ],
 )
+
+mongo_cc_library(
+    name = "storage_devnull",
+    srcs = [
+        "devnull_init.cpp",
+    ],
+    deps = [
+        ":storage_devnull_core",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/db/storage:storage_engine_impl",
+        "//src/mongo/db/storage:storage_engine_lock_file",
+    ],
+)

@@ -190,3 +190,129 @@ mongo_cc_library(
         "//src/mongo/db/repl:image_collection_entry",
     ],
 )
+
+mongo_cc_library(
+    name = "change_stream_pre_images_op_observer",
+    srcs = [
+        "change_stream_pre_images_op_observer.cpp",
+    ],
+    hdrs = [
+        "change_stream_pre_images_op_observer.h",
+    ],
+    deps = [
+        ":op_observer",
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/pipeline:change_stream_preimage",
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/db/repl:tenant_migration_decoration",
+        "//src/mongo/db/transaction:transaction_operations",
+    ],
+)
+
+mongo_cc_library(
+    name = "fallback_op_observer",
+    srcs = [
+        "fallback_op_observer.cpp",
+    ],
+    hdrs = [
+        "fallback_op_observer.h",
+    ],
+    deps = [
+        ":batched_write_context",
+        ":op_observer",
+        ":op_observer_util",
+        "//src/mongo/db:read_write_concern_defaults",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/transaction",
+        "//src/mongo/db/views:view_catalog_helpers",
+    ],
+)
+
+mongo_cc_library(
+    name = "op_observer_impl",
+    srcs = [
+        "op_observer_impl.cpp",
+    ],
+    hdrs = [
+        "op_observer_impl.h",
+        "operation_logger.h",
+    ],
+    deps = [
+        ":batched_write_context",
+        ":op_observer",
+        ":op_observer_util",
+        "//src/mongo/db:change_stream_serverless_helpers",
+        "//src/mongo/db:internal_transactions_feature_flag",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:read_write_concern_defaults",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/catalog:commit_quorum_options",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/catalog:import_collection_oplog_entry",
+        "//src/mongo/db/commands:txn_cmd_request",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/repl:repl_server_parameters",
+        "//src/mongo/db/repl:tenant_migration_access_blocker",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/transaction",
+        "//src/mongo/db/transaction:transaction_operations",
+        "//src/mongo/s:grid",
+    ],
+)
+
+mongo_cc_library(
+    name = "batched_write_context",
+    srcs = [
+        "batched_write_context.cpp",
+    ],
+    hdrs = [
+        "batched_write_context.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/transaction:transaction_operations",
+    ],
+)
+
+mongo_cc_library(
+    name = "operation_logger_impl",
+    srcs = [
+        "operation_logger_impl.cpp",
+    ],
+    hdrs = [
+        "operation_logger.h",
+        "operation_logger_impl.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/repl:oplog",
+    ],
+)
+
+mongo_cc_library(
+    name = "fcv_op_observer",
+    srcs = [
+        "fcv_op_observer.cpp",
+    ],
+    hdrs = [
+        "fcv_op_observer.h",
+    ],
+    deps = [
+        ":op_observer",
+        ":op_observer_util",
+        "//src/mongo:base",
+        "//src/mongo/db/commands:mongod_fcv",
+        "//src/mongo/db/session:kill_sessions_local",
+        "//src/mongo/executor:egress_connection_closer_manager",
+    ],
+)
