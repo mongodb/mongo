@@ -48,33 +48,6 @@ env.Library(
 )
 
 env.Library(
-    target="query_settings_cmds",
-    source=[
-        # This document source has been re-located here from 'pipeline' to avoid the
-        # 'pipeline' -> 'query_settings_utils' -> 'pipeline' cyclic dependency.
-        # Generating the Debug Query Shape requires re-parsing the query instance via
-        # `query_settings::utils::createRepresentativeInfo()`, which internally uses
-        # `Pipeline::parse()`.
-        "$BUILD_DIR/mongo/db/pipeline/document_source_query_settings.cpp",
-        "query_settings_cmds_gen.cpp",
-        "query_settings_cmds.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/clientdriver_minimal",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/commands/cluster_server_parameter_cmds_idl",
-        "$BUILD_DIR/mongo/db/commands/set_cluster_parameter_impl",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/query/canonical_query",
-        "$BUILD_DIR/mongo/db/query/plan_cache/query_plan_cache",
-        "$BUILD_DIR/mongo/db/query/query_settings/manager",
-        "$BUILD_DIR/mongo/db/query/query_settings/utils",
-        "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
-        "$BUILD_DIR/mongo/db/repl/repl_settings",
-    ],
-)
-
-env.Library(
     target="map_reduce_agg",
     source=[
         "map_reduce_agg.cpp",

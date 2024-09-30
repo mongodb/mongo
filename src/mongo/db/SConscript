@@ -161,85 +161,6 @@ env.Library(
 )
 
 env.Library(
-    target="change_stream_change_collection_manager",
-    source=[
-        "change_collection_truncate_markers.cpp",
-        "change_stream_change_collection_manager.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "catalog/catalog_helpers",
-        "catalog/collection_crud",
-        "catalog/collection_options",
-        "change_stream_serverless_helpers",
-        "change_streams_cluster_parameter",
-        "concurrency/exception_util",
-        "dbhelpers",
-        "record_id_helpers",
-        "server_feature_flags",
-        "service_context",
-    ],
-)
-
-env.Library(
-    target="change_collection_expired_change_remover",
-    source=[
-        "change_collection_expired_documents_remover.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/change_stream_change_collection_manager",
-        "$BUILD_DIR/mongo/db/change_stream_serverless_helpers",
-        "$BUILD_DIR/mongo/db/change_streams_cluster_parameter",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/util/periodic_runner",
-    ],
-)
-
-env.Library(
-    target="change_stream_pre_image_util",
-    source=[
-        "change_stream_pre_image_util.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "change_stream_options_manager",
-        "change_stream_serverless_helpers",
-        "concurrency/exception_util",
-        "pipeline/change_stream_preimage",
-        "query_exec",
-        "record_id_helpers",
-        "server_base",
-    ],
-)
-
-env.Library(
-    target="change_stream_pre_images_collection_manager",
-    source=[
-        "change_stream_pre_images_collection_manager.cpp",
-        "change_stream_pre_images_tenant_truncate_markers.cpp",
-        "change_stream_pre_images_truncate_manager.cpp",
-        "change_stream_pre_images_truncate_markers_per_nsUUID.cpp",
-    ],
-    LIBDEPS=[
-        "pipeline/change_stream_preimage",
-    ],
-    LIBDEPS_PRIVATE=[
-        "catalog/catalog_helpers",
-        "catalog/collection_crud",
-        "catalog/collection_options",
-        "change_stream_options_manager",
-        "change_stream_pre_image_util",
-        "change_stream_serverless_helpers",
-        "concurrency/exception_util",
-        "query_exec",
-        "record_id_helpers",
-        "repl/storage_interface",
-        "server_base",
-        "server_feature_flags",
-        "storage/storage_options",
-    ],
-)
-
-env.Library(
     target="change_stream_pre_image_test_helpers",
     source=[
         "change_stream_pre_image_test_helpers.cpp",
@@ -356,39 +277,6 @@ env.CppUnitTest(
         "s/sharding_catalog_manager",
         "service_context_d_test_fixture",
         "shard_role_api",
-    ],
-)
-
-env.Library(
-    target="fle_crud",
-    source=[
-        "commands/fle2_get_count_info_command_gen.cpp",
-        "fle_crud.cpp",
-        "query/fle/encrypted_predicate.cpp",
-        "query/fle/equality_predicate.cpp",
-        "query/fle/query_rewriter.cpp",
-        "query/fle/range_predicate.cpp",
-        "query/fle/range_validator.cpp",
-        "query/fle/server_rewrite.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/crypto/encrypted_field_config",
-        "pipeline/pipeline",
-        "query/command_request_response",
-        "query/write_ops/write_ops_parsers",
-        "transaction/transaction_api",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/crypto/fle_crypto",
-        "$BUILD_DIR/mongo/executor/inline_executor",
-        "$BUILD_DIR/mongo/executor/task_executor_pool",
-        "$BUILD_DIR/mongo/s/sharding_router_api",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "dbdirectclient",
-        "query/collation/collator_factory_interface",
-        "query/query_request",
-        "query_expressions",
-        "session/logical_session_id",
     ],
 )
 
@@ -519,68 +407,6 @@ env.Library(
 )
 
 env.Library(
-    target="index_builds_coordinator_mongod",
-    source=[
-        "index_builds_coordinator_mongod.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_enterprise"
-        if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", [])
-        else "",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "index_builds_coordinator_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "catalog/collection_catalog",
-        "catalog/index_build_entry_idl",
-        "index_build_entry_helpers",
-        "repl/tenant_migration_access_blocker",
-        "resumable_index_builds_idl",
-        "s/forwardable_operation_metadata",
-        "shard_role",
-        "storage/two_phase_index_build_knobs_idl",
-    ],
-)
-
-env.Library(
-    target="index_builds_coordinator_interface",
-    source=[
-        "index_builds_coordinator.cpp",
-        "repl_index_build_state.cpp",
-        "active_index_builds.cpp",
-    ],
-    LIBDEPS=[
-        "catalog/commit_quorum_options",
-        "catalog/index_builds_manager",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/storage/durable_catalog",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "catalog/collection_catalog",
-        "catalog/index_build_entry_idl",
-        "catalog/index_build_oplog_entry",
-        "catalog/multi_index_block",
-        "concurrency/exception_util",
-        "dbhelpers",
-        "index_build_entry_helpers",
-        "repl/cloner_utils",
-        "repl/repl_coordinator_interface",
-        "repl/tenant_migration_access_blocker",
-        "repl/timestamp_block",
-        "resumable_index_builds_idl",
-        "server_base",
-        "shard_role",
-        "storage/disk_space_util",
-        "storage/encryption_hooks",
-        "storage/storage_options",
-        "storage/storage_util",
-        "storage/two_phase_index_build_knobs_idl",
-    ],
-)
-
-env.Library(
     target="index_builds_coordinator_mock",
     source=["index_builds_coordinator_mock.cpp"],
     LIBDEPS=[
@@ -596,24 +422,6 @@ env.Library(
         "s/forwardable_operation_metadata",
         "shard_role",
         "storage/two_phase_index_build_knobs_idl",
-    ],
-)
-
-env.Library(
-    target="index_build_entry_helpers",
-    source=[
-        "index_build_entry_helpers.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "catalog/collection_crud",
-        "catalog/commit_quorum_options",
-        "catalog/index_build_entry_idl",
-        "catalog/local_oplog_info",
-        "concurrency/exception_util",
-        "dbhelpers",
-        "server_base",
-        "service_context",
-        "shard_role",
     ],
 )
 
@@ -743,19 +551,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/session/kill_sessions_local",
         "$BUILD_DIR/mongo/db/transaction/transaction",
         "$BUILD_DIR/mongo/util/periodic_runner",
-    ],
-)
-
-env.Library(
-    target="keys_collection_util",
-    source=[
-        "keys_collection_util.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "dbhelpers",
-        "keys_collection_document",
-        "shard_role",
     ],
 )
 

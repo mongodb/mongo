@@ -186,3 +186,21 @@ mongo_cc_library(
         "//src/mongo/util:secure_compare_memory",
     ],
 )
+
+mongo_cc_library(
+    name = "deferred_writer",
+    srcs = [
+        "deferred_writer.cpp",
+    ],
+    hdrs = [
+        "deferred_writer.h",
+    ],
+    deps = [
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)

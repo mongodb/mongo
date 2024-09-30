@@ -634,3 +634,130 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "sharding_task_executor",
+    srcs = [
+        "sharding_task_executor.cpp",
+    ],
+    hdrs = [
+        "sharding_task_executor.h",
+    ],
+    deps = [
+        ":sharding_router_api",
+        "//src/mongo/db:operation_time_tracker",
+        "//src/mongo/db:server_base",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/s/client:sharding_client",
+    ],
+)
+
+# Functionality for initializing all the services used by sharding, which are
+# common between MongoS and MongoD
+mongo_cc_library(
+    name = "sharding_initialization",
+    srcs = [
+        "client_metadata_propagation_egress_hook.cpp",
+        "initialize_tenant_to_shard_cache.cpp",
+        "routing_table_cache_gossip_metadata_hook.cpp",
+        "sharding_initialization.cpp",
+        "sharding_task_executor_pool_controller.cpp",
+        ":sharding_task_executor_pool_gen",
+        "//src/mongo/s/client:sharding_connection_hook.cpp",
+        "//src/mongo/s/client:sharding_network_connection_hook.cpp",
+    ],
+    hdrs = [
+        "client_metadata_propagation_egress_hook.h",
+        "initialize_tenant_to_shard_cache.h",
+        "routing_table_cache_gossip_metadata_hook.h",
+        "sharding_initialization.h",
+        "sharding_task_executor_pool_controller.h",
+        "//src/mongo/s/client:sharding_connection_hook.h",
+        "//src/mongo/s/client:sharding_network_connection_hook.h",
+    ],
+    deps = [
+        ":grid",
+        ":query_analysis_sampler",
+        ":sharding_task_executor",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/executor:async_multicaster",
+        "//src/mongo/executor:connection_pool_executor",
+        "//src/mongo/executor:scoped_task_executor",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/rpc:client_metadata",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/rpc:metadata_impersonated_user",
+        "//src/mongo/s/catalog:sharding_catalog_client_impl",
+        "//src/mongo/util:periodic_runner_factory",
+    ],
+)
+
+# This is the main library to use for consumers of sharding. It will pull the
+# routing and targeting functionality.
+#
+# This is the only library, which should be referenced directly outside of
+# mongo/s/ and mongo/db/s/
+mongo_cc_library(
+    name = "sharding_api",
+    srcs = [
+        "cluster_ddl.cpp",
+        "cluster_write.cpp",
+        "collection_routing_info_targeter.cpp",
+        "//src/mongo/s/write_ops:batch_write_exec.cpp",
+        "//src/mongo/s/write_ops:batch_write_op.cpp",
+        "//src/mongo/s/write_ops:bulk_write_exec.cpp",
+        "//src/mongo/s/write_ops:coordinate_multi_update_util.cpp",
+        "//src/mongo/s/write_ops:pause_migrations_during_multi_updates_enablement.cpp",
+        "//src/mongo/s/write_ops:write_op.cpp",
+        "//src/mongo/s/write_ops:write_without_shard_key_util.cpp",
+    ],
+    hdrs = [
+        "cluster_ddl.h",
+        "cluster_write.h",
+        "collection_routing_info_targeter.h",
+        "//src/mongo/s/write_ops:batch_write_exec.h",
+        "//src/mongo/s/write_ops:batch_write_op.h",
+        "//src/mongo/s/write_ops:bulk_write_exec.h",
+        "//src/mongo/s/write_ops:coordinate_multi_update_util.h",
+        "//src/mongo/s/write_ops:pause_migrations_during_multi_updates_enablement.h",
+        "//src/mongo/s/write_ops:write_op.h",
+        "//src/mongo/s/write_ops:write_without_shard_key_util.h",
+    ],
+    deps = [
+        ":sharding_router_api",
+        "//src/mongo/db:fle_crud",
+        "//src/mongo/db:internal_transactions_feature_flag",
+        "//src/mongo/db:not_primary_error_tracker",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/commands/query_cmd:bulk_write_common",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
+        "//src/mongo/db/query/write_ops:parsed_update",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/timeseries:timeseries_metadata",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries:timeseries_write_util",
+        "//src/mongo/db/transaction:transaction_api",
+        "//src/mongo/executor:inline_executor",
+        "//src/mongo/s/query/planner:cluster_find",
+        "//src/mongo/s/write_ops:batch_write_types",
+    ],
+)
+
+mongo_cc_library(
+    name = "sessions_collection_sharded",
+    srcs = [
+        "sessions_collection_sharded.cpp",
+    ],
+    hdrs = [
+        "sessions_collection_sharded.h",
+    ],
+    deps = [
+        ":sharding_api",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/session:sessions_collection",
+    ],
+)
