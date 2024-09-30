@@ -1397,11 +1397,6 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "ttl_gen",
-    src = "ttl.idl",
-)
-
 mongo_cc_library(
     name = "working_set_common",
     srcs = [
@@ -1633,20 +1628,6 @@ mongo_cc_library(
         ":operation_time_tracker",
         ":vector_clock",
         "//src/mongo/rpc:metadata",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "ttl_collection_cache",
-    srcs = [
-        "ttl_collection_cache.cpp",
-    ],
-    hdrs = [
-        "ttl_collection_cache.h",
-    ],
-    deps = [
-        ":service_context",
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
     ],
 )
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ttl_collection_cache.h"
+#include "mongo/db/ttl/ttl_collection_cache.h"
 
 #include <memory>
 

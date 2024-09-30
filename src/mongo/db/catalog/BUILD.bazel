@@ -445,7 +445,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "index_key_validate.h",
-        "//src/mongo/db:ttl_collection_cache.h",
+        "//src/mongo/db/ttl:ttl_collection_cache.h",
     ],
     deps = [
         "//src/mongo/db:common",
@@ -555,11 +555,11 @@ mongo_cc_library(
         "//src/mongo/db:collection_index_usage_tracker",
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:ttl_collection_cache",
         "//src/mongo/db:vector_clock",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/ttl:ttl_collection_cache",
     ],
 )
 
@@ -677,7 +677,6 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:shard_role",
-        "//src/mongo/db:ttl_collection_cache",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/write_ops",
@@ -690,6 +689,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:catalog_helper",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/ttl:ttl_collection_cache",
         "//src/mongo/db/views",
         "//src/mongo/db/views:view_catalog_helpers",
     ],

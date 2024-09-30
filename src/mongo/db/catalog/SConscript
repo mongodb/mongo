@@ -106,7 +106,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util",
         "$BUILD_DIR/mongo/db/timeseries/timeseries_extended_range",
         "$BUILD_DIR/mongo/db/transaction/transaction",
-        "$BUILD_DIR/mongo/db/ttl_collection_cache",
+        "$BUILD_DIR/mongo/db/ttl/ttl_collection_cache",
         "$BUILD_DIR/mongo/db/vector_clock",
         "$BUILD_DIR/mongo/db/views/view_catalog_helpers",
         "$BUILD_DIR/mongo/util/log_and_backoff",

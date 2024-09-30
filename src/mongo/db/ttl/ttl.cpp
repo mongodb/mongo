@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/ttl.h"
+#include "mongo/db/ttl/ttl.h"
 
 // IWYU pragma: no_include "cxxabi.h"
 #include <absl/container/node_hash_map.h>
@@ -99,8 +99,8 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/db/ttl_collection_cache.h"
-#include "mongo/db/ttl_gen.h"
+#include "mongo/db/ttl/ttl_collection_cache.h"
+#include "mongo/db/ttl/ttl_gen.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

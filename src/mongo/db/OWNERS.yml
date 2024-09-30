@@ -41,9 +41,6 @@ filters:
   - "*txn*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "ttl*":
-    approvers:
-      - 10gen/server-storage-execution
   - "dbdirectclient*":
     approvers:
       - 10gen/server-programmability

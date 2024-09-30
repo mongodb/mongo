@@ -99,7 +99,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/db/ttl_collection_cache.h"
+#include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/logv2/log.h"

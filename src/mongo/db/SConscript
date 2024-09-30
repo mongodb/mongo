@@ -54,6 +54,7 @@ env.SConscript(
         "storage",
         "timeseries",
         "transaction",
+        "ttl",
         "update",
         "views",
     ],
@@ -480,32 +481,6 @@ env.Library(
 )
 
 env.Library(
-    target="ttl_d",
-    source=[
-        "ttl.cpp",
-        "ttl_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "catalog/catalog_helpers",
-        "catalog/index_key_validate",
-        "coll_mod_command_idl",
-        "commands/fsync_locked",
-        "commands/server_status_core",
-        "index_commands_idl",
-        "query/write_ops/write_ops",
-        "query_exec",
-        "record_id_helpers",
-        "repl/replica_set_aware_service",
-        "repl/tenant_migration_access_blocker",
-        "s/sharding_runtime_d",
-        "server_base",
-        "service_context",
-        "shard_role",
-        "ttl_collection_cache",
-    ],
-)
-
-env.Library(
     target="startup_recovery",
     source=[
         "repair.cpp",
@@ -777,8 +752,8 @@ env.Library(
         "system_index",
         "timeseries/bucket_compression_failure",
         "traffic_recorder",
-        "ttl_collection_cache",
-        "ttl_d",
+        "ttl/ttl_collection_cache",
+        "ttl/ttl_d",
         "update/update_driver",
         "update_index_data",
         "windows_options" if env.TargetOSIs("windows") else [],
@@ -905,7 +880,7 @@ env.Library(
         "storage/storage_control",
         "system_index",
         "timeseries/timeseries_op_observer",
-        "ttl_d",
+        "ttl/ttl_d",
         "vector_clock",
     ],
     LIBDEPS_TAGS=[
@@ -1283,24 +1258,6 @@ if wiredtiger:
             "s/shard_server_test_fixture",
             "s/sharding_runtime_d",
             "shard_role",
-        ],
-    )
-
-    envWithAsio.CppUnitTest(
-        target="ttl_test",
-        source=[
-            "ttl_collection_cache_test.cpp",
-            "ttl_test.cpp",
-        ],
-        LIBDEPS=[
-            "dbdirectclient",
-            "index_build_entry_helpers",
-            "index_builds_coordinator_mongod",
-            "repl/replmocks",
-            "service_context_d_test_fixture",
-            "shard_role",
-            "ttl_collection_cache",
-            "ttl_d",
         ],
     )
 

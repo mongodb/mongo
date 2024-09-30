@@ -28,7 +28,7 @@
 global:
     cpp_namespace: mongo
     cpp_includes:
-        - "mongo/db/ttl.h"
+        - "mongo/db/ttl/ttl.h"
 server_parameters:
     ttlMonitorEnabled:
         description: "Enable the TTL monitor."
