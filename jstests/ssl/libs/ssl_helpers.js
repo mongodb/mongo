@@ -13,8 +13,11 @@ TestData.ignoreUnterminatedProcesses = true;
 export var KEYFILE = "jstests/libs/key1";
 
 export var SERVER_CERT = "jstests/libs/server.pem";
+export var TRUSTED_SERVER_CERT = "jstests/libs/trusted-server.pem";
 export var CA_CERT = "jstests/libs/ca.pem";
+export var TRUSTED_CA_CERT = "jstests/libs/trusted-ca.pem";
 export var CLIENT_CERT = "jstests/libs/client.pem";
+export var TRUSTED_CLIENT_CERT = "jstests/libs/trusted-client.pem";
 export var DH_PARAM = "jstests/libs/8k-prime.dhparam";
 export var CLUSTER_CERT = "jstests/libs/cluster_cert.pem";
 

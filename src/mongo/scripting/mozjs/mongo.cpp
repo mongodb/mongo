@@ -769,9 +769,27 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 #endif
 
     boost::optional<TransientSSLParams> transientSSLParams;
-    if (mongoShellOptions.getTls() && mongoShellOptions.getTls()->getCreateNewConnection()) {
-        // Empty tls options to create a new connection.
+    if (mongoShellOptions.getTls()) {
+        const auto& tlsOpts = mongoShellOptions.getTls();
+
         TLSCredentials tlsCredentials;
+        tlsCredentials.tlsPEMKeyFile = tlsOpts->getCertificateKeyFile().value_or("").toString();
+        tlsCredentials.tlsPEMKeyPassword =
+            tlsOpts->getCertificateKeyFilePassword().value_or("").toString();
+        tlsCredentials.tlsCAFile = tlsOpts->getCAFile().value_or("").toString();
+        tlsCredentials.tlsCRLFile = tlsOpts->getCRLFile().value_or("").toString();
+        tlsCredentials.tlsAllowInvalidHostnames = tlsOpts->getAllowInvalidHostnames();
+        tlsCredentials.tlsAllowInvalidCertificates = tlsOpts->getAllowInvalidCertificates();
+
+#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+        if (tlsOpts->getCertificateSelector()) {
+            uassertStatusOK(
+                parseCertificateSelector(&tlsCredentials.tlsCertificateSelector,
+                                         "tls.certificateSelector",
+                                         tlsOpts->getCertificateSelector().value().toString()));
+        }
+#endif  // MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+
         transientSSLParams = TransientSSLParams(tlsCredentials);
     }
 
