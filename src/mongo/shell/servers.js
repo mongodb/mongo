@@ -1578,6 +1578,12 @@ var _stopUndoLiveRecord = function(undoLiveRecordPid) {
 MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
     // TODO: Make there only be one codepath for starting mongo processes
 
+    // The config fuzzer does not apply all fuzzed configurations to mongo binaries executed via
+    // MongoRunner (See SERVER-92148 and SERVER-92894). To avoid a situation where programmers
+    // develop tests believing otherwise, we make doing so an explicit error.
+    assert(!jsTest.options().fuzzMongodConfigs,
+           "runMongo*() cannot be used with a fuzzed configuration, use standalone.py instead.");
+
     argArray = appendSetParameterArgs(argArray);
     var port = MongoRunner.parsePort.apply(null, argArray);
     var pid = -1;
