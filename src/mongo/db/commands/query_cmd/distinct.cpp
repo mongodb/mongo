@@ -192,7 +192,36 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
     const auto& collectionPtr = coll.getCollectionPtr();
     const MultipleCollectionAccessor collections{coll};
 
-    if (canonicalQuery->getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled()) {
+    const bool isFeatureFlagShardFilteringDistinctScanEnabled =
+        canonicalQuery->getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
+
+    // If there's a $natural hint via query settings, we need to go through the query planner to
+    // ensure it gets enforced.
+    const auto hasNaturalHintViaQuerySettings = [&] {
+        const auto& indexHintSpecs =
+            canonicalQuery->getExpCtx()->getQuerySettings().getIndexHints();
+        if (!indexHintSpecs) {
+            return false;
+        }
+        for (const auto& hintSpec : *indexHintSpecs) {
+            for (const auto& hint : hintSpec.getAllowedIndexes()) {
+                if (hint.getNaturalHint()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    // If the query has no filter or sort, there's no need to do multiplanning and we will
+    // short-cut the planner by immediately picking the index with the smallest suitable key.
+    // Ultimately the query planner would do the same, but the additional planning work done
+    // before that can add up to a noticeable regression for fast queries.
+    const bool shouldMultiplan = isFeatureFlagShardFilteringDistinctScanEnabled &&
+        (!canonicalQuery->getFindCommandRequest().getFilter().isEmpty() ||
+         canonicalQuery->getSortPattern() || hasNaturalHintViaQuerySettings());
+
+    if (shouldMultiplan) {
         return uassertStatusOK(
             getExecutorFind(opCtx,
                             collections,
@@ -201,6 +230,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
                             // TODO SERVER-93018: Investigate why we prefer a collection scan
                             // against a 'GENERATE_COVERED_IXSCANS' when no filter is present.
                             QueryPlannerParams::DEFAULT));
+    }
+
+    size_t plannerOptions = QueryPlannerParams::DEFAULT;
+    if (isFeatureFlagShardFilteringDistinctScanEnabled &&
+        OperationShardingState::isComingFromRouter(opCtx)) {
+        plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
     // If the collection doesn't exist 'getExecutor()' should create an EOF plan for it no
@@ -212,10 +247,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
 
     // Try creating a plan that does DISTINCT_SCAN.
     auto swQuerySolution =
-        tryGetQuerySolutionForDistinct(collections, QueryPlannerParams::DEFAULT, *canonicalQuery);
+        tryGetQuerySolutionForDistinct(collections, plannerOptions, *canonicalQuery);
     if (swQuerySolution.isOK()) {
         return uassertStatusOK(getExecutorDistinct(collections,
-                                                   QueryPlannerParams::DEFAULT,
+                                                   plannerOptions,
                                                    std::move(canonicalQuery),
                                                    std::move(swQuerySolution.getValue())));
     }
