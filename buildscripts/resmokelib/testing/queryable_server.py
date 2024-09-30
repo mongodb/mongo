@@ -105,7 +105,11 @@ class QueryableHandler(BaseHTTPRequestHandler):
 
         for root, dirs, files in os.walk(self.dbpath):
             for file in files:
-                dir_files.append({"filename": file, "fileSize": getsize(join(root, file))})
+                rel_dir = os.path.relpath(root, self.dbpath)
+                rel_file = os.path.join(rel_dir, file)
+                if rel_file.startswith("./"):
+                    rel_file = rel_file[2:]
+                dir_files.append({"filename": rel_file, "fileSize": getsize(join(root, file))})
 
         return {"ok": True, "files": dir_files}
 
@@ -125,9 +129,10 @@ class QueryableHandler(BaseHTTPRequestHandler):
 
         if file_name not in self.ephemeral_files:
             self.ephemeral_files[file_name] = tempfile.TemporaryFile()
-            file = open(file_path, "rb")
-            self.ephemeral_files[file_name].write(file.read())
-            file.close()
+            if os.path.isfile(file_path):
+                file = open(file_path, "rb")
+                self.ephemeral_files[file_name].write(file.read())
+                file.close()
 
         file = self.ephemeral_files[file_name]
         file.seek(offset)
@@ -151,9 +156,10 @@ class QueryableHandler(BaseHTTPRequestHandler):
 
         if file_name not in self.ephemeral_files:
             self.ephemeral_files[file_name] = tempfile.TemporaryFile()
-            file = open(file_path, "rb")
-            self.ephemeral_files[file_name].write(file.read())
-            file.close()
+            if os.path.isfile(file_path):
+                file = open(file_path, "rb")
+                self.ephemeral_files[file_name].write(file.read())
+                file.close()
 
         file = self.ephemeral_files[file_name]
         file.seek(offset)

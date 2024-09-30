@@ -5,3 +5,6 @@ filters:
   - "analyze_shard_key.py":
     approvers:
       - 10gen/server-cluster-scalability
+  - "queryable_server_hook.py":
+    approvers:
+      - 10gen/server-rss-sydney

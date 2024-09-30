@@ -992,6 +992,17 @@ tasks:
           use_large_distro: "true"
 
   - <<: *gen_task_template
+    name: queryableWT_gen
+    tags: ["assigned_to_jira_team_server_rss_sydney", "release_critical"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: queryable_wt
+          resmoke_args: src/mongo/db/modules/*/jstests/queryable_wt/*.js
+          resmoke_jobs_max: 1
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
     name: read_concern_linearizable_passthrough_gen
     tags:
       [

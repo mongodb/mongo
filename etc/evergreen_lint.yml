@@ -73,6 +73,7 @@ rules:
           - assigned_to_jira_team_server_programmability
           - assigned_to_jira_team_server_workload_scheduling
           - assigned_to_jira_team_server_networking_and_observability
+          - assigned_to_jira_team_server_rss_sydney
 
           # https://github.com/10gen/mothra/blob/main/mothra/teams/rnd_dev_prod.yaml
           - assigned_to_jira_team_devprod_build

@@ -58,13 +58,18 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/resmokeconfig/suites/OWNERS.yml
 /buildscripts/resmokeconfig/suites/**/*
 /buildscripts/resmokeconfig/suites/**/query_golden* @10gen/query-optimization @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/queryable_wt* @10gen/server-rss-sydney @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/**/* @10gen/devprod-correctness @svc-auto-approve-bot
 
+# The following patterns are parsed from ./buildscripts/resmokelib/testing/OWNERS.yml
+/buildscripts/resmokelib/testing/**/queryable_server.py @10gen/server-rss-sydney @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/hooks/OWNERS.yml
 /buildscripts/resmokelib/testing/hooks/**/*
 /buildscripts/resmokelib/testing/hooks/**/analyze_shard_key.py @10gen/server-cluster-scalability @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/queryable_server_hook.py @10gen/server-rss-sydney @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/tracing_profiler/OWNERS.yml
 /buildscripts/tracing_profiler/**/* @10gen/query @svc-auto-approve-bot
@@ -721,6 +726,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/hot_backups/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/hot_backups/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
 /src/mongo/db/modules/enterprise/jstests/hot_backups/**/magic_restore* @10gen/server-replication @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/queryable_wt/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/queryable_wt/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/streams/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/streams/**/* @10gen/streams-engine @svc-auto-approve-bot
