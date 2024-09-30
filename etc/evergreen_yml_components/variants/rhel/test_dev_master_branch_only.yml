@@ -269,6 +269,7 @@ buildvariants:
       # sharding_uninitialized_fcv_jscore_passthrough_gen spawns too many connections
       # and processes to be used with TLS on a single host.
       - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !embedded_router_jscore_passthrough_with_balancer_gen !.auth !.txns
+      - name: sharded_jscore_txns
       - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen
       - name: .lint
       - name: libdeps_graph_linting
