@@ -15,8 +15,8 @@
  * created or discarded.
  */
 #include <catch2/catch.hpp>
-#include <iostream>
 #include <filesystem>
+#include <iostream>
 
 #include "wt_internal.h"
 #include "../wrappers/mock_session.h"

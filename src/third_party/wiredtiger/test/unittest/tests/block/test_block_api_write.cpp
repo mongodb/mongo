@@ -33,6 +33,40 @@ struct addr_cookie {
     size_t size;
 };
 
+void
+setup_bm(std::shared_ptr<mock_session> &session, WT_BM *bm, const std::string &file_path)
+{
+    REQUIRE(
+      (session->get_mock_connection()->setup_block_manager(session->get_wt_session_impl())) == 0);
+    session->setup_block_manager_file_operations();
+
+    /*
+     * Manually set all the methods in WT_BM. The __wt_blkcache_open() function also initializes the
+     * block manager methods, however the function exists within the WiredTiger block cache and is
+     * a layer above the block manager module. This violates the testing layer concept as we would
+     * be technically testing a whole another module. Therefore we chosen to manually setup the
+     * block manager instead
+     * .
+     */
+    WT_CLEAR(*bm);
+    __wti_bm_method_set(bm, false);
+
+    // Create the underlying file in the filesystem.
+    REQUIRE(__wt_block_manager_create(
+              session->get_wt_session_impl(), file_path.c_str(), std::stoi(ALLOCATION_SIZE)) == 0);
+
+    // Open the file and return the block handle.
+    config_parser cp({{"allocation_size", ALLOCATION_SIZE}, {"block_allocation", BLOCK_ALLOCATION},
+      {"os_cache_max", OS_CACHE_MAX}, {"os_cache_dirty_max", OS_CACHE_DIRTY_MAX},
+      {"access_pattern_hint", ACCESS_PATTERN}});
+    REQUIRE(
+      __wt_block_open(session->get_wt_session_impl(), file_path.c_str(), WT_TIERED_OBJECTID_NONE,
+        cp.get_config_array(), false, false, false, std::stoi(ALLOCATION_SIZE), &bm->block) == 0);
+
+    // Initialize the extent lists inside the block handle.
+    REQUIRE(__wti_block_ckpt_init(session->get_wt_session_impl(), &bm->block->live, nullptr) == 0);
+}
+
 /*
  * Test and validate the bm->write_size() function.
  */
@@ -170,37 +204,12 @@ TEST_CASE("Block manager: file operation read, write and write_size functions", 
 {
     // Build Mock session, this will automatically create a mock connection.
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
-    config_parser cp({{"allocation_size", ALLOCATION_SIZE}, {"block_allocation", BLOCK_ALLOCATION},
-      {"os_cache_max", OS_CACHE_MAX}, {"os_cache_dirty_max", OS_CACHE_DIRTY_MAX},
-      {"access_pattern_hint", ACCESS_PATTERN}});
-
-    REQUIRE(
-      (session->get_mock_connection()->setup_block_manager(session->get_wt_session_impl())) == 0);
-    session->setup_block_manager_file_operations();
 
     WT_BM bm;
     WT_CLEAR(bm);
-    /*
-     * Manually set all the methods in WT_BM. The __wt_blkcache_open() function also initializes the
-     * block manager methods, however the function exists within the WiredTiger block cache and is
-     * a layer above the block manager module. This violates the testing layer concept as we would
-     * be technically testing a whole another module. Therefore we chosen to manually setup the
-     * block manager instead
-     * .
-     */
-    __wti_bm_method_set(&bm, false);
-
     auto path = std::filesystem::current_path();
-    std::string file_path = path.string() + "/test.wt";
-    // Create the underlying file in the filesystem.
-    REQUIRE(__wt_block_manager_create(
-              session->get_wt_session_impl(), file_path.c_str(), std::stoi(ALLOCATION_SIZE)) == 0);
-    // Open the file and return the block handle.
-    REQUIRE(
-      __wt_block_open(session->get_wt_session_impl(), file_path.c_str(), WT_TIERED_OBJECTID_NONE,
-        cp.get_config_array(), false, false, false, std::stoi(ALLOCATION_SIZE), &bm.block) == 0);
-    // Initialize the extent lists inside the block handle.
-    REQUIRE(__wti_block_ckpt_init(session->get_wt_session_impl(), &bm.block->live, nullptr) == 0);
+    std::string file_path(path.string() + "/test.wt");
+    setup_bm(session, &bm, file_path);
 
     SECTION("Test write_size api")
     {
