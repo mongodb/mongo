@@ -18,7 +18,6 @@ const rst = new ReplSetTest({
             // Make yielding more common.
             internalQueryExecYieldPeriodMS: 1,
             internalQueryExecYieldIterations: 1,
-            featureFlagLogSlowOpsBasedOnTimeWorking: true,
         },
     }
 });

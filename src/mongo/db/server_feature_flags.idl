@@ -123,12 +123,6 @@ feature_flags:
         cpp_varname: gFeatureFlagCompactOptions
         default: true
         shouldBeFCVGated: false
-    featureFlagLogSlowOpsBasedOnTimeWorking:
-        description: "Feature flag to enable slow operation logging based on time working rather
-        than total latency"
-        cpp_varname: gFeatureFlagLogSlowOpsBasedOnTimeWorking
-        default: true
-        shouldBeFCVGated: false
     # TODO SERVER-89999 remove once the version becomes last LTS
     featureFlagDisallowBucketCollectionWithoutTimeseriesOptions:
         description: "Disallow creation of timeseries bucket collection without timeseries options"

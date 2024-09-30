@@ -658,13 +658,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         // settings.
         bool shouldSample;
         std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-            opCtx,
-            logOptions.component(),
-            (gFeatureFlagLogSlowOpsBasedOnTimeWorking.isEnabled(
-                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
-                 ? _debug.workingTimeMillis
-                 : Milliseconds(executionTimeMillis)),
-            Milliseconds(slowMs));
+            opCtx, logOptions.component(), _debug.workingTimeMillis, Milliseconds(slowMs));
 
         shouldProfileAtLevel1 = shouldLogSlowOp && shouldSample;
     }
@@ -1368,11 +1362,8 @@ void OpDebug::report(OperationContext* opCtx,
 
     pAttrs->add("queues", queuesBuilder.obj());
 
-    if (gFeatureFlagLogSlowOpsBasedOnTimeWorking.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        // workingMillis should always be present for any operation
-        pAttrs->add("workingMillis", workingTimeMillis.count());
-    }
+    // workingMillis should always be present for any operation
+    pAttrs->add("workingMillis", workingTimeMillis.count());
 
     // durationMillis should always be present for any operation
     pAttrs->add(
