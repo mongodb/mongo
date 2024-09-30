@@ -318,8 +318,8 @@ buildvariants:
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
           - rhel8.8-medium
-      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.fuzzer_deterministic
-      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.fuzzer_deterministic
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
           - rhel8.8-medium
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
@@ -802,6 +802,7 @@ buildvariants:
       # TODO(SERVER-90936): Remove this once streams_kafka* tests can work with the "default" tag.
       - name: streams_kafka
       - name: streams_kafka_gwproxy
+      - name: .fuzzer_deterministic
 
   ### Security Patch-Specific Build Variants ###
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template

@@ -249,7 +249,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
-        "release_critical",
+        "auxiliary",
         "fuzzer_deterministic",
         "common",
         "multiversion",
@@ -408,7 +408,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
-        "release_critical",
+        "auxiliary",
         "fuzzer_deterministic",
         "common",
         "timeseries",
@@ -1205,7 +1205,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
-        "release_critical",
+        "auxiliary",
         "fuzzer_deterministic",
         "multiversion",
         "incompatible_mac",
@@ -1341,7 +1341,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_optimization",
-        "release_critical",
+        "auxiliary",
         "fuzzer_deterministic",
         "optimization",
         "incompatible_mac",
