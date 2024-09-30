@@ -44,6 +44,7 @@ def get_tests_with_feature_flag_tags(feature_flags, ent_path):
 def get_tests_missing_fcv_tag(tests):
     """Get the list of tests missing requires FCV tag."""
     found_tests = []
+    jscomment.get_tags.cache_clear()
     for test in tests:
         try:
             test_tags = jscomment.get_tags(test)
@@ -72,7 +73,6 @@ def main(diff_file, ent_path):
     tests_with_feature_flag_tag = get_tests_with_feature_flag_tags(enabled_feature_flags, ent_path)
 
     _run_git_cmd(["apply", diff_file])
-    _run_git_cmd(["apply", diff_file], cwd=ent_path)
     tests_missing_fcv_tag = get_tests_missing_fcv_tag(tests_with_feature_flag_tag)
 
     if tests_missing_fcv_tag:
