@@ -268,6 +268,7 @@ enum class DocumentSourceType {
     kValidateStub,                          // DocumentSourceValidateStub
     kVectorSearch,                          // DocumentSourceVectorSearch
     kWindowStub,                            // DocumentSourceWindowStub
+    kExternalApi,                           // DocumentSourceExternalApiStub
 };
 
 class DocumentSource : public RefCountable {
