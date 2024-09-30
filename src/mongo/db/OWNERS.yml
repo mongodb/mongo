@@ -66,27 +66,6 @@ filters:
   - "curop*":
     approvers:
       - 10gen/query-integration-observability
-  - "allocate_cursor_id*":
-    approvers:
-      - 10gen/query-execution
-  - "clientcursor*":
-    approvers:
-      - 10gen/query-execution
-  - "cursor_id.h":
-    approvers:
-      - 10gen/query-execution
-  - "cursor_manager*":
-    approvers:
-      - 10gen/query-execution
-  - "cursor_server_params*":
-    approvers:
-      - 10gen/query-execution
-  - "exhaust_cursor_currentop_integration_test.cpp":
-    approvers:
-      - 10gen/query-integration-staff-leads
-  - "generic_cursor*":
-    approvers:
-      - 10gen/query-execution
   - "update_index_data*":
     approvers:
       - 10gen/query-execution
