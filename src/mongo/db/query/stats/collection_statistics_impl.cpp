@@ -49,11 +49,11 @@ double CollectionStatisticsImpl::getCardinality() const {
 }
 
 void CollectionStatisticsImpl::addHistogram(const std::string& path,
-                                            std::shared_ptr<const ArrayHistogram> histogram) const {
+                                            std::shared_ptr<const CEHistogram> histogram) const {
     _histograms[path] = histogram;
 }
 
-const ArrayHistogram* CollectionStatisticsImpl::getHistogram(const std::string& path) const {
+const CEHistogram* CollectionStatisticsImpl::getHistogram(const std::string& path) const {
     if (auto mapIt = _histograms.find(path); mapIt != _histograms.end()) {
         return mapIt->second.get();
     } else {

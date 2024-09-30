@@ -33,7 +33,7 @@
 #include <string>
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/collection_statistics.h"
 
 namespace mongo::stats {
@@ -51,12 +51,12 @@ public:
      * Adds a histogram along the given path.
      */
     void addHistogram(const std::string& path,
-                      std::shared_ptr<const ArrayHistogram> histogram) const override;
+                      std::shared_ptr<const CEHistogram> histogram) const override;
 
     /**
      * Returns the histogram for the given field path, or nullptr if none exists.
      */
-    const ArrayHistogram* getHistogram(const std::string& path) const override;
+    const CEHistogram* getHistogram(const std::string& path) const override;
 
     ~CollectionStatisticsMock() override = default;
 

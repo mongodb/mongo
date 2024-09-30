@@ -38,13 +38,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
 
 namespace mongo::stats {
 using StatsPathString = std::pair<NamespaceString, std::string>;
-using StatsCacheVal = std::shared_ptr<const ArrayHistogram>;
+using StatsCacheVal = std::shared_ptr<const CEHistogram>;
 
 class StatsCacheLoader {
 public:

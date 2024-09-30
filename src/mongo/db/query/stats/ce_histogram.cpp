@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 
 #include <cstddef>
 #include <functional>
@@ -316,7 +316,7 @@ void validate(const ScalarHistogram& scalar,
                                      std::less_equal<double>());
 
     } else if (numArrays > 0) {
-        uasserted(7131000, "A scalar ArrayHistogram should not have any arrays in its counters.");
+        uasserted(7131000, "A scalar CEHistogram should not have any arrays in its counters.");
     }
 
     // Validate boolean counters.
@@ -368,20 +368,20 @@ double getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammabl
     return total;
 }
 
-ArrayHistogram::ArrayHistogram()
-    : ArrayHistogram(ScalarHistogram::make(), {} /* Type counts. */, 0.0 /* Sample size. */) {}
+CEHistogram::CEHistogram()
+    : CEHistogram(ScalarHistogram::make(), {} /* Type counts. */, 0.0 /* Sample size. */) {}
 
-ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
-                               TypeCounts typeCounts,
-                               ScalarHistogram arrayUnique,
-                               ScalarHistogram arrayMin,
-                               ScalarHistogram arrayMax,
-                               TypeCounts arrayTypeCounts,
-                               double sampleSize,
-                               double emptyArrayCount,
-                               double trueCount,
-                               double falseCount,
-                               double nanCount)
+CEHistogram::CEHistogram(ScalarHistogram scalar,
+                         TypeCounts typeCounts,
+                         ScalarHistogram arrayUnique,
+                         ScalarHistogram arrayMin,
+                         ScalarHistogram arrayMax,
+                         TypeCounts arrayTypeCounts,
+                         double sampleSize,
+                         double emptyArrayCount,
+                         double trueCount,
+                         double falseCount,
+                         double nanCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _emptyArrayCount(emptyArrayCount),
@@ -394,12 +394,12 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
       _arrayMax(std::move(arrayMax)),
       _arrayTypeCounts(std::move(arrayTypeCounts)) {}
 
-ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
-                               TypeCounts typeCounts,
-                               double sampleSize,
-                               double trueCount,
-                               double falseCount,
-                               double nanCount)
+CEHistogram::CEHistogram(ScalarHistogram scalar,
+                         TypeCounts typeCounts,
+                         double sampleSize,
+                         double trueCount,
+                         double falseCount,
+                         double nanCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _emptyArrayCount(0.0),
@@ -412,37 +412,37 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
       _arrayMax(boost::none),
       _arrayTypeCounts(boost::none) {}
 
-std::shared_ptr<const ArrayHistogram> ArrayHistogram::make() {
+std::shared_ptr<const CEHistogram> CEHistogram::make() {
     // No need to validate an empty histogram.
-    return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram());
+    return std::shared_ptr<const CEHistogram>(new CEHistogram());
 }
 
-std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scalar,
-                                                           TypeCounts typeCounts,
-                                                           double sampleSize,
-                                                           double trueCount,
-                                                           double falseCount,
-                                                           double nanCount,
-                                                           bool doValidation) {
+std::shared_ptr<const CEHistogram> CEHistogram::make(ScalarHistogram scalar,
+                                                     TypeCounts typeCounts,
+                                                     double sampleSize,
+                                                     double trueCount,
+                                                     double falseCount,
+                                                     double nanCount,
+                                                     bool doValidation) {
     if (doValidation) {
         validate(scalar, typeCounts, boost::none, sampleSize, trueCount, falseCount, nanCount);
     }
-    return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram(
+    return std::shared_ptr<const CEHistogram>(new CEHistogram(
         std::move(scalar), std::move(typeCounts), sampleSize, trueCount, falseCount, nanCount));
 }
 
-std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scalar,
-                                                           TypeCounts typeCounts,
-                                                           ScalarHistogram arrayUnique,
-                                                           ScalarHistogram arrayMin,
-                                                           ScalarHistogram arrayMax,
-                                                           TypeCounts arrayTypeCounts,
-                                                           double sampleSize,
-                                                           double emptyArrayCount,
-                                                           double trueCount,
-                                                           double falseCount,
-                                                           double nanCount,
-                                                           bool doValidation) {
+std::shared_ptr<const CEHistogram> CEHistogram::make(ScalarHistogram scalar,
+                                                     TypeCounts typeCounts,
+                                                     ScalarHistogram arrayUnique,
+                                                     ScalarHistogram arrayMin,
+                                                     ScalarHistogram arrayMax,
+                                                     TypeCounts arrayTypeCounts,
+                                                     double sampleSize,
+                                                     double emptyArrayCount,
+                                                     double trueCount,
+                                                     double falseCount,
+                                                     double nanCount,
+                                                     bool doValidation) {
     if (doValidation) {
         validate(scalar,
                  typeCounts,
@@ -452,20 +452,20 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scala
                  falseCount,
                  nanCount);
     }
-    return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram(std::move(scalar),
-                                                                    std::move(typeCounts),
-                                                                    std::move(arrayUnique),
-                                                                    std::move(arrayMin),
-                                                                    std::move(arrayMax),
-                                                                    std::move(arrayTypeCounts),
-                                                                    sampleSize,
-                                                                    emptyArrayCount,
-                                                                    trueCount,
-                                                                    falseCount,
-                                                                    nanCount));
+    return std::shared_ptr<const CEHistogram>(new CEHistogram(std::move(scalar),
+                                                              std::move(typeCounts),
+                                                              std::move(arrayUnique),
+                                                              std::move(arrayMin),
+                                                              std::move(arrayMax),
+                                                              std::move(arrayTypeCounts),
+                                                              sampleSize,
+                                                              emptyArrayCount,
+                                                              trueCount,
+                                                              falseCount,
+                                                              nanCount));
 }
 
-std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(Statistics stats) {
+std::shared_ptr<const CEHistogram> CEHistogram::make(Statistics stats) {
     // Note that we don't run validation when loading a histogram from the Statistics collection
     // because we already validated this histogram before inserting it.
     const auto scalar = ScalarHistogram::make(stats.getScalarHistogram());
@@ -477,27 +477,27 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(Statistics stats) {
 
     // If we have ArrayStatistics, we will need to initialize the array-only fields.
     if (auto maybeArrayStats = stats.getArrayStatistics(); maybeArrayStats) {
-        return std::shared_ptr<const ArrayHistogram>(
-            new ArrayHistogram(std::move(scalar),
-                               std::move(typeCounts),
-                               ScalarHistogram::make(maybeArrayStats->getUniqueHistogram()),
-                               ScalarHistogram::make(maybeArrayStats->getMinHistogram()),
-                               ScalarHistogram::make(maybeArrayStats->getMaxHistogram()),
-                               mapStatsTypeCountToTypeCounts(maybeArrayStats->getTypeCount()),
-                               sampleSize,
-                               stats.getEmptyArrayCount(),
-                               trueCount,
-                               falseCount,
-                               nanCount));
+        return std::shared_ptr<const CEHistogram>(
+            new CEHistogram(std::move(scalar),
+                            std::move(typeCounts),
+                            ScalarHistogram::make(maybeArrayStats->getUniqueHistogram()),
+                            ScalarHistogram::make(maybeArrayStats->getMinHistogram()),
+                            ScalarHistogram::make(maybeArrayStats->getMaxHistogram()),
+                            mapStatsTypeCountToTypeCounts(maybeArrayStats->getTypeCount()),
+                            sampleSize,
+                            stats.getEmptyArrayCount(),
+                            trueCount,
+                            falseCount,
+                            nanCount));
     }
 
     // If we don't have ArrayStatistics available, we should construct a histogram with only scalar
     // fields.
-    return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram(
+    return std::shared_ptr<const CEHistogram>(new CEHistogram(
         std::move(scalar), std::move(typeCounts), sampleSize, trueCount, falseCount, nanCount));
 }
 
-bool ArrayHistogram::isArray() const {
+bool CEHistogram::isArray() const {
     return _arrayUnique && _arrayMin && _arrayMax && _arrayTypeCounts;
 }
 
@@ -515,7 +515,7 @@ std::string typeCountsToString(const TypeCounts& typeCounts) {
     return os.str();
 }
 
-std::string ArrayHistogram::toString() const {
+std::string CEHistogram::toString() const {
     std::ostringstream os;
     os << "{\n";
     os << " scalar: " << _scalar.toString();
@@ -530,61 +530,61 @@ std::string ArrayHistogram::toString() const {
     return os.str();
 }
 
-const ScalarHistogram& ArrayHistogram::getScalar() const {
+const ScalarHistogram& CEHistogram::getScalar() const {
     return _scalar;
 }
 
-const ScalarHistogram& ArrayHistogram::getArrayUnique() const {
-    tassert(7131002, "Only an array ArrayHistogram has a unique histogram.", isArray());
+const ScalarHistogram& CEHistogram::getArrayUnique() const {
+    tassert(7131002, "Only an array CEHistogram has a unique histogram.", isArray());
     return *_arrayUnique;
 }
 
-const ScalarHistogram& ArrayHistogram::getArrayMin() const {
-    tassert(7131003, "Only an array ArrayHistogram has a min histogram.", isArray());
+const ScalarHistogram& CEHistogram::getArrayMin() const {
+    tassert(7131003, "Only an array CEHistogram has a min histogram.", isArray());
     return *_arrayMin;
 }
 
-const ScalarHistogram& ArrayHistogram::getArrayMax() const {
-    tassert(7131004, "Only an array ArrayHistogram has a max histogram.", isArray());
+const ScalarHistogram& CEHistogram::getArrayMax() const {
+    tassert(7131004, "Only an array CEHistogram has a max histogram.", isArray());
     return *_arrayMax;
 }
 
-const TypeCounts& ArrayHistogram::getTypeCounts() const {
+const TypeCounts& CEHistogram::getTypeCounts() const {
     return _typeCounts;
 }
 
-const TypeCounts& ArrayHistogram::getArrayTypeCounts() const {
-    tassert(7131005, "Only an array ArrayHistogram has array type counts.", isArray());
+const TypeCounts& CEHistogram::getArrayTypeCounts() const {
+    tassert(7131005, "Only an array CEHistogram has array type counts.", isArray());
     return *_arrayTypeCounts;
 }
 
-double ArrayHistogram::getArrayCount() const {
+double CEHistogram::getArrayCount() const {
     if (isArray()) {
         double arrayCount = getTypeCount(sbe::value::TypeTags::Array);
         uassert(
-            6979503, "Histogram with array data must have at least one array.", arrayCount > 0.0);
+            6979503, "CEHistogram with array data must have at least one array.", arrayCount > 0.0);
         return arrayCount;
     }
     return 0.0;
 }
 
-double ArrayHistogram::getTypeCount(sbe::value::TypeTags tag) const {
+double CEHistogram::getTypeCount(sbe::value::TypeTags tag) const {
     return getTagTypeCount(getTypeCounts(), tag);
 }
 
-double ArrayHistogram::getArrayTypeCount(sbe::value::TypeTags tag) const {
+double CEHistogram::getArrayTypeCount(sbe::value::TypeTags tag) const {
     return getTagTypeCount(getArrayTypeCounts(), tag);
 }
 
-double ArrayHistogram::getTotalTypeCount() const {
+double CEHistogram::getTotalTypeCount() const {
     return getTotalCount(getTypeCounts());
 }
 
-double ArrayHistogram::getTotalArrayTypeCount() const {
+double CEHistogram::getTotalArrayTypeCount() const {
     return getTotalCount(getArrayTypeCounts());
 }
 
-BSONObj ArrayHistogram::serialize() const {
+BSONObj CEHistogram::serialize() const {
     BSONObjBuilder histogramBuilder;
 
     // Serialize boolean type counters.
@@ -618,11 +618,11 @@ BSONObj ArrayHistogram::serialize() const {
 
 BSONObj makeStatistics(double documents,
                        double sampleRate,
-                       const std::shared_ptr<const ArrayHistogram> arrayHistogram) {
+                       const std::shared_ptr<const CEHistogram> ceHistogram) {
     BSONObjBuilder builder;
     builder.appendNumber("documents", documents);
     builder.appendNumber("sampleRate", sampleRate);
-    builder.appendElements(arrayHistogram->serialize());
+    builder.appendElements(ceHistogram->serialize());
     builder.doneFast();
     return builder.obj();
 }
@@ -630,10 +630,10 @@ BSONObj makeStatistics(double documents,
 BSONObj makeStatsPath(StringData path,
                       double documents,
                       double sampleRate,
-                      const std::shared_ptr<const ArrayHistogram> arrayHistogram) {
+                      const std::shared_ptr<const CEHistogram> ceHistogram) {
     BSONObjBuilder builder;
     builder.append("_id", path);
-    builder.append("statistics", makeStatistics(documents, sampleRate, arrayHistogram));
+    builder.append("statistics", makeStatistics(documents, sampleRate, ceHistogram));
     builder.doneFast();
     return builder.obj();
 }

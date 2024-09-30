@@ -118,7 +118,7 @@ ErrorCalculationSummary runQueries(size_t size,
                                    std::pair<size_t, size_t> interval,
                                    std::pair<sbe::value::TypeTags, size_t> queryTypeInfo,
                                    const std::vector<stats::SBEValue>& data,
-                                   std::shared_ptr<const stats::ArrayHistogram> arrHist,
+                                   std::shared_ptr<const stats::CEHistogram> ceHist,
                                    bool includeScalar,
                                    bool useE2EAPI,
                                    size_t seed);

@@ -43,7 +43,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/rand_utils_new.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
@@ -57,7 +57,7 @@
 
 namespace mongo::stats {
 
-TEST(ArrayHistograms, BSONEdgeValues) {
+TEST(CEHistograms, BSONEdgeValues) {
     const std::vector<SBEValue> values{
         SBEValue{sbe::value::TypeTags::Nothing, {}},
 
@@ -120,8 +120,8 @@ TEST(ArrayHistograms, BSONEdgeValues) {
         sbe::value::makeNewObject(),
         sbe::value::makeNewObjectId(),
     };
-    auto ah = createArrayEstimator(values, ScalarHistogram::kMaxBuckets);
-    // We are relying on the fact that 'createArrayEstimator()' performs validation of the histogram
+    auto ceHist = createCEHistogram(values, ScalarHistogram::kMaxBuckets);
+    // We are relying on the fact that 'createCEHistogram()' performs validation of the histogram
     // upon construction.
 
     TypeCounts expectedTypeCounts = {
@@ -142,25 +142,25 @@ TEST(ArrayHistograms, BSONEdgeValues) {
         {sbe::value::TypeTags::Object, 1},
         {sbe::value::TypeTags::ObjectId, 1},
     };
-    ASSERT_EQ(expectedTypeCounts, ah->getTypeCounts());
-    ASSERT_EQ(ah->getTrueCount(), 1);
-    ASSERT_EQ(ah->getFalseCount(), 1);
-    ASSERT_EQ(ah->getNanCount(), 4);
-    ASSERT_EQ(ah->getEmptyArrayCount(), 1);
+    ASSERT_EQ(expectedTypeCounts, ceHist->getTypeCounts());
+    ASSERT_EQ(ceHist->getTrueCount(), 1);
+    ASSERT_EQ(ceHist->getFalseCount(), 1);
+    ASSERT_EQ(ceHist->getNanCount(), 4);
+    ASSERT_EQ(ceHist->getEmptyArrayCount(), 1);
 
     // Verify that we can build a histogram with the number of buckets equal to the number of
     // types in the value stream + 1 (numeric, date, timestamp, string, and objectId).
-    ah = createArrayEstimator(values, 6);
+    ceHist = createCEHistogram(values, 6);
 
     // Ensure we fail to build a histrogram when we have more types than buckets.
-    ASSERT_THROWS(createArrayEstimator(values, 5), DBException);
+    ASSERT_THROWS(createCEHistogram(values, 5), DBException);
 }
 
-TEST(ArrayHistograms, EmptyHistogram) {
-    auto ah = createArrayEstimator({}, ScalarHistogram::kMaxBuckets);
+TEST(CEHistograms, EmptyHistogram) {
+    auto ceHist = createCEHistogram({}, ScalarHistogram::kMaxBuckets);
 }
 
-TEST(ArrayHistograms, SingleEntryHistogram) {
+TEST(CEHistograms, SingleEntryHistogram) {
     const Date_t d = dateFromISOString("2015-10-21T07:28:00+0000").getValue();
     const std::vector<SBEValue> values{
         makeInt64Value(42),
@@ -172,13 +172,13 @@ TEST(ArrayHistograms, SingleEntryHistogram) {
     };
     for (auto&& v : values) {
         std::vector<SBEValue> singleValVec{sbe::value::copyValue(v.getTag(), v.getValue())};
-        auto ah = createArrayEstimator(singleValVec, ScalarHistogram::kMaxBuckets);
-        ah = createArrayEstimator(singleValVec, 1);
+        auto ceHist = createCEHistogram(singleValVec, ScalarHistogram::kMaxBuckets);
+        ceHist = createCEHistogram(singleValVec, 1);
     }
 }
 
-TEST(ArrayHistograms, DuplicateValues) {
-    auto ah = createArrayEstimator(
+TEST(CEHistograms, DuplicateValues) {
+    auto ceHist = createCEHistogram(
         {
             makeInt64Value(1),
             makeInt64Value(1),
@@ -190,9 +190,9 @@ TEST(ArrayHistograms, DuplicateValues) {
         3);
 }
 
-TEST(ArrayHistograms, SingleEntryInTypeClass) {
+TEST(CEHistograms, SingleEntryInTypeClass) {
     // Single entry at the end
-    auto ah = createArrayEstimator(
+    auto ceHist = createCEHistogram(
         {
             makeInt64Value(1),
             makeInt64Value(2),
@@ -200,7 +200,7 @@ TEST(ArrayHistograms, SingleEntryInTypeClass) {
         },
         3);
     // Single entry at the beginning
-    ah = createArrayEstimator(
+    ceHist = createCEHistogram(
         {
             makeInt64Value(1),
             sbe::value::makeNewString("marty"),
@@ -208,7 +208,7 @@ TEST(ArrayHistograms, SingleEntryInTypeClass) {
         },
         3);
     // Single entry in the middle
-    ah = createArrayEstimator(
+    ceHist = createCEHistogram(
         {
             makeInt64Value(1),
             makeInt64Value(2),
@@ -219,8 +219,8 @@ TEST(ArrayHistograms, SingleEntryInTypeClass) {
         4);
 }
 
-TEST(ArrayHistograms, LargeAreasWithinTypeClass) {
-    auto ah = createArrayEstimator(
+TEST(CEHistograms, LargeAreasWithinTypeClass) {
+    auto ceHist = createCEHistogram(
         {
             makeInt32Value(std::numeric_limits<int32_t>::min()),
             makeInt32Value(std::numeric_limits<int32_t>::max()),
@@ -234,8 +234,8 @@ TEST(ArrayHistograms, LargeAreasWithinTypeClass) {
         2);
 }
 
-TEST(ArrayHistograms, SmallAreasWithinTypeClass) {
-    auto ah = createArrayEstimator(
+TEST(CEHistograms, SmallAreasWithinTypeClass) {
+    auto ceHist = createCEHistogram(
         {
             sbe::value::makeCopyDecimal(Decimal128::kSmallestNegative),
             sbe::value::makeCopyDecimal(Decimal128::kNormalizedZero),
@@ -244,7 +244,7 @@ TEST(ArrayHistograms, SmallAreasWithinTypeClass) {
         2);
 }
 
-TEST(ArrayHistograms, MixedTypedHistrogram) {
+TEST(CEHistograms, MixedTypedHistrogram) {
     std::mt19937_64 seed(42);
     MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
     TypeDistrVector td;
@@ -261,11 +261,11 @@ TEST(ArrayHistograms, MixedTypedHistrogram) {
     DatasetDescriptorNew desc{std::move(td), seed};
     const std::vector<SBEValue> values = desc.genRandomDataset(10'000);
     ASSERT_EQ(10'000, values.size());
-    auto ah = createArrayEstimator(values, ScalarHistogram::kMaxBuckets);
-    ASSERT_EQ(10'000, ah->getScalar().getCardinality());
+    auto ceHist = createCEHistogram(values, ScalarHistogram::kMaxBuckets);
+    ASSERT_EQ(10'000, ceHist->getScalar().getCardinality());
 }
 
-TEST(ArrayHistograms, LargeNumberOfScalarValuesBucketRanges) {
+TEST(CEHistograms, LargeNumberOfScalarValuesBucketRanges) {
     std::mt19937_64 seed(42);
     MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
     TypeDistrVector td;
@@ -273,16 +273,16 @@ TEST(ArrayHistograms, LargeNumberOfScalarValuesBucketRanges) {
     DatasetDescriptorNew desc{std::move(td), seed};
     const std::vector<SBEValue> values = desc.genRandomDataset(1'000'000);
     ASSERT_EQ(1'000'000, values.size());
-    auto ah = createArrayEstimator(values, ScalarHistogram::kMaxBuckets);
+    auto ceHist = createCEHistogram(values, ScalarHistogram::kMaxBuckets);
 
-    ASSERT_EQ(1'000'000, ah->getScalar().getCardinality());
+    ASSERT_EQ(1'000'000, ceHist->getScalar().getCardinality());
     // Assert that each bucket has at least one entry.
-    std::for_each(ah->getScalar().getBuckets().begin(),
-                  ah->getScalar().getBuckets().end(),
+    std::for_each(ceHist->getScalar().getBuckets().begin(),
+                  ceHist->getScalar().getBuckets().end(),
                   [](auto&& bucket) { ASSERT_GTE(bucket._equalFreq + bucket._rangeFreq, 1); });
 }
 
-TEST(ArrayHistograms, LargeArraysHistogram) {
+TEST(CEHistograms, LargeArraysHistogram) {
     std::mt19937_64 seed(42);
     MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
 
@@ -299,15 +299,15 @@ TEST(ArrayHistograms, LargeArraysHistogram) {
     const auto values = arrayDatasetDesc.genRandomDataset(10);
     ASSERT_EQ(10, values.size());
 
-    auto ah = createArrayEstimator(values, ScalarHistogram::kMaxBuckets);
+    auto ceHist = createCEHistogram(values, ScalarHistogram::kMaxBuckets);
 
-    ASSERT_TRUE(ah->getScalar().empty());
-    ASSERT_EQ(100, ah->getArrayUnique().getBuckets().size());
-    ASSERT_FALSE(ah->getArrayMin().empty());
-    ASSERT_FALSE(ah->getArrayMax().empty());
+    ASSERT_TRUE(ceHist->getScalar().empty());
+    ASSERT_EQ(100, ceHist->getArrayUnique().getBuckets().size());
+    ASSERT_FALSE(ceHist->getArrayMin().empty());
+    ASSERT_FALSE(ceHist->getArrayMax().empty());
 }
 
-TEST(ArrayHistograms, LargeNumberOfArraysHistogram) {
+TEST(CEHistograms, LargeNumberOfArraysHistogram) {
     std::mt19937_64 seed(42);
     MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
 
@@ -324,12 +324,12 @@ TEST(ArrayHistograms, LargeNumberOfArraysHistogram) {
     const auto values = arrayDatasetDesc.genRandomDataset(100'000);
     ASSERT_EQ(100'000, values.size());
 
-    auto ah = createArrayEstimator(values, ScalarHistogram::kMaxBuckets);
+    auto ceHist = createCEHistogram(values, ScalarHistogram::kMaxBuckets);
 
-    ASSERT_TRUE(ah->getScalar().empty());
-    ASSERT_EQ(100, ah->getArrayUnique().getBuckets().size());
-    ASSERT_EQ(100, ah->getArrayMin().getBuckets().size());
-    ASSERT_EQ(100, ah->getArrayMax().getBuckets().size());
+    ASSERT_TRUE(ceHist->getScalar().empty());
+    ASSERT_EQ(100, ceHist->getArrayUnique().getBuckets().size());
+    ASSERT_EQ(100, ceHist->getArrayMin().getBuckets().size());
+    ASSERT_EQ(100, ceHist->getArrayMax().getBuckets().size());
 }
 
 std::vector<SBEValue> generateValuesVector(std::vector<int> vals) {
@@ -350,10 +350,10 @@ void assertBounds(const std::vector<int>& expectedBounds, const ScalarHistogram&
     ASSERT_EQ(expectedBounds, gotBounds);
 }
 
-TEST(ArrayHistograms, MaxDiffIntegerBounds) {
+TEST(CEHistograms, MaxDiffIntegerBounds) {
     auto values = generateValuesVector({3, 6, 9});
-    auto ah = createArrayEstimator(values, 3);
-    assertBounds({3, 6, 9}, ah->getScalar());
+    auto ceHist = createCEHistogram(values, 3);
+    assertBounds({3, 6, 9}, ceHist->getScalar());
 
     // Recall that area = (distance to next value - current value) * freqency of current value
 
@@ -364,8 +364,8 @@ TEST(ArrayHistograms, MaxDiffIntegerBounds) {
     // 9 -> inf
     // We'd expect the top 3 buckets to be {3, 7, 9}.
     values = generateValuesVector({3, 6, 7, 9});
-    ah = createArrayEstimator(values, 3);
-    assertBounds({3, 7, 9}, ah->getScalar());
+    ceHist = createCEHistogram(values, 3);
+    assertBounds({3, 7, 9}, ceHist->getScalar());
 
     // Data distribution -> Area
     // 1 -> inf
@@ -375,11 +375,11 @@ TEST(ArrayHistograms, MaxDiffIntegerBounds) {
     // 10 -> (12-10) * 1 = 2
     // 12 -> inf
     values = generateValuesVector({1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 10, 12});
-    ah = createArrayEstimator(values, 3);
-    assertBounds({1, 3, 12}, ah->getScalar());
+    ceHist = createCEHistogram(values, 3);
+    assertBounds({1, 3, 12}, ceHist->getScalar());
 }
 
-TEST(ArrayHistograms, Golden) {
+TEST(CEHistograms, Golden) {
     const std::vector<SBEValue> values = {
         makeInt64Value(3),
         makeInt64Value(4),
@@ -401,7 +401,7 @@ TEST(ArrayHistograms, Golden) {
             return arr;
         }()),
     };
-    auto ah = createArrayEstimator(values, 8, stats::SortArg::kArea);
+    auto ceHist = createCEHistogram(values, 8, stats::SortArg::kArea);
     auto expected = fromjson(R"(
     {
         trueCount: 0.0,
@@ -448,9 +448,9 @@ TEST(ArrayHistograms, Golden) {
             typeCount: [ { typeName: "NumberInt64", count: 1.0 } ]
         }
     })");
-    ASSERT_BSONOBJ_EQ(expected, ah->serialize());
+    ASSERT_BSONOBJ_EQ(expected, ceHist->serialize());
 
-    auto ahAreaDiff = createArrayEstimator(values, 8);
+    auto ceHistAreaDiff = createCEHistogram(values, 8);
     auto expectedAreaDiff = fromjson(R"(
     {
         trueCount: 0.0,
@@ -497,7 +497,7 @@ TEST(ArrayHistograms, Golden) {
             typeCount: [ { typeName: "NumberInt64", count: 1.0 } ]
         }
     })");
-    ASSERT_BSONOBJ_EQ(expectedAreaDiff, ahAreaDiff->serialize());
+    ASSERT_BSONOBJ_EQ(expectedAreaDiff, ceHistAreaDiff->serialize());
 }
 
 }  // namespace mongo::stats

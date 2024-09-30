@@ -121,7 +121,7 @@ void BM_CreateHistogram(benchmark::State& state) {
 
     for (auto curState : state) {
         // Built histogram.
-        auto arrHist = stats::createArrayEstimator(data, configuration.numberOfBuckets);
+        auto ceHist = stats::createCEHistogram(data, configuration.numberOfBuckets);
     }
 }
 
@@ -170,7 +170,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
     }
 
     // Build histogram.
-    auto arrHist = stats::createArrayEstimator(data, configuration.numberOfBuckets);
+    auto ceHist = stats::createCEHistogram(data, configuration.numberOfBuckets);
 
     TypeProbability typeCombinationQuery{configuration.sbeDataType, 100};
 
@@ -181,7 +181,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
                    configuration.dataInterval,
                    typeCombinationQuery,
                    data,
-                   arrHist,
+                   ceHist,
                    true /*includeScalar*/,
                    false /*useE2EAPI*/,
                    seed);

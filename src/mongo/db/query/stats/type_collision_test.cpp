@@ -38,7 +38,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/platform/decimal128.h"
@@ -76,15 +76,15 @@ TEST(TypeCollisionTest, ZeroedCollidingTypesHistogram) {
 
     // We should always fail to build a histogram on 0 buckets.
     auto i = 0;
-    ASSERT_THROWS(createArrayEstimator(data, 0), DBException);
+    ASSERT_THROWS(createCEHistogram(data, 0), DBException);
 
     // We should always fail to build a histogram if we have fewer buckets than type classes.
     for (i = 1; i < 5; i++) {
-        ASSERT_THROWS(createArrayEstimator(data, i), DBException);
+        ASSERT_THROWS(createCEHistogram(data, i), DBException);
     }
 
     // With sufficient buckets, we should build a histogram with one bucket per type class.
-    auto ah = createArrayEstimator(data, i);
+    auto ceHist = createCEHistogram(data, i);
     auto expected = fromjson(
         "{ \
 		trueCount: 0.0, \
@@ -142,6 +142,6 @@ TEST(TypeCollisionTest, ZeroedCollidingTypesHistogram) {
 			bounds: [0.0, \"\", ObjectId('000000000000000000000000'), new Date(0), Timestamp(0, 0)]\
 		} \
 	}");
-    ASSERT_BSONOBJ_EQ(expected, ah->serialize());
+    ASSERT_BSONOBJ_EQ(expected, ceHist->serialize());
 }
 }  // namespace mongo::stats

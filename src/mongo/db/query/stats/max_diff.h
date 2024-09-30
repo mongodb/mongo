@@ -38,7 +38,7 @@
 #include <vector>
 
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/value_utils.h"
 
@@ -130,8 +130,8 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistribution,
  * Given a vector containing SBEValues, generate a set of statistics to summarize the supplied
  * data. Histograms will use the supplied number of buckets.
  */
-std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBEValue>& arrayData,
-                                                           size_t numBuckets,
-                                                           SortArg sortArg = SortArg::kAreaDiff);
+std::shared_ptr<const CEHistogram> createCEHistogram(const std::vector<SBEValue>& arrayData,
+                                                     size_t numBuckets,
+                                                     SortArg sortArg = SortArg::kAreaDiff);
 
 }  // namespace mongo::stats

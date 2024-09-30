@@ -301,7 +301,7 @@ ErrorCalculationSummary runQueries(size_t size,
                                    const std::pair<size_t, size_t> interval,
                                    const std::pair<sbe::value::TypeTags, size_t> queryTypeInfo,
                                    const std::vector<stats::SBEValue>& data,
-                                   const std::shared_ptr<const stats::ArrayHistogram> arrHist,
+                                   const std::shared_ptr<const stats::CEHistogram> ceHist,
                                    bool includeScalar,
                                    bool useE2EAPI,
                                    const size_t seed) {
@@ -355,7 +355,7 @@ ErrorCalculationSummary runQueries(size_t size,
 
                 // Estimate result.
                 estimatedCard = estimateCardinalityEq(
-                    *arrHist, queryTypeInfo.first, sbeValLow[i].getValue(), includeScalar);
+                    *ceHist, queryTypeInfo.first, sbeValLow[i].getValue(), includeScalar);
                 break;
             }
             case kRange: {
@@ -371,7 +371,7 @@ ErrorCalculationSummary runQueries(size_t size,
                     data, queryTypeInfo.first, sbeValLow[i], sbeValHigh[i]);
 
                 // Estimate result.
-                estimatedCard = estimateCardinalityRange(*arrHist,
+                estimatedCard = estimateCardinalityRange(*ceHist,
                                                          true /*lowInclusive*/,
                                                          queryTypeInfo.first,
                                                          sbeValLow[i].getValue(),
@@ -465,7 +465,7 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
             }
 
             // Build histogram.
-            auto arrHist = stats::createArrayEstimator(data, numberOfBuckets);
+            auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
 
             // Run queries.
             for (const auto& typeCombinationQuery : typeCombinationsQueries) {
@@ -480,7 +480,7 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
                                         queryInterval,
                                         typeCombinationQuery,
                                         data,
-                                        arrHist,
+                                        ceHist,
                                         includeScalar,
                                         useE2EAPI,
                                         seed);

@@ -36,7 +36,7 @@ namespace mongo::ce {
 namespace {
 namespace value = sbe::value;
 
-using stats::ArrayHistogram;
+using stats::CEHistogram;
 using stats::ScalarHistogram;
 using stats::TypeCounts;
 
@@ -59,7 +59,7 @@ constexpr double kErrorBound = 0.01;
 // assertions comparing the estimated cardinality with the correct value, or approximate assertions
 // accepting 'kErrorBound' error.
 
-TEST(ScalarEstimatorInterpolationTest, ManualHistogram) {
+TEST(ScalarHistogramEstimatorInterpolationTest, ManualHistogram) {
     std::vector<BucketData> data{{0, 1.0, 1.0, 1.0},
                                  {10, 1.0, 10.0, 5.0},
                                  {20, 3.0, 15.0, 3.0},
@@ -85,7 +85,7 @@ TEST(ScalarEstimatorInterpolationTest, ManualHistogram) {
     ASSERT_EQ(21.5, estimateCardinalityScalarHistogramInteger(hist, 25, kGreaterOrEqual));
 }
 
-TEST(ScalarEstimatorInterpolationTest, UniformIntEstimate) {
+TEST(ScalarHistogramEstimatorInterpolationTest, UniformIntEstimate) {
     // This hard-codes a maxdiff histogram with 10 buckets built off a uniform int distribution with
     // a minimum of 0, a maximum of 1000, and 70 distinct values.
     std::vector<BucketData> data{{2, 1, 0, 0},
@@ -139,7 +139,7 @@ TEST(ScalarEstimatorInterpolationTest, UniformIntEstimate) {
     ASSERT_APPROX_EQUAL(43.0, expectedCard, 0.1);  // Actual: 40.
 }
 
-TEST(ScalarEstimatorInterpolationTest, NormalIntEstimate) {
+TEST(ScalarHistogramEstimatorInterpolationTest, NormalIntEstimate) {
     // This hard-codes a maxdiff histogram with 10 buckets built off a normal int distribution with
     // a minimum of 0, a maximum of 1000, and 70 distinct values.
     std::vector<BucketData> data{{2, 1, 0, 0},
@@ -180,7 +180,7 @@ TEST(ScalarEstimatorInterpolationTest, NormalIntEstimate) {
     ASSERT_APPROX_EQUAL(10.4, expectedCard, 0.1);  // Actual: 10.
 }
 
-TEST(ScalarEstimatorInterpolationTest, UniformStrEstimate) {
+TEST(ScalarHistogramEstimatorInterpolationTest, UniformStrEstimate) {
     // This hard-codes a maxdiff histogram with 10 buckets built off a uniform string distribution
     // with a minimum length of 3, a maximum length of 5, and 80 distinct values.
     std::vector<BucketData> data{{{"0ejz", 2, 0, 0},
@@ -212,7 +212,7 @@ TEST(ScalarEstimatorInterpolationTest, UniformStrEstimate) {
     ASSERT_APPROX_EQUAL(41.3, expectedCard, 0.1);  // Actual: 41.
 }
 
-TEST(ScalarEstimatorInterpolationTest, NormalStrEstimate) {
+TEST(ScalarHistogramEstimatorInterpolationTest, NormalStrEstimate) {
     // This hard-codes a maxdiff histogram with 10 buckets built off a normal string distribution
     // with a minimum length of 3, a maximum length of 5, and 80 distinct values.
     std::vector<BucketData> data{{
@@ -261,7 +261,7 @@ TEST(ScalarEstimatorInterpolationTest, NormalStrEstimate) {
     ASSERT_APPROX_EQUAL(40.0, expectedCard, 0.1);  // Actual: 37.
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, OneBucketIntHistogram) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, OneBucketIntHistogram) {
 
     std::vector<BucketData> data{{100, 3.0, 27.0, 9.0}};
     const ScalarHistogram hist = createHistogram(data);
@@ -290,7 +290,7 @@ TEST(ScalarEstimatorEdgeCasesTest, OneBucketIntHistogram) {
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kGreaterOrEqual).card);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, OneExclusiveBucketIntHistogram) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, OneExclusiveBucketIntHistogram) {
     // Data set of a single value.
     // By exclusive bucket we mean a bucket with only boundary, that is the range frequency and
     // NDV are zero.
@@ -314,7 +314,7 @@ TEST(ScalarEstimatorEdgeCasesTest, OneExclusiveBucketIntHistogram) {
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kGreater).card);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, OneBucketTwoIntValuesHistogram) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, OneBucketTwoIntValuesHistogram) {
     // Data set of two values, example {5, 100, 100}.
     std::vector<BucketData> data{{100, 2.0, 1.0, 1.0}};
     const ScalarHistogram hist = createHistogram(data);
@@ -335,7 +335,7 @@ TEST(ScalarEstimatorEdgeCasesTest, OneBucketTwoIntValuesHistogram) {
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kGreater).card);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, OneBucketTwoIntValuesHistogram2) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, OneBucketTwoIntValuesHistogram2) {
     std::vector<BucketData> data{{100, 2.0, 3.0, 1.0}};
     const ScalarHistogram hist = createHistogram(data);
 
@@ -355,7 +355,7 @@ TEST(ScalarEstimatorEdgeCasesTest, OneBucketTwoIntValuesHistogram2) {
     ASSERT_EQ(0.0, estimateCardinality(hist, NumberInt64, 1000, kGreater).card);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, TwoBucketsIntHistogram) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, TwoBucketsIntHistogram) {
     std::vector<BucketData> data{{1, 1.0, 0.0, 0.0}, {100, 3.0, 26.0, 8.0}};
     const ScalarHistogram hist = createHistogram(data);
 
@@ -401,7 +401,7 @@ TEST(ScalarEstimatorEdgeCasesTest, TwoBucketsIntHistogram) {
         19.38, estimateCardinality(hist, NumberInt64, 50, kGreaterOrEqual).card, kErrorBound);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, ThreeExclusiveBucketsIntHistogram) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, ThreeExclusiveBucketsIntHistogram) {
     std::vector<BucketData> data{{1, 1.0, 0.0, 0.0}, {10, 8.0, 0.0, 0.0}, {100, 1.0, 0.0, 0.0}};
     const ScalarHistogram hist = createHistogram(data);
 
@@ -414,7 +414,7 @@ TEST(ScalarEstimatorEdgeCasesTest, ThreeExclusiveBucketsIntHistogram) {
     ASSERT_EQ(9.0, estimateCardinality(hist, NumberInt64, 5, kGreaterOrEqual).card);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, OneBucketStrHistogram) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, OneBucketStrHistogram) {
     std::vector<BucketData> data{{"xyz", 3.0, 27.0, 9.0}};
     const ScalarHistogram hist = createHistogram(data);
 
@@ -455,7 +455,7 @@ TEST(ScalarEstimatorEdgeCasesTest, OneBucketStrHistogram) {
     ASSERT_EQ(0.0, estimateCardinality(hist, tag, value, kGreater).card);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, TwoBucketsStrHistogram) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, TwoBucketsStrHistogram) {
     // Data set of 100 strings in the range ["abc", "xyz"], with average frequency of 2.
     std::vector<BucketData> data{{"abc", 2.0, 0.0, 0.0}, {"xyz", 3.0, 95.0, 48.0}};
     const ScalarHistogram hist = createHistogram(data);
@@ -508,7 +508,7 @@ TEST(ScalarEstimatorEdgeCasesTest, TwoBucketsStrHistogram) {
         4.98, estimateCardinality(hist, tag, value, kGreaterOrEqual).card, kErrorBound);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, TwoBucketsDateHistogram) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, TwoBucketsDateHistogram) {
     // June 6, 2017 -- June 7, 2017.
     const int64_t startInstant = 1496777923000LL;
     const int64_t endInstant = 1496864323000LL;
@@ -548,7 +548,7 @@ TEST(ScalarEstimatorEdgeCasesTest, TwoBucketsDateHistogram) {
     ASSERT_EQ(0.0, estimateCardinality(hist, Date, valueAfter, kGreater).card);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, TwoBucketsTimestampHistogram) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, TwoBucketsTimestampHistogram) {
     // June 6, 2017 -- June 7, 2017 in seconds.
     const int64_t startInstant = 1496777923LL;
     const int64_t endInstant = 1496864323LL;
@@ -589,7 +589,7 @@ TEST(ScalarEstimatorEdgeCasesTest, TwoBucketsTimestampHistogram) {
     ASSERT_EQ(0.0, estimateCardinality(hist, TimeStamp, valueAfter, kGreater).card);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, TwoBucketsObjectIdHistogram) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, TwoBucketsObjectIdHistogram) {
     const auto startOid = OID("63340d8d27afef2de7357e8d");
     const auto endOid = OID("63340dbed6cd8af737d4139a");
     ASSERT_TRUE(startOid < endOid);
@@ -641,7 +641,7 @@ TEST(ScalarEstimatorEdgeCasesTest, TwoBucketsObjectIdHistogram) {
  * the cardinality estimates are precise. To test the approximate estimation, we force the histogram
  * generation to use one bucket per type (except the first numeric type).
  */
-TEST(ScalarEstimatorEdgeCasesTest, MinValueMixedHistogramFromData) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromData) {
     const int64_t startInstant = 1506777923000LL;
     const int64_t endInstant = 1516864323000LL;
     const Timestamp startTs{Seconds(1516864323LL), 0};
@@ -824,7 +824,7 @@ TEST(ScalarEstimatorEdgeCasesTest, MinValueMixedHistogramFromData) {
     ASSERT_EQ(3.0, expectedCard.card);
 }
 
-TEST(ScalarEstimatorEdgeCasesTest, MinValueMixedHistogramFromBuckets) {
+TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromBuckets) {
     const auto endOid = OID("63340dbed6cd8af737d4139a");
     const auto endDate = Date_t::fromMillisSinceEpoch(1526864323000LL);
     const Timestamp endTs{Seconds(1526864323LL), 0};
@@ -881,10 +881,10 @@ TEST(ScalarEstimatorEdgeCasesTest, MinValueMixedHistogramFromBuckets) {
 }
 
 
-// --------------------- ARRAY HISTOGRAM ESTIMATION TESTS ---------------------
+// --------------------- CE HISTOGRAM ESTIMATION TESTS ---------------------
 // The tests included in this section of the file evaluate the functionality and correctness of the
-// ArrayHistogram.
-// The tests generates array histograms and estimates the frequency of various keys values. The
+// CEHistogram.
+// The tests generates ce_histograms and estimates the frequency of various keys values. The
 // tests either perform exact assertions comparing the estimated cardinality with the correct value,
 // or approximate assertions accepting 'kErrorBound' error.
 
@@ -957,7 +957,7 @@ static std::string computeRMSE(std::vector<QuerySpec>& querySet, bool isElemMatc
     return os.str();
 }
 
-TEST(ArrayEstimatorTest, ManualHistogram) {
+TEST(CEHistogramEstimatorTest, ManualHistogram) {
     std::vector<BucketData> data{{0, 1.0, 1.0, 1.0},
                                  {10, 1.0, 10.0, 5.0},
                                  {20, 3.0, 15.0, 3.0},
@@ -966,19 +966,18 @@ TEST(ArrayEstimatorTest, ManualHistogram) {
                                  {50, 1.0, 10.0, 5.0}};
     const double intCnt = 55;
     const ScalarHistogram& hist = createHistogram(data);
-    const auto arrHist =
-        ArrayHistogram::make(hist, stats::TypeCounts{{NumberInt64, intCnt}}, intCnt);
+    const auto ceHist = CEHistogram::make(hist, stats::TypeCounts{{NumberInt64, intCnt}}, intCnt);
 
-    ASSERT_EQ(3.0, estimateCardinalityEq(*arrHist, NumberInt64, 20, true).card);
-    ASSERT_EQ(1.0, estimateCardinalityEq(*arrHist, NumberInt64, 50, true).card);
+    ASSERT_EQ(3.0, estimateCardinalityEq(*ceHist, NumberInt64, 20, true).card);
+    ASSERT_EQ(1.0, estimateCardinalityEq(*ceHist, NumberInt64, 50, true).card);
     ASSERT_EQ(0,
-              estimateCardinalityEq(*arrHist, NumberInt64, 40, false)
+              estimateCardinalityEq(*ceHist, NumberInt64, 40, false)
                   .card);  // should be 2.0 for includeScalar: true
     // value not in data
-    ASSERT_EQ(0, estimateCardinalityEq(*arrHist, NumberInt64, 60, true).card);
+    ASSERT_EQ(0, estimateCardinalityEq(*ceHist, NumberInt64, 60, true).card);
 }
 
-TEST(ArrayEstimatorTest, UniformIntHistogram) {
+TEST(CEHistogramEstimatorTest, UniformIntHistogram) {
     std::vector<BucketData> data{{2, 1, 0, 0},
                                  {57, 3, 2, 1},
                                  {179, 5, 10, 6},
@@ -991,19 +990,18 @@ TEST(ArrayEstimatorTest, UniformIntHistogram) {
                                  {986, 1, 0, 0}};
     const ScalarHistogram& hist = createHistogram(data);
     const double intCnt = 100;
-    const auto arrHist =
-        ArrayHistogram::make(hist, stats::TypeCounts{{NumberInt64, intCnt}}, intCnt);
+    const auto ceHist = CEHistogram::make(hist, stats::TypeCounts{{NumberInt64, intCnt}}, intCnt);
 
-    ASSERT_EQ(4.0, estimateCardinalityEq(*arrHist, NumberInt64, 558, true).card);
+    ASSERT_EQ(4.0, estimateCardinalityEq(*ceHist, NumberInt64, 558, true).card);
     ASSERT_APPROX_EQUAL(1.6,
-                        estimateCardinalityEq(*arrHist, NumberInt64, 530, true).card,
+                        estimateCardinalityEq(*ceHist, NumberInt64, 530, true).card,
                         0.1);  // Actual: 1.
     ASSERT_APPROX_EQUAL(1.6,
-                        estimateCardinalityEq(*arrHist, NumberInt64, 400, true).card,
+                        estimateCardinalityEq(*ceHist, NumberInt64, 400, true).card,
                         0.1);  // Actual: 1.
 }
 
-TEST(ArrayEstimatorTest, NormalIntArrayHistogram) {
+TEST(CEHistogramEstimatorTest, NormalIntArrayHistogram) {
     std::vector<BucketData> data{{2, 1, 0, 0},
                                  {317, 8, 20, 15},
                                  {344, 2, 0, 0},
@@ -1016,16 +1014,15 @@ TEST(ArrayEstimatorTest, NormalIntArrayHistogram) {
                                  {993, 1, 21, 9}};
     const ScalarHistogram hist = createHistogram(data);
     const double intCnt = 100;
-    const auto arrHist =
-        ArrayHistogram::make(hist, stats::TypeCounts{{NumberInt64, intCnt}}, intCnt);
+    const auto ceHist = CEHistogram::make(hist, stats::TypeCounts{{NumberInt64, intCnt}}, intCnt);
 
-    ASSERT_EQ(3.0, estimateCardinalityEq(*arrHist, NumberInt64, 696, true).card);
+    ASSERT_EQ(3.0, estimateCardinalityEq(*ceHist, NumberInt64, 696, true).card);
     ASSERT_APPROX_EQUAL(1.3,
-                        estimateCardinalityEq(*arrHist, NumberInt64, 150, true).card,
+                        estimateCardinalityEq(*ceHist, NumberInt64, 150, true).card,
                         0.1);  // Actual: 1.
 }
 
-TEST(ArrayEstimatorTest, SkewedIntHistogram) {
+TEST(CEHistogramEstimatorTest, SkewedIntHistogram) {
     std::vector<BucketData> data{{0, 1.0, 1.0, 1.0},
                                  {10, 150.0, 10.0, 5.0},
                                  {20, 100.0, 14.0, 3.0},
@@ -1034,16 +1031,15 @@ TEST(ArrayEstimatorTest, SkewedIntHistogram) {
                                  {50, 1.0, 10.0, 5.0}};
     const double intCnt = 300;
     const ScalarHistogram& hist = createHistogram(data);
-    const auto arrHist =
-        ArrayHistogram::make(hist, stats::TypeCounts{{NumberInt64, intCnt}}, intCnt);
+    const auto ceHist = CEHistogram::make(hist, stats::TypeCounts{{NumberInt64, intCnt}}, intCnt);
 
-    ASSERT_EQ(150.0, estimateCardinalityEq(*arrHist, NumberInt64, 10, true).card);
-    ASSERT_EQ(100.0, estimateCardinalityEq(*arrHist, NumberInt64, 20, true).card);
-    ASSERT_EQ(1.0, estimateCardinalityEq(*arrHist, NumberInt64, 30, true).card);
-    ASSERT_EQ(0, estimateCardinalityEq(*arrHist, NumberInt64, 40, false).card);
+    ASSERT_EQ(150.0, estimateCardinalityEq(*ceHist, NumberInt64, 10, true).card);
+    ASSERT_EQ(100.0, estimateCardinalityEq(*ceHist, NumberInt64, 20, true).card);
+    ASSERT_EQ(1.0, estimateCardinalityEq(*ceHist, NumberInt64, 30, true).card);
+    ASSERT_EQ(0, estimateCardinalityEq(*ceHist, NumberInt64, 40, false).card);
 }
 
-TEST(ArrayEstimatorTest, StringHistogram) {
+TEST(CEHistogramEstimatorTest, StringHistogram) {
     std::vector<BucketData> data{
         {"testA", 5.0, 2.0, 1.0}, {"testB", 3.0, 2.0, 2.0}, {"testC", 2.0, 1.0, 1.0}};
     const double strCnt = 15;
@@ -1051,21 +1047,21 @@ TEST(ArrayEstimatorTest, StringHistogram) {
 
     ASSERT_EQ(strCnt, getTotals(hist).card);
 
-    const auto arrHist = ArrayHistogram::make(
-        hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
+    const auto ceHist =
+        CEHistogram::make(hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
 
     auto [tag, value] = value::makeNewString("testA"_sd);
     value::ValueGuard vg(tag, value);
-    ASSERT_EQ(5.0, estimateCardinalityEq(*arrHist, tag, value, true).card);
+    ASSERT_EQ(5.0, estimateCardinalityEq(*ceHist, tag, value, true).card);
 
     std::tie(tag, value) = value::makeNewString("testB"_sd);
-    ASSERT_EQ(3.0, estimateCardinalityEq(*arrHist, tag, value, true).card);
+    ASSERT_EQ(3.0, estimateCardinalityEq(*ceHist, tag, value, true).card);
 
     std::tie(tag, value) = value::makeNewString("testC"_sd);
-    ASSERT_EQ(0, estimateCardinalityEq(*arrHist, tag, value, false).card);
+    ASSERT_EQ(0, estimateCardinalityEq(*ceHist, tag, value, false).card);
 }
 
-TEST(ArrayEstimatorTest, UniformStrHistogram) {
+TEST(CEHistogramEstimatorTest, UniformStrHistogram) {
     std::vector<BucketData> data{{{"0ejz", 2, 0, 0},
                                   {"8DCaq", 3, 4, 4},
                                   {"Cy5Kw", 3, 3, 3},
@@ -1079,17 +1075,17 @@ TEST(ArrayEstimatorTest, UniformStrHistogram) {
     const double strCnt = 100;
     const ScalarHistogram& hist = createHistogram(data);
 
-    const auto arrHist = ArrayHistogram::make(
-        hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
+    const auto ceHist =
+        CEHistogram::make(hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
 
     const auto [tag, value] = value::makeNewString("TTV"_sd);
     value::ValueGuard vg(tag, value);
 
     ASSERT_APPROX_EQUAL(
-        1.55, estimateCardinalityEq(*arrHist, tag, value, true).card, 0.1);  // Actual: 2.
+        1.55, estimateCardinalityEq(*ceHist, tag, value, true).card, 0.1);  // Actual: 2.
 }
 
-TEST(ArrayEstimatorTest, NormalStrHistogram) {
+TEST(CEHistogramEstimatorTest, NormalStrHistogram) {
     std::vector<BucketData> data{{
         {"0ejz", 1, 0, 0},
         {"4FGjc", 3, 5, 3},
@@ -1105,21 +1101,21 @@ TEST(ArrayEstimatorTest, NormalStrHistogram) {
     const double strCnt = 100;
     const ScalarHistogram& hist = createHistogram(data);
 
-    const auto arrHist = ArrayHistogram::make(
-        hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
+    const auto ceHist =
+        CEHistogram::make(hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
 
     auto [tag, value] = value::makeNewString("TTV"_sd);
     value::ValueGuard vg(tag, value);
 
     ASSERT_APPROX_EQUAL(
-        5.0, estimateCardinalityEq(*arrHist, tag, value, true).card, 0.1);  // Actual: 5.
+        5.0, estimateCardinalityEq(*ceHist, tag, value, true).card, 0.1);  // Actual: 5.
 
     std::tie(tag, value) = value::makeNewString("Pfa"_sd);
     ASSERT_APPROX_EQUAL(
-        1.75, estimateCardinalityEq(*arrHist, tag, value, true).card, 0.1);  // Actual: 2.
+        1.75, estimateCardinalityEq(*ceHist, tag, value, true).card, 0.1);  // Actual: 2.
 }
 
-TEST(ArrayEstimatorTest, IntStrHistogram) {
+TEST(CEHistogramEstimatorTest, IntStrHistogram) {
     std::vector<BucketData> data{{1, 1.0, 0.0, 0.0}, {"test", 20.0, 0.0, 0.0}};
     const double intCnt = 1;
     const double strCnt = 20;
@@ -1128,20 +1124,20 @@ TEST(ArrayEstimatorTest, IntStrHistogram) {
 
     ASSERT_EQ(totalCnt, getTotals(hist).card);
 
-    const auto arrHist = ArrayHistogram::make(
+    const auto ceHist = CEHistogram::make(
         hist,
         stats::TypeCounts{{NumberInt64, intCnt}, {value::TypeTags::StringSmall, strCnt}},
         totalCnt);
     auto [tag, value] = value::makeNewString("test"_sd);
     value::ValueGuard vg(tag, value);
 
-    ASSERT_EQ(20.0, estimateCardinalityEq(*arrHist, tag, value, true).card);
-    ASSERT_EQ(1.0, estimateCardinalityEq(*arrHist, NumberInt64, 1, true).card);
-    ASSERT_EQ(0, estimateCardinalityEq(*arrHist, tag, value, false).card);
-    ASSERT_EQ(0, estimateCardinalityEq(*arrHist, NumberInt64, 1, false).card);
+    ASSERT_EQ(20.0, estimateCardinalityEq(*ceHist, tag, value, true).card);
+    ASSERT_EQ(1.0, estimateCardinalityEq(*ceHist, NumberInt64, 1, true).card);
+    ASSERT_EQ(0, estimateCardinalityEq(*ceHist, tag, value, false).card);
+    ASSERT_EQ(0, estimateCardinalityEq(*ceHist, NumberInt64, 1, false).card);
 }
 
-TEST(ArrayEstimatorTest, UniformIntStrHistogram) {
+TEST(CEHistogramEstimatorTest, UniformIntStrHistogram) {
     std::vector<BucketData> data{{
         {2, 3, 0, 0},       {19, 4, 1, 1},      {226, 2, 49, 20},  {301, 5, 12, 4},
         {317, 3, 0, 0},     {344, 2, 3, 1},     {423, 5, 18, 6},   {445, 3, 0, 0},
@@ -1156,30 +1152,30 @@ TEST(ArrayEstimatorTest, UniformIntStrHistogram) {
 
     ASSERT_EQ(totalCnt, getTotals(hist).card);
 
-    const auto arrHist = ArrayHistogram::make(
+    const auto ceHist = CEHistogram::make(
         hist,
         stats::TypeCounts{{NumberInt64, intCnt}, {value::TypeTags::StringSmall, strCnt}},
         totalCnt);
 
     ASSERT_APPROX_EQUAL(7.0,
-                        estimateCardinalityEq(*arrHist, NumberInt64, 993, true).card,
+                        estimateCardinalityEq(*ceHist, NumberInt64, 993, true).card,
                         0.1);  // Actual: 9
 
     auto [tag, value] = value::makeNewString("04e"_sd);
     value::ValueGuard vg(tag, value);
 
     ASSERT_APPROX_EQUAL(
-        2.2, estimateCardinalityEq(*arrHist, tag, value, true).card, 0.1);  // Actual: 3.
+        2.2, estimateCardinalityEq(*ceHist, tag, value, true).card, 0.1);  // Actual: 3.
 
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
     value::Value lowVal = 100000000;
 
     ASSERT_APPROX_EQUAL(0.0,
-                        estimateCardinalityEq(*arrHist, lowTag, lowVal, true).card,
+                        estimateCardinalityEq(*ceHist, lowTag, lowVal, true).card,
                         0.1);  // Actual: 0
 
     // Query: [{$match: {a: {$lt: '04e'}}}].
-    auto expectedCard = estimateCardinalityRange(*arrHist,
+    auto expectedCard = estimateCardinalityRange(*ceHist,
                                                  false /* lowInclusive */,
                                                  lowTag,
                                                  lowVal,
@@ -1190,8 +1186,7 @@ TEST(ArrayEstimatorTest, UniformIntStrHistogram) {
     ASSERT_CE_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 0.
 
     // Query: [{$match: {a: {$lte: '04e'}}}].
-    expectedCard =
-        estimateCardinalityRange(*arrHist, false, lowTag, lowVal, true, tag, value, true);
+    expectedCard = estimateCardinalityRange(*ceHist, false, lowTag, lowVal, true, tag, value, true);
     ASSERT_CE_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 3.
 
     // Value towards the end of the bucket gets the same half bucket estimate.
@@ -1199,16 +1194,15 @@ TEST(ArrayEstimatorTest, UniformIntStrHistogram) {
 
     // Query: [{$match: {a: {$lt: '8B5'}}}].
     expectedCard =
-        estimateCardinalityRange(*arrHist, false, lowTag, lowVal, false, tag, value, true);
+        estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, tag, value, true);
     ASSERT_CE_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 24.
 
     // Query: [{$match: {a: {$lte: '8B5'}}}].
-    expectedCard =
-        estimateCardinalityRange(*arrHist, false, lowTag, lowVal, true, tag, value, true);
+    expectedCard = estimateCardinalityRange(*ceHist, false, lowTag, lowVal, true, tag, value, true);
     ASSERT_CE_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 29.
 }
 
-TEST(ArrayEstimatorInterpolationTest, UniformIntStrEstimate) {
+TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
     // This hard-codes a maxdiff histogram with 20 buckets built off of a uniform distribution with
     // two types occurring with equal probability:
     // - 100 distinct ints between 0 and 1000, and
@@ -1224,7 +1218,7 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntStrEstimate) {
         {"MIb", 5, 45, 17}, {"Zgi", 3, 55, 22}, {"pZ", 6, 62, 25}, {"yUwxz", 5, 29, 12},
     }};
     const ScalarHistogram hist = createHistogram(data);
-    const auto arrHist = ArrayHistogram::make(
+    const auto ceHist = CEHistogram::make(
         hist,
         TypeCounts{{value::TypeTags::NumberInt64, numInt}, {value::TypeTags::StringSmall, numStr}},
         collCard);
@@ -1258,14 +1252,14 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntStrEstimate) {
 
     // Type bracketing: low value of different type than the bucket bound.
     // Query: [{$match: {a: {$eq: 100000000}}}].
-    expectedCard = estimateCardinalityEq(*arrHist, lowTag, lowVal, true /* includeScalar */);
+    expectedCard = estimateCardinalityEq(*ceHist, lowTag, lowVal, true /* includeScalar */);
     ASSERT_CE_APPROX_EQUAL(0.0, expectedCard.card, 0.1);  // Actual: 0.
 
     // No interpolation for inequality to values inside the first string bucket, fallback to half of
     // the bucket frequency.
 
     // Query: [{$match: {a: {$lt: '04e'}}}].
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             false /* lowInclusive */,
                                             lowTag,
                                             lowVal,
@@ -1276,7 +1270,7 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntStrEstimate) {
     ASSERT_CE_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 0.
 
     // Query: [{$match: {a: {$lte: '04e'}}}].
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             false /* lowInclusive */,
                                             lowTag,
                                             lowVal,
@@ -1290,7 +1284,7 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntStrEstimate) {
     std::tie(tag, value) = value::makeNewString("8B5"_sd);
 
     // Query: [{$match: {a: {$lt: '8B5'}}}].
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             false /* lowInclusive */,
                                             lowTag,
                                             lowVal,
@@ -1301,7 +1295,7 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntStrEstimate) {
     ASSERT_CE_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 24.
 
     // Query: [{$match: {a: {$lte: '8B5'}}}].
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             false /* lowInclusive */,
                                             lowTag,
                                             lowVal,
@@ -1312,7 +1306,7 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntStrEstimate) {
     ASSERT_CE_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 29.
 }
 
-TEST(ArrayEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
+TEST(CEHistogramEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
     // This hard-codes a maxdiff histogram with 10 buckets built off of an array distribution with
     // arrays between 3 and 5 elements long, each containing 100 distinct ints uniformly distributed
     // between 0 and 1000. There are no scalar elements.
@@ -1343,14 +1337,14 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
     }};
     const ScalarHistogram uniqueHist = createHistogram(uniqueData);
 
-    const auto arrHist = ArrayHistogram::make(scalarHist,
-                                              TypeCounts{{value::TypeTags::Array, 100}},
-                                              uniqueHist,
-                                              minHist,
-                                              maxHist,
-                                              // There are 100 non-empty int-only arrays.
-                                              TypeCounts{{value::TypeTags::NumberInt64, 100}},
-                                              100.0 /* sampleSize */);
+    const auto ceHist = CEHistogram::make(scalarHist,
+                                          TypeCounts{{value::TypeTags::Array, 100}},
+                                          uniqueHist,
+                                          minHist,
+                                          maxHist,
+                                          // There are 100 non-empty int-only arrays.
+                                          TypeCounts{{value::TypeTags::NumberInt64, 100}},
+                                          100.0 /* sampleSize */);
 
     // Query in the middle of the domain: estimate from ArrayUnique histogram.
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
@@ -1360,14 +1354,14 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 600}}}}].
     auto expectedCard =
-        estimateCardinalityRange(*arrHist, false, lowTag, lowVal, false, highTag, highVal, false);
+        estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, false);
     ASSERT_CE_APPROX_EQUAL(27.0, expectedCard.card, 0.1);  // actual 21.
 
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 600}}}].
     // Note: although there are no scalars, the estimate is different than the
     // above since we use different formulas.
     expectedCard =
-        estimateCardinalityRange(*arrHist, false, lowTag, lowVal, false, highTag, highVal, true);
+        estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, true);
     ASSERT_CE_APPROX_EQUAL(92.0, expectedCard.card, 0.1);  // actual 92.
 
     // Query at the end of the domain: more precise estimates from ArrayMin, ArrayMax histograms.
@@ -1376,16 +1370,16 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 10, $lt: 110}}}}].
     expectedCard =
-        estimateCardinalityRange(*arrHist, false, lowTag, lowVal, false, highTag, highVal, false);
+        estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, false);
     ASSERT_CE_APPROX_EQUAL(24.1, expectedCard.card, 0.1);  // actual 29.
 
     // Test interpolation for query: [{$match: {a: {$gt: 10, $lt: 110}}}].
     expectedCard =
-        estimateCardinalityRange(*arrHist, false, lowTag, lowVal, false, highTag, highVal, true);
+        estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, true);
     ASSERT_CE_APPROX_EQUAL(27.8, expectedCard.card, 0.1);  // actual 31.
 }
 
-TEST(ArrayEstimatorInterpolationTest, UniformIntMixedArrayEstimate) {
+TEST(CEHistogramEstimatorInterpolationTest, UniformIntMixedArrayEstimate) {
     // This hard-codes a maxdiff histogram with 20 buckets built off of a mixed distribution split
     // with equal probability between:
     // - an array distribution between 3 and 5 elements long, each containing 80 distinct ints
@@ -1424,14 +1418,14 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntMixedArrayEstimate) {
     const ScalarHistogram uniqueHist = createHistogram(uniqueData);
 
     TypeCounts typeCounts{{value::TypeTags::NumberInt64, 106}, {value::TypeTags::Array, 94}};
-    const auto arrHist = ArrayHistogram::make(scalarHist,
-                                              typeCounts,
-                                              uniqueHist,
-                                              minHist,
-                                              maxHist,
-                                              // There are 94 non-empty int-only arrays.
-                                              TypeCounts{{value::TypeTags::NumberInt64, 94}},
-                                              200.0 /* sampleSize */);
+    const auto ceHist = CEHistogram::make(scalarHist,
+                                          typeCounts,
+                                          uniqueHist,
+                                          minHist,
+                                          maxHist,
+                                          // There are 94 non-empty int-only arrays.
+                                          TypeCounts{{value::TypeTags::NumberInt64, 94}},
+                                          200.0 /* sampleSize */);
 
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
     value::Value lowVal = 500;
@@ -1440,33 +1434,33 @@ TEST(ArrayEstimatorInterpolationTest, UniformIntMixedArrayEstimate) {
 
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 550}}}].
     auto expectedCard =
-        estimateCardinalityRange(*arrHist, false, lowTag, lowVal, false, highTag, highVal, true);
+        estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, true);
     ASSERT_CE_APPROX_EQUAL(92.9, expectedCard.card, 0.1);  // Actual: 94.
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 550}}}}].
     expectedCard =
-        estimateCardinalityRange(*arrHist, false, lowTag, lowVal, false, highTag, highVal, false);
+        estimateCardinalityRange(*ceHist, false, lowTag, lowVal, false, highTag, highVal, false);
     ASSERT_CE_APPROX_EQUAL(11.0, expectedCard.card, 0.1);  // Actual: 8.
 }
 
-TEST(ArrayEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
+TEST(CEHistogramEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
     // Data set of mixed data types: 3 integers and 5 strings.
     constexpr double numInts = 3.0;
     constexpr double numStrs = 5.0;
     constexpr double collCard = numInts + numStrs;
     std::vector<BucketData> data{{1, numInts, 0.0, 0.0}, {"abc", numStrs, 0.0, 0.0}};
     const ScalarHistogram hist = createHistogram(data);
-    const auto arrHist = ArrayHistogram::make(hist,
-                                              TypeCounts{{value::TypeTags::NumberInt64, numInts},
-                                                         {value::TypeTags::StringSmall, numStrs}},
-                                              collCard);
+    const auto ceHist = CEHistogram::make(hist,
+                                          TypeCounts{{value::TypeTags::NumberInt64, numInts},
+                                                     {value::TypeTags::StringSmall, numStrs}},
+                                          collCard);
 
     const auto [tagLowDbl, valLowDbl] =
         std::make_pair(value::TypeTags::NumberDouble,
                        value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
 
     // (NaN, 1).
-    auto expectedCard = estimateCardinalityRange(*arrHist,
+    auto expectedCard = estimateCardinalityRange(*ceHist,
                                                  false,
                                                  tagLowDbl,
                                                  valLowDbl,
@@ -1477,7 +1471,7 @@ TEST(ArrayEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
     ASSERT_CE_APPROX_EQUAL(0.0, expectedCard.card, kErrorBound);
 
     // (NaN, 5).
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             false,
                                             tagLowDbl,
                                             valLowDbl,
@@ -1493,7 +1487,7 @@ TEST(ArrayEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
     value::ValueGuard vg(tag, value);
 
     // [0, "").
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true,
                                             value::TypeTags::NumberInt32,
                                             value::bitcastFrom<int64_t>(0),
@@ -1505,24 +1499,24 @@ TEST(ArrayEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
 
     // ["", "a"].
     expectedCard =
-        estimateCardinalityRange(*arrHist, true, tagLowStr, valLowStr, true, tag, value, true);
+        estimateCardinalityRange(*ceHist, true, tagLowStr, valLowStr, true, tag, value, true);
 
     ASSERT_CE_APPROX_EQUAL(0.0, expectedCard.card, kErrorBound);
 
     std::tie(tag, value) = value::makeNewString("xyz"_sd);
     // ["", "xyz"].
     expectedCard =
-        estimateCardinalityRange(*arrHist, true, tagLowStr, valLowStr, true, tag, value, true);
+        estimateCardinalityRange(*ceHist, true, tagLowStr, valLowStr, true, tag, value, true);
 
     ASSERT_CE_APPROX_EQUAL(numStrs, expectedCard.card, kErrorBound);
 }
 
-TEST(ArrayEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
+TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
     // Data set of mixed data types: 20 integers and 80 strings.
     // Histogram with one bucket per data type.
     std::vector<BucketData> data{{100, 3.0, 17.0, 9.0}, {"pqr", 5.0, 75.0, 25.0}};
     const ScalarHistogram hist = createHistogram(data);
-    const auto arrHist = ArrayHistogram::make(
+    const auto ceHist = CEHistogram::make(
         hist,
         TypeCounts{{value::TypeTags::NumberInt64, 20}, {value::TypeTags::StringSmall, 80}},
         100.0 /* sampleSize */);
@@ -1586,7 +1580,7 @@ TEST(ArrayEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
         std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1000000));
 
     // [NaN, 25].
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true,
                                             tagLowDbl,
                                             valLowDbl,
@@ -1597,7 +1591,7 @@ TEST(ArrayEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
     ASSERT_CE_APPROX_EQUAL(8.49, expectedCard.card, kErrorBound);
 
     // [25, 1000000].
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true,
                                             value::TypeTags::NumberInt32,
                                             value::bitcastFrom<int64_t>(25),
@@ -1609,7 +1603,7 @@ TEST(ArrayEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
 
     // [NaN, 1000000].
     expectedCard = estimateCardinalityRange(
-        *arrHist, true, tagLowDbl, valLowDbl, true, tagHighInt, valHighInt, true);
+        *ceHist, true, tagLowDbl, valLowDbl, true, tagHighInt, valHighInt, true);
     ASSERT_CE_APPROX_EQUAL(20.0, expectedCard.card, kErrorBound);
 
     const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
@@ -1617,11 +1611,11 @@ TEST(ArrayEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
 
     // [NaN, "").
     expectedCard = estimateCardinalityRange(
-        *arrHist, true, tagLowDbl, valLowDbl, false, tagLowStr, valLowStr, true);
+        *ceHist, true, tagLowDbl, valLowDbl, false, tagLowStr, valLowStr, true);
     ASSERT_CE_APPROX_EQUAL(20.0, expectedCard.card, kErrorBound);
 
     // [25, "").
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true,
                                             value::TypeTags::NumberInt32,
                                             value::bitcastFrom<int64_t>(25),
@@ -1633,7 +1627,7 @@ TEST(ArrayEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
 
     // ["", "a"].
     expectedCard =
-        estimateCardinalityRange(*arrHist, true, tagLowStr, valLowStr, true, tag, value, true);
+        estimateCardinalityRange(*ceHist, true, tagLowStr, valLowStr, true, tag, value, true);
 
     ASSERT_CE_APPROX_EQUAL(37.49, expectedCard.card, kErrorBound);
 
@@ -1641,17 +1635,16 @@ TEST(ArrayEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
     auto [tagObj, valObj] = value::makeNewObject();
     value::ValueGuard vgObj(tagObj, valObj);
     expectedCard =
-        estimateCardinalityRange(*arrHist, true, tagLowStr, valLowStr, false, tagObj, valObj, true);
+        estimateCardinalityRange(*ceHist, true, tagLowStr, valLowStr, false, tagObj, valObj, true);
     ASSERT_CE_APPROX_EQUAL(80.0, expectedCard.card, kErrorBound);
 
     // ["a", {}).
-    expectedCard =
-        estimateCardinalityRange(*arrHist, true, tag, value, false, tagObj, valObj, true);
+    expectedCard = estimateCardinalityRange(*ceHist, true, tag, value, false, tagObj, valObj, true);
 
     ASSERT_CE_APPROX_EQUAL(45.5, expectedCard.card, kErrorBound);
 }
 
-TEST(ArrayEstimatorDataTest, Histogram1000ArraysSmall10Buckets) {
+TEST(CEHistogramEstimatorDataTest, Histogram1000ArraysSmall10Buckets) {
     std::vector<BucketData> scalarData{{}};
     const ScalarHistogram scalarHist = createHistogram(scalarData);
 
@@ -1701,7 +1694,7 @@ TEST(ArrayEstimatorDataTest, Histogram1000ArraysSmall10Buckets) {
     arrayTypeCounts.insert({value::TypeTags::NumberInt32, 1000});
 
     constexpr double collCard = 1000.0;
-    const auto arrHist = ArrayHistogram::make(
+    const auto ceHist = CEHistogram::make(
         scalarHist, typeCounts, aUniqueHist, aMinHist, aMaxHist, arrayTypeCounts, collCard);
 
     std::vector<QuerySpec> querySet{{10, 20, 35.7, 93.0, 37.8, 39.0},
@@ -1713,7 +1706,7 @@ TEST(ArrayEstimatorDataTest, Histogram1000ArraysSmall10Buckets) {
 
     for (const auto q : querySet) {
         // $match query, includeScalar = true.
-        auto estCard = estimateCardinalityRange(*arrHist,
+        auto estCard = estimateCardinalityRange(*ceHist,
                                                 false,
                                                 value::TypeTags::NumberInt32,
                                                 value::bitcastFrom<int32_t>(q.low),
@@ -1724,7 +1717,7 @@ TEST(ArrayEstimatorDataTest, Histogram1000ArraysSmall10Buckets) {
         ASSERT_CE_APPROX_EQUAL(estCard.card, q.estMatch, 0.1);
 
         // $elemMatch query, includeScalar = false.
-        estCard = estimateCardinalityRange(*arrHist,
+        estCard = estimateCardinalityRange(*ceHist,
                                            false,
                                            value::TypeTags::NumberInt32,
                                            value::bitcastFrom<int32_t>(q.low),
@@ -1744,7 +1737,7 @@ TEST(ArrayEstimatorDataTest, Histogram1000ArraysSmall10Buckets) {
     }
 }
 
-TEST(ArrayEstimatorDataTest, Histogram1000ArraysLarge10Buckets) {
+TEST(CEHistogramEstimatorDataTest, Histogram1000ArraysLarge10Buckets) {
     std::vector<BucketData> scalarData{{}};
     const ScalarHistogram scalarHist = createHistogram(scalarData);
 
@@ -1794,7 +1787,7 @@ TEST(ArrayEstimatorDataTest, Histogram1000ArraysLarge10Buckets) {
     arrayTypeCounts.insert({value::TypeTags::NumberInt32, 1000});
 
     constexpr double collCard = 1000.0;
-    const auto arrHist = ArrayHistogram::make(
+    const auto ceHist = CEHistogram::make(
         scalarHist, typeCounts, aUniqueHist, aMinHist, aMaxHist, arrayTypeCounts, collCard);
 
     std::vector<QuerySpec> querySet{{10, 20, 13.7, 39.0, 9.7, 26.0},
@@ -1806,7 +1799,7 @@ TEST(ArrayEstimatorDataTest, Histogram1000ArraysLarge10Buckets) {
 
     for (const auto q : querySet) {
         // $match query, includeScalar = true.
-        auto estCard = estimateCardinalityRange(*arrHist,
+        auto estCard = estimateCardinalityRange(*ceHist,
                                                 false,
                                                 value::TypeTags::NumberInt32,
                                                 value::bitcastFrom<int32_t>(q.low),
@@ -1817,7 +1810,7 @@ TEST(ArrayEstimatorDataTest, Histogram1000ArraysLarge10Buckets) {
         ASSERT_CE_APPROX_EQUAL(estCard.card, q.estMatch, 0.1);
 
         // $elemMatch query, includeScalar = false.
-        estCard = estimateCardinalityRange(*arrHist,
+        estCard = estimateCardinalityRange(*ceHist,
                                            false,
                                            value::TypeTags::NumberInt32,
                                            value::bitcastFrom<int32_t>(q.low),

@@ -37,7 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/collection_statistics.h"
 #include "mongo/db/query/stats/stats_cache.h"
 #include "mongo/db/query/stats/stats_cache_loader.h"
@@ -68,9 +68,9 @@ public:
 
     ~StatsCatalog();
 
-    StatusWith<std::shared_ptr<const ArrayHistogram>> getHistogram(OperationContext* opCtx,
-                                                                   const NamespaceString& nss,
-                                                                   const std::string& path);
+    StatusWith<std::shared_ptr<const CEHistogram>> getHistogram(OperationContext* opCtx,
+                                                                const NamespaceString& nss,
+                                                                const std::string& path);
 
     Status invalidatePath(const NamespaceString& nss, const std::string& path);
 

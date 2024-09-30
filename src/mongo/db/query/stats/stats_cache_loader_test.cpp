@@ -43,7 +43,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/stats_cache_loader.h"
@@ -100,14 +100,14 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
         {sbe::value::TypeTags::NumberDouble, doubleCount},
         {sbe::value::TypeTags::Boolean, trueCount + falseCount},
     };
-    auto ah = ArrayHistogram::make(
+    auto ceHist = CEHistogram::make(
         ScalarHistogram::make(*bounds, buckets), tc, numDocs, trueCount, falseCount);
-    auto expectedSerialized = ah->serialize();
+    auto expectedSerialized = ceHist->serialize();
 
     // Serialize histogram into a stats path.
     std::string path = "somePath";
     constexpr double sampleRate = 1.0;
-    auto serialized = stats::makeStatsPath(path, numDocs, sampleRate, ah);
+    auto serialized = stats::makeStatsPath(path, numDocs, sampleRate, ceHist);
 
     // Initalize stats collection.
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "stats");
@@ -146,7 +146,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
     auto emptyArray2Val = sbe::value::makeNewArray().second;
     auto emptyArray3Val = sbe::value::makeNewArray().second;
 
-    // Create a small ArrayHistogram with boolean & empty array counts using maxdiff.
+    // Create a small CEHistogram with boolean & empty array counts using maxdiff.
     const std::vector<SBEValue> values{
         // Scalar doubles: 1, 2, 3.
         SBEValue{sbe::value::TypeTags::NumberDouble, sbe::value::bitcastFrom<double>(1.0)},
@@ -166,18 +166,18 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
         // A non-empty array.
         SBEValue{sbe::value::TypeTags::Array, nonEmptyArrayVal},
     };
-    auto ah = createArrayEstimator(values, numDocs);
-    auto expectedSerialized = ah->serialize();
+    auto ceHist = createCEHistogram(values, numDocs);
+    auto expectedSerialized = ceHist->serialize();
 
     // Sanity check counters.
-    ASSERT_EQ(ah->getTrueCount(), 2.0);
-    ASSERT_EQ(ah->getFalseCount(), 4.0);
-    ASSERT_EQ(ah->getEmptyArrayCount(), 3.0);
+    ASSERT_EQ(ceHist->getTrueCount(), 2.0);
+    ASSERT_EQ(ceHist->getFalseCount(), 4.0);
+    ASSERT_EQ(ceHist->getEmptyArrayCount(), 3.0);
 
     // Serialize histogram into a stats path.
     std::string path = "somePath";
     constexpr double sampleRate = 1.0;
-    auto serialized = stats::makeStatsPath(path, numDocs, sampleRate, ah);
+    auto serialized = stats::makeStatsPath(path, numDocs, sampleRate, ceHist);
 
     // Initalize stats collection.
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "stats");

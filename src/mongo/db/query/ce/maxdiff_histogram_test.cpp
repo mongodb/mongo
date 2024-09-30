@@ -322,8 +322,8 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
     auto rawData = genFixedValueArray(nElems, 1.0, 0.0);
     auto arrayData = nestArrays(rawData, 0 /* No empty arrays */);
 
-    auto estimator = createArrayEstimator(arrayData, nBuckets, stats::SortArg::kArea);
-    auto estimatorAreaDiff = createArrayEstimator(arrayData, nBuckets);
+    auto estimator = createCEHistogram(arrayData, nBuckets, stats::SortArg::kArea);
+    auto estimatorAreaDiff = createCEHistogram(arrayData, nBuckets);
 
     auto opCtx = makeOperationContext();
 
@@ -417,10 +417,10 @@ TEST_F(HistogramTest, MaxDiffEmptyArrays) {
           "nElems"_attr = nElems,
           "arrayData"_attr = printValueArray(arrayData));
 
-    const auto arrayHist = createArrayEstimator(arrayData, nBuckets, stats::SortArg::kAreaDiff);
-    const auto arrayHistAreaDiff = createArrayEstimator(arrayData, nBuckets);
+    const auto ceHist = createCEHistogram(arrayData, nBuckets, stats::SortArg::kAreaDiff);
+    const auto ceHistAreaDiff = createCEHistogram(arrayData, nBuckets);
 
-    const auto histograms = {arrayHist, arrayHistAreaDiff};
+    const auto histograms = {ceHist, ceHistAreaDiff};
 
     std::for_each(histograms.begin(), histograms.end(), [emptyArrayCount](auto&& histogram) {
         ASSERT_EQ(histogram->getEmptyArrayCount(), emptyArrayCount);

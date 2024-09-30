@@ -409,9 +409,9 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib,
     return ScalarHistogram::make(std::move(bounds), std::move(buckets));
 }
 
-std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBEValue>& arrayData,
-                                                           size_t nBuckets,
-                                                           SortArg sortArg) {
+std::shared_ptr<const CEHistogram> createCEHistogram(const std::vector<SBEValue>& arrayData,
+                                                     size_t nBuckets,
+                                                     SortArg sortArg) {
     uassert(7120500, "A histogram must have at least one bucket.", nBuckets > 0);
 
     // Values that will be used as inputs to histogram generation code.
@@ -529,25 +529,25 @@ std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBE
 
     if (isScalar) {
         // If we don't have array elements, we don't include array fields in the final histogram.
-        return ArrayHistogram::make(makeHistogram(scalarData),
-                                    std::move(typeCounts),
-                                    arrayData.size(),
-                                    trueCount,
-                                    falseCount,
-                                    nanCount);
+        return CEHistogram::make(makeHistogram(scalarData),
+                                 std::move(typeCounts),
+                                 arrayData.size(),
+                                 trueCount,
+                                 falseCount,
+                                 nanCount);
     }
 
-    return ArrayHistogram::make(makeHistogram(scalarData),
-                                std::move(typeCounts),
-                                makeHistogram(arrayUniqueData),
-                                makeHistogram(arrayMinData),
-                                makeHistogram(arrayMaxData),
-                                std::move(arrayTypeCounts),
-                                arrayData.size(),
-                                emptyArrayCount,
-                                trueCount,
-                                falseCount,
-                                nanCount);
+    return CEHistogram::make(makeHistogram(scalarData),
+                             std::move(typeCounts),
+                             makeHistogram(arrayUniqueData),
+                             makeHistogram(arrayMinData),
+                             makeHistogram(arrayMaxData),
+                             std::move(arrayTypeCounts),
+                             arrayData.size(),
+                             emptyArrayCount,
+                             trueCount,
+                             falseCount,
+                             nanCount);
 }
 
 }  // namespace mongo::stats

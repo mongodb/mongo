@@ -20,13 +20,13 @@ idl_generator(
 mongo_cc_library(
     name = "stats_histograms",
     srcs = [
-        "array_histogram.cpp",
+        "ce_histogram.cpp",
         "scalar_histogram.cpp",
         "value_utils.cpp",
         ":stats_gen_for_histograms",
     ],
     hdrs = [
-        "array_histogram.h",
+        "ce_histogram.h",
         "scalar_histogram.h",
         "value_utils.h",
     ],

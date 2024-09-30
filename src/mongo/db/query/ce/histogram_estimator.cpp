@@ -31,7 +31,7 @@
 
 namespace mongo::ce {
 
-Cardinality HistogramEstimator::estimateCardinality(const stats::ArrayHistogram& hist,
+Cardinality HistogramEstimator::estimateCardinality(const stats::CEHistogram& hist,
                                                     const Cardinality collectionSize,
                                                     const mongo::Interval& interval,
                                                     bool includeScalar) {
@@ -40,7 +40,7 @@ Cardinality HistogramEstimator::estimateCardinality(const stats::ArrayHistogram&
         collectionSize;
 }
 
-bool HistogramEstimator::canEstimateInterval(const stats::ArrayHistogram& hist,
+bool HistogramEstimator::canEstimateInterval(const stats::CEHistogram& hist,
                                              const mongo::Interval& interval,
                                              bool includeScalar) {
 

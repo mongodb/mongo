@@ -37,7 +37,7 @@
 #include <utility>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/stats_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -90,7 +90,7 @@ StatsCatalog& StatsCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-StatusWith<std::shared_ptr<const ArrayHistogram>> StatsCatalog::getHistogram(
+StatusWith<std::shared_ptr<const CEHistogram>> StatsCatalog::getHistogram(
     OperationContext* opCtx, const NamespaceString& nss, const std::string& path) {
     try {
         auto handle = _statsCache.acquire(opCtx, std::make_pair(nss, path));

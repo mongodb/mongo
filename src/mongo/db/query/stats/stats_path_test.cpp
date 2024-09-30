@@ -32,7 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/stats_gen.h"
 #include "mongo/idl/idl_parser.h"
@@ -86,11 +86,11 @@ TEST(StatsPath, BasicValidStatsPath) {
         {sbe::value::TypeTags::Boolean, trueCount + falseCount},
     };
     const auto sh = ScalarHistogram::make(*bounds, buckets);
-    auto ah = ArrayHistogram::make(std::move(sh), tc, numDocs, trueCount, falseCount);
+    auto cehist = CEHistogram::make(std::move(sh), tc, numDocs, trueCount, falseCount);
 
     // Serialize to BSON.
     constexpr double sampleRate = 1.0;
-    auto serializedPath = stats::makeStatsPath("somePath", numDocs, sampleRate, ah);
+    auto serializedPath = stats::makeStatsPath("somePath", numDocs, sampleRate, cehist);
 
     // Parse StatsPath via IDL & serialize to BSON.
     auto parsedPath = StatsPath::parse(ctx, serializedPath);
@@ -109,11 +109,11 @@ TEST(StatsPath, BasicValidEmptyStatsPath) {
     std::vector<Bucket> buckets;
 
     // Create an empty scalar histogram.
-    auto ah = ArrayHistogram::make(ScalarHistogram::make(), TypeCounts{}, 0.0 /* sampleSize */);
+    auto cehist = CEHistogram::make(ScalarHistogram::make(), TypeCounts{}, 0.0 /* sampleSize */);
 
     // Serialize to BSON.
     constexpr double sampleRate = 1.0;
-    auto serializedPath = stats::makeStatsPath("someEmptyPath", numDocs, sampleRate, ah);
+    auto serializedPath = stats::makeStatsPath("someEmptyPath", numDocs, sampleRate, cehist);
 
     // Parse StatsPath via IDL & serialize to BSON.
     auto parsedPath = StatsPath::parse(ctx, serializedPath);

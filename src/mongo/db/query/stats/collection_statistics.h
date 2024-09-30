@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 
 namespace mongo::stats {
 
-using Histograms = std::map<std::string, std::shared_ptr<const ArrayHistogram>>;
+using Histograms = std::map<std::string, std::shared_ptr<const CEHistogram>>;
 
 class CollectionStatistics {
 public:
@@ -46,13 +46,13 @@ public:
     /**
      * Returns the histogram for the given field path, or nullptr if none exists.
      */
-    virtual const ArrayHistogram* getHistogram(const std::string& path) const = 0;
+    virtual const CEHistogram* getHistogram(const std::string& path) const = 0;
 
     /**
      * Adds a histogram along the given path.
      */
     virtual void addHistogram(const std::string& path,
-                              std::shared_ptr<const ArrayHistogram> histogram) const = 0;
+                              std::shared_ptr<const CEHistogram> histogram) const = 0;
 
     virtual ~CollectionStatistics() = default;
 };

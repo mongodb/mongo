@@ -33,7 +33,7 @@ namespace mongo::ce {
 namespace {
 namespace value = sbe::value;
 
-using stats::ArrayHistogram;
+using stats::CEHistogram;
 using stats::ScalarHistogram;
 using stats::TypeCounts;
 
@@ -72,7 +72,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
 
     constexpr double collCard = 1000.0;
     const ScalarHistogram hist = createHistogram(data);
-    const auto arrHist = ArrayHistogram::make(
+    const auto ceHist = CEHistogram::make(
         hist,
         TypeCounts{{value::TypeTags::NumberInt64, 515}, {value::TypeTags::StringSmall, 485}},
         collCard);
@@ -96,7 +96,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
 
     // Range query crossing the type brackets.
     // Actual cardinality {$gt: 100} = 475.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             false /* lowInclusive */,
                                             value::TypeTags::NumberInt64,
                                             value::bitcastFrom<int64_t>(100),
@@ -107,7 +107,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     ASSERT_CE_APPROX_EQUAL(460.1, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$lt: 'abc'} = 291.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true /* lowInclusive */,
                                             tagLowStr,
                                             valLowStr,
@@ -118,7 +118,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     ASSERT_CE_APPROX_EQUAL(319.9, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$gte: 'abc'} = 194.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true /* lowInclusive */,
                                             tagAbc,
                                             valAbc,
@@ -130,11 +130,11 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
 
     // Queries over the low string bound.
     // Actual cardinality {$eq: ''} = 0.
-    expectedCard = estimateCardinalityEq(*arrHist, tagLowStr, valLowStr, true);
+    expectedCard = estimateCardinalityEq(*ceHist, tagLowStr, valLowStr, true);
     ASSERT_CE_APPROX_EQUAL(2.727, expectedCard.card, 0.001);
 
     // Actual cardinality {$gt: ''} = 485.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             false /* lowInclusive */,
                                             tagLowStr,
                                             valLowStr,
@@ -222,7 +222,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
                           {value::TypeTags::Array, 293}};
     TypeCounts arrayTypeCounts{{value::TypeTags::NumberInt64, 282},
                                {value::TypeTags::StringSmall, 222}};
-    const auto arrHist = ArrayHistogram::make(
+    const auto ceHist = CEHistogram::make(
         scalarHist, typeCounts, uniqueHist, minHist, maxHist, arrayTypeCounts, collCard);
 
     const auto [tagLowDbl, valLowDbl] =
@@ -232,7 +232,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     value::ValueGuard vgLowStr(tagLowStr, valLowStr);
 
     // Actual cardinality {$lt: 100} = 115.
-    EstimationResult expectedCard = estimateCardinalityRange(*arrHist,
+    EstimationResult expectedCard = estimateCardinalityRange(*ceHist,
                                                              false /* lowInclusive */,
                                                              tagLowDbl,
                                                              valLowDbl,
@@ -243,7 +243,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     ASSERT_CE_APPROX_EQUAL(109.9, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$gt: 502} = 434.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             false /* lowInclusive */,
                                             value::TypeTags::NumberInt64,
                                             value::bitcastFrom<int64_t>(500),
@@ -254,7 +254,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     ASSERT_CE_APPROX_EQUAL(443.8, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$gte: 502} = 437.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true /* lowInclusive */,
                                             value::TypeTags::NumberInt64,
                                             value::bitcastFrom<int64_t>(500),
@@ -265,17 +265,17 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     ASSERT_CE_APPROX_EQUAL(448.3, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$eq: ''} = 0.
-    expectedCard = estimateCardinalityEq(*arrHist, tagLowStr, valLowStr, true /* includeScalar */);
+    expectedCard = estimateCardinalityEq(*ceHist, tagLowStr, valLowStr, true /* includeScalar */);
     ASSERT_CE_APPROX_EQUAL(6.69, expectedCard.card, 0.001);
 
     // Actual cardinality {$eq: 'DD2'} = 2.
     auto [tagStr, valStr] = value::makeNewString("DD2"_sd);
     value::ValueGuard vg(tagStr, valStr);
-    expectedCard = estimateCardinalityEq(*arrHist, tagStr, valStr, true /* includeScalar */);
+    expectedCard = estimateCardinalityEq(*ceHist, tagStr, valStr, true /* includeScalar */);
     ASSERT_CE_APPROX_EQUAL(5.27, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$lte: 'DD2'} = 120.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true /* lowInclusive */,
                                             tagLowStr,
                                             valLowStr,
@@ -288,7 +288,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     // Actual cardinality {$gt: 'DD2'} = 450.
     auto [tagObj, valObj] = value::makeNewObject();
     value::ValueGuard vgObj(tagObj, valObj);
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             false /* lowInclusive */,
                                             tagStr,
                                             valStr,
@@ -303,11 +303,11 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
         std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(603));
 
     // Actual cardinality {$match: {a: {$elemMatch: {$eq: 603}}}} = 12.
-    expectedCard = estimateCardinalityEq(*arrHist, tagInt, valInt, false /* includeScalar */);
+    expectedCard = estimateCardinalityEq(*ceHist, tagInt, valInt, false /* includeScalar */);
     ASSERT_CE_APPROX_EQUAL(12.0, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$match: {a: {$elemMatch: {$lte: 603}}}} = 252.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             false /* lowInclusive */,
                                             tagLowDbl,
                                             valLowDbl,
@@ -318,7 +318,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     ASSERT_CE_APPROX_EQUAL(293.0, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$match: {a: {$elemMatch: {$gte: 603}}}} = 200.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true /* lowInclusive */,
                                             tagInt,
                                             valInt,
@@ -330,11 +330,11 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
 
     // Actual cardinality {$match: {a: {$elemMatch: {$eq: 'cu'}}}} = 7.
     std::tie(tagStr, valStr) = value::makeNewString("cu"_sd);
-    expectedCard = estimateCardinalityEq(*arrHist, tagStr, valStr, false /* includeScalar */);
+    expectedCard = estimateCardinalityEq(*ceHist, tagStr, valStr, false /* includeScalar */);
     ASSERT_CE_APPROX_EQUAL(3.8, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$match: {a: {$elemMatch: {$gte: 'cu'}}}} = 125.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true /* lowInclusive */,
                                             tagStr,
                                             valStr,
@@ -345,7 +345,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     ASSERT_CE_APPROX_EQUAL(109.7, expectedCard.card, kErrorBound);
 
     // Actual cardinality {$match: {a: {$elemMatch: {$lte: 'cu'}}}} = 141.
-    expectedCard = estimateCardinalityRange(*arrHist,
+    expectedCard = estimateCardinalityRange(*ceHist,
                                             true /* lowInclusive */,
                                             tagLowStr,
                                             valLowStr,

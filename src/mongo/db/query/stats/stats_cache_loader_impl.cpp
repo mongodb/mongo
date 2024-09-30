@@ -44,7 +44,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/stats_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -84,7 +84,7 @@ SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx
             IDLParserContext ctx("StatsPath");
             BSONObj document = cursor->nextSafe().getOwned();
             auto parsedStats = StatsPath::parse(ctx, document);
-            StatsCacheVal statsPtr(ArrayHistogram::make(parsedStats.getStatistics()));
+            StatsCacheVal statsPtr(CEHistogram::make(parsedStats.getStatistics()));
             return makeReadyFutureWith([this, statsPtr] { return statsPtr; }).semi();
         }
 

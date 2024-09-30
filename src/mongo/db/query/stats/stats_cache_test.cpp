@@ -39,7 +39,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/stats_cache.h"
 #include "mongo/db/query/stats/stats_cache_loader_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -91,7 +91,7 @@ protected:
 };
 
 TEST(StatsCacheTest, StandaloneValueHandle) {
-    StatsCacheVal statsPtr(ArrayHistogram::make());
+    StatsCacheVal statsPtr(CEHistogram::make());
     StatsCache::ValueHandle standaloneHandle(std::move(statsPtr));
     ASSERT(standaloneHandle.isValid());
 }

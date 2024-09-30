@@ -52,54 +52,54 @@ using TypeCounts = std::map<sbe::value::TypeTags, double>;
  **/
 double getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammable = boost::none);
 
-class ArrayHistogram {
+class CEHistogram {
 public:
     /**
      * Factory method for constructing an empty scalar histogram.
      */
-    static std::shared_ptr<const ArrayHistogram> make();
+    static std::shared_ptr<const CEHistogram> make();
 
     /**
-     * Factory method for constructing an ArrayHistogram using StatsPath IDL as input.
+     * Factory method for constructing an CEHistogram using StatsPath IDL as input.
      */
-    static std::shared_ptr<const ArrayHistogram> make(Statistics stats);
+    static std::shared_ptr<const CEHistogram> make(Statistics stats);
 
     /**
      * Factory method for constructing a scalar histogram (no array fields).
      */
-    static std::shared_ptr<const ArrayHistogram> make(ScalarHistogram scalar,
-                                                      TypeCounts typeCounts,
-                                                      double sampleSize,
-                                                      double trueCount = 0.0,
-                                                      double falseCount = 0.0,
-                                                      double nanCount = 0.0,
-                                                      bool validate = true);
+    static std::shared_ptr<const CEHistogram> make(ScalarHistogram scalar,
+                                                   TypeCounts typeCounts,
+                                                   double sampleSize,
+                                                   double trueCount = 0.0,
+                                                   double falseCount = 0.0,
+                                                   double nanCount = 0.0,
+                                                   bool validate = true);
 
     /**
      * Factory method for constructing an array field histogram. All array fields must be
      * initialized.
      */
-    static std::shared_ptr<const ArrayHistogram> make(ScalarHistogram scalar,
-                                                      TypeCounts typeCounts,
-                                                      ScalarHistogram arrayUnique,
-                                                      ScalarHistogram arrayMin,
-                                                      ScalarHistogram arrayMax,
-                                                      TypeCounts arrayTypeCounts,
-                                                      double sampleSize,
-                                                      double emptyArrayCount = 0.0,
-                                                      double trueCount = 0.0,
-                                                      double falseCount = 0.0,
-                                                      double nanCount = 0.0,
-                                                      bool validate = true);
+    static std::shared_ptr<const CEHistogram> make(ScalarHistogram scalar,
+                                                   TypeCounts typeCounts,
+                                                   ScalarHistogram arrayUnique,
+                                                   ScalarHistogram arrayMin,
+                                                   ScalarHistogram arrayMax,
+                                                   TypeCounts arrayTypeCounts,
+                                                   double sampleSize,
+                                                   double emptyArrayCount = 0.0,
+                                                   double trueCount = 0.0,
+                                                   double falseCount = 0.0,
+                                                   double nanCount = 0.0,
+                                                   bool validate = true);
 
-    // ArrayHistogram is neither copy-constructible nor copy-assignable.
-    ArrayHistogram(const ArrayHistogram&) = delete;
-    ArrayHistogram& operator=(const ArrayHistogram&) = delete;
+    // CEHistogram is neither copy-constructible nor copy-assignable.
+    CEHistogram(const CEHistogram&) = delete;
+    CEHistogram& operator=(const CEHistogram&) = delete;
 
     // However, it is move-constructible and move-assignable.
-    ArrayHistogram(ArrayHistogram&&) = default;
-    ArrayHistogram& operator=(ArrayHistogram&&) = default;
-    ~ArrayHistogram() = default;
+    CEHistogram(CEHistogram&&) = default;
+    CEHistogram& operator=(CEHistogram&&) = default;
+    ~CEHistogram() = default;
 
     std::string toString() const;
 
@@ -156,28 +156,28 @@ public:
 
 private:
     // Constructs an empty scalar histogram.
-    ArrayHistogram();
+    CEHistogram();
 
     // Constructor for scalar field histograms.
-    ArrayHistogram(ScalarHistogram scalar,
-                   TypeCounts typeCounts,
-                   double sampleSize,
-                   double trueCount = 0.0,
-                   double falseCount = 0.0,
-                   double nanCount = 0.0);
+    CEHistogram(ScalarHistogram scalar,
+                TypeCounts typeCounts,
+                double sampleSize,
+                double trueCount = 0.0,
+                double falseCount = 0.0,
+                double nanCount = 0.0);
 
     // Constructor for array field histograms. We have to initialize all array fields in this case.
-    ArrayHistogram(ScalarHistogram scalar,
-                   TypeCounts typeCounts,
-                   ScalarHistogram arrayUnique,
-                   ScalarHistogram arrayMin,
-                   ScalarHistogram arrayMax,
-                   TypeCounts arrayTypeCounts,
-                   double sampleSize,
-                   double emptyArrayCount = 0.0,
-                   double trueCount = 0.0,
-                   double falseCount = 0.0,
-                   double nanCount = 0.0);
+    CEHistogram(ScalarHistogram scalar,
+                TypeCounts typeCounts,
+                ScalarHistogram arrayUnique,
+                ScalarHistogram arrayMin,
+                ScalarHistogram arrayMax,
+                TypeCounts arrayTypeCounts,
+                double sampleSize,
+                double emptyArrayCount = 0.0,
+                double trueCount = 0.0,
+                double falseCount = 0.0,
+                double nanCount = 0.0);
 
     /* Fields for all paths. */
 
@@ -212,7 +212,7 @@ private:
  */
 BSONObj makeStatistics(double documents,
                        double sampleRate,
-                       std::shared_ptr<const ArrayHistogram> arrayHistogram);
+                       std::shared_ptr<const CEHistogram> ceHistogram);
 
 /**
  * Returns an owned BSON Object representing data matching mongo::StatsPath IDL.
@@ -220,5 +220,5 @@ BSONObj makeStatistics(double documents,
 BSONObj makeStatsPath(StringData path,
                       double documents,
                       double sampleRate,
-                      std::shared_ptr<const ArrayHistogram> arrayHistogram);
+                      std::shared_ptr<const CEHistogram> ceHistogram);
 }  // namespace mongo::stats

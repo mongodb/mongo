@@ -44,7 +44,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/stats_gen.h"
 #include "mongo/db/query/stats/value_utils.h"
@@ -120,8 +120,8 @@ Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
     uassert(8423374, "Can not merge analyze pipelines", !toBeMerged);
 
     // Generate and serialize maxdiff histogram for scalar and array values.
-    auto arrayHistogram = stats::createArrayEstimator(_values, _params.getNumberBuckets());
-    auto stats = stats::makeStatistics(_count, _params.getSampleRate(), arrayHistogram);
+    auto ceHistogram = stats::createCEHistogram(_values, _params.getNumberBuckets());
+    auto stats = stats::makeStatistics(_count, _params.getSampleRate(), ceHistogram);
 
     return Value(stats);
 }

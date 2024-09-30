@@ -108,9 +108,9 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="array_histogram_test",
+    target="ce_histogram_test",
     source=[
-        "array_histogram_test.cpp",
+        "ce_histogram_test.cpp",
     ],
     LIBDEPS=[
         "stats_test_utils",

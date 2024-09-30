@@ -46,7 +46,7 @@
 #include "mongo/db/query/ce/histogram_common.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/assert.h"
@@ -167,7 +167,7 @@ std::string printValueArray(const std::vector<SBEValue>& values) {
     return strStream.str();
 }
 
-std::string plotArrayEstimator(const ArrayHistogram& estimator, const std::string& header) {
+std::string plotArrayEstimator(const CEHistogram& estimator, const std::string& header) {
     std::ostringstream os;
     os << header << "\n";
     if (!estimator.getScalar().empty()) {

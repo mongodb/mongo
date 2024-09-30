@@ -65,7 +65,7 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="histogram_bm",
-    source=["array_histogram_bm.cpp"],
+    source=["ce_histogram_bm.cpp"],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "ce_test_utils",
