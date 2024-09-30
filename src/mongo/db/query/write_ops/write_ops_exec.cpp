@@ -2324,7 +2324,7 @@ namespace {
 
 using TimeseriesBatches =
     std::vector<std::pair<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>, size_t>>;
-using TimeseriesStmtIds = stdx::unordered_map<OID, std::vector<StmtId>, OID::Hasher>;
+using TimeseriesStmtIds = timeseries::TimeseriesStmtIds;
 struct TimeseriesSingleWriteResult {
     StatusWith<SingleWriteResult> result;
     bool canContinue = true;
@@ -3042,7 +3042,7 @@ insertIntoBucketCatalog(OperationContext* opCtx,
         batches.emplace_back(std::move(insertResult->batch), index);
         const auto& batch = batches.back().first;
         if (isTimeseriesWriteRetryable(opCtx)) {
-            stmtIds[batch->bucketId.oid].push_back(stmtId);
+            stmtIds[batch.get()].push_back(stmtId);
         }
 
         // If this insert closed buckets, rewrite to be a compressed column. If we cannot
@@ -3169,9 +3169,8 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
         auto& [batch, index] = batches[itr];
         if (timeseries::bucket_catalog::claimWriteBatchCommitRights(*batch)) {
             handledHere.insert(batch.get());
-            auto stmtIds = isTimeseriesWriteRetryable(opCtx)
-                ? std::move(bucketStmtIds[batch->bucketId.oid])
-                : std::vector<StmtId>{};
+            auto stmtIds = isTimeseriesWriteRetryable(opCtx) ? std::move(bucketStmtIds[batch.get()])
+                                                             : std::vector<StmtId>{};
             try {
                 canContinue = commitTimeseriesBucket(opCtx,
                                                      batch,

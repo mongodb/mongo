@@ -138,7 +138,7 @@ std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> m
     const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements);
 
 using TimeseriesBatches = std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>;
-using TimeseriesStmtIds = stdx::unordered_map<OID, std::vector<StmtId>, OID::Hasher>;
+using TimeseriesStmtIds = stdx::unordered_map<bucket_catalog::WriteBatch*, std::vector<StmtId>>;
 
 /**
  * Builds the transform update oplog entry with a transform function.
