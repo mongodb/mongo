@@ -792,7 +792,7 @@ Status runAggregateOnView(AggExState& aggExState,
         // Set the namespace of the curop back to the view namespace so ctx records
         // stats on this view namespace on destruction.
         stdx::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
-        CurOp::get(aggExState.getOpCtx())->setNS_inlock(aggExState.getOriginalNss());
+        CurOp::get(aggExState.getOpCtx())->setNS(lk, aggExState.getOriginalNss());
     }
 
     return status;
@@ -1227,8 +1227,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         if (shouldDoFLERewrite(aggExState.getRequest())) {
             {
                 stdx::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
-                CurOp::get(aggExState.getOpCtx())
-                    ->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                CurOp::get(aggExState.getOpCtx())->setShouldOmitDiagnosticInformation(lk, true);
             }
 
             if (!aggExState.getRequest().getEncryptionInformation()->getCrudProcessed().value_or(
@@ -1268,7 +1267,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         {
             auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();
             stdx::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
-            curOp->setPlanSummary_inlock(std::move(planSummary));
+            curOp->setPlanSummary(lk, std::move(planSummary));
             curOp->debug().queryFramework = execs[0]->getQueryFramework();
         }
     }
@@ -1344,7 +1343,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     // create a temp collection, changing the curop namespace to the name of this temp collection.
     {
         stdx::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
-        curOp->setNS_inlock(aggExState.getOriginalNss());
+        curOp->setNS(lk, aggExState.getOriginalNss());
     }
 
     return Status::OK();

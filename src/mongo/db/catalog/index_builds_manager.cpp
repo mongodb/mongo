@@ -176,9 +176,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         progressMeter.set(
-            lk,
-            CurOp::get(opCtx)->setProgress_inlock(curopMessage, coll->numRecords(opCtx)),
-            opCtx);
+            lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, coll->numRecords(opCtx)), opCtx);
     }
 
     auto ns = coll->ns();

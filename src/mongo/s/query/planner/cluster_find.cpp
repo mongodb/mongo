@@ -948,11 +948,11 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         CurOp::get(opCtx)->debug().nShards = pinnedCursor.getValue()->getNumRemotes();
         CurOp::get(opCtx)->debug().cursorid = cursorId;
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(
             lk, pinnedCursor.getValue()->shouldOmitDiagnosticInformation());
-        CurOp::get(opCtx)->setOriginatingCommand_inlock(
-            pinnedCursor.getValue()->getOriginatingCommand());
-        CurOp::get(opCtx)->setGenericCursor_inlock(pinnedCursor.getValue().toGenericCursor());
+        CurOp::get(opCtx)->setOriginatingCommand(lk,
+                                                 pinnedCursor.getValue()->getOriginatingCommand());
+        CurOp::get(opCtx)->setGenericCursor(lk, pinnedCursor.getValue().toGenericCursor());
     }
 
     // If the 'failGetMoreAfterCursorCheckout' failpoint is enabled, throw an exception with the

@@ -147,7 +147,7 @@ public:
                     processFLECountS(opCtx, nss, &countRequest);
                 }
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
             }
 
             const auto cri = uassertStatusOK(
@@ -325,7 +325,7 @@ public:
             processFLECountS(opCtx, nss, &countRequest);
 
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
         }
 
         BSONObj targetingQuery = countRequest.getQuery();

@@ -269,7 +269,7 @@ AutoStatsTracker::AutoStatsTracker(
     }
 
     stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
-    CurOp::get(_opCtx)->enter_inlock(nss, dbProfilingLevel);
+    CurOp::get(_opCtx)->enter(clientLock, nss, dbProfilingLevel);
 }
 
 AutoStatsTracker::~AutoStatsTracker() {
@@ -1082,10 +1082,11 @@ OldClientContext::OldClientContext(OperationContext* opCtx,
     }
 
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    currentOp->enter_inlock(nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace()
-                                                                : nss,
-                            DatabaseProfileSettings::get(opCtx->getServiceContext())
-                                .getDatabaseProfileLevel(_db->name()));
+
+    currentOp->enter(lk,
+                     nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss,
+                     DatabaseProfileSettings::get(opCtx->getServiceContext())
+                         .getDatabaseProfileLevel(_db->name()));
 }
 
 AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(

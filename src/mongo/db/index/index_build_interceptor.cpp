@@ -168,7 +168,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
     ProgressMeterHolder progress;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        progress.set(lk, CurOp::get(opCtx)->setProgress_inlock(curopMessage), opCtx);
+        progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage), opCtx);
     }
 
     {

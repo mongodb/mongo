@@ -100,7 +100,7 @@ public:
      * Returns true if we have scheduled a remote command and are waiting for the response.
      */
     bool isActive() const;
-    bool _isActive_inlock() const;
+    bool _isActive(WithLock lk) const;
 
     /**
      * Schedules remote command request.

@@ -392,7 +392,8 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     // Set dummy 'ns' and 'command'.
     {
         stdx::lock_guard<Client> clientLock(*opCtx->getClient());
-        curop->setGenericOpRequestDetails_inlock(
+        curop->setGenericOpRequestDetails(
+            clientLock,
             NamespaceString::createNamespaceString_forTest("myDb.coll"),
             nullptr,
             command,
@@ -509,7 +510,8 @@ TEST(CurOpTest, CheckNSAgainstSerializationContext) {
     // Set dummy 'ns' and 'command'.
     {
         stdx::lock_guard<Client> clientLock(*opCtx->getClient());
-        curop->setGenericOpRequestDetails_inlock(
+        curop->setGenericOpRequestDetails(
+            clientLock,
             NamespaceString::createNamespaceString_forTest(tid, "testDb.coll"),
             nullptr,
             command,

@@ -64,10 +64,10 @@ MultiApplier::~MultiApplier() {
 
 bool MultiApplier::isActive() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _isActive_inlock();
+    return _isActive(lk);
 }
 
-bool MultiApplier::_isActive_inlock() const {
+bool MultiApplier::_isActive(WithLock lk) const {
     return State::kRunning == _state || State::kShuttingDown == _state;
 }
 
@@ -121,7 +121,7 @@ void MultiApplier::shutdown() {
 
 void MultiApplier::join() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _condition.wait(lk, [this]() { return !_isActive_inlock(); });
+    _condition.wait(lk, [&]() { return !_isActive(lk); });
 }
 
 MultiApplier::State MultiApplier::getState_forTest() const {

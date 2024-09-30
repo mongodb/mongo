@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/util/concurrency/with_lock.h"
 #include <boost/optional.hpp>
 #include <functional>
 
@@ -41,7 +42,7 @@ namespace repl {
 
 /**
  * RAII type that stores the result of callbacks written using the executor::TaskExecutor framework.
- * Only the first result passed to setResultAndCancelRemainingWork_inlock() is saved.
+ * Only the first result passed to setResultAndCancelRemainingWork() is saved.
  * Calls '_onCompletion' on destruction with result.
  * We use an invariant to ensure that a result has been provided by the caller at destruction.
  */
@@ -52,7 +53,7 @@ public:
      * Function to cancel remaining work in caller after setting '_result'.
      * This function must be called while holding a lock on the caller's mutex.
      */
-    using CancelRemainingWorkInLockFn = std::function<void()>;
+    using CancelRemainingWorkFn = std::function<void(WithLock lk)>;
 
     /**
      * Callback function to pass result to caller at destruction.
@@ -61,12 +62,12 @@ public:
 
     /**
      * Constructor for this completion guard.
-     * 'cancelRemainingWorkInLock' is called after setting the result to cancel any outstanding
-     * work in the caller. 'cancelRemainingWorkInLock' must be called while holding a lock on the
+     * 'CancelRemainingWork' is called after setting the result to cancel any outstanding
+     * work in the caller. 'CancelRemainingWork' must be called while holding a lock on the
      * caller's mutex.
      * 'onCompletion' is called with the result at destruction.
      */
-    CallbackCompletionGuard(const CancelRemainingWorkInLockFn& cancelRemainingWorkInLock,
+    CallbackCompletionGuard(const CancelRemainingWorkFn& cancelRemainingWork,
                             const OnCompletionFn& onCompletion);
 
     /**
@@ -81,23 +82,23 @@ public:
      * Sets result if called for the first time.
      * Cancels remaining work in caller.
      * Requires either a unique_lock or lock_guard to be passed in to ensure that we call
-     * _cancelRemainingWork_inlock()) while we have a lock on the callers's mutex.
+     * _CancelRemainingWork()) while we have a lock on the callers's mutex.
      */
-    void setResultAndCancelRemainingWork_inlock(const stdx::lock_guard<stdx::mutex>& lock,
-                                                const Result& result);
-    void setResultAndCancelRemainingWork_inlock(const stdx::unique_lock<stdx::mutex>& lock,
-                                                const Result& result);
+    void setResultAndCancelRemainingWork(const stdx::lock_guard<stdx::mutex>& lock,
+                                         const Result& result);
+    void setResultAndCancelRemainingWork(const stdx::unique_lock<stdx::mutex>& lock,
+                                         const Result& result);
 
 private:
     /**
      * Once we verified that we have the caller's lock, this function is called by both
-     * versions of setResultAndCancelRemainingWork_inlock() to set the result and cancel any
+     * versions of setResultAndCancelRemainingWork() to set the result and cancel any
      * remaining work in the caller.
      */
-    void _setResultAndCancelRemainingWork_inlock(const Result& result);
+    void _setResultAndCancelRemainingWork(WithLock lk, const Result& result);
 
     // Called at most once after setting '_result'.
-    const CancelRemainingWorkInLockFn _cancelRemainingWorkInLock;
+    const CancelRemainingWorkFn _cancelRemainingWork;
 
     // Called at destruction with '_result'.
     const OnCompletionFn _onCompletion;
@@ -108,9 +109,8 @@ private:
 
 template <typename Result>
 CallbackCompletionGuard<Result>::CallbackCompletionGuard(
-    const CancelRemainingWorkInLockFn& cancelRemainingWorkInLock,
-    const OnCompletionFn& onCompletion)
-    : _cancelRemainingWorkInLock(cancelRemainingWorkInLock), _onCompletion(onCompletion) {}
+    const CancelRemainingWorkFn& cancelRemainingWork, const OnCompletionFn& onCompletion)
+    : _cancelRemainingWork(cancelRemainingWork), _onCompletion(onCompletion) {}
 
 template <typename Result>
 CallbackCompletionGuard<Result>::~CallbackCompletionGuard() {
@@ -123,28 +123,28 @@ CallbackCompletionGuard<Result>::~CallbackCompletionGuard() {
 }
 
 template <typename Result>
-void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork_inlock(
+
+void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork(
     const stdx::lock_guard<stdx::mutex>& lock, const Result& result) {
-    _setResultAndCancelRemainingWork_inlock(result);
+    _setResultAndCancelRemainingWork(lock, result);
 }
 
 template <typename Result>
-void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork_inlock(
+void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork(
     const stdx::unique_lock<stdx::mutex>& lock, const Result& result) {
-    invariant(lock.owns_lock());
-    _setResultAndCancelRemainingWork_inlock(result);
+    _setResultAndCancelRemainingWork(lock, result);
 }
 
 template <typename Result>
-void CallbackCompletionGuard<Result>::_setResultAndCancelRemainingWork_inlock(
-    const Result& result) {
+void CallbackCompletionGuard<Result>::_setResultAndCancelRemainingWork(WithLock lk,
+                                                                       const Result& result) {
     if (_result) {
         return;
     }
     _result = result;
 
     // This is called at most once.
-    _cancelRemainingWorkInLock();
+    _cancelRemainingWork(lk);
 }
 
 }  // namespace repl

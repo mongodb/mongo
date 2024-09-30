@@ -607,7 +607,8 @@ private:
             stdx::lock_guard<Client> lk(*client);
             // We construct a legacy $cmd namespace so we can fill in curOp using
             // the existing logic that existed for OP_QUERY commands
-            CurOp::get(opCtx)->setGenericOpRequestDetails_inlock(
+            CurOp::get(opCtx)->setGenericOpRequestDetails(
+                lk,
                 NamespaceString::makeCommandNamespace(_invocation->db()),
                 command,
                 request.body,

@@ -187,7 +187,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     // Store the plan summary string in CurOp.
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curop->setPlanSummary_inlock(explainer.getPlanSummary());
+        curop->setPlanSummary(lk, explainer.getPlanSummary());
     }
 
     try {
@@ -223,7 +223,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         // this temp collection.
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setNS_inlock(parsedMr.getNamespace());
+            CurOp::get(opCtx)->setNS(lk, parsedMr.getNamespace());
         }
 
         return true;

@@ -185,7 +185,7 @@ SemiFuture<TenantOplogApplier::OpTimePair> TenantOplogApplier::getNotificationFo
     OpTime donorOpTime) {
     stdx::lock_guard lk(_mutex);
     // If we're not running, return a future with the status we shut down with.
-    if (!_isActive_inlock()) {
+    if (!_isActive(lk)) {
         return SemiFuture<OpTimePair>::makeReady(_finalStatus);
     }
     // If this optime has already passed, just return a ready future.
@@ -208,7 +208,7 @@ Timestamp TenantOplogApplier::getResumeBatchingTs() const {
     return _resumeBatchingTs;
 }
 
-void TenantOplogApplier::_doStartup_inlock() {
+void TenantOplogApplier::_doStartup(WithLock) {
     _oplogBatcher = std::make_shared<TenantOplogBatcher>(
         _migrationUuid, _oplogBuffer, _executor, _resumeBatchingTs, _startApplyingAfterOpTime);
     uassertStatusOK(_oplogBatcher->startup());
@@ -232,7 +232,7 @@ void TenantOplogApplier::_setFinalStatusIfOk(WithLock, Status newStatus) {
     }
 }
 
-void TenantOplogApplier::_doShutdown_inlock() noexcept {
+void TenantOplogApplier::_doShutdown(WithLock) noexcept {
     // Shutting down the oplog batcher will make the _applyLoop stop with an error future, thus
     // shutting down the applier.
     _oplogBatcher->shutdown();
@@ -256,7 +256,7 @@ void TenantOplogApplier::_applyLoop(TenantOplogBatch batch) {
     {
         stdx::lock_guard lk(_mutex);
         // Applier is not active as someone might have called shutdown().
-        if (!_isActive_inlock())
+        if (!_isActive(lk))
             return;
         _applyLoopApplyingBatch = true;
     }
@@ -294,11 +294,11 @@ bool TenantOplogApplier::_shouldStopApplying(Status status) {
         stdx::lock_guard lk(_mutex);
         _applyLoopApplyingBatch = false;
 
-        if (!_isActive_inlock()) {
+        if (!_isActive(lk)) {
             return true;
         }
 
-        if (_isShuttingDown_inlock()) {
+        if (_isShuttingDown(lk)) {
             _finishShutdown(lk,
                             {ErrorCodes::CallbackCanceled, "Tenant oplog applier shutting down"});
             return true;
@@ -347,7 +347,7 @@ void TenantOplogApplier::_finishShutdown(WithLock lk, Status status) {
         listEntry.second.setError(_finalStatus);
     }
     _opTimeNotificationList.clear();
-    _transitionToComplete_inlock();
+    _transitionToComplete(lk);
 }
 
 void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {

@@ -145,10 +145,9 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx,
     ProgressMeterHolder progress;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        progress.set(
-            lk,
-            CurOp::get(opCtx)->setProgress_inlock(curopMessage, _duplicateCounter.load(), 1),
-            opCtx);
+        progress.set(lk,
+                     CurOp::get(opCtx)->setProgress(lk, curopMessage, _duplicateCounter.load(), 1),
+                     opCtx);
     }
 
     int resolved = 0;

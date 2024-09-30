@@ -135,7 +135,7 @@ public:
     void join();
 
 private:
-    bool _isActive_inlock() const;
+    bool _isActive(WithLock lk) const;
     bool _isShuttingDown() const;
 
     /**

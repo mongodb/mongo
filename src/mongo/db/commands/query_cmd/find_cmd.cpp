@@ -196,8 +196,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
 void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& queryObj) {
     auto curOp = CurOp::get(opCtx);
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    curOp->setOpDescription_inlock(queryObj);
-    curOp->setNS_inlock(nss);
+    curOp->setOpDescription(lk, queryObj);
+    curOp->setNS(lk, nss);
 }
 
 /**
@@ -820,7 +820,7 @@ public:
 
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
+                CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
             }
 
             if (!collection.exists()) {
@@ -1048,7 +1048,7 @@ public:
                         opCtx, _cmdRequest->getNamespaceOrUUID().nss(), _cmdRequest.get());
                 }
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
             }
         }
     };

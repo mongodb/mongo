@@ -557,7 +557,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 request.getEncryptionInformation()->setCrudProcessed(true);
             }
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
         }
 
         expCtx->initializeReferencedSystemVariables();

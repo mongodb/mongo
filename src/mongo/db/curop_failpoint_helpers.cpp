@@ -52,7 +52,7 @@ std::string CurOpFailpointHelpers::updateCurOpFailPointMsg(OperationContext* opC
                                                            const std::string& newMsg) {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     auto oldMsg = CurOp::get(opCtx)->getFailPointMessage();
-    CurOp::get(opCtx)->setFailPointMessage_inlock(newMsg.c_str());
+    CurOp::get(opCtx)->setFailPointMessage(lk, newMsg.c_str());
     return oldMsg;
 }
 

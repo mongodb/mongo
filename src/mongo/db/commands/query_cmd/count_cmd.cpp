@@ -316,7 +316,7 @@ public:
             // Store the plan summary string in CurOp.
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                curOp->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
+                curOp->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
             }
 
             auto countResult = exec->executeCount();
@@ -477,7 +477,7 @@ public:
                     req = std::cref(potentiallyRewrittenReq.value());
                 }
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
             }
 
             return req;

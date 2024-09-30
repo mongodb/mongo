@@ -130,7 +130,7 @@ public:
     State getState_forTest() const;
 
 private:
-    bool _isActive_inlock() const;
+    bool _isActive(WithLock lk) const;
 
     /**
      * DB worker callback function - applies all operations.

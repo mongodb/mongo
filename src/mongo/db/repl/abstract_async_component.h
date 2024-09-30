@@ -71,14 +71,14 @@ public:
 
     /**
      * Starts the component. If the transition from PreStart to Running is allowed, this invokes
-     * _doStartup_inlock() defined in the concrete class. If _doStartup_inlock() fails, this
+     * _doStartup() defined in the concrete class. If _doStartup() fails, this
      * component will transition to Complete and any restarts after this will be disallowed.
      */
     Status startup() noexcept;
 
     /**
      * Signals this component to begin shutting down. If the transition from Running to ShuttingDown
-     * is allowed, this invokes _doShutdown_inlock() defined in the concrete class.
+     * is allowed, this invokes _doShutdown() defined in the concrete class.
      * Transition directly from PreStart to Complete if not started yet.
      */
     void shutdown() noexcept;
@@ -116,20 +116,20 @@ protected:
     /**
      * Returns true if this component is currently running or in the process of shutting down.
      */
-    bool _isActive_inlock() noexcept;
+    bool _isActive(WithLock lk) noexcept;
 
     /**
      * Returns true if this component has received a shutdown request ('_state' is ShuttingDown).
      */
     bool _isShuttingDown() noexcept;
-    bool _isShuttingDown_inlock() noexcept;
+    bool _isShuttingDown(WithLock lock) noexcept;
 
     /**
      * Transitions this component to complete and notifies any waiters on '_stateCondition'.
      * May be called at most once.
      */
     void _transitionToComplete() noexcept;
-    void _transitionToComplete_inlock() noexcept;
+    void _transitionToComplete(WithLock lk) noexcept;
 
     /**
      * Checks the given status (or embedded status inside the callback args) and current component
@@ -138,10 +138,13 @@ protected:
      * include 'message'.
      * Otherwise, returns Status::OK().
      */
-    Status _checkForShutdownAndConvertStatus_inlock(
-        const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message);
-    Status _checkForShutdownAndConvertStatus_inlock(const Status& status,
-                                                    const std::string& message);
+    Status _checkForShutdownAndConvertStatus(
+        WithLock lk,
+        const executor::TaskExecutor::CallbackArgs& callbackArgs,
+        const std::string& message);
+    Status _checkForShutdownAndConvertStatus(WithLock lk,
+                                             const Status& status,
+                                             const std::string& message);
     Status _checkForShutdownAndConvertStatus(
         const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message);
     Status _checkForShutdownAndConvertStatus(const Status& status, const std::string& message);
@@ -151,18 +154,20 @@ protected:
      * Saves handle if work was successfully scheduled.
      * Returns scheduleWork status (without the handle).
      */
-    Status _scheduleWorkAndSaveHandle_inlock(executor::TaskExecutor::CallbackFn work,
-                                             executor::TaskExecutor::CallbackHandle* handle,
-                                             const std::string& name);
-    Status _scheduleWorkAtAndSaveHandle_inlock(Date_t when,
-                                               executor::TaskExecutor::CallbackFn work,
-                                               executor::TaskExecutor::CallbackHandle* handle,
-                                               const std::string& name);
+    Status _scheduleWorkAndSaveHandle(WithLock lk,
+                                      executor::TaskExecutor::CallbackFn work,
+                                      executor::TaskExecutor::CallbackHandle* handle,
+                                      const std::string& name);
+    Status _scheduleWorkAtAndSaveHandle(WithLock lk,
+                                        Date_t when,
+                                        executor::TaskExecutor::CallbackFn work,
+                                        executor::TaskExecutor::CallbackHandle* handle,
+                                        const std::string& name);
 
     /**
      * Cancels task executor callback handle if not null.
      */
-    void _cancelHandle_inlock(executor::TaskExecutor::CallbackHandle handle);
+    void _cancelHandle(WithLock lk, executor::TaskExecutor::CallbackHandle handle);
 
     /**
      * Starts up a component, owned by us, and checks our shutdown state at the same time. If the
@@ -170,7 +175,7 @@ protected:
      * from startup().
      */
     template <typename T>
-    Status _startupComponent_inlock(std::unique_ptr<T>& component);
+    Status _startupComponent(WithLock lk, std::unique_ptr<T>& component);
     template <typename T>
     Status _startupComponent(std::unique_ptr<T>& component);
 
@@ -178,7 +183,7 @@ protected:
      * Shuts down a component, owned by us, if not null.
      */
     template <typename T>
-    void _shutdownComponent_inlock(const std::unique_ptr<T>& component);
+    void _shutdownComponent(WithLock lk, const std::unique_ptr<T>& component);
     template <typename T>
     void _shutdownComponent(const std::unique_ptr<T>& component);
 
@@ -188,24 +193,24 @@ private:
      * Running.
      * Invoked at most once by AbstractAsyncComponent.
      *
-     * If _doStartup_inlock() fails, startup() will transition this component from Running to
+     * If _doStartup() fails, startup() will transition this component from Running to
      * Complete. Subsequent startup() attempts will return an IllegalOperation error.
      *
-     * If _doStartup_inlock() succeeds, the component stays in Running (or ShuttingDown if
+     * If _doStartup() succeeds, the component stays in Running (or ShuttingDown if
      * shutdown() is called) until the component has finished its processing (transtion to
      * Complete).
      *
      * It is the responsibility of the implementation to transition the component state to Complete
-     * by calling _transitionToComplete_inlock() once the component has finished its processing.
+     * by calling _transitionToComplete() once the component has finished its processing.
      */
-    virtual void _doStartup_inlock() = 0;
+    virtual void _doStartup(WithLock) = 0;
 
     /**
      * Runs shutdown procedure after a successful transition from Running to ShuttingDown.
      * Invoked at most once by AbstractAsyncComponent.
      * May not throw exceptions.
      */
-    virtual void _doShutdown_inlock() noexcept = 0;
+    virtual void _doShutdown(WithLock) noexcept = 0;
 
     /**
      * Function invoked before join() without holding the component's mutex.
@@ -235,7 +240,7 @@ private:
     // Protected by mutex in concrete class returned in _getMutex().
     State _state = State::kPreStart;  // (M)
 
-    // Used by _transitionToComplete_inlock() to signal changes in '_state'.
+    // Used by _transitionToComplete() to signal changes in '_state'.
     mutable stdx::condition_variable _stateCondition;  // (S)
 };
 
@@ -246,10 +251,10 @@ private:
 std::ostream& operator<<(std::ostream& os, const AbstractAsyncComponent::State& state);
 
 template <typename T>
-Status AbstractAsyncComponent::_startupComponent_inlock(std::unique_ptr<T>& component) {
+Status AbstractAsyncComponent::_startupComponent(WithLock lk, std::unique_ptr<T>& component) {
     MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
 
-    if (_isShuttingDown_inlock()) {
+    if (_isShuttingDown(lk)) {
         // Save name of 'component' before resetting unique_ptr.
         auto componentToStartUp = component->_componentName;
         component.reset();
@@ -268,11 +273,11 @@ Status AbstractAsyncComponent::_startupComponent_inlock(std::unique_ptr<T>& comp
 template <typename T>
 Status AbstractAsyncComponent::_startupComponent(std::unique_ptr<T>& component) {
     stdx::lock_guard<stdx::mutex> lock(*_getMutex());
-    return _startupComponent_inlock(component);
+    return _startupComponent(lock, component);
 }
 
 template <typename T>
-void AbstractAsyncComponent::_shutdownComponent_inlock(const std::unique_ptr<T>& component) {
+void AbstractAsyncComponent::_shutdownComponent(WithLock lk, const std::unique_ptr<T>& component) {
     MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
 
     if (!component) {
@@ -284,7 +289,7 @@ void AbstractAsyncComponent::_shutdownComponent_inlock(const std::unique_ptr<T>&
 template <typename T>
 void AbstractAsyncComponent::_shutdownComponent(const std::unique_ptr<T>& component) {
     stdx::lock_guard<stdx::mutex> lock(*_getMutex());
-    _shutdownComponent_inlock(component);
+    _shutdownComponent(lock, component);
 }
 
 }  // namespace repl

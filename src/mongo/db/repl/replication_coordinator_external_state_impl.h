@@ -158,7 +158,7 @@ private:
     /**
      * Stops data replication and returns with 'lock' locked.
      */
-    void _stopDataReplication_inlock(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock);
+    void _stopDataReplication(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock);
 
     /**
      * Called when the instance transitions to primary in order to notify a potentially sharded host

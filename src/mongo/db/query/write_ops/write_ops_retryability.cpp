@@ -145,7 +145,7 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
                                           BSON("_id" << sessionId.toBSON()));
         {
             stdx::lock_guard<Client> clientLock(*opCtx->getClient());
-            curOp->setNS_inlock(existingNS);
+            curOp->setNS(clientLock, existingNS);
         }
         if (imageDoc.isEmpty()) {
             LOGV2_WARNING(5676402,

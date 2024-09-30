@@ -478,7 +478,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     GetTxnCallback getTxns) {
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     auto documents = insertRequest.getDocuments();
@@ -578,7 +578,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
         uassert(6371302, "Only single document deletes are permitted", deletes.size() == 1);
 
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
@@ -688,7 +688,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                         write_ops::UpdateModification::Type::kReplacement);
 
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
@@ -966,7 +966,7 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     validateFindAndModifyRequest(findAndModifyRequest);
@@ -1276,7 +1276,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     if (request.getWriteCommandRequestBase().getEncryptionInformation()->getCrudProcessed()) {
@@ -1350,7 +1350,7 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
@@ -1398,7 +1398,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
 
     {
         stdx::lock_guard<Client> lk(*expCtx->opCtx->getClient());
-        CurOp::get(expCtx->opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(expCtx->opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     auto edcNss = findAndModifyRequest.getNamespace();
@@ -1590,7 +1590,7 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     // FLE2 Mongos CRUD operations loopback through MongoS with EncryptionInformation as

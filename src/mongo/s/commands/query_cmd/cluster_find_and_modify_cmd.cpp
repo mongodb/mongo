@@ -616,7 +616,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
         if (shouldDoFLERewrite(findAndModifyRequest)) {
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
             }
 
             auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);

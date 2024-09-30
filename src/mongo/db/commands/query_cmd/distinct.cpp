@@ -530,7 +530,7 @@ public:
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setPlanSummary_inlock(executor->getPlanExplainer().getPlanSummary());
+            CurOp::get(opCtx)->setPlanSummary(lk, executor->getPlanExplainer().getPlanSummary());
         }
 
         const auto key = cmdObj.getStringField(CanonicalDistinct::kKeyField);

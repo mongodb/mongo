@@ -233,7 +233,7 @@ std::string Fetcher::getDiagnosticString() const {
     output << " database: " << toStringForLogging(_dbname);
     output << " query: " << _cmdObj;
     output << " query metadata: " << _metadata;
-    output << " active: " << _isActive_inlock();
+    output << " active: " << _isActive(lk);
     output << " findNetworkTimeout: " << _findNetworkTimeout;
     output << " getMoreNetworkTimeout: " << _getMoreNetworkTimeout;
     output << " shutting down?: " << _isShuttingDown_inlock();
@@ -250,10 +250,10 @@ std::string Fetcher::getDiagnosticString() const {
 
 bool Fetcher::isActive() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _isActive_inlock();
+    return _isActive(lk);
 }
 
-bool Fetcher::_isActive_inlock() const {
+bool Fetcher::_isActive(WithLock lk) const {
     return State::kRunning == _state || State::kShuttingDown == _state;
 }
 
@@ -308,7 +308,7 @@ Status Fetcher::join(Interruptible* interruptible) {
     try {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         interruptible->waitForConditionOrInterrupt(
-            _condition, lk, [this]() { return !_isActive_inlock(); });
+            _condition, lk, [&]() { return !_isActive(lk); });
         return Status::OK();
     } catch (const DBException&) {
         return exceptionToStatus();

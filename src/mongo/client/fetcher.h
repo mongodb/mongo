@@ -229,7 +229,7 @@ public:
     }
 
 private:
-    bool _isActive_inlock() const;
+    bool _isActive(WithLock lk) const;
 
     /**
      * Schedules getMore command to be run by the executor

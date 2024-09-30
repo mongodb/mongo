@@ -73,7 +73,7 @@ void runCommand(OperationContext* opCtx,
     const auto apiParamsFromClient = parseAndValidateAPIParameters(*invocation);
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setCommand_inlock(command);
+        CurOp::get(opCtx)->setCommand(lk, command);
         APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
     }
 

@@ -495,12 +495,12 @@ void setCurOpInfoAndEnsureStarted(OperationContext* opCtx,
 
     // For timeseries operations with the 'isTimeseriesNamespace' field set (i.e. sent from mongos),
     // use the view namespace for logging/profiling purposes.
-    curOp->setNS_inlock(nsEntry.getIsTimeseriesNamespace()
-                            ? nsEntry.getNs().getTimeseriesViewNamespace()
-                            : nsEntry.getNs());
-    curOp->setNetworkOp_inlock(NetworkOp::dbMsg);
-    curOp->setLogicalOp_inlock(LogicalOp::opBulkWrite);
-    curOp->setOpDescription_inlock(opDescription);
+    curOp->setNS(lk,
+                 nsEntry.getIsTimeseriesNamespace() ? nsEntry.getNs().getTimeseriesViewNamespace()
+                                                    : nsEntry.getNs());
+    curOp->setNetworkOp(lk, NetworkOp::dbMsg);
+    curOp->setLogicalOp(lk, LogicalOp::opBulkWrite);
+    curOp->setOpDescription(lk, opDescription);
     curOp->ensureStarted();
 
     if (logicalOp == LogicalOp::opInsert) {
@@ -722,7 +722,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
         {
             // Flag set here and in fle_crud.cpp since this only executes on a mongod.
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
         }
 
         auto processed = attemptGroupedFLEInserts(opCtx, req, firstOpIdx, insertDocs, nsEntry, out);
@@ -914,7 +914,7 @@ bool attemptProcessFLEUpdate(OperationContext* opCtx,
                              const mongo::NamespaceInfoEntry& nsInfoEntry) {
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     write_ops::UpdateCommandRequest updateCommand =
@@ -958,7 +958,7 @@ bool attemptProcessFLEDelete(OperationContext* opCtx,
                              const mongo::NamespaceInfoEntry& nsInfoEntry) {
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     write_ops::DeleteCommandRequest deleteRequest =
@@ -1155,7 +1155,7 @@ BSONObj getQueryForExplain(OperationContext* opCtx,
     if (shouldDoFLERewrite(nsEntry)) {
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
         }
 
         if (!nsEntry.getEncryptionInformation()->getCrudProcessed().value_or(false)) {

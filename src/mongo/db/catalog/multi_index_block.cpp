@@ -534,7 +534,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     ProgressMeterHolder progress;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        progress.set(lk, CurOp::get(opCtx)->setProgress_inlock(curopMessage, numRecords), opCtx);
+        progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, numRecords), opCtx);
     }
 
     hangAfterSettingUpIndexBuild.executeIf(

@@ -91,8 +91,8 @@ public:
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());
             pm.set(lk,
-                   CurOp::get(opCtx)->setProgress_inlock(
-                       _progressMessage, _keysInserted, 3 /* secondsBetween */),
+                   CurOp::get(opCtx)->setProgress(
+                       lk, _progressMessage, _keysInserted, 3 /* secondsBetween */),
                    opCtx);
         }  // namespace mongo
 

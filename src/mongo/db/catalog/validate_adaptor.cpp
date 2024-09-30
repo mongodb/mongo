@@ -827,7 +827,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     const auto rs = coll->getRecordStore();
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        _progress.set(lk, CurOp::get(opCtx)->setProgress_inlock(curopMessage, totalRecords), opCtx);
+        _progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, totalRecords), opCtx);
     }
 
     if (_validateState->getFirstRecordId().isNull()) {
@@ -1067,13 +1067,14 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     if (!_progress.get(WithLock::withoutLock())->isActive()) {
         const char* curopMessage = "Validate: scanning index entries";
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        _progress.set(lk,
-                      CurOp::get(opCtx)->setProgress_inlock(
-                          curopMessage,
-                          isColumnStoreIndex(index)
-                              ? _columnIndexConsistency.getTotalIndexKeys()
-                              : _keyBasedIndexConsistency.getTotalIndexKeys()),
-                      opCtx);
+        _progress.set(
+            lk,
+            CurOp::get(opCtx)->setProgress(lk,
+                                           curopMessage,
+                                           isColumnStoreIndex(index)
+                                               ? _columnIndexConsistency.getTotalIndexKeys()
+                                               : _keyBasedIndexConsistency.getTotalIndexKeys()),
+            opCtx);
     }
 
     int64_t numKeys = 0;

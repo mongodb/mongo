@@ -699,7 +699,7 @@ public:
             {
                 CurOp::get(opCtx)->ensureStarted();
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setNS_inlock(dbname);
+                CurOp::get(opCtx)->setNS(lk, dbname);
             }
 
             AutoGetDb autoDb(opCtx, dbname, MODE_IS);
@@ -739,7 +739,8 @@ public:
             } else {
                 {
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->enter_inlock(
+                    CurOp::get(opCtx)->enter(
+                        lk,
                         dbname,
                         DatabaseProfileSettings::get(opCtx->getServiceContext())
                             .getDatabaseProfileLevel(dbname));

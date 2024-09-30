@@ -331,13 +331,13 @@ private:
     /**
      * Schedules the _runQuery function to run in a separate thread.
      */
-    void _doStartup_inlock() override;
+    void _doStartup(WithLock) override;
 
     /**
      * Shuts down the DBClientCursor and DBClientConnection. Uses the connection's
      * shutdownAndDisallowReconnect function to interrupt it.
      */
-    void _doShutdown_inlock() noexcept override;
+    void _doShutdown(WithLock) noexcept override;
 
     void _preJoin() noexcept override {}
 

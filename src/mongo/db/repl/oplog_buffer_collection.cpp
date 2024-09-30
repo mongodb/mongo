@@ -139,9 +139,9 @@ void OplogBufferCollection::startup(OperationContext* opCtx) {
     _updateLastPushedTimestampFromCollection(lk, opCtx);
 }
 
-void OplogBufferCollection::_updateLastPushedTimestampFromCollection(WithLock,
+void OplogBufferCollection::_updateLastPushedTimestampFromCollection(WithLock lk,
                                                                      OperationContext* opCtx) {
-    auto lastPushedObj = _lastDocumentPushed_inlock(opCtx);
+    auto lastPushedObj = _lastDocumentPushed(lk, opCtx);
     if (lastPushedObj) {
         auto lastPushedId = lastPushedObj->getObjectField(kIdFieldName);
         fassert(
@@ -288,7 +288,7 @@ bool OplogBufferCollection::tryPop(OperationContext* opCtx, Value* value) {
     if (_count == 0) {
         return false;
     }
-    return _pop_inlock(opCtx, value);
+    return _pop(lk, opCtx, value);
 }
 
 bool OplogBufferCollection::waitForDataFor(Milliseconds waitDuration,
@@ -315,14 +315,14 @@ bool OplogBufferCollection::peek(OperationContext* opCtx, Value* value) {
     if (_count == 0) {
         return false;
     }
-    *value = _peek_inlock(opCtx, PeekMode::kExtractEmbeddedDocument);
+    *value = _peek(lk, opCtx, PeekMode::kExtractEmbeddedDocument);
     return true;
 }
 
 boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
     OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    auto lastDocumentPushed = _lastDocumentPushed_inlock(opCtx);
+    auto lastDocumentPushed = _lastDocumentPushed(lk, opCtx);
     if (lastDocumentPushed) {
         BSONObj entryObj = extractEmbeddedOplogDocument(*lastDocumentPushed);
         entryObj.shareOwnershipWith(*lastDocumentPushed);
@@ -370,7 +370,7 @@ Status OplogBufferCollection::seekToTimestamp(OperationContext* opCtx,
         _lastPoppedKey = key;
     } else {
         // The document with the requested timestamp was found.  _lastPoppedKey will be set to that
-        // document's timestamp once the document is popped from the peek cache in _pop_inlock().
+        // document's timestamp once the document is popped from the peek cache in _pop().
         _lastPoppedKey = {};
         _peekCache.push(docWithTimestamp);
     }
@@ -385,8 +385,8 @@ Status OplogBufferCollection::seekToTimestamp(OperationContext* opCtx,
     return Status::OK();
 }
 
-boost::optional<OplogBuffer::Value> OplogBufferCollection::_lastDocumentPushed_inlock(
-    OperationContext* opCtx) const {
+boost::optional<OplogBuffer::Value> OplogBufferCollection::_lastDocumentPushed(
+    WithLock lk, OperationContext* opCtx) const {
     if (_count == 0) {
         return boost::none;
     }
@@ -402,9 +402,8 @@ boost::optional<OplogBuffer::Value> OplogBufferCollection::_lastDocumentPushed_i
     return docs.front();
 }
 
-bool OplogBufferCollection::_pop_inlock(OperationContext* opCtx, Value* value) {
-    BSONObj docFromCollection =
-        _peek_inlock(opCtx, PeekMode::kReturnUnmodifiedDocumentFromCollection);
+bool OplogBufferCollection::_pop(WithLock lk, OperationContext* opCtx, Value* value) {
+    BSONObj docFromCollection = _peek(lk, opCtx, PeekMode::kReturnUnmodifiedDocumentFromCollection);
     _lastPoppedKey = docFromCollection[kIdFieldName].wrap("");
     *value = extractEmbeddedOplogDocument(docFromCollection).getOwned();
 
@@ -421,7 +420,7 @@ bool OplogBufferCollection::_pop_inlock(OperationContext* opCtx, Value* value) {
     return true;
 }
 
-BSONObj OplogBufferCollection::_peek_inlock(OperationContext* opCtx, PeekMode peekMode) {
+BSONObj OplogBufferCollection::_peek(WithLock lk, OperationContext* opCtx, PeekMode peekMode) {
     invariant(_count > 0);
 
     BSONObj startKey;

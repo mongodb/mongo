@@ -365,7 +365,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         if (request().getEncryptionInformation()) {
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
             }
 
             if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
@@ -498,7 +498,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     if (req.getEncryptionInformation().has_value()) {
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            curOp.setShouldOmitDiagnosticInformation_inlock(lk, true);
+            curOp.setShouldOmitDiagnosticInformation(lk, true);
         }
         if (!req.getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
             return processFLEFindAndModify(opCtx, req);
@@ -552,11 +552,12 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         if (req.getIsTimeseriesNamespace() && nsString.isTimeseriesBucketsCollection()) {
             auto viewNss = nsString.getTimeseriesViewNamespace();
-            curOp.setNS_inlock(viewNss);
-            curOp.setOpDescription_inlock(timeseries::timeseriesViewCommand(
-                unparsedRequest().body, "findAndModify", viewNss.coll()));
+            curOp.setNS(lk, viewNss);
+            curOp.setOpDescription(lk,
+                                   timeseries::timeseriesViewCommand(
+                                       unparsedRequest().body, "findAndModify", viewNss.coll()));
         } else {
-            curOp.setNS_inlock(nsString);
+            curOp.setNS(lk, nsString);
         }
         curOp.ensureStarted();
     }

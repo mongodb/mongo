@@ -307,7 +307,7 @@ public:
                 {
                     // Flag set here and in fle_crud.cpp since this only executes on a mongod.
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
                 }
 
                 if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
@@ -514,7 +514,7 @@ public:
                 {
                     // Flag set here and in fle_crud.cpp since this only executes on a mongod.
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
                 }
                 if (!request().getEncryptionInformation().value().getCrudProcessed()) {
                     return processFLEUpdate(opCtx, request());
@@ -639,7 +639,7 @@ public:
             if (shouldDoFLERewrite(request())) {
                 {
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
                 }
 
                 if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
@@ -765,7 +765,7 @@ public:
                 {
                     // Flag set here and in fle_crud.cpp since this only executes on a mongod.
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
                 }
 
                 if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
@@ -828,7 +828,7 @@ public:
             if (shouldDoFLERewrite(request())) {
                 {
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
                 }
 
                 if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {

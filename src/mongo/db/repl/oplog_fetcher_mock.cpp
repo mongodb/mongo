@@ -88,7 +88,7 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId,
     TestCodeBlock tcb(this);
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        if (!_isActive_inlock()) {
+        if (!_isActive(lock)) {
             return;
         }
         _oplogFetcherRestartDecision->fetchSuccessful(this);
@@ -159,7 +159,7 @@ void OplogFetcherMock::shutdownWith(Status status) {
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         // Noop if the OplogFetcher is not active or is already shutting down.
-        if (!_isActive_inlock() || _isShuttingDown_inlock()) {
+        if (!_isActive(lock) || _isShuttingDown(lock)) {
             return;
         }
 
@@ -183,12 +183,12 @@ void OplogFetcherMock::waitForshutdown() {
     }
 }
 
-void OplogFetcherMock::_doStartup_inlock() {
+void OplogFetcherMock::_doStartup(WithLock) {
     // Create a thread that waits on the _finishPromise and call _finishCallback once with the
     // finish status. This is to synchronize the OplogFetcher shutdown between the test thread and
     // the OplogFetcher's owner. For example, the OplogFetcher could be shut down by the test thread
     // by simulating an error response while the owner of the OplogFetcher (e.g. InitialSyncer) is
-    // also trying to shut it down via shutdown() and _doShutdown_inlock(). Thus, by having
+    // also trying to shut it down via shutdown() and _doShutdown(). Thus, by having
     // _waitForFinishThread as the only place that calls _finishCallback, we can make sure that
     // _finishCallback is called only once (outside of the mutex) on shutdown.
     _waitForFinishThread = stdx::thread([this]() {
@@ -203,7 +203,7 @@ void OplogFetcherMock::_doStartup_inlock() {
     });
 }
 
-void OplogFetcherMock::_doShutdown_inlock() noexcept {
+void OplogFetcherMock::_doShutdown(WithLock) noexcept {
     // Fulfill the finish promise so _finishCallback is called (outside of the mutex).
     if (!_finishPromise->getFuture().isReady()) {
         _finishPromise->setError(
@@ -229,7 +229,7 @@ void OplogFetcherMock::_finishCallback(Status status) {
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
     decltype(_oplogFetcherRestartDecision) oplogFetcherRestartDecision;
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _transitionToComplete_inlock();
+    _transitionToComplete(lock);
 
     // Release any resources that might be held by the '_onShutdownCallbackFn' function object.
     // The function object will be destroyed outside the lock since the temporary variable

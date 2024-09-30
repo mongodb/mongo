@@ -177,7 +177,7 @@ Status _dropDatabase(OperationContext* opCtx,
     {
         CurOp::get(opCtx)->ensureStarted();
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setNS_inlock(dbName);
+        CurOp::get(opCtx)->setNS(lk, dbName);
     }
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);

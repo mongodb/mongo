@@ -92,9 +92,9 @@ public:
 private:
     // =============== AbstractAsyncComponent overrides ================
 
-    void _doStartup_inlock() override;
+    void _doStartup(WithLock) override;
 
-    void _doShutdown_inlock() noexcept override;
+    void _doShutdown(WithLock) noexcept override;
 
     void _preJoin() noexcept override {}
 

@@ -544,7 +544,7 @@ void ParseAndRunCommand::_parseCommand() {
     // Fill out all currentOp details.
     {
         stdx::lock_guard<Client> lk(*client);
-        CurOp::get(opCtx)->setGenericOpRequestDetails_inlock(nss, command, request.body, _opType);
+        CurOp::get(opCtx)->setGenericOpRequestDetails(lk, nss, command, request.body, _opType);
     }
 
     _osi = initializeOperationSessionInfo(opCtx,

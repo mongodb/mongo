@@ -105,7 +105,7 @@ void Reporter::shutdown() {
 
     _requestWaitingStatus = RequestWaitingStatus::kNoWaiting;
 
-    if (_isActive_inlock()) {
+    if (_isActive(lk)) {
         executor::TaskExecutor::CallbackHandle handle;
         if (_remoteCommandCallbackHandle.isValid()) {
             invariant(!_prepareAndSendCommandCallbackHandle.isValid());
@@ -119,7 +119,7 @@ void Reporter::shutdown() {
         _executor->cancel(handle);
     }
 
-    if (_isBackupActive_inlock()) {
+    if (_isBackupActive(lk)) {
         executor::TaskExecutor::CallbackHandle handle;
         if (_backupRemoteCommandCallbackHandle.isValid()) {
             invariant(!_backupPrepareAndSendCommandCallbackHandle.isValid());
@@ -136,7 +136,7 @@ void Reporter::shutdown() {
 
 Status Reporter::join() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _condition.wait(lk, [this]() { return !_isActive_inlock() && !_isBackupActive_inlock(); });
+    _condition.wait(lk, [&]() { return !_isActive(lk) && !_isBackupActive(lk); });
     return _status;
 }
 
@@ -155,14 +155,14 @@ Status Reporter::trigger(bool allowOneMore) {
         _keepAliveTimeoutWhen = Date_t();
         _executor->cancel(_prepareAndSendCommandCallbackHandle);
         return Status::OK();
-    } else if (_isActive_inlock()) {
+    } else if (_isActive(lk)) {
         if (!allowOneMore) {
             // If it is already scheduled to be prioritized request, keep it as it is.
             if (_requestWaitingStatus == RequestWaitingStatus::kNoWaiting) {
                 _requestWaitingStatus = RequestWaitingStatus::kNormalWaiting;
             }
             return Status::OK();
-        } else if (_isBackupActive_inlock()) {
+        } else if (_isBackupActive(lk)) {
             _requestWaitingStatus = RequestWaitingStatus::kPrioritizedWaiting;
             return Status::OK();
         } else {
@@ -216,9 +216,10 @@ StatusWith<BSONObj> Reporter::_prepareCommand() {
     return prepareResult.getValue();
 }
 
-void Reporter::_sendCommand_inlock(BSONObj commandRequest,
-                                   Milliseconds netTimeout,
-                                   bool useBackupChannel) {
+void Reporter::_sendCommand(WithLock lk,
+                            BSONObj commandRequest,
+                            Milliseconds netTimeout,
+                            bool useBackupChannel) {
     LOGV2_DEBUG(21587,
                 2,
                 "Reporter sending oplog progress to upstream updater",
@@ -258,13 +259,13 @@ void Reporter::_processResponseCallback(
         // If the reporter was shut down before this callback is invoked,
         // return the canceled "_status".
         if (!_status.isOK()) {
-            _onShutdown_inlock(useBackupChannel);
+            _onShutdown(lk, useBackupChannel);
             return;
         }
 
         _status = rcbd.response.status;
         if (!_status.isOK()) {
-            _onShutdown_inlock(useBackupChannel);
+            _onShutdown(lk, useBackupChannel);
             return;
         }
 
@@ -273,7 +274,7 @@ void Reporter::_processResponseCallback(
         _status = getStatusFromCommandResult(commandResult);
 
         if (!_status.isOK()) {
-            _onShutdown_inlock(useBackupChannel);
+            _onShutdown(lk, useBackupChannel);
             return;
         }
 
@@ -296,7 +297,7 @@ void Reporter::_processResponseCallback(
                 });
             _status = scheduleResult.getStatus();
             if (!_status.isOK()) {
-                _onShutdown_inlock(useBackupChannel);
+                _onShutdown(lk, useBackupChannel);
                 return;
             }
 
@@ -316,13 +317,13 @@ void Reporter::_processResponseCallback(
     // save one request in that case but for now we leave it for future optimization.
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!_status.isOK()) {
-        _onShutdown_inlock(useBackupChannel);
+        _onShutdown(lk, useBackupChannel);
         return;
     }
 
-    _sendCommand_inlock(prepareResult.getValue(), _updatePositionTimeout, useBackupChannel);
+    _sendCommand(lk, prepareResult.getValue(), _updatePositionTimeout, useBackupChannel);
     if (!_status.isOK()) {
-        _onShutdown_inlock(useBackupChannel);
+        _onShutdown(lk, useBackupChannel);
         return;
     }
 
@@ -338,7 +339,7 @@ void Reporter::_prepareAndSendCommandCallback(const executor::TaskExecutor::Call
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (!_status.isOK()) {
-            _onShutdown_inlock(useBackupChannel);
+            _onShutdown(lk, useBackupChannel);
             return;
         }
 
@@ -351,7 +352,7 @@ void Reporter::_prepareAndSendCommandCallback(const executor::TaskExecutor::Call
         }
 
         if (!_status.isOK()) {
-            _onShutdown_inlock(useBackupChannel);
+            _onShutdown(lk, useBackupChannel);
             return;
         }
     }
@@ -361,13 +362,13 @@ void Reporter::_prepareAndSendCommandCallback(const executor::TaskExecutor::Call
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!_status.isOK()) {
-        _onShutdown_inlock(useBackupChannel);
+        _onShutdown(lk, useBackupChannel);
         return;
     }
 
-    _sendCommand_inlock(prepareResult.getValue(), _updatePositionTimeout, useBackupChannel);
+    _sendCommand(lk, prepareResult.getValue(), _updatePositionTimeout, useBackupChannel);
     if (!_status.isOK()) {
-        _onShutdown_inlock(useBackupChannel);
+        _onShutdown(lk, useBackupChannel);
         return;
     }
 
@@ -384,7 +385,7 @@ void Reporter::_prepareAndSendCommandCallback(const executor::TaskExecutor::Call
     }
 }
 
-void Reporter::_onShutdown_inlock(bool useBackupChannel) {
+void Reporter::_onShutdown(WithLock lk, bool useBackupChannel) {
     _requestWaitingStatus = RequestWaitingStatus::kNoWaiting;
     if (!useBackupChannel) {
         _remoteCommandCallbackHandle = executor::TaskExecutor::CallbackHandle();
@@ -399,19 +400,19 @@ void Reporter::_onShutdown_inlock(bool useBackupChannel) {
 
 bool Reporter::isActive() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _isActive_inlock();
+    return _isActive(lk);
 }
 
 bool Reporter::isBackupActive() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _isBackupActive_inlock();
+    return _isBackupActive(lk);
 }
 
-bool Reporter::_isActive_inlock() const {
+bool Reporter::_isActive(WithLock lk) const {
     return _remoteCommandCallbackHandle.isValid() || _prepareAndSendCommandCallbackHandle.isValid();
 }
 
-bool Reporter::_isBackupActive_inlock() const {
+bool Reporter::_isBackupActive(WithLock lk) const {
     return _backupRemoteCommandCallbackHandle.isValid() ||
         _backupPrepareAndSendCommandCallbackHandle.isValid();
 }

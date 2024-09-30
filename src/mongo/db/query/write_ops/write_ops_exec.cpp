@@ -872,7 +872,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
+        CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 
     if (updateRequest->shouldReturnAnyDocs()) {
@@ -992,7 +992,7 @@ long long performDelete(OperationContext* opCtx,
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
+        CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 
     if (deleteRequest->getReturnDeleted()) {
@@ -1140,8 +1140,8 @@ WriteResult performInserts(OperationContext* opCtx,
     // Timeseries inserts already did as part of performTimeseriesWrites.
     if (source != OperationSource::kTimeseriesInsert) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(wholeOp.getNamespace());
-        curOp.setLogicalOp_inlock(LogicalOp::opInsert);
+        curOp.setNS(lk, wholeOp.getNamespace());
+        curOp.setLogicalOp(lk, LogicalOp::opInsert);
         curOp.ensureStarted();
         // Initialize 'ninserted' for the operation if is not yet.
         curOp.debug().additiveMetrics.incrementNinserted(0);
@@ -1285,7 +1285,7 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
+        CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 
     auto updateResult = exec->executeUpdate();
@@ -1464,11 +1464,12 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
         ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
             opCtx->getWriteConcern());
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(
-            source == OperationSource::kTimeseriesUpdate ? ns.getTimeseriesViewNamespace() : ns);
-        curOp.setNetworkOp_inlock(dbUpdate);
-        curOp.setLogicalOp_inlock(LogicalOp::opUpdate);
-        curOp.setOpDescription_inlock(op.toBSON());
+        curOp.setNS(lk,
+                    source == OperationSource::kTimeseriesUpdate ? ns.getTimeseriesViewNamespace()
+                                                                 : ns);
+        curOp.setNetworkOp(lk, dbUpdate);
+        curOp.setLogicalOp(lk, LogicalOp::opUpdate);
+        curOp.setOpDescription(lk, op.toBSON());
         curOp.ensureStarted();
     }
 
@@ -1812,11 +1813,12 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     auto& curOp = *CurOp::get(opCtx);
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(
-            source == OperationSource::kTimeseriesDelete ? ns.getTimeseriesViewNamespace() : ns);
-        curOp.setNetworkOp_inlock(dbDelete);
-        curOp.setLogicalOp_inlock(LogicalOp::opDelete);
-        curOp.setOpDescription_inlock(op.toBSON());
+        curOp.setNS(lk,
+                    source == OperationSource::kTimeseriesDelete ? ns.getTimeseriesViewNamespace()
+                                                                 : ns);
+        curOp.setNetworkOp(lk, dbDelete);
+        curOp.setLogicalOp(lk, LogicalOp::opDelete);
+        curOp.setOpDescription(lk, op.toBSON());
         curOp.ensureStarted();
     }
 
@@ -1878,7 +1880,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
+        CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 
     auto nDeleted = exec->executeDelete();
@@ -3316,10 +3318,11 @@ write_ops::InsertCommandReply performTimeseriesWrites(
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         auto requestNs = ns(request);
-        curOp.setNS_inlock(requestNs.isTimeseriesBucketsCollection()
-                               ? requestNs.getTimeseriesViewNamespace()
-                               : requestNs);
-        curOp.setLogicalOp_inlock(LogicalOp::opInsert);
+        curOp.setNS(lk,
+                    requestNs.isTimeseriesBucketsCollection()
+                        ? requestNs.getTimeseriesViewNamespace()
+                        : requestNs);
+        curOp.setLogicalOp(lk, LogicalOp::opInsert);
         curOp.ensureStarted();
         // Initialize 'ninserted' for the operation if is not yet.
         curOp.debug().additiveMetrics.incrementNinserted(0);

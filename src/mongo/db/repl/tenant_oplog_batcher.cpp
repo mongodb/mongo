@@ -198,7 +198,7 @@ StatusWith<TenantOplogBatch> TenantOplogBatcher::_readNextBatch(BatchLimits limi
         while (!hasData) {
             hasData = _oplogBuffer->waitForData(Seconds(1));
             stdx::lock_guard lk(_mutex);
-            if (!_isActive_inlock() || _isShuttingDown_inlock()) {
+            if (!_isActive(lk) || _isShuttingDown(lk)) {
                 return {ErrorCodes::CallbackCanceled, "Tenant oplog batcher shut down"};
             }
         }
@@ -244,8 +244,9 @@ StatusWith<TenantOplogBatch> TenantOplogBatcher::_readNextBatch(BatchLimits limi
     return batch;
 }
 
-SemiFuture<TenantOplogBatch> TenantOplogBatcher::_scheduleNextBatch(WithLock, BatchLimits limits) {
-    if (!_isActive_inlock() || _isShuttingDown_inlock()) {
+SemiFuture<TenantOplogBatch> TenantOplogBatcher::_scheduleNextBatch(WithLock lk,
+                                                                    BatchLimits limits) {
+    if (!_isActive(lk) || _isShuttingDown(lk)) {
         return SemiFuture<TenantOplogBatch>::makeReady(
             Status(ErrorCodes::CallbackCanceled, "Tenant oplog batcher has been shut down."));
     }
@@ -259,8 +260,8 @@ SemiFuture<TenantOplogBatch> TenantOplogBatcher::_scheduleNextBatch(WithLock, Ba
                 stdx::lock_guard lk(_mutex);
                 _batchRequested = false;
                 taskCompletionPromise->setError(args.status);
-                if (_isShuttingDown_inlock()) {
-                    _transitionToComplete_inlock();
+                if (_isShuttingDown(lk)) {
+                    _transitionToComplete(lk);
                 }
                 return;
             }
@@ -275,8 +276,8 @@ SemiFuture<TenantOplogBatch> TenantOplogBatcher::_scheduleNextBatch(WithLock, Ba
             // oplog fetcher batch".
             _batchRequested = false;
             taskCompletionPromise->setFrom(std::move(result));
-            if (_isShuttingDown_inlock()) {
-                _transitionToComplete_inlock();
+            if (_isShuttingDown(lk)) {
+                _transitionToComplete(lk);
             }
         });
 
@@ -285,8 +286,8 @@ SemiFuture<TenantOplogBatch> TenantOplogBatcher::_scheduleNextBatch(WithLock, Ba
         stdx::lock_guard lk(_mutex);
         _batchRequested = false;
         taskCompletionPromise->setError(statusWithCbh.getStatus());
-        if (_isShuttingDown_inlock()) {
-            _transitionToComplete_inlock();
+        if (_isShuttingDown(lk)) {
+            _transitionToComplete(lk);
         }
     }
     return std::move(pf.future).semi();
@@ -300,7 +301,7 @@ SemiFuture<TenantOplogBatch> TenantOplogBatcher::getNextBatch(BatchLimits limits
     return _scheduleNextBatch(lk, limits);
 }
 
-void TenantOplogBatcher::_doStartup_inlock() {
+void TenantOplogBatcher::_doStartup(WithLock) {
     LOGV2_DEBUG(
         4885604, 1, "Tenant Oplog Batcher starting up", "component"_attr = _getComponentName());
     if (!_resumeBatchingTs.isNull()) {
@@ -326,11 +327,11 @@ void TenantOplogBatcher::_doStartup_inlock() {
     }
 }
 
-void TenantOplogBatcher::_doShutdown_inlock() noexcept {
+void TenantOplogBatcher::_doShutdown(WithLock lk) noexcept {
     LOGV2_DEBUG(
         4885605, 1, "Tenant Oplog Batcher shutting down", "component"_attr = _getComponentName());
     if (!_batchRequested) {
-        _transitionToComplete_inlock();
+        _transitionToComplete(lk);
     }
     // If _batchRequested was true, we handle the _transitionToComplete when it becomes false.
 }

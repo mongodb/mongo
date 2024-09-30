@@ -162,7 +162,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         progress.set(
             lk,
-            CurOp::get(opCtx)->setProgress_inlock(curopMessage, _skippedRecordCounter.load(), 1),
+            CurOp::get(opCtx)->setProgress(lk, curopMessage, _skippedRecordCounter.load(), 1),
             opCtx);
     }
 

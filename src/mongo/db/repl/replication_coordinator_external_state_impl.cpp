@@ -343,9 +343,9 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
 
     LOGV2(21301, "Starting replication reporter thread");
     invariant(!_syncSourceFeedbackThread);
-    // Get the pointer while holding the lock so that _stopDataReplication_inlock() won't
+    // Get the pointer while holding the lock so that _stopDataReplication() won't
     // leave the unique pointer empty if the _syncSourceFeedbackThread's function starts
-    // after _stopDataReplication_inlock's move.
+    // after _stopDataReplication's move.
     auto bgSyncPtr = _bgSync.get();
     _syncSourceFeedbackThread = std::make_unique<stdx::thread>([this, bgSyncPtr, replCoord] {
         _syncSourceFeedback.run(_taskExecutor.get(), bgSyncPtr, replCoord);
@@ -359,7 +359,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     storageEngine->notifyReplStartupRecoveryComplete(opCtx);
 }
 
-void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
+void ReplicationCoordinatorExternalStateImpl::_stopDataReplication(
     OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock) {
     // Make sue no other _stopDataReplication calls are in progress.
     _dataReplicationStopped.wait(lock, [this]() { return !_stoppingDataReplication; });
@@ -498,7 +498,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
         return;
     }
 
-    _stopDataReplication_inlock(opCtx, lk);
+    _stopDataReplication(opCtx, lk);
 
     LOGV2(21307, "Stopping replication storage threads");
     _taskExecutor->shutdown();

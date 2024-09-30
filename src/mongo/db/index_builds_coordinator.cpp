@@ -434,8 +434,8 @@ void updateCurOpForCommitOrAbort(OperationContext* opCtx, StringData fieldName, 
     auto curOp = CurOp::get(opCtx);
     builder.appendElementsUnique(curOp->opDescription());
     auto opDescObj = builder.obj();
-    curOp->setLogicalOp_inlock(LogicalOp::opCommand);
-    curOp->setOpDescription_inlock(opDescObj);
+    curOp->setLogicalOp(lk, LogicalOp::opCommand);
+    curOp->setOpDescription(lk, opDescObj);
     curOp->ensureStarted();
 }
 
@@ -2261,9 +2261,9 @@ void IndexBuildsCoordinator::updateCurOpOpDescription(OperationContext* opCtx,
     auto curOp = CurOp::get(opCtx);
     builder.appendElementsUnique(curOpDesc ? curOpDesc.value() : curOp->opDescription());
     auto opDescObj = builder.obj();
-    curOp->setLogicalOp_inlock(LogicalOp::opCommand);
-    curOp->setOpDescription_inlock(opDescObj);
-    curOp->setNS_inlock(nss);
+    curOp->setLogicalOp(lk, LogicalOp::opCommand);
+    curOp->setOpDescription(lk, opDescObj);
+    curOp->setNS(lk, nss);
     curOp->ensureStarted();
 }
 

@@ -113,9 +113,9 @@ private:
 
     void _pushEntry(OperationContext* opCtx, TenantOplogBatch* batch, OplogEntry&& op);
 
-    void _doStartup_inlock() final;
+    void _doStartup(WithLock) final;
 
-    void _doShutdown_inlock() noexcept final;
+    void _doShutdown(WithLock) noexcept final;
 
     void _preJoin() noexcept final {}
 

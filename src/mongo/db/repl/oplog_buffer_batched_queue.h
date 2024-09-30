@@ -81,8 +81,8 @@ public:
     void exitDrainMode() final;
 
 private:
-    void _waitForSpace_inlock(stdx::unique_lock<stdx::mutex>& lk, std::size_t size);
-    void _clear_inlock(WithLock lk);
+    void _waitForSpace(stdx::unique_lock<stdx::mutex>& lk, std::size_t size);
+    void _clear(WithLock lk);
 
     mutable stdx::mutex _mutex;
     stdx::condition_variable _notEmptyCV;

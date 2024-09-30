@@ -52,7 +52,7 @@ void OplogBufferBatchedQueue::shutdown(OperationContext* opCtx) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _isShutdown = true;
-        _clear_inlock(lk);
+        _clear(lk);
     }
 
     if (_counters) {
@@ -77,7 +77,7 @@ void OplogBufferBatchedQueue::push(OperationContext*,
 
         // Block until enough space is available.
         invariant(!_drainMode);
-        _waitForSpace_inlock(lk, size);
+        _waitForSpace(lk, size);
 
         // Do not push anything if already shutdown.
         if (_isShutdown) {
@@ -102,7 +102,7 @@ void OplogBufferBatchedQueue::push(OperationContext*,
 void OplogBufferBatchedQueue::waitForSpace(OperationContext* opCtx, const Cost& cost) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     // This buffer has no limit for count.
-    _waitForSpace_inlock(lk, cost.size);
+    _waitForSpace(lk, cost.size);
 }
 
 bool OplogBufferBatchedQueue::isEmpty() const {
@@ -124,7 +124,7 @@ std::size_t OplogBufferBatchedQueue::getCount() const {
 void OplogBufferBatchedQueue::clear(OperationContext*) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _clear_inlock(lk);
+        _clear(lk);
     }
 
     if (_counters) {
@@ -189,8 +189,7 @@ void OplogBufferBatchedQueue::exitDrainMode() {
     _drainMode = false;
 }
 
-void OplogBufferBatchedQueue::_waitForSpace_inlock(stdx::unique_lock<stdx::mutex>& lk,
-                                                   std::size_t size) {
+void OplogBufferBatchedQueue::_waitForSpace(stdx::unique_lock<stdx::mutex>& lk, std::size_t size) {
     invariant(size > 0);
     invariant(!_waitSize);
 
@@ -202,7 +201,7 @@ void OplogBufferBatchedQueue::_waitForSpace_inlock(stdx::unique_lock<stdx::mutex
     }
 }
 
-void OplogBufferBatchedQueue::_clear_inlock(WithLock lk) {
+void OplogBufferBatchedQueue::_clear(WithLock lk) {
     _queue = {};
     _curSize = 0;
     _curCount = 0;

@@ -95,10 +95,10 @@ SyncSourceResolver::~SyncSourceResolver() {
 
 bool SyncSourceResolver::isActive() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _isActive_inlock();
+    return _isActive(lock);
 }
 
-bool SyncSourceResolver::_isActive_inlock() const {
+bool SyncSourceResolver::_isActive(WithLock lk) const {
     return State::kRunning == _state || State::kShuttingDown == _state;
 }
 
@@ -144,7 +144,7 @@ void SyncSourceResolver::shutdown() {
 
 void SyncSourceResolver::join() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _condition.wait(lk, [this]() { return !_isActive_inlock(); });
+    _condition.wait(lk, [&]() { return !_isActive(lk); });
 }
 
 bool SyncSourceResolver::_isShuttingDown() const {

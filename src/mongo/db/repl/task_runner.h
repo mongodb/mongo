@@ -138,7 +138,7 @@ private:
      * Loop exits when any of the tasks returns a non-kContinue next action.
      */
     void _runTasks();
-    void _finishRunTasks_inlock();
+    void _finishRunTasks(WithLock lk);
 
     /**
      * Waits for next scheduled task to be added to queue.

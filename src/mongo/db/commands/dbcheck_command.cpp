@@ -177,8 +177,8 @@ void _initializeCurOp(OperationContext* opCtx, boost::optional<DbCheckCollection
 
     stdx::unique_lock<Client> lk(*opCtx->getClient());
     auto curOp = CurOp::get(opCtx);
-    curOp->setNS_inlock(info->nss);
-    curOp->setOpDescription_inlock(info->toBSON());
+    curOp->setNS(lk, info->nss);
+    curOp->setOpDescription(lk, info->toBSON());
     curOp->ensureStarted();
 }
 
@@ -1799,8 +1799,9 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         progress.set(
             lk,
-            CurOp::get(opCtx)->setProgress_inlock(
-                StringData(curOpMessage), collAcquisition.getCollectionPtr()->numRecords(opCtx)),
+            CurOp::get(opCtx)->setProgress(lk,
+                                           StringData(curOpMessage),
+                                           collAcquisition.getCollectionPtr()->numRecords(opCtx)),
             opCtx);
         retryProgressInitialization = false;
     }

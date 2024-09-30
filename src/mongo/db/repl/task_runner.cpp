@@ -165,7 +165,7 @@ void TaskRunner::_runTasks() {
             nextAction == NextAction::kInvalid) {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (_tasks.empty()) {
-                _finishRunTasks_inlock();
+                _finishRunTasks(lk);
                 return;
             }
         }
@@ -189,11 +189,11 @@ void TaskRunner::_runTasks() {
     cancelTasks();
 
     lk.lock();
-    _finishRunTasks_inlock();
+    _finishRunTasks(lk);
     cancelTasks();
 }
 
-void TaskRunner::_finishRunTasks_inlock() {
+void TaskRunner::_finishRunTasks(WithLock lk) {
     _active = false;
     _cancelRequested = false;
     _condition.notify_all();

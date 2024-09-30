@@ -707,21 +707,21 @@ public:
             auto planSummary = exec->getPlanExplainer().getPlanSummary();
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                curOp->setPlanSummary_inlock(planSummary);
+                curOp->setPlanSummary(lk, planSummary);
 
                 // Ensure that the original query or command object is available in the slow query
                 // log, profiler and currentOp.
                 auto originatingCommand = cursorPin->getOriginatingCommandObj();
                 if (!originatingCommand.isEmpty()) {
-                    curOp->setOriginatingCommand_inlock(originatingCommand);
+                    curOp->setOriginatingCommand(lk, originatingCommand);
                 }
 
                 curOp->debug().queryFramework = exec->getQueryFramework();
-                curOp->setShouldOmitDiagnosticInformation_inlock(
+                curOp->setShouldOmitDiagnosticInformation(
                     lk, cursorPin->shouldOmitDiagnosticInformation());
 
                 // Update the genericCursor stored in curOp with the new cursor stats.
-                curOp->setGenericCursor_inlock(cursorPin->toGenericCursor());
+                curOp->setGenericCursor(lk, cursorPin->toGenericCursor());
             }
 
             // If this is a change stream cursor, check whether the tenant has migrated elsewhere.

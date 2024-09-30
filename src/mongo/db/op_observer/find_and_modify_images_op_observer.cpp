@@ -90,7 +90,7 @@ void writeToImageCollection(OperationContext* opCtx, OpStateAccumulator* opAccum
     UpdateResult res = Helpers::upsert(opCtx, collection, imageEntry.toBSON());
     {
         stdx::lock_guard<Client> clientLock(*opCtx->getClient());
-        curOp->setNS_inlock(existingNs);
+        curOp->setNS(clientLock, existingNs);
     }
 
     invariant(res.numDocsModified == 1 || !res.upsertedId.isEmpty());

@@ -94,7 +94,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                                                   const CompactStructuredEncryptionData& request) {
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     uassert(6583201,

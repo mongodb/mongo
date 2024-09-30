@@ -339,11 +339,11 @@ public:
 
     // basic options
     // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_MSG, etc.
-    NetworkOp networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
+    NetworkOp networkOp{opInvalid};  // only set this through setNetworkOp() to keep synced
     // _logicalOp is the logical operation type, ie 'dbQuery' regardless of whether this is an
     // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_MSG.
     // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
-    LogicalOp logicalOp{LogicalOp::opInvalid};  // only set this through setNetworkOp_inlock()
+    LogicalOp logicalOp{LogicalOp::opInvalid};  // only set this through setNetworkOp()
     bool iscommand{false};
 
     // detailed options
@@ -553,9 +553,9 @@ public:
  * the associated OperationContext at any time, or by other threads that have
  * locked the context's owning Client object.
  *
- * The mutator methods on CurOp whose names end _inlock may only be called by the thread
- * executing the associated OperationContext and Client, and only when that thread has also
- * locked the Client object.  All other mutators may only be called by the thread executing
+ * The mutator methods on CurOp who take in a lock as the first argument may only be called by
+ * the thread executing the associated OperationContext and Client, and only when that thread has
+ * also locked the Client object.  All other mutators may only be called by the thread executing
  * CurOp, but do not require holding the Client lock.  The exception to this is the kill()
  * method, which is self-synchronizing.
  *
@@ -600,7 +600,7 @@ public:
     CurOp() = default;
 
     /**
-     * This allows the caller to set the command on the CurOp without using setCommand_inlock and
+     * This allows the caller to set the command on the CurOp without using setCommand and
      * having to acquire the Client lock or having to leave a comment indicating why the
      * client lock isn't necessary.
      */
@@ -614,10 +614,8 @@ public:
      * is set early in the request processing backend and does not typically need to be called
      * thereafter. It is necessary to hold the Client lock while this method executes.
      */
-    void setGenericOpRequestDetails_inlock(NamespaceString nss,
-                                           const Command* command,
-                                           BSONObj cmdObj,
-                                           NetworkOp op);
+    void setGenericOpRequestDetails(
+        WithLock, NamespaceString nss, const Command* command, BSONObj cmdObj, NetworkOp op);
 
     /**
      * Sets metrics collected at the end of an operation onto curOp's OpDebug instance. Note that
@@ -658,13 +656,13 @@ public:
         return _originatingCommand;
     }
 
-    void enter_inlock(NamespaceString nss, int dbProfileLevel);
-    void enter_inlock(const DatabaseName& dbName, int dbProfileLevel);
+    void enter(WithLock, NamespaceString nss, int dbProfileLevel);
+    void enter(WithLock lk, const DatabaseName& dbName, int dbProfileLevel);
 
     /**
      * Sets the type of the current network operation.
      */
-    void setNetworkOp_inlock(NetworkOp op) {
+    void setNetworkOp(WithLock, NetworkOp op) {
         _networkOp = op;
         _debug.networkOp = op;
     }
@@ -672,7 +670,7 @@ public:
     /**
      * Sets the type of the current logical operation.
      */
-    void setLogicalOp_inlock(LogicalOp op) {
+    void setLogicalOp(WithLock, LogicalOp op) {
         _logicalOp = op;
         _debug.logicalOp = op;
     }
@@ -680,7 +678,7 @@ public:
     /**
      * Marks the current operation as being a command.
      */
-    void markCommand_inlock() {
+    void markCommand(WithLock) {
         _isCommand = true;
     }
 
@@ -969,19 +967,19 @@ public:
      * 'opDescription' must be either an owned BSONObj or guaranteed to outlive the OperationContext
      * it is associated with.
      */
-    void setOpDescription_inlock(const BSONObj& opDescription);
+    void setOpDescription(WithLock, const BSONObj& opDescription);
 
     /**
      * Sets the original command object.
      */
-    void setOriginatingCommand_inlock(const BSONObj& commandObj) {
+    void setOriginatingCommand(WithLock, const BSONObj& commandObj) {
         _originatingCommand = commandObj.getOwned();
     }
 
     const Command* getCommand() const {
         return _command;
     }
-    void setCommand_inlock(const Command* command) {
+    void setCommand(WithLock, const Command* command) {
         _command = command;
     }
 
@@ -1005,14 +1003,14 @@ public:
     /**
      * Sets the message for FailPoints used.
      */
-    void setFailPointMessage_inlock(StringData message) {
+    void setFailPointMessage(WithLock, StringData message) {
         _failPointMessage = message.toString();
     }
 
     /**
      * Sets the message for this CurOp.
      */
-    void setMessage_inlock(StringData message);
+    void setMessage(WithLock lk, StringData message);
 
     /**
      * Sets the message and the progress meter for this CurOp.
@@ -1020,9 +1018,10 @@ public:
      * Accessors and modifiers of ProgressMeter associated with the CurOp must follow the same
      * locking scheme as CurOp. It is necessary to hold the lock while this method executes.
      */
-    ProgressMeter& setProgress_inlock(StringData name,
-                                      unsigned long long progressMeterTotal = 0,
-                                      int secondsBetween = 3);
+    ProgressMeter& setProgress(WithLock,
+                               StringData name,
+                               unsigned long long progressMeterTotal = 0,
+                               int secondsBetween = 3);
 
     /**
      * Captures stats on the locker after transaction resources are unstashed to the operation
@@ -1055,7 +1054,7 @@ public:
     CurOp* parent() const {
         return _parent;
     }
-    boost::optional<GenericCursor> getGenericCursor_inlock() const {
+    boost::optional<GenericCursor> getGenericCursor(WithLock) const {
         return _genericCursor;
     }
 
@@ -1076,22 +1075,22 @@ public:
      * generally the Context should set this up
      * but sometimes you want to do it ahead of time
      */
-    void setNS_inlock(NamespaceString nss);
-    void setNS_inlock(const DatabaseName& dbName);
+    void setNS(WithLock, NamespaceString nss);
+    void setNS(WithLock, const DatabaseName& dbName);
 
     StringData getPlanSummary() const {
         return _planSummary;
     }
 
-    void setPlanSummary_inlock(StringData summary) {
+    void setPlanSummary(WithLock, StringData summary) {
         _planSummary = summary.toString();
     }
 
-    void setPlanSummary_inlock(std::string summary) {
+    void setPlanSummary(WithLock, std::string summary) {
         _planSummary = std::move(summary);
     }
 
-    void setGenericCursor_inlock(GenericCursor gc);
+    void setGenericCursor(WithLock, GenericCursor gc);
 
     boost::optional<SingleThreadedLockStats> getLockStatsBase() const {
         if (!_resourceStatsBase) {
@@ -1104,7 +1103,7 @@ public:
         _tickSource = tickSource;
     }
 
-    void setShouldOmitDiagnosticInformation_inlock(WithLock, bool shouldOmitDiagnosticInfo) {
+    void setShouldOmitDiagnosticInformation(WithLock, bool shouldOmitDiagnosticInfo) {
         _shouldOmitDiagnosticInformation = shouldOmitDiagnosticInfo;
     }
     bool getShouldOmitDiagnosticInformation() const {
@@ -1226,11 +1225,11 @@ private:
     boost::optional<Microseconds> _remoteOpStartTime;
 
     // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_MSG, etc.
-    NetworkOp _networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
+    NetworkOp _networkOp{opInvalid};  // only set this through setNetworkOp() to keep synced
     // _logicalOp is the logical operation type, ie 'dbQuery' regardless of whether this is an
     // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_MSG.
     // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
-    LogicalOp _logicalOp{LogicalOp::opInvalid};  // only set this through setNetworkOp_inlock()
+    LogicalOp _logicalOp{LogicalOp::opInvalid};  // only set this through setNetworkOp()
 
     bool _isCommand{false};
     int _dbprofile{0};  // 0=off, 1=slow, 2=all

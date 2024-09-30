@@ -3749,7 +3749,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
         // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
-        // Since we black holed OplogFetcher's find request, _getNextApplierBatch_inlock() will
+        // Since we black holed OplogFetcher's find request, _getNextApplierBatch() will
         // not return any operations for us to apply, leading to _getNextApplierBatchCallback()
         // rescheduling itself at new->now() + _options.getApplierBatchCallbackRetryWait.
     }
@@ -3775,7 +3775,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
 
     ASSERT_TRUE(_replicationProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx.get()));
 
-    // _getNextApplierBatch_inlock() returns BadValue when it gets an oplog entry with an unexpected
+    // _getNextApplierBatch() returns BadValue when it gets an oplog entry with an unexpected
     // version (not OplogEntry::kOplogVersion).
     auto oplogEntry = makeOplogEntryObj(1);
     auto oplogEntryWithInconsistentVersion =
@@ -3810,7 +3810,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
             processSuccessfulFCVFetcherResponseLastLTS();
 
             // Simulate an OplogFetcher batch with bad oplog entries that will be added to the oplog
-            // buffer and processed by _getNextApplierBatch_inlock().
+            // buffer and processed by _getNextApplierBatch().
             getOplogFetcher()->receiveBatch(1LL, {oplogEntry, oplogEntryWithInconsistentVersion});
         }
 
@@ -3844,13 +3844,13 @@ TEST_F(
 
     ASSERT_TRUE(_replicationProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx.get()));
 
-    // _getNextApplierBatch_inlock() returns BadValue when it gets an oplog entry with an unexpected
+    // _getNextApplierBatch() returns BadValue when it gets an oplog entry with an unexpected
     // version (not OplogEntry::kOplogVersion).
     auto oplogEntry = makeOplogEntryObj(1);
     auto oplogEntryWithInconsistentVersion =
         makeOplogEntryObj(2, OpTypeEnum::kInsert, OplogEntry::kOplogVersion + 100);
 
-    // Enable 'rsSyncApplyStop' so that _getNextApplierBatch_inlock() returns an empty batch of
+    // Enable 'rsSyncApplyStop' so that _getNextApplierBatch() returns an empty batch of
     // operations instead of a batch containing an oplog entry with a bad version.
     auto failPoint = globalFailPointRegistry().find("rsSyncApplyStop");
     failPoint->setMode(FailPoint::alwaysOn);
@@ -3884,7 +3884,7 @@ TEST_F(
             processSuccessfulFCVFetcherResponseLastLTS();
 
             // Simulate an OplogFetcher batch with bad oplog entries that will be added to the oplog
-            // buffer and processed by _getNextApplierBatch_inlock().
+            // buffer and processed by _getNextApplierBatch().
             getOplogFetcher()->receiveBatch(1LL, {oplogEntry, oplogEntryWithInconsistentVersion});
         }
 
@@ -3892,7 +3892,7 @@ TEST_F(
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(2)});
 
         // Since the 'rsSyncApplyStop' fail point is enabled, InitialSyncer will get an empty
-        // batch of operations from _getNextApplierBatch_inlock() even though the oplog buffer
+        // batch of operations from _getNextApplierBatch() even though the oplog buffer
         // is not empty.
     }
 

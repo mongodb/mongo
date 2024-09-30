@@ -347,11 +347,11 @@ OperationContext* CurOp::opCtx() {
     return _stack->opCtx();
 }
 
-void CurOp::setOpDescription_inlock(const BSONObj& opDescription) {
+void CurOp::setOpDescription(WithLock, const BSONObj& opDescription) {
     _opDescription = opDescription;
 }
 
-void CurOp::setGenericCursor_inlock(GenericCursor gc) {
+void CurOp::setGenericCursor(WithLock, GenericCursor gc) {
     _genericCursor = std::move(gc);
 }
 
@@ -361,10 +361,8 @@ CurOp::~CurOp() {
     invariant(!_stack || this == _stack->pop());
 }
 
-void CurOp::setGenericOpRequestDetails_inlock(NamespaceString nss,
-                                              const Command* command,
-                                              BSONObj cmdObj,
-                                              NetworkOp op) {
+void CurOp::setGenericOpRequestDetails(
+    WithLock, NamespaceString nss, const Command* command, BSONObj cmdObj, NetworkOp op) {
     // Set the _isCommand flags based on network op only. For legacy writes on mongoS, we
     // resolve them to OpMsgRequests and then pass them into the Commands path, so having a
     // valid Command* here does not guarantee that the op was issued from the client using a
@@ -446,7 +444,7 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
     }
 }
 
-void CurOp::setMessage_inlock(StringData message) {
+void CurOp::setMessage(WithLock, StringData message) {
     if (_progressMeter && _progressMeter->isActive()) {
         LOGV2_ERROR(
             20527, "Updating message", "old"_attr = redact(_message), "new"_attr = redact(message));
@@ -455,10 +453,11 @@ void CurOp::setMessage_inlock(StringData message) {
     _message = message.toString();  // copy
 }
 
-ProgressMeter& CurOp::setProgress_inlock(StringData message,
-                                         unsigned long long progressMeterTotal,
-                                         int secondsBetween) {
-    setMessage_inlock(message);
+ProgressMeter& CurOp::setProgress(WithLock lk,
+                                  StringData message,
+                                  unsigned long long progressMeterTotal,
+                                  int secondsBetween) {
+    setMessage(lk, message);
     if (_progressMeter) {
         _progressMeter->reset(progressMeterTotal, secondsBetween);
         _progressMeter->setName(message);
@@ -492,11 +491,11 @@ void CurOp::updateStatsOnTransactionStash() {
     _resourceStatsBase->subtractForStash(getAdditiveResourceStats(locker, boost::none));
 }
 
-void CurOp::setNS_inlock(NamespaceString nss) {
+void CurOp::setNS(WithLock, NamespaceString nss) {
     _nss = std::move(nss);
 }
 
-void CurOp::setNS_inlock(const DatabaseName& dbName) {
+void CurOp::setNS(WithLock, const DatabaseName& dbName) {
     _nss = NamespaceString(dbName);
 }
 
@@ -563,14 +562,14 @@ Milliseconds CurOp::_sumBlockedTimeTotal() {
                                        timeQueuedForFlowControl + prepareConflictDurationMicros);
 }
 
-void CurOp::enter_inlock(NamespaceString nss, int dbProfileLevel) {
+void CurOp::enter(WithLock, NamespaceString nss, int dbProfileLevel) {
     ensureStarted();
     _nss = std::move(nss);
     raiseDbProfileLevel(dbProfileLevel);
 }
 
-void CurOp::enter_inlock(const DatabaseName& dbName, int dbProfileLevel) {
-    enter_inlock(NamespaceString(dbName), dbProfileLevel);
+void CurOp::enter(WithLock lk, const DatabaseName& dbName, int dbProfileLevel) {
+    enter(lk, NamespaceString(dbName), dbProfileLevel);
 }
 
 bool CurOp::shouldDBProfile() {

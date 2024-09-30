@@ -80,10 +80,10 @@ RemoteCommandRetryScheduler::~RemoteCommandRetryScheduler() {
 
 bool RemoteCommandRetryScheduler::isActive() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _isActive_inlock();
+    return _isActive(lock);
 }
 
-bool RemoteCommandRetryScheduler::_isActive_inlock() const {
+bool RemoteCommandRetryScheduler::_isActive(WithLock lk) const {
     return State::kRunning == _state || State::kShuttingDown == _state;
 }
 
@@ -138,7 +138,7 @@ void RemoteCommandRetryScheduler::shutdown() {
 
 void RemoteCommandRetryScheduler::join() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _condition.wait(lock, [this]() { return !_isActive_inlock(); });
+    _condition.wait(lock, [&]() { return !_isActive(lock); });
 }
 
 std::string RemoteCommandRetryScheduler::toString() const {
@@ -146,7 +146,7 @@ std::string RemoteCommandRetryScheduler::toString() const {
     str::stream output;
     output << "RemoteCommandRetryScheduler";
     output << " request: " << _request.toString();
-    output << " active: " << _isActive_inlock();
+    output << " active: " << _isActive(lock);
     if (_remoteCommandCallbackHandle.isValid()) {
         output << " callbackHandle.valid: " << _remoteCommandCallbackHandle.isValid();
         output << " callbackHandle.cancelled: " << _remoteCommandCallbackHandle.isCanceled();
@@ -215,7 +215,7 @@ void RemoteCommandRetryScheduler::_onComplete(
     _callback = {};
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(_isActive_inlock());
+    invariant(_isActive(lock));
     _state = State::kComplete;
     _condition.notify_all();
 }

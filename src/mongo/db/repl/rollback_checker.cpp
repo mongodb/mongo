@@ -68,7 +68,7 @@ StatusWith<RollbackChecker::CallbackHandle> RollbackChecker::checkForRollback(
             int remoteRBID = rbidElement.numberInt();
 
             UniqueLock lk(_mutex);
-            bool hadRollback = _checkForRollback_inlock(remoteRBID);
+            bool hadRollback = _checkForRollback(lk, remoteRBID);
             lk.unlock();
             nextAction(hadRollback);
         } else {
@@ -101,7 +101,7 @@ StatusWith<RollbackChecker::CallbackHandle> RollbackChecker::reset(const Callbac
             int newRBID = rbidElement.numberInt();
 
             UniqueLock lk(_mutex);
-            _setRBID_inlock(newRBID);
+            _setRBID(lk, newRBID);
             lk.unlock();
 
             // Actual bool value does not matter because reset_sync()
@@ -138,7 +138,7 @@ int RollbackChecker::getLastRBID_forTest() {
     return _lastRBID;
 }
 
-bool RollbackChecker::_checkForRollback_inlock(int remoteRBID) {
+bool RollbackChecker::_checkForRollback(WithLock lk, int remoteRBID) {
     _lastRBID = remoteRBID;
     return remoteRBID != _baseRBID;
 }
@@ -150,7 +150,7 @@ StatusWith<RollbackChecker::CallbackHandle> RollbackChecker::_scheduleGetRollbac
     return _executor->scheduleRemoteCommand(getRollbackIDReq, nextAction);
 }
 
-void RollbackChecker::_setRBID_inlock(int rbid) {
+void RollbackChecker::_setRBID(WithLock lk, int rbid) {
     _baseRBID = rbid;
     _lastRBID = rbid;
 }

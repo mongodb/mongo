@@ -93,7 +93,7 @@ void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _isShutdown = true;
         if (_options.clearOnShutdown) {
-            _clear_inlock(lk);
+            _clear(lk);
         } else {
             _notFullCV.notify_one();
             _notEmptyCV.notify_one();
@@ -150,7 +150,7 @@ void OplogBufferBlockingQueue::_push(Batch::const_iterator begin,
 
         // Block until enough space is available.
         invariant(!_drainMode);
-        _waitForSpace_inlock(lk, cost);
+        _waitForSpace(lk, cost);
 
         // Do not push anything if already shutdown.
         if (_isShutdown) {
@@ -174,7 +174,7 @@ void OplogBufferBlockingQueue::_push(Batch::const_iterator begin,
 
 void OplogBufferBlockingQueue::waitForSpace(OperationContext*, const Cost& cost) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _waitForSpace_inlock(lk, cost);
+    _waitForSpace(lk, cost);
 }
 
 bool OplogBufferBlockingQueue::isEmpty() const {
@@ -195,7 +195,7 @@ std::size_t OplogBufferBlockingQueue::getCount() const {
 void OplogBufferBlockingQueue::clear(OperationContext*) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _clear_inlock(lk);
+        _clear(lk);
     }
 
     if (_counters) {
@@ -287,8 +287,7 @@ void OplogBufferBlockingQueue::exitDrainMode() {
     _drainMode = false;
 }
 
-void OplogBufferBlockingQueue::_waitForSpace_inlock(stdx::unique_lock<stdx::mutex>& lk,
-                                                    const Cost& cost) {
+void OplogBufferBlockingQueue::_waitForSpace(stdx::unique_lock<stdx::mutex>& lk, const Cost& cost) {
     invariant(cost.size > 0 && cost.count > 0);
     invariant(!_waitSize && !_waitCount);
 
@@ -304,7 +303,7 @@ void OplogBufferBlockingQueue::_waitForSpace_inlock(stdx::unique_lock<stdx::mute
     }
 }
 
-void OplogBufferBlockingQueue::_clear_inlock(WithLock lk) {
+void OplogBufferBlockingQueue::_clear(WithLock lk) {
     _queue = {};
     _curSize = 0;
     _curCount = 0;

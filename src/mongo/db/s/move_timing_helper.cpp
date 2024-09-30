@@ -117,7 +117,7 @@ void MoveTimingHelper::done(int step) {
 
     {
         stdx::lock_guard<Client> lk(*_opCtx->getClient());
-        op->setMessage_inlock(s.c_str());
+        op->setMessage(lk, s.c_str());
     }
 
     _b.appendNumber(s, _t.millis());

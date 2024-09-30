@@ -87,8 +87,8 @@ public:
     void exitDrainMode() final;
 
 private:
-    void _waitForSpace_inlock(stdx::unique_lock<stdx::mutex>& lk, const Cost& cost);
-    void _clear_inlock(WithLock lk);
+    void _waitForSpace(stdx::unique_lock<stdx::mutex>& lk, const Cost& cost);
+    void _clear(WithLock lk);
     void _push(Batch::const_iterator begin, Batch::const_iterator end, const Cost& cost);
 
     mutable stdx::mutex _mutex;

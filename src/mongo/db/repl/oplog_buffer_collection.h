@@ -168,7 +168,7 @@ private:
      * Returns the oldest oplog entry in the buffer.
      * Assumes the buffer is not empty.
      */
-    BSONObj _peek_inlock(OperationContext* opCtx, PeekMode peekMode);
+    BSONObj _peek(WithLock lk, OperationContext* opCtx, PeekMode peekMode);
 
     // Storage interface used to perform storage engine level functions on the collection.
     StorageInterface* _storageInterface;
@@ -176,7 +176,7 @@ private:
     /**
      * Pops an entry off the buffer in a lock.
      */
-    bool _pop_inlock(OperationContext* opCtx, Value* value);
+    bool _pop(WithLock lk, OperationContext* opCtx, Value* value);
 
     /**
      * Puts documents in collection without checking for order and without updating
@@ -190,7 +190,7 @@ private:
      * Returns the last document pushed onto the collection. This does not remove the `_id` field
      * of the document. If the collection is empty, this returns boost::none.
      */
-    boost::optional<Value> _lastDocumentPushed_inlock(OperationContext* opCtx) const;
+    boost::optional<Value> _lastDocumentPushed(WithLock lk, OperationContext* opCtx) const;
 
     /**
      * Updates '_lastPushedTimestamp' based on the last document in the collection.
@@ -230,7 +230,7 @@ private:
 
     BSONObj _lastPoppedKey;
 
-    // Used by _peek_inlock() to hold results of the read ahead query that will be used for pop/peek
+    // Used by _peek() to hold results of the read ahead query that will be used for pop/peek
     // results.
     std::queue<BSONObj> _peekCache;
 

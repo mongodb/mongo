@@ -263,8 +263,9 @@ void OplogFetcher::setConnection(std::unique_ptr<DBClientConnection>&& _connecte
     _conn = std::move(_connectedClient);
 }
 
-void OplogFetcher::_doStartup_inlock() {
-    uassertStatusOK(_scheduleWorkAndSaveHandle_inlock(
+void OplogFetcher::_doStartup(WithLock lk) {
+    uassertStatusOK(_scheduleWorkAndSaveHandle(
+        lk,
         [this](const executor::TaskExecutor::CallbackArgs& args) {
             // Tests use this failpoint to prevent the oplog fetcher from starting.  If those
             // tests fail and the oplog fetcher is canceled, we want to continue so we see
@@ -278,8 +279,8 @@ void OplogFetcher::_doStartup_inlock() {
         "_runQuery"));
 }
 
-void OplogFetcher::_doShutdown_inlock() noexcept {
-    _cancelHandle_inlock(_runQueryHandle);
+void OplogFetcher::_doShutdown(WithLock lk) noexcept {
+    _cancelHandle(lk, _runQueryHandle);
 
     if (_conn) {
         _conn->shutdownAndDisallowReconnect();
@@ -298,8 +299,8 @@ std::string OplogFetcher::toString() {
     output << " last optime fetched: " << _lastFetched.toString();
     output << " source: " << _config.source.toString();
     output << " namespace: " << toStringForLogging(_nss);
-    output << " active: " << _isActive_inlock();
-    output << " shutting down?:" << _isShuttingDown_inlock();
+    output << " active: " << _isActive(lock);
+    output << " shutting down?:" << _isShuttingDown(lock);
     output << " first batch: " << _firstBatch;
     output << " initial find timeout: " << _getInitialFindMaxTime();
     output << " retried find timeout: " << _getRetriedFindMaxTime();
@@ -376,7 +377,7 @@ void OplogFetcher::_finishCallback(Status status) {
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
     decltype(_oplogFetcherRestartDecision) oplogFetcherRestartDecision;
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _transitionToComplete_inlock();
+    _transitionToComplete(lock);
 
     // Release any resources that might be held by the '_onShutdownCallbackFn' function object.
     // The function object will be destroyed outside the lock since the temporary variable
@@ -433,7 +434,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
             // Both of these checks need to happen while holding the mutex since they could race
             // with shutdown.
             stdx::lock_guard<stdx::mutex> lock(_mutex);
-            if (_isShuttingDown_inlock()) {
+            if (_isShuttingDown(lock)) {
                 status = {ErrorCodes::CallbackCanceled, "oplog fetcher shutting down"};
             } else if (_runQueryHandle.isCanceled()) {
                 invariant(_getExecutor()->isShuttingDown());
@@ -495,7 +496,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
                     opCtx->waitForConditionOrInterruptFor(_shutdownCondVar,
                                                           lk,
                                                           _awaitDataTimeout,
-                                                          [&] { return _isShuttingDown_inlock(); });
+                                                          [&] { return _isShuttingDown(lk); });
                     _cursor.reset();
                     continue;
                 } catch (const DBException& e) {

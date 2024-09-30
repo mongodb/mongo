@@ -4725,7 +4725,7 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         auto curOp = CurOp::get(opCtx.get());
-        curOp->setLogicalOp_inlock(LogicalOp::opCommand);
+        curOp->setLogicalOp(lk, LogicalOp::opCommand);
         BSONObjBuilder bob;
         bob.append("replSetReconfig", "automatic");
         bob.append("memberId", memberId.getData());
@@ -4733,8 +4733,8 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
         bob.append("info",
                    "An automatic reconfig. Used to remove a 'newlyAdded' config field for a "
                    "replica set member.");
-        curOp->setOpDescription_inlock(bob.obj());
-        curOp->setNS_inlock(NamespaceString::kSystemReplSetNamespace);
+        curOp->setOpDescription(lk, bob.obj());
+        curOp->setNS(lk, NamespaceString::kSystemReplSetNamespace);
         curOp->ensureStarted();
     }
 
@@ -5627,7 +5627,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     _replicationWaiterList.setValueIf(
         lk, [this](WithLock lk, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
             // This throws if a waiter's writeConcern is no longer satisfiable, in which case
-            // setValueIf_inlock will fulfill the waiter's promise with the error status.
+            // setValueIf will fulfill the waiter's promise with the error status.
             uassertStatusOK(_checkIfWriteConcernCanBeSatisfied(lk, writeConcern));
             // Return false meaning that the waiter is still satisfiable and thus can remain in the
             // waiter list.
@@ -6266,7 +6266,7 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(const GenericArguments& gen
         return;
     }
 
-    // Avoid retrieving Rollback ID if we do not need it for _prepareOplogQueryMetadata_inlock().
+    // Avoid retrieving Rollback ID if we do not need it for _prepareOplogQueryMetadata().
     int rbid = -1;
     if (hasOplogQueryMetadata) {
         rbid = _replicationProcess->getRollbackID();
@@ -6556,7 +6556,7 @@ void ReplicationCoordinatorImpl::createWMajorityWriteAvailabilityDateWaiter(OpTi
 
     WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,
                                      WriteConcernOptions::SyncMode::UNSET,
-                                     // The timeout isn't used by _doneWaitingForReplication_inlock.
+                                     // The timeout isn't used by _doneWaitingForReplication.
                                      WriteConcernOptions::kNoTimeout);
     writeConcern = _populateUnsetWriteConcernOptionsSyncMode(lk, writeConcern);
 
