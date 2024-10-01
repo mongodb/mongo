@@ -147,9 +147,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
 /**
  * Runs a pipeline on a specific shard. Used for running a pipeline on a specifc shard (i.e. by per
  * shard $changeStream cursors). This function will not add a shard version to the request sent to
- * mongod. If 'eligibleForSampling' is true, attaches a unique sample id to the request for that
- * shard if the collection has query sampling enabled and the rate-limited sampler successfully
- * generates a sample id for it.
+ * mongod.
  */
 Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const ClusterAggregate::Namespaces& namespaces,
@@ -157,7 +155,6 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                       Document serializedCommand,
                                       const PrivilegeVector& privileges,
                                       ShardId shardId,
-                                      bool eligibleForSampling,
                                       BSONObjBuilder* out,
                                       bool requestQueryStatsFromRemotes);
 

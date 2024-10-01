@@ -939,7 +939,6 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                       Document serializedCommand,
                                       const PrivilegeVector& privileges,
                                       ShardId shardId,
-                                      bool eligibleForSampling,
                                       BSONObjBuilder* out,
                                       bool requestQueryStatsFromRemotes) {
     auto opCtx = expCtx->opCtx;
@@ -961,15 +960,6 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                                               boost::none,
                                                               overrideBatchSize,
                                                               requestQueryStatsFromRemotes);
-
-    if (eligibleForSampling) {
-        if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
-                opCtx,
-                namespaces.executionNss,
-                analyze_shard_key::SampledCommandNameEnum::kAggregate)) {
-            cmdObj = analyze_shard_key::appendSampleId(std::move(cmdObj), std::move(*sampleId));
-        }
-    }
 
     MultiStatementTransactionRequestsSender ars(
         opCtx,

@@ -281,6 +281,20 @@ void performValidationChecks(const OperationContext* opCtx,
     liteParsedPipeline.validate(opCtx);
     aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
     aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
+
+    uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchange());
+    uassert(51143,
+            "Cannot specify runtime constants option to a mongos",
+            !request.getLegacyRuntimeConstants());
+    uassert(51089,
+            str::stream() << "Internal parameter(s) ["
+                          << AggregateCommandRequest::kNeedsMergeFieldName << ", "
+                          << AggregateCommandRequest::kFromMongosFieldName
+                          << "] cannot be set to 'true' when sent to mongos",
+            !request.getNeedsMerge() && !request.getFromMongos());
+    uassert(ErrorCodes::BadValue,
+            "Aggregate queries on mongoS may not request or provide a resume token",
+            !request.getRequestResumeToken() && !request.getResumeAfter());
 }
 
 /**
@@ -433,20 +447,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // aggregation command.
     performValidationChecks(opCtx, request, liteParsedPipeline);
 
-    uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchange());
-    uassert(51143,
-            "Cannot specify runtime constants option to a mongos",
-            !request.getLegacyRuntimeConstants());
-    uassert(51089,
-            str::stream() << "Internal parameter(s) ["
-                          << AggregateCommandRequest::kNeedsMergeFieldName << ", "
-                          << AggregateCommandRequest::kFromMongosFieldName
-                          << "] cannot be set to 'true' when sent to mongos",
-            !request.getNeedsMerge() && !request.getFromMongos());
-    uassert(ErrorCodes::BadValue,
-            "Aggregate queries on mongoS may not request or provide a resume token",
-            !request.getRequestResumeToken() && !request.getResumeAfter());
-
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
         auto criSW = getCollectionRoutingInfoForTxnCmd(opCtx, nss);
 
@@ -565,7 +565,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // Optimize the pipeline if:
         // - We have a valid routing table.
         // - We know the collection's collation.
-        // - We have a change stream or need to do a FLE rewrite.
+        // - We have a change stream.
+        // - Need to do a FLE rewrite.
         // - It's a collectionless aggregation, and so a collection default collation cannot exist.
         // This is because the results of optimization may depend on knowing the collation.
         // TODO SERVER-81991: Determine whether this is necessary once all unsharded collections are
@@ -738,10 +739,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
                     ShardId shardId(std::string(request.getPassthroughToShard()->getShard()));
 
-                    // This is an aggregation pipeline started internally, so it is not eligible for
-                    // sampling.
-                    const bool eligibleForSampling = false;
-
                     return cluster_aggregation_planner::runPipelineOnSpecificShardOnly(
                         expCtx,
                         namespaces,
@@ -749,7 +746,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                         serializeForPassthrough(expCtx, request),
                         privileges,
                         shardId,
-                        eligibleForSampling,
                         result,
                         requestQueryStatsFromRemotes);
                 }
