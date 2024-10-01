@@ -109,7 +109,6 @@ TEST_F(AsioTransportLayerTest, HTTPRequestGetsHTTPError) {
     ASSERT_EQ(ec, asio::error::eof);
 #endif
 }
-}  // namespace
 
 class AsyncClientIntegrationTest : public AsioTransportLayerTest {
 public:
@@ -213,12 +212,16 @@ public:
                 _client->runCommandRequest(makeTestRequest(DatabaseName::kAdmin, cmdObj)).get());
         }
 
-        void waitForTimesEntered(int count) {
+        void waitForTimesEntered(Interruptible* interruptible, int count) {
             auto cmdObj =
                 BSON("waitForFailPoint" << _fpName << "timesEntered" << _initialTimesEntered + count
                                         << "maxTimeMS" << 30000);
-            assertOK(
-                _client->runCommandRequest(makeTestRequest(DatabaseName::kAdmin, cmdObj)).get());
+            assertOK(_client->runCommandRequest(makeTestRequest(DatabaseName::kAdmin, cmdObj))
+                         .get(interruptible));
+        }
+
+        void waitForTimesEntered(int count) {
+            waitForTimesEntered(Interruptible::notInterruptible(), count);
         }
 
     private:
@@ -263,33 +266,88 @@ public:
         assertOK(client.runCommandRequest(killOp).get());
     }
 
+    /**
+     * Returns a Baton that can be used to run commands on, or nullptr for reactor-only operation.
+     */
+    virtual BatonHandle baton() {
+        return nullptr;
+    }
+
+    /** Returns an Interruptible appropriate for the Baton returned from baton(). */
+    virtual Interruptible* interruptible() {
+        return Interruptible::notInterruptible();
+    }
+
+    // Test case declarations.
+    void testShortReadsAndWritesWork();
+    void testAsyncConnectTimeoutCleansUpSocket();
+    void testExhaustHelloShouldReceiveMultipleReplies();
+    void testExhaustHelloShouldStopOnFailure();
+    void testRunCommandRequest();
+    void testRunCommandRequestCancel();
+    void testRunCommandRequestCancelEarly();
+    void testRunCommandRequestCancelSourceDismissed();
+    void testRunCommandCancelBetweenSendAndRead();
+    void testExhaustCommand();
+    void testBeginExhaustCommandRequestCancel();
+    void testBeginExhaustCommandCancelEarly();
+    void testAwaitExhaustCommandCancel();
+    void testAwaitExhaustCommandCancelEarly();
+
 private:
     ReactorHandle _reactor;
     stdx::thread _reactorThread;
 };
 
-namespace {
+class AsyncClientIntegrationTestWithBaton : public AsyncClientIntegrationTest {
+public:
+    void setUp() override {
+        AsyncClientIntegrationTest::setUp();
+        _client = getGlobalServiceContext()->getService()->makeClient("BatonClient");
+        _opCtx = _client->makeOperationContext();
+        _baton = _opCtx->getBaton();
+    }
+
+    BatonHandle baton() override {
+        return _baton;
+    }
+
+    Interruptible* interruptible() override {
+        return _opCtx.get();
+    }
+
+private:
+    ServiceContext::UniqueClient _client;
+    ServiceContext::UniqueOperationContext _opCtx;
+    BatonHandle _baton;
+};
+
+using AsyncClientIntegrationTestWithoutBaton = AsyncClientIntegrationTest;
+
+#define TEST_WITH_AND_WITHOUT_BATON_F(suite, name) \
+    TEST_F(suite##WithBaton, name) {               \
+        test##name();                              \
+    }                                              \
+    TEST_F(suite##WithoutBaton, name) {            \
+        test##name();                              \
+    }                                              \
+    void suite::test##name()
 
 // This test forces reads and writes to occur one byte at a time, verifying SERVER-34506
 // (the isJustForContinuation optimization works).
 //
-// Because of the file size limit, it's only an effective check on debug builds (where the
-// future implementation checks the length of the future chain).
-TEST_F(AsyncClientIntegrationTest, ShortReadsAndWritesWork) {
+// Because of the file size limit, it's only an effective check on debug builds (where the future
+// implementation checks the length of the future chain).
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, ShortReadsAndWritesWork) {
     auto dbClient = makeClient();
 
     FailPointEnableBlock fp("asioTransportLayerShortOpportunisticReadWrite");
 
     auto req = makeTestRequest(DatabaseName::kAdmin, BSON("ping" << 1));
-    assertOK(dbClient->runCommandRequest(req).get());
-
-    auto client = getGlobalServiceContext()->getService()->makeClient(__FILE__);
-    auto opCtx = client->makeOperationContext();
-
-    assertOK(dbClient->runCommandRequest(req, opCtx->getBaton()).get(opCtx.get()));
+    assertOK(dbClient->runCommandRequest(req, baton()).get(interruptible()));
 }
 
-TEST_F(AsyncClientIntegrationTest, AsyncConnectTimeoutCleansUpSocket) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, AsyncConnectTimeoutCleansUpSocket) {
     FailPointEnableBlock fp("asioTransportLayerAsyncConnectTimesOut");
     auto metrics = std::make_shared<ConnectionMetrics>(getServiceContext()->getFastClockSource());
     auto client = AsyncDBClient::connect(getServer(),
@@ -302,18 +360,19 @@ TEST_F(AsyncClientIntegrationTest, AsyncConnectTimeoutCleansUpSocket) {
     ASSERT_EQ(client.getStatus(), ErrorCodes::NetworkTimeout);
 }
 
-TEST_F(AsyncClientIntegrationTest, ExhaustHelloShouldReceiveMultipleReplies) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest,
+                              ExhaustHelloShouldReceiveMultipleReplies) {
     auto client = makeClient();
 
     auto req = makeExhaustHello(Milliseconds(100));
 
     Future<executor::RemoteCommandResponse> beginExhaustFuture =
-        client->beginExhaustCommandRequest(req);
+        client->beginExhaustCommandRequest(req, baton());
 
     Date_t prevTime;
     TopologyVersion topologyVersion;
     {
-        auto reply = beginExhaustFuture.get();
+        auto reply = beginExhaustFuture.get(interruptible());
         ASSERT(reply.moreToCome);
         assertOK(reply);
         prevTime = reply.data.getField("localTime").Date();
@@ -321,9 +380,10 @@ TEST_F(AsyncClientIntegrationTest, ExhaustHelloShouldReceiveMultipleReplies) {
                                                  reply.data.getField("topologyVersion").Obj());
     }
 
-    Future<executor::RemoteCommandResponse> awaitExhaustFuture = client->awaitExhaustCommand();
+    Future<executor::RemoteCommandResponse> awaitExhaustFuture =
+        client->awaitExhaustCommand(baton());
     {
-        auto reply = awaitExhaustFuture.get();
+        auto reply = awaitExhaustFuture.get(interruptible());
         assertOK(reply);
         ASSERT(reply.moreToCome);
         auto replyTime = reply.data.getField("localTime").Date();
@@ -335,11 +395,12 @@ TEST_F(AsyncClientIntegrationTest, ExhaustHelloShouldReceiveMultipleReplies) {
         ASSERT_EQ(replyTopologyVersion.getCounter(), topologyVersion.getCounter());
     }
 
-    Future<executor::RemoteCommandResponse> cancelExhaustFuture = client->awaitExhaustCommand();
+    Future<executor::RemoteCommandResponse> cancelExhaustFuture =
+        client->awaitExhaustCommand(baton());
     {
         client->cancel();
         client->end();
-        auto swReply = cancelExhaustFuture.getNoThrow();
+        auto swReply = cancelExhaustFuture.getNoThrow(interruptible());
 
         // The original hello request has maxAwaitTimeMs = 1000 ms, if the cancel executes
         // before the 1000ms then we expect the future to resolve with an error. It should
@@ -353,7 +414,7 @@ TEST_F(AsyncClientIntegrationTest, ExhaustHelloShouldReceiveMultipleReplies) {
     }
 }
 
-TEST_F(AsyncClientIntegrationTest, ExhaustHelloShouldStopOnFailure) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, ExhaustHelloShouldStopOnFailure) {
     auto client = makeClient();
     auto fpClient = makeClient();
 
@@ -362,40 +423,19 @@ TEST_F(AsyncClientIntegrationTest, ExhaustHelloShouldStopOnFailure) {
 
     auto helloReq = makeExhaustHello(Seconds(1));
 
-    auto resp = client->beginExhaustCommandRequest(helloReq).get();
+    auto resp = client->beginExhaustCommandRequest(helloReq, baton()).get(interruptible());
     ASSERT_OK(resp.status);
     ASSERT(!resp.moreToCome);
     ASSERT_EQ(getStatusFromCommandResult(resp.data), ErrorCodes::CommandFailed);
 }
 
-TEST_F(AsyncClientIntegrationTest, RunCommandRequest) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, RunCommandRequest) {
     auto client = makeClient();
     auto req = makeTestRequest(DatabaseName::kAdmin, BSON("echo" << std::string(1 << 10, 'x')));
-    assertOK(client->runCommandRequest(req).get());
+    assertOK(client->runCommandRequest(req, baton()).get(interruptible()));
 }
 
-TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancel) {
-    auto client = makeClient();
-    auto fpClient = makeClient();
-    CancellationSource cancelSource;
-
-    auto fpGuard = configureFailCommand(fpClient, "echo", boost::none, Milliseconds(60000));
-
-    UUID operationKey = UUID::gen();
-    auto req = makeTestRequest(DatabaseName::kAdmin,
-                               BSON("echo"
-                                    << "RunCommandRequestCancel"),
-                               operationKey);
-    auto runCommandFuture = client->runCommandRequest(req, nullptr, nullptr, cancelSource.token());
-    ON_BLOCK_EXIT([&] { killOp(*fpClient, operationKey); });
-
-    fpGuard.waitForTimesEntered(1);
-
-    cancelSource.cancel();
-    ASSERT_EQ(runCommandFuture.getNoThrow(), ErrorCodes::CallbackCanceled);
-}
-
-TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancelBaton) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, RunCommandRequestCancel) {
     auto fpClient = makeClient();
     CancellationSource cancelSource;
 
@@ -406,27 +446,27 @@ TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancelBaton) {
         // Limit dbClient's scope to this thread to test the cancellation callback outliving
         // the caller's client.
         auto dbClient = makeClient();
-        auto client = getGlobalServiceContext()->getService()->makeClient(__FILE__);
-        auto opCtx = client->makeOperationContext();
 
         auto opKey = UUID::gen();
         auto req = makeTestRequest(DatabaseName::kAdmin, BSON("ping" << 1), opKey);
-        auto fut =
-            dbClient->runCommandRequest(req, opCtx->getBaton(), nullptr, cancelSource.token());
+        auto fut = dbClient->runCommandRequest(req, baton(), nullptr, cancelSource.token());
         ON_BLOCK_EXIT([&]() { killOp(*fpClient, opKey); });
 
-        opCtx->setDeadlineAfterNowBy(Seconds(30), ErrorCodes::ExceededTimeLimit);
-        pf.promise.setFrom(fut.getNoThrow(opCtx.get()));
+        pf.promise.setFrom(fut.getNoThrow(interruptible()));
     });
 
-    fpGuard.waitForTimesEntered(1);
+    auto client = getGlobalServiceContext()->getService()->makeClient(__FILE__);
+    auto opCtx = client->makeOperationContext();
+    opCtx->setDeadlineAfterNowBy(Seconds(30), ErrorCodes::ExceededTimeLimit);
+
+    fpGuard.waitForTimesEntered(opCtx.get(), 1);
     cancelSource.cancel();
 
-    ASSERT_EQ(pf.future.getNoThrow(), ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(pf.future.getNoThrow(opCtx.get()), ErrorCodes::CallbackCanceled);
     cmdThread.join();
 }
 
-TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancelEarly) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, RunCommandRequestCancelEarly) {
     auto client = makeClient();
     CancellationSource cancelSource;
 
@@ -435,12 +475,12 @@ TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancelEarly) {
     auto req = makeTestRequest(DatabaseName::kAdmin,
                                BSON("echo"
                                     << "RunCommandRequestCancelEarly"));
-    auto fut = client->runCommandRequest(req, nullptr, nullptr, cancelSource.token());
+    auto fut = client->runCommandRequest(req, baton(), nullptr, cancelSource.token());
     ASSERT(fut.isReady());
-    ASSERT_EQ(fut.getNoThrow(), ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(fut.getNoThrow(interruptible()), ErrorCodes::CallbackCanceled);
 }
 
-TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancelSourceDismissed) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, RunCommandRequestCancelSourceDismissed) {
     auto client = makeClient();
     auto fpClient = makeClient();
     auto cancelSource = boost::make_optional(CancellationSource());
@@ -451,14 +491,14 @@ TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancelSourceDismissed) {
                                BSON("echo"
                                     << "RunCommandRequestCancelSourceDismissed"));
 
-    auto runCommandFuture = client->runCommandRequest(req, nullptr, nullptr, cancelSource->token());
+    auto runCommandFuture = client->runCommandRequest(req, baton(), nullptr, cancelSource->token());
     cancelSource.reset();
-    assertOK(runCommandFuture.get());
+    assertOK(runCommandFuture.get(interruptible()));
 }
 
-// Tests that cancellation doesn't "miss" if it happens to occur between sending a command
-// request and reading its response.
-TEST_F(AsyncClientIntegrationTest, RunCommandCancelBetweenSendAndRead) {
+// Tests that cancellation doesn't "miss" if it happens to occur between sending a command request
+// and reading its response.
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, RunCommandCancelBetweenSendAndRead) {
     auto client = makeClient();
     CancellationSource cancelSource;
 
@@ -470,7 +510,8 @@ TEST_F(AsyncClientIntegrationTest, RunCommandCancelBetweenSendAndRead) {
         // happens to run on the current thread due to the sending future being immediately
         // available.
         auto req = makeTestRequest(DatabaseName::kAdmin, BSON("ping" << 1));
-        pf.promise.setFrom(client->runCommandRequest(req, nullptr, nullptr, cancelSource.token()));
+        pf.promise.setFrom(client->runCommandRequest(req, baton(), nullptr, cancelSource.token())
+                               .getNoThrow(interruptible()));
     });
 
     fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
@@ -481,15 +522,15 @@ TEST_F(AsyncClientIntegrationTest, RunCommandCancelBetweenSendAndRead) {
     commandThread.join();
 }
 
-TEST_F(AsyncClientIntegrationTest, ExhaustCommand) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, ExhaustCommand) {
     auto client = makeClient();
     auto opKey = UUID::gen();
 
     auto helloReq = makeExhaustHello(Milliseconds(100), opKey);
-    assertOK(client->beginExhaustCommandRequest(helloReq).get());
+    assertOK(client->beginExhaustCommandRequest(helloReq, baton()).get(interruptible()));
 
     for (auto i = 0; i < 3; i++) {
-        assertOK(client->awaitExhaustCommand().get());
+        assertOK(client->awaitExhaustCommand(baton()).get(interruptible()));
     }
 
     auto killOpClient = makeClient();
@@ -498,7 +539,7 @@ TEST_F(AsyncClientIntegrationTest, ExhaustCommand) {
     auto now = getGlobalServiceContext()->getFastClockSource()->now();
     for (auto deadline = now + Seconds(30); now < deadline;
          now = getGlobalServiceContext()->getFastClockSource()->now()) {
-        auto finalResp = client->awaitExhaustCommand().get();
+        auto finalResp = client->awaitExhaustCommand(baton()).get(interruptible());
         ASSERT_OK(finalResp.status);
         if (getStatusFromCommandResult(finalResp.data).code() == ErrorCodes::Interrupted) {
             break;
@@ -506,10 +547,11 @@ TEST_F(AsyncClientIntegrationTest, ExhaustCommand) {
     }
 
     assertOK(
-        client->runCommandRequest(makeTestRequest(DatabaseName::kAdmin, BSON("ping" << 1))).get());
+        client->runCommandRequest(makeTestRequest(DatabaseName::kAdmin, BSON("ping" << 1)), baton())
+            .get(interruptible()));
 }
 
-TEST_F(AsyncClientIntegrationTest, BeginExhaustCommandRequestCancel) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, BeginExhaustCommandRequestCancel) {
     auto client = makeClient();
     auto fpClient = makeClient();
     CancellationSource cancelSource;
@@ -519,58 +561,58 @@ TEST_F(AsyncClientIntegrationTest, BeginExhaustCommandRequestCancel) {
     UUID operationKey = UUID::gen();
     auto helloReq = makeExhaustHello(Milliseconds(100), operationKey);
     auto beginExhaustFuture =
-        client->beginExhaustCommandRequest(helloReq, nullptr, cancelSource.token());
+        client->beginExhaustCommandRequest(helloReq, baton(), cancelSource.token());
     ON_BLOCK_EXIT([&]() { killOp(*fpClient, operationKey); });
 
     fpGuard.waitForTimesEntered(1);
     cancelSource.cancel();
-    ASSERT_EQ(beginExhaustFuture.getNoThrow(), ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(beginExhaustFuture.getNoThrow(interruptible()), ErrorCodes::CallbackCanceled);
 }
 
-TEST_F(AsyncClientIntegrationTest, BeginExhaustCommandCancelEarly) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, BeginExhaustCommandCancelEarly) {
     auto client = makeClient();
     CancellationSource cancelSource;
     cancelSource.cancel();
 
     auto beginExhaustFuture = client->beginExhaustCommandRequest(
-        makeExhaustHello(Milliseconds(100)), nullptr, cancelSource.token());
+        makeExhaustHello(Milliseconds(100)), baton(), cancelSource.token());
     ASSERT(beginExhaustFuture.isReady());
-    ASSERT_EQ(beginExhaustFuture.getNoThrow(), ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(beginExhaustFuture.getNoThrow(interruptible()), ErrorCodes::CallbackCanceled);
 }
 
-TEST_F(AsyncClientIntegrationTest, AwaitExhaustCommandCancel) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, AwaitExhaustCommandCancel) {
     auto client = makeClient();
     CancellationSource cancelSource;
 
     // Use long maxAwaitTimeMS.
     auto helloReq = makeExhaustHello(Milliseconds(30000));
     Future<executor::RemoteCommandResponse> beginExhaustFuture =
-        client->beginExhaustCommandRequest(helloReq, nullptr, cancelSource.token());
+        client->beginExhaustCommandRequest(helloReq, baton(), cancelSource.token());
 
     // The first response should come in quickly.
-    assertOK(beginExhaustFuture.get());
+    assertOK(beginExhaustFuture.get(interruptible()));
 
     // The second response will take maxAwaitTimeMS.
     Future<executor::RemoteCommandResponse> awaitExhaustFuture =
-        client->awaitExhaustCommand(nullptr, cancelSource.token());
+        client->awaitExhaustCommand(baton(), cancelSource.token());
     cancelSource.cancel();
-    ASSERT_EQ(awaitExhaustFuture.getNoThrow(), ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(awaitExhaustFuture.getNoThrow(interruptible()), ErrorCodes::CallbackCanceled);
 }
 
-TEST_F(AsyncClientIntegrationTest, AwaitExhaustCommandCancelEarly) {
+TEST_WITH_AND_WITHOUT_BATON_F(AsyncClientIntegrationTest, AwaitExhaustCommandCancelEarly) {
     auto client = makeClient();
     CancellationSource cancelSource;
 
     auto helloReq = makeExhaustHello(Milliseconds(100));
     Future<executor::RemoteCommandResponse> beginExhaustFuture =
-        client->beginExhaustCommandRequest(helloReq, nullptr, cancelSource.token());
-    assertOK(beginExhaustFuture.get());
+        client->beginExhaustCommandRequest(helloReq, baton(), cancelSource.token());
+    assertOK(beginExhaustFuture.get(interruptible()));
 
     cancelSource.cancel();
     Future<executor::RemoteCommandResponse> awaitExhaustFuture =
-        client->awaitExhaustCommand(nullptr, cancelSource.token());
+        client->awaitExhaustCommand(baton(), cancelSource.token());
     ASSERT(awaitExhaustFuture.isReady());
-    ASSERT_EQ(awaitExhaustFuture.getNoThrow(), ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(awaitExhaustFuture.getNoThrow(interruptible()), ErrorCodes::CallbackCanceled);
 }
 
 }  // namespace
