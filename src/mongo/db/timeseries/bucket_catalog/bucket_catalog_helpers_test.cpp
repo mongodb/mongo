@@ -126,7 +126,6 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
 
     // Generate an aggregation request to find a suitable bucket to reopen.
     auto aggregationPipeline = generateReopeningPipeline(
-        opCtx,
         time,
         normalizedMetadata ? normalizedMetadata->firstElement() : metadata,
         controlMinTimePath,
@@ -622,11 +621,18 @@ TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
         _insertIntoBucketColl(doc);
     }
 
+    auto findDocFromOID = [opCtx = operationContext(),
+                           coll = (*autoColl).get()](const OID& bucketId) {
+        Snapshotted<BSONObj> bucketObj;
+        auto rid = record_id_helpers::keyForOID(bucketId);
+        return (coll->findDoc(opCtx, rid, &bucketObj)) ? bucketObj.value() : BSONObj();
+    };
+
     // Given a valid OID for a bucket document, we should be able to retrieve the full bucket
     // document.
     for (const auto& doc : bucketDocs) {
         const auto bucketId = doc["_id"].OID();
-        auto retrievedBucket = findDocFromOID(operationContext(), (*autoColl).get(), bucketId);
+        auto retrievedBucket = findDocFromOID(bucketId);
         ASSERT(!retrievedBucket.isEmpty());
         ASSERT_BSONOBJ_EQ(retrievedBucket, doc);
     }
@@ -636,7 +642,7 @@ TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
                                         OID("90e7e6ec27c28d338ab29200"),
                                         OID("00e7e6ec27c28d338ab29200")};
     for (const auto& oid : nonExistentOIDs) {
-        auto retrievedBucket = findDocFromOID(operationContext(), (*autoColl).get(), oid);
+        auto retrievedBucket = findDocFromOID(oid);
         ASSERT(retrievedBucket.isEmpty());
     }
 }

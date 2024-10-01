@@ -59,8 +59,8 @@ enum class IncludeMemoryOverheadFromMap { kInclude, kExclude };
  * Function that should run validation against the bucket to ensure it's a proper bucket document.
  * Typically, this should execute Collection::checkValidation.
  */
-using BucketDocumentValidator = std::function<std::pair<Collection::SchemaValidationResult, Status>(
-    OperationContext*, const BSONObj&)>;
+using BucketDocumentValidator =
+    std::function<std::pair<Collection::SchemaValidationResult, Status>(const BSONObj&)>;
 
 /**
  * Used to pass a bucket document into the BucketCatalog to reopen.

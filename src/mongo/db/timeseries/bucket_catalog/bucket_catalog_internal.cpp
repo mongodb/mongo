@@ -60,7 +60,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -99,13 +98,12 @@ stdx::mutex _bucketIdGenLock;
 PseudoRandom _bucketIdGenPRNG(SecureRandom().nextInt64());
 AtomicWord<uint64_t> _bucketIdGenCounter{static_cast<uint64_t>(_bucketIdGenPRNG.nextInt64())};
 
-OperationId getOpId(OperationContext* opCtx, CombineWithInsertsFromOtherClients combine) {
+OperationId getOpId(OperationId opId, CombineWithInsertsFromOtherClients combine) {
     switch (combine) {
         case CombineWithInsertsFromOtherClients::kAllow:
             return 0;
         case CombineWithInsertsFromOtherClients::kDisallow:
-            invariant(opCtx->getOpID());
-            return opCtx->getOpID();
+            return opId;
     }
     MONGO_UNREACHABLE;
 }
@@ -276,8 +274,7 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
     return nullptr;
 }
 
-Bucket* useBucket(OperationContext* opCtx,
-                  BucketCatalog& catalog,
+Bucket* useBucket(BucketCatalog& catalog,
                   Stripe& stripe,
                   WithLock stripeLock,
                   const NamespaceString& nss,
@@ -288,7 +285,7 @@ Bucket* useBucket(OperationContext* opCtx,
     if (it == stripe.openBucketsByKey.end()) {
         // No open bucket for this metadata.
         return mode == AllowBucketCreation::kYes
-            ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info, time)
+            ? &allocateBucket(catalog, stripe, stripeLock, info, time)
             : nullptr;
     }
 
@@ -302,7 +299,7 @@ Bucket* useBucket(OperationContext* opCtx,
     }
     if (!bucket) {
         return mode == AllowBucketCreation::kYes
-            ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info, time)
+            ? &allocateBucket(catalog, stripe, stripeLock, info, time)
             : nullptr;
     }
 
@@ -320,7 +317,7 @@ Bucket* useBucket(OperationContext* opCtx,
           getTimeseriesBucketClearedError(nss, bucket->bucketId.oid));
 
     return mode == AllowBucketCreation::kYes
-        ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info, time)
+        ? &allocateBucket(catalog, stripe, stripeLock, info, time)
         : nullptr;
 }
 
@@ -375,8 +372,7 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
     return nullptr;
 }
 
-StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
-                                                       BucketCatalog& catalog,
+StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
                                                        ExecutionStatsController& stats,
                                                        const UUID& collectionUUID,
                                                        const StringDataComparator* comparator,
@@ -398,7 +394,7 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
     }
 
     // Validate the bucket document against the schema.
-    auto result = validator(opCtx, bucketDoc);
+    auto result = validator(bucketDoc);
     if (result.first != Collection::SchemaValidationResult::kPass) {
         return result.second;
     }
@@ -536,8 +532,7 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
     return {std::move(bucket)};
 }
 
-StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
-                                                        BucketCatalog& catalog,
+StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
                                                         Stripe& stripe,
                                                         WithLock stripeLock,
                                                         ExecutionStatsController& stats,
@@ -547,7 +542,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
                                                         ClosedBuckets& closedBuckets) {
     invariant(bucket.get());
 
-    expireIdleBuckets(opCtx, catalog, stripe, stripeLock, stats, closedBuckets);
+    expireIdleBuckets(catalog, stripe, stripeLock, stats, closedBuckets);
 
     auto status = initializeBucketState(
         catalog.bucketStateRegistry, bucket->bucketId, bucket.get(), targetEra);
@@ -584,8 +579,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
             if (existingBucket->rolloverAction == RolloverAction::kNone) {
                 stats.incNumBucketsClosedDueToReopening();
                 if (allCommitted(*existingBucket)) {
-                    closeOpenBucket(
-                        opCtx, catalog, stripe, stripeLock, *existingBucket, closedBuckets);
+                    closeOpenBucket(catalog, stripe, stripeLock, *existingBucket, closedBuckets);
                 } else {
                     existingBucket->rolloverAction = RolloverAction::kSoftClose;
                 }
@@ -645,16 +639,17 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
 }
 
 std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
-    OperationContext* opCtx,
     BucketCatalog& catalog,
     Stripe& stripe,
     WithLock stripeLock,
     const BSONObj& doc,
+    OperationId opId,
     CombineWithInsertsFromOtherClients combine,
     AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,
-    const Date_t& time) {
+    const Date_t& time,
+    uint64_t storageCacheSize) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     Sizes sizesToBeAdded;
 
@@ -662,8 +657,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     std::reference_wrapper<Bucket> bucketToUse{existingBucket};
     bool openedDueToMetadata = true;
     if (!isNewlyOpenedBucket) {
-        auto [action, reason] = determineRolloverAction(opCtx,
-                                                        catalog.trackingContexts,
+        auto [action, reason] = determineRolloverAction(catalog.trackingContexts,
                                                         doc,
                                                         insertContext,
                                                         existingBucket,
@@ -671,15 +665,16 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                                         newFieldNamesToBeInserted,
                                                         sizesToBeAdded,
                                                         mode,
-                                                        time);
+                                                        time,
+                                                        storageCacheSize);
         if ((action == RolloverAction::kSoftClose || action == RolloverAction::kArchive) &&
             mode == AllowBucketCreation::kNo) {
             // We don't actually want to roll this bucket over yet, bail out.
             return reason;
         } else if (action != RolloverAction::kNone) {
             openedDueToMetadata = false;
-            bucketToUse = rollover(
-                opCtx, catalog, stripe, stripeLock, existingBucket, insertContext, action, time);
+            bucketToUse =
+                rollover(catalog, stripe, stripeLock, existingBucket, insertContext, action, time);
             isNewlyOpenedBucket = true;
         }
     }
@@ -696,7 +691,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
 
     auto batch = activeBatch(catalog.trackingContexts,
                              bucket,
-                             getOpId(opCtx, combine),
+                             getOpId(opId, combine),
                              insertContext.stripeNumber,
                              insertContext.stats);
     batch->measurements.push_back(doc);
@@ -832,8 +827,7 @@ void removeBucket(
     stripe.openBucketsById.erase(allIt);
 }
 
-void archiveBucket(OperationContext* opCtx,
-                   BucketCatalog& catalog,
+void archiveBucket(BucketCatalog& catalog,
                    Stripe& stripe,
                    WithLock stripeLock,
                    Bucket& bucket,
@@ -855,7 +849,7 @@ void archiveBucket(OperationContext* opCtx,
         // We had a meta hash collision, and already have a bucket archived with the same meta hash
         // and timestamp as this bucket. Since it's somewhat arbitrary which bucket we keep, we'll
         // keep the one that's already archived and just plain close this one.
-        closeOpenBucket(opCtx, catalog, stripe, stripeLock, bucket, closedBuckets);
+        closeOpenBucket(catalog, stripe, stripeLock, bucket, closedBuckets);
     }
 }
 
@@ -917,14 +911,14 @@ std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSi
     return {std::min(gTimeseriesBucketMaxSize, derivedMaxSize), derivedMaxSize};
 }
 
-InsertResult getReopeningContext(OperationContext* opCtx,
-                                 BucketCatalog& catalog,
+InsertResult getReopeningContext(BucketCatalog& catalog,
                                  Stripe& stripe,
                                  WithLock stripeLock,
                                  InsertContext& info,
                                  uint64_t catalogEra,
                                  AllowQueryBasedReopening allowQueryBasedReopening,
-                                 const Date_t& time) {
+                                 const Date_t& time,
+                                 uint64_t storageCacheSize) {
     if (auto archived = findArchivedCandidate(catalog, stripe, stripeLock, info, time)) {
         // Synchronize concurrent disk accesses. An outstanding query-based reopening request for
         // this series or an outstanding archived-based reopening request or prepared batch for this
@@ -959,9 +953,6 @@ InsertResult getReopeningContext(OperationContext* opCtx,
         "." + std::to_string(gTimeseriesBucketMaxCount - 1);
 
     // Derive the maximum bucket size.
-    auto storageCacheSize = static_cast<uint64_t>(
-        opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
-        1024);
     auto [bucketMaxSize, _] =
         getCacheDerivedBucketMaxSize(storageCacheSize, catalog.numberOfActiveBuckets.load());
 
@@ -970,8 +961,7 @@ InsertResult getReopeningContext(OperationContext* opCtx,
                             stripeLock,
                             info.key,
                             catalogEra,
-                            generateReopeningPipeline(opCtx,
-                                                      time,
+                            generateReopeningPipeline(time,
                                                       metaElement,
                                                       controlMinTimePath,
                                                       maxDataTimeFieldPath,
@@ -1045,8 +1035,7 @@ void markBucketNotIdle(Stripe& stripe, WithLock stripeLock, Bucket& bucket) {
     }
 }
 
-void expireIdleBuckets(OperationContext* opCtx,
-                       BucketCatalog& catalog,
+void expireIdleBuckets(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
                        ExecutionStatsController& stats,
@@ -1062,14 +1051,14 @@ void expireIdleBuckets(OperationContext* opCtx,
         auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, bucket);
         if (state && !conflictsWithInsertions(state.value())) {
             // Can archive a bucket if it's still eligible for insertions.
-            archiveBucket(opCtx, catalog, stripe, stripeLock, *bucket, closedBuckets);
+            archiveBucket(catalog, stripe, stripeLock, *bucket, closedBuckets);
             stats.incNumBucketsArchivedDueToMemoryThreshold();
         } else if (state &&
                    (isBucketStateCleared(state.value()) || isBucketStateFrozen(state.value()))) {
             // Bucket was cleared and just needs to be removed from catalog.
             removeBucket(catalog, stripe, stripeLock, *bucket, RemovalMode::kAbort);
         } else {
-            closeOpenBucket(opCtx, catalog, stripe, stripeLock, *bucket, closedBuckets);
+            closeOpenBucket(catalog, stripe, stripeLock, *bucket, closedBuckets);
             stats.incNumBucketsClosedDueToMemoryThreshold();
         }
 
@@ -1146,13 +1135,12 @@ void resetBucketOIDCounter() {
     _bucketIdGenCounter.store(static_cast<uint64_t>(_bucketIdGenPRNG.nextInt64()));
 }
 
-Bucket& allocateBucket(OperationContext* opCtx,
-                       BucketCatalog& catalog,
+Bucket& allocateBucket(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
                        InsertContext& info,
                        const Date_t& time) {
-    expireIdleBuckets(opCtx, catalog, stripe, stripeLock, info.stats, info.closedBuckets);
+    expireIdleBuckets(catalog, stripe, stripeLock, info.stats, info.closedBuckets);
 
     // In rare cases duplicate bucket _id fields can be generated in the same stripe and fail to be
     // inserted. We will perform a limited number of retries to minimize the probability of
@@ -1204,8 +1192,7 @@ Bucket& allocateBucket(OperationContext* opCtx,
     return *bucket;
 }
 
-Bucket& rollover(OperationContext* opCtx,
-                 BucketCatalog& catalog,
+Bucket& rollover(BucketCatalog& catalog,
                  Stripe& stripe,
                  WithLock stripeLock,
                  Bucket& bucket,
@@ -1217,9 +1204,9 @@ Bucket& rollover(OperationContext* opCtx,
         // The bucket does not contain any measurements that are yet to be committed, so we can take
         // action now.
         if (action == RolloverAction::kArchive) {
-            archiveBucket(opCtx, catalog, stripe, stripeLock, bucket, info.closedBuckets);
+            archiveBucket(catalog, stripe, stripeLock, bucket, info.closedBuckets);
         } else {
-            closeOpenBucket(opCtx, catalog, stripe, stripeLock, bucket, info.closedBuckets);
+            closeOpenBucket(catalog, stripe, stripeLock, bucket, info.closedBuckets);
         }
     } else {
         // We must keep the bucket around until all measurements are committed committed, just mark
@@ -1227,11 +1214,10 @@ Bucket& rollover(OperationContext* opCtx,
         bucket.rolloverAction = action;
     }
 
-    return allocateBucket(opCtx, catalog, stripe, stripeLock, info, time);
+    return allocateBucket(catalog, stripe, stripeLock, info, time);
 }
 
 std::pair<RolloverAction, RolloverReason> determineRolloverAction(
-    OperationContext* opCtx,
     TrackingContexts& trackingContexts,
     const BSONObj& doc,
     InsertContext& info,
@@ -1240,7 +1226,8 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
     Sizes& sizesToBeAdded,
     AllowBucketCreation mode,
-    const Date_t& time) {
+    const Date_t& time,
+    uint64_t storageCacheSize) {
     // If the mode is enabled to create new buckets, then we should update stats for soft closures
     // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
     // we want to soft close the bucket yet and should wait to update closure stats.
@@ -1276,9 +1263,6 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
 
     // In scenarios where we have a high cardinality workload and face increased cache pressure we
     // will decrease the size of buckets before we close them.
-    auto storageCacheSize = static_cast<uint64_t>(
-        opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
-        1024);
     auto [effectiveMaxSize, cacheDerivedBucketMaxSize] =
         getCacheDerivedBucketMaxSize(storageCacheSize, numberOfActiveBuckets);
 
@@ -1383,8 +1367,7 @@ Status getTimeseriesBucketClearedError(const NamespaceString& nss, const OID& oi
                           << " was cleared"};
 }
 
-void closeOpenBucket(OperationContext* opCtx,
-                     BucketCatalog& catalog,
+void closeOpenBucket(BucketCatalog& catalog,
                      Stripe& stripe,
                      WithLock stripeLock,
                      Bucket& bucket,
@@ -1413,8 +1396,7 @@ void closeOpenBucket(OperationContext* opCtx,
         catalog, stripe, stripeLock, bucket, error ? RemovalMode::kAbort : RemovalMode::kClose);
 }
 
-void closeOpenBucket(OperationContext* opCtx,
-                     BucketCatalog& catalog,
+void closeOpenBucket(BucketCatalog& catalog,
                      Stripe& stripe,
                      WithLock stripeLock,
                      Bucket& bucket,
@@ -1462,30 +1444,6 @@ void closeArchivedBucket(BucketCatalog& catalog,
             boost::none,
             getOrInitializeExecutionStats(catalog, bucket.bucketId.collectionUUID));
     } catch (...) {
-    }
-}
-
-void runPostCommitDebugChecks(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const Bucket& bucket,
-                              const WriteBatch& batch) {
-    // Check in-memory and disk state, caller still has commit rights.
-    DBDirectClient client{opCtx};
-    BSONObj queriedBucket = client.findOne(nss, BSON("_id" << batch.bucketId.oid));
-    if (!queriedBucket.isEmpty()) {
-        uint32_t memCount = batch.numPreviouslyCommittedMeasurements + batch.measurements.size();
-        uint32_t diskCount = isCompressedBucket(queriedBucket)
-            ? static_cast<uint32_t>(queriedBucket.getObjectField(kBucketControlFieldName)
-                                        .getIntField(kBucketControlCountFieldName))
-            : static_cast<uint32_t>(
-                  queriedBucket.getObjectField(kBucketDataFieldName)
-                      .getObjectField(StringData{bucket.timeField.data(), bucket.timeField.size()})
-                      .nFields());
-        invariant(memCount == diskCount,
-                  str::stream() << "Expected in-memory (" << memCount << ") and on-disk ("
-                                << diskCount
-                                << ") measurement counts to match. Bucket contents on disk: "
-                                << queriedBucket.toString());
     }
 }
 

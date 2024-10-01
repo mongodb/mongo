@@ -44,9 +44,10 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -96,11 +97,6 @@ StatusWith<std::pair<Date_t, BSONElement>> extractTimeAndMeta(const BSONObj& doc
 BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime);
 
 /**
- * Retrieves a document from the record store based off of the bucket ID.
- */
-BSONObj findDocFromOID(OperationContext* opCtx, const Collection* coll, const OID& bucketId);
-
-/**
  * Generates an aggregation pipeline to identify a bucket eligible to receive a new measurement
  * specified by a document's metadata and timestamp (measurementTs).
  *
@@ -110,8 +106,7 @@ BSONObj findDocFromOID(OperationContext* opCtx, const Collection* coll, const OI
  * iii. the measurementTs is within the allowed time span for the bucket
  * iv.  the bucket has less than the max number of measurements and is below the max bucket size
  */
-std::vector<BSONObj> generateReopeningPipeline(OperationContext* opCtx,
-                                               const Date_t& time,
+std::vector<BSONObj> generateReopeningPipeline(const Date_t& time,
                                                boost::optional<BSONElement> metadata,
                                                const std::string& controlMinTimePath,
                                                const std::string& maxDataTimeFieldPath,
@@ -123,7 +118,8 @@ std::vector<BSONObj> generateReopeningPipeline(OperationContext* opCtx,
  *
  * To be called from an OpObserver, e.g. in onDelete and onUpdate.
  */
-void handleDirectWrite(OperationContext* opCtx,
+void handleDirectWrite(RecoveryUnit&,
+                       BucketCatalog&,
                        const TimeseriesOptions& options,
                        const StringDataComparator* comparator,
                        const UUID& collectionUUID,

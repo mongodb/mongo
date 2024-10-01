@@ -2656,12 +2656,13 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     }
 
     timeseries::getOpTimeAndElectionId(opCtx, opTime, electionId);
+    auto bucketsNs = request.getNamespace().makeTimeseriesBucketsNamespace();
 
-    auto closedBucket = finish(opCtx,
-                               bucketCatalog,
-                               request.getNamespace().makeTimeseriesBucketsNamespace(),
+    auto closedBucket = finish(bucketCatalog,
+                               bucketsNs,
                                batch,
-                               timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
+                               timeseries::bucket_catalog::CommitInfo{*opTime, *electionId},
+                               timeseries::getPostCommitDebugChecks(opCtx, bucketsNs));
 
     if (closedBucket) {
         // If this write closed a bucket, compress the bucket
@@ -2736,14 +2737,14 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
         }
 
         timeseries::getOpTimeAndElectionId(opCtx, opTime, electionId);
+        auto bucketsNs = request.getNamespace().makeTimeseriesBucketsNamespace();
 
         for (auto batch : batchesToCommit) {
-            auto closedBucket =
-                finish(opCtx,
-                       bucketCatalog,
-                       request.getNamespace().makeTimeseriesBucketsNamespace(),
-                       batch,
-                       timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
+            auto closedBucket = finish(bucketCatalog,
+                                       bucketsNs,
+                                       batch,
+                                       timeseries::bucket_catalog::CommitInfo{*opTime, *electionId},
+                                       timeseries::getPostCommitDebugChecks(opCtx, bucketsNs));
             batch.get().reset();
 
             if (!closedBucket) {

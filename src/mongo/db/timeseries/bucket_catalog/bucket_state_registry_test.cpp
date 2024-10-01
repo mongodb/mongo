@@ -93,8 +93,8 @@ public:
     }
 
     Bucket& createBucket(InsertContext& info, Date_t time) {
-        auto ptr = &internal::allocateBucket(
-            operationContext(), *this, *stripes[info.stripeNumber], withLock, info, time);
+        auto ptr =
+            &internal::allocateBucket(*this, *stripes[info.stripeNumber], withLock, info, time);
         ASSERT_FALSE(hasBeenCleared(*ptr));
         return *ptr;
     }
@@ -722,12 +722,8 @@ TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
     auto bucketId = bucket.bucketId;
 
     ClosedBuckets closedBuckets;
-    internal::archiveBucket(operationContext(),
-                            *this,
-                            *stripes[info1.stripeNumber],
-                            WithLock::withoutLock(),
-                            bucket,
-                            closedBuckets);
+    internal::archiveBucket(
+        *this, *stripes[info1.stripeNumber], WithLock::withoutLock(), bucket, closedBuckets);
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
 }
@@ -780,7 +776,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
         // this and closes the bucket.
         bucket.rolloverAction = RolloverAction::kHardClose;
         CommitInfo commitInfo{};
-        auto closedBucket = finish(operationContext(), *this, ns, batch, commitInfo);
+        auto closedBucket = finish(*this, ns, batch, commitInfo);
         ASSERT(closedBucket.has_value());
         ASSERT_EQ(closedBucket.value().bucketId.oid, bucketId.oid);
 

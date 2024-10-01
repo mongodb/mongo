@@ -150,8 +150,7 @@ BSONObj generateReopeningMatchFilter(const Date_t& time,
 
 }  // namespace
 
-std::vector<BSONObj> generateReopeningPipeline(OperationContext* opCtx,
-                                               const Date_t& time,
+std::vector<BSONObj> generateReopeningPipeline(const Date_t& time,
                                                boost::optional<BSONElement> metadata,
                                                const std::string& controlMinTimePath,
                                                const std::string& maxDataTimeFieldPath,
@@ -261,20 +260,12 @@ StatusWith<std::pair<Date_t, BSONElement>> extractTimeAndMeta(const BSONObj& doc
     return std::make_pair(time, metaElem);
 }
 
-BSONObj findDocFromOID(OperationContext* opCtx, const Collection* coll, const OID& bucketId) {
-    Snapshotted<BSONObj> bucketObj;
-    auto rid = record_id_helpers::keyForOID(bucketId);
-    auto foundDoc = coll->findDoc(opCtx, rid, &bucketObj);
-
-    return (foundDoc) ? bucketObj.value() : BSONObj();
-}
-
-void handleDirectWrite(OperationContext* opCtx,
+void handleDirectWrite(RecoveryUnit& ru,
+                       BucketCatalog& bucketCatalog,
                        const TimeseriesOptions& options,
                        const StringDataComparator* comparator,
                        const UUID& collectionUUID,
                        const BSONObj& bucket) {
-    auto& bucketCatalog = GlobalBucketCatalog::get(opCtx->getServiceContext());
     const BucketId bucketId =
         extractBucketId(bucketCatalog, options, comparator, collectionUUID, bucket);
 
@@ -284,17 +275,12 @@ void handleDirectWrite(OperationContext* opCtx,
 
     // Then register callbacks so we can let the BucketCatalog know that we are done with our direct
     // write after the actual write takes place (or is abandoned), and allow reopening.
-    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [svcCtx = opCtx->getServiceContext(), bucketId](OperationContext*,
-                                                        boost::optional<Timestamp>) {
-            auto& bucketCatalog = GlobalBucketCatalog::get(svcCtx);
-            directWriteFinish(bucketCatalog.bucketStateRegistry, bucketId);
-        });
-    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-        [svcCtx = opCtx->getServiceContext(), bucketId](OperationContext*) {
-            auto& bucketCatalog = GlobalBucketCatalog::get(svcCtx);
-            directWriteFinish(bucketCatalog.bucketStateRegistry, bucketId);
-        });
+    ru.onCommit([&bucketCatalog, bucketId](OperationContext*, boost::optional<Timestamp>) {
+        directWriteFinish(bucketCatalog.bucketStateRegistry, bucketId);
+    });
+    ru.onRollback([&bucketCatalog, bucketId](OperationContext*) {
+        directWriteFinish(bucketCatalog.bucketStateRegistry, bucketId);
+    });
 }
 
 }  // namespace mongo::timeseries::bucket_catalog
