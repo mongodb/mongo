@@ -96,11 +96,20 @@ auto rehydrateIndexKey(const BSONObj& keyPattern, const BSONObj& dehydratedKey) 
     BSONObjIterator valueIter{dehydratedKey};
 
     while (keyIter.more() && valueIter.more()) {
-        auto fieldName = keyIter.next().fieldNameStringData();
+        const auto& keyElt = keyIter.next();
+        auto fieldName = keyElt.fieldNameStringData();
         auto value = valueIter.next();
 
         // Skip the $** index virtual field, as it's not part of the actual index key.
         if (fieldName == "$_path") {
+            continue;
+        }
+
+        // Skip hashed index fields. Rehydrating of index keys is used for covered projections.
+        // Rehydrating of hashed field value is pointless on its own. The query planner dependency
+        // analysis should make sure that a covered projection can only be generated for non-hashed
+        // fields.
+        if (keyElt.type() == mongo::String && keyElt.valueStringData() == IndexNames::HASHED) {
             continue;
         }
 
