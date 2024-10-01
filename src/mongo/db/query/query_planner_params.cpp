@@ -631,8 +631,15 @@ QueryPlannerParams::QueryPlannerParams(QueryPlannerParams::ArgsForDistinct&& dis
         return;
     }
 
-    mainCollectionInfo.indexes = getIndexEntriesForDistinct(distinctArgs);
     const auto& canonicalQuery = distinctArgs.canonicalQuery;
+    if (canonicalQuery.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled()) {
+        // When shard filtering for distinct scan is enabled and shard filtering is requested, we
+        // need to check if the collection is actually sharded and fill out the shard key if it is.
+        fillOutPlannerParamsForExpressQuery(
+            distinctArgs.opCtx, canonicalQuery, distinctArgs.collections.getMainCollection());
+    }
+
+    mainCollectionInfo.indexes = getIndexEntriesForDistinct(distinctArgs);
     applyQuerySettingsOrIndexFiltersForMainCollection(canonicalQuery, distinctArgs.collections);
 
     // If there exists an index filter, we ignore all hints. Else, we only keep the index specified

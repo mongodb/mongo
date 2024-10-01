@@ -907,13 +907,6 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "PROJECTION_SIMPLE",
-						"transformBy" : {
-							"_id" : 1,
-							"b" : 1
-						}
-					},
-					{
 						"stage" : "FETCH"
 					},
 					{
@@ -1172,6 +1165,72 @@
 						"multiKeyPaths" : {
 							"a" : [ ],
 							"b" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"accum" : "$b"
+				}
+			}
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$first" : "$b"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "FETCH"
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ]
 						},
 						"stage" : "DISTINCT_SCAN"
 					}

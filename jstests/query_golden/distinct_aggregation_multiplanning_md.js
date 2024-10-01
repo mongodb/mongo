@@ -45,6 +45,10 @@ outputAggregationPlanAndResults(
     coll, [{$sort: {a: 1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
 outputAggregationPlanAndResults(
     coll, [{$sort: {a: -1, b: 1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
+// DISTINCT_SCAN on 'a_1' + FETCH is picked but scanning 'a_1_b_1' would avoid fetching. Currently
+// 'a_1_b_1' is not even considered for this query.
+// TODO SERVER-95152: Ensure we pick a fully covered plan here.
+outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", accum: {$first: "$b"}}}]);
 // Ensure the planner correctly reverses the DISTINCT_SCAN direction for $first and $top.
 outputAggregationPlanAndResults(
     coll, [{$group: {_id: "$d", accum: {$top: {sortBy: {d: -1}, output: "$c"}}}}]);

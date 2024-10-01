@@ -106,6 +106,8 @@ void finalizeWildcardIndexScanConfiguration(
  */
 bool isWildcardObjectSubpathScan(const IndexScanNode* node);
 
+bool isWildcardObjectSubpathScan(const IndexEntry& index, const IndexBounds& bounds);
+
 /**
  * It's not obvious which element is the wildcard element in a compound wildcard index key pattern.
  * This helper can give you the wildcard element based on the position tracked in 'IndexEntry'.

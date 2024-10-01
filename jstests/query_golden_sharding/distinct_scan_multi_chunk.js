@@ -4,12 +4,17 @@
  *
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
- *   # TODO SERVER-92458: Remove this tag once we are filtering out orphans.
+ *   # TODO SERVER-92459: Remove this tag once we are filtering out orphans in all cases.
  *   tsan_incompatible
  * ]
  */
 
-import {line, outputDistinctPlanAndResults} from "jstests/libs/pretty_md.js";
+import {
+    outputAggregationPlanAndResults,
+    outputDistinctPlanAndResults,
+    section,
+    subSection
+} from "jstests/libs/pretty_md.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 TestData.skipCheckOrphans = true;  // Deliberately inserts orphans.
@@ -29,11 +34,14 @@ const allChunks = shard0Chunks.concat(shard1Chunks);
 const coll = db[jsTestName()];
 coll.drop();
 coll.createIndex({shardKey: 1});
+coll.createIndex({shardKey: 1, notShardKey: 1});
 
 const docs = [];
 for (const chunk of allChunks) {
     for (let i = 0; i < 3; i++) {
-        docs.push({shardKey: `${chunk}_${i}`});
+        docs.push({shardKey: `${chunk}_${i}`, notShardKey: `1notShardKey_${chunk}_${i}`},
+                  {shardKey: `${chunk}_${i}`, notShardKey: `2notShardKey_${chunk}_${i}`},
+                  {shardKey: `${chunk}_${i}`, notShardKey: `3notShardKey_${chunk}_${i}`});
     }
 }
 coll.insertMany(docs);
@@ -58,7 +66,10 @@ for (const shardKey of shard1Chunks) {
     const docs = [];
     for (const chunk of shard1Chunks) {
         for (let i = 0; i < 3; i++) {
-            docs.push({shardKey: `${chunk}_${i}_orphan`});
+            docs.push({
+                shardKey: `${chunk}_${i}_orphan`,
+                notShardKey: `notShardKey_${chunk}_${i}_orphan`
+            });
         }
     }
     assert.commandWorked(shardingTest.shard0.getCollection(coll.getFullName()).insert(docs));
@@ -68,14 +79,122 @@ for (const shardKey of shard1Chunks) {
     const docs = [];
     for (const chunk of shard0Chunks) {
         for (let i = 0; i < 3; i++) {
-            docs.push({shardKey: `${chunk}_${i}_orphan`});
+            docs.push({
+                shardKey: `${chunk}_${i}_orphan`,
+                notShardKey: `notShardKey_${chunk}_${i}_orphan`
+            });
         }
     }
     assert.commandWorked(shardingTest.shard1.getCollection(coll.getFullName()).insert(docs));
 }
 
-// Currently no sharding filter is applied on DISTINCT_SCAN plans.
-line("TODO SERVER-92458: Shard filter out the orphan documents");
+section("distinct on shard key");
 outputDistinctPlanAndResults(coll, "shardKey");
+
+section("$group on shard key with $top/$bottom");
+subSection("sort by shard key, output shard key");
+outputAggregationPlanAndResults(
+    coll,
+    [{$group: {_id: "$shardKey", accum: {$top: {sortBy: {shardKey: 1}, output: "$shardKey"}}}}]);
+outputAggregationPlanAndResults(
+    coll,
+    [{$group: {_id: "$shardKey", accum: {$top: {sortBy: {shardKey: -1}, output: "$shardKey"}}}}]);
+outputAggregationPlanAndResults(
+    coll,
+    [{$group: {_id: "$shardKey", accum: {$bottom: {sortBy: {shardKey: 1}, output: "$shardKey"}}}}]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$shardKey", accum: {$bottom: {sortBy: {shardKey: -1}, output: "$shardKey"}}}}
+]);
+
+subSection("sort by shard key and another field, output shard key");
+outputAggregationPlanAndResults(
+    coll, [{
+        $group: {
+            _id: "$shardKey",
+            accum: {$top: {sortBy: {shardKey: 1, notShardKey: 1}, output: "$shardKey"}}
+        }
+    }]);
+outputAggregationPlanAndResults(
+    coll, [{
+        $group: {
+            _id: "$shardKey",
+            accum: {$bottom: {sortBy: {shardKey: 1, notShardKey: 1}, output: "$shardKey"}}
+        }
+    }]);
+
+subSection("sort by shard key and another field, output non-shard key field");
+outputAggregationPlanAndResults(
+    coll, [{
+        $group: {
+            _id: "$shardKey",
+            accum: {$top: {sortBy: {shardKey: 1, notShardKey: 1}, output: "$notShardKey"}}
+        }
+    }]);
+outputAggregationPlanAndResults(
+    coll, [{
+        $group: {
+            _id: "$shardKey",
+            accum: {$bottom: {sortBy: {shardKey: 1, notShardKey: 1}, output: "$notShardKey"}}
+        }
+    }]);
+
+// TODO SERVER-95198: Currently results in a COLLSCAN plan. However, in theory it could also be
+// answered by a DISTINCT_SCAN on 'shardKey_1_notShardKey_1'.
+subSection("sort by non-shard key field, output shard key");
+outputAggregationPlanAndResults(
+    coll,
+    [{$group: {_id: "$shardKey", accum: {$top: {sortBy: {notShardKey: 1}, output: "$shardKey"}}}}]);
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$shardKey", accum: {$bottom: {sortBy: {notShardKey: 1}, output: "$shardKey"}}}}
+]);
+
+// TODO SERVER-95198: Currently results in a COLLSCAN plan. However, in theory it could also be
+// answered by a DISTINCT_SCAN on 'shardKey_1_notShardKey_1'.
+subSection("sort by non-shard key field, output non-shard key field");
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$shardKey", accum: {$top: {sortBy: {notShardKey: 1}, output: "$notShardKey"}}}}
+]);
+outputAggregationPlanAndResults(
+    coll, [{
+        $group:
+            {_id: "$shardKey", accum: {$bottom: {sortBy: {notShardKey: 1}, output: "$notShardKey"}}}
+    }]);
+
+section("$group on shard key with $first/$last");
+subSection("with preceding $sort on shard key");
+outputAggregationPlanAndResults(
+    coll, [{$sort: {shardKey: -1}}, {$group: {_id: "$shardKey", accum: {$first: "$shardKey"}}}]);
+outputAggregationPlanAndResults(
+    coll, [{$sort: {shardKey: 1}}, {$group: {_id: "$shardKey", accum: {$first: "$shardKey"}}}]);
+outputAggregationPlanAndResults(
+    coll, [{$sort: {shardKey: -1}}, {$group: {_id: "$shardKey", accum: {$last: "$shardKey"}}}]);
+outputAggregationPlanAndResults(
+    coll, [{$sort: {shardKey: 1}}, {$group: {_id: "$shardKey", accum: {$last: "$shardKey"}}}]);
+
+subSection("with preceding $sort on shard key and another field");
+outputAggregationPlanAndResults(coll, [
+    {$sort: {shardKey: 1, notShardKey: 1}},
+    {$group: {_id: "$shardKey", accum: {$first: "$shardKey"}}}
+]);
+outputAggregationPlanAndResults(coll, [
+    {$sort: {shardKey: 1, notShardKey: 1}},
+    {$group: {_id: "$shardKey", accum: {$last: "$shardKey"}}}
+]);
+
+subSection("without preceding $sort, output shard key");
+outputAggregationPlanAndResults(coll, [{$group: {_id: "$shardKey", accum: {$first: "$shardKey"}}}]);
+outputAggregationPlanAndResults(coll, [{$group: {_id: "$shardKey", accum: {$last: "$shardKey"}}}]);
+
+// TODO SERVER-92459: Uncomment these tests and ensure we get DISTINCT_SCAN with
+// isShardFiltering=true and isFetching=true.
+//
+// Currently, a DISTINCT_SCAN on 'shardKey_1' without shard filtering is chosen since the query also
+// requires fetching.
+//
+// subSection("without preceding $sort, output non-shard key field");
+// outputAggregationPlanAndResults(coll,
+//                                 [{$group: {_id: "$shardKey", accum: {$first: "$notShardKey"}}}]);
+// outputAggregationPlanAndResults(coll,
+//                                 [{$group: {_id: "$shardKey", accum: {$last: "$notShardKey"}}}]);
 
 shardingTest.stop();

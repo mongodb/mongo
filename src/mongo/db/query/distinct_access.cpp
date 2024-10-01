@@ -46,7 +46,7 @@ namespace {
  * indexes in case of not multiplanning.
  */
 bool isIndexSuitableForDistinct(const CanonicalQuery& canonicalQuery,
-                                IndexEntry& index,
+                                const IndexEntry& index,
                                 const std::string& field,
                                 bool flipDistinctScanDirection,
                                 bool strictDistinctOnly) {
@@ -182,6 +182,8 @@ std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
                              canonicalDistinct.getKey(),
                              collator,
                              &distinctNodeIndex)) {
+        // TODO SERVER-94880: Construct an index scan and let
+        // 'QueryPlannerAnalysis::analyzeDataAccess()' handle the conversion to distinct scan.
         auto dn = std::make_unique<DistinctNode>(
             plannerParams.mainCollectionInfo.indexes[distinctNodeIndex]);
         dn->direction = 1;
@@ -204,12 +206,18 @@ std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
         // the projection and 'analyzeDataAccess()' would do that. NB: whether other aspects of
         // data access are important, it's hard to say, this code has been like this since long
         // ago (and it has always passed in new 'QueryPlannerParams').
-        auto soln = QueryPlannerAnalysis::analyzeDataAccess(
-            canonicalQuery,
-            // TODO SERVER-87683 Investigate why empty parameters are used instead of
-            // 'plannerParams'.
-            QueryPlannerParams{QueryPlannerParams::ArgsForTest{}},
-            std::move(solnRoot));
+        std::unique_ptr<QuerySolution> soln;
+        if (canonicalQuery.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled()) {
+            soln = QueryPlannerAnalysis::analyzeDataAccess(
+                canonicalQuery, plannerParams, std::move(solnRoot));
+        } else {
+            soln = QueryPlannerAnalysis::analyzeDataAccess(
+                canonicalQuery,
+                // TODO SERVER-87683 Investigate why empty parameters are used instead of
+                // 'plannerParams'.
+                QueryPlannerParams{QueryPlannerParams::ArgsForTest{}},
+                std::move(solnRoot));
+        }
         uassert(8404000, "Failed to finalize a DISTINCT_SCAN plan", soln);
         return soln;
     }
@@ -221,7 +229,7 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& 
                                                           bool flipDistinctScanDirection) {
     const CanonicalDistinct& canonicalDistinct = *canonicalQuery.getDistinct();
     if (canonicalQuery.getFindCommandRequest().getFilter().isEmpty() &&
-        !canonicalQuery.getSortPattern()) {
+        !canonicalQuery.getSortPattern() && !canonicalDistinct.getSortRequirement()) {
         // If a query has neither a filter nor a sort, the query planner won't attempt to use an
         // index for it even if the index could provide the distinct semantics on the key from the
         // 'canonicalDistinct'. So, we create the solution "manually" from a suitable index.
@@ -285,41 +293,76 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
                                 bool flipDistinctScanDirection) {
     auto root = soln->root();
 
-    // We can attempt to convert a plan if it follows one of these patterns (starting from the
-    // root):
-    //   1. PROJECT=>FETCH=>IXSCAN
-    //   2. FETCH=>IXSCAN
-    //   3. PROJECT=>IXSCAN
-    QuerySolutionNode* projectNode = nullptr;
-    IndexScanNode* indexScanNode = nullptr;
+    // When a plan can be converted to use DISTINCT_SCAN, we may expect to see these nodes
+    // on top of an IXSCAN.
+    ProjectionNode* projectionNode = nullptr;
     FetchNode* fetchNode = nullptr;
+    // If present, the sort key generator will remain in place.
+    SortKeyGeneratorNode* sortKeyGenNode = nullptr;
+    // If present, shard filtering will be pushed into the DISTINCT_SCAN.
+    ShardingFilterNode* shardFilterNode = nullptr;
+    // If the plan is already using a distinct scan, we may have to finalize the plan by pushing
+    // fetch and shard filtering stages to the distinct scan.
+    DistinctNode* distinctScanNode = nullptr;
+    IndexScanNode* indexScanNode = nullptr;
 
-    switch (root->getType()) {
-        case STAGE_PROJECTION_DEFAULT:
-        case STAGE_PROJECTION_COVERED:
-        case STAGE_PROJECTION_SIMPLE:
-            projectNode = root;
+    // Walk the solution until we find either IXSCAN, DISTINCT_SCAN or an unexpected stage.
+    for (QuerySolutionNode* currNode = root;; currNode = currNode->children[0].get()) {
+        switch (currNode->getType()) {
+            case STAGE_PROJECTION_DEFAULT:
+            case STAGE_PROJECTION_COVERED:
+            case STAGE_PROJECTION_SIMPLE:
+                tassert(9245800, "Didn't expect to find two projections", !projectionNode);
+                projectionNode = static_cast<ProjectionNode*>(currNode);
+                break;
+            case STAGE_FETCH:
+                tassert(9245801, "Didn't expect to find two fetch nodes", !fetchNode);
+                fetchNode = static_cast<FetchNode*>(currNode);
+                break;
+            case STAGE_SORT_KEY_GENERATOR:
+                tassert(9245802, "Didn't expect to find two sort key generators", !sortKeyGenNode);
+                sortKeyGenNode = static_cast<SortKeyGeneratorNode*>(currNode);
+                break;
+            case STAGE_SHARDING_FILTER:
+                tassert(9245803, "Didn't expect to find two sharding filters", !shardFilterNode);
+                shardFilterNode = static_cast<ShardingFilterNode*>(currNode);
+                break;
+            case STAGE_IXSCAN:
+                tassert(9245804, "Didn't expect to find two index scans", !indexScanNode);
+                indexScanNode = static_cast<IndexScanNode*>(currNode);
+                break;
+            case STAGE_DISTINCT_SCAN:
+                tassert(9245805, "Didn't expect to find two distinct scans", !distinctScanNode);
+                distinctScanNode = static_cast<DistinctNode*>(currNode);
+                break;
+            default:
+                return false;
+        }
+        if (currNode->children.size() != 1) {
             break;
-        case STAGE_FETCH:
-            fetchNode = static_cast<FetchNode*>(root);
-            break;
-        default:
-            return false;
+        }
     }
 
-    if (!fetchNode && (STAGE_FETCH == root->children[0]->getType())) {
-        fetchNode = static_cast<FetchNode*>(root->children[0].get());
-    }
-
-    if (fetchNode && (STAGE_IXSCAN == fetchNode->children[0]->getType())) {
-        indexScanNode = static_cast<IndexScanNode*>(fetchNode->children[0].get());
-    } else if (projectNode && (STAGE_IXSCAN == projectNode->children[0]->getType())) {
-        indexScanNode = static_cast<IndexScanNode*>(projectNode->children[0].get());
-    }
-
-    if (!indexScanNode) {
+    if (!indexScanNode && !distinctScanNode) {
         return false;
     }
+
+    tassert(9245809,
+            "Didn't expect to find both distinct and index scans",
+            !indexScanNode || !distinctScanNode);
+
+    // Preserve old behavior when shard filtering for distinct scan is not enabled.
+    const bool isShardFilteringDistinctScanEnabled =
+        canonicalQuery.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
+    if ((shardFilterNode || distinctScanNode || sortKeyGenNode) &&
+        !isShardFilteringDistinctScanEnabled) {
+        return false;
+    }
+
+    const auto& indexEntry = indexScanNode ? indexScanNode->index : distinctScanNode->index;
+    const auto& indexBounds = indexScanNode ? indexScanNode->bounds : distinctScanNode->bounds;
+    const auto queryCollator =
+        indexScanNode ? indexScanNode->queryCollator : distinctScanNode->queryCollator;
 
     const bool strictDistinctOnly =
         (plannerParams.mainCollectionInfo.options & QueryPlannerParams::STRICT_DISTINCT_ONLY);
@@ -334,16 +377,13 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
     // DISTINCT_SCAN, for e.g. if the distinct key is not part of the index. In the former case, we
     // have not done this check yet, so we filter out ineligible indexes here.
     if (canonicalQuery.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled()) {
-        if (!isIndexSuitableForDistinct(canonicalQuery,
-                                        indexScanNode->index,
-                                        field,
-                                        flipDistinctScanDirection,
-                                        strictDistinctOnly)) {
+        if (!isIndexSuitableForDistinct(
+                canonicalQuery, indexEntry, field, flipDistinctScanDirection, strictDistinctOnly)) {
             return false;
         }
         if (canonicalQuery.getFindCommandRequest().getFilter().isEmpty() &&
             !canonicalQuery.getSortPattern() && !hasSortRequirement &&
-            isAFullIndexScanPreferable(indexScanNode->index, field, indexScanNode->queryCollator)) {
+            isAFullIndexScanPreferable(indexEntry, field, queryCollator)) {
             return false;
         }
     }
@@ -354,10 +394,10 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
         return false;
     }
 
-    if (indexScanNode->index.type == IndexType::INDEX_WILDCARD) {
+    if (indexEntry.type == IndexType::INDEX_WILDCARD) {
         // If the query is on a field other than the distinct key, we may have generated a $** plan
         // which does not actually contain the distinct key field.
-        if (field != std::next(indexScanNode->index.keyPattern.begin())->fieldName()) {
+        if (field != std::next(indexEntry.keyPattern.begin())->fieldName()) {
             return false;
         }
         // If the query includes object bounds, we cannot turn this IXSCAN into a DISTINCT_SCAN.
@@ -365,7 +405,7 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
         // (Path, Value, RecordId) order. If the distinct fields in two successive documents are
         // objects with the same leaf path values but in different field order, e.g. {a: 1, b: 2}
         // and {b: 2, a: 1}, we would therefore only return the first document and skip the other.
-        if (wildcard_planning::isWildcardObjectSubpathScan(indexScanNode)) {
+        if (wildcard_planning::isWildcardObjectSubpathScan(indexEntry, indexBounds)) {
             return false;
         }
     }
@@ -373,7 +413,7 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
     // An additional filter must be applied to the data in the key, so we can't just skip
     // all the keys with a given value; we must examine every one to find the one that (may)
     // pass the filter.
-    if (indexScanNode->filter) {
+    if (indexScanNode && indexScanNode->filter) {
         return false;
     }
 
@@ -381,13 +421,13 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
     // special cases.  Don't want to handle the interactions between those and distinct.
     // Don't think this will ever really be true but if it somehow is, just ignore this
     // soln.
-    if (indexScanNode->bounds.isSimpleRange) {
+    if (indexBounds.isSimpleRange) {
         return false;
     }
 
     // Figure out which field we're skipping to the next value of.
     int fieldNo = 0;
-    BSONObjIterator it(indexScanNode->index.keyPattern);
+    BSONObjIterator it(indexEntry.keyPattern);
     while (it.more()) {
         if (field == it.next().fieldName()) {
             break;
@@ -404,9 +444,9 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
         // equality bounds on 'a' prevent the scan from seeing duplicate 'b' values by ensuring the
         // scan is limited to a single value for the 'a' field.
         for (size_t i = 0; i < static_cast<size_t>(fieldNo); ++i) {
-            invariant(i < indexScanNode->bounds.size());
-            if (indexScanNode->bounds.fields[i].intervals.size() != 1 ||
-                !indexScanNode->bounds.fields[i].intervals[0].isPoint()) {
+            tassert(9245810, "Smaller than expected indexBounds size", i < indexBounds.size());
+            if (indexBounds.fields[i].intervals.size() != 1 ||
+                !indexBounds.fields[i].intervals[0].isPoint()) {
                 return false;
             }
         }
@@ -414,8 +454,8 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
 
     // We should not use a distinct scan if the field over which we are computing the distinct is
     // multikey.
-    if (indexScanNode->index.multikey) {
-        const auto& multikeyPaths = indexScanNode->index.multikeyPaths;
+    if (indexEntry.multikey) {
+        const auto& multikeyPaths = indexEntry.multikeyPaths;
         if (multikeyPaths.empty()) {
             // We don't have path-level multikey information available.
             return false;
@@ -447,40 +487,62 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
             canonicalQuery.getDistinct()->getSerializedSortRequirement(),
             canonicalQuery.getFindCommandRequest().getHint(),
             reverseScanIfNeededToSatisfySortRequirement,
-            indexScanNode)) {
+            indexScanNode ? static_cast<QuerySolutionNode*>(indexScanNode)
+                          : static_cast<QuerySolutionNode*>(distinctScanNode))) {
         return false;
     }
 
+    const int direction = indexScanNode ? indexScanNode->direction : distinctScanNode->direction;
     // Make a new DistinctNode. We will swap this for the ixscan in the provided solution.
-    auto distinctNode = std::make_unique<DistinctNode>(indexScanNode->index);
-    distinctNode->direction =
-        flipDistinctScanDirection ? -indexScanNode->direction : indexScanNode->direction;
-    distinctNode->bounds =
-        flipDistinctScanDirection ? indexScanNode->bounds.reverse() : indexScanNode->bounds;
-    distinctNode->queryCollator = indexScanNode->queryCollator;
+    auto distinctNode = std::make_unique<DistinctNode>(indexEntry);
+    distinctNode->direction = flipDistinctScanDirection ? -direction : direction;
+    distinctNode->bounds = flipDistinctScanDirection ? indexBounds.reverse() : indexBounds;
+    distinctNode->queryCollator = queryCollator;
     distinctNode->fieldNo = fieldNo;
+    // TODO SERVER-92459: Support shard filtering when it requires fetching.
+    distinctNode->isShardFiltering = !fetchNode && shardFilterNode != nullptr;
+
+    tassert(9245807,
+            "Found SORT_KEY_GENERATOR in an unexpected location",
+            !sortKeyGenNode || (!projectionNode && sortKeyGenNode == root) ||
+                (projectionNode && sortKeyGenNode == projectionNode->children[0].get()));
 
     if (fetchNode) {
         // If the original plan had PROJECT and FETCH stages, we can get rid of the PROJECT
         // transforming the plan from PROJECT=>FETCH=>IXSCAN to FETCH=>DISTINCT_SCAN.
-        if (projectNode) {
-            invariant(projectNode == root);
-            invariant(fetchNode == root->children[0].get());
-            invariant(STAGE_FETCH == root->children[0]->getType());
-            invariant(STAGE_IXSCAN == root->children[0]->children[0]->getType());
-            // Make the fetch the new root. This destroys the project stage.
+        if (projectionNode) {
+            // TODO SERVER-92459: Remove since we can replace both PROJECT and FETCH in a single
+            // step.
+            tassert(9245811, "Expected PROJECT to be the root node", projectionNode == root);
+
+            // Make the FETCH or SORT_KEY_GENERATOR the new root. This destroys the project stage.
             soln->setRoot(std::move(root->children[0]));
         }
 
         // Attach the distinct node in the index scan's place.
+        //
+        // TODO SERVER-92459: Since DISTINCT_SCAN can also fetch, we can have the DISTINCT_SCAN
+        // replace the entire tree.
         fetchNode->children[0] = std::move(distinctNode);
     } else {
-        // There is no fetch node. The PROJECT=>IXSCAN tree should become PROJECT=>DISTINCT_SCAN.
-        invariant(projectNode == root);
-        invariant(STAGE_IXSCAN == root->children[0]->getType());
+        // There is no fetch node. The PROJECT=>IXSCAN tree should become
+        // PROJECT=>DISTINCT_SCAN. If there is a shard filter, it will also be removed since shard
+        // filtering is implemented by DISTINCT_SCAN
+        tassert(9245812, "Expected PROJECT to be the root node", projectionNode == root);
 
         // Attach the distinct node in the index scan's place.
-        root->children[0] = std::move(distinctNode);
+        QuerySolutionNode* parent = sortKeyGenNode ? sortKeyGenNode : root;
+        parent->children[0] = std::move(distinctNode);
+    }
+
+    if (isShardFilteringDistinctScanEnabled && soln->hasNode(STAGE_SHARDING_FILTER)) {
+        // We may end up here if we have SHARDING_FILTER=>FETCH=>DISTINCT_SCAN.
+        // TODO SERVER-92459: This case will be handled automatically once we allow DISTINCT_SCAN to
+        // absorb FETCH.
+        tassert(9245808,
+                "Unexpected SHARDING_FILTER location",
+                soln->root()->getType() == STAGE_SHARDING_FILTER);
+        soln->setRoot(std::move(soln->root()->children[0]));
     }
 
     return true;
