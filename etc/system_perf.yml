@@ -115,7 +115,7 @@ modules:
     owner: mongodb-labs
     repo: YCSB
     prefix: ${workdir}/src
-    branch: production
+    branch: main
   - name: py-tpcc
     owner: mongodb-labs
     repo: py-tpcc
