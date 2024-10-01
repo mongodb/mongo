@@ -180,10 +180,10 @@ boost::optional<Milliseconds> ReshardingMetrics::getRecipientHighEstimateRemaini
         getStartFor(TimedPhase::kApplying).has_value(),
         getBytesWrittenCount(),
         getApproxBytesToScanCount(),
-        getElapsed<Seconds>(TimedPhase::kCloning, getClockSource()).value_or(Seconds{0}),
+        getElapsed<Milliseconds>(TimedPhase::kCloning, getClockSource()).value_or(Seconds{0}),
         getOplogEntriesApplied(),
         getOplogEntriesFetched(),
-        getElapsed<Seconds>(TimedPhase::kApplying, getClockSource()).value_or(Seconds{0}));
+        getElapsed<Milliseconds>(TimedPhase::kApplying, getClockSource()).value_or(Seconds{0}));
 }
 
 std::unique_ptr<ReshardingMetrics> ReshardingMetrics::makeInstance(UUID instanceId,
