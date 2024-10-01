@@ -1156,7 +1156,6 @@ public:
         }
 
         uassertOSStatusOK(::SSLSetConnection(_ssl.get(), static_cast<void*>(this)));
-        uassertOSStatusOK(::SSLSetPeerID(_ssl.get(), _ssl.get(), sizeof(_ssl)));
         uassertOSStatusOK(::SSLSetIOFuncs(_ssl.get(), read_func, write_func));
         uassertOSStatusOK(::SSLSetProtocolVersionMin(_ssl.get(), ctx->protoMin));
         uassertOSStatusOK(::SSLSetProtocolVersionMax(_ssl.get(), ctx->protoMax));
