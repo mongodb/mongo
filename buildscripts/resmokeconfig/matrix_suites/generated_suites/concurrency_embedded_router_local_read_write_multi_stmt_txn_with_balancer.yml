@@ -32,6 +32,7 @@ executor:
     enable_balancer: true
     mongod_options:
       set_parameters:
+        analyzeShardKeyMaxNumStaleVersionRetries: 2
         defaultConfigCommandTimeoutMS: 90000
         enableTestCommands: 1
         failpoint.overrideDDLLockTimeout:

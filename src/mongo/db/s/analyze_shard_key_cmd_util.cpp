@@ -391,10 +391,17 @@ void runClusterAggregate(OperationContext* opCtx,
                                                     collUuid);
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
-    auto pipeline =
-        shardVersionRetry(opCtx, Grid::get(opCtx)->catalogCache(), nss, "AnalyzeShardKey"_sd, [&] {
-            return Pipeline::makePipeline(aggRequest, expCtx);
-        });
+    size_t altNumRetries = 0;  // 0 means use the default max number of retries.
+    if (MONGO_unlikely(analyzeShardKeyMaxNumStaleVersionRetries > 0)) {
+        altNumRetries = analyzeShardKeyMaxNumStaleVersionRetries;
+    }
+    auto pipeline = shardVersionRetry(
+        opCtx,
+        Grid::get(opCtx)->catalogCache(),
+        nss,
+        "AnalyzeShardKey"_sd,
+        [&] { return Pipeline::makePipeline(aggRequest, expCtx); },
+        altNumRetries);
 
     while (auto doc = pipeline->getNext()) {
         callbackFn(doc->toBson());

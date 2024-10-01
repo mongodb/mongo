@@ -225,3 +225,17 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+
+    analyzeShardKeyMaxNumStaleVersionRetries:
+        description: >-
+            Overrides the maximum number of retries for StaleVersion errors in analyzeShardKey
+            queries; 0 value has no effect.
+            TODO SERVER-95399 Consider removing this test-only parameter.
+        set_at: [startup, runtime]
+        cpp_vartype: int
+        cpp_varname: analyzeShardKeyMaxNumStaleVersionRetries
+        default: 0
+        validator:
+            lte: 10
+            gte: 0
+        redact: false

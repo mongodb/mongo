@@ -5,7 +5,7 @@
  * guaranteed to be true when it is run in parallel with other workloads.
  *
  * @tags: [
- *  requires_fcv_71,
+ *  requires_fcv_81,
  *  uses_transactions,
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,

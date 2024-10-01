@@ -48,21 +48,27 @@ void checkErrorStatusAndMaxRetries(const Status& status,
                                    const NamespaceString& nss,
                                    CatalogCache* catalogCache,
                                    StringData taskDescription,
-                                   size_t numAttempts) {
-    auto logAndTestMaxRetries = [numAttempts, taskDescription](const Status& status) {
-        if (numAttempts > kMaxNumStaleVersionRetries) {
-            uassertStatusOKWithContext(status,
-                                       str::stream() << "Exceeded maximum number of "
-                                                     << kMaxNumStaleVersionRetries
-                                                     << " retries attempting " << taskDescription);
-        }
+                                   size_t numAttempts,
+                                   size_t altMaxNumRetries) {
+    auto logAndTestMaxRetries =
+        [numAttempts, taskDescription, altMaxNumRetries](const Status& status) {
+            size_t maxNumRetries = kMaxNumStaleVersionRetries;
+            if (MONGO_unlikely(altMaxNumRetries > 0)) {
+                maxNumRetries = altMaxNumRetries;
+            }
+            if (numAttempts > maxNumRetries) {
+                uassertStatusOKWithContext(status,
+                                           str::stream()
+                                               << "Exceeded maximum number of " << maxNumRetries
+                                               << " retries attempting " << taskDescription);
+            }
 
-        LOGV2_DEBUG(4553800,
-                    3,
-                    "Retrying {task_description}. Got error: {exception}",
-                    "task_description"_attr = taskDescription,
-                    "exception"_attr = status);
-    };
+            LOGV2_DEBUG(4553800,
+                        3,
+                        "Retrying {task_description}. Got error: {exception}",
+                        "task_description"_attr = taskDescription,
+                        "exception"_attr = status);
+        };
 
     if (status == ErrorCodes::StaleDbVersion) {
         auto staleInfo = status.extraInfo<

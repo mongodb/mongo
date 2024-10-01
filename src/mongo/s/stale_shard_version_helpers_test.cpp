@@ -105,7 +105,7 @@ TEST_F(SyncShardVersionRetry, LimitedStaleErrorsShouldReturnCorrectValue) {
     auto token = cancellationSource.token();
     auto catalogCache = Grid::get(service())->catalogCache();
 
-    int tries = 0;
+    size_t tries = 0;
     auto retVal = shardVersionRetry(operationContext(), catalogCache, nss(), desc(), [&]() {
         if (++tries < 5) {
             const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
@@ -123,6 +123,35 @@ TEST_F(SyncShardVersionRetry, LimitedStaleErrorsShouldReturnCorrectValue) {
 
         return 10;
     });
+
+    ASSERT_EQ(10, retVal);
+
+    size_t altMaxNumRetries = 6;
+    tries = 0;
+    retVal = shardVersionRetry(
+        operationContext(),
+        catalogCache,
+        nss(),
+        desc(),
+        [&]() {
+            if (++tries < altMaxNumRetries / 2) {
+                const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
+                const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
+                uassert(
+                    StaleConfigInfo(
+                        nss(),
+                        ShardVersionFactory::make(ChunkVersion(gen1, {5, 23}),
+                                                  boost::optional<CollectionIndexes>(boost::none)),
+                        ShardVersionFactory::make(ChunkVersion(gen2, {6, 99}),
+                                                  boost::optional<CollectionIndexes>(boost::none)),
+                        ShardId("sB")),
+                    "testX",
+                    false);
+            }
+
+            return 10;
+        },
+        altMaxNumRetries);
 
     ASSERT_EQ(10, retVal);
 }
@@ -149,12 +178,42 @@ TEST_F(SyncShardVersionRetry, ExhaustedRetriesShouldThrowOriginalException) {
     ASSERT_THROWS_CODE(shardVersionRetryInvocation(), DBException, ErrorCodes::StaleDbVersion);
 }
 
+TEST_F(SyncShardVersionRetry, AltExhaustedRetriesShouldThrowOriginalException) {
+    CancellationSource cancellationSource;
+    auto token = cancellationSource.token();
+    auto catalogCache = Grid::get(service())->catalogCache();
+
+    size_t altMaxNumRetries = 2;
+
+    size_t tries = 0;
+    auto shardVersionRetryInvocation = [&]() {
+        return shardVersionRetry(
+            operationContext(),
+            catalogCache,
+            nss(),
+            desc(),
+            [&]() {
+                if (++tries < 2 * altMaxNumRetries) {
+                    uassert(StaleDbRoutingVersion(nss().dbName(),
+                                                  DatabaseVersion(UUID::gen(), Timestamp(2, 3)),
+                                                  DatabaseVersion(UUID::gen(), Timestamp(5, 3))),
+                            "testX",
+                            false);
+                }
+                return 10;
+            },
+            altMaxNumRetries);
+    };
+
+    ASSERT_THROWS_CODE(shardVersionRetryInvocation(), DBException, ErrorCodes::StaleDbVersion);
+}
+
 TEST_F(SyncShardVersionRetry, ShouldNotBreakOnTimeseriesBucketNamespaceRewrite) {
     CancellationSource cancellationSource;
     auto token = cancellationSource.token();
     auto catalogCache = Grid::get(service())->catalogCache();
 
-    int tries = 0;
+    size_t tries = 0;
     auto retVal = shardVersionRetry(operationContext(), catalogCache, nss(), desc(), [&]() {
         if (++tries < 5) {
             const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));

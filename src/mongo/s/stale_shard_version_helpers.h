@@ -64,7 +64,8 @@ void checkErrorStatusAndMaxRetries(const Status& status,
                                    const NamespaceString& nss,
                                    CatalogCache* catalogCache,
                                    StringData taskDescription,
-                                   size_t numAttempts);
+                                   size_t numAttempts,
+                                   size_t altMaxNumRetries = 0);
 
 /**
  * Performs necessary cache invalidations based on the error status.
@@ -75,9 +76,10 @@ void checkErrorStatusAndMaxRetries(const StatusWith<T>& status,
                                    const NamespaceString& nss,
                                    CatalogCache* catalogCache,
                                    StringData taskDescription,
-                                   size_t numAttempts) {
+                                   size_t numAttempts,
+                                   size_t altMaxNumRetries) {
     return checkErrorStatusAndMaxRetries(
-        status.getStatus(), nss, catalogCache, taskDescription, numAttempts);
+        status.getStatus(), nss, catalogCache, taskDescription, numAttempts, altMaxNumRetries);
 }
 
 }  // namespace shard_version_retry
@@ -87,13 +89,16 @@ void checkErrorStatusAndMaxRetries(const StatusWith<T>& status,
  * encountered, the CatalogCache is marked for refresh and 'callback' is retried. When retried,
  * 'callback' will trigger a refresh of the CatalogCache and block until it's done when it next
  * consults the CatalogCache.
+ * If retryLimitForTesting is non-zero, it is used as the maximum number of times to retry; if it is
+ * zero, kMaxNumStaleVersionRetries is used instead.
  */
 template <typename F>
 auto shardVersionRetry(OperationContext* opCtx,
                        CatalogCache* catalogCache,
                        NamespaceString nss,
                        StringData taskDescription,
-                       const F& callbackFn) {
+                       const F& callbackFn,
+                       size_t altMaxNumRetries = 0) {
     size_t numAttempts = 0;
 
     while (true) {
@@ -101,7 +106,7 @@ auto shardVersionRetry(OperationContext* opCtx,
             return callbackFn();
         } catch (const DBException& ex) {
             shard_version_retry::checkErrorStatusAndMaxRetries(
-                ex.toStatus(), nss, catalogCache, taskDescription, ++numAttempts);
+                ex.toStatus(), nss, catalogCache, taskDescription, ++numAttempts, altMaxNumRetries);
         }
     }
 }
