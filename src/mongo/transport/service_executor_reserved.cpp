@@ -230,7 +230,6 @@ void ServiceExecutorReserved::_runOnDataAvailable(const std::shared_ptr<Session>
                                                   Task task) {
     invariant(session);
     _schedule([this, session, callback = std::move(task)](Status status) {
-        yieldIfAppropriate();
         if (!status.isOK()) {
             callback(std::move(status));
             return;

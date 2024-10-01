@@ -40,6 +40,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/processinfo.h"
 
@@ -92,6 +93,8 @@ public:
     }
 
     void lastTearDown() {
+        unittest::MinimumLoggedSeverityGuard suppressNetworkInfoGuard{
+            logv2::LogComponent::kNetwork, logv2::LogSeverity::Warning()};
         (void)executor()->shutdown(Hours{1});
         setGlobalServiceContext({});
     }

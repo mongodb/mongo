@@ -790,7 +790,7 @@ Future<void> SessionWorkflow::Impl::_doOneIteration() {
 
 void SessionWorkflow::Impl::_scheduleIteration() try {
     _work = nullptr;
-    taskRunner()->schedule(_captureContext([&](Status status) {
+    auto runOneIteration = _captureContext([&](Status status) {
         if (MONGO_unlikely(!status.isOK())) {
             _cleanupSession(status);
             return;
@@ -798,15 +798,20 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
 
         try {
             // All available service executors use dedicated threads, so it's okay to
-            // run eager futures in an ordinary loop to bypass scheduler overhead.
-            while (true) {
+            // run eager futures in an ordinary loop to bypass scheduler overhead. Loop
+            // while we have `_nextWork` in case there have been synthetic exhaust
+            // requests produced on this iteration.
+            do {
                 _doOneIteration().get();
                 _work = nullptr;
-            }
+            } while (_nextWork);
+            _scheduleIteration();
         } catch (const DBException& ex) {
             _onLoopError(ex.toStatus());
         }
-    }));
+    });
+
+    taskRunner()->runOnDataAvailable(session(), std::move(runOneIteration));
 } catch (const DBException& ex) {
     auto error = ex.toStatus();
     LOGV2_WARNING_OPTIONS(22993,
