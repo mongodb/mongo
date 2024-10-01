@@ -117,23 +117,26 @@ public:
             std::unique_ptr<MatchExpression> filter = list_databases::getFilter(cmd, opCtx, ns());
 
             std::vector<DatabaseName> dbNames;
-            StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
             {
-                Lock::GlobalLock lk(opCtx, MODE_IS);
+                // Read lock free through a consistent in-memory catalog and storage snapshot.
+                AutoReadLockFree lockFreeReadBlock(opCtx);
+                auto catalog = CollectionCatalog::get(opCtx);
+
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
-
-                dbNames = storageEngine->listDatabases(cmd.getDbName().tenantId());
+                dbNames =
+                    catalog->getAllConsistentDbNamesForTenant(opCtx, cmd.getDbName().tenantId());
             }
             std::vector<ListDatabasesReplyItem> items;
-            int64_t totalSize = list_databases::setReplyItems(opCtx,
-                                                              dbNames,
-                                                              items,
-                                                              storageEngine,
-                                                              nameOnly,
-                                                              filter,
-                                                              false /* setTenantId */,
-                                                              authorizedDatabases);
+            int64_t totalSize =
+                list_databases::setReplyItems(opCtx,
+                                              dbNames,
+                                              items,
+                                              getGlobalServiceContext()->getStorageEngine(),
+                                              nameOnly,
+                                              filter,
+                                              false /* setTenantId */,
+                                              authorizedDatabases);
 
             ListDatabasesReply reply(items);
             if (!nameOnly) {

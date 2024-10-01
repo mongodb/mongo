@@ -112,22 +112,23 @@ public:
             std::unique_ptr<MatchExpression> filter = list_databases::getFilter(cmd, opCtx, ns());
 
             std::vector<DatabaseName> dbNames;
-            StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
             {
-                Lock::GlobalLock lk(opCtx, MODE_IS);
-                dbNames = storageEngine->listDatabases();
+                // Read lock free through a consistent in-memory catalog and storage snapshot.
+                AutoReadLockFree lockFreeReadBlock(opCtx);
+                auto catalog = CollectionCatalog::get(opCtx);
+                dbNames = catalog->getAllConsistentDbNames(opCtx);
             }
 
             std::vector<ListDatabasesForAllTenantsReplyItem> items;
-            int64_t totalSize = list_databases::setReplyItems(opCtx,
-                                                              dbNames,
-                                                              items,
-                                                              storageEngine,
-                                                              nameOnly,
-                                                              filter,
-                                                              true /* setTenantId */,
-                                                              false /* authorizedDatabases*/);
-
+            int64_t totalSize =
+                list_databases::setReplyItems(opCtx,
+                                              dbNames,
+                                              items,
+                                              getGlobalServiceContext()->getStorageEngine(),
+                                              nameOnly,
+                                              filter,
+                                              true /* setTenantId */,
+                                              false /* authorizedDatabases*/);
             Reply reply(items);
             if (!nameOnly) {
                 reply.setTotalSize(totalSize);
