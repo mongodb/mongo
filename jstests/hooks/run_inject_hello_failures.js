@@ -1,5 +1,3 @@
-import {getFailPointName} from "jstests/libs/fail_point_util.js";
-
 // Interval between test loops.
 const kTestLoopPeriodMs = 20 * 1000;
 
@@ -76,16 +74,14 @@ function injectReduceRefreshPeriod(connection) {
 function injectHelloFail(connection) {
     jsTestLog(`Inject Hello fail to connection ${connection}`);
     const adminDB = getAdminDB(connection);
-    const fpName = getFailPointName("shardWaitInHello", connection.getMaxWireVersion());
     assert.commandWorked(adminDB.runCommand({
-        configureFailPoint: fpName,
+        configureFailPoint: "shardWaitInHello",
         mode: "alwaysOn",
         data: {internalClient: 1}  // No effect if client is mongo shell.
     }));
-    const prefixedName = `failpoint.${fpName}`;
-    const res = adminDB.runCommand({getParameter: 1, [prefixedName]: 1});
+    const res = adminDB.runCommand({getParameter: 1, "failpoint.shardWaitInHello": 1});
     assert.commandWorked(res);
-    assert.eq(res[`failpoint.${fpName}`].mode, 1);
+    assert.eq(res["failpoint.shardWaitInHello"].mode, 1);
 }
 
 function freeze(connection) {

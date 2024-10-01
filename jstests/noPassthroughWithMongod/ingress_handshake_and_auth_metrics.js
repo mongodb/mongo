@@ -3,7 +3,6 @@
  *
  * @tags: [requires_fcv_70]
  */
-import {getFailPointName} from "jstests/libs/fail_point_util.js";
 import {ingressHandshakeMetricsTest} from "jstests/libs/ingress_handshake_metrics_helpers.js";
 
 let runTest = (connectionHealthLoggingOn) => {
@@ -18,7 +17,7 @@ let runTest = (connectionHealthLoggingOn) => {
         helloProcessingDelayMillis: 50,
         helloResponseDelayMillis: 100,
         rootCredentials: rootCreds,
-        helloFailPointName: getFailPointName("shardWaitInHello", conn.getMaxWireVersion()),
+        helloFailPointName: "shardWaitInHello",
     });
 
     jsTestLog("Connecting to mongod and running the test.");

@@ -16,7 +16,6 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
-import {getFailPointName} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: {rs0: {nodes: 1}}});
@@ -29,8 +28,7 @@ awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: true, ismaster: true});
 // Turn on the shardWaitInHello failpoint. This will cause the primary node to cease sending "hello"
 // responses and the RSM should mark the node as down
 jsTestLog("Turning on shardWaitInHello failpoint. Node should stop sending hello responses.");
-const helloFailpoint = configureFailPoint(
-    rsPrimary, getFailPointName("shardWaitInHello", rsPrimary.getMaxWireVersion()));
+const helloFailpoint = configureFailPoint(rsPrimary, "shardWaitInHello");
 awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: false, ismaster: false});
 helloFailpoint.off();
 

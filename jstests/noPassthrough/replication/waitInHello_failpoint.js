@@ -1,7 +1,6 @@
 // Tests the shardWaitInHello and routerWaitInHello failpoints.
 // @tags: [requires_replication]
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {getFailPointName} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -31,16 +30,15 @@ function runTest(conn, fpName) {
 
 const standalone = MongoRunner.runMongod({});
 assert.neq(null, standalone, "mongod was unable to start up");
-runTest(standalone, getFailPointName("shardWaitInHello", standalone.getMaxWireVersion()));
+runTest(standalone, "shardWaitInHello");
 MongoRunner.stopMongod(standalone);
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
-runTest(rst.getPrimary(),
-        getFailPointName("shardWaitInHello", rst.getPrimary().getMaxWireVersion()));
+runTest(rst.getPrimary(), "shardWaitInHello");
 rst.stopSet();
 
 const st = new ShardingTest({mongos: 1, shards: [{nodes: 1}], config: 1});
-runTest(st.s, getFailPointName("routerWaitInHello", st.s.getMaxWireVersion()));
+runTest(st.s, "routerWaitInHello");
 st.stop();

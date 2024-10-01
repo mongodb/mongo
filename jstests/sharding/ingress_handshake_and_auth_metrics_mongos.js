@@ -8,7 +8,6 @@
  *   embedded_router_incompatible,
  * ]
  */
-import {getFailPointName} from "jstests/libs/fail_point_util.js";
 import {ingressHandshakeMetricsTest} from "jstests/libs/ingress_handshake_metrics_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -23,7 +22,7 @@ let runTest = (connectionHealthLoggingOn) => {
         postAuthDelayMillis: 100,
         helloProcessingDelayMillis: 50,
         helloResponseDelayMillis: 100,
-        helloFailPointName: getFailPointName("routerWaitInHello", conn.getMaxWireVersion()),
+        helloFailPointName: "routerWaitInHello",
     });
 
     jsTestLog("Connecting to mongos and running the test.");

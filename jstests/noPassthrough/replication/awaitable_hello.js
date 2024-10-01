@@ -3,7 +3,7 @@
  * isMaster and ismaster.
  * @tags: [requires_replication]
  */
-import {configureFailPoint, getFailPointName} from "jstests/libs/fail_point_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -200,11 +200,10 @@ function runTest(db, cmd, logFailpoint, failpointName) {
 
 // Set command log verbosity to 0 to avoid logging *all* commands in the "slow query" log.
 const conn = MongoRunner.runMongod({setParameter: {logComponentVerbosity: tojson({command: 0})}});
-const shardWaitInHello = getFailPointName("shardWaitInHello", conn.getMaxWireVersion());
 assert.neq(null, conn, "mongod was unable to start up");
-runTest(conn.getDB("admin"), "hello", "waitForHelloCommandLogged", shardWaitInHello);
-runTest(conn.getDB("admin"), "isMaster", "waitForIsMasterCommandLogged", shardWaitInHello);
-runTest(conn.getDB("admin"), "ismaster", "waitForIsMasterCommandLogged", shardWaitInHello);
+runTest(conn.getDB("admin"), "hello", "waitForHelloCommandLogged", "shardWaitInHello");
+runTest(conn.getDB("admin"), "isMaster", "waitForIsMasterCommandLogged", "shardWaitInHello");
+runTest(conn.getDB("admin"), "ismaster", "waitForIsMasterCommandLogged", "shardWaitInHello");
 MongoRunner.stopMongod(conn);
 
 const replTest = new ReplSetTest(
@@ -212,15 +211,15 @@ const replTest = new ReplSetTest(
 replTest.startSet();
 replTest.initiate();
 runTest(
-    replTest.getPrimary().getDB("admin"), "hello", "waitForHelloCommandLogged", shardWaitInHello);
+    replTest.getPrimary().getDB("admin"), "hello", "waitForHelloCommandLogged", "shardWaitInHello");
 runTest(replTest.getPrimary().getDB("admin"),
         "isMaster",
         "waitForIsMasterCommandLogged",
-        shardWaitInHello);
+        "shardWaitInHello");
 runTest(replTest.getPrimary().getDB("admin"),
         "ismaster",
         "waitForIsMasterCommandLogged",
-        shardWaitInHello);
+        "shardWaitInHello");
 replTest.stopSet();
 
 const st = new ShardingTest({
@@ -229,8 +228,7 @@ const st = new ShardingTest({
     config: 1,
     other: {mongosOptions: {setParameter: {logComponentVerbosity: tojson({command: 0})}}}
 });
-const fpName = getFailPointName("routerWaitInHello", st.s.getMaxWireVersion());
-runTest(st.s.getDB("admin"), "hello", "waitForHelloCommandLogged", fpName);
-runTest(st.s.getDB("admin"), "isMaster", "waitForIsMasterCommandLogged", fpName);
-runTest(st.s.getDB("admin"), "ismaster", "waitForIsMasterCommandLogged", fpName);
+runTest(st.s.getDB("admin"), "hello", "waitForHelloCommandLogged", "routerWaitInHello");
+runTest(st.s.getDB("admin"), "isMaster", "waitForIsMasterCommandLogged", "routerWaitInHello");
+runTest(st.s.getDB("admin"), "ismaster", "waitForIsMasterCommandLogged", "routerWaitInHello");
 st.stop();

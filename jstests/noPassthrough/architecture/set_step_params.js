@@ -3,7 +3,7 @@
  */
 
 import {assertHasConnPoolStats, launchFinds} from "jstests/libs/conn_pool_helpers.js";
-import {configureFailPointForRS, getFailPointName} from "jstests/libs/fail_point_util.js";
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kDbName = 'test';
@@ -33,7 +33,6 @@ const cfg = primary.getDB('local').system.replset.findOne();
 const allHosts = cfg.members.map(x => x.host);
 const mongosDB = mongos.getDB(kDbName);
 const primaryOnly = [primary.name];
-const waitInHelloFpName = getFailPointName("shardWaitInHello", mongos.getMaxWireVersion());
 
 var threads = [];
 var currentCheckNum = 0;
@@ -133,7 +132,7 @@ runSubTest("MaxConnecting", function() {
                                 "waitInFindBeforeMakingBatch",
                                 {shouldCheckForInterrupt: true, nss: kDbName + ".test"});
     const fpHelloRs =
-        configureFailPointForRS(st.rs0.nodes, waitInHelloFpName, {shouldCheckForInterrupt: true});
+        configureFailPointForRS(st.rs0.nodes, "shardWaitInHello", {shouldCheckForInterrupt: true});
     dropConnections();
 
     // Go to the limit of maxConnecting, so we're stuck here
@@ -202,7 +201,7 @@ runSubTest("Timeouts", function() {
 
     // Block refreshes and wait for the toRefresh timeout
     const fpHelloRs =
-        configureFailPointForRS(st.rs0.nodes, waitInHelloFpName, {shouldCheckForInterrupt: true});
+        configureFailPointForRS(st.rs0.nodes, "shardWaitInHello", {shouldCheckForInterrupt: true});
     sleep(toRefreshTimeoutMS);
 
     // Confirm that we're in pending for all of our conns
