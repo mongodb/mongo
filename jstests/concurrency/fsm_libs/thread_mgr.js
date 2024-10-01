@@ -111,7 +111,8 @@ export const ThreadManager = function(clusterOptions) {
                     clusterOptions: clusterOptions,
                     seed: Random.randInt(1e13),  // contains range of Date.getTime()
                     errorLatch: errorLatch,
-                    sessionOptions: options.sessionOptions
+                    sessionOptions: options.sessionOptions,
+                    numThreads: numThreads,
                 };
 
                 var t = makeThread(workloads, args, options);

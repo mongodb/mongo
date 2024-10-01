@@ -230,7 +230,9 @@ export const workerThread = (function() {
                     startState: config.startState,
                     states: config.states,
                     tid: args.tid,
-                    transitions: config.transitions
+                    transitions: config.transitions,
+                    errorLatch: args.errorLatch,
+                    numThreads: args.numThreads,
                 };
             }
 
@@ -247,6 +249,7 @@ export const workerThread = (function() {
                 await run(configs);
                 return {ok: 1};
             } catch (e) {
+                jsTest.log('Thread failed. Other threads will stop execution on next iteration.');
                 args.errorLatch.countDown();
                 return {
                     ok: 0,

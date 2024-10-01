@@ -30,6 +30,8 @@ export var fsm = (function() {
     //                    { stateName: { nextState1: probability,
     //                                   nextState2: ... } }
     // args.iterations = number of iterations to run the FSM for
+    // args.errorLatch = the latch that a thread count downs when it errors.
+    // args.numThreads = total number of threads running.
     async function runFSM(args) {
         if (TestData.runInsideTransaction) {
             let overridePath = "jstests/libs/override_methods/";
@@ -105,6 +107,10 @@ export var fsm = (function() {
         }
 
         for (var i = 0; i < args.iterations; ++i) {
+            if (args.errorLatch.getCount() < args.numThreads) {
+                break;
+            }
+
             var fn = args.states[currentState];
 
             assert.eq('function', typeof fn, 'states.' + currentState + ' is not a function');
