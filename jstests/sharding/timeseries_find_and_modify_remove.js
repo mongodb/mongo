@@ -269,23 +269,27 @@ setUpShardedCluster();
             rootStage: "TS_MODIFY",
             bucketFilter: makeBucketFilter({
                 $and: [
+                    // The bucket's _id encodes the time info and so the bucket filter will include
+                    // the _id range filter.
+                    {"_id": {"$lte": ObjectId("43b71b80ffffffffffffffff")}},
+                    {"_id": {"$gte": ObjectId("43b70d700000000000000000")}},
                     {
-                        [`control.min.${timeFieldName}`]:
-                            {$_internalExprLte: doc6_c_f105[timeFieldName]}
+                        [`control.max.${timeFieldName}`]:
+                            {$_internalExprGte: doc6_c_f105[timeFieldName]}
                     },
                     // -1 hour
                     {
                         [`control.min.${timeFieldName}`]:
                             {$_internalExprGte: ISODate("2005-12-31T23:00:00Z")}
                     },
-                    {
-                        [`control.max.${timeFieldName}`]:
-                            {$_internalExprGte: doc6_c_f105[timeFieldName]}
-                    },
                     // +1 hour
                     {
                         [`control.max.${timeFieldName}`]:
                             {$_internalExprLte: ISODate("2006-01-01T01:00:00Z")}
+                    },
+                    {
+                        [`control.min.${timeFieldName}`]:
+                            {$_internalExprLte: doc6_c_f105[timeFieldName]}
                     },
                 ]
             }),
@@ -310,23 +314,27 @@ setUpShardedCluster();
             rootStage: "TS_MODIFY",
             bucketFilter: makeBucketFilter({
                 $and: [
+                    // The bucket's _id encodes the time info and so the bucket filter will include
+                    // the _id range filter.
+                    {"_id": {"$lte": ObjectId("45984f00ffffffffffffffff")}},
+                    {"_id": {"$gte": ObjectId("459840f00000000000000000")}},
                     {
-                        [`control.min.${timeFieldName}`]:
-                            {$_internalExprLte: doc7_c_f106[timeFieldName]}
+                        [`control.max.${timeFieldName}`]:
+                            {$_internalExprGte: doc7_c_f106[timeFieldName]}
                     },
                     // -1 hour
                     {
                         [`control.min.${timeFieldName}`]:
                             {$_internalExprGte: ISODate("2006-12-31T23:00:00Z")}
                     },
-                    {
-                        [`control.max.${timeFieldName}`]:
-                            {$_internalExprGte: doc7_c_f106[timeFieldName]}
-                    },
                     // +1 hour
                     {
                         [`control.max.${timeFieldName}`]:
                             {$_internalExprLte: ISODate("2007-01-01T01:00:00Z")}
+                    },
+                    {
+                        [`control.min.${timeFieldName}`]:
+                            {$_internalExprLte: doc7_c_f106[timeFieldName]}
                     },
                 ]
             }),

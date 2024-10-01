@@ -159,6 +159,9 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
 
                 auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), origNs);
                 expCtx->collationMatchesDefault = collationMatchesDefault;
+                // We can't know if there won't be extended range values in the collection, so
+                // assume there will be.
+                expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
 
                 // partialFilterExpression is evaluated against a collection, so there are no
                 // computed fields.

@@ -62,8 +62,9 @@ import {
                 returnDoc: doc_a_early_time,
                 bucketFilter: makeBucketFilter({
                     $and: [
-                        {"control.min.time": {$_internalExprLt: startingTime}},
+                        {_id: {$lt: ObjectId("63e058180000000000000000")}},
                         {"control.max.time": {$_internalExprLt: ISODate("2023-02-06T01:45:00Z")}},
+                        {"control.min.time": {$_internalExprLt: startingTime}},
                     ]
                 }),
                 residualFilter: {},
@@ -88,6 +89,7 @@ import {
                 returnDoc: doc_a_late_time,
                 bucketFilter: makeBucketFilter({
                     $and: [
+                        {_id: {$gt: ObjectId("63e05494ffffffffffffffff")}},
                         {"control.max.time": {$_internalExprGt: startingTime}},
                         {"control.min.time": {$_internalExprGte: startingTime}},
                     ]
@@ -116,6 +118,7 @@ import {
                 returnDoc: doc_a_latest_time,
                 bucketFilter: makeBucketFilter({
                     $and: [
+                        {_id: {$gte: ObjectId("63e058180000000000000000")}},
                         {"control.max.time": {$_internalExprGte: times[3]}},
                         {"control.min.time": {$_internalExprGte: times[3]}},
                     ]
@@ -159,22 +162,15 @@ import {
                 returnDoc: doc_b_start_time,
                 bucketFilter: makeBucketFilter({
                     $and: [
+                        {_id: {$lt: ObjectId("63e05b9c0000000000000000")}},
+                        {_id: {$gte: ObjectId("63e054940000000000000000")}},
+                        {"control.max.time": {$_internalExprGte: times[1]}},
+                        {"control.min.time": {$_internalExprGte: times[1]}},
                         {
-                            $and: [
-                                {"control.min.time": {$_internalExprLt: times[3]}},
-                                {
-                                    "control.max.time":
-                                        {$_internalExprLt: new Date(times[3].getTime() + offset)}
-                                },
-
-                            ]
+                            "control.max.time":
+                                {$_internalExprLt: new Date(times[3].getTime() + offset)}
                         },
-                        {
-                            $and: [
-                                {"control.max.time": {$_internalExprGte: times[1]}},
-                                {"control.min.time": {$_internalExprGte: times[1]}},
-                            ]
-                        }
+                        {"control.min.time": {$_internalExprLt: times[3]}},
                     ]
                 }),
                 residualFilter: {},
@@ -200,6 +196,7 @@ import {
                 returnDoc: doc_a_latest_time,
                 bucketFilter: makeBucketFilter({meta: {$eq: 1}}, {
                     $and: [
+                        {_id: {$gte: ObjectId("63e054940000000000000000")}},
                         {"control.max.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
                         {"control.min.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
                     ]
@@ -248,11 +245,12 @@ import {
                 nDeleted: 1,
                 bucketFilter: makeBucketFilter({
                     $and: [
-                        {"control.min.time": {$_internalExprLt: times[2]}},
+                        {_id: {$lt: ObjectId("63e059da0000000000000000")}},
                         {
                             "control.max.time":
                                 {$_internalExprLt: new Date(times[2].getTime() + offset)}
                         },
+                        {"control.min.time": {$_internalExprLt: times[2]}},
                     ]
                 }),
                 residualFilter: {[timeFieldName]: {$lt: times[2]}},
@@ -273,10 +271,12 @@ import {
                 nDeleted: 1,
                 bucketFilter: makeBucketFilter({
                     $and: [
-                        {"control.min.time": {$_internalExprLte: ISODate("2023-02-06T01:37:30Z")}},
-                        {"control.min.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
+                        {_id: {$lte: ObjectId("63e059daffffffffffffffff")}},
+                        {_id: {$gte: ObjectId("63e056560000000000000000")}},
                         {"control.max.time": {$_internalExprGte: ISODate("2023-02-06T01:37:30Z")}},
+                        {"control.min.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
                         {"control.max.time": {$_internalExprLte: ISODate("2023-02-06T01:52:30Z")}},
+                        {"control.min.time": {$_internalExprLte: ISODate("2023-02-06T01:37:30Z")}},
                     ]
                 }),
                 residualFilter: {[timeFieldName]: {$eq: times[2]}},
@@ -297,6 +297,7 @@ import {
                 nDeleted: 1,
                 bucketFilter: makeBucketFilter({
                     $and: [
+                        {_id: {$gte: ObjectId("63e058180000000000000000")}},
                         {"control.max.time": {$_internalExprGte: times[3]}},
                         {"control.min.time": {$_internalExprGte: times[3]}},
                     ]
