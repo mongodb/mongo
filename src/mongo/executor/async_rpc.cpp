@@ -133,21 +133,21 @@ public:
                 })
             .then([targeter](TaskExecutor::RemoteCommandCallbackArgs cbargs) {
                 auto r = cbargs.response;
-                auto s = makeErrorIfNeeded(r, r.target);
+                auto s = makeErrorIfNeeded(r);
                 // Update targeter for errors.
-                if (!s.isOK() && s.code() == ErrorCodes::RemoteCommandExecutionError && r.target) {
+                if (!s.isOK() && s.code() == ErrorCodes::RemoteCommandExecutionError) {
                     auto extraInfo = s.extraInfo<AsyncRPCErrorInfo>();
                     if (extraInfo->isLocal()) {
-                        targeter->onRemoteCommandError(*(r.target), extraInfo->asLocal()).get();
+                        targeter->onRemoteCommandError(r.target, extraInfo->asLocal()).get();
                     } else {
                         targeter
-                            ->onRemoteCommandError(*(r.target),
+                            ->onRemoteCommandError(r.target,
                                                    extraInfo->asRemote().getRemoteCommandResult())
                             .get();
                     }
                 }
                 uassertStatusOK(s);
-                return AsyncRPCInternalResponse{r.data, r.target.get(), *r.elapsed};
+                return AsyncRPCInternalResponse{r.data, r.target, *r.elapsed};
             });
     }
 };

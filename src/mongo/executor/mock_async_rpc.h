@@ -153,19 +153,17 @@ public:
                 stdx::lock_guard lg{_m};
                 _requests.emplace_back(cmdBSON, dbName, targets[0], std::move(p));
                 _hasRequestsCV.notify_one();
-                return std::move(f).onCompletion([targetUsed =
-                                                      targets[0]](StatusWith<BSONObj> resp) {
-                    if (!resp.isOK()) {
-                        uassertStatusOK(Status{AsyncRPCErrorInfo(resp.getStatus(), targetUsed),
-                                               "Remote command execution failed"});
-                    }
-                    Status maybeError(
-                        detail::makeErrorIfNeeded(executor::RemoteCommandResponse(
-                                                      targetUsed, resp.getValue(), Microseconds(1)),
-                                                  targetUsed));
-                    uassertStatusOK(maybeError);
-                    return detail::AsyncRPCInternalResponse{resp.getValue(), targetUsed};
-                });
+                return std::move(f).onCompletion(
+                    [targetUsed = targets[0]](StatusWith<BSONObj> resp) {
+                        if (!resp.isOK()) {
+                            uassertStatusOK(Status{AsyncRPCErrorInfo(resp.getStatus(), targetUsed),
+                                                   "Remote command execution failed"});
+                        }
+                        Status maybeError(detail::makeErrorIfNeeded(executor::RemoteCommandResponse(
+                            targetUsed, resp.getValue(), Microseconds(1))));
+                        uassertStatusOK(maybeError);
+                        return detail::AsyncRPCInternalResponse{resp.getValue(), targetUsed};
+                    });
             });
     }
 
@@ -281,8 +279,7 @@ public:
                                            "Remote command execution failed"});
                 }
                 Status maybeError(detail::makeErrorIfNeeded(
-                    executor::RemoteCommandResponse(targets[0], ans.getValue(), Microseconds(1)),
-                    targets[0]));
+                    executor::RemoteCommandResponse(targets[0], ans.getValue(), Microseconds(1))));
                 uassertStatusOK(maybeError);
                 return detail::AsyncRPCInternalResponse{ans.getValue(), targets[0]};
             });

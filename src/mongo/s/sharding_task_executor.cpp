@@ -191,11 +191,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         if (!args.response.isOK()) {
             HostAndPort target;
 
-            if (args.response.target) {
-                target = *args.response.target;
-            } else {
-                target = hosts;
-            }
+            target = args.response.target;
 
             auto shard = grid->shardRegistry()->getShardForHostNoReload(target);
 
@@ -225,9 +221,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             return;
         }
 
-        invariant(args.response.target);
-
-        auto target = *args.response.target;
+        auto target = args.response.target;
 
         auto shard = grid->shardRegistry()->getShardForHostNoReload(target);
 

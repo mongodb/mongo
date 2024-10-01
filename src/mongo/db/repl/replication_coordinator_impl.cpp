@@ -2965,7 +2965,7 @@ BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     // provide additional management when trying to cancel the request with differing clients.
     executor::RemoteCommandRequest request(primaryHostAndPort, dbName, cmdObj, nullptr);
     executor::RemoteCommandResponse cbkResponse(
-        Status{ErrorCodes::InternalError, "Uninitialized value"});
+        primaryHostAndPort, Status{ErrorCodes::InternalError, "Uninitialized value"});
 
     // Schedule the remote command.
     auto&& scheduleResult = _replExecutor->scheduleRemoteCommand(

@@ -152,9 +152,10 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
             }
             return false;
         }))) {
-        return ResponseStatus{BSON("code" << failPointErrorCode << "ok" << false << "errmsg"
-                                          << "fail point"),
-                              Milliseconds(1)};
+        return ResponseStatus::make_forTest(BSON("code" << failPointErrorCode << "ok" << false
+                                                        << "errmsg"
+                                                        << "fail point"),
+                                            Milliseconds(1));
     }
 
     if (isSelfShard) {
@@ -195,7 +196,9 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
             // 'ResponseStatus' is the response format of a remote request sent over the network
             // so we simulate that format manually here, since we sent the request over the
             // loopback.
-            return ResponseStatus{replyOpMsg.body.getOwned(), _executor->now() - start};
+            return ResponseStatus{HostAndPort("localhost", serverGlobalParams.port),
+                                  replyOpMsg.body.getOwned(),
+                                  _executor->now() - start};
         });
     }
 

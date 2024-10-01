@@ -442,7 +442,7 @@ void remoteCommandFailedEarly(const TaskExecutor::CallbackArgs& cbData,
                               const TaskExecutor::RemoteCommandCallbackFn& cb,
                               const RemoteCommandRequest& request) {
     invariant(!cbData.status.isOK());
-    cb({cbData.executor, cbData.myHandle, request, {boost::none, cbData.status}});
+    cb({cbData.executor, cbData.myHandle, request, {request.target, cbData.status}});
 }
 }  // namespace
 

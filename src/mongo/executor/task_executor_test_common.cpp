@@ -607,7 +607,10 @@ COMMON_EXECUTOR_TEST(ScheduleRemoteCommand) {
     net->enterNetwork();
     ASSERT(net->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(noi, net->now(), {ErrorCodes::NoSuchKey, "I'm missing"});
+    net->scheduleResponse(
+        noi,
+        net->now(),
+        RemoteCommandResponse::make_forTest(Status(ErrorCodes::NoSuchKey, "I'm missing")));
     net->runReadyNetworkOperations();
     ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
@@ -812,9 +815,10 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandIsResolvedWhenMoreToComeFlagIsF
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     const Date_t startTime = net->now();
     std::list responses = {
-        std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
+        std::make_pair(startTime,
+                       RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), true)),
         std::make_pair(startTime + Milliseconds(2),
-                       RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
+                       RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false))};
     for (auto& [when, response] : responses) {
         net->scheduleResponse(noi, when, response);
     }
@@ -853,9 +857,10 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandIsResolvedWhenCanceled) {
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     const Date_t startTime = net->now();
     std::list responses = {
-        std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
+        std::make_pair(startTime,
+                       RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), true)),
         std::make_pair(startTime + Milliseconds(2),
-                       RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
+                       RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false))};
     for (auto& [when, response] : responses) {
         net->scheduleResponse(noi, when, response);
     }
@@ -906,11 +911,13 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandSwallowsErrorsWhenMoreToComeFla
     ASSERT(net->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     const Date_t startTime = net->now();
-    RemoteCommandResponse error_response{ErrorCodes::NoSuchKey, "I'm missing"};
+    RemoteCommandResponse error_response =
+        RemoteCommandResponse::make_forTest(Status(ErrorCodes::NoSuchKey, "I'm missing"));
     error_response.moreToCome = true;
-    std::list responses = {std::make_pair(startTime, error_response),
-                           std::make_pair(startTime + Milliseconds(2),
-                                          RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
+    std::list responses = {
+        std::make_pair(startTime, error_response),
+        std::make_pair(startTime + Milliseconds(2),
+                       RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false))};
     for (auto& [when, response] : responses) {
         net->scheduleResponse(noi, when, response);
     }
@@ -948,7 +955,8 @@ COMMON_EXECUTOR_TEST(
     ASSERT(net->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     const Date_t startTime = net->now();
-    net->scheduleResponse(noi, startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), false));
+    net->scheduleResponse(
+        noi, startTime, RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false));
     net->runUntil(startTime + Milliseconds(1));
 
     ASSERT_EQUALS(numTimesCallbackCalled, 1);
@@ -988,9 +996,10 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWhenMoreToComeF
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     const Date_t startTime = net->now();
     std::list responses = {
-        std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
+        std::make_pair(startTime,
+                       RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), true)),
         std::make_pair(startTime + Milliseconds(2),
-                       RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
+                       RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false))};
     for (auto& [when, response] : responses) {
         net->scheduleResponse(noi, when, response);
     }
@@ -1033,7 +1042,10 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWhenErrorRespon
     // Respond to the request.
     ASSERT(net->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(noi, net->now(), {ErrorCodes::NoSuchKey, "I'm missing"});
+    net->scheduleResponse(
+        noi,
+        net->now(),
+        RemoteCommandResponse::make_forTest(Status(ErrorCodes::NoSuchKey, "I'm missing")));
     net->runReadyNetworkOperations();
 
     ASSERT_EQUALS(numTimesCallbackCalled, 1);
@@ -1073,11 +1085,13 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureSwallowsErrorsWhenMoreToC
     // Respond to the request.
     ASSERT(net->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    RemoteCommandResponse error_response{ErrorCodes::NoSuchKey, "I'm missing"};
+    RemoteCommandResponse error_response =
+        RemoteCommandResponse::make_forTest(Status(ErrorCodes::NoSuchKey, "I'm missing"));
     error_response.moreToCome = true;
-    auto responses = {std::make_pair(startTime, error_response),
-                      std::make_pair(startTime + Milliseconds(2),
-                                     RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
+    auto responses = {
+        std::make_pair(startTime, error_response),
+        std::make_pair(startTime + Milliseconds(2),
+                       RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false))};
     for (auto& [when, response] : responses) {
         net->scheduleResponse(noi, when, response);
     }
@@ -1121,9 +1135,10 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWithErrorOnCanc
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     const Date_t startTime = net->now();
     std::list responses = {
-        std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
+        std::make_pair(startTime,
+                       RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), true)),
         std::make_pair(startTime + Milliseconds(2),
-                       RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
+                       RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false))};
     for (auto& [when, response] : responses) {
         net->scheduleResponse(noi, when, response);
     }

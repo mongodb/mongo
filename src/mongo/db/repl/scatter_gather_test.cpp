@@ -188,18 +188,21 @@ TEST_F(ScatterGatherTest, DeleteAlgorithmAfterItHasCompleted) {
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now() + Seconds(2), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(2),
+                          (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
 
     noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now() + Seconds(2), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(2),
+                          (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
 
     noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now() + Seconds(5), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(5),
+                          (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
 
     net->runUntil(net->now() + Seconds(2));
@@ -228,19 +231,21 @@ TEST_F(ScatterGatherTest, DeleteAlgorithmBeforeItCompletes) {
     net->enterNetwork();
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     net->scheduleResponse(
-        noi, net->now(), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+        noi, net->now(), (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
     // Get and process the response from the first node immediately.
     net->runReadyNetworkOperations();
 
     noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now() + Seconds(2), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(2),
+                          (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
 
     noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now() + Seconds(5), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(5),
+                          (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
 
     sga.reset();
@@ -266,8 +271,9 @@ TEST_F(ScatterGatherTest, DeleteAlgorithmAfterCancel) {
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now() + Seconds(2), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(2),
+                          (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
 
     // Cancel the runner so following responses won't change the result. All pending requests
@@ -364,18 +370,21 @@ TEST_F(ScatterGatherTest, DoNotProcessMoreThanSufficientResponses) {
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now() + Seconds(2), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(2),
+                          (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
 
     noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now() + Seconds(2), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(2),
+                          (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
 
     noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now() + Seconds(5), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(5),
+                          (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
 
     net->runUntil(net->now() + Seconds(2));
@@ -404,15 +413,16 @@ TEST_F(ScatterGatherTest, AlgorithmProcessesCallbackCanceledResponse) {
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now() + Seconds(2), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(2),
+                          (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     ASSERT_FALSE(ranCompletion);
 
     noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi,
-        net->now() + Seconds(2),
-        (RemoteCommandResponse(ErrorCodes::CallbackCanceled, "Testing canceled callback")));
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(2),
+                          (RemoteCommandResponse::make_forTest(
+                              Status(ErrorCodes::CallbackCanceled, "Testing canceled callback"))));
     ASSERT_FALSE(ranCompletion);
 
     // We don't schedule a response from one node to make sure the response with the
@@ -468,7 +478,7 @@ TEST_F(ScatterGatherTest, DoNotCreateCallbacksIfHasSufficientResponsesReturnsTru
         NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         net->scheduleResponse(noi,
                               net->now(),
-                              (RemoteCommandResponse(
+                              (RemoteCommandResponse::make_forTest(
                                     BSON("ok" << 1),
                                     boost::posix_time::milliseconds(10))));
         net->runReadyNetworkOperations();
@@ -477,7 +487,7 @@ TEST_F(ScatterGatherTest, DoNotCreateCallbacksIfHasSufficientResponsesReturnsTru
         noi = net->getNextReadyRequest();
         net->scheduleResponse(noi,
                               net->now(),
-                              (RemoteCommandResponse(
+                              (RemoteCommandResponse::make_forTest(
                                     BSON("ok" << 1),
                                     boost::posix_time::milliseconds(10))));
         net->runReadyNetworkOperations();
@@ -486,7 +496,7 @@ TEST_F(ScatterGatherTest, DoNotCreateCallbacksIfHasSufficientResponsesReturnsTru
         noi = net->getNextReadyRequest();
         net->scheduleResponse(noi,
                               net->now(),
-                              (RemoteCommandResponse(
+                              (RemoteCommandResponse::make_forTest(
                                     BSON("ok" << 1),
                                     boost::posix_time::milliseconds(10))));
         net->runReadyNetworkOperations();
@@ -506,7 +516,7 @@ TEST_F(ScatterGatherTest, SuccessfulScatterGatherViaRun) {
     net->enterNetwork();
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     net->scheduleResponse(
-        noi, net->now(), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+        noi, net->now(), (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     net->runReadyNetworkOperations();
 
     noi = net->getNextReadyRequest();
@@ -515,7 +525,7 @@ TEST_F(ScatterGatherTest, SuccessfulScatterGatherViaRun) {
 
     noi = net->getNextReadyRequest();
     net->scheduleResponse(
-        noi, net->now(), (RemoteCommandResponse(BSON("ok" << 1), Milliseconds(10))));
+        noi, net->now(), (RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(10))));
     net->runReadyNetworkOperations();
     net->exitNetwork();
 

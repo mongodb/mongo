@@ -198,7 +198,7 @@ executor::RemoteCommandResponse initWireVersion(
 
     if (auto status = DBClientSession::appendClientMetadata(applicationName, &bob);
         !status.isOK()) {
-        return status;
+        return {conn->getServerHostAndPort(), status};
     }
 
     conn->getCompressorManager().clientBegin(&bob);
@@ -229,10 +229,11 @@ executor::RemoteCommandResponse initWireVersion(
 
     conn->getCompressorManager().clientFinish(helloObj);
 
-    return executor::RemoteCommandResponse{std::move(helloObj), finish - start};
+    return executor::RemoteCommandResponse{
+        conn->getServerHostAndPort(), std::move(helloObj), finish - start};
 
 } catch (...) {
-    return exceptionToStatus();
+    return {conn->getServerHostAndPort(), exceptionToStatus()};
 }
 
 boost::optional<Milliseconds> clampTimeout(double timeoutInSec) {

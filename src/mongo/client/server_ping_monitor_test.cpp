@@ -148,7 +148,8 @@ protected:
         if (node->isRunning()) {
             const auto opmsg = static_cast<OpMsgRequest>(request);
             const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
-            _net->scheduleSuccessfulResponse(noi, RemoteCommandResponse(reply, Milliseconds(0)));
+            _net->scheduleSuccessfulResponse(
+                noi, RemoteCommandResponse::make_forTest(reply, Milliseconds(0)));
         } else {
             _net->scheduleErrorResponse(noi, Status(ErrorCodes::HostUnreachable, ""));
         }

@@ -83,8 +83,8 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
         executor::RemoteCommandRequest request(
             host, DatabaseName::kAdmin, listDbCommand.toBSON(), opCtx);
 
-        executor::RemoteCommandResponse response =
-            Status(ErrorCodes::InternalError, "Internal error running command");
+        executor::RemoteCommandResponse response(
+            host, Status(ErrorCodes::InternalError, "Internal error running command"));
 
         auto swCallbackHandle = executor->scheduleRemoteCommand(
             request, [&response](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {

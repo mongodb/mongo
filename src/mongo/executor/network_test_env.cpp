@@ -66,12 +66,15 @@ void NetworkTestEnv::onCommands(std::vector<OnCommandFunction> funcs) {
         } else if (resultStatus.isOK()) {
             BSONObjBuilder result(std::move(resultStatus.getValue()));
             CommandHelpers::appendCommandStatusNoThrow(result, resultStatus.getStatus());
-            const RemoteCommandResponse response(result.obj(), Milliseconds(1));
+            const RemoteCommandResponse response =
+                RemoteCommandResponse::make_forTest(result.obj(), Milliseconds(1));
 
             _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
         } else {
             _mockNetwork->scheduleResponse(
-                noi, _mockNetwork->now(), {resultStatus.getStatus(), Milliseconds(0)});
+                noi,
+                _mockNetwork->now(),
+                RemoteCommandResponse::make_forTest(resultStatus.getStatus(), Milliseconds(0)));
         }
     }
 
@@ -91,11 +94,15 @@ void NetworkTestEnv::onCommandWithMetadata(OnCommandWithMetadataFunction func) {
     } else if (cmdResponseStatus.isOK()) {
         BSONObjBuilder result(std::move(cmdResponseStatus.data));
         CommandHelpers::appendCommandStatusNoThrow(result, cmdResponseStatus.status);
-        const RemoteCommandResponse response(result.obj(), Milliseconds(1));
+        const RemoteCommandResponse response =
+            RemoteCommandResponse::make_forTest(result.obj(), Milliseconds(1));
 
         _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
     } else {
-        _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), cmdResponseStatus.status);
+        _mockNetwork->scheduleResponse(
+            noi,
+            _mockNetwork->now(),
+            RemoteCommandResponse::make_forTest(cmdResponseStatus.status));
     }
 
     _mockNetwork->runReadyNetworkOperations();
@@ -128,7 +135,7 @@ void NetworkTestEnv::onFindWithMetadataCommand(OnFindCommandWithMetadataFunction
         const auto& resultStatus = func(request);
 
         if (!resultStatus.isOK()) {
-            return resultStatus.getStatus();
+            return RemoteCommandResponse::make_forTest(resultStatus.getStatus());
         }
 
         std::vector<BSONObj> result;
@@ -145,7 +152,7 @@ void NetworkTestEnv::onFindWithMetadataCommand(OnFindCommandWithMetadataFunction
         BSONObjBuilder resultBuilder(std::move(metadata));
         appendCursorResponseObject(0LL, nss, arr.arr(), boost::none, &resultBuilder);
 
-        return RemoteCommandResponse(resultBuilder.obj(), Milliseconds(1));
+        return RemoteCommandResponse::make_forTest(resultBuilder.obj(), Milliseconds(1));
     });
 }
 

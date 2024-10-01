@@ -222,7 +222,7 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
         replSetNameString = replSetName.toString();
     }
 
-    executor::TaskExecutor::ResponseStatus status(response, ping);
+    executor::TaskExecutor::ResponseStatus status(request.target, response, ping);
     executor::TaskExecutor::RemoteCommandCallbackArgs cbData(
         _replExecutor.get(), handle, request, status);
 

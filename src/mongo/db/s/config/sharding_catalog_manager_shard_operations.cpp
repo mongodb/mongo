@@ -398,8 +398,8 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
     executor::RemoteCommandRequest request(
         host, dbName, cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);
 
-    executor::RemoteCommandResponse response =
-        Status(ErrorCodes::InternalError, "Internal error running command");
+    executor::RemoteCommandResponse response(
+        host, Status(ErrorCodes::InternalError, "Internal error running command"));
 
     auto swCallbackHandle = _executorForAddShard->scheduleRemoteCommand(
         request, [&response](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {

@@ -90,7 +90,7 @@ public:
                                     TaskExecutor* exec) {
         CallbackHandle cbHandle;
         setCallbackForHandle(&cbHandle, rcb.second);
-        auto errorResponse = RemoteCommandResponse(boost::none, kCallbackCanceledErrorStatus);
+        auto errorResponse = RemoteCommandResponse(rcb.first.target, kCallbackCanceledErrorStatus);
         TaskExecutor::RemoteCommandCallbackFn callback;
         using std::swap;
         swap(rcb.second->callback, callback);
@@ -102,12 +102,11 @@ public:
     static void runCallbackFinished(stdx::unique_lock<stdx::mutex>& lk,
                                     RequestAndCallback rcb,
                                     TaskExecutor* exec,
-                                    const StatusWith<RemoteCommandResponse>& result,
-                                    boost::optional<HostAndPort> targetUsed) {
+                                    const StatusWith<RemoteCommandResponse>& result) {
         // Convert the result into a RemoteCommandResponse unconditionally.
-        RemoteCommandResponse asRcr =
-            result.isOK() ? result.getValue() : RemoteCommandResponse(result.getStatus());
-        asRcr.target = targetUsed;
+        RemoteCommandResponse asRcr = result.isOK()
+            ? result.getValue()
+            : RemoteCommandResponse(rcb.first.target, result.getStatus());
         CallbackHandle cbHandle;
         setCallbackForHandle(&cbHandle, rcb.second);
         TaskExecutor::RemoteCommandCallbackFn callback;
@@ -344,12 +343,7 @@ void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<stdx::mutex>&
                 // stream. In any case, we first complete the current request
                 // by invoking it's callback:
                 state = CallbackState::State::kDone;
-                // Get the target if we successfully acquired a stream.
-                boost::optional<HostAndPort> target = boost::none;
-                if (_stream) {
-                    target = _stream->getClient()->remote();
-                }
-                CallbackState::runCallbackFinished(lk, req, this, result, target);
+                CallbackState::runCallbackFinished(lk, req, this, result);
             }
             // If we weren't able to acquire a stream, shut-down.
             if (!_stream) {

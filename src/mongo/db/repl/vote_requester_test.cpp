@@ -171,18 +171,20 @@ protected:
     }
 
     RemoteCommandResponse badRemoteCommandResponse() {
-        return RemoteCommandResponse(ErrorCodes::NodeNotFound, "not on my watch");
+        return RemoteCommandResponse::make_forTest(
+            Status(ErrorCodes::NodeNotFound, "not on my watch"));
     }
 
     RemoteCommandResponse callbackCanceledCommandResponse() {
-        return RemoteCommandResponse(ErrorCodes::CallbackCanceled, "Testing canceled callback");
+        return RemoteCommandResponse::make_forTest(
+            Status(ErrorCodes::CallbackCanceled, "Testing canceled callback"));
     }
 
     RemoteCommandResponse votedYes() {
         ReplSetRequestVotesResponse response;
         response.setVoteGranted(true);
         response.setTerm(1);
-        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
+        return RemoteCommandResponse::make_forTest(response.toBSON(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedYesStatusNotOkBecauseFailedToStoreLastVote() {
@@ -194,7 +196,7 @@ protected:
         auto status =
             Status(ErrorCodes::InterruptedDueToReplStateChange, "operation was interrupted");
         CommandHelpers::appendCommandStatusNoThrow(result, status);
-        return RemoteCommandResponse(result.obj(), Milliseconds(10));
+        return RemoteCommandResponse::make_forTest(result.obj(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedNoBecauseConfigVersionDoesNotMatch() {
@@ -202,7 +204,7 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's config version differs from mine");
-        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
+        return RemoteCommandResponse::make_forTest(response.toBSON(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedNoBecauseSetNameDiffers() {
@@ -210,7 +212,7 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's set name differs from mine");
-        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
+        return RemoteCommandResponse::make_forTest(response.toBSON(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedNoBecauseLastOpTimeIsGreater() {
@@ -218,7 +220,7 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's data is staler than mine");
-        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
+        return RemoteCommandResponse::make_forTest(response.toBSON(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedNoBecauseTermIsGreater() {
@@ -226,7 +228,7 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(3);
         response.setReason("candidate's term is lower than mine");
-        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
+        return RemoteCommandResponse::make_forTest(response.toBSON(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedNoBecauseAlreadyVoted() {
@@ -234,7 +236,7 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(2);
         response.setReason("already voted for another candidate this term");
-        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
+        return RemoteCommandResponse::make_forTest(response.toBSON(), Milliseconds(10));
     }
 
     std::unique_ptr<VoteRequester::Algorithm> _requester;

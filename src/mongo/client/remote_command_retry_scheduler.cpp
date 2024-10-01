@@ -198,7 +198,10 @@ void RemoteCommandRetryScheduler::_remoteCommandCallback(
     }();
 
     if (!scheduleStatus.isOK()) {
-        _onComplete({rcba.executor, rcba.myHandle, rcba.request, scheduleStatus});
+        _onComplete({rcba.executor,
+                     rcba.myHandle,
+                     rcba.request,
+                     executor::RemoteCommandResponse(rcba.request.target, scheduleStatus)});
         return;
     }
 }

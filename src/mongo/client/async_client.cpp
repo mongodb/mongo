@@ -280,7 +280,8 @@ Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
             auto cmdReply = rpc::makeReply(&response);
             _parseHelloResponse(requestObj, cmdReply);
             if (hook) {
-                executor::RemoteCommandResponse cmdResp(*cmdReply, timer.elapsed());
+                executor::RemoteCommandResponse cmdResp(
+                    _peer, cmdReply->getCommandReply(), timer.elapsed());
                 uassertStatusOK(hook->validateHost(_peer, requestObj, cmdResp));
             }
         });
@@ -401,7 +402,8 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
                       std::move(fromConnAcquiredTimer),
                       token)
         .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {
-            return executor::RemoteCommandResponse(*response, startTimer.elapsed());
+            return executor::RemoteCommandResponse(
+                _peer, response->getCommandReply(), startTimer.elapsed());
         });
 }
 
@@ -414,8 +416,11 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::_continueReceiveExhaustRe
         .then([stopwatch, msgId, baton, this](Message responseMsg) mutable {
             bool isMoreToComeSet = OpMsg::isFlagSet(responseMsg, OpMsg::kMoreToCome);
             rpc::UniqueReply response = rpc::UniqueReply(responseMsg, rpc::makeReply(&responseMsg));
-            auto rcResponse = executor::RemoteCommandResponse(
-                *response, duration_cast<Milliseconds>(stopwatch.elapsed()), isMoreToComeSet);
+            auto rcResponse =
+                executor::RemoteCommandResponse(_peer,
+                                                response->getCommandReply(),
+                                                duration_cast<Milliseconds>(stopwatch.elapsed()),
+                                                isMoreToComeSet);
             return rcResponse;
         });
 }

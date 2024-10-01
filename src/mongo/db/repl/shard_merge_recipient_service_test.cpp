@@ -450,19 +450,19 @@ protected:
             MockNetwork::InSequence seq(*_mockNet);
             _mockNet
                 ->expect(backupCursorRequest,
-                         RemoteCommandResponse(
-                             {cursorDataMock.getBackupCursorBatches(0), Milliseconds()}))
+                         RemoteCommandResponse::make_forTest(
+                             cursorDataMock.getBackupCursorBatches(0), Milliseconds()))
                 .times(1);
             _mockNet
                 ->expect(getMoreRequest,
-                         RemoteCommandResponse(
-                             {cursorDataMock.getBackupCursorBatches(1), Milliseconds()}))
+                         RemoteCommandResponse::make_forTest(
+                             cursorDataMock.getBackupCursorBatches(1), Milliseconds()))
                 .times(1);
 
             _mockNet
                 ->expect(getMoreRequest,
-                         RemoteCommandResponse(
-                             {cursorDataMock.getBackupCursorBatches(-1), Milliseconds()}))
+                         RemoteCommandResponse::make_forTest(
+                             cursorDataMock.getBackupCursorBatches(-1), Milliseconds()))
                 .times(1);
         }
 
@@ -471,18 +471,18 @@ protected:
 
     void expectSuccessfulKillBackupCursorCall() {
         _mockNet
-            ->expect(
-                killBackupCursorRequest,
-                RemoteCommandResponse({cursorDataMock.getkillBackupCursorReply(), Milliseconds()}))
+            ->expect(killBackupCursorRequest,
+                     RemoteCommandResponse::make_forTest(cursorDataMock.getkillBackupCursorReply(),
+                                                         Milliseconds()))
             .times(1);
         _mockNet->runUntilExpectationsSatisfied();
     }
 
     void expectSuccessfulBackupCursorEmptyGetMore() {
         _mockNet
-            ->expect(
-                getMoreRequest,
-                RemoteCommandResponse({cursorDataMock.getBackupCursorBatches(-1), Milliseconds()}))
+            ->expect(getMoreRequest,
+                     RemoteCommandResponse::make_forTest(cursorDataMock.getBackupCursorBatches(-1),
+                                                         Milliseconds()))
             .times(1);
         _mockNet->runUntilExpectationsSatisfied();
     }
@@ -743,30 +743,31 @@ TEST_F(ShardMergeRecipientServiceTest, OpenBackupCursorRetriesIfBackupCursorIsTo
     {
         MockNetwork::InSequence seq(*getMockNet());
         getMockNet()
-            ->expect(backupCursorRequest,
-                     RemoteCommandResponse({cursorDataMock.getBackupCursorBatches(
-                                                0, TSOlderThanCursorDataMockCheckpointTS),
-                                            Milliseconds()}))
-            .times(1);
-        getMockNet()
-            ->expect(
-                killBackupCursorRequest,
-                RemoteCommandResponse({cursorDataMock.getkillBackupCursorReply(), Milliseconds()}))
-            .times(1);
-        getMockNet()
             ->expect(
                 backupCursorRequest,
-                RemoteCommandResponse({cursorDataMock.getBackupCursorBatches(0), Milliseconds()}))
+                RemoteCommandResponse::make_forTest(
+                    cursorDataMock.getBackupCursorBatches(0, TSOlderThanCursorDataMockCheckpointTS),
+                    Milliseconds()))
             .times(1);
         getMockNet()
-            ->expect(
-                getMoreRequest,
-                RemoteCommandResponse({cursorDataMock.getBackupCursorBatches(1), Milliseconds()}))
+            ->expect(killBackupCursorRequest,
+                     RemoteCommandResponse::make_forTest(cursorDataMock.getkillBackupCursorReply(),
+                                                         Milliseconds()))
             .times(1);
         getMockNet()
-            ->expect(
-                getMoreRequest,
-                RemoteCommandResponse({cursorDataMock.getBackupCursorBatches(-1), Milliseconds()}))
+            ->expect(backupCursorRequest,
+                     RemoteCommandResponse::make_forTest(cursorDataMock.getBackupCursorBatches(0),
+                                                         Milliseconds()))
+            .times(1);
+        getMockNet()
+            ->expect(getMoreRequest,
+                     RemoteCommandResponse::make_forTest(cursorDataMock.getBackupCursorBatches(1),
+                                                         Milliseconds()))
+            .times(1);
+        getMockNet()
+            ->expect(getMoreRequest,
+                     RemoteCommandResponse::make_forTest(cursorDataMock.getBackupCursorBatches(-1),
+                                                         Milliseconds()))
             .times(1);
     }
     getMockNet()->runUntilExpectationsSatisfied();
@@ -802,11 +803,13 @@ TEST_F(ShardMergeRecipientServiceTest, MergeFailsIfBackupCursorIsAlreadyActiveOn
 
     auto backupCursorConflictErrorCode = 50886;
     getMockNet()
-        ->expect(backupCursorRequest,
-                 RemoteCommandResponse(
-                     ErrorCodes::Error(backupCursorConflictErrorCode),
-                     "The existing backup cursor must be closed before $backupCursor can succeed.",
-                     Milliseconds()))
+        ->expect(
+            backupCursorRequest,
+            RemoteCommandResponse::make_forTest(
+                Status(
+                    ErrorCodes::Error(backupCursorConflictErrorCode),
+                    "The existing backup cursor must be closed before $backupCursor can succeed."),
+                Milliseconds()))
         .times(1);
     getMockNet()->runUntilExpectationsSatisfied();
 
@@ -838,9 +841,10 @@ TEST_F(ShardMergeRecipientServiceTest, MergeFailsIfDonorIsFsyncLocked) {
     auto backupCursorConflictWithFsyncErrorCode = 50887;
     getMockNet()
         ->expect(backupCursorRequest,
-                 RemoteCommandResponse(ErrorCodes::Error(backupCursorConflictWithFsyncErrorCode),
-                                       "The node is currently fsyncLocked.",
-                                       Milliseconds()))
+                 RemoteCommandResponse::make_forTest(
+                     Status(ErrorCodes::Error(backupCursorConflictWithFsyncErrorCode),
+                            "The node is currently fsyncLocked."),
+                     Milliseconds()))
         .times(1);
     getMockNet()->runUntilExpectationsSatisfied();
 
@@ -872,9 +876,10 @@ TEST_F(ShardMergeRecipientServiceTest, MergeFailsIfBackupCursorNotSupportedOnDon
     auto backupCursorNotSupportedErrorCode = 40324;
     getMockNet()
         ->expect(backupCursorRequest,
-                 RemoteCommandResponse(ErrorCodes::Error(backupCursorNotSupportedErrorCode),
-                                       "Unrecognized pipeline stage name: '$backupCursor'",
-                                       Milliseconds()))
+                 RemoteCommandResponse::make_forTest(
+                     Status(ErrorCodes::Error(backupCursorNotSupportedErrorCode),
+                            "Unrecognized pipeline stage name: '$backupCursor'"),
+                     Milliseconds()))
         .times(1);
     getMockNet()->runUntilExpectationsSatisfied();
 

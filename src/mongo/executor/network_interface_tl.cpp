@@ -631,7 +631,7 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
     StatusWith<RemoteCommandResponse> swResponse) {
     RemoteCommandResponse response;
     if (!swResponse.isOK()) {
-        response = RemoteCommandResponse(std::move(swResponse.getStatus()));
+        response = RemoteCommandResponse(request.target, std::move(swResponse.getStatus()));
     } else {
         response = std::move(swResponse.getValue());
     }
@@ -1016,7 +1016,8 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
                 if (swResponse.isOK()) {
                     return swResponse.getValue();
                 } else {
-                    return RemoteCommandResponse(std::move(swResponse.getStatus()),
+                    return RemoteCommandResponse(cmdState->request.target,
+                                                 std::move(swResponse.getStatus()),
                                                  cmdState->stopwatch.elapsed());
                 }
             }();

@@ -93,13 +93,14 @@ const Status kError2Status{ErrorCodes::HostUnreachable, "dummy"};
 const Status kWriteConcernError1Status{ErrorCodes::WriteConcernFailed, "dummy"};
 const Status kWriteConcernError2Status{ErrorCodes::UnsatisfiableWriteConcern, "dummy"};
 
-executor::RemoteCommandResponse kOkResponse{BSON("ok" << 1), Milliseconds(0)};
+executor::RemoteCommandResponse kOkResponse =
+    executor::RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(0));
 
 executor::RemoteCommandResponse makeErrorResponse(const Status& errorStatus) {
     invariant(!errorStatus.isOK());
     BSONObjBuilder res;
     CommandHelpers::appendCommandStatusNoThrow(res, errorStatus);
-    return {res.obj(), Milliseconds(0)};
+    return executor::RemoteCommandResponse::make_forTest(res.obj(), Milliseconds(0));
 }
 
 executor::RemoteCommandResponse makeWriteConcernErrorResponse(
@@ -110,7 +111,7 @@ executor::RemoteCommandResponse makeWriteConcernErrorResponse(
     wcError.setStatus(writeConcernErrorStatus);
     res.append("ok", 1);
     res.append("writeConcernError", wcError.toBSON());
-    return {res.obj(), Milliseconds(0)};
+    return executor::RemoteCommandResponse::make_forTest(res.obj(), Milliseconds(0));
 }
 
 HostAndPort makeHostAndPort(const ShardId& shardId) {

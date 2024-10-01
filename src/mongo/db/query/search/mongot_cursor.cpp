@@ -155,15 +155,20 @@ long long computeInitialBatchSize(const boost::intrusive_ptr<ExpressionContext>&
 }
 }  // namespace
 
+HostAndPort getMongotAddress() {
+    auto swHostAndPort = HostAndPort::parse(globalMongotParams.host);
+    // This host and port string is configured and validated at startup.
+    invariant(swHostAndPort.getStatus());
+
+    return swHostAndPort.getValue();
+}
+
 executor::RemoteCommandRequest getRemoteCommandRequest(OperationContext* opCtx,
                                                        const NamespaceString& nss,
                                                        const BSONObj& cmdObj) {
     doThrowIfNotRunningWithMongotHostConfigured();
-    auto swHostAndPort = HostAndPort::parse(globalMongotParams.host);
-    // This host and port string is configured and validated at startup.
-    invariant(swHostAndPort.getStatus());
     executor::RemoteCommandRequest rcr(
-        executor::RemoteCommandRequest(swHostAndPort.getValue(), nss.dbName(), cmdObj, opCtx));
+        executor::RemoteCommandRequest(getMongotAddress(), nss.dbName(), cmdObj, opCtx));
     rcr.sslMode = transport::ConnectSSLMode::kDisableSSL;
     return rcr;
 }
@@ -385,8 +390,9 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
     std::function<bool(Status)> retryPolicy) {
     using namespace fmt::literals;
     auto taskExecutor = executor::getMongotTaskExecutor(expCtx->opCtx->getServiceContext());
-    executor::RemoteCommandResponse response =
-        Status(ErrorCodes::InternalError, "Internal error running search command");
+    executor::RemoteCommandResponse response = {
+        getMongotAddress(),
+        Status(ErrorCodes::InternalError, "Internal error running search command")};
     for (;;) {
         Status err = Status::OK();
         do {

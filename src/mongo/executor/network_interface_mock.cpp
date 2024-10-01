@@ -156,7 +156,8 @@ void NetworkInterfaceMock::cancelCommand(const CallbackHandle& cbHandle, const B
     invariant(!inShutdown());
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    ResponseStatus rs(ErrorCodes::CallbackCanceled, "Network operation canceled", Milliseconds(0));
+    ResponseStatus rs = ResponseStatus::make_forTest(
+        Status(ErrorCodes::CallbackCanceled, "Network operation canceled"), Milliseconds(0));
 
     _interruptWithResponse_inlock(cbHandle, rs);
 }
@@ -241,11 +242,12 @@ void NetworkInterfaceMock::shutdown() {
     _waitingToRunMask |= kExecutorThread;  // Prevents network thread from scheduling.
     lk.unlock();
     for (auto& op : todo) {
-        auto response = NetworkResponse{{},
-                                        now,
-                                        ResponseStatus{ErrorCodes::ShutdownInProgress,
-                                                       "Shutting down mock network",
-                                                       Milliseconds(0)}};
+        auto response =
+            NetworkResponse{{},
+                            now,
+                            ResponseStatus::make_forTest(Status(ErrorCodes::ShutdownInProgress,
+                                                                "Shutting down mock network"),
+                                                         Milliseconds(0))};
         if (op.fulfillResponse(std::move(response))) {
             LOGV2_WARNING(22590,
                           "Mock network interface shutting down with outstanding request",
@@ -371,7 +373,7 @@ void NetworkInterfaceMock::scheduleResponse(NetworkOperationIterator noi,
 }
 
 RemoteCommandRequest NetworkInterfaceMock::scheduleSuccessfulResponse(const BSONObj& response) {
-    return scheduleSuccessfulResponse(RemoteCommandResponse(response, Milliseconds(0)));
+    return scheduleSuccessfulResponse(ResponseStatus::make_forTest(response, Milliseconds(0)));
 }
 
 RemoteCommandRequest NetworkInterfaceMock::scheduleSuccessfulResponse(
@@ -408,7 +410,7 @@ RemoteCommandRequest NetworkInterfaceMock::scheduleErrorResponse(NetworkOperatio
 RemoteCommandRequest NetworkInterfaceMock::scheduleErrorResponse(NetworkOperationIterator noi,
                                                                  Date_t when,
                                                                  const Status& response) {
-    scheduleResponse(noi, when, response);
+    scheduleResponse(noi, when, ResponseStatus::make_forTest(response));
     return noi->getRequest();
 }
 
@@ -495,8 +497,9 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(NetworkOperation&& op) {
             if (!status.isOK()) {
                 return;
             }
-            auto response = ResponseStatus(
-                ErrorCodes::NetworkInterfaceExceededTimeLimit, "Network timeout", Milliseconds(0));
+            auto response = ResponseStatus::make_forTest(
+                Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, "Network timeout"),
+                Milliseconds(0));
             _interruptWithResponse_inlock(cbh, std::move(response));
         });
     }
@@ -511,11 +514,11 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
 
     auto handshakeReply = (handshakeReplyIter != std::end(_handshakeReplies))
         ? handshakeReplyIter->second
-        : RemoteCommandResponse(BSONObj(), Milliseconds(0));
+        : ResponseStatus::make_forTest(BSONObj(), Milliseconds(0));
 
     auto valid = _hook->validateHost(target, op.getRequest().cmdObj, handshakeReply);
     if (!valid.isOK()) {
-        auto response = NetworkResponse{{}, _now_inlock(), valid};
+        auto response = NetworkResponse{{}, _now_inlock(), ResponseStatus::make_forTest(valid)};
         op.fulfillResponse(std::move(response));
         return;
     }
@@ -523,7 +526,8 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
     auto swHookPostconnectCommand = _hook->makeRequest(target);
 
     if (!swHookPostconnectCommand.isOK()) {
-        auto response = NetworkResponse{{}, _now_inlock(), swHookPostconnectCommand.getStatus()};
+        auto response = NetworkResponse{
+            {}, _now_inlock(), ResponseStatus::make_forTest(swHookPostconnectCommand.getStatus())};
         op.fulfillResponse(std::move(response));
         return;
     }
@@ -557,7 +561,8 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
 
             auto handleStatus = _hook->handleReply(op.getRequest().target, std::move(rs));
             if (!handleStatus.isOK()) {
-                auto response = NetworkResponse{{}, _now_inlock(), handleStatus};
+                auto response =
+                    NetworkResponse{{}, _now_inlock(), ResponseStatus::make_forTest(handleStatus)};
                 op.fulfillResponse(std::move(response));
                 return;
             }

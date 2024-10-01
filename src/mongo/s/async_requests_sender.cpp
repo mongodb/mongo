@@ -322,14 +322,14 @@ auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(std::vector<HostAndP
 
 auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs&& rcr)
     -> SemiFuture<RemoteCommandCallbackArgs> {
-    if (rcr.response.target) {
-        _shardHostAndPort = rcr.response.target;
-    }
+    _shardHostAndPort = rcr.response.target;
 
     auto status = rcr.response.status;
+    bool isRemote = false;
 
     if (status.isOK()) {
         status = getStatusFromCommandResult(rcr.response.data);
+        isRemote = true;
     }
 
     if (status.isOK()) {
@@ -345,10 +345,10 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs&&
     // There was an error with either the response or the command.
     return getShard()
         .thenRunOn(*_ars->_subBaton)
-        .then([this, status = std::move(status), rcr = std::move(rcr)](
+        .then([this, status = std::move(status), rcr = std::move(rcr), isRemote](
                   std::shared_ptr<mongo::Shard>&& shard) {
-            if (rcr.response.target) {
-                shard->updateReplSetMonitor(*rcr.response.target, status);
+            if (!ErrorCodes::isShutdownError(status.code()) || isRemote) {
+                shard->updateReplSetMonitor(rcr.response.target, status);
             }
 
             bool isStartingTransaction = _cmdObj.getField("startTransaction").booleanSafe();

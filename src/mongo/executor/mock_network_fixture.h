@@ -151,7 +151,7 @@ public:
 
         Action(const BSONObj& response) {
             _actionFunc = [=](const BSONObj& request) {
-                return RemoteCommandResponse(response, Milliseconds(0));
+                return RemoteCommandResponse::make_forTest(response, Milliseconds(0));
             };
         }
 

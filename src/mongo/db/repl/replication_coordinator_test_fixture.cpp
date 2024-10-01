@@ -269,7 +269,7 @@ executor::RemoteCommandResponse ReplCoordTest::makeResponseStatus(const BSONObj&
           "Responding with {doc} (elapsed: {millis})",
           "doc"_attr = doc,
           "millis"_attr = millis);
-    return RemoteCommandResponse(doc, millis);
+    return RemoteCommandResponse::make_forTest(doc, millis);
 }
 
 void ReplCoordTest::simulateEnoughHeartbeatsForAllNodesUp() {

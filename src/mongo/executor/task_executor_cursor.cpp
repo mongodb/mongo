@@ -185,7 +185,7 @@ TaskExecutorCursor::~TaskExecutorCursor() {
         // inline.
         if (!swCallback.isOK()) {
             TaskExecutor::RemoteCommandCallbackArgs args(
-                _executor.get(), {}, {}, swCallback.getStatus());
+                _executor.get(), {}, {}, {_rcr.target, swCallback.getStatus()});
             callbackToRun(args);
         }
     } catch (const DBException& ex) {

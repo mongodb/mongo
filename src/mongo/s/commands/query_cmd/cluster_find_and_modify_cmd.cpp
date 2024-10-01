@@ -698,13 +698,13 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
 
     const auto millisElapsed = timer.millis();
 
-    executor::RemoteCommandResponse response(bob.obj(), Milliseconds(millisElapsed));
-
     // We fetch an arbitrary host from the ConnectionString, since
     // ClusterExplain::buildExplainResult() doesn't use the given HostAndPort.
     auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, *shardId));
-    AsyncRequestsSender::Response arsResponse{
-        *shardId, response, shard->getConnString().getServers().front()};
+    auto host = shard->getConnString().getServers().front();
+
+    executor::RemoteCommandResponse response(host, bob.obj(), Milliseconds(millisElapsed));
+    AsyncRequestsSender::Response arsResponse{*shardId, response, host};
 
     return ClusterExplain::buildExplainResult(
         ExpressionContext::makeBlankExpressionContext(opCtx, nss),

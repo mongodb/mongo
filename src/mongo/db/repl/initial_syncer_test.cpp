@@ -243,7 +243,7 @@ public:
                                  const BSONObj& obj) {
         NetworkInterfaceMock* net = getNet();
         Milliseconds millis(0);
-        RemoteCommandResponse response(obj, millis);
+        RemoteCommandResponse response = RemoteCommandResponse::make_forTest(obj, millis);
         LOGV2(24159,
               "Sending response for network request",
               "dbname"_attr = noi->getRequest().dbname,
@@ -261,7 +261,9 @@ public:
                   "errorStatus"_attr = errorStatus);
         }
         verifyNextRequestCommandName(cmdName);
-        net->scheduleResponse(net->getNextReadyRequest(), net->now(), errorStatus);
+        net->scheduleResponse(net->getNextReadyRequest(),
+                              net->now(),
+                              RemoteCommandResponse::make_forTest(errorStatus));
     }
 
     void processNetworkResponse(std::string cmdName, const BSONObj& obj) {
@@ -655,7 +657,7 @@ RemoteCommandResponse makeCursorResponse(CursorId cursorId,
     }
     ASSERT_OK(oqMetadata.writeToMetadata(&bob));
     bob.append("ok", 1);
-    return {bob.obj(), Milliseconds()};
+    return RemoteCommandResponse::make_forTest(bob.obj(), Milliseconds());
 }
 
 /**
@@ -1833,8 +1835,8 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError_Mock
     _mock
         ->expect(BSON("find"
                       << "system.version"),
-                 RemoteCommandResponse(ErrorCodes::OperationFailed,
-                                       "find command failed at sync source"))
+                 RemoteCommandResponse::make_forTest(
+                     Status(ErrorCodes::OperationFailed, "find command failed at sync source")))
         .times(1);
 
     // Start the real work.
@@ -1926,10 +1928,10 @@ TEST_F(InitialSyncerTest, InitialSyncerResendsFindCommandIfFCVFetcherReturnsRetr
 
     // Respond to the first FCV attempt with a retriable error.
     _mock
-        ->expect(
-            BSON("find"
-                 << "system.version"),
-            RemoteCommandResponse(ErrorCodes::HostUnreachable, "host unreachable network error"))
+        ->expect(BSON("find"
+                      << "system.version"),
+                 RemoteCommandResponse::make_forTest(
+                     Status(ErrorCodes::HostUnreachable, "host unreachable network error")))
         .times(1);
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
@@ -2502,9 +2504,9 @@ TEST_F(InitialSyncerTest,
         _mock
             ->expect(BSON("find"
                           << "oplog.rs"),
-                     RemoteCommandResponse(
-                         ErrorCodes::OperationFailed,
-                         "Oplog entry fetcher associated with the stopTimestamp failed"))
+                     RemoteCommandResponse::make_forTest(
+                         Status(ErrorCodes::OperationFailed,
+                                "Oplog entry fetcher associated with the stopTimestamp failed")))
             .times(1);
     }
 

@@ -82,19 +82,20 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
                                               << "stuff"),
                                          nullptr};
 
-    RemoteCommandResponse expectedResponse{BSON("foo"
-                                                << "bar"
-                                                << "baz"
-                                                << "garply"
-                                                << "bar"
-                                                << "baz"),
-                                           Milliseconds(30)};
+    RemoteCommandResponse expectedResponse = RemoteCommandResponse::make_forTest(BSON("foo"
+                                                                                      << "bar"
+                                                                                      << "baz"
+                                                                                      << "garply"
+                                                                                      << "bar"
+                                                                                      << "baz"),
+                                                                                 Milliseconds(30));
 
     // need to copy as it will be moved
     auto helloReplyData = BSON("iamyour"
                                << "father");
 
-    RemoteCommandResponse helloReply{helloReplyData.copy(), Milliseconds(20)};
+    RemoteCommandResponse helloReply =
+        RemoteCommandResponse::make_forTest(helloReplyData.copy(), Milliseconds(20));
 
     net().setHandshakeReplyForHost(testHost(), std::move(helloReply));
 

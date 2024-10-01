@@ -762,7 +762,8 @@ TEST_F(AsyncResultsMergerTest, ErrorReceivedFromShard) {
     responses.emplace_back(kTestNss, CursorId(2), batch2);
     scheduleNetworkResponses(std::move(responses));
 
-    scheduleErrorResponse({ErrorCodes::BadValue, "bad thing happened"});
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::BadValue, "bad thing happened")));
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -1222,7 +1223,8 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     ASSERT_FALSE(arm->ready());
 
     // An error occurs with the first host.
-    scheduleErrorResponse({ErrorCodes::AuthenticationFailed, "authentication failed"});
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::AuthenticationFailed, "authentication failed")));
     ASSERT_FALSE(arm->ready());
 
     // Instead of propagating the error, we should be willing to return results from the two
@@ -1246,7 +1248,8 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
 
     // Now the second host becomes unreachable. We should still be willing to return results from
     // the third shard.
-    scheduleErrorResponse({ErrorCodes::AuthenticationFailed, "authentication failed"});
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::AuthenticationFailed, "authentication failed")));
     ASSERT_FALSE(arm->ready());
 
     responses.clear();
@@ -1301,7 +1304,8 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsSingleNode) {
 
     // The lone host involved in this query returns an error. This should simply cause us to return
     // EOF.
-    scheduleErrorResponse({ErrorCodes::AuthenticationFailed, "authentication failed"});
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::AuthenticationFailed, "authentication failed")));
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
@@ -1326,7 +1330,8 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsOnRetriableErrorNoRetries) {
     scheduleNetworkResponses(std::move(responses));
 
     // From the second host we get a network (retriable) error.
-    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::HostUnreachable, "host unreachable")));
 
     executor()->waitForEvent(readyEvent);
     ASSERT_TRUE(arm->ready());
@@ -1360,7 +1365,8 @@ TEST_F(AsyncResultsMergerTest, MaxTimeMSExpiredAllowPartialResultsTrue) {
     scheduleNetworkResponses(std::move(responses));
 
     // From the second host we get a MaxTimeMSExpired error.
-    scheduleErrorResponse({ErrorCodes::MaxTimeMSExpired, "MaxTimeMSExpired"});
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::MaxTimeMSExpired, "MaxTimeMSExpired")));
 
     executor()->waitForEvent(readyEvent);
 
@@ -1396,7 +1402,8 @@ TEST_F(AsyncResultsMergerTest, MaxTimeMSExpiredAllowPartialResultsFalse) {
     scheduleNetworkResponses(std::move(responses));
 
     // From the second host we get a MaxTimeMSExpired error.
-    scheduleErrorResponse({ErrorCodes::MaxTimeMSExpired, "MaxTimeMSExpired"});
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::MaxTimeMSExpired, "MaxTimeMSExpired")));
 
     executor()->waitForEvent(readyEvent);
 
@@ -1424,7 +1431,8 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsOnMaxTimeMSExpiredThenLateData
     ASSERT_FALSE(arm->ready());
 
     // From the first host we get a MaxTimeMSExpired error.
-    scheduleErrorResponse({ErrorCodes::MaxTimeMSExpired, "MaxTimeMSExpired"});
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::MaxTimeMSExpired, "MaxTimeMSExpired")));
 
     // Second host returns single result *after* first host times out.
     std::vector<CursorResponse> responses;
@@ -1455,8 +1463,10 @@ TEST_F(AsyncResultsMergerTest, ReturnsErrorOnRetriableError) {
     ASSERT_FALSE(arm->ready());
 
     // Both hosts return network (retriable) errors.
-    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
-    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::HostUnreachable, "host unreachable")));
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::HostUnreachable, "host unreachable")));
 
     executor()->waitForEvent(readyEvent);
     ASSERT_TRUE(arm->ready());
@@ -2013,7 +2023,8 @@ TEST_F(AsyncResultsMergerTest, ShardCanErrorInBetweenReadyAndNextEvent) {
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
-    scheduleErrorResponse({ErrorCodes::BadValue, "bad thing happened"});
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::BadValue, "bad thing happened")));
 
     ASSERT_EQ(ErrorCodes::BadValue, arm->nextEvent().getStatus());
 

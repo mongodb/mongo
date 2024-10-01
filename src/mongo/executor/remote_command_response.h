@@ -56,82 +56,49 @@ namespace executor {
 
 /**
  * Type of object describing the response of previously sent RemoteCommandRequest.
- */
-struct RemoteCommandResponseBase {
-    RemoteCommandResponseBase() = default;
-
-    RemoteCommandResponseBase(ErrorCodes::Error code, std::string reason);
-
-    RemoteCommandResponseBase(ErrorCodes::Error code, std::string reason, Microseconds elapsed);
-
-    RemoteCommandResponseBase(Status s);
-
-    RemoteCommandResponseBase(Status s, Microseconds elapsed);
-
-    RemoteCommandResponseBase(BSONObj dataObj, Microseconds elapsed, bool moreToCome = false);
-
-    RemoteCommandResponseBase(const rpc::ReplyInterface& rpcReply,
-                              Microseconds elapsed,
-                              bool moreToCome = false);
-
-    bool isOK() const;
-
-    BSONObj data;  // Always owned. May point into message.
-    boost::optional<Microseconds> elapsed;
-    Status status = Status::OK();
-    bool moreToCome = false;  // Whether or not the moreToCome bit is set on an exhaust message.
-
-protected:
-    ~RemoteCommandResponseBase() = default;
-};
-
-/**
- * This type is a RemoteCommandResponseBase + the target that the origin request was actually run
- * on.
  *
  * The target member may be used by callers to associate a HostAndPort with the remote or
  * local error that the RemoteCommandResponse holds. The "status" member will be populated
- * with possible local errors, while the "data" member may hold any remote errors. For local
- * errors that are not caused by the remote (for example, local shutdown), the target member will
- * not be filled.
+ * with possible local errors, while the "data" member may hold any remote errors.
  *
- * For local errors, the response is associated (by the network interface) with a remote
- * HostAndPort for these cases:
- *   1. When acquiring a connection to the remote from the pool.
- *   2. When using the connection to the remote.
- *   3. Enforcing a timeout (propagated or internal) while using the connection to the remote.
  */
-struct RemoteCommandResponse : RemoteCommandResponseBase {
-    using RemoteCommandResponseBase::RemoteCommandResponseBase;
+struct RemoteCommandResponse {
+    RemoteCommandResponse() = default;
 
-    RemoteCommandResponse(boost::optional<HostAndPort> hp,
-                          ErrorCodes::Error code,
-                          std::string reason);
+    RemoteCommandResponse(HostAndPort hp, Status s);
 
-    RemoteCommandResponse(boost::optional<HostAndPort> hp,
-                          ErrorCodes::Error code,
-                          std::string reason,
-                          Microseconds elapsed);
-
-    RemoteCommandResponse(boost::optional<HostAndPort> hp, Status s);
-
-    RemoteCommandResponse(boost::optional<HostAndPort> hp, Status s, Microseconds elapsed);
-
-    RemoteCommandResponse(HostAndPort hp, BSONObj dataObj, Microseconds elapsed);
+    RemoteCommandResponse(HostAndPort hp, Status s, Microseconds elapsed);
 
     RemoteCommandResponse(HostAndPort hp,
-                          const rpc::ReplyInterface& rpcReply,
-                          Microseconds elapsed);
+                          BSONObj dataObj,
+                          Microseconds elapsed,
+                          bool moreToCome = false);
 
     std::string toString() const;
 
     bool operator==(const RemoteCommandResponse& rhs) const;
     bool operator!=(const RemoteCommandResponse& rhs) const;
 
-    boost::optional<HostAndPort> target;
+    bool isOK() const;
+
+    static RemoteCommandResponse make_forTest(Status s);
+    static RemoteCommandResponse make_forTest(Status s, Microseconds elapsed);
+    static RemoteCommandResponse make_forTest(BSONObj dataObj,
+                                              Microseconds elapsed,
+                                              bool moreToCome = false);
+
+    BSONObj data;  // Always owned. May point into message.
+    boost::optional<Microseconds> elapsed;
+    Status status = Status::OK();
+    bool moreToCome = false;  // Whether or not the moreToCome bit is set on an exhaust message.
+    HostAndPort target;
 
     friend std::ostream& operator<<(std::ostream& os, const RemoteCommandResponse& request);
-};
 
+private:
+    RemoteCommandResponse(Status s);
+    RemoteCommandResponse(Status s, Microseconds elapsed);
+    RemoteCommandResponse(BSONObj dataObj, Microseconds elapsed, bool moreToCome);
+};
 }  // namespace executor
 }  // namespace mongo

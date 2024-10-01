@@ -183,14 +183,13 @@ public:
  * Returns a RemoteCommandExecutionError with ErrorExtraInfo populated to contain
  * details about any error, local or remote, contained in `r`.
  */
-inline Status makeErrorIfNeeded(TaskExecutor::ResponseStatus r,
-                                boost::optional<HostAndPort> targetAttempted) {
+inline Status makeErrorIfNeeded(TaskExecutor::ResponseStatus r) {
     if (r.status.isOK() && getStatusFromCommandResult(r.data).isOK() &&
         getWriteConcernStatusFromCommandResult(r.data).isOK() &&
         getFirstWriteErrorStatusFromCommandResult(r.data).isOK()) {
         return Status::OK();
     }
-    return {AsyncRPCErrorInfo(r, targetAttempted), "Remote command execution failed"};
+    return {AsyncRPCErrorInfo(r), "Remote command execution failed"};
 }
 
 /**

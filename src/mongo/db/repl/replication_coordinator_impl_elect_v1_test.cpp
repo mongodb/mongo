@@ -2683,7 +2683,8 @@ TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
         const RemoteCommandRequest& request = noi->getRequest();
         if (request.target.host() == "node2") {
             auto status = Status(ErrorCodes::HostUnreachable, "Can't reach remote host");
-            getNet()->scheduleResponse(noi, getNet()->now(), status);
+            getNet()->scheduleResponse(
+                noi, getNet()->now(), RemoteCommandResponse::make_forTest(status));
         } else {
             getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time1));
         }
@@ -2954,7 +2955,8 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
         const RemoteCommandRequest& request = noi->getRequest();
         if (request.target.host() == "node2") {
             auto status = Status(ErrorCodes::HostUnreachable, "Can't reach remote host");
-            getNet()->scheduleResponse(noi, getNet()->now(), status);
+            getNet()->scheduleResponse(
+                noi, getNet()->now(), RemoteCommandResponse::make_forTest(status));
         } else {
             getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time3));
         }

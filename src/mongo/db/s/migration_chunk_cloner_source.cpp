@@ -978,7 +978,7 @@ void MigrationChunkClonerSource::_cleanup(bool wasSuccessful) {
 StatusWith<BSONObj> MigrationChunkClonerSource::_callRecipient(OperationContext* opCtx,
                                                                const BSONObj& cmdObj) {
     executor::RemoteCommandResponse responseStatus(
-        Status{ErrorCodes::InternalError, "Uninitialized value"});
+        _recipientHost, Status{ErrorCodes::InternalError, "Uninitialized value"});
 
     auto executor = Grid::get(getGlobalServiceContext())->getExecutorPool()->getFixedExecutor();
     auto scheduleStatus = executor->scheduleRemoteCommand(

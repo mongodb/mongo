@@ -155,10 +155,7 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
                                                             const DatabaseName& dbName,
                                                             Milliseconds maxTimeMSOverride,
                                                             const BSONObj& cmdObj) {
-    RemoteCommandResponse response =
-        Status(ErrorCodes::InternalError,
-               str::stream() << "Failed to run remote command request cmd: " << cmdObj);
-
+    boost::optional<RemoteCommandResponse> response;
     auto asyncStatus = _scheduleCommand(
         opCtx,
         readPref,
@@ -188,17 +185,21 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
         return e.toStatus();
     }
 
-    const auto& host = asyncHandle.hostTargetted;
-    updateReplSetMonitor(host, response.status);
+    // After wait returns successfully, the callback in _scheduleCommand is guaranteed to have run
+    // and set the response.
+    invariant(response);
 
-    if (!response.status.isOK()) {
-        if (ErrorCodes::isExceededTimeLimitError(response.status.code())) {
-            LOGV2(22739, "Operation timed out", "error"_attr = redact(response.status));
+    const auto& host = asyncHandle.hostTargetted;
+    updateReplSetMonitor(host, response->status);
+
+    if (!response->status.isOK()) {
+        if (ErrorCodes::isExceededTimeLimitError(response->status.code())) {
+            LOGV2(22739, "Operation timed out", "error"_attr = redact(response->status));
         }
-        return response.status;
+        return response->status;
     }
 
-    auto result = response.data.getOwned();
+    auto result = response->data.getOwned();
     auto commandStatus = getStatusFromCommandResult(result);
     auto writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
 

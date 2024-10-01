@@ -170,7 +170,8 @@ SemiFuture<RemoteCommandResponse> ExhaustResponseReaderTL::next() {
                 if (swResp.isOK()) {
                     return swResp;
                 }
-                return RemoteCommandResponse(std::move(swResp.getStatus()));
+                return RemoteCommandResponse(_originatingRequest.target,
+                                             std::move(swResp.getStatus()));
             })
         .tapAll(
             [this, anchor = shared_from_this()](const StatusWith<RemoteCommandResponse>& swResp) {

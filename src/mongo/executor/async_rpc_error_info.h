@@ -72,7 +72,7 @@ public:
               _remoteCommandResult{getStatusFromCommandResult(_error)},
               _remoteCommandWriteConcernError{getWriteConcernStatusFromCommandResult(_error)},
               _remoteCommandFirstWriteError{getFirstWriteErrorStatusFromCommandResult(_error)},
-              _targetUsed{*rcr.target},
+              _targetUsed{rcr.target},
               _elapsed{*rcr.elapsed} {
             // The buffer backing the default empty BSONObj has static duration so it is effectively
             // owned.
@@ -138,7 +138,7 @@ public:
      * Construct the relevant extra info from the RemoteCommandResponse provided by the TaskExecutor
      * used to invoke the remote command.
      */
-    AsyncRPCErrorInfo(RemoteCommandResponse rcr, boost::optional<HostAndPort> target)
+    AsyncRPCErrorInfo(RemoteCommandResponse rcr)
         : _prov{[&] {
               if (!rcr.status.isOK())
                   return CommandErrorProvenance::kLocal;
@@ -151,7 +151,7 @@ public:
                   return RemoteError(rcr);
               }
           }()},
-          _targetAttempted{target} {}
+          _targetAttempted{rcr.target} {}
     /**
      * Construct the relevant extra info from an error status - used if a remote command invokation
      * attempt fails before it reaches the TaskExecutor level.
