@@ -1685,12 +1685,7 @@ AsioTransportLayer::createTransientSSLContext(const TransientSSLParams& transien
 
 #ifdef __linux__
 BatonHandle AsioTransportLayer::makeBaton(OperationContext* opCtx) const {
-    invariant(!opCtx->getBaton());
-
-    auto baton = std::make_shared<AsioNetworkingBaton>(opCtx);
-    opCtx->setBaton(baton);
-
-    return baton;
+    return std::dynamic_pointer_cast<Baton>(std::make_shared<AsioNetworkingBaton>(opCtx));
 }
 #endif
 
