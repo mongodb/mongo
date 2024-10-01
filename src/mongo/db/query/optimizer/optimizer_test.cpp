@@ -46,7 +46,6 @@
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
@@ -695,122 +694,6 @@ TEST(Explain, ExplainBsonForConstant) {
         "    value: 3\n"
         "}\n",
         cNode);
-}
-
-TEST(IntervalNormalize, Basic) {
-    auto intervalExpr = _disj(_conj(_interval(_incl("3"_cint64), _incl("4"_cint64)),
-                                    _interval(_incl("1"_cint64), _incl("2"_cint64))),
-                              _disj(_interval(_incl("3"_cint64), _incl("4"_cint64)),
-                                    _interval(_excl("3"_cint64), _incl("4"_cint64)),
-                                    _interval(_incl("3"_cint64), _incl("2"_cint64))),
-                              _interval(_incl("5"_cint64), _incl("6"_cint64)));
-
-    ASSERT_INTERVAL(
-        "{\n"
-        "    {\n"
-        "        {[Const [3], Const [4]]}\n"
-        "     ^ \n"
-        "        {[Const [1], Const [2]]}\n"
-        "    }\n"
-        " U \n"
-        "    {\n"
-        "        {[Const [3], Const [4]]}\n"
-        "     U \n"
-        "        {(Const [3], Const [4]]}\n"
-        "     U \n"
-        "        {[Const [3], Const [2]]}\n"
-        "    }\n"
-        " U \n"
-        "    {[Const [5], Const [6]]}\n"
-        "}\n",
-        intervalExpr);
-
-    normalizeIntervals(intervalExpr);
-
-    // Demonstrate that Atoms are sorted first, then conjunctions and disjunctions. Atoms are sorted
-    // first on the lower then on the upper bounds.
-    ASSERT_INTERVAL(
-        "{\n"
-        "    {[Const [5], Const [6]]}\n"
-        " U \n"
-        "    {\n"
-        "        {[Const [1], Const [2]]}\n"
-        "     ^ \n"
-        "        {[Const [3], Const [4]]}\n"
-        "    }\n"
-        " U \n"
-        "    {\n"
-        "        {[Const [3], Const [2]]}\n"
-        "     U \n"
-        "        {[Const [3], Const [4]]}\n"
-        "     U \n"
-        "        {(Const [3], Const [4]]}\n"
-        "    }\n"
-        "}\n",
-        intervalExpr);
-}
-
-TEST(IntervalNormalize, IntervalNormalizeConstantsFirst) {
-    auto intervalExpr = _disj(_conj(_interval(_incl("var1"_var), _incl("var2"_var))),
-                              _conj(_interval(_incl("3"_cint64), _incl("var2"_var))),
-                              _conj(_interval(_incl("7"_cint64), _incl("8"_cint64))),
-                              _conj(_interval(_incl("var3"_var), _incl("4"_cint64))),
-                              _conj(_interval(_incl("1"_cint64), _incl("5"_cint64))));
-
-    ASSERT_INTERVAL_AUTO(
-        "{\n"
-        "    {{[Variable [var1], Variable [var2]]}}\n"
-        " U \n"
-        "    {{[Const [3], Variable [var2]]}}\n"
-        " U \n"
-        "    {{[Const [7], Const [8]]}}\n"
-        " U \n"
-        "    {{[Variable [var3], Const [4]]}}\n"
-        " U \n"
-        "    {{[Const [1], Const [5]]}}\n"
-        "}\n",
-        intervalExpr);
-
-    normalizeIntervals(intervalExpr);
-
-    // Demonstrate that constant intervals are sorted first.
-    ASSERT_INTERVAL_AUTO(
-        "{\n"
-        "    {{[Const [1], Const [5]]}}\n"
-        " U \n"
-        "    {{[Const [7], Const [8]]}}\n"
-        " U \n"
-        "    {{[Const [3], Variable [var2]]}}\n"
-        " U \n"
-        "    {{[Variable [var1], Variable [var2]]}}\n"
-        " U \n"
-        "    {{[Variable [var3], Const [4]]}}\n"
-        "}\n",
-        intervalExpr);
-}
-
-TEST(IntervalNormalize, MixedTypes) {
-    auto intervalExpr = _disj(_conj(_interval(_incl("str1"_cstr), _incl("str2"_cstr))),
-                              _conj(_interval(_incl("7"_cint64), _incl("8"_cint64))));
-
-    ASSERT_INTERVAL_AUTO(
-        "{\n"
-        "    {{[Const [\"str1\"], Const [\"str2\"]]}}\n"
-        " U \n"
-        "    {{[Const [7], Const [8]]}}\n"
-        "}\n",
-        intervalExpr);
-
-    normalizeIntervals(intervalExpr);
-
-    // Note that numerics are sorted before strings.
-    ASSERT_INTERVAL_AUTO(
-        "{\n"
-        "    {{[Const [7], Const [8]]}}\n"
-        " U \n"
-        "    {{[Const [\"str1\"], Const [\"str2\"]]}}\n"
-        "}\n",
-        intervalExpr);
 }
 
 TEST(Optimizer, ExplainRIDUnion) {

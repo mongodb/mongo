@@ -31,7 +31,6 @@
 #include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/utils/bool_expression_builder.h"
-#include "mongo/db/query/optimizer/utils/interval_utils.h"
 
 namespace mongo::ce {
 
@@ -79,18 +78,6 @@ IntervalRequirement getMinMaxIntervalForType(sbe::value::TypeTags type) {
 
     return IntervalRequirement{BoundRequirement(minInclusive, std::move(*min)),
                                BoundRequirement(maxInclusive, std::move(*max))};
-}
-
-bool isIntervalSubsetOfType(const IntervalRequirement& interval, sbe::value::TypeTags type) {
-    // Create a conjunction of the interval and the min-max interval for the type as input for the
-    // intersection function.
-    auto intervals = std::move(*BoolExprBuilder<IntervalRequirement>{}
-                                    .pushDisj()
-                                    .pushConj()
-                                    .atom(interval)
-                                    .atom(getMinMaxIntervalForType(type))
-                                    .finish());
-    return intersectDNFIntervals(intervals, ConstEval::constFold).has_value();
 }
 
 }  // namespace mongo::ce

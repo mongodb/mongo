@@ -66,12 +66,31 @@
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
-#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/util/assert_util.h"
 
 
 namespace mongo::optimizer {
+
+namespace {
+/**
+ * If the input expression is a constant or a variable, or it is an EvalFilter/Path which has an
+ * identity path and input which itself is constant or variable, then return a pointer to the deepst
+ * simple expression.
+ */
+template <class T>
+ABT::reference_type getTrivialExprPtr(const ABT& n) {
+    if (n.is<Constant>() || n.is<Variable>()) {
+        return n.ref();
+    }
+    if (const auto* ptr = n.cast<T>();
+        ptr != nullptr && ptr->getPath().template is<PathIdentity>()) {
+        return getTrivialExprPtr<T>(ptr->getInput());
+    }
+    return {};
+}
+
+}  // namespace
 
 ABTPrinter::ABTPrinter(PlanAndProps planAndProps,
                        const ExplainVersion explainVersion,

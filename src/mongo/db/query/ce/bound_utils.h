@@ -70,9 +70,4 @@ boost::optional<sbe::value::TypeTags> getBoundReqTypeTag(const BoundRequirement&
  */
 IntervalRequirement getMinMaxIntervalForType(sbe::value::TypeTags type);
 
-/**
- * Helper function to determine if the given 'interval' is a subset of the given 'type'.
- */
-bool isIntervalSubsetOfType(const IntervalRequirement& interval, sbe::value::TypeTags type);
-
 }  // namespace mongo::ce

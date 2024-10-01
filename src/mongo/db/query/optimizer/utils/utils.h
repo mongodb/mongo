@@ -121,34 +121,6 @@ struct DefaultChildAccessor {
 };
 
 /**
- * Used to access and manipulate the left child of a binary node.
- */
-template <class NodeType>
-struct LeftChildAccessor {
-    const ABT& operator()(const ABT& node) const {
-        return node.cast<NodeType>()->getLeftChild();
-    }
-
-    ABT& operator()(ABT& node) const {
-        return node.cast<NodeType>()->getLeftChild();
-    }
-};
-
-/**
- * Used to access and manipulate the right child of a binary node.
- */
-template <class NodeType>
-struct RightChildAccessor {
-    const ABT& operator()(const ABT& node) const {
-        return node.cast<NodeType>()->getRightChild();
-    }
-
-    ABT& operator()(ABT& node) const {
-        return node.cast<NodeType>()->getRightChild();
-    }
-};
-
-/**
  * Used to access children of a n-ary node. By default, it accesses the first child.
  */
 template <class NodeType>
@@ -212,29 +184,5 @@ private:
 
     std::variant<IdType, PrefixMapType> _ids;
 };
-
-using SpoolIdGenerator = IdGenerator<int64_t>;
-
-// Use a union node to restrict the set of projections we expose up the tree. The union node is
-// optimized away during lowering.
-void restrictProjections(ProjectionNameVector projNames, CEType ce, PhysPlanBuilder& input);
-
-using PathToIntervalFn = std::function<boost::optional<IntervalReqExpr::Node>(const ABT&)>;
-
-/**
- * Encode an index of an index field as a field name in order to use with a FieldProjectionMap.
- */
-std::string encodeIndexKeyName(size_t indexField);
-
-/**
- * Decode an field name as an index field.
- */
-size_t decodeIndexKeyName(const std::string& fieldName);
-
-/**
- * Checks if we have an interval tree which has at least one atomic interval which may include Null
- * as an endpoint.
- */
-bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals, const ConstFoldFn& constFold);
 
 }  // namespace mongo::optimizer

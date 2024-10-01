@@ -43,12 +43,36 @@
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/util/assert_util.h"
 
 
 namespace mongo::optimizer {
+namespace {
+std::vector<ABT::reference_type> collectComposed(const ABT& n) {
+    if (auto comp = n.cast<PathComposeM>(); comp) {
+        auto lhs = collectComposed(comp->getPath1());
+        auto rhs = collectComposed(comp->getPath2());
+        lhs.insert(lhs.end(), rhs.begin(), rhs.end());
+        return lhs;
+    }
+    return {n.ref()};
+}
+
+template <class Element = PathComposeM>
+inline void maybeComposePath(ABT& composition, ABT child) {
+    if (child.is<PathIdentity>()) {
+        return;
+    }
+    if (composition.is<PathIdentity>()) {
+        composition = std::move(child);
+        return;
+    }
+
+    composition = make<Element>(std::move(composition), std::move(child));
+}
+}  // namespace
+
 ABT::reference_type PathFusion::follow(ABT::reference_type n) {
     if (auto var = n.cast<Variable>(); var) {
         auto def = _env.getDefinition(*var);
