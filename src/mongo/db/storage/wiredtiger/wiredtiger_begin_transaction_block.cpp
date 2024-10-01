@@ -45,6 +45,40 @@
 
 
 namespace mongo {
+
+namespace {
+
+// There are a few delicate restore scenarios where untimestamped writes are still required.
+bool allowUntimestampedWrites() {
+    // Magic restore may need to perform untimestamped writes on timestamped tables as a part of
+    // the server automated restore procedure.
+    if (storageGlobalParams.magicRestore) {
+        return true;
+    }
+
+    if (!gAllowUnsafeUntimestampedWrites) {
+        return false;
+    }
+
+    // Ignore timestamps in selective restore mode.
+    if (storageGlobalParams.restore) {
+        return true;
+    }
+
+    // We can safely ignore setting this configuration option when recovering from the
+    // oplog as standalone because:
+    // 1. Replaying oplog entries write with a timestamp.
+    // 2. The instance is put in read-only mode after oplog application has finished.
+    if (getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
+        !repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+        return true;
+    }
+
+    return false;
+}
+
+}  // namespace
+
 using namespace fmt::literals;
 
 WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
@@ -73,15 +107,8 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
         }
         builder << "),";
     }
-    if (allowUntimestampedWrite != RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce) {
-        builder << "no_timestamp=true,";
-    } else if (MONGO_unlikely(gAllowUnsafeUntimestampedWrites &&
-                              getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
-                              !repl::ReplSettings::shouldRecoverFromOplogAsStandalone())) {
-        // We can safely ignore setting this configuration option when recovering from the oplog as
-        // standalone because:
-        // 1. Replaying oplog entries write with a timestamp.
-        // 2. The instance is put in read-only mode after oplog application has finished.
+    if (allowUntimestampedWrite != RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce ||
+        MONGO_unlikely(allowUntimestampedWrites())) {
         builder << "no_timestamp=true,";
     }
 

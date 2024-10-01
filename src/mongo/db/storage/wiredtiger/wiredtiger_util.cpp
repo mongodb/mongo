@@ -880,6 +880,14 @@ void WiredTigerUtil::validateTableLogging(OperationContext* opCtx,
                                           bool& valid,
                                           std::vector<std::string>& errors,
                                           std::vector<std::string>& warnings) {
+    if (gWiredTigerSkipTableLoggingChecksDuringValidation) {
+        LOGV2(9264500,
+              "Skipping validation of table log settings due to usage of "
+              "'wiredTigerSkipTableLoggingChecksDuringValidation'",
+              "ident"_attr = uri);
+        return;
+    }
+
     logv2::DynamicAttributes attrs;
     if (indexName) {
         attrs.add("index", indexName);
