@@ -80,6 +80,14 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "damage_vector",
+    srcs = [],
+    hdrs = [
+        "damage_vector.h",
+    ],
+)
+
+mongo_cc_library(
     name = "remove_saver",
     srcs = [
         "remove_saver.cpp",

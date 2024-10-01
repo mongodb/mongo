@@ -19,6 +19,9 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
     """
     shared_lib = None
     static_lib = None
+    input_files = ctx.attr.binary_with_debug.files.to_list()
+    if len(input_files) == 0:
+        return None, None, None, None
     if ctx.attr.type == "library":
         for file in ctx.attr.binary_with_debug.files.to_list():
             if file.path.endswith(WITH_DEBUG_SUFFIX + static_ext):
@@ -116,25 +119,27 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
             unsupported_features = ctx.disabled_features,
         )
 
-        linker_input = cc_common.create_linker_input(
-            owner = ctx.label,
-            libraries = depset(direct = [
-                cc_common.create_library_to_link(
-                    actions = ctx.actions,
-                    feature_configuration = feature_configuration,
-                    cc_toolchain = cc_toolchain,
-                    dynamic_library = shared_lib,
-                    static_library = static_lib if cc_shared_library == None else None,
-                ),
-            ]),
-            user_link_flags = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags,
-        )
-
         linker_input_deps = []
         for dep in ctx.attr.deps:
             linker_input_deps.append(dep[CcInfo].linking_context.linker_inputs)
 
-        linking_context = cc_common.create_linking_context(linker_inputs = depset(direct = [linker_input], transitive = linker_input_deps))
+        if shared_lib or static_lib:
+            direct_lib = cc_common.create_library_to_link(
+                actions = ctx.actions,
+                feature_configuration = feature_configuration,
+                cc_toolchain = cc_toolchain,
+                dynamic_library = shared_lib,
+                static_library = static_lib if cc_shared_library == None else None,
+            )
+            linker_input = cc_common.create_linker_input(
+                owner = ctx.label,
+                libraries = depset(direct = [direct_lib]),
+                user_link_flags = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags,
+            )
+            linking_context = cc_common.create_linking_context(linker_inputs = depset(direct = [linker_input], transitive = linker_input_deps))
+
+        else:
+            linking_context = cc_common.create_linking_context(linker_inputs = depset(transitive = linker_input_deps))
 
     else:
         linking_context = ctx.attr.binary_with_debug[CcInfo].linking_context
@@ -182,21 +187,28 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
         all_user_link_flags[flag] = True
     all_user_link_flags = [flag for flag, _ in all_user_link_flags.items()]
 
-    linker_input = cc_common.create_linker_input(
-        owner = ctx.label,
-        libraries = depset(direct = [
-            cc_common.create_library_to_link(
-                actions = ctx.actions,
-                feature_configuration = feature_configuration,
-                cc_toolchain = cc_toolchain,
-                # Replace reference to dynamic library with final name
-                dynamic_library = output_shared_lib,
-                # Omit reference to static library
-            ),
-        ], transitive = [depset(dep_libraries)]),
-        user_link_flags = all_user_link_flags,
-        additional_inputs = depset(original_info.linker_input.additional_inputs),
-    )
+    if output_shared_lib:
+        direct_lib = cc_common.create_library_to_link(
+            actions = ctx.actions,
+            feature_configuration = feature_configuration,
+            cc_toolchain = cc_toolchain,
+            # Replace reference to dynamic library with final name
+            dynamic_library = output_shared_lib,
+            # Omit reference to static library
+        )
+        linker_input = cc_common.create_linker_input(
+            owner = ctx.label,
+            libraries = depset(direct = [direct_lib], transitive = [depset(dep_libraries)]),
+            user_link_flags = all_user_link_flags,
+            additional_inputs = depset(original_info.linker_input.additional_inputs),
+        )
+    else:
+        linker_input = cc_common.create_linker_input(
+            owner = ctx.label,
+            libraries = depset(transitive = [depset(dep_libraries)]),
+            user_link_flags = all_user_link_flags,
+            additional_inputs = depset(original_info.linker_input.additional_inputs),
+        )
 
     return CcSharedLibraryInfo(
         dynamic_deps = original_info.dynamic_deps,
@@ -205,18 +217,11 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
         linker_input = linker_input,
     )
 
-def noop_extraction(ctx):
-    return [
-        DefaultInfo(
-            files = depset(transitive = [ctx.attr.binary_with_debug.files]),
-            executable = ctx.attr.binary_with_debug.files[0] if ctx.attr.type == "program" else None,
-        ),
-        ctx.attr.binary_with_debug[CcInfo],
-    ]
-
 def linux_extraction(ctx, cc_toolchain, inputs):
     outputs = []
+    unstripped_static_bin = None
     input_bin, output_bin, debug_info, static_lib = get_inputs_and_outputs(ctx, ".so", ".a", ".debug")
+    input_file = ctx.attr.binary_with_debug.files.to_list()
 
     if input_bin:
         if ctx.attr.enabled:
@@ -253,14 +258,14 @@ def linux_extraction(ctx, cc_toolchain, inputs):
             )
             outputs += [output_bin]
 
-    unstripped_static_bin = None
-    if static_lib:
-        unstripped_static_bin = propgate_static_lib(ctx, static_lib, ".a", inputs)
-        outputs.append(unstripped_static_bin)
+    if len(input_file):
+        if static_lib:
+            unstripped_static_bin = propgate_static_lib(ctx, static_lib, ".a", inputs)
+            outputs.append(unstripped_static_bin)
 
-    if ctx.attr.shared_archive:
-        unstripped_shared_archive = symlink_shared_archive(ctx, ".so", ".a")
-        outputs.append(unstripped_shared_archive)
+        if ctx.attr.shared_archive:
+            unstripped_shared_archive = symlink_shared_archive(ctx, ".so", ".a")
+            outputs.append(unstripped_shared_archive)
 
     # The final program binary depends on the existence of the dependent dynamic library files. With
     # build-without-the-bytes enabled, these aren't downloaded. Manually collect them and add them to the
@@ -285,7 +290,9 @@ def linux_extraction(ctx, cc_toolchain, inputs):
 
 def macos_extraction(ctx, cc_toolchain, inputs):
     outputs = []
+    unstripped_static_bin = None
     input_bin, output_bin, debug_info, static_lib = get_inputs_and_outputs(ctx, ".dylib", ".a", ".dSYM")
+    input_file = ctx.attr.binary_with_debug.files.to_list()
 
     if input_bin:
         if ctx.attr.enabled:
@@ -323,14 +330,14 @@ def macos_extraction(ctx, cc_toolchain, inputs):
             )
             outputs += [output_bin]
 
-    unstripped_static_bin = None
-    if static_lib:
-        unstripped_static_bin = propgate_static_lib(ctx, static_lib, ".a", inputs)
-        outputs.append(unstripped_static_bin)
+    if len(input_file):
+        if static_lib:
+            unstripped_static_bin = propgate_static_lib(ctx, static_lib, ".a", inputs)
+            outputs.append(unstripped_static_bin)
 
-    if ctx.attr.shared_archive:
-        unstripped_shared_archive = symlink_shared_archive(ctx, ".dylib", ".a")
-        outputs.append(unstripped_shared_archive)
+        if ctx.attr.shared_archive:
+            unstripped_shared_archive = symlink_shared_archive(ctx, ".dylib", ".a")
+            outputs.append(unstripped_shared_archive)
 
     # The final program binary depends on the existence of the dependent dynamic library files. With
     # build-without-the-bytes enabled, these aren't downloaded. Manually collect them and add them to the
@@ -363,44 +370,47 @@ def windows_extraction(ctx, cc_toolchain, inputs):
     else:
         fail("Can't extract debug info from unknown type: " + ctx.attr.type)
 
-    basename = ctx.attr.binary_with_debug.files.to_list()[0].basename[:-len(WITH_DEBUG_SUFFIX + ext)]
-    output = ctx.actions.declare_file(basename + ext)
-
+    input_file = ctx.attr.binary_with_debug.files.to_list()
     outputs = []
     output_library = None
     output_dynamic_library = None
-    for input in ctx.attr.binary_with_debug.files.to_list():
-        ext = "." + input.extension
 
-        basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ext)]
+    if len(input_file):
+        basename = ctx.attr.binary_with_debug.files.to_list()[0].basename[:-len(WITH_DEBUG_SUFFIX + ext)]
         output = ctx.actions.declare_file(basename + ext)
-        outputs.append(output)
 
-        if ext == ".lib":
-            output_library = output
-        if ext == ".dll":
-            output_dynamic_library = output
-            # TODO support PDB outputs for dynamic windows builds when we are on bazel 7.2
-            # https://github.com/bazelbuild/bazel/pull/21900/files
+        for input in ctx.attr.binary_with_debug.files.to_list():
+            ext = "." + input.extension
 
-        ctx.actions.symlink(
-            output = output,
-            target_file = input,
-        )
+            basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ext)]
+            output = ctx.actions.declare_file(basename + ext)
+            outputs.append(output)
 
-    if pdb:
-        basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ext)]
-        pdb_output = ctx.actions.declare_file(basename + ".pdb")
-        outputs.append(pdb_output)
+            if ext == ".lib":
+                output_library = output
+            if ext == ".dll":
+                output_dynamic_library = output
+                # TODO support PDB outputs for dynamic windows builds when we are on bazel 7.2
+                # https://github.com/bazelbuild/bazel/pull/21900/files
 
-        ctx.actions.symlink(
-            output = pdb_output,
-            target_file = pdb.to_list()[0],
-        )
+            ctx.actions.symlink(
+                output = output,
+                target_file = input,
+            )
 
-    if ctx.attr.shared_archive:
-        unstripped_shared_archive = symlink_shared_archive(ctx, ".dll", ".lib")
-        outputs.append(unstripped_shared_archive)
+        if pdb:
+            basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ext)]
+            pdb_output = ctx.actions.declare_file(basename + ".pdb")
+            outputs.append(pdb_output)
+
+            ctx.actions.symlink(
+                output = pdb_output,
+                target_file = pdb.to_list()[0],
+            )
+
+        if ctx.attr.shared_archive:
+            unstripped_shared_archive = symlink_shared_archive(ctx, ".dll", ".lib")
+            outputs.append(unstripped_shared_archive)
 
     provided_info = [
         DefaultInfo(
@@ -418,11 +428,6 @@ def windows_extraction(ctx, cc_toolchain, inputs):
     return provided_info
 
 def extract_debuginfo_impl(ctx):
-    # some cases (header file groups) there is no input files to do
-    # anything with, besides forward things along.
-    if not ctx.attr.binary_with_debug.files.to_list():
-        return noop_extraction(ctx)
-
     cc_toolchain = find_cpp_toolchain(ctx)
     inputs = depset(transitive = [
         ctx.attr.binary_with_debug.files,

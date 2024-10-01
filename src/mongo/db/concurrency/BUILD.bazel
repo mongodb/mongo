@@ -156,7 +156,6 @@ mongo_cc_library(
         "//src/mongo/db/session:logical_session_id_helpers.h",
         "//src/mongo/db/sorter:sorter_gen",
         "//src/mongo/db/storage:compact_options.h",
-        "//src/mongo/db/storage:damage_vector.h",
         "//src/mongo/db/storage:ident.h",
         "//src/mongo/db/storage:key_format.h",
         "//src/mongo/db/storage:key_string.h",
@@ -183,6 +182,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/storage:damage_vector",
         "//src/mongo/util:secure_compare_memory",
     ],
 )

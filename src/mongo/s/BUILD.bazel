@@ -609,7 +609,6 @@ mongo_cc_library(
         "resource_yielders.cpp",
     ],
     hdrs = [
-        "//src/mongo/db/storage:damage_vector.h",
         "//src/mongo/db/transaction:transaction_participant_resource_yielder.h",
         "//src/mongo/s:resource_yielders.h",
         "//src/mongo/s:transaction_router_resource_yielder.h",
@@ -621,6 +620,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/storage:damage_vector",
     ],
 )
 
