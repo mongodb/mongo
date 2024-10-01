@@ -1714,7 +1714,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_startCommitMonitor(
         _coordinatorDoc.getSourceNss(),
         extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards()),
         **executor,
-        _ctHolder->getCommitMonitorToken());
+        _ctHolder->getCommitMonitorToken(),
+        resharding::gReshardingDelayBeforeRemainingOperationTimeQueryMillis.load());
 
     _commitMonitorQuiesced = _commitMonitor->waitUntilRecipientsAreWithinCommitThreshold()
                                  .thenRunOn(**executor)

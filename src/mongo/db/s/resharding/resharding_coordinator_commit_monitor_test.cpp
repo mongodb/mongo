@@ -152,7 +152,7 @@ void CoordinatorCommitMonitorTest::setUp() {
 
     _cancellationSource = std::make_unique<CancellationSource>();
     _commitMonitor = std::make_shared<CoordinatorCommitMonitor>(
-        _ns, _recipientShards, _futureExecutor, _cancellationSource->token(), Milliseconds(0));
+        _ns, _recipientShards, _futureExecutor, _cancellationSource->token(), 0, Milliseconds(0));
     _commitMonitor->setNetworkExecutorForTest(executor());
 }
 
