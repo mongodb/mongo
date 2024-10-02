@@ -424,6 +424,7 @@ icuEnv.CppUnitTest(
         "shared_buffer_test.cpp",
         "scoped_unlock_test.cpp",
         "secure_zero_memory_test.cpp",
+        "signal_handlers_asynchronous_test.cpp" if not env.TargetOSIs("windows") else [],
         "signal_handlers_synchronous_test.cpp" if not env.TargetOSIs("windows") else [],
         "static_immortal_test.cpp",
         "str_test.cpp",
@@ -462,7 +463,9 @@ icuEnv.CppUnitTest(
         "progress_meter",
         "safe_num",
         "secure_zero_memory",
+        "signal_handlers",
         "summation",
+        "version_impl",
     ],
 )
 
