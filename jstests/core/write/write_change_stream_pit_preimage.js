@@ -10,15 +10,15 @@
 //  incompatible_with_preimages_by_default,
 // ]
 import {
+    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
+    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
+    preImagesForOps,
+} from "jstests/libs/change_stream_util.js";
+import {
     ClusteredCollectionUtil
 } from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
-    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
-    preImagesForOps,
-} from "jstests/libs/query/change_stream_util.js";
 
 // Pre-images are only recorded in the replica set mode.
 if (!FixtureHelpers.isReplSet(db)) {

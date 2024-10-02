@@ -16,7 +16,7 @@ import {
     isIxscan,
     isIxscanMultikey,
     planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 let coll = db.covered_multikey;
 coll.drop();

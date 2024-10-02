@@ -6,7 +6,7 @@
 import {
     blockProcessingTestCases,
     generateMetaVals
-} from "jstests/libs/query/block_processing_test_cases.js";
+} from "jstests/libs/block_processing_test_cases.js";
 import {leafs} from "jstests/query_golden/libs/example_data.js";
 
 const scalarConn = MongoRunner.runMongod();

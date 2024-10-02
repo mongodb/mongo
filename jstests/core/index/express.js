@@ -20,16 +20,16 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getPlanStage,
     getQueryPlanner,
     getWinningPlan,
     isExpress
-} from "jstests/libs/query/analyze_plan.js";
-import {runWithParamsAllNodes} from "jstests/libs/query/optimizer_utils.js";
-import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {runWithParamsAllNodes} from "jstests/libs/optimizer_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const coll = db.getCollection('express_coll');
 

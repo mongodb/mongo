@@ -7,7 +7,7 @@
  * ]
  */
 
-import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/analyze_plan.js";
 
 const parameterName = "internalQueryEnableBooleanExpressionsSimplifier";
 const isSImplifierEnabled =

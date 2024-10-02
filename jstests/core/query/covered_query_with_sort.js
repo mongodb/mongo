@@ -7,7 +7,7 @@
 //   assumes_unsharded_collection,
 // ]
 
-import {getPlanStage, getWinningPlan, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 const coll = db.covered_query_with_sort;
 coll.drop();

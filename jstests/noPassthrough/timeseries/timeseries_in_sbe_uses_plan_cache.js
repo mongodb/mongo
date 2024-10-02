@@ -1,8 +1,8 @@
 /**
  * Ensures that SBE-eligible time series queries use the classic plan cache.
  */
-import {assertCacheUsage} from "jstests/libs/query/plan_cache_utils.js";
-import {checkSbeStatus, kSbeRestricted} from "jstests/libs/query/sbe_util.js";
+import {assertCacheUsage} from "jstests/libs/plan_cache_utils.js";
+import {checkSbeStatus, kSbeRestricted} from "jstests/libs/sbe_util.js";
 
 // Start a single mongoD using MongoRunner.
 const conn = MongoRunner.runMongod();

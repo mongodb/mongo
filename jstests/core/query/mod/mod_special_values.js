@@ -4,7 +4,7 @@
  * This test exercises a changed behavior, thus prevent it running in multi-version variants.
  * @tags: [requires_fcv_51]
  */
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 const testDB = db.getSiblingDB(jsTestName());
 
 function executeTestCase(collection, testCase) {

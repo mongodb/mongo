@@ -7,7 +7,7 @@
  * requires_external_data_source,
  * ]
  */
-import {aggPlanHasStage} from "jstests/libs/query/analyze_plan.js";
+import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 
 // Runs tests on a standalone mongod.
 let conn = MongoRunner.runMongod({setParameter: {enableComputeMode: true}});

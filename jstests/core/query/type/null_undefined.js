@@ -9,7 +9,7 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();

@@ -1,7 +1,7 @@
 // Test to check whether the number of intervals in a geoNear query equals
 // the number of inputStages it completes
 
-import {getExecutionStages} from "jstests/libs/query/analyze_plan.js";
+import {getExecutionStages} from "jstests/libs/analyze_plan.js";
 
 var t = db.jstests_geo_s2explain;
 t.drop();

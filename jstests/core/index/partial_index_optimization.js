@@ -19,7 +19,7 @@ import {
     assertStagesForExplainOfCommand,
     getWinningPlan,
     isCollscan,
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 function flagVal(n) {
     return (n % 5 > 3) ? true : false;

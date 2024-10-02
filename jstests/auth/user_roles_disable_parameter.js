@@ -1,7 +1,7 @@
 // Tests that $$USER_ROLES is not available when the server parameter is set to false.
 // @tags: [requires_fcv_70]
 
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 
 const dbName = "test";
 const collName = "coll";

@@ -1,7 +1,7 @@
 /**
  * Test a $group query which has a large number of group-by fields and needs to spill to disk.
  */
-import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
 const MEM_LIMIT_KB = 2;
 

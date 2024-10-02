@@ -7,8 +7,8 @@
  * ]
  */
 
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 var isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 

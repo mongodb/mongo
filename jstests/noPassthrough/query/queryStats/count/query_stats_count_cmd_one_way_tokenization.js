@@ -4,10 +4,7 @@
  * @tags: [requires_fcv_81]
  */
 
-import {
-    getQueryStatsCountCmd,
-    withQueryStatsEnabled
-} from "jstests/libs/query/query_stats_utils.js";
+import {getQueryStatsCountCmd, withQueryStatsEnabled} from "jstests/libs/query_stats_utils.js";
 
 withQueryStatsEnabled(jsTestName(), (coll) => {
     const testDB = coll.getDB();

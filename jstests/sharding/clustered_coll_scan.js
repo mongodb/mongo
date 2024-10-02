@@ -3,8 +3,8 @@
  * (SERVER-83119)
  */
 
+import {isClusteredIxscan, isExpress} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {isClusteredIxscan, isExpress} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({

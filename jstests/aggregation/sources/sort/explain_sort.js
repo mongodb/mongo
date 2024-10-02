@@ -5,7 +5,7 @@
 //   # Asserts on the number of documents examined in an explain plan.
 //   assumes_no_implicit_index_creation
 // ]
-import {getAggPlanStages, isQueryPlan} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, isQueryPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_sort;
 coll.drop();

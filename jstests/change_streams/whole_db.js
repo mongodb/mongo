@@ -2,12 +2,9 @@
 // Do not run in whole-cluster passthrough since this test assumes that the change stream will be
 // invalidated by a database drop.
 // @tags: [do_not_run_in_whole_cluster_passthrough]
+import {assertInvalidChangeStreamNss, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    assertInvalidChangeStreamNss,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDb.dropDatabase());

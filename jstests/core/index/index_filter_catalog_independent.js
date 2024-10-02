@@ -14,14 +14,14 @@
  *   assumes_balancer_off,
  * ]
  */
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     getPlanStages,
     getQueryPlanners,
     getWinningPlan,
     getWinningPlanFromExplain,
     isCollscan
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const collName = "index_filter_catalog_independent";
 const coll = db[collName];

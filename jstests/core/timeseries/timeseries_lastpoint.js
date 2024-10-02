@@ -47,7 +47,7 @@ import {
     getPlanStage,
     getSingleNodeExplain,
     isAggregationPlan
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.timeseries_lastpoint;
 const bucketsColl = db.system.buckets.timeseries_lastpoint;

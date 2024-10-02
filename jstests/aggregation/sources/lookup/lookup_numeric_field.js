@@ -5,7 +5,7 @@
 //   # Using a column scan removes the transformBy we search for.
 //   assumes_no_implicit_index_creation,
 // ]
-import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const local = db.local;
 const foreign = db.foreign;

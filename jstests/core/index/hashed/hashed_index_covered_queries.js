@@ -9,7 +9,7 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
+import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const coll = db.compound_hashed_index;
 coll.drop();

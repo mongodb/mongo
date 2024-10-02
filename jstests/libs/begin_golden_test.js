@@ -1,4 +1,4 @@
-import {checkSbeStatus} from "jstests/libs/query/sbe_util.js";
+import {checkSbeStatus} from "jstests/libs/sbe_util.js";
 
 // Run any set-up necessary for a golden jstest. This function should be called from the suite
 // definition, so that individual tests don't need to remember to call it.

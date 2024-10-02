@@ -9,11 +9,8 @@
 //   uses_atclustertime,
 //
 // ]
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {
-    assertChangeStreamEventEq,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Use a higher frequency for periodic noops to speed up the test.

@@ -1,6 +1,6 @@
+import {everyWinningPlan, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
-import {everyWinningPlan, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
 
 function addOptionalQueryFields(src, dst) {
     for (let field of ["projection", "sort", "collation"]) {

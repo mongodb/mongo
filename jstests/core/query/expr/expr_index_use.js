@@ -11,7 +11,7 @@ import {
     getEngine,
     getPlanStage,
     hasRejectedPlans
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.expr_index_use;
 coll.drop();

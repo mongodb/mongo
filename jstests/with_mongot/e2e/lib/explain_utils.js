@@ -4,7 +4,7 @@
 
 import {
     getAggPlanStages,
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 import {
     validateMongotStageExplainExecutionStats,
     verifyShardsPartExplainOutput

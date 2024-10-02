@@ -54,7 +54,7 @@ assert.commandWorked(mongosDB.adminCommand(
     {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
 async function checkStream() {
-    const {assertChangeStreamEventEq} = await import("jstests/libs/query/change_stream_util.js");
+    const {assertChangeStreamEventEq} = await import("jstests/libs/change_stream_util.js");
 
     const testDb = db.getSiblingDB(jsTestName());
     let coll = testDb[jsTestName()];

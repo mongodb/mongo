@@ -10,7 +10,7 @@
  * ]
  */
 
-import {WildcardIndexHelpers} from "jstests/libs/query/wildcard_index_helpers.js";
+import {WildcardIndexHelpers} from "jstests/libs/wildcard_index_helpers.js";
 
 const collectionName = "compound_wildcard_index_hiding";
 const cwiList = [

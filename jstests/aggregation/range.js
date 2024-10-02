@@ -1,7 +1,7 @@
 /*
  * Tests general $range functionality.
  */
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 
 import {arrayEq, assertErrorCode} from "jstests/aggregation/extras/utils.js";
 

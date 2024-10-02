@@ -12,8 +12,8 @@
  *   requires_pipeline_optimization,
  * ]
  */
-import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.server39788;
 coll.drop();

@@ -21,10 +21,6 @@
 
 // Integration tests for the collation feature.
 import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
-import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
-import {
     getPlanStage,
     getSingleNodeExplain,
     getWinningPlan,
@@ -32,7 +28,11 @@ import {
     isIdhackOrExpress,
     isIxscan,
     planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 let testDb = db.getSiblingDB("collation_js");
 var coll = testDb.collation;

@@ -1,4 +1,9 @@
 import {
+    everyWinningPlan,
+    getNestedProperties,
+    isIdhackOrExpress
+} from "jstests/libs/analyze_plan.js";
+import {
     getCollectionName,
     getCommandName,
     getExplainCommand,
@@ -7,13 +12,8 @@ import {
     isSystemCollectionName
 } from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
-import {
-    everyWinningPlan,
-    getNestedProperties,
-    isIdhackOrExpress
-} from "jstests/libs/query/analyze_plan.js";
-import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
-import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {QuerySettingsIndexHintsTests} from "jstests/libs/query_settings_index_hints_tests.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 /**
  * Override which applies 'bad' query settings over supported commands in order to test the fallback

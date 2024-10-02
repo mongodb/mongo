@@ -8,8 +8,8 @@
  *   featureFlagSbeFull
  * ]
  */
-import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
-import {getPlanCacheSize} from "jstests/libs/query/plan_cache_utils.js";
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");

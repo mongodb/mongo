@@ -9,8 +9,8 @@
  *  assumes_no_implicit_index_creation
  * ]
  */
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 

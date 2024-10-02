@@ -6,9 +6,9 @@
  * uses_transactions,
  * ]
  */
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());

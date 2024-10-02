@@ -6,7 +6,7 @@
  * ]
  */
 
-import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const collName = jsTestName();
 const qsutils = new QuerySettingsUtils(db, collName);

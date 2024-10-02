@@ -13,12 +13,12 @@
 //   requires_persistence,
 //   not_allowed_with_signed_security_token,
 // ]
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 
 import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.spill_to_disk;
 coll.drop();

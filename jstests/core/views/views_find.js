@@ -10,7 +10,7 @@
  * ]
  */
 import {arrayEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 
 let viewsDB = db.getSiblingDB("views_find");
 assert.commandWorked(viewsDB.dropDatabase());

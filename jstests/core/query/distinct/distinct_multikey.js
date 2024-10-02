@@ -4,8 +4,8 @@
  *   assumes_read_concern_local,
  * ]
  */
+import {getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.jstest_distinct_multikey;
 coll.drop();

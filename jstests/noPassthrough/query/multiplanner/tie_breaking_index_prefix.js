@@ -4,7 +4,7 @@
 
 "use strict";
 
-import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
 
 // Test initialization.
 

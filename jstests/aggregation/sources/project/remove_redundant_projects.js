@@ -13,12 +13,12 @@ import {
     getWinningPlan,
     isAggregationPlan,
     isQueryPlan,
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 import {
     checkSbeCompletelyDisabled,
     checkSbeFullyEnabled,
     checkSbeRestrictedOrFullyEnabled
-} from "jstests/libs/query/sbe_util.js";
+} from "jstests/libs/sbe_util.js";
 
 let coll = db.remove_redundant_projects;
 coll.drop();

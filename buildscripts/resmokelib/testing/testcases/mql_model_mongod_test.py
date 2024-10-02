@@ -28,7 +28,7 @@ class MqlModelMongodTestCase(jsrunnerfile.JSRunnerFileTestCase):
             logger,
             "MQL MongoD Model test",
             json_filenames[0],
-            test_runner_file="jstests/libs/query/mql_model_mongod_test_runner.js",
+            test_runner_file="jstests/libs/mql_model_mongod_test_runner.js",
             shell_executable=shell_executable,
             shell_options=shell_options,
         )

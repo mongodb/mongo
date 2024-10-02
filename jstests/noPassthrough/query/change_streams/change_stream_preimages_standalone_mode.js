@@ -12,11 +12,11 @@
  * ]
  */
 
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {preImagesForOps} from "jstests/libs/query/change_stream_util.js";
+import {preImagesForOps} from "jstests/libs/change_stream_util.js";
 import {
     assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled
-} from "jstests/libs/query/change_stream_util.js";
+} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 /**

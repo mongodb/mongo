@@ -4,7 +4,7 @@
 
 import {getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 export const forwardCollscan = {
     stage: "COLLSCAN",

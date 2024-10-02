@@ -1,6 +1,6 @@
 // Basic integration tests for the $round and $trunc aggregation expressions.
 
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 

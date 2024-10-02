@@ -2,7 +2,7 @@
  * Test that applicationName and namespace appear in queryStats for the find command.
  * @tags: [requires_fcv_71]
  */
-import {getQueryStats, getQueryStatsFindCmd} from "jstests/libs/query/query_stats_utils.js";
+import {getQueryStats, getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";
 
 const kApplicationName = "MongoDB Shell";
 

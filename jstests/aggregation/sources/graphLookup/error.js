@@ -1,6 +1,6 @@
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test the error cases.
 
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 

@@ -1,4 +1,3 @@
-import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {
     everyWinningPlan,
     flattenQueryPlanTree,
@@ -11,11 +10,12 @@ import {
     isEofPlan,
     isIdhackOrExpress,
     planHasStage,
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
+import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeRestrictedOrFullyEnabled
-} from "jstests/libs/query/sbe_util.js";
+} from "jstests/libs/sbe_util.js";
 
 /**
  * Class containing common test functions used in query_settings_index_application_* tests.

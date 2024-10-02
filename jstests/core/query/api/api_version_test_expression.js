@@ -15,9 +15,9 @@
  * ]
  */
 
+import {getExecutionStats} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getExecutionStats} from "jstests/libs/query/analyze_plan.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_test_expression";

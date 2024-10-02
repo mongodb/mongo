@@ -11,7 +11,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getWinningPlan, isIdhackOrExpress, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlan, isIdhackOrExpress, planHasStage} from "jstests/libs/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db.timeseries_bucket_index;

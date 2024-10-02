@@ -12,7 +12,7 @@ import {
     summarizeExplainForCE
 } from "jstests/libs/ce_stats_utils.js";
 import {loadJSONDataset} from "jstests/libs/load_ce_test_data.js";
-import {forceCE, round2} from "jstests/libs/query/optimizer_utils.js";
+import {forceCE, round2} from "jstests/libs/optimizer_utils.js";
 import {computeStrategyErrors} from "jstests/query_golden/libs/compute_errors.js";
 
 /**

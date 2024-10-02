@@ -8,9 +8,9 @@
  * ]
  */
 
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");

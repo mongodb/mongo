@@ -1,7 +1,7 @@
 /**
  * Test that the 'n' family of accumulators work as window functions.
  */
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 
 import {
     seedWithTickerData,

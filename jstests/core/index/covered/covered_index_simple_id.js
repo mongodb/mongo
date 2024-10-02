@@ -5,7 +5,7 @@
 // Simple covered index query test
 
 // Include helpers for analyzing explain output.
-import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var coll = db.getCollection("covered_simple_id");
 coll.drop();

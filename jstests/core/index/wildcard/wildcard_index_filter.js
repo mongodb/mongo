@@ -14,8 +14,8 @@
  * ]
  */
 
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.wildcard_index_filter;
 

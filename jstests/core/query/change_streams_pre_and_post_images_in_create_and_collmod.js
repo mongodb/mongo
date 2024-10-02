@@ -6,11 +6,11 @@
  * requires_replication,
  * ]
  */
-import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
     assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
-} from "jstests/libs/query/change_stream_util.js";
+} from "jstests/libs/change_stream_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const dbName = 'testDB';
 const collName = 'changeStreamPreAndPostImages';

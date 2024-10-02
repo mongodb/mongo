@@ -17,7 +17,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     const testdb = db.getSiblingDB("timeseries_metric_index_2dsphere_db");

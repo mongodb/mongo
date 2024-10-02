@@ -9,7 +9,7 @@
 // ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

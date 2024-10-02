@@ -7,8 +7,8 @@
  * 'noPassthrough' flag, are passed through as-is.
  */
 
+import {ChangeStreamWatchMode} from "jstests/libs/change_stream_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 
 // Helper function which tests can call to explicitly request that the command not be modified by
 // the passthrough code. When defined, ChangeStreamTest will adopt this as its default runCommand

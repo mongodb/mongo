@@ -8,8 +8,8 @@
  * meets expectation. It then runs the same test against a sharded collection with a single shard.
  */
 
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
-import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function testArraySorted(arr, key) {

@@ -16,8 +16,8 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     const testdb = db.getSiblingDB("timeseries_special_indexes_db");

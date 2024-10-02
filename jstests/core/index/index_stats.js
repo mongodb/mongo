@@ -18,8 +18,8 @@
 //   references_foreign_collection,
 // ]
 
-import {getAggPlanStage, getPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getAggPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 var colName = "jstests_index_stats";
 var col = db[colName];

@@ -1,6 +1,6 @@
 // Tests that a query with $in filter over a large array chooses the optimal index. We ban SBE
 // multi planner to run as it chooses a plan with a suboptimal index.
-import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
 // The SBE multi planner chooses the wrong index.
 

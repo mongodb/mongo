@@ -8,12 +8,8 @@
  *   assumes_read_concern_local
  * ]
  */
+import {getPlanStages, getWinningPlanFromExplain, isEofPlan} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {
-    getPlanStages,
-    getWinningPlanFromExplain,
-    isEofPlan
-} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "explain_find_trivially_false_predicates_in_tailables_over_capped_colls";
 

@@ -4,7 +4,7 @@
  * versioning are included for good measure.
  * @tags: [requires_fcv_71]
  */
-import {getLatestQueryStatsEntry} from "jstests/libs/query/query_stats_utils.js";
+import {getLatestQueryStatsEntry} from "jstests/libs/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({

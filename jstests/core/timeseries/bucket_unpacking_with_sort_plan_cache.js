@@ -23,12 +23,12 @@
  *     assumes_balancer_off,
  * ]
  */
-import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {
     getAggPlanStage,
     getAggPlanStages,
     getPlanCacheKeyFromExplain
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const fields = ["a", "b", "i"];
 

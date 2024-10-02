@@ -13,7 +13,7 @@
  * ]
  */
 import {EncryptedClient, kSafeContentField} from "jstests/fle2/libs/encrypted_client_util.js";
-import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const buildInfo = assert.commandWorked(db.runCommand({"buildInfo": 1}));
 

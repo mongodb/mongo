@@ -1,6 +1,6 @@
 // Tests that pipeline optimization works properly when the failpoint isn't triggered, and is
 // disabled properly when it is triggered.
-import {aggPlanHasStage} from "jstests/libs/query/analyze_plan.js";
+import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 
 Random.setRandomSeed();
 

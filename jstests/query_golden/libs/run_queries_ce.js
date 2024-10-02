@@ -4,7 +4,7 @@ import {
     getPlanSkeleton,
     navigateToRootNode,
     round2
-} from "jstests/libs/query/optimizer_utils.js";
+} from "jstests/libs/optimizer_utils.js";
 import {
     aggegateOptimizationTimesPerStrategy,
     aggregateErrorsPerCategory,

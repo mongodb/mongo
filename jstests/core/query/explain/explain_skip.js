@@ -6,7 +6,7 @@
  *   assumes_against_mongod_not_mongos,
  * ]
  */
-import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_skip;
 coll.drop();

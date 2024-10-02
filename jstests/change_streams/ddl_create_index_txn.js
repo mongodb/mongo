@@ -15,8 +15,8 @@
  * ]
  */
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const dbName = jsTestName() + "_db0";
 const collName = jsTestName() + '_1';

@@ -9,8 +9,8 @@
  *   requires_fcv_80
  * ]
  */
-import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";

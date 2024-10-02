@@ -12,8 +12,8 @@
  * ]
  */
 
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();

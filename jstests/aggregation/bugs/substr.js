@@ -1,5 +1,5 @@
 // Aggregation $substrBytes tests.
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let t = db.jstests_aggregation_substr;

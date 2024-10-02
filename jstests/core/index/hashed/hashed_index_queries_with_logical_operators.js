@@ -8,7 +8,7 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
+import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const coll = db.hashed_index_queries_with_logical_operators;
 coll.drop();

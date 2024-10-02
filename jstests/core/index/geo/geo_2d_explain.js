@@ -1,7 +1,7 @@
 // @tags: [
 //   assumes_balancer_off,
 // ]
-import {getExecutionStats, getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getExecutionStats, getPlanStages} from "jstests/libs/analyze_plan.js";
 
 var t = db.geo_2d_explain;
 

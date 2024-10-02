@@ -20,8 +20,8 @@
  *     requires_getmore,
  * ]
  */
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 function getNonConfigShards() {
     const shards = db.getSiblingDB('config').shards.find({_id: {$ne: "config"}}).toArray();

@@ -1,7 +1,7 @@
 /**
  * Test that explain output is correctly truncated when it grows too large.
  */
-import {getPlanStage, getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const dbName = "test";
 const collName = jsTestName();

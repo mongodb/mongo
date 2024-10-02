@@ -14,7 +14,7 @@ import {
     getQueryPlanner,
     getSingleNodeExplain,
     getWinningPlanFromExplain
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 var coll = db.orToIn;
 coll.drop();

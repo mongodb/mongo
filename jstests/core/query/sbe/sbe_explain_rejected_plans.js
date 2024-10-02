@@ -5,16 +5,16 @@
  *    requires_fcv_63,
  * ]
  */
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     getExecutionStages,
     getPlanStages,
     getRejectedPlan,
     getRejectedPlans,
     getWinningPlan,
-} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBEEnabled = checkSbeFullyEnabled(db);
 if (!isSBEEnabled) {

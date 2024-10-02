@@ -4,9 +4,9 @@
 //   does_not_support_stepdowns,
 // ]
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.wildcard_nonblocking_sort;
 coll.drop();

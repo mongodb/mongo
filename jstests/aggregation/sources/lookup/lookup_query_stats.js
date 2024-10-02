@@ -14,15 +14,12 @@
  *     requires_pipeline_optimization
  * ]
  */
-import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {
     getQueryInfoAtTopLevelOrFirstStage,
     getSbePlanStages
-} from "jstests/libs/query/sbe_explain_helpers.js";
-import {
-    checkSbeFullyEnabled,
-    checkSbeRestrictedOrFullyEnabled
-} from "jstests/libs/query/sbe_util.js";
+} from "jstests/libs/sbe_explain_helpers.js";
+import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBEFullyEnabled = checkSbeFullyEnabled(db);
 const isSBELookupEnabled = checkSbeRestrictedOrFullyEnabled(db);

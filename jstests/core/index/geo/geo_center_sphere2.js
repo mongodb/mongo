@@ -9,7 +9,7 @@
 // multiple documents, and so requires simultaneous testing.
 //
 
-import {deg2rad, rad2deg} from "jstests/libs/query/geo_math.js";
+import {deg2rad, rad2deg} from "jstests/libs/geo_math.js";
 
 function computexscandist(y, maxDistDegrees) {
     return maxDistDegrees /

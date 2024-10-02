@@ -15,8 +15,8 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const documentList = [
     {

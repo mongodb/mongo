@@ -1,6 +1,6 @@
 // In SERVER-22580 and SERVER-51557, the $substrCP expression was introduced. In this file, we test
 // the error cases and the intended behavior of this expression.
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.substrCP;

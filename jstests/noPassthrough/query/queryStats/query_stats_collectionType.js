@@ -4,7 +4,7 @@
  * in query_stats_changeStreams.js.
  * @tags: [requires_fcv_72]
  */
-import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
+import {getQueryStats} from "jstests/libs/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {

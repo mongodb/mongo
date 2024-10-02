@@ -5,7 +5,7 @@
  * Requires random cursor support.
  * @tags: [requires_replication]
  */
-import {aggPlanHasStage} from "jstests/libs/query/analyze_plan.js";
+import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const numDocs = 1000;

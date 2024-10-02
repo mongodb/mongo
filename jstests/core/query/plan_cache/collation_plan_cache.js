@@ -21,8 +21,8 @@
 //   requires_fcv_72,
 //   multiversion_incompatible,
 // ]
-import {getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getPlanCacheKeyFromExplain} from "jstests/libs/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 var coll = db.collation_plan_cache;
 coll.drop();

@@ -10,8 +10,8 @@
  * ]
  */
 
+import {getQueryPlanner, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getQueryPlanner, getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_verision_unstable_indexes";

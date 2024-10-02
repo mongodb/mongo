@@ -2,8 +2,8 @@
  * Tests the pipeline-style update is accepted by the findAndModify command.
  * @tags: [requires_non_retryable_writes]
  */
+import {getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStage, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.find_and_modify_pipeline_update;
 coll.drop();

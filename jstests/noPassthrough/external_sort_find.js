@@ -1,8 +1,8 @@
 /**
  * Test that the find command can spill to disk while executing a blocking sort.
  */
-import {getAggPlanStage, getPlanStage} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getAggPlanStage, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 // Only allow blocking sort execution to use 100 kB of memory.
 const kMaxMemoryUsageKB = 100;

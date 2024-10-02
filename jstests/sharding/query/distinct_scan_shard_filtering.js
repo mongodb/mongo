@@ -9,7 +9,7 @@
  * ]
  */
 
-import {getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 import {
     assertPipelineResultsAndExplain,
     assertPlanDoesNotUseDistinctScan,
@@ -18,7 +18,7 @@ import {
     assertPlanUsesIndexScan,
     coll,
     prepareCollection
-} from "jstests/libs/query/group_to_distinct_scan_utils.js";
+} from "jstests/libs/group_to_distinct_scan_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 TestData.skipCheckOrphans = true;

@@ -2,7 +2,7 @@
  * Tests that clustered collections can be used for sorted scanning without inserting
  * a blocking scan operator.
  */
-import {getPlanStage, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
 
 Random.setRandomSeed();
 

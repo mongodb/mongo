@@ -14,7 +14,7 @@ import {
     getWinningPlan,
     isCollscan,
     planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 const collName = "jstests_explain_distinct";
 const coll = db[collName];

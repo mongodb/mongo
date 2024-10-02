@@ -10,7 +10,7 @@ import {
     hasRejectedPlans,
     isQueryPlan,
     planHasStage,
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.use_query_sort;
 coll.drop();

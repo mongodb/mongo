@@ -8,7 +8,7 @@ import {
     getLatestQueryStatsEntry,
     getValueAtPath,
     withQueryStatsEnabled,
-} from "jstests/libs/query/query_stats_utils.js";
+} from "jstests/libs/query_stats_utils.js";
 
 const testColl = jsTestName();
 

@@ -20,7 +20,7 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getEngine, getPlanStage, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+import {getEngine, getPlanStage, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 
 const coll = db.timeseries_lastpoint_common_sort_key;
 const bucketsColl = db.system.buckets.timeseries_lastpoint_common_sort_key;

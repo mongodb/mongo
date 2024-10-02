@@ -5,7 +5,7 @@
 //   does_not_support_causal_consistency,
 // ]
 
-import {hasRejectedPlans} from "jstests/libs/query/analyze_plan.js";
+import {hasRejectedPlans} from "jstests/libs/analyze_plan.js";
 
 /**
  * Tests running explain on a variety of explainable commands (find, update, remove, etc.) when

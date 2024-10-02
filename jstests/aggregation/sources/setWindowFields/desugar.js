@@ -10,7 +10,7 @@
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */
-import {getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 
 const coll = db[jsTestName()];
 assert.commandWorked(coll.insert({}));

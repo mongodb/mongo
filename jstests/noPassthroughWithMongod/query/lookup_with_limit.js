@@ -1,12 +1,12 @@
 /**
  * Tests that the $limit stage is pushed before $lookup stages, except when there is an $unwind.
  */
-import {flattenQueryPlanTree, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {flattenQueryPlanTree, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeFullyEnabled,
     checkSbeRestrictedOrFullyEnabled
-} from "jstests/libs/query/sbe_util.js";
+} from "jstests/libs/sbe_util.js";
 
 const isFeatureFlagSbeFullEnabled = checkSbeFullFeatureFlagEnabled(db);
 const isSbeEnabled = checkSbeFullyEnabled(db);

@@ -10,7 +10,7 @@
  *   requires_non_retryable_writes,
  * ]
  */
-import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_sort_type;
 coll.drop();

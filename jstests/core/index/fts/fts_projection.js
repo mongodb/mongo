@@ -3,7 +3,7 @@
 //   assumes_read_concern_local,
 // ]
 
-import {getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 var t = db.getSiblingDB("test").getCollection("fts_projection");
 t.drop();

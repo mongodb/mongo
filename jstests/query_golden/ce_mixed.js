@@ -11,7 +11,7 @@ import {
     runHistogramsTest,
     summarizeExplainForCE
 } from "jstests/libs/ce_stats_utils.js";
-import {forceCE} from "jstests/libs/query/optimizer_utils.js";
+import {forceCE} from "jstests/libs/optimizer_utils.js";
 
 const collCard = 300;
 const numberBuckets = 5;

@@ -3,7 +3,7 @@
  * if feature flag is on.
  * @tags: [requires_fcv_71]
  */
-import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
+import {getQueryStats} from "jstests/libs/query_stats_utils.js";
 
 let options = {
     setParameter: {internalQueryStatsRateLimit: 0},

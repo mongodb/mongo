@@ -18,7 +18,7 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());

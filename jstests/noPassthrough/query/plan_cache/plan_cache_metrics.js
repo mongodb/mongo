@@ -3,7 +3,7 @@
  * and cleared from the cache.
  */
 
-import {getPlanCacheSize} from "jstests/libs/query/plan_cache_utils.js";
+import {getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
 
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB('test');

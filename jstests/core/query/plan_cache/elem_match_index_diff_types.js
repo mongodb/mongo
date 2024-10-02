@@ -4,7 +4,7 @@
  * when the entry and predicate have different data types which affect index compatibility.
  */
 
-import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
 
 const coll = db.elem_match_index_diff_types;
 const indexCollation = {

@@ -19,8 +19,8 @@
  * ]
  */
 
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {
     addIndex,
     assertPipelineResultsAndExplain,
@@ -32,7 +32,7 @@ import {
     documents,
     prepareCollection,
     removeIndex,
-} from "jstests/libs/query/group_to_distinct_scan_utils.js";
+} from "jstests/libs/group_to_distinct_scan_utils.js";
 
 prepareCollection();
 

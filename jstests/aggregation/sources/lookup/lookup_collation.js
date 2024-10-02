@@ -10,12 +10,8 @@
  * The 'collation' command option overrides local collection's collation.
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {getAggPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    getAggPlanStages,
-    getQueryPlanner,
-    getWinningPlan
-} from "jstests/libs/query/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());

@@ -3,7 +3,7 @@
  * will update the index entries associated with that document.
  */
 
-import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var coll = db.index_type_change;
 coll.drop();

@@ -15,13 +15,9 @@
  *   assumes_standalone_mongod
  * ]
  */
+import {getAggPlanStages, getEngine} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getAggPlanStages, getEngine} from "jstests/libs/query/analyze_plan.js";
-import {
-    checkSbeStatus,
-    kFeatureFlagSbeFullEnabled,
-    kSbeDisabled
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeStatus, kFeatureFlagSbeFullEnabled, kSbeDisabled} from "jstests/libs/sbe_util.js";
 
 // We pushdown unpack when checkSbeRestrictedOrFullyEnabled is true and when
 // featureFlagTimeSeriesInSbe is set.

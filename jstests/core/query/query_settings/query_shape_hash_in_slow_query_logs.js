@@ -16,7 +16,7 @@
 //   simulate_atlas_proxy_incompatible,
 //   requires_fcv_80,
 // ]
-import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const collName = "test";
 const qsutils = new QuerySettingsUtils(db, collName);

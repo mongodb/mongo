@@ -7,8 +7,8 @@
 //   # Explain of a resolved view must be executed by mongos.
 //   directly_against_shardsvrs_incompatible,
 // ]
+import {getAggPlanStages, getPlanStages} from "jstests/libs/analyze_plan.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {getAggPlanStages, getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 

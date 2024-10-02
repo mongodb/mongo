@@ -7,7 +7,7 @@
  *   requires_fastcount,
  * ]
  */
-import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const t = db.single_field_hashed_index;
 t.drop();

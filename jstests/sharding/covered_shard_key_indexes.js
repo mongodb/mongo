@@ -3,7 +3,7 @@
 // particular queries
 //
 
-import {getChunkSkipsFromShard} from "jstests/libs/query/analyze_plan.js";
+import {getChunkSkipsFromShard} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1});

@@ -6,7 +6,7 @@
  *   requires_pipeline_optimization,
  * ]
  */
-import {getAggPlanStage, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 /**
  * Utillity for inhibiting aggregate stage pushdowns to find-land queries. It doesn't prohibit other

@@ -7,7 +7,7 @@
  *   requires_pipeline_optimization,
  * ]
  */
-import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 // Find how many stages of the plan are 'stageName'.
 function numberOfStages(explain, stageName) {

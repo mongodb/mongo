@@ -22,7 +22,7 @@
  *   cannot_run_during_upgrade_downgrade,
  * ]
  */
-import {aggPlanHasStage} from "jstests/libs/query/analyze_plan.js";
+import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.timeseries_nondefault_collation;
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());

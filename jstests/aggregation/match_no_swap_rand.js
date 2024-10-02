@@ -14,7 +14,7 @@
  *   requires_fcv_72
  * ]
  */
-import {getPlanStage, getQueryPlanner, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 function getWinningPlanForPipeline({coll, pipeline}) {
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));

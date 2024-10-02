@@ -5,8 +5,8 @@
 //   assumes_read_concern_local,
 // ]
 //
-import {getExecutionStats} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getExecutionStats} from "jstests/libs/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 if (checkSbeRestrictedOrFullyEnabled(db)) {
     const coll = db.test;

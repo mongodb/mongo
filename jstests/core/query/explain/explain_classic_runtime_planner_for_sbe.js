@@ -10,7 +10,7 @@ import {
     getExecutionStages,
     getExecutionStats,
     getRejectedPlans,
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_classic_runtime_planner_for_sbe;
 coll.drop();

@@ -2,7 +2,7 @@
  * Common utility functions variables for $group to DISTINCT_SCAN optimization.
  */
 
-import {getAggPlanStages, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getQueryPlanner} from "jstests/libs/analyze_plan.js";
 
 export let coll;
 

@@ -7,14 +7,11 @@
  *   uses_multiple_connections,
  * ]
  */
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {
     assertDropAndRecreateCollection,
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
-import {
-    assertChangeStreamEventEq,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_pre_images");
 const cst = new ChangeStreamTest(db);

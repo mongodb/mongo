@@ -5,7 +5,7 @@
 // @tags: [
 // ]
 
-import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function assertShardFilter(explain) {

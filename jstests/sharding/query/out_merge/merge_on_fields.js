@@ -1,7 +1,7 @@
 // Tests that the "on" fields are correctly automatically generated when the user does not specify
 // it in the $merge stage.
 import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
-import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});

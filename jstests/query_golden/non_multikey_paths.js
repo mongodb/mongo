@@ -7,7 +7,7 @@
  *   requires_cqf,
  * ]
  */
-import {leftmostLeafStage, prettyInterval} from "jstests/libs/query/optimizer_utils.js";
+import {leftmostLeafStage, prettyInterval} from "jstests/libs/optimizer_utils.js";
 
 db.setLogLevel(4, "query");
 

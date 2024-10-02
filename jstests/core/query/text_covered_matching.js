@@ -12,7 +12,7 @@
 //   assumes_read_concern_local,
 // ]
 
-import {getPlanStages, getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.text_covered_matching;
 

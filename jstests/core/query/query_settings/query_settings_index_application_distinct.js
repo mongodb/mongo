@@ -16,8 +16,8 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
-import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
-import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {QuerySettingsIndexHintsTests} from "jstests/libs/query_settings_index_hints_tests.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 // Create the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.

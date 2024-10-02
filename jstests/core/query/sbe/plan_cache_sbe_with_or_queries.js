@@ -15,11 +15,7 @@
 //   featureFlagSbeFull,
 // ]
 
-import {
-    getPlanCacheKeyFromShape,
-    getWinningPlan,
-    planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanCacheKeyFromShape, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 function getPlanCacheEntries(query, collection, db) {
     const planCacheKey = getPlanCacheKeyFromShape({query, collection, db});

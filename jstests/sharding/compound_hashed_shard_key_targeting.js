@@ -8,12 +8,12 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 import {
     profilerHasAtLeastOneMatchingEntryOrThrow,
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
-import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {

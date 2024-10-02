@@ -1,4 +1,4 @@
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 
 var testDB = db.getSiblingDB("expression_ts_second_increment");
 

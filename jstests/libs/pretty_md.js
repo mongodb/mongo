@@ -4,10 +4,10 @@
  */
 
 /* eslint-disable no-undef */
-import {normalizeArray, tojsonMultiLineSortKeys} from "jstests/libs/golden_test.js";
 import {
     formatExplainRoot,
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
+import {normalizeArray, tojsonMultiLineSortKeys} from "jstests/libs/golden_test.js";
 
 let sectionCount = 1;
 export function section(msg) {

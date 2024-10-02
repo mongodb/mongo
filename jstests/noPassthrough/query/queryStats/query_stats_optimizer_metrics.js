@@ -2,7 +2,7 @@
  * This test validates optimizer metrics in query stats supplemental metrics section.
  * @tags: [requires_fcv_71]
  */
-import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
+import {getQueryStats} from "jstests/libs/query_stats_utils.js";
 
 const conn = MongoRunner.runMongod(
     {setParameter: {internalQueryCollectOptimizerMetrics: true, internalQueryStatsRateLimit: -1}});

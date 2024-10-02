@@ -7,7 +7,7 @@
  *   assumes_against_mongod_not_mongos,
  * ]
  */
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 

@@ -3,9 +3,9 @@
  * @tags: [featureFlagSbeFull]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {getAggPlanStages, getWinningPlanFromExplain} from "jstests/libs/analyze_plan.js";
+import {assertEngine} from "jstests/libs/analyze_plan.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {getAggPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {assertEngine} from "jstests/libs/query/analyze_plan.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mongotCommandForQuery,

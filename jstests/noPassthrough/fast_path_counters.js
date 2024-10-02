@@ -2,13 +2,8 @@
  * Tests that query planning fast path counters are updated correctly.
  */
 
+import {getWinningPlan, isExpress, isIdhack, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {
-    getWinningPlan,
-    isExpress,
-    isIdhack,
-    isIdhackOrExpress
-} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
 const conn = MongoRunner.runMongod({});

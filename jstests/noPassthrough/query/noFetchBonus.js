@@ -2,7 +2,7 @@
 //   requires_replication,
 //   requires_sharding,
 // ]
-import {getRejectedPlans, isIndexOnly, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getRejectedPlans, isIndexOnly, planHasStage} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}, config: 1});

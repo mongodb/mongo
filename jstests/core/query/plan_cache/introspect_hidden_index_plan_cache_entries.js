@@ -14,7 +14,7 @@
  * ]
  */
 
-import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
 
 const collName = 'introspect_hidden_index_plan_cache_entries';
 const collNotAffectedName = 'introspect_hidden_index_plan_cache_entries_unaffected';

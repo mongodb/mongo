@@ -4,7 +4,7 @@
 //   # because the shard doesn't know whether the merger needs the textScore metadata.
 //   assumes_unsharded_collection,
 // ]
-import {planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.optimize_text;
 assert.commandWorked(coll.createIndex({"$**": "text"}));

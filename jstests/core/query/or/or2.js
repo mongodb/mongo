@@ -3,7 +3,7 @@
 // ]
 
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const t = db.jstests_or2;
 t.drop();

@@ -9,8 +9,8 @@
  * ]
  */
 
-import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
+import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/sbe_util.js";
 
 if (checkSbeCompletelyDisabled(db)) {
     jsTestLog("Skipping test because SBE is disabled: no lowering of $lookup to SBE.");

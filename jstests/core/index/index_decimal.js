@@ -7,7 +7,7 @@
 
 // Test indexing of decimal numbers
 // Include helpers for analyzing explain output.
-import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isCollscan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var t = db.decimal_indexing;
 t.drop();

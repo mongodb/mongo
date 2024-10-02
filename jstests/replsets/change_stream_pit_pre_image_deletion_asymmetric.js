@@ -7,7 +7,7 @@
  * requires_fcv_60,
  * ]
  */
-import {getPreImages} from "jstests/libs/query/change_stream_util.js";
+import {getPreImages} from "jstests/libs/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 

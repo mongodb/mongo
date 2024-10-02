@@ -5,7 +5,7 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/explain/explain.js";
-import {planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states = Object.extend({

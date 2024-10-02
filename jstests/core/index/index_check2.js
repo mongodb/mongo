@@ -7,7 +7,7 @@ let t = db.index_check2;
 t.drop();
 
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 for (var i = 0; i < 1000; i++) {
     var a = [];

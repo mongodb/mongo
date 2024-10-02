@@ -5,8 +5,8 @@
  *   does_not_support_stepdowns,
  * ]
  */
+import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.wildcard_partial_index;
 

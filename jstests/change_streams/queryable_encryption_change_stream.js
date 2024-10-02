@@ -8,10 +8,7 @@
 // ]
 //
 import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
-import {
-    canonicalizeEventForTesting,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
+import {canonicalizeEventForTesting, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 
 if (!isEnterpriseShell()) {
     jsTestLog("Skipping test as it requires the enterprise module");

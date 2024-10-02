@@ -1,7 +1,7 @@
 /**
  * Tests foreground validation's ability to fix up allowable multikey metadata problems.
  */
-import {getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const dbName = jsTestName();

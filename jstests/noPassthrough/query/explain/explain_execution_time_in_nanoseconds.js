@@ -2,7 +2,7 @@
 // includes "executionTimeMicros"/"executionTimeNanos" only if requested.
 // "executionTimeMillisEstimate" will always be present in the explain output.
 // Check that "queryPlanner" has "optimizationTimeMillis".
-import {getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getAllPlanStages} from "jstests/libs/analyze_plan.js";
 
 let conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start up");

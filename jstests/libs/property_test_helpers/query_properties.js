@@ -1,9 +1,9 @@
+import {getRejectedPlans} from "jstests/libs/analyze_plan.js";
 import {
     aggPipelineModel,
     aggPipelineNoOrsModel,
 } from "jstests/libs/property_test_helpers/query_models.js";
-import {getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 /*
  * Properties take the collection we're testing, a list of queries to use during the property test,

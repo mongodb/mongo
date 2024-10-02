@@ -6,7 +6,7 @@
 //   # unexpected plans.
 //   assumes_no_implicit_index_creation,
 // ]
-import {assertCoveredQueryAndCount} from "jstests/libs/query/analyze_plan.js";
+import {assertCoveredQueryAndCount} from "jstests/libs/analyze_plan.js";
 
 const coll = db.index_bounds_maxkey;
 coll.drop();

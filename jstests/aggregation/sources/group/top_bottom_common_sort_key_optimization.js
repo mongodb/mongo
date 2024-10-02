@@ -21,7 +21,7 @@ import {
     getEngine,
     getPlanStages,
     getSingleNodeExplain
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());

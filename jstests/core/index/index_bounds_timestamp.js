@@ -10,7 +10,7 @@ import {
     getWinningPlanFromExplain,
     isCollscan,
     isIndexOnly
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 // Setup the test collection.
 let coll = db.index_bounds_timestamp;

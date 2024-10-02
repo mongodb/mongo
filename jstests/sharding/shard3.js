@@ -1,5 +1,5 @@
 // Include helpers for analyzing explain output.
-import {getChunkSkipsFromAllShards} from "jstests/libs/query/analyze_plan.js";
+import {getChunkSkipsFromAllShards} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const s = new ShardingTest({name: "shard3", shards: 2, mongos: 2, other: {enableBalancer: true}});

@@ -2,9 +2,9 @@
  * Test the use of "explain" with the "$search" aggregation stage, but does not check the value of
  * executionStats.
  */
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
@@ -12,7 +12,6 @@ import {
     setUpMongotReturnExplain,
     setUpMongotReturnExplainAndCursor,
 } from "jstests/with_mongot/mongotmock/lib/utils.js";
-
 // Set up mongotmock and point the mongod to it.
 const mongotmock = new MongotMock();
 mongotmock.start();

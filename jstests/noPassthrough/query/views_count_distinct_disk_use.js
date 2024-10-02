@@ -1,7 +1,7 @@
 // Test count and distinct on views use with different values of the allowDiskUseByDefault
 // parameter.
 
-import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");

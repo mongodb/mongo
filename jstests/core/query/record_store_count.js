@@ -6,8 +6,8 @@
  * ]
  */
 
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 var coll = db.record_store_count;
 coll.drop();

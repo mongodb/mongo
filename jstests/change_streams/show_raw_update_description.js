@@ -9,8 +9,8 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "t1");

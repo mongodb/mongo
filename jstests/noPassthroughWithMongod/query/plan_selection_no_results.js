@@ -4,7 +4,7 @@
  * The plan which is able to most cheaply determine that there are no results should be selected as
  * the winner.
  */
-import {getEngine, getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getEngine, getPlanStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.plan_selection_no_results;
 coll.drop();

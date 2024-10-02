@@ -8,8 +8,8 @@
  */
 
 import {anyEq, arrayEq, documentEq} from "jstests/aggregation/extras/utils.js";
+import {getExecutionStats, getUnionWithStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getExecutionStats, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;

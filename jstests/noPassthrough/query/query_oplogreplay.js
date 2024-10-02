@@ -1,7 +1,7 @@
 // Test oplog queries that can be optimized with oplogReplay.
 // @tags: [requires_replication, requires_capped]
 
-import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let replSet = new ReplSetTest({nodes: 1});

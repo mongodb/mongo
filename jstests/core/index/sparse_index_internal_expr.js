@@ -9,7 +9,7 @@
  * ]
  */
 
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.sparse_index_internal_expr;
 coll.drop();

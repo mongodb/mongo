@@ -1,7 +1,7 @@
 // In SERVER-6773, the $split expression was introduced. In this file, we test the functionality and
 // error cases of the expression.
 
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 
 import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 

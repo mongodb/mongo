@@ -3,7 +3,7 @@
  * instead of the embeddings.
  */
 
-import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {
     getMovieData,
     getPlotEmbeddingById

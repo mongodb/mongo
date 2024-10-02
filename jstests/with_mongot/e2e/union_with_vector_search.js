@@ -3,7 +3,7 @@
  * The collection used for $vectorSearch in this test includes no score ties.
  */
 
-import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {
     getMovieData,
     getPlotEmbeddingById

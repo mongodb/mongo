@@ -11,7 +11,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-import {getAggPlanStages, getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.distinct_multikey;
 coll.drop();

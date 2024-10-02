@@ -2,8 +2,8 @@
  * Tests that detailed debug information is excluded from new plan cache entries once the estimated
  * cumulative size of the system's plan caches exceeds a pre-configured threshold.
  */
-import {getPlanCacheSize} from "jstests/libs/query/plan_cache_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 /**
  * Creates two indexes for the given collection. In order for plans to be cached, there need to be

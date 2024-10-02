@@ -11,8 +11,8 @@
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
 // ]
+import {getPlanCacheKeyFromExplain} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.plan_cache_stats_shard_and_host;
 coll.drop();

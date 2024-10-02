@@ -1,4 +1,4 @@
-import {round2} from "jstests/libs/query/optimizer_utils.js";
+import {round2} from "jstests/libs/optimizer_utils.js";
 
 /**
  * Compute cardinality estimation errors for a testcase and CE strategy.

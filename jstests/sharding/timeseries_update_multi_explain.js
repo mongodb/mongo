@@ -12,7 +12,7 @@ import {
     generateTimeValue,
     makeBucketFilter
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
-import {getExecutionStages} from "jstests/libs/query/analyze_plan.js";
+import {getExecutionStages} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {TimeseriesMultiUpdateUtil} from "jstests/sharding/libs/timeseries_update_multi_util.js";
 

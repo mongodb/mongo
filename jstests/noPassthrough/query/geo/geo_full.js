@@ -18,7 +18,7 @@
 // test fails, and hard-wiring that as the test number.
 //
 
-import {deg2rad, rad2deg} from "jstests/libs/query/geo_math.js";
+import {deg2rad, rad2deg} from "jstests/libs/geo_math.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");

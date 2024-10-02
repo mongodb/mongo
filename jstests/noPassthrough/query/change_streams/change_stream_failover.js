@@ -5,8 +5,8 @@
 //   requires_majority_read_concern,
 //   requires_replication,
 // ]
+import {ChangeStreamTest, ChangeStreamWatchMode} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ChangeStreamTest, ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 3});

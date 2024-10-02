@@ -12,7 +12,7 @@
  * ]
  */
 
-import {getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getPlanCacheKeyFromExplain} from "jstests/libs/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");

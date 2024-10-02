@@ -8,8 +8,8 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStage, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 // Make sure that the test collection is empty before starting the test.
 const testColl = db.update_pipeline_shell_helpers_test;

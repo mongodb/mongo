@@ -13,7 +13,7 @@
  * ]
  */
 
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Use a higher frequency for periodic noops to speed up the test.

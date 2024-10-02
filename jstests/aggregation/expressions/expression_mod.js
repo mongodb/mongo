@@ -1,6 +1,6 @@
 // Confirm correctness of $mod evaluation in aggregation.
 
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 
 import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 

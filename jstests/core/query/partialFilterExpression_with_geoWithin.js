@@ -1,6 +1,6 @@
 // @tags: [requires_non_retryable_writes, requires_fcv_51]
 
-import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.partialFilterExpression_with_geoWithin;
 coll.drop();

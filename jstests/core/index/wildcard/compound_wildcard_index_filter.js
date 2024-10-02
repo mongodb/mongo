@@ -12,7 +12,7 @@
  * ]
  */
 
-import {WildcardIndexHelpers} from "jstests/libs/query/wildcard_index_helpers.js";
+import {WildcardIndexHelpers} from "jstests/libs/wildcard_index_helpers.js";
 
 /**
  * Utility function to find an index filter by keyPattern or index name in the given filterList.

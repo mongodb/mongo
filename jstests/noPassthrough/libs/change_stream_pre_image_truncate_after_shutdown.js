@@ -23,13 +23,13 @@
  *      truncateAfterShutdownTest.teardown();
  */
 
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     getPreImages,
     getPreImagesCollection,
     kPreImagesCollectionDatabase,
     kPreImagesCollectionName
-} from "jstests/libs/query/change_stream_util.js";
+} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 

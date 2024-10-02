@@ -3,15 +3,15 @@
 // collection results in a failure in the secondary reads suite.
 // @tags: [assumes_read_preference_unchanged]
 import {
+    assertInvalidChangeStreamNss,
+    assertValidChangeStreamNss,
+    ChangeStreamTest
+} from "jstests/libs/change_stream_util.js";
+import {
     assertDropAndRecreateCollection,
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    assertInvalidChangeStreamNss,
-    assertValidChangeStreamNss,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
 
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "t1");

@@ -13,7 +13,7 @@ import {
     getPlanStages,
     isCollscan,
     isIxscan
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 

@@ -15,7 +15,7 @@ import {
     isIdhackOrExpress,
     isIndexOnly,
     isIxscan
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 let coll = db["projection_dotted_paths"];
 coll.drop();

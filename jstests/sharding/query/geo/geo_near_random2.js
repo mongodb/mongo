@@ -2,10 +2,10 @@
  * This tests 1% of all points using $near and $nearSphere.
  */
 
-import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
+import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var testName = jsTestName();
+var testName = "geo_near_random2";
 var s = new ShardingTest({shards: 3});
 
 var db = s.getDB("test");

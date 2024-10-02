@@ -16,7 +16,7 @@
  *  tenant_migration_incompatible,
  * ]
  */
-import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();

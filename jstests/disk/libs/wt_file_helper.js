@@ -4,7 +4,7 @@ import {
     getWinningPlan,
     isExpress,
     isIxscan
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 
 /**
  * Get the URI of the wt collection file given the collection name.

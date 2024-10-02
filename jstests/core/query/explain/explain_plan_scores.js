@@ -9,11 +9,7 @@
 //   assumes_against_mongod_not_mongos,
 // ]
 
-import {
-    getRejectedPlan,
-    getRejectedPlans,
-    getWinningPlan
-} from "jstests/libs/query/analyze_plan.js";
+import {getRejectedPlan, getRejectedPlans, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_plan_scores;
 coll.drop();

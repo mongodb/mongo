@@ -11,10 +11,10 @@
  *   directly_against_shardsvrs_incompatible,
  * ]
  */
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
-import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const sbeEnabled = checkSbeFullyEnabled(db) &&
     FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');

@@ -8,7 +8,7 @@
  * ]
  */
 import {documentEq} from "jstests/aggregation/extras/utils.js";
-import {planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test deliberately inserts orphans.

@@ -2,7 +2,7 @@
  * Test that queryStats works properly for a find command that uses regex.
  * @tags: [requires_fcv_71]
  */
-import {getLatestQueryStatsEntry} from "jstests/libs/query/query_stats_utils.js";
+import {getLatestQueryStatsEntry} from "jstests/libs/query_stats_utils.js";
 
 // Turn on the collecting of queryStats metrics.
 let options = {

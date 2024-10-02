@@ -8,8 +8,8 @@
 //   requires_fcv_63,
 // ]
 
-import {getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 

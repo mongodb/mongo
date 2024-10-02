@@ -16,14 +16,14 @@
  */
 
 import {getExplainPipelineFromAggregationResult} from "jstests/aggregation/extras/utils.js";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     aggPlanHasStage,
     getAggPlanStages,
     getWinningPlanFromExplain,
     isEofPlan,
     planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 function assertPlanIsEOF(plan) {
     // Explain query output doesn't include planning for the foreign branch hence we use execution

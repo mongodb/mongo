@@ -3,7 +3,7 @@
  * from the cache.
  */
 
-import {checkSbeCompletelyDisabled, checkSbeRestricted} from "jstests/libs/query/sbe_util.js";
+import {checkSbeCompletelyDisabled, checkSbeRestricted} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 

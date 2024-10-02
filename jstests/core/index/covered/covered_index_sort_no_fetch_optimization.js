@@ -9,8 +9,8 @@
  *   assumes_unsharded_collection,
  * ]
  */
+import {getWinningPlan, isIndexOnly, planHasStage} from "jstests/libs/analyze_plan.js";
 import {exhaustFindCursorAndReturnResults} from "jstests/libs/find_cmd_util.js";
-import {getWinningPlan, isIndexOnly, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "covered_index_sort_no_fetch_optimization";
 const coll = db.getCollection(collName);

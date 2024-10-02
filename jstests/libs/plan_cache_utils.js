@@ -2,13 +2,13 @@
  * Utility methods for reading planCache counters
  */
 
-import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {
     getCachedPlan,
     getEngine,
     getPlanCacheShapeHashFromObject,
     getPlanStage
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 export function getPlanCacheSize(db) {
     return db.serverStatus().metrics.query.planCache.totalSizeEstimateBytes;

@@ -4,7 +4,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-import {getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

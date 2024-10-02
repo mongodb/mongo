@@ -13,8 +13,8 @@
  *   requires_timeseries,
  * ]
  */
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {exhaustFindCursorAndReturnResults} from "jstests/libs/find_cmd_util.js";
-import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.timeseries_hint;
 coll.drop();

@@ -12,7 +12,7 @@
 import {
     getPlanCacheKeyFromPipeline,
     getPlanCacheShapeHashFromObject
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "testdb";

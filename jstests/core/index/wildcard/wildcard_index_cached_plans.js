@@ -22,16 +22,16 @@
  *   does_not_support_multiplanning_single_solutions,
  * ]
  */
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getPlanCacheKeyFromExplain,
     getPlanCacheKeyFromShape,
     getPlanStage,
     getPlanStages,
     getWinningPlan,
-} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
+} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.wildcard_cached_plans;
 

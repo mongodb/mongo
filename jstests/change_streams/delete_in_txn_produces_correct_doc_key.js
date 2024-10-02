@@ -6,8 +6,8 @@
 //  assumes_against_mongod_not_mongos
 //  ]
 
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const collName = "delete_in_txn_produces_correct_doc_key";
 

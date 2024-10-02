@@ -11,7 +11,7 @@
 //   do_not_wrap_aggregations_in_facets,
 //   requires_pipeline_optimization,
 // ]
-import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 const t = db.jstests_aggregation_server6192;
 t.drop();

@@ -18,13 +18,13 @@
  * ]
  */
 
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     getAllNodeExplains,
     getPlanCacheKeyFromExplain,
     getPlanCacheShapeHashFromExplain
-} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
+} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
 function groupBy(arr, keyFn) {
     let dict = {};

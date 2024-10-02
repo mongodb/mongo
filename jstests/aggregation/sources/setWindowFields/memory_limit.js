@@ -7,7 +7,7 @@
  * ]
  */
 
-import "jstests/libs/query/sbe_assert_error_override.js";
+import "jstests/libs/sbe_assert_error_override.js";
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";

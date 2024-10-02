@@ -2,7 +2,7 @@
  * Test the use of "explain" with the "$search" aggregation stage in SBE.
  * @tags: [featureFlagSbeFull]
  */
-import {planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 

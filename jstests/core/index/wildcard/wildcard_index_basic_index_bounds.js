@@ -14,13 +14,13 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getPlanStages,
     getRejectedPlan,
     getRejectedPlans,
     getWinningPlan
-} from "jstests/libs/query/analyze_plan.js";
+} from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Asserts that the given cursors produce identical result sets.
 function assertResultsEq(cursor1, cursor2) {
