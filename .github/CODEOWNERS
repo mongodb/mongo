@@ -321,6 +321,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/noPassthrough/configuration/OWNERS.yml
 /jstests/noPassthrough/configuration/**/configExpand_* @10gen/server-security @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/feature_compatibility_version/OWNERS.yml
+/jstests/noPassthrough/feature_compatibility_version/**/* @10gen/server-replication @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/interruption/OWNERS.yml
 /jstests/noPassthrough/interruption/**/* @10gen/server-programmability @svc-auto-approve-bot
 
@@ -383,6 +386,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/query/yield/OWNERS.yml
 /jstests/noPassthrough/query/yield/**/* @10gen/query-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/noPassthrough/read_write_concern/OWNERS.yml
+/jstests/noPassthrough/read_write_concern/**/* @10gen/server-replication @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/noPassthrough/replication/OWNERS.yml
+/jstests/noPassthrough/replication/**/* @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/rs_endpoint/OWNERS.yml
 /jstests/noPassthrough/rs_endpoint/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
