@@ -28,4 +28,5 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/query_expressions",
         "boolean_simplification",
     ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )

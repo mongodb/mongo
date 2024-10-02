@@ -144,6 +144,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/record_id_helpers",
         "$BUILD_DIR/mongo/db/server_base",
     ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 env.CppUnitTest(

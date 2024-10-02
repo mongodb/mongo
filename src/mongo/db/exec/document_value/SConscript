@@ -23,4 +23,5 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/server_base",
         "document_value",
     ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )

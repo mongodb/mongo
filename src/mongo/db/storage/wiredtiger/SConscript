@@ -233,6 +233,7 @@ wtEnv.Benchmark(
         "wiredtiger_index_test_harness",
         "wiredtiger_record_store_test_harness",
     ],
+    CONSOLIDATED_TARGET="wt_storage_bm",
 )
 
 wtEnv.Benchmark(
@@ -247,4 +248,5 @@ wtEnv.Benchmark(
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "storage_wiredtiger_core",
     ],
+    CONSOLIDATED_TARGET="wt_storage_bm",
 )

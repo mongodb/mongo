@@ -137,6 +137,7 @@ env.Benchmark(
         "service_executor",
         "transport_layer_mock",
     ],
+    CONSOLIDATED_TARGET="second_half_bm",
 )
 
 env.Benchmark(
@@ -152,4 +153,5 @@ env.Benchmark(
         "transport_layer_manager",
         "transport_layer_mock",
     ],
+    CONSOLIDATED_TARGET="second_half_bm",
 )

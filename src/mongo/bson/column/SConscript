@@ -25,6 +25,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/base",
         "column",
     ],
+    CONSOLIDATED_TARGET="bsoncolumn_bm",
 )
 
 env.Library(
@@ -66,6 +67,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/sbe_values",
         "column",
     ],
+    CONSOLIDATED_TARGET="bsoncolumn_bm",
 )
 
 env.CppLibfuzzerTest(

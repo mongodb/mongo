@@ -263,6 +263,7 @@ env.Benchmark(
         "clock_sources",
         "processinfo",
     ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 env.CppUnitTest(
@@ -282,6 +283,7 @@ env.Benchmark(
         "decimal_counter_bm.cpp",
     ],
     LIBDEPS=[],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 env.Benchmark(
@@ -306,6 +308,7 @@ env.Benchmark(
         "tick_source_bm.cpp",
     ],
     LIBDEPS=[],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 pcre_env = env.Clone()
@@ -480,10 +483,7 @@ if env.TargetOSIs("windows"):
         ],
     )
 
-env.Benchmark(
-    target="base64_bm",
-    source="base64_bm.cpp",
-)
+env.Benchmark(target="base64_bm", source="base64_bm.cpp", CONSOLIDATED_TARGET="first_half_bm")
 
 stacktraceEnv = env.Clone()
 if use_libunwind:
@@ -556,6 +556,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/base",
         "processinfo",
     ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 pretty_printer_test_program = env.Program(

@@ -82,4 +82,5 @@ env.Benchmark(
         "fle_crypto",
         "sha_block",
     ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )

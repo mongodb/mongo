@@ -48,6 +48,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/service_context_non_d",
         "lock_manager",
     ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 env.PrettyPrinterTest(target="lock_gdb_test.py")

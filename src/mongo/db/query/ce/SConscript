@@ -69,6 +69,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "ce_test_utils",
     ],
+    CONSOLIDATED_TARGET="second_half_bm",
 )
 
 env.Program(

@@ -45,6 +45,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/service_context_non_d",
         "ticketholder",
     ],
+    CONSOLIDATED_TARGET="second_half_bm",
 )
 
 env.Benchmark(

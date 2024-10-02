@@ -29,4 +29,5 @@ env.Benchmark(
         "manager",
         "utils",
     ],
+    CONSOLIDATED_TARGET="query_nond_bm",
 )

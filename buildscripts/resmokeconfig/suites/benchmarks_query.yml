@@ -5,19 +5,10 @@ selector:
   root: build/benchmarks.txt
   include_files:
     # The trailing asterisk is for handling the .exe extension on Windows.
-    - build/install/bin/percentile_algo_bm*
-    - build/install/bin/window_function_percentile_bm*
-    - build/install/bin/window_function_concat_arrays_bm*
-    - build/install/bin/rate_limiting_bm*
-    - build/install/bin/shapifying_bm*
-    - build/install/bin/profile_filter_bm*
-    - build/install/bin/query_settings_lookup_bm*
-    - build/install/bin/plan_cache_key_encoding_bm*
+    - build/install/bin/query_bm*
+    - build/install/bin/query_nond_bm*
     - build/install/bin/point_query_bm*
-    - build/install/bin/canonical_query_bm*
-    - build/install/bin/query_planner_bm*
     - build/install/bin/plan_cache_classic_bm*
-    - build/install/bin/sbe_builder_bm*
 
 executor:
   config: {}

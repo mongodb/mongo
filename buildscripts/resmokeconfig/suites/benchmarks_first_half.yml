@@ -8,48 +8,29 @@ selector:
   include_files:
     # Note: This list is manually curated based on https://docs.google.com/spreadsheets/d/1yK0JIM9fN6CS-KlnOl7BcdsWd5qdJtlILo9e3BCB8QQ/edit#gid=0
     # It will NOT automagically get updated if new benchmark-related tests are added.
-    - build/install/bin/bson_bm*
-    - build/install/bin/base64_bm*
-    - build/install/bin/lock_manager_bm*
-    - build/install/bin/uuid_bm*
-    - build/install/bin/storage_record_id_bm*
+    - build/install/bin/first_half_bm*
+    - build/install/bin/path_lower_bm*
     - build/install/bin/storage_wiredtiger_begin_transaction_block_bm*
-    - build/install/bin/commands_bm*
     - build/install/bin/abt_lower_bm*
-    - build/install/bin/logv2_bm*
-    - build/install/bin/condition_variable_bm*
-    - build/install/bin/document_bm*
-    - build/install/bin/decimal_counter_bm*
-    - build/install/bin/endian_bm*
-    - build/install/bin/clock_source_bm*
-    - build/install/bin/quine_mccluskey_bm*
     - build/install/bin/string_bm*
     - build/install/bin/stacktrace_bm*
-    - build/install/bin/storage_wiredtiger_index_bm*
     - build/install/bin/placement_history_bm*
-    - build/install/bin/sbe_vm_bm*
-    - build/install/bin/tick_source_bm*
-    - build/install/bin/crypto_bm*
     - build/install/bin/system_resource_canary_bm*
     - build/install/bin/future_bm*
 
   exclude_files:
     # The trailing asterisk is for handling the .exe extension on Windows.
     # These benchmarks are being run as part of the benchmarks_sharding.yml test suite.
-    - build/install/bin/chunk_manager_refresh_bm*
-    - build/install/bin/migration_chunk_cloner_source_legacy_bm*
-    - build/install/bin/sharding_write_router_bm*
+    - build/install/bin/sharding_bm*
     # These benchmarks are being run as part of the benchmarks_bsoncolumn.yml test suite.
     - build/install/bin/bsoncolumn_bm*
-    - build/install/bin/simple8b_bm*
     # Hash table benchmark is really slow, don't run on evergreen
     - build/install/bin/hash_table_bm*
     # These benchmarks are being run as part of the benchmarks_query.yml
-    - build/install/bin/percentile_algo_bm*
-    - build/install/bin/window_function_percentile_bm*
-    - build/install/bin/rate_limiting_bm*
-    - build/install/bin/profile_filter_bm*
-    - build/install/bin/plan_cache_key_encoding_bm*
+    - build/install/bin/query_bm*
+    - build/install/bin/query_nond_bm*
+    - build/install/bin/plan_cache_classic_bm*
+    - build/install/bin/point_query_bm*
     # These benchmarks are being run as part of the benchmarks_expression*.yml
     - build/install/bin/expression_bm*
     - build/install/bin/sbe_expression_bm*
@@ -60,7 +41,7 @@ selector:
     - build/install/bin/immutable_absl_comparison_bm*
     - build/install/bin/immutable_std_comparison_bm*
     # These benchmarks are being run as part of the benchmarks_replication.yml test suite.
-    - build/install/bin/oplog_application_bm*
+    - build/install/bin/repl_bm*
 
 executor:
   config: {}

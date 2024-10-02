@@ -6,7 +6,6 @@ selector:
   include_files:
     # The trailing asterisk is for handling the .exe extension on Windows.
     - build/install/bin/bsoncolumn_bm*
-    - build/install/bin/simple8b_bm*
 
 executor:
   config: {}

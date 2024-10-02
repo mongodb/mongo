@@ -33,6 +33,7 @@ env.Benchmark(
         "endian_bm.cpp",
     ],
     LIBDEPS=[],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 if get_option("link-model") == "dynamic":

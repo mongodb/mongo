@@ -39,6 +39,7 @@ env.Benchmark(
         "document_source_mock",
         "pipeline",
     ],
+    CONSOLIDATED_TARGET="second_half_bm",
 )
 
 env.Library(
@@ -263,6 +264,7 @@ env.Benchmark(
     LIBDEPS=[
         "accumulator",
     ],
+    CONSOLIDATED_TARGET="query_bm",
 )
 
 env.CppUnitTest(
@@ -299,6 +301,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/service_context_non_d",
         "accumulator",
     ],
+    CONSOLIDATED_TARGET="query_nond_bm",
 )
 
 env.Benchmark(
@@ -311,6 +314,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/service_context_non_d",
         "accumulator",
     ],
+    CONSOLIDATED_TARGET="query_nond_bm",
 )
 
 bmEnv = env.Clone()

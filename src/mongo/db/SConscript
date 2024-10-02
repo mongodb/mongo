@@ -85,6 +85,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/util/processinfo",
         "profile_settings",
     ],
+    CONSOLIDATED_TARGET="query_bm",
 )
 
 env.CppUnitTest(
@@ -1227,6 +1228,7 @@ env.Benchmark(
     LIBDEPS=[
         "server_base",
     ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 env.Benchmark(

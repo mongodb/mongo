@@ -13,6 +13,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/query/sort_pattern",
         "index_access_method",
     ],
+    CONSOLIDATED_TARGET="second_half_bm",
 )
 
 indexTestEnv = env.Clone()

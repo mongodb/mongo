@@ -44,6 +44,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/util/processinfo",
         "rate_limiting",
     ],
+    CONSOLIDATED_TARGET="query_bm",
 )
 
 env.Benchmark(
@@ -65,4 +66,5 @@ env.Benchmark(
         "$BUILD_DIR/mongo/util/processinfo",
         "query_stats",
     ],
+    CONSOLIDATED_TARGET="query_nond_bm",
 )

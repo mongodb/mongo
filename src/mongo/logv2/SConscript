@@ -28,4 +28,5 @@ env.Benchmark(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
     ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )

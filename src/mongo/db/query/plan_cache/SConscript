@@ -31,6 +31,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/query_expressions",
         "$BUILD_DIR/mongo/db/service_context_non_d",
     ],
+    CONSOLIDATED_TARGET="query_nond_bm",
 )
 
 env.Benchmark(

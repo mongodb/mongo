@@ -33,6 +33,7 @@ env.Benchmark(
         "operation_logger_transaction_proxy",
         "user_write_block_mode_op_observer",
     ],
+    CONSOLIDATED_TARGET="repl_bm",
 )
 
 env.CppUnitTest(

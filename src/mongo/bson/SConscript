@@ -45,6 +45,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/bson/bson_validate",
     ],
+    CONSOLIDATED_TARGET="first_half_bm",
 )
 
 env.CppLibfuzzerTest(
