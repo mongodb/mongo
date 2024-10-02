@@ -146,7 +146,6 @@ repl::OpTime ClusterServerParameterOpObserver::onDropCollection(
     const NamespaceString& collectionName,
     const UUID& uuid,
     std::uint64_t numRecords,
-    CollectionDropType dropType,
     bool markFromMigrate) {
     if (isConfigNamespace(collectionName)) {
         // Entire collection deleted, reset to default state.

@@ -295,11 +295,6 @@ void ReplicationCoordinatorExternalStateMock::setElectionTimeoutOffsetLimitFract
 void ReplicationCoordinatorExternalStateMock::notifyOplogMetadataWaiters(
     const OpTime& committedOpTime) {}
 
-boost::optional<OpTime> ReplicationCoordinatorExternalStateMock::getEarliestDropPendingOpTime()
-    const {
-    return {};
-}
-
 double ReplicationCoordinatorExternalStateMock::getElectionTimeoutOffsetLimitFraction() const {
     return _electionTimeoutOffsetLimitFraction;
 }

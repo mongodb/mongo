@@ -878,20 +878,6 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
         if (currentName && *currentName == newCollName)
             return Status::OK();
 
-        if (currentName && currentName->isDropPendingNamespace()) {
-            LOGV2(20308,
-                  "CMD: create -- existing collection with conflicting UUID is in a drop-pending "
-                  "state",
-                  "newCollection"_attr = newCollName,
-                  "conflictingUUID"_attr = uuid,
-                  "existingCollection"_attr = *currentName);
-            return Status(ErrorCodes::NamespaceExists,
-                          str::stream()
-                              << "existing collection " << currentName->toStringForErrorMsg()
-                              << " with conflicting UUID " << uuid.toString()
-                              << " is in a drop-pending state.");
-        }
-
         // In the case of oplog replay, a future command may have created or renamed a
         // collection with that same name. In that case, renaming this future collection to
         // a random temporary name is correct: once all entries are replayed no temporary

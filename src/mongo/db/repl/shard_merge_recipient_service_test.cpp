@@ -63,7 +63,6 @@
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -225,12 +224,6 @@ public:
 
             // Need real (non-mock) storage for the oplog buffer.
             StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
-
-            // The DropPendingCollectionReaper is required to drop the oplog buffer collection.
-            repl::DropPendingCollectionReaper::set(
-                serviceContext,
-                std::make_unique<repl::DropPendingCollectionReaper>(
-                    StorageInterface::get(serviceContext)));
 
             // Set up OpObserver so that repl::logOp() will store the oplog entry's optime in
             // ReplClientInfo.

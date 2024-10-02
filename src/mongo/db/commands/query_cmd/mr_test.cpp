@@ -65,7 +65,6 @@
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
@@ -323,7 +322,6 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType,
                                   bool markFromMigrate) override;
 
     // Hook for onInserts. Defaults to a no-op function but may be overridden to inject exceptions
@@ -387,7 +385,6 @@ repl::OpTime MapReduceOpObserver::onDropCollection(OperationContext* opCtx,
                                                    const NamespaceString& collectionName,
                                                    const UUID& uuid,
                                                    std::uint64_t numRecords,
-                                                   const CollectionDropType dropType,
                                                    bool markFromMigrate) {
     // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
     // drop.
@@ -453,10 +450,6 @@ void MapReduceCommandTest::setUp() {
         [](OperationContext* opCtx) { return std::make_unique<DBDirectClient>(opCtx); });
     repl::ReplicationCoordinator::set(service,
                                       std::make_unique<repl::ReplicationCoordinatorMock>(service));
-
-    repl::DropPendingCollectionReaper::set(
-        service,
-        std::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 
     // Set up an OpObserver to track the temporary collections mapReduce creates.
     auto opObserver = std::make_unique<MapReduceOpObserver>();

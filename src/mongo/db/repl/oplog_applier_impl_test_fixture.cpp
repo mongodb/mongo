@@ -59,7 +59,6 @@
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
@@ -210,8 +209,6 @@ void OplogApplierImplTest::setUp() {
         std::make_unique<MongoDSessionCatalog>(
             std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
-    DropPendingCollectionReaper::set(
-        serviceContext, std::make_unique<DropPendingCollectionReaper>(getStorageInterface()));
     repl::createOplog(_opCtx.get());
 
     _consistencyMarkers = std::make_unique<ReplicationConsistencyMarkersMock>();
@@ -240,7 +237,6 @@ void OplogApplierImplTest::tearDown() {
     HealthLogInterface::get(serviceContext)->shutdown();
     _opCtx.reset();
     _consistencyMarkers = {};
-    DropPendingCollectionReaper::set(serviceContext, {});
     StorageInterface::set(serviceContext, {});
     ServiceContextMongoDTest::tearDown();
 

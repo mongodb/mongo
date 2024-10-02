@@ -74,7 +74,6 @@
 #include "mongo/db/read_write_concern_defaults_gen.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/noop_writer.h"
@@ -239,11 +238,9 @@ void scheduleWork(executor::TaskExecutor* executor, executor::TaskExecutor::Call
 
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(
     ServiceContext* service,
-    DropPendingCollectionReaper* dropPendingCollectionReaper,
     StorageInterface* storageInterface,
     ReplicationProcess* replicationProcess)
     : _service(service),
-      _dropPendingCollectionReaper(dropPendingCollectionReaper),
       _storageInterface(storageInterface),
       _replicationProcess(replicationProcess) {
     uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
@@ -1349,32 +1346,6 @@ bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {
 void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
     const OpTime& committedOpTime) {
     signalOplogWaiters();
-
-    // Notify the DropPendingCollectionReaper if there are any drop-pending collections with
-    // drop optimes before or at the committed optime.
-    if (auto earliestDropOpTime = _dropPendingCollectionReaper->getEarliestDropOpTime()) {
-        if (committedOpTime >= *earliestDropOpTime) {
-            auto reaper = _dropPendingCollectionReaper;
-            scheduleWork(
-                _taskExecutor.get(),
-                [committedOpTime, reaper](const executor::TaskExecutor::CallbackArgs& args) {
-                    if (MONGO_unlikely(dropPendingCollectionReaperHang.shouldFail())) {
-                        LOGV2(21310,
-                              "fail point dropPendingCollectionReaperHang enabled. "
-                              "Blocking until fail point is disabled",
-                              "committedOpTime"_attr = committedOpTime);
-                        dropPendingCollectionReaperHang.pauseWhileSet();
-                    }
-                    auto opCtx = cc().makeOperationContext();
-                    reaper->dropCollectionsOlderThan(opCtx.get(), committedOpTime);
-                });
-        }
-    }
-}
-
-boost::optional<OpTime> ReplicationCoordinatorExternalStateImpl::getEarliestDropPendingOpTime()
-    const {
-    return _dropPendingCollectionReaper->getEarliestDropOpTime();
 }
 
 double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFraction() const {

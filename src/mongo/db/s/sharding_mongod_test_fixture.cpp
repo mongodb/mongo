@@ -43,7 +43,6 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_impl.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -242,9 +241,6 @@ void ShardingMongoDTestFixture::setUp() {
     repl::ReplicationCoordinator::set(service, std::move(replCoordPtr));
 
     auto storagePtr = std::make_unique<repl::StorageInterfaceImpl>();
-
-    repl::DropPendingCollectionReaper::set(
-        service, std::make_unique<repl::DropPendingCollectionReaper>(storagePtr.get()));
 
     repl::ReplicationProcess::set(service,
                                   std::make_unique<repl::ReplicationProcess>(

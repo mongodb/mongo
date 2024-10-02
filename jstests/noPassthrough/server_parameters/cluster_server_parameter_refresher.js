@@ -15,7 +15,6 @@ import {
     runGetClusterParameterSharded
 } from "jstests/libs/cluster_server_parameter_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 function runTest(st, startupRefreshIntervalMS) {
     // This assert is necessary because we subtract 8000 MS from this value later on, and we don't
@@ -125,10 +124,6 @@ function runTest(st, startupRefreshIntervalMS) {
     [st.configRS, ...st._rs.map(rs => rs.test)].forEach(rs => {
         const db = rs.getPrimary().getDB('config');
         assert.commandWorked(db.clusterParameters.remove({_id: "testIntClusterParameter"}));
-        assert.soon(function() {
-            return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(
-                db, "clusterParameters");
-        });
     });
     delete expectedParams.testIntClusterParameter;
 

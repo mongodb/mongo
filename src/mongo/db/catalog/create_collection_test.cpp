@@ -363,39 +363,6 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
     ASSERT_EQUALS(uuid1, getCollectionUuid(opCtx.get(), bucketsColl));
 }
 
-TEST_F(CreateCollectionTest,
-       CreateCollectionForApplyOpsWithSpecificUuidReturnsNamespaceExistsIfCollectionIsDropPending) {
-    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
-    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    auto dropPendingNss = curNss.makeDropPendingNamespace(dropOpTime);
-    NamespaceString newNss = NamespaceString::createNamespaceString_forTest("test.newColl");
-
-    auto opCtx = makeOpCtx();
-    auto uuid = UUID::gen();
-    Lock::DBLock lock(opCtx.get(), newNss.dbName(), MODE_IX);
-
-    // Create drop pending collection using StorageInterface.
-    {
-        CollectionOptions options;
-        options.uuid = uuid;
-        ASSERT_OK(_storage->createCollection(opCtx.get(), dropPendingNss, options));
-    }
-    ASSERT_TRUE(collectionExists(opCtx.get(), dropPendingNss));
-    ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
-
-    // This should fail because we are not allowed to take a collection out of its drop-pending
-    // state.
-    ASSERT_EQUALS(ErrorCodes::NamespaceExists,
-                  createCollectionForApplyOps(opCtx.get(),
-                                              newNss.dbName(),
-                                              uuid,
-                                              BSON("create" << newNss.coll()),
-                                              /*allowRenameOutOfTheWay*/ false));
-
-    ASSERT_TRUE(collectionExists(opCtx.get(), dropPendingNss));
-    ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
-}
-
 // TODO SERVER-92265 consider removing TimeseriesBucketingParametersChangedFlagAlwaysTrue
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagAlwaysTrue) {
     RAIIServerParameterControllerForTest featureFlagController(

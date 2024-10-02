@@ -159,7 +159,6 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  const CollectionDropType dropType,
                                   bool markFromMigrate) override {
         return {};
     }

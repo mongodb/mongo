@@ -54,7 +54,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -262,8 +261,6 @@ int dbtestsMain(int argc, char** argv) {
         .ignore();
 
     auto storageMock = std::make_unique<repl::StorageInterfaceMock>();
-    repl::DropPendingCollectionReaper::set(
-        service, std::make_unique<repl::DropPendingCollectionReaper>(storageMock.get()));
 
     AuthorizationManager::get(service->getService())->setAuthEnabled(false);
     ScriptEngine::setup(ExecutionEnvironment::Server);

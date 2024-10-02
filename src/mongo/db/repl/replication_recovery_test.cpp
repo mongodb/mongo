@@ -63,7 +63,6 @@
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
@@ -185,7 +184,6 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  const CollectionDropType dropType,
                                   bool markFromMigrate) override {
         // If the oplog is not disabled for this namespace, then we need to reserve an op time for
         // the drop.
@@ -275,9 +273,6 @@ private:
 
         auto observerRegistry = checked_cast<OpObserverRegistry*>(service->getOpObserver());
         observerRegistry->addObserver(std::make_unique<ReplicationRecoveryTestObObserver>());
-
-        repl::DropPendingCollectionReaper::set(
-            service, std::make_unique<repl::DropPendingCollectionReaper>(_storageInterface));
     }
 
     void tearDown() override {

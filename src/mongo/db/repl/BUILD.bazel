@@ -78,22 +78,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_library(
-    name = "drop_pending_collection_reaper",
-    srcs = [
-        "drop_pending_collection_reaper.cpp",
-    ],
-    hdrs = [
-        "drop_pending_collection_reaper.h",
-    ],
-    deps = [
-        ":optime",  # TODO(SERVER-93876): Remove.
-        ":storage_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",
-    ],
-)
-
 idl_generator(
     name = "rollback_impl_gen",
     src = "rollback_impl.idl",

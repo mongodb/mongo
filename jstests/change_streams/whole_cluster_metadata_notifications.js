@@ -9,7 +9,6 @@ import {
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Define two databases. We will conduct our tests by creating one collection in each.
 const testDB1 = db.getSiblingDB(jsTestName());
@@ -73,11 +72,6 @@ const resumeToken = change._id;
 // For cluster-wide streams, it is possible to resume at a point before a collection is dropped,
 // even if the "drop" notification has not been received on the original stream yet.
 assertDropCollection(db1Coll, db1Coll.getName());
-// Wait for two-phase drop to complete, so that the UUID no longer exists.
-assert.soon(function() {
-    return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(testDB1,
-                                                                         db1Coll.getName());
-});
 assert.commandWorked(adminDB.runCommand({
     aggregate: 1,
     pipeline: [{$changeStream: {resumeAfter: resumeToken, allChangesForCluster: true}}],

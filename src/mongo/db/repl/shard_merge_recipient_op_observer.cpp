@@ -541,7 +541,6 @@ repl::OpTime ShardMergeRecipientOpObserver::onDropCollection(OperationContext* o
                                                              const NamespaceString& collectionName,
                                                              const UUID& uuid,
                                                              std::uint64_t numRecords,
-                                                             const CollectionDropType dropType,
                                                              bool markFromMigrate) {
     if (collectionName == NamespaceString::kShardMergeRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {

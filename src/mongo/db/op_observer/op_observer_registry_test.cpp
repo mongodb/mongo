@@ -66,7 +66,6 @@ struct TestObserver : public OpObserverNoop {
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  const CollectionDropType dropType,
                                   bool markFromMigrate) override {
         drops++;
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
@@ -210,7 +209,6 @@ TEST_F(OpObserverRegistryTest, OnDropCollectionObserverResultReturnsRightTime) {
                                          testNss,
                                          UUID::gen(),
                                          0U,
-                                         OpObserver::CollectionDropType::kOnePhase,
                                          /*markFromMigrate=*/false);
     };
     checkConsistentOpTime(op);
@@ -237,7 +235,6 @@ DEATH_TEST_F(OpObserverRegistryTest, OnDropCollectionReturnsInconsistentTime, "i
                                          testNss,
                                          UUID::gen(),
                                          0U,
-                                         OpObserver::CollectionDropType::kOnePhase,
                                          /*markFromMigrate=*/false);
     };
     checkInconsistentOpTime(op);

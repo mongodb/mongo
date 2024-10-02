@@ -40,7 +40,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -97,10 +96,6 @@ void MockReplCoordServerFixture::setUp() {
     ASSERT_TRUE(client.createCollection(NamespaceString::kRsOplogNamespace, 1024 * 1024, true));
 
     repl::acquireOplogCollectionForLogging(opCtx());
-
-    repl::DropPendingCollectionReaper::set(
-        service,
-        std::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 
     // Set a committed snapshot so that we can perform majority reads.
     WriteUnitOfWork wuow{_opCtx.get()};

@@ -153,21 +153,4 @@ TEST_F(CappedUtilsTest, ConvertToCappedUpdatesCollectionOptionsOnSuccess) {
         << "unexpected capped collection size: " << options.toBSON();
 }
 
-TEST_F(CappedUtilsTest, ConvertToCappedReturnsNamespaceNotFoundIfCollectionIsDropPending) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    auto dropPendingNss = nss.makeDropPendingNamespace(dropOpTime);
-
-    auto opCtx = makeOpCtx();
-    ASSERT_OK(_storage->createCollection(opCtx.get(), dropPendingNss, {}));
-    auto options = getCollectionOptions(opCtx.get(), dropPendingNss);
-    ASSERT_FALSE(options.capped);
-
-    ASSERT_THROWS_CODE(convertToCapped(opCtx.get(), dropPendingNss, cappedCollectionSize),
-                       DBException,
-                       ErrorCodes::NamespaceNotFound);
-    options = getCollectionOptions(opCtx.get(), dropPendingNss);
-    ASSERT_FALSE(options.capped);
-}
-
 }  // namespace

@@ -2556,11 +2556,6 @@ BSONObj ReplicationCoordinatorImpl::_getReplicationProgress(WithLock wl) const {
     const auto currentCommittedSnapshotOpTime = _getCurrentCommittedSnapshotOpTime(wl);
     progress.append("currentCommittedSnapshotOpTime", currentCommittedSnapshotOpTime.toBSON());
 
-    const auto earliestDropPendingOpTime = _externalState->getEarliestDropPendingOpTime();
-    if (earliestDropPendingOpTime) {
-        progress.append("earliestDropPendingOpTime", earliestDropPendingOpTime->toBSON());
-    }
-
     _topCoord->fillMemberData(&progress);
     return progress.obj();
 }

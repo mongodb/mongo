@@ -231,7 +231,6 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  const CollectionDropType dropType,
                                   bool markFromMigrate) override {
         // If the oplog is not disabled for this namespace, then we need to reserve an op time for
         // the drop.

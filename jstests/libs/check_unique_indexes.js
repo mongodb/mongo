@@ -19,10 +19,8 @@ export function checkUniqueIndexFormatVersion(adminDB) {
         let currentDatabase = adminDB.getSiblingDB(database.name);
         // Get the list of collections including collections that are pending drop. This is to
         // ensure that every unique index has the correct format version.
-        let collectionsWithPending =
-            currentDatabase.runCommand("listCollections", {includePendingDrops: true})
-                .cursor.firstBatch;
-        collectionsWithPending.forEach(function(c) {
+        let collections = currentDatabase.runCommand("listCollections").cursor.firstBatch;
+        collections.forEach(function(c) {
             if (c.type == "view") {
                 return;
             }

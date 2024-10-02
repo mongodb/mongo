@@ -2365,15 +2365,6 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     const auto& nss = collection.get()->ns();
 
     {
-        // Disallow index builds on drop-pending namespaces (system.drop.*) if we are primary.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (replCoord->getSettings().isReplSet() &&
-            replCoord->canAcceptWritesFor(opCtx, nssOrUuid)) {
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "drop-pending collection: " << nss.toStringForErrorMsg(),
-                    !nss.isDropPendingNamespace());
-        }
-
         // This check is for optimization purposes only as since this lock is released after this,
         // and is acquired again when we build the index in _setUpIndexBuild.
         auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
