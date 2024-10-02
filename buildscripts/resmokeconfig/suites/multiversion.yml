@@ -3,7 +3,7 @@ test_kind: js_test
 selector:
   roots:
     - jstests/multiVersion/**/*.js
-    - src/mongo/db/modules/*/jstests/hot_backups/multiVersion/*.js
+    - src/mongo/db/modules/*/jstests/hot_backups_multiversion/*.js
     - src/mongo/db/modules/*/jstests/audit/multiVersion/*.js
   exclude_files:
     # Do not execute files with helper functions.
@@ -23,7 +23,7 @@ selector:
 executor:
   archive:
     tests:
-      - src/mongo/db/modules/enterprise/jstests/hot_backups/multiVersion/*.js
+      - src/mongo/db/modules/enterprise/jstests/hot_backups_multiversion/*.js
   config:
     shell_options:
       nodb: ""
