@@ -16,7 +16,6 @@ mongo_cc_library(
     srcs = [
         "defs.cpp",
         "explain.cpp",
-        "index_bounds.cpp",
         "node.cpp",
         "reference_tracker.cpp",
         "//src/mongo/db/query/optimizer/syntax:expr.cpp",
@@ -29,7 +28,6 @@ mongo_cc_library(
     hdrs = [
         "defs.h",
         "explain.h",
-        "index_bounds.h",
         "node.h",
         "reference_tracker.h",
         "//src/mongo/db/query/optimizer:bool_expression.h",

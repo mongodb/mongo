@@ -1036,138 +1036,6 @@ public:
         return printer;
     }
 
-    void printBound(ExplainPrinter& printer, const BoundRequirement& bound) {
-        if constexpr (version < ExplainVersion::V3) {
-            // Since we are printing on a single level, use V1 printer in order to avoid children
-            // being reversed. Also note that we are specifically not printing inclusive flag here.
-            // The inclusion is explained by the caller.
-
-            ExplainGeneratorTransporter<ExplainVersion::V1> gen;
-            auto boundPrinter = gen.generate(bound.getBound());
-            printer.printSingleLevel(boundPrinter);
-        } else if constexpr (version == ExplainVersion::V3) {
-            printer.fieldName("inclusive").print(bound.isInclusive());
-            {
-                ExplainPrinter boundPrinter = generate(bound.getBound());
-                printer.fieldName("bound").print(boundPrinter);
-            }
-        } else {
-            MONGO_UNREACHABLE;
-        }
-    }
-
-    void printBound(ExplainPrinter& printer, const CompoundBoundRequirement& bound) {
-        if constexpr (version < ExplainVersion::V3) {
-            const bool manyConstants = bound.size() > 1 && bound.isConstant();
-            if (manyConstants) {
-                printer.print("Const [");
-            }
-
-            bool first = true;
-            for (const auto& entry : bound.getBound()) {
-                if (first) {
-                    first = false;
-                } else {
-                    printer.print(" | ");
-                }
-
-                if (manyConstants) {
-                    std::ostringstream os;
-                    os << entry.cast<Constant>()->get();
-                    printer.print(os.str());
-                } else {
-                    ExplainGeneratorTransporter<ExplainVersion::V1> gen;
-                    auto boundPrinter = gen.generate(entry);
-                    printer.printSingleLevel(boundPrinter);
-                }
-            }
-
-            if (manyConstants) {
-                printer.print("]");
-            }
-        } else if constexpr (version == ExplainVersion::V3) {
-            printer.fieldName("inclusive").print(bound.isInclusive());
-
-            std::vector<ExplainPrinter> printers;
-            for (const auto& entry : bound.getBound()) {
-                printers.push_back(generate(entry));
-            }
-            printer.fieldName("bound").print(printers);
-        } else {
-            MONGO_UNREACHABLE;
-        }
-    }
-
-    template <class T>
-    void printInterval(ExplainPrinter& printer, const T& interval) {
-        const auto& lowBound = interval.getLowBound();
-        const auto& highBound = interval.getHighBound();
-
-        if constexpr (version < ExplainVersion::V3) {
-            // Shortened output for half-open, fully open and point intervals.
-            if (interval.isFullyOpen()) {
-                printer.print("<fully open>");
-            } else if (interval.isEquality()) {
-                printer.print("=");
-                printBound(printer, lowBound);
-            } else if (lowBound.isMinusInf()) {
-                printer.print("<");
-                if (highBound.isInclusive()) {
-                    printer.print("=");
-                }
-                printBound(printer, highBound);
-            } else if (highBound.isPlusInf()) {
-                printer.print(">");
-                if (lowBound.isInclusive()) {
-                    printer.print("=");
-                }
-                printBound(printer, lowBound);
-            } else {
-                // Output for a generic interval.
-
-                printer.print(lowBound.isInclusive() ? "[" : "(");
-                printBound(printer, lowBound);
-
-                printer.print(", ");
-                printBound(printer, highBound);
-
-                printer.print(highBound.isInclusive() ? "]" : ")");
-            }
-        } else if constexpr (version == ExplainVersion::V3) {
-            ExplainPrinter lowBoundPrinter;
-            printBound(lowBoundPrinter, lowBound);
-            ExplainPrinter highBoundPrinter;
-            printBound(highBoundPrinter, highBound);
-
-            ExplainPrinter local;
-            local.fieldName("lowBound")
-                .print(lowBoundPrinter)
-                .fieldName("highBound")
-                .print(highBoundPrinter);
-            printer.print(local);
-        } else {
-            MONGO_UNREACHABLE;
-        }
-    }
-
-    template <class T>
-    std::string printInterval(const T& interval) {
-        ExplainPrinter printer;
-        printInterval(printer, interval);
-        return printer.str();
-    }
-
-    template <class T>
-    ExplainPrinter printIntervalExpr(const typename BoolExpr<T>::Node& intervalExpr) {
-        const auto printFn = [this](ExplainPrinter& printer, const T& interval) {
-            printInterval(printer, interval);
-        };
-
-        ExplainPrinter printer;
-        BoolExprPrinter<T>{printFn}.print(printer, intervalExpr);
-        return printer;
-    }
-
     template <class T>
     class BoolExprPrinter {
     public:
@@ -1279,10 +1147,6 @@ public:
             .fieldName("indexDefName")
             .print(node.getIndexDefName())
             .separator(", ");
-
-        printer.fieldName("interval").separator("{");
-        printInterval(printer, node.getIndexInterval());
-        printer.separator("}");
 
         printBooleanFlag(printer, "reversed", node.isIndexReverseOrder());
 
@@ -2542,27 +2406,6 @@ public:
 
 std::string ABTPrinter::getPlanSummary() const {
     return ShortPlanSummaryTransport().getPlanSummary(_planAndProps._node);
-}
-
-std::string ExplainGenerator::explainInterval(const IntervalRequirement& interval) {
-    ExplainGeneratorV2 gen;
-    return gen.printInterval(interval);
-}
-
-std::string ExplainGenerator::explainCompoundInterval(const CompoundIntervalRequirement& interval) {
-    ExplainGeneratorV2 gen;
-    return gen.printInterval(interval);
-}
-
-std::string ExplainGenerator::explainIntervalExpr(const IntervalReqExpr::Node& intervalExpr) {
-    ExplainGeneratorV2 gen;
-    return gen.printIntervalExpr<IntervalRequirement>(intervalExpr).str();
-}
-
-std::string ExplainGenerator::explainCompoundIntervalExpr(
-    const CompoundIntervalReqExpr::Node& intervalExpr) {
-    ExplainGeneratorV2 gen;
-    return gen.printIntervalExpr<CompoundIntervalRequirement>(intervalExpr).str();
 }
 
 bool isEOFPlan(const ABT::reference_type node) {

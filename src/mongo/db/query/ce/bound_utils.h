@@ -34,7 +34,6 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/abt/utils.h"  // TODO: remove this somehow!!!
-#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
 namespace mongo::ce {
@@ -52,22 +51,5 @@ boost::optional<std::pair<sbe::value::TypeTags, sbe::value::Value>> getConstType
  * bounds (or boost::none if not).
  */
 boost::optional<sbe::value::TypeTags> getConstTypeTag(const ABT& abt);
-
-/**
- * Helper function to extract an sbe tag & value from the given 'boundReq' if possible, or
- * boost::none if not.
- */
-boost::optional<std::pair<sbe::value::TypeTags, sbe::value::Value>> getBound(
-    const BoundRequirement& boundReq);
-
-/**
- * Helper function to extract the TypeTag from the given 'boundReq' or boost::none if not.
- */
-boost::optional<sbe::value::TypeTags> getBoundReqTypeTag(const BoundRequirement& boundReq);
-
-/**
- * Helper function to return the interval corresponding to a given 'type'.
- */
-IntervalRequirement getMinMaxIntervalForType(sbe::value::TypeTags type);
 
 }  // namespace mongo::ce

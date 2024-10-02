@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
@@ -40,16 +39,6 @@ namespace mongo::optimizer {
  * Used to compare trees containing only Paths and Expressions.
  */
 int compareExprAndPaths(const ABT& n1, const ABT& n2);
-
-/**
- * Used to compare atomic intervals.
- */
-int compareIntervals(const IntervalRequirement& i1, const IntervalRequirement& i2);
-
-/**
- * Used to compare interval trees.
- */
-int compareIntervalExpr(const IntervalReqExpr::Node& i1, const IntervalReqExpr::Node& i2);
 
 /**
  * The result of a comparison operation evaluated during constant folding.

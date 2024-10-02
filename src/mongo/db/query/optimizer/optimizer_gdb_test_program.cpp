@@ -79,9 +79,6 @@ int clang_optnone main(int argc, char** argv) {
         "Scan [coll, {root}]\n",
         testABT);
 
-    auto testInterval = _disj(_interval(_incl("1"_cint32), _incl("3"_cint32)),
-                              _interval(_incl("4"_cint32), _incl("5"_cint32)));
-
     [[maybe_unused]] mongo::optimizer::FieldProjectionMap emptyProjectionMap;
     [[maybe_unused]] mongo::optimizer::FieldProjectionMap testProjectionMap;
     testProjectionMap._rootProjection = "test";

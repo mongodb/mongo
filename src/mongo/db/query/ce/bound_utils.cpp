@@ -28,56 +28,22 @@
  */
 
 #include "mongo/db/query/ce/bound_utils.h"
-#include "mongo/db/query/optimizer/bool_expression.h"
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
-#include "mongo/db/query/optimizer/utils/bool_expression_builder.h"
 
 namespace mongo::ce {
 
 boost::optional<std::pair<sbe::value::TypeTags, sbe::value::Value>> getConstTypeVal(
-    const ABT& abt) {
-    if (const auto* constant = abt.cast<Constant>(); constant) {
+    const optimizer::ABT& abt) {
+    if (const auto* constant = abt.cast<optimizer::Constant>(); constant) {
         return constant->get();
     }
     return boost::none;
 };
 
-boost::optional<sbe::value::TypeTags> getConstTypeTag(const ABT& abt) {
+boost::optional<sbe::value::TypeTags> getConstTypeTag(const optimizer::ABT& abt) {
     if (auto maybeConstVal = getConstTypeVal(abt); maybeConstVal) {
         return maybeConstVal->first;
     }
     return boost::none;
 };
-
-boost::optional<std::pair<sbe::value::TypeTags, sbe::value::Value>> getBound(
-    const BoundRequirement& boundReq) {
-    const ABT& bound = boundReq.getBound();
-    if (bound.is<Constant>()) {
-        return getConstTypeVal(bound);
-    }
-    return boost::none;
-};
-
-boost::optional<sbe::value::TypeTags> getBoundReqTypeTag(const BoundRequirement& boundReq) {
-    if (const auto bound = getBound(boundReq); bound) {
-        return bound->first;
-    }
-    return boost::none;
-}
-
-IntervalRequirement getMinMaxIntervalForType(sbe::value::TypeTags type) {
-    // Note: This function works based on the assumption that there are no intervals that include
-    // values from more than one type. That is why the MinMax interval of a type will include all
-    // possible intervals over that type.
-
-    auto&& [min, minInclusive] = getMinMaxBoundForType(true /*isMin*/, type);
-    tassert(7051103, str::stream() << "Type " << type << " has no minimum", min);
-
-    auto&& [max, maxInclusive] = getMinMaxBoundForType(false /*isMin*/, type);
-    tassert(7051104, str::stream() << "Type " << type << " has no maximum", max);
-
-    return IntervalRequirement{BoundRequirement(minInclusive, std::move(*min)),
-                               BoundRequirement(maxInclusive, std::move(*max))};
-}
 
 }  // namespace mongo::ce

@@ -54,15 +54,6 @@ if __name__ == "__main__":
             + 'Scan["coll", "root"]\n',
         )
 
-        assertPrintedOutput(
-            "testInterval",
-            "{\n"
-            + "    {[Const [1], Const [3]]}\n"
-            + " U \n"
-            + "    {[Const [4], Const [5]]}\n"
-            + "}\n",
-        )
-
         assertPrintedOutput("emptyProjectionMap", "{std::map with 0 elements}\n")
 
         assertPrintedOutput(

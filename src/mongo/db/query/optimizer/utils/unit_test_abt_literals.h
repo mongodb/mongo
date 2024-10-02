@@ -472,55 +472,6 @@ private:
 };
 
 /**
- * Interval expressions.
- */
-inline auto _disj(IntervalReqExpr::NodeVector v) {
-    return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(v));
-}
-
-template <typename... Ts>
-inline auto _disj(Ts&&... pack) {
-    IntervalReqExpr::NodeVector v;
-    (v.push_back(std::forward<Ts>(pack)), ...);
-    return _disj(std::move(v));
-}
-
-inline auto _conj(IntervalReqExpr::NodeVector v) {
-    return IntervalReqExpr::make<IntervalReqExpr::Conjunction>(std::move(v));
-}
-
-template <typename... Ts>
-inline auto _conj(Ts&&... pack) {
-    IntervalReqExpr::NodeVector v;
-    (v.push_back(std::forward<Ts>(pack)), ...);
-    return _conj(std::move(v));
-}
-
-inline auto _interval(IntervalRequirement req) {
-    return IntervalReqExpr::make<IntervalReqExpr::Atom>(std::move(req));
-}
-
-inline auto _interval(BoundRequirement low, BoundRequirement high) {
-    return _interval({std::move(low), std::move(high)});
-}
-
-inline auto _incl(ExprHolder expr) {
-    return BoundRequirement(true /*inclusive*/, std::move(expr._n));
-}
-
-inline auto _excl(ExprHolder expr) {
-    return BoundRequirement(false /*inclusive*/, std::move(expr._n));
-}
-
-inline auto _plusInf() {
-    return BoundRequirement::makePlusInf();
-}
-
-inline auto _minusInf() {
-    return BoundRequirement::makeMinusInf();
-}
-
-/**
  * Shorthand explainer: generate C++ code to construct ABTs in shorthand form. The use case is to
  * provide an easy way to capture an ABT from a JS test and convert it to use in a C++ unit test.
  */

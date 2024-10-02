@@ -197,20 +197,17 @@ bool CoScanNode::operator==(const CoScanNode& other) const {
 IndexScanNode::IndexScanNode(FieldProjectionMap fieldProjectionMap,
                              std::string scanDefName,
                              std::string indexDefName,
-                             CompoundIntervalRequirement indexInterval,
                              bool isIndexReverseOrder)
     : Base(buildSimpleBinder(extractProjectionNamesForScan(fieldProjectionMap))),
       _fieldProjectionMap(std::move(fieldProjectionMap)),
       _scanDefName(std::move(scanDefName)),
       _indexDefName(std::move(indexDefName)),
-      _indexInterval(std::move(indexInterval)),
       _isIndexReverseOrder(isIndexReverseOrder) {}
 
 bool IndexScanNode::operator==(const IndexScanNode& other) const {
     // Scan spec does not participate, the indexSpec by itself should determine equality.
     return _fieldProjectionMap == other._fieldProjectionMap && _scanDefName == other._scanDefName &&
-        _indexDefName == other._indexDefName && _indexInterval == other._indexInterval &&
-        _isIndexReverseOrder == other._isIndexReverseOrder;
+        _indexDefName == other._indexDefName && _isIndexReverseOrder == other._isIndexReverseOrder;
 }
 
 const FieldProjectionMap& IndexScanNode::getFieldProjectionMap() const {
@@ -223,10 +220,6 @@ const std::string& IndexScanNode::getScanDefName() const {
 
 const std::string& IndexScanNode::getIndexDefName() const {
     return _indexDefName;
-}
-
-const CompoundIntervalRequirement& IndexScanNode::getIndexInterval() const {
-    return _indexInterval;
 }
 
 bool IndexScanNode::isIndexReverseOrder() const {

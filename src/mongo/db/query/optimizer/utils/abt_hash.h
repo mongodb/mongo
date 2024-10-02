@@ -31,7 +31,6 @@
 
 #include <cstddef>
 
-#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
 namespace mongo::optimizer {
@@ -40,8 +39,6 @@ class ABTHashGenerator {
 public:
     static size_t generate(const ABT& node);
     static size_t generate(const ABT::reference_type& nodeRef);
-
-    static size_t generate(const IntervalRequirement& req);
 };
 
 }  // namespace mongo::optimizer

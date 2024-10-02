@@ -43,7 +43,6 @@
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
@@ -227,7 +226,6 @@ public:
     IndexScanNode(FieldProjectionMap fieldProjectionMap,
                   std::string scanDefName,
                   std::string indexDefName,
-                  CompoundIntervalRequirement indexInterval,
                   bool isIndexReverseOrder);
 
     bool operator==(const IndexScanNode& other) const;
@@ -244,8 +242,6 @@ public:
 
     const std::string& getIndexDefName() const;
 
-    const CompoundIntervalRequirement& getIndexInterval() const;
-
     bool isIndexReverseOrder() const;
 
 private:
@@ -256,9 +252,6 @@ private:
 
     // The name of the index.
     const std::string _indexDefName;
-
-    // The index interval.
-    const CompoundIntervalRequirement _indexInterval;
 
     // Do we reverse the index order.
     const bool _isIndexReverseOrder;

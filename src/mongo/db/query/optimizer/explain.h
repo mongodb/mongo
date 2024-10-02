@@ -36,7 +36,6 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
-#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
@@ -295,15 +294,6 @@ public:
     static std::string explainBSONStr(ABT::reference_type node,
                                       bool displayProperties = false,
                                       const NodeToGroupPropsMap& nodeMap = {});
-
-    static std::string explainInterval(const IntervalRequirement& interval);
-
-    static std::string explainCompoundInterval(const CompoundIntervalRequirement& interval);
-
-    static std::string explainIntervalExpr(const IntervalReqExpr::Node& intervalExpr);
-
-    static std::string explainCompoundIntervalExpr(
-        const CompoundIntervalReqExpr::Node& intervalExpr);
 };
 
 }  // namespace mongo::optimizer

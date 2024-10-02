@@ -60,30 +60,6 @@ class OptimizerTypePrinter(object):
         return eval_print_fn(self.val, self.print_fn)
 
 
-class IntervalPrinter(OptimizerTypePrinter):
-    """Pretty-printer for mongo::optimizer::IntervalRequirement."""
-
-    def __init__(self, val):
-        """Initialize IntervalPrinter."""
-        super().__init__(val, "ExplainGenerator::explainInterval")
-
-
-class CompoundIntervalPrinter(OptimizerTypePrinter):
-    """Pretty-printer for mongo::optimizer::CompoundIntervalRequirement."""
-
-    def __init__(self, val):
-        """Initialize CompoundIntervalPrinter."""
-        super().__init__(val, "ExplainGenerator::explainCompoundInterval")
-
-
-class IntervalExprPrinter(OptimizerTypePrinter):
-    """Pretty-printer for mongo::optimizer::IntervalRequirement::Node."""
-
-    def __init__(self, val):
-        """Initialize IntervalExprPrinter."""
-        super().__init__(val, "ExplainGenerator::explainIntervalExpr")
-
-
 class StrongStringAliasPrinter(object):
     """Pretty-printer for mongo::optimizer::StrongStringAlias."""
 
@@ -643,11 +619,10 @@ class IndexScanNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 1, "IndexScan")
 
     def to_string(self):
-        return "IndexScan[{{{}}}, scanDef={}, indexDef={}, interval={}]".format(
+        return "IndexScan[{{{}}}, scanDef={}, indexDef={}]".format(
             self.val["_fieldProjectionMap"],
             self.val["_scanDefName"],
             self.val["_indexDefName"],
-            self.val["_indexInterval"],
         ).replace("\n", "")
 
 
@@ -1063,23 +1038,6 @@ def bool_expr_type(T):
 
 def register_optimizer_printers(pp):
     """Registers a number of pretty printers related to the CQF optimizer."""
-
-    # IntervalRequirement printer.
-    pp.add("Interval", f"{OPTIMIZER_NS}::IntervalRequirement", False, IntervalPrinter)
-    pp.add(
-        "CompoundInterval",
-        f"{OPTIMIZER_NS}::CompoundIntervalRequirement",
-        False,
-        CompoundIntervalPrinter,
-    )
-
-    # IntervalReqExpr::Node printer.
-    pp.add(
-        "IntervalExpr",
-        bool_expr_type(f"{OPTIMIZER_NS}::IntervalRequirement"),
-        False,
-        IntervalExprPrinter,
-    )
 
     # Memo printer.
     pp.add("Memo", f"{OPTIMIZER_NS}::cascades::Memo", False, MemoPrinter)

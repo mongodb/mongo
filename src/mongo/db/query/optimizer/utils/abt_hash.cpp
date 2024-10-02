@@ -47,7 +47,6 @@
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
@@ -87,11 +86,6 @@ static size_t computeDistributionHash(const DistributionRequirement& prop) {
     return resultHash;
 }
 
-static void updateBoundHash(size_t& result, const BoundRequirement& bound) {
-    updateHash(result, std::hash<bool>()(bound.isInclusive()));
-    updateHash(result, ABTHashGenerator::generate(bound.getBound()));
-};
-
 template <class T>
 class BoolExprHasher {
 public:
@@ -115,18 +109,7 @@ public:
         }
         return result;
     }
-
-    size_t compute(const typename T::Node& intervals) {
-        return algebra::transport<false>(intervals, *this);
-    }
 };
-
-size_t ABTHashGenerator::generate(const IntervalRequirement& req) {
-    size_t result = 17;
-    updateBoundHash(result, req.getLowBound());
-    updateBoundHash(result, req.getHighBound());
-    return 17;
-}
 
 /**
  * Hasher for ABT nodes. Used in conjunction with memo.

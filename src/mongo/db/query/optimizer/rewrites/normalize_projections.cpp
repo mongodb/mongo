@@ -97,7 +97,6 @@ void ProjNormalize::transport(ABT& n, const IndexScanNode& node, ABT& bind) {
     n = make<IndexScanNode>(renameFieldProjectionMap(node.getFieldProjectionMap()),
                             node.getScanDefName(),
                             node.getIndexDefName(),
-                            node.getIndexInterval(),
                             node.isIndexReverseOrder());
 }
 
