@@ -45,7 +45,7 @@ void ShardingDDLCoordinatorExternalStateForTest::waitForVectorClockDurable(
 void ShardingDDLCoordinatorExternalStateForTest::assertIsPrimaryShardForDb(
     OperationContext* opCtx, const DatabaseName& dbName) const {}
 
-bool ShardingDDLCoordinatorExternalStateForTest::isShardedTimeseries(
+bool ShardingDDLCoordinatorExternalStateForTest::isTrackedTimeseries(
     OperationContext* opCtx, const NamespaceString& bucketNss) const {
     return false;
 }

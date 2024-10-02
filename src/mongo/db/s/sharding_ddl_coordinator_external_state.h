@@ -41,7 +41,7 @@ public:
     virtual void waitForVectorClockDurable(OperationContext* opCtx) const = 0;
     virtual void assertIsPrimaryShardForDb(OperationContext* opCtx,
                                            const DatabaseName& dbName) const = 0;
-    virtual bool isShardedTimeseries(OperationContext* opCtx,
+    virtual bool isTrackedTimeseries(OperationContext* opCtx,
                                      const NamespaceString& bucketNss) const = 0;
     virtual void allowMigrations(OperationContext* opCtx,
                                  const NamespaceString& nss,
@@ -58,7 +58,7 @@ public:
     void waitForVectorClockDurable(OperationContext* opCtx) const override;
     void assertIsPrimaryShardForDb(OperationContext* opCtx,
                                    const DatabaseName& dbName) const override;
-    bool isShardedTimeseries(OperationContext* opCtx,
+    bool isTrackedTimeseries(OperationContext* opCtx,
                              const NamespaceString& bucketNss) const override;
     void allowMigrations(OperationContext* opCtx,
                          const NamespaceString& nss,

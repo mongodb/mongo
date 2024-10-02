@@ -216,7 +216,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_translateTimeseriesNss(
 
                const auto bucketNss = originalNss().makeTimeseriesBucketsNamespace();
 
-               if (_getExternalState()->isShardedTimeseries(opCtx, bucketNss)) {
+               if (_getExternalState()->isTrackedTimeseries(opCtx, bucketNss)) {
                    auto coordMetadata = metadata();
                    coordMetadata.setBucketNss(bucketNss);
                    setMetadata(std::move(coordMetadata));

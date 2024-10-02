@@ -54,7 +54,7 @@ void ShardingDDLCoordinatorExternalStateImpl::assertIsPrimaryShardForDb(
     scopedDss->assertIsPrimaryShardForDb(opCtx);
 }
 
-bool ShardingDDLCoordinatorExternalStateImpl::isShardedTimeseries(
+bool ShardingDDLCoordinatorExternalStateImpl::isTrackedTimeseries(
     OperationContext* opCtx, const NamespaceString& bucketNss) const {
     try {
         const auto bucketColl = Grid::get(opCtx)->catalogClient()->getCollection(
