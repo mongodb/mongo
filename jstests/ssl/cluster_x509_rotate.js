@@ -47,18 +47,18 @@ const newnode = rst.add({
 const host = "localhost:" + newnode.port;
 assert.soon(() => {
     print(`Testing that ${host} is up`);
-    return 0 ===
-        runMongoProgram("mongo",
-                        "--tls",
-                        "--tlsAllowInvalidHostnames",
-                        "--host",
-                        host,
-                        "--tlsCertificateKeyFile",
-                        "jstests/libs/trusted-client.pem",
-                        "--tlsCAFile",
-                        "jstests/libs/trusted-ca.pem",
-                        "--eval",
-                        ";");
+    try {
+        new Mongo(host, undefined, {
+            tls: {
+                certificateKeyFile: "jstests/libs/trusted-client.pem",
+                CAFile: "jstests/libs/trusted-ca.pem",
+                allowInvalidHostnames: true
+            }
+        });
+    } catch (error) {
+        return false;
+    }
+    return true;
 });
 
 print("Reinitiating replica set");
@@ -66,30 +66,30 @@ rst.reInitiate();
 
 assert.soon(() => {
     print(`Waiting for ${host} to join replica set`);
-    return 0 ===
-        runMongoProgram("mongo",
-                        "--tls",
-                        "--tlsAllowInvalidHostnames",
-                        "--host",
-                        host,
-                        "--tlsCertificateKeyFile",
-                        "jstests/libs/trusted-client.pem",
-                        "--tlsCAFile",
-                        "jstests/libs/trusted-ca.pem",
-                        "--eval",
-                        `const PRIMARY = 1;
-                        const SECONDARY = 2;
-                        const s = db.adminCommand({replSetGetStatus: 1});
-                        if (!s.ok) {
-                            print('replSetGetStatus is not ok');
-                            quit(1);
-                        }
-                        if (s.myState != PRIMARY && s.myState != SECONDARY) {
-                            print('node is not primary or secondary');
-                            quit(1);
-                        };
-                        print('node is online and in cluster');
-                        `);
+    try {
+        const conn = new Mongo(host, undefined, {
+            tls: {
+                certificateKeyFile: "jstests/libs/trusted-client.pem",
+                CAFile: "jstests/libs/trusted-ca.pem",
+                allowInvalidHostnames: true
+            }
+        });
+        const PRIMARY = 1;
+        const SECONDARY = 2;
+        const s = conn.adminCommand({replSetGetStatus: 1});
+        if (!s.ok) {
+            print('replSetGetStatus is not ok');
+            return false;
+        }
+        if (s.myState != PRIMARY && s.myState != SECONDARY) {
+            print('node is not primary or secondary');
+            return false;
+        }
+        print('node is online and in cluster');
+    } catch (error) {
+        return false;
+    }
+    return true;
 });
 
 // Make sure each node can connect to each other node
@@ -97,20 +97,15 @@ for (let node of rst.nodeList()) {
     for (let target of rst.nodeList()) {
         if (node !== target) {
             print(`Testing connectivity of ${node} to ${target}`);
-            assert.eq(0,
-                      runMongoProgram(
-                          "mongo",
-                          "--tls",
-                          "--tlsAllowInvalidHostnames",
-                          "--host",
-                          node,
-                          "--tlsCertificateKeyFile",
-                          "jstests/libs/trusted-client.pem",
-                          "--tlsCAFile",
-                          "jstests/libs/trusted-ca.pem",
-                          "--eval",
-                          `assert.commandWorked(db.adminCommand({replSetTestEgress: 1, target: "${
-                              target}", timeoutSecs: NumberInt(15)}));`));
+            const conn = new Mongo(node, undefined, {
+                tls: {
+                    certificateKeyFile: "jstests/libs/trusted-client.pem",
+                    CAFile: "jstests/libs/trusted-ca.pem",
+                    allowInvalidHostnames: true
+                }
+            });
+            assert.commandWorked(
+                conn.adminCommand({replSetTestEgress: 1, target, timeoutSecs: NumberInt(15)}));
         }
     }
 }
