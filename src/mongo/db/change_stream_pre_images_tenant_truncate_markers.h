@@ -40,6 +40,72 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+namespace pre_image_marker_initialization_internal {
+/**
+ * The RecordId and wall time extracted from a pre-image. Comprises a pre-image 'sample'.
+ */
+using RecordIdAndWallTime = CollectionTruncateMarkers::RecordIdAndWallTime;
+
+int64_t countTotalSamples(
+    const stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash>& samplesMap);
+
+/**
+ * Returns the 'CollectionTruncateMarkers::RecordIdAndWallTime' for the most recent pre-image per
+ * each 'nsUUID' in the pre-images collection.
+ */
+stdx::unordered_map<UUID, RecordIdAndWallTime, UUID::Hash> sampleLastRecordPerNsUUID(
+    OperationContext* opCtx, const CollectionAcquisition& preImagesCollection);
+
+/**
+ * Attempts to gather 'targetNumSamples' across the pre-images collection.
+ *
+ * The samples are guaranteed to include the most recent (visible) pre-image per 'nsUUID'
+ * within the pre-images collection - all additional samples are retrieved at random.
+ *
+ * Returns 'targetNumSamples', sorted by RecordId and mapped by 'nsUUID', with 2 exceptions
+ * - (a) The collection is empty: No samples are returned.
+ * - (b) There are more 'nsUUID's than 'targetNumSamples': 1 sample per nsUUID is returned.
+ */
+stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash> collectPreImageSamples(
+    OperationContext* opCtx,
+    const CollectionAcquisition& preImagesCollection,
+    int64_t targetNumSamples);
+
+/**
+ * Populates the 'markersMap' by scanning the pre-images collection.
+ */
+void populateByScanning(
+    OperationContext* opCtx,
+    boost::optional<TenantId> tenantId,
+    const CollectionAcquisition& preImagesCollection,
+    int32_t minBytesPerMarker,
+    ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap);
+
+/**
+ * Given:
+ *  . 'numRecords' and 'dataSize' - The expected size of the 'preImagesCollection'. These
+ *      metrics are not guaranteed to be correct after an unclean shutdown.
+ * . 'minBytesPerMarker' - The minimum number of bytes needed to compose a full truncate marker.
+ * . 'randomSamplesPerMarker' - The number of samples necessary to estimate a full truncate marker.
+ *
+ * Populates the 'markersMap' by sampling the pre-images collection. If sampling cannot complete,
+ * falls back to scanning the collection.
+ *
+ * Sampling Guarantee: Individual truncate markers and metrics for each 'nsUUID' may not be
+ * accurate; but, cumulatively, the total number of records and bytes captured by the 'markersMap'
+ * should reflect the 'numRecords' and 'dataSize'.
+ */
+void populateBySampling(
+    OperationContext* opCtx,
+    boost::optional<TenantId> tenantId,
+    const CollectionAcquisition& preImagesCollection,
+    int64_t numRecords,
+    int64_t dataSize,
+    int32_t minBytesPerMarker,
+    uint64_t randomSamplesPerMarker,
+    ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap);
+}  // namespace pre_image_marker_initialization_internal
+
 /**
  * Statistics for a truncate pass over a given tenant's pre-images collection.
  */

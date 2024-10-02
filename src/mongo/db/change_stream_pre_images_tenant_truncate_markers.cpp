@@ -133,42 +133,22 @@ void truncateExpiredMarkersForNsUUID(
     }
 }
 
-//  Populates the 'markersMap' by scanning the pre-images collection.
-void scanToPopulate(
-    OperationContext* opCtx,
-    const boost::optional<TenantId> tenantId,
-    const CollectionAcquisition& preImagesCollection,
-    int32_t minBytesPerMarker,
-    ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap) {
-    const auto nsUUIDs = change_stream_pre_image_util::getNsUUIDs(opCtx, preImagesCollection);
-    for (const auto& nsUUID : nsUUIDs) {
-        auto initialSetOfMarkers = PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
-            opCtx, preImagesCollection, nsUUID, minBytesPerMarker);
+}  // namespace
 
-        markersMap.getOrEmplace(nsUUID,
-                                tenantId,
-                                std::move(initialSetOfMarkers.markers),
-                                initialSetOfMarkers.leftoverRecordsCount,
-                                initialSetOfMarkers.leftoverRecordsBytes,
-                                minBytesPerMarker,
-                                CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
-    }
-}
-
-// Container for samples of pre-images keyed by their 'nsUUID'.
-using NsUUIDToSamplesMap = stdx::
-    unordered_map<UUID, std::vector<CollectionTruncateMarkers::RecordIdAndWallTime>, UUID::Hash>;
-
-void distributeUnaccountedBytesAndRecords(
+namespace pre_image_marker_initialization_internal {
+// Given the expected 'numRecords' and 'dataSize' of the pre-images collection, and the number of
+// 'recordsInMarkersMap' and 'bytesInMarkersMap', distributes the difference across truncate markers
+// so the resulting 'markersMap' accounts for the total 'numRecords' and 'dataSize'.
+void distributeUnaccountedRecordsAndBytes(
     const stdx::unordered_set<UUID, UUID::Hash>& nsUUIDs,
     const UUID& preImagesCollectionUUID,
-    int64_t preImagesCollNumRecords,
-    int64_t preImagesCollDataSize,
+    int64_t numRecords,
+    int64_t dataSize,
     int64_t recordsInMarkersMap,
     int64_t bytesInMarkersMap,
     ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap) {
-    const auto unaccountedRecords = preImagesCollNumRecords - recordsInMarkersMap;
-    const auto unaccountedBytes = preImagesCollDataSize - bytesInMarkersMap;
+    const auto unaccountedRecords = numRecords - recordsInMarkersMap;
+    const auto unaccountedBytes = dataSize - bytesInMarkersMap;
 
     if (unaccountedRecords < 0 || unaccountedBytes < 0) {
         // The markers account for more records / bytes than the estimated pre-images collection.
@@ -180,8 +160,8 @@ void distributeUnaccountedBytesAndRecords(
             "preImagesCollectionUUID"_attr = preImagesCollectionUUID,
             "recordsAcrossMarkers"_attr = recordsInMarkersMap,
             "bytesAcrossMarkers"_attr = bytesInMarkersMap,
-            "expectedRecords"_attr = preImagesCollNumRecords,
-            "expectedBytes"_attr = preImagesCollDataSize);
+            "expectedRecords"_attr = numRecords,
+            "expectedBytes"_attr = dataSize);
         return;
     }
 
@@ -207,7 +187,8 @@ void distributeUnaccountedBytesAndRecords(
     arbitraryNsUUIDMarkers->updateMarkers(remainderBytes, RecordId{}, Date_t{}, remainderRecords);
 }
 
-int64_t countTotalSamples(const NsUUIDToSamplesMap& samplesMap) {
+int64_t countTotalSamples(
+    const stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash>& samplesMap) {
     int64_t totalSamples{0};
     for (const auto& [_, nsUUIDSamples] : samplesMap) {
         totalSamples = totalSamples + nsUUIDSamples.size();
@@ -215,97 +196,19 @@ int64_t countTotalSamples(const NsUUIDToSamplesMap& samplesMap) {
     return totalSamples;
 }
 
-void appendSample(const BSONObj& preImageObj, const RecordId& rId, NsUUIDToSamplesMap& samplesMap) {
-    auto uuid = change_stream_pre_image_util::getPreImageNsUUID(preImageObj);
+void appendSample(
+    const BSONObj& preImageObj,
+    const RecordId& rId,
+    stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash>& samplesMap) {
+    const auto uuid = change_stream_pre_image_util::getPreImageNsUUID(preImageObj);
+    const auto wallTime = PreImagesTruncateMarkersPerNsUUID::getWallTime(preImageObj);
+    const auto ridAndWall = RecordIdAndWallTime{rId, wallTime};
+
     if (auto it = samplesMap.find(uuid); it != samplesMap.end()) {
-        it->second.push_back(CollectionTruncateMarkers::RecordIdAndWallTime{
-            rId, PreImagesTruncateMarkersPerNsUUID::getWallTime(preImageObj)});
+        it->second.push_back(std::move(ridAndWall));
     } else {
-        // It's possible concurrent inserts have occurred since the initial point sampling
-        // to establish the number of NsUUIDs.
-        samplesMap[uuid] = {CollectionTruncateMarkers::RecordIdAndWallTime{
-            rId, PreImagesTruncateMarkersPerNsUUID::getWallTime(preImageObj)}};
+        samplesMap.emplace(uuid, std::vector<RecordIdAndWallTime>{std::move(ridAndWall)});
     }
-}
-
-// Iterates over each 'nsUUID' captured by the pre-images in 'rs', and populates the 'samplesMap' to
-// include the 'RecordIdAndWallTime' for the most recent pre-image inserted for each 'nsUUID'.
-void sampleLastRecordPerNsUUID(OperationContext* opCtx,
-                               RecordStore* rs,
-                               NsUUIDToSamplesMap& samplesMap) {
-    auto cursor = rs->getCursor(opCtx, false /** forward **/);
-    boost::optional<Record> record = cursor->next();
-    while (record) {
-        // As a reverse cursor, the first record we see for a namespace is the highest.
-        UUID currentNsUUID = change_stream_pre_image_util::getPreImageNsUUID(record->data.toBson());
-        appendSample(record->data.toBson(), record->id, samplesMap);
-
-        RecordId minRecordIdForNsUUID =
-            change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(currentNsUUID)
-                .recordId();
-
-        // A reverse exclusive 'seek' will return the previous entry in the collection. This should
-        // ensure that the record's id is less than the 'minRecordIdForNsUUID', which positions it
-        // exactly at the highest record of the previous collection UUID.
-        record = cursor->seek(minRecordIdForNsUUID, SeekableRecordCursor::BoundInclusion::kExclude);
-        invariant(!record ||
-                  currentNsUUID !=
-                      change_stream_pre_image_util::getPreImageNsUUID(record->data.toBson()));
-    }
-}
-
-// Returns a map of NsUUID to corresponding samples from the 'preImagesCollection'.
-//
-// Guarantees:
-//  (1) The result will contain at least 1 sample per 'nsUUID' in the pre-images collection.
-//  (2) For each 'nsUUID', the samples will be ordered as they appear in the underlying pre-images
-//  collection.
-NsUUIDToSamplesMap gatherOrderedSamplesAcrossNsUUIDs(
-    OperationContext* opCtx, const CollectionAcquisition& preImagesCollection, int64_t numSamples) {
-    // First, try to obtain 1 sample per 'nsUUID'.
-    NsUUIDToSamplesMap samplesMap;
-    sampleLastRecordPerNsUUID(
-        opCtx, preImagesCollection.getCollectionPtr()->getRecordStore(), samplesMap);
-    auto numLastRecords = countTotalSamples(samplesMap);
-
-    Timer lastProgressTimer;
-
-    auto samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
-    auto numSamplesRemaining = numSamples - numLastRecords;
-    auto exec = InternalPlanner::sampleCollection(
-        opCtx, preImagesCollection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
-
-    BSONObj doc;
-    RecordId rId;
-    for (int i = 0; i < numSamplesRemaining; i++) {
-        if (exec->getNext(&doc, &rId) == PlanExecutor::IS_EOF) {
-            // This really shouldn't happen unless the collection is empty and the size storer was
-            // really off on its collection size estimate.
-            break;
-        }
-        appendSample(doc, rId, samplesMap);
-        if (samplingLogIntervalSeconds > 0 &&
-            lastProgressTimer.elapsed() >= Seconds(samplingLogIntervalSeconds)) {
-            LOGV2(7658600,
-                  "Pre-images collection random sampling progress",
-                  "namespace"_attr = preImagesCollection.nss(),
-                  "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
-                  "completed"_attr = (i + 1),
-                  "totalRandomSamples"_attr = numSamplesRemaining,
-                  "totalSamples"_attr = numSamples);
-            lastProgressTimer.reset();
-        }
-    }
-
-    for (auto& [_, samples] : samplesMap) {
-        std::sort(
-            samples.begin(),
-            samples.end(),
-            [](const CollectionTruncateMarkers::RecordIdAndWallTime& a,
-               const CollectionTruncateMarkers::RecordIdAndWallTime& b) { return a.id < b.id; });
-    }
-
-    return samplesMap;
 }
 
 void updateMarkersMapAggregates(
@@ -320,26 +223,137 @@ void updateMarkersMapAggregates(
     aggDataSize = aggDataSize + initialSetOfMarkers.leftoverRecordsBytes;
 }
 
-// Guarantee: Individual truncate markers and metrics for each 'nsUUID' may not be accurate, but
-// cumulatively, the total number of records and bytes captured by the 'markersMap' should reflect
-// the reported 'preImagesCollNumRecords' and 'preImagesCollDataSize' of the pre-images collection.
-//
-// Samples the contents of the pre-images collection to populate the 'markersMap'.
-void sampleToPopulate(
+stdx::unordered_map<UUID, RecordIdAndWallTime, UUID::Hash> sampleLastRecordPerNsUUID(
+    OperationContext* opCtx, const CollectionAcquisition& preImagesCollection) {
+    const auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
+    stdx::unordered_map<UUID, RecordIdAndWallTime, UUID::Hash> lastRecords;
+
+    auto cursor = rs->getCursor(opCtx, false /** forward **/);
+    boost::optional<Record> record = cursor->next();
+    while (record) {
+        // As a reverse cursor, the first record we see for a namespace is the highest.
+        UUID currentNsUUID = change_stream_pre_image_util::getPreImageNsUUID(record->data.toBson());
+        const auto rid = record->id;
+        const auto wallTime = PreImagesTruncateMarkersPerNsUUID::getWallTime(record->data.toBson());
+        lastRecords.insert({currentNsUUID, RecordIdAndWallTime{rid, wallTime}});
+
+        RecordId minRecordIdForNsUUID =
+            change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(currentNsUUID)
+                .recordId();
+
+        // A reverse exclusive 'seek' will return the previous entry in the collection. This
+        // should ensure that the record's id is less than the 'minRecordIdForNsUUID', which
+        // positions it exactly at the highest record of the previous collection UUID.
+        record = cursor->seek(minRecordIdForNsUUID, SeekableRecordCursor::BoundInclusion::kExclude);
+        invariant(!record ||
+                  currentNsUUID !=
+                      change_stream_pre_image_util::getPreImageNsUUID(record->data.toBson()));
+    }
+    return lastRecords;
+}
+
+stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash> collectPreImageSamples(
+    OperationContext* opCtx,
+    const CollectionAcquisition& preImagesCollection,
+    int64_t targetNumSamples) {
+    const auto nsUUIDLastRecords = sampleLastRecordPerNsUUID(opCtx, preImagesCollection);
+
+    stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash> samples;
+    for (const auto& [uuid, ridAndWall] : nsUUIDLastRecords) {
+        // Ensure 'samples' capture the last record of each nsUUID.
+        samples.emplace(uuid, std::vector<RecordIdAndWallTime>{ridAndWall});
+    }
+
+    const int64_t numLastRecords = nsUUIDLastRecords.size();
+    const int64_t numRandomSamples = targetNumSamples - numLastRecords;
+    if (numRandomSamples <= 0) {
+        return samples;
+    }
+
+    auto exec = InternalPlanner::sampleCollection(
+        opCtx, preImagesCollection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+    Timer lastProgressTimer;
+    const auto samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
+    BSONObj preImageObj;
+    RecordId rId;
+    for (int i = 0; i < numRandomSamples; i++) {
+        if (exec->getNext(&preImageObj, &rId) == PlanExecutor::IS_EOF) {
+            // This really shouldn't happen unless the collection is empty and the size storer was
+            // really off on its collection size estimate.
+            break;
+        }
+        appendSample(preImageObj, rId, samples);
+        if (samplingLogIntervalSeconds > 0 &&
+            lastProgressTimer.elapsed() >= Seconds(samplingLogIntervalSeconds)) {
+            LOGV2(7658600,
+                  "Pre-images collection random sampling progress",
+                  "namespace"_attr = preImagesCollection.nss(),
+                  "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
+                  "randomSamplesCompleted"_attr = (i + 1),
+                  "targetRandomSamples"_attr = numRandomSamples,
+                  "targetNumSamples"_attr = targetNumSamples);
+            lastProgressTimer.reset();
+        }
+    }
+
+    // Order each sample.
+    for (auto& [_, samplesPerNsUUID] : samples) {
+        std::sort(
+            samplesPerNsUUID.begin(),
+            samplesPerNsUUID.end(),
+            [](const RecordIdAndWallTime& a, const RecordIdAndWallTime& b) { return a.id < b.id; });
+    }
+
+    return samples;
+}
+
+void populateByScanning(
     OperationContext* opCtx,
     const boost::optional<TenantId> tenantId,
     const CollectionAcquisition& preImagesCollection,
-    int64_t preImagesCollDataSize,
-    int64_t preImagesCollNumRecords,
     int32_t minBytesPerMarker,
     ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap) {
-    double avgRecordSize = double(preImagesCollDataSize) / double(preImagesCollNumRecords);
+    const auto nsUUIDs = change_stream_pre_image_util::getNsUUIDs(opCtx, preImagesCollection);
+    for (const auto& nsUUID : nsUUIDs) {
+        auto initialSetOfMarkers = PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
+            opCtx, preImagesCollection, nsUUID, minBytesPerMarker);
+
+        markersMap.getOrEmplace(nsUUID,
+                                tenantId,
+                                std::move(initialSetOfMarkers.markers),
+                                initialSetOfMarkers.leftoverRecordsCount,
+                                initialSetOfMarkers.leftoverRecordsBytes,
+                                minBytesPerMarker,
+                                CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+    }
+}
+
+void populateBySampling(
+    OperationContext* opCtx,
+    const boost::optional<TenantId> tenantId,
+    const CollectionAcquisition& preImagesCollection,
+    int64_t numRecords,
+    int64_t dataSize,
+    int32_t minBytesPerMarker,
+    uint64_t randomSamplesPerMarker,
+    ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap) {
+    if (dataSize < 1 || numRecords < 1 || dataSize < numRecords) {
+        // Safeguard against non-sensical and divide by 0 computations since 'numRecords' and
+        // 'dataSize' aren't guaranteed to be accurate after unclean shutdown.
+        LOGV2(9528900,
+              "Reverting to scanning for initial pre-images truncate markers. The tracked number "
+              "of records and bytes in the pre-images collection are not compatible with sampling",
+              "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
+              "tenantId"_attr = tenantId,
+              "numRecords"_attr = numRecords,
+              "dataSize"_attr = dataSize);
+        return populateByScanning(
+            opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
+    }
+    double avgRecordSize = double(dataSize) / double(numRecords);
     double estimatedRecordsPerMarker = std::ceil(minBytesPerMarker / avgRecordSize);
     double estimatedBytesPerMarker = estimatedRecordsPerMarker * avgRecordSize;
-
-    uint64_t numSamples =
-        (CollectionTruncateMarkers::kRandomSamplesPerMarker * preImagesCollNumRecords) /
-        estimatedRecordsPerMarker;
+    uint64_t numSamples = (randomSamplesPerMarker * numRecords) / estimatedRecordsPerMarker;
 
     if (numSamples == 0) {
         LOGV2(8198000,
@@ -348,21 +362,17 @@ void sampleToPopulate(
               "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
               "tenantId"_attr = tenantId);
 
-        return scanToPopulate(opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
+        return populateByScanning(
+            opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////
     //
     //  PHASE 1: Gather ordered sample points across the 'nsUUIDs' captured in the pre-images
     //  collection.
-    //
-    //
-    //  {nsUUID: <ordered samples, at least 1 per nsUUID>}
-    //
     ////////////////////////////////////////////////////////////////////////////////////////////
-    const auto orderedSamples =
-        gatherOrderedSamplesAcrossNsUUIDs(opCtx, preImagesCollection, numSamples);
-    const auto totalSamples = countTotalSamples(orderedSamples);
+    const auto samples = collectPreImageSamples(opCtx, preImagesCollection, numSamples);
+    const auto totalSamples = countTotalSamples(samples);
     if (totalSamples != (int64_t)numSamples) {
         // Given the distribution of pre-images to 'nsUUID', the number of samples collected cannot
         // effectively represent the pre-images collection. Default to scanning instead.
@@ -373,20 +383,21 @@ void sampleToPopulate(
               "samplesDesired"_attr = numSamples,
               "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
               "tenantId"_attr = tenantId);
-        return scanToPopulate(opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
+        return populateByScanning(
+            opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     //
     //  Phase 2: Use the samples to generate and install initial sets of whole markers for each
     //  nsUUID. The aggregate number of records and bytes across the map aren't expected to match
-    //  the reported 'preImagesCollDataSize' and 'preImagesCollNumRecords' yet.
+    //  the reported 'dataSize' and 'numRecords' yet.
     //
     ////////////////////////////////////////////////////////////////////////////////////////////
-    int64_t bytesInMarkersMap{0};
     int64_t recordsInMarkersMap{0};
+    int64_t bytesInMarkersMap{0};
     stdx::unordered_set<UUID, UUID::Hash> nsUUIDs;
-    for (const auto& [nsUUID, samples] : orderedSamples) {
+    for (const auto& [nsUUID, nsUUIDSamples] : samples) {
         nsUUIDs.emplace(nsUUID);
 
         auto initialSetOfMarkers =
@@ -394,7 +405,7 @@ void sampleToPopulate(
                 opCtx,
                 preImagesCollection.uuid(),
                 nsUUID,
-                samples,
+                nsUUIDSamples,
                 estimatedRecordsPerMarker,
                 estimatedBytesPerMarker);
 
@@ -415,10 +426,10 @@ void sampleToPopulate(
     //  map make up the expected number of records and bytes in the pre-images collection.
     //
     ////////////////////////////////////////////////////////////////////////////////////////////
-    distributeUnaccountedBytesAndRecords(nsUUIDs,
+    distributeUnaccountedRecordsAndBytes(nsUUIDs,
                                          preImagesCollection.uuid(),
-                                         preImagesCollNumRecords,
-                                         preImagesCollDataSize,
+                                         numRecords,
+                                         dataSize,
                                          recordsInMarkersMap,
                                          bytesInMarkersMap,
                                          markersMap);
@@ -453,20 +464,23 @@ void populateMarkersMap(
                "tenantId"_attr = tenantId);
 
     if (initialCreationMethod == CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {
-        sampleToPopulate(opCtx,
-                         tenantId,
-                         preImagesCollection,
-                         dataSize,
-                         numRecords,
-                         minBytesPerMarker,
-                         markersMap);
+        pre_image_marker_initialization_internal::populateBySampling(
+            opCtx,
+            tenantId,
+            preImagesCollection,
+            numRecords,
+            dataSize,
+            minBytesPerMarker,
+            CollectionTruncateMarkers::kRandomSamplesPerMarker,
+            markersMap);
     } else {
         // Even if the collection is expected to be empty, try scanning since a table scan provides
         // more accurate results.
-        scanToPopulate(opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
+        pre_image_marker_initialization_internal::populateByScanning(
+            opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
     }
 }
-}  // namespace
+}  // namespace pre_image_marker_initialization_internal
 
 PreImagesTenantMarkers PreImagesTenantMarkers::createMarkers(
     OperationContext* opCtx,
@@ -474,7 +488,8 @@ PreImagesTenantMarkers PreImagesTenantMarkers::createMarkers(
     const CollectionAcquisition& preImagesCollection) {
     invariant(preImagesCollection.exists());
     PreImagesTenantMarkers preImagesTenantMarkers(tenantId, preImagesCollection.uuid());
-    populateMarkersMap(opCtx, tenantId, preImagesCollection, preImagesTenantMarkers._markersMap);
+    pre_image_marker_initialization_internal::populateMarkersMap(
+        opCtx, tenantId, preImagesCollection, preImagesTenantMarkers._markersMap);
     return preImagesTenantMarkers;
 }
 
@@ -493,13 +508,11 @@ void PreImagesTenantMarkers::refreshMarkers(OperationContext* opCtx) {
             const auto preImagesCollection = acquirePreImagesCollectionForRead(
                 opCtx,
                 NamespaceStringOrUUID{_preImagesCollectionNss.dbName(), _preImagesCollectionUUID});
-            const auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
-
-            NsUUIDToSamplesMap highestRecordIdAndWallTimeSamples;
-            sampleLastRecordPerNsUUID(opCtx, rs, highestRecordIdAndWallTimeSamples);
-
-            for (const auto& [nsUUID, recordIdAndWallTimeVec] : highestRecordIdAndWallTimeSamples) {
-                const auto& [highestRid, highestWallTime] = recordIdAndWallTimeVec[0];
+            const auto nsUUIDLastRecords =
+                pre_image_marker_initialization_internal::sampleLastRecordPerNsUUID(
+                    opCtx, preImagesCollection);
+            for (const auto& [nsUUID, recordIdAndWallTime] : nsUUIDLastRecords) {
+                const auto& [highestRid, highestWallTime] = recordIdAndWallTime;
                 updateOnInsert(highestRid, nsUUID, highestWallTime, 0, 0);
             }
         });
