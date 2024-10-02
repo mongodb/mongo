@@ -133,6 +133,23 @@ def _impl(ctx):
         ],
     )
 
+    omitted_timestamps_feature = feature(
+        name = "thin_archive",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = [ACTION_NAMES.cpp_link_static_library],
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-T",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
     default_compile_flags_feature = feature(
         name = "default_compile_flags",
         enabled = True,
