@@ -244,7 +244,14 @@ mongo_cc_library(
         ],
         "//conditions:default": [
             "-Wno-sign-compare",
-            "-Wno-error=implicit-fallthrough",
+
+            # Disable warnings for third party libraries as no action will be taken to fix them
+            # and they just clutter the output logs
+            "-Wno-invalid-offsetof",
+            "-Wno-unused-variable",
+            "-Wno-class-memaccess",
+            "-Wno-implicit-fallthrough",
+
             # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated'
             #                     after Mozjs Update
             "-Wno-deprecated",
