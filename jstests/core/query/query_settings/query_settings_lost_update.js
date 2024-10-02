@@ -153,15 +153,6 @@ runQuerySettingsCommandsConcurrently({
     finalConfiguration: []
 });
 
-// Verify that query settings removal fails when the query settings entry for the same query shape
-// has been deleted concurrently.
-runQuerySettingsCommandsConcurrently({
-    initialConfiguration: [qsutils.makeQueryShapeConfiguration(querySettingsB, queryA)],
-    commandToFail: qsutils.makeRemoveQuerySettingsCommand(queryA),
-    commandToPass: qsutils.makeRemoveQuerySettingsCommand(queryAInstance2),
-    finalConfiguration: []
-});
-
 // Verify that query settings insert fails when another query settings entry for a different query
 // shape has been inserted concurrently.
 runQuerySettingsCommandsConcurrently({

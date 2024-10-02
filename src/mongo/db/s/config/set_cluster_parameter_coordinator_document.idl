@@ -72,5 +72,6 @@ structs:
                     "Expected current cluster parameter time for this parameter before the
                     'setClusterParameter' invocation. If this current time does not match the
                     'previousTime' persisted in the 'config.clusterParameters' collection then
-                    'setClusterParameter' will fail."
+                    'setClusterParameter' will fail unless the 'parameter' value matches the current
+                    cluster parameter value."
                 optional: true

@@ -72,6 +72,7 @@ public:
     }
 
 private:
+    friend class SetClusterParameterCoordinatorTest;
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
@@ -81,9 +82,10 @@ private:
     void _commit(OperationContext* opCtx);
 
     /*
-     * Returns the timestamp of the persisted cluster parameter value.
+     * Returns the persisted cluster parameter value. Returns boost::none if the parameter has not
+     * been set.
      */
-    boost::optional<Timestamp> _getPersistedClusterParameterTime(OperationContext* opCtx) const;
+    boost::optional<BSONObj> _getPersistedClusterParameter(OperationContext* opCtx) const;
 
     /*
      * Sends setClusterParameter to every shard in the cluster with the appropiate session.
@@ -98,6 +100,20 @@ private:
     StringData serializePhase(const Phase& phase) const override {
         return SetClusterParameterCoordinatorPhase_serializer(phase);
     }
+
+    /*
+     * Returns true if 'previousTime' does not match the value of "clusterParameterTime" field of
+     * the cluster-wide parameter document 'currentClusterParameterValue'.
+     */
+    static bool _isPersistedStateConflictingWithPreviousTime(
+        const boost::optional<LogicalTime>& previousTime,
+        const boost::optional<BSONObj>& currentClusterParameterValue);
+
+    /* Returns true if the cluster-wide parameter value given as variable 'parameter' is equal to
+     * the cluster-wide parameter value given as the persisted parameter document
+     * 'persistedParameter'.
+     */
+    static bool _parameterValuesEqual(const BSONObj& parameter, const BSONObj& persistedParameter);
 
     bool _detectedConcurrentUpdate = false;
 };
