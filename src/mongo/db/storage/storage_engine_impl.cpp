@@ -1009,6 +1009,7 @@ void StorageEngineImpl::endBackup(OperationContext* opCtx) {
 }
 
 Status StorageEngineImpl::disableIncrementalBackup(OperationContext* opCtx) {
+    LOGV2(9538600, "Disabling incremental backup");
     return _engine->disableIncrementalBackup(opCtx);
 }
 

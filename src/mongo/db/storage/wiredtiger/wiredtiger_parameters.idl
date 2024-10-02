@@ -236,3 +236,12 @@ server_parameters:
       validator:
         gte: 1
       redact: false
+
+    wiredTigerVerboseShutdownCheckpointLogs:
+      description: >-
+        Enables verbose checkpoint logs on shutdown.
+      set_at: startup
+      cpp_vartype: bool
+      cpp_varname: gWiredTigerVerboseShutdownCheckpointLogs
+      default: false
+      redact: false
