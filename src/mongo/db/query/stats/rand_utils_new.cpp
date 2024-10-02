@@ -39,7 +39,7 @@
 #include <vector>
 
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::stats {

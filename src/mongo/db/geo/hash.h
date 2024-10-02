@@ -39,7 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/basic.h"
 
 namespace mongo {

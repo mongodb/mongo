@@ -535,7 +535,7 @@ mongo_cc_library(
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/storage:duplicate_key_error_info",
-        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/storage/key_string",
     ],
 )
 
@@ -683,9 +683,9 @@ mongo_cc_library(
         "//src/mongo/db/repl:drop_pending_collection_reaper",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:index_entry_comparison",
-        "//src/mongo/db/storage:key_string",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:catalog_helper",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:timeseries_options",

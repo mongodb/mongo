@@ -87,7 +87,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"

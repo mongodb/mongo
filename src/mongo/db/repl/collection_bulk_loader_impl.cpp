@@ -50,7 +50,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"

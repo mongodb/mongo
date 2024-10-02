@@ -28,7 +28,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:common",
-        "//src/mongo/db/storage:key_string",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
         "//src/third_party/s2",
     ],
 )

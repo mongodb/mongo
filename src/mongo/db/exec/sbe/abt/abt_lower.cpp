@@ -79,7 +79,7 @@
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 

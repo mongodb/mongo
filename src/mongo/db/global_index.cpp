@@ -66,7 +66,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"

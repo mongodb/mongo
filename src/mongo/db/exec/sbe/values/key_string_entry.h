@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo::sbe::value {

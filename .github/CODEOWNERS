@@ -1104,6 +1104,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/storage/**/column_store* @10gen/query-integration-staff-leads @svc-auto-approve-bot
 /src/mongo/db/storage/**/durable_catalog* @10gen/server-catalog-and-routing @10gen/server-rss-sydney @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/storage/key_string/OWNERS.yml
+/src/mongo/db/storage/key_string/**/* @10gen/server-storage-execution @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/test_output/exec/OWNERS.yml
 /src/mongo/db/test_output/exec/**/* @10gen/query-execution @svc-auto-approve-bot
 

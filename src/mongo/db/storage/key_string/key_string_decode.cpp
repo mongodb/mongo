@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "key_format.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -44,7 +43,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"

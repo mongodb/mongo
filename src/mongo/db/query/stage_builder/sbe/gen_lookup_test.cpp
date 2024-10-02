@@ -65,7 +65,7 @@
 #include "mongo/db/query/stage_builder/sbe/sbe_builder_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"

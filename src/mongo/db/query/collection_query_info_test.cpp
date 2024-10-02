@@ -51,7 +51,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/ident.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"

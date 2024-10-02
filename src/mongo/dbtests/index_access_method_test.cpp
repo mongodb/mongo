@@ -57,7 +57,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/assert.h"

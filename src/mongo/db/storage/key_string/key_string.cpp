@@ -49,7 +49,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"

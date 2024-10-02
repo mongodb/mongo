@@ -39,7 +39,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep

@@ -71,7 +71,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"

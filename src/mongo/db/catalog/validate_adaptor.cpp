@@ -72,7 +72,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"

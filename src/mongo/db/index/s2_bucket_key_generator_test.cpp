@@ -53,7 +53,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"

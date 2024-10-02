@@ -49,7 +49,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {

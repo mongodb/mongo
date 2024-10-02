@@ -43,7 +43,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"

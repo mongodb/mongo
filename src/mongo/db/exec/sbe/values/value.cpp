@@ -59,7 +59,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"

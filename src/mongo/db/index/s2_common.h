@@ -37,7 +37,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 
 class S2CellId;
 class S2RegionCoverer;

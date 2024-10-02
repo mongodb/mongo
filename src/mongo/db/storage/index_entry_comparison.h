@@ -52,7 +52,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/debug_util.h"
 

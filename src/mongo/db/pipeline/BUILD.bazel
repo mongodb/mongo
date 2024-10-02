@@ -168,7 +168,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_shape",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats:query_stats_parse",
-        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/idl:idl_parser",
         "//src/mongo/s:common_s",

@@ -40,7 +40,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/path_internal.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

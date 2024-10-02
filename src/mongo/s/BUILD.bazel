@@ -526,7 +526,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/commands:cluster_server_parameter_cmds_idl",
         "//src/mongo/db/query/query_shape",
-        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",

@@ -79,7 +79,7 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"

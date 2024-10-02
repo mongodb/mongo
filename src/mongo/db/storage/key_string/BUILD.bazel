@@ -1,0 +1,36 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "key_string",
+    srcs = [
+        "key_string.cpp",
+    ],
+    hdrs = [
+        "key_string.h",
+        "//src/mongo/db/exec/sbe/values:key_string_entry.h",
+        "//src/mongo/db/exec/sbe/values:row.h",
+        "//src/mongo/db/exec/sbe/values:slot.h",
+        "//src/mongo/db/exec/sbe/values:slot_util.h",
+        "//src/mongo/db/exec/sbe/values:value.h",
+        "//src/mongo/db/exec/sbe/values:value_builder.h",
+        "//src/mongo/db/storage:index_entry_comparison.h",
+        "//src/mongo/db/storage:sorted_data_interface.h",
+        "//src/mongo/util:id_generator.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/op_observer:op_observer",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)

@@ -47,7 +47,7 @@
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"

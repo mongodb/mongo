@@ -54,7 +54,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"

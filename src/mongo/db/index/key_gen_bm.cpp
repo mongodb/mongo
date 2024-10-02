@@ -44,7 +44,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {

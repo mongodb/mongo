@@ -38,7 +38,7 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"

@@ -60,7 +60,7 @@
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/ident.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/util/shared_buffer_fragment.h"

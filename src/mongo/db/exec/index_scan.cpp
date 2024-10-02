@@ -47,7 +47,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"

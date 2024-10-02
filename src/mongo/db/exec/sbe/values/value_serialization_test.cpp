@@ -44,7 +44,7 @@
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"

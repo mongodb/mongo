@@ -60,7 +60,7 @@
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"

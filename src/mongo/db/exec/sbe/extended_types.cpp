@@ -43,7 +43,7 @@
 #include "mongo/db/matcher/in_list_data.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/pcre_util.h"
 

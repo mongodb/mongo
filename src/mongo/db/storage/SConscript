@@ -7,27 +7,12 @@ env.SConscript(
     must_exist=1,
     dirs=[
         "devnull",
+        "key_string",
         "kv",
         "wiredtiger",
     ],
     exports=[
         "env",
-    ],
-)
-
-ksdecode = env.Program(
-    target="ksdecode",
-    source=[
-        "key_string_decode.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "key_string",
-    ],
-    AIB_COMPONENT="ksdecode",
-    AIB_COMPONENTS_EXTRA=[
-        "dist-test",
     ],
 )
 
@@ -41,7 +26,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/unittest/unittest",
         "index_entry_comparison",
-        "key_string",
+        "key_string/key_string",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/shard_role_api",
@@ -150,17 +135,6 @@ env.Library(
 )
 
 env.Benchmark(
-    target="storage_key_string_bm",
-    source=[
-        "key_string_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "key_string",
-    ],
-)
-
-env.Benchmark(
     target="storage_record_id_bm",
     source=[
         "record_id_bm.cpp",
@@ -180,7 +154,6 @@ env.CppUnitTest(
         "disk_space_monitor_test.cpp",
         "flow_control_test.cpp",
         "index_entry_comparison_test.cpp",
-        "key_string_test.cpp",
         "kv/durable_catalog_test.cpp",
         "kv/kv_drop_pending_ident_reaper_test.cpp",
         "kv/storage_engine_test.cpp",
@@ -215,24 +188,12 @@ env.CppUnitTest(
         "disk_space_monitor",
         "flow_control",
         "flow_control_parameters",
-        "key_string",
+        "key_string/key_string",
         "kv/kv_drop_pending_ident_reaper",
         "record_store_base",
         "storage_engine_common",
         "storage_engine_lock_file",
         "storage_engine_metadata",
         "storage_options",
-    ],
-)
-
-env.CppLibfuzzerTest(
-    target="key_string_to_bson_fuzzer",
-    source=[
-        "key_string_to_bson_fuzzer.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/bson_validate",
-        "key_string",
     ],
 )

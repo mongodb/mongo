@@ -275,32 +275,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "key_string",
-    srcs = [
-        "key_string.cpp",
-    ],
-    hdrs = [
-        "index_entry_comparison.h",
-        "key_string.h",
-        "sorted_data_interface.h",
-        "//src/mongo/db/exec/sbe/values:key_string_entry.h",
-        "//src/mongo/db/exec/sbe/values:row.h",
-        "//src/mongo/db/exec/sbe/values:slot.h",
-        "//src/mongo/db/exec/sbe/values:slot_util.h",
-        "//src/mongo/db/exec/sbe/values:value.h",
-        "//src/mongo/db/exec/sbe/values:value_builder.h",
-        "//src/mongo/util:id_generator.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/op_observer:op_observer",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/bson:bson_validate",
-    ],
-)
-
-mongo_cc_library(
     name = "execution_context",
     srcs = [
         "execution_context.cpp",
@@ -375,8 +349,8 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_core",
     ],
     deps = [
-        "key_string",
         "//src/mongo:base",
+        "//src/mongo/db/storage/key_string",
     ],
 )
 
@@ -390,8 +364,8 @@ mongo_cc_library(
     ],
     deps = [
         ":duplicate_key_error_info",
-        ":key_string",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/storage/key_string",
     ],
 )
 

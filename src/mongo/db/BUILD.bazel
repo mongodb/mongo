@@ -1411,7 +1411,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:working_set",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/storage:execution_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:key_string",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -1460,7 +1460,7 @@ mongo_cc_library(
         "//src/mongo/bson:bson_validate",
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:key_string",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -2111,7 +2111,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/storage/key_string",
     ],
 )
 
@@ -2280,8 +2280,8 @@ mongo_cc_library(
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/datetime:date_time_support",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:key_string",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:pcre_util",
         "//src/mongo/util:string_listset",
         "//src/mongo/util:summation",  # TODO(SERVER-93876): Remove.
@@ -2944,7 +2944,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/session:logical_session_id_helpers",
-        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/storage/key_string",
         "//src/mongo/db/transaction",
     ],
 )

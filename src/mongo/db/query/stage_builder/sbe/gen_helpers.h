@@ -78,7 +78,7 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/field_set.h"
 #include "mongo/util/string_map.h"

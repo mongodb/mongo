@@ -28,7 +28,7 @@
  */
 
 #include "mongo/bson/bson_validate.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 
 const mongo::Ordering kAllAscending = mongo::Ordering::make(mongo::BSONObj());
 const mongo::Ordering kOneDescending = mongo::Ordering::make(BSON("a" << -1));

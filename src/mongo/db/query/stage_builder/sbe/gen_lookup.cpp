@@ -88,7 +88,7 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"

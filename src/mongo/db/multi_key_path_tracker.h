@@ -37,7 +37,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

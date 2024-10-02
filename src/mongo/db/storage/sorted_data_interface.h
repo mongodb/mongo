@@ -36,7 +36,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 
 #pragma once
 

@@ -45,7 +45,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/test_harness_helper.h"
 

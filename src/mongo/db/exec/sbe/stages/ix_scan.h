@@ -59,7 +59,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/transaction_resources.h"

@@ -38,7 +38,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/clock_source.h"

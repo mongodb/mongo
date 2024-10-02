@@ -33,7 +33,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/bufreader.h"
 
 namespace mongo::sbe::value {

@@ -49,7 +49,7 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/assert_util.h"

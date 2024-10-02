@@ -39,7 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/platform/atomic_word.h"

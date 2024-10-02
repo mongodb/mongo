@@ -27,7 +27,7 @@ mongo_cc_library(
         "//src/mongo/db/geo:geometry",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/geo:geoparser",
         "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:key_string",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
         "//src/third_party/s2",
     ],
 )
@@ -143,10 +143,10 @@ mongo_cc_library(
         "//src/mongo/db/storage:encryption_hooks",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:execution_context",
         "//src/mongo/db/storage:index_entry_comparison",
-        "//src/mongo/db/storage:key_string",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:write_unit_of_work",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/util:progress_meter",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.

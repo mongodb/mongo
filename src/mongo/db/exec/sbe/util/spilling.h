@@ -37,7 +37,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/platform/basic.h"

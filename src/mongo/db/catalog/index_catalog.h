@@ -53,7 +53,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {

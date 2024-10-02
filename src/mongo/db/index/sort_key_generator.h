@@ -50,7 +50,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

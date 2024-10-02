@@ -41,7 +41,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/debug_util.h"
 

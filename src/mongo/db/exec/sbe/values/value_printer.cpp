@@ -49,7 +49,7 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"

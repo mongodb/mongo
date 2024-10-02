@@ -1,0 +1,53 @@
+Import("env")
+
+env = env.Clone()
+
+env.Benchmark(
+    target="storage_key_string_bm",
+    source=[
+        "key_string_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "key_string",
+    ],
+)
+
+ksdecode = env.Program(
+    target="ksdecode",
+    source=[
+        "key_string_decode.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/util/options_parser/options_parser",
+        "key_string",
+    ],
+    AIB_COMPONENT="ksdecode",
+    AIB_COMPONENTS_EXTRA=[
+        "dist-test",
+    ],
+)
+
+env.CppUnitTest(
+    target="key_string_test",
+    source=[
+        "key_string_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/server_base",
+        "key_string",
+    ],
+)
+
+env.CppLibfuzzerTest(
+    target="key_string_to_bson_fuzzer",
+    source=[
+        "key_string_to_bson_fuzzer.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/bson/bson_validate",
+        "key_string",
+    ],
+)

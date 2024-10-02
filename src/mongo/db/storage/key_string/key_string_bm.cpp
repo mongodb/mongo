@@ -40,7 +40,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"

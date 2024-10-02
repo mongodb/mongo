@@ -45,7 +45,7 @@
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/devnull/ephemeral_catalog_record_store.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"

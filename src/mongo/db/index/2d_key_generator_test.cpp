@@ -46,7 +46,7 @@
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"

@@ -67,7 +67,7 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/compiler.h"

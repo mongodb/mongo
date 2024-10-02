@@ -74,7 +74,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
