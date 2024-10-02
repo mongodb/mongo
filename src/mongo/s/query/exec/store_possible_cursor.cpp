@@ -56,6 +56,7 @@
 #include "mongo/s/query/exec/cluster_client_cursor_impl.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
+#include "mongo/s/query/exec/collect_query_stats_mongos.h"
 #include "mongo/s/query/exec/store_possible_cursor.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/decorable.h"

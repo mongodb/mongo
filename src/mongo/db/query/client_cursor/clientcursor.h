@@ -56,7 +56,6 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/optime.h"
@@ -687,21 +686,6 @@ public:
 private:
     static Counter64& _makeStat(StringData name);
 };
-
-/**
- * Records certain metrics for the current operation on OpDebug and aggregates those metrics for
- * query stats use. If a cursor pin is provided, metrics are aggregated on the cursor; otherwise,
- * metrics are written directly to the query stats store.
- * NOTE: Metrics are taken from opDebug.additiveMetrics, so CurOp::setEndOfOpMetrics must be called
- * *prior* to calling these.
- *
- * Currently, query stats are only collected for find and aggregate requests (and their subsequent
- * getMore requests), so these should only be called from those request paths.
- */
-void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& cursor);
-void collectQueryStatsMongod(OperationContext* opCtx,
-                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             std::unique_ptr<query_stats::Key> key);
 
 /*
  * Updates the cursor lifespan histogram metric given the birth and death dates

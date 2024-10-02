@@ -6,3 +6,6 @@ filters:
   - "exhaust_cursor_currentop_integration_test.cpp":
     approvers:
       - 10gen/query-integration-staff-leads
+  - "collect_query_stats_mongod.*":
+    approvers:
+      - 10gen/query-integration-observability

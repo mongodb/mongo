@@ -873,6 +873,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/client_cursor/OWNERS.yml
 /src/mongo/db/query/client_cursor/**/* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/client_cursor/**/exhaust_cursor_currentop_integration_test.cpp @10gen/query-integration-staff-leads @svc-auto-approve-bot
+/src/mongo/db/query/client_cursor/**/collect_query_stats_mongod.* @10gen/query-integration-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/collation/OWNERS.yml
 /src/mongo/db/query/collation/**/* @10gen/query-execution @svc-auto-approve-bot
@@ -1299,6 +1300,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/s/query/exec/OWNERS.yml
 /src/mongo/s/query/exec/**/* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/s/query/exec/**/collect_query_stats_mongos.* @10gen/query-integration-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/s/query/planner/OWNERS.yml
 /src/mongo/s/query/planner/**/* @10gen/query-optimization @svc-auto-approve-bot

@@ -64,9 +64,9 @@ mongo_cc_library(
         "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/client_cursor:generic_cursor",
-        "//src/mongo/db/query/query_stats",
         "//src/mongo/db/session:kill_sessions",
         "//src/mongo/db/session:logical_session_cache",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/session:logical_session_id",  # TODO(SERVER-93876): Remove.
@@ -107,11 +107,13 @@ mongo_cc_library(
     srcs = [
         "cluster_client_cursor_impl.cpp",
         "cluster_client_cursor_params.cpp",
+        "collect_query_stats_mongos.cpp",
         "store_possible_cursor.cpp",
     ],
     hdrs = [
         "cluster_client_cursor_impl.h",
         "cluster_client_cursor_params.h",
+        "collect_query_stats_mongos.h",
         "owned_remote_cursor.h",
         "store_possible_cursor.h",
     ],

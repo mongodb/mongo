@@ -66,6 +66,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/query/count_command_as_aggregation_command.h"

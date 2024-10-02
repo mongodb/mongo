@@ -35,6 +35,7 @@
 #include <memory>
 
 #include "mongo/base/clonable_ptr.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/query/util/named_enum.h"
 
@@ -99,5 +100,11 @@ private:
     mongo::stdx::unordered_map<SupplementalMetricType, clonable_ptr<SupplementalStatsEntry>>
         _metrics;
 };
+
+/**
+ * Computes supplemental query stats metrics for the operation represented by 'opDebug'.
+ */
+std::vector<std::unique_ptr<SupplementalStatsEntry>> computeSupplementalQueryStatsMetrics(
+    const OpDebug& opDebug);
 
 }  // namespace mongo::query_stats

@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/query-execution
+  - "collect_query_stats_mongos.*":
+    approvers:
+      - 10gen/query-integration-observability

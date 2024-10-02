@@ -13,10 +13,12 @@ mongo_cc_library(
     name = "client_cursor",
     srcs = [
         "clientcursor.cpp",
+        "collect_query_stats_mongod.cpp",
         "cursor_manager.cpp",
     ],
     hdrs = [
         "clientcursor.h",
+        "collect_query_stats_mongod.h",
         "cursor_manager.h",
         "//src/mongo/db/catalog:external_data_source_scope_guard.h",  # TODO(SERVER-95100): Remove
     ],

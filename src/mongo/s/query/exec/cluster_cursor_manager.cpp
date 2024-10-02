@@ -45,8 +45,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/query/client_cursor/allocate_cursor_id.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_stats/query_stats.h"
-#include "mongo/db/query/query_stats/vector_search_stats_entry.h"
 #include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/logv2/log.h"
@@ -78,22 +76,6 @@ Status cursorNotFoundStatus(CursorId cursorId) {
 Status cursorInUseStatus(CursorId cursorId) {
     return {ErrorCodes::CursorInUse,
             str::stream() << "Cursor already in use (id: " << cursorId << ")."};
-}
-
-void maybeAddVectorSearchMetrics(
-    const OpDebug& opDebug,
-    std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>>& supplementalMetrics) {
-    if (const auto& metrics = opDebug.vectorSearchMetrics) {
-        supplementalMetrics.emplace_back(std::make_unique<query_stats::VectorSearchStatsEntry>(
-            metrics->limit, metrics->numCandidatesLimitRatio));
-    }
-}
-
-std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>> computeSupplementalQueryMetrics(
-    const OpDebug& opDebug) {
-    std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>> supplementalMetrics;
-    maybeAddVectorSearchMetrics(opDebug, supplementalMetrics);
-    return supplementalMetrics;
 }
 
 }  // namespace
@@ -618,71 +600,6 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
     invariant(1 == eraseResult);
 
     return std::move(cursor);
-}
-
-void collectQueryStatsMongos(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key) {
-    // If we haven't registered a cursor to prepare for getMore requests, we record
-    // queryStats directly.
-    auto& opDebug = CurOp::get(opCtx)->debug();
-
-    auto snapshot = query_stats::captureMetrics(
-        opCtx,
-        query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
-        opDebug.additiveMetrics);
-
-    query_stats::writeQueryStats(opCtx,
-                                 opDebug.queryStatsInfo.keyHash,
-                                 std::move(key),
-                                 snapshot,
-                                 computeSupplementalQueryMetrics(opDebug));
-}
-
-void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(cursor->takeRemoteMetrics());
-    cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
-
-    // For a change stream query that never ends, we want to collect query stats on the initial
-    // query and each getMore. Here we record the initial query.
-    if (cursor->getQueryStatsWillNeverExhaust()) {
-        auto& opDebug = CurOp::get(opCtx)->debug();
-
-        auto snapshot = query_stats::captureMetrics(
-            opCtx,
-            query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
-            opDebug.additiveMetrics);
-
-        query_stats::writeQueryStats(opCtx,
-                                     opDebug.queryStatsInfo.keyHash,
-                                     cursor->takeKey(),
-                                     snapshot,
-                                     {} /* supplementalMetrics */,
-                                     cursor->getQueryStatsWillNeverExhaust());
-    }
-}
-
-void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor) {
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(cursor->takeRemoteMetrics());
-    cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
-
-    // For a change stream query that never ends, we want to update query stats for every getMore on
-    // the cursor.
-    if (cursor->getQueryStatsWillNeverExhaust()) {
-        auto& opDebug = CurOp::get(opCtx)->debug();
-
-        auto snapshot = query_stats::captureMetrics(
-            opCtx,
-            query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
-            opDebug.additiveMetrics);
-
-        query_stats::writeQueryStats(opCtx,
-                                     opDebug.queryStatsInfo.keyHash,
-                                     nullptr,
-                                     snapshot,
-                                     {} /* supplementalMetrics */,
-                                     cursor->getQueryStatsWillNeverExhaust());
-    }
 }
 
 }  // namespace mongo
