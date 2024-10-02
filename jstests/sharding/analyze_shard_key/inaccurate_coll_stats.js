@@ -205,9 +205,9 @@ function runTest(conn, {rst, st}) {
                                                             expectedMetricsX);
         assert.eq(resXAfter.keyCharacteristics.avgDocSizeBytes, expectedAvgDocSize);
 
+        // Skip checking the key characteristics metrics for a unique shard key after an unclean
+        // shutdown, since $collStats can return an incorrect number of total documents.
         assert.commandWorked(resYAfter);
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resYAfter.keyCharacteristics,
-                                                            expectedMetricsY);
         assert.eq(resYAfter.keyCharacteristics.avgDocSizeBytes, expectedAvgDocSize);
     }
 }
