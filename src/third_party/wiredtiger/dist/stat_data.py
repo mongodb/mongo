@@ -64,11 +64,6 @@ class CacheStat(Stat):
     prefix = 'cache'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, CacheStat.prefix, desc, flags)
-class CacheWalkStat(Stat):
-    prefix = 'cache_walk'
-    def __init__(self, name, desc, flags=''):
-        flags += ',cache_walk'
-        Stat.__init__(self, name, CacheWalkStat.prefix, desc, flags)
 class CapacityStat(Stat):
     prefix = 'capacity'
     def __init__(self, name, desc, flags=''):
@@ -105,6 +100,15 @@ class DhandleStat(Stat):
     prefix = 'data-handle'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
+class EvictCacheWalkStat(Stat):
+    prefix = 'cache_walk'
+    def __init__(self, name, desc, flags=''):
+        flags += ',cache_walk'
+        Stat.__init__(self, name, EvictCacheWalkStat.prefix, desc, flags)
+class EvictStat(Stat):
+    prefix = 'eviction'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, EvictStat.prefix, desc, flags)
 class JoinStat(Stat):
     prefix = 'join'
     def __init__(self, name, desc, flags=''):
@@ -256,7 +260,7 @@ conn_stats = [
     BlockStat('block_write', 'blocks written'),
 
     ##########################################
-    # Cache and eviction statistics
+    # Cache statistics
     ##########################################
     CacheStat('cache_bytes_hs', 'bytes belonging to the history store table in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_image', 'bytes belonging to page images in the cache', 'no_clear,no_scale,size'),
@@ -265,77 +269,6 @@ conn_stats = [
     CacheStat('cache_bytes_max', 'maximum bytes configured', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_other', 'bytes not belonging to page images in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_updates', 'bytes allocated for updates', 'no_clear,no_scale,size'),
-    CacheStat('cache_eviction_active_workers', 'eviction worker thread active', 'no_clear'),
-    CacheStat('cache_eviction_aggressive_set', 'eviction currently operating in aggressive mode', 'no_clear,no_scale'),
-    CacheStat('cache_eviction_app_attempt', 'page evict attempts by application threads'),
-    CacheStat('cache_eviction_app_dirty_attempt', 'modified page evict attempts by application threads'),
-    CacheStat('cache_eviction_app_dirty_fail', 'modified page evict failures by application threads'),
-    CacheStat('cache_eviction_app_fail', 'page evict failures by application threads'),
-    CacheStat('cache_eviction_app_time', 'application thread time evicting (usecs)'),
-    CacheStat('cache_eviction_clear_ordinary', 'pages removed from the ordinary queue to be queued for urgent eviction'),
-    CacheStat('cache_eviction_consider_prefetch', 'pages considered for eviction that were brought in by pre-fetch', 'no_clear,no_scale'),
-    CacheStat('cache_eviction_empty_score', 'eviction empty score', 'no_clear,no_scale'),
-    CacheStat('cache_eviction_fail', 'pages selected for eviction unable to be evicted'),
-    CacheStat('cache_eviction_fail_active_children_on_an_internal_page', 'pages selected for eviction unable to be evicted because of active children on an internal page'),
-    CacheStat('cache_eviction_fail_checkpoint_no_ts', 'pages selected for eviction unable to be evicted because of race between checkpoint and updates without timestamps'),
-    CacheStat('cache_eviction_fail_in_reconciliation', 'pages selected for eviction unable to be evicted because of failure in reconciliation'),
-    CacheStat('cache_eviction_force', 'forced eviction - pages selected count'),
-    CacheStat('cache_eviction_force_clean', 'forced eviction - pages evicted that were clean count'),
-    CacheStat('cache_eviction_force_delete', 'forced eviction - pages selected because of too many deleted items count'),
-    CacheStat('cache_eviction_force_dirty', 'forced eviction - pages evicted that were dirty count'),
-    CacheStat('cache_eviction_force_fail', 'forced eviction - pages selected unable to be evicted count'),
-    CacheStat('cache_eviction_force_hs', 'forced eviction - history store pages selected while session has history store cursor open'),
-    CacheStat('cache_eviction_force_hs_fail', 'forced eviction - history store pages failed to evict while session has history store cursor open'),
-    CacheStat('cache_eviction_force_hs_success', 'forced eviction - history store pages successfully evicted while session has history store cursor open'),
-    CacheStat('cache_eviction_force_long_update_list', 'forced eviction - pages selected because of a large number of updates to a single item'),
-    CacheStat('cache_eviction_force_no_retry', 'forced eviction - do not retry count to evict pages selected to evict during reconciliation'),
-    CacheStat('cache_eviction_get_ref_empty', 'eviction calls to get a page found queue empty'),
-    CacheStat('cache_eviction_get_ref_empty2', 'eviction calls to get a page found queue empty after locking'),
-    CacheStat('cache_eviction_internal_pages_already_queued', 'internal pages seen by eviction walk that are already queued'),
-    CacheStat('cache_eviction_internal_pages_queued', 'internal pages queued for eviction'),
-    CacheStat('cache_eviction_internal_pages_seen', 'internal pages seen by eviction walk'),
-    CacheStat('cache_eviction_maximum_milliseconds', 'maximum milliseconds spent at a single eviction', 'no_clear,no_scale,size'),
-    CacheStat('cache_eviction_maximum_page_size', 'maximum page size seen at eviction', 'no_clear,no_scale,size'),
-    CacheStat('cache_eviction_pages_already_queued', 'pages seen by eviction walk that are already queued'),
-    CacheStat('cache_eviction_pages_in_parallel_with_checkpoint', 'pages evicted in parallel with checkpoint'),
-    CacheStat('cache_eviction_pages_ordinary_queued', 'pages queued for eviction'),
-    CacheStat('cache_eviction_pages_queued_oldest', 'pages queued for urgent eviction during walk'),
-    CacheStat('cache_eviction_pages_queued_post_lru', 'pages queued for eviction post lru sorting'),
-    CacheStat('cache_eviction_pages_queued_urgent', 'pages queued for urgent eviction'),
-    CacheStat('cache_eviction_pages_queued_urgent_hs_dirty', 'pages queued for urgent eviction from history store due to high dirty content'),
-    CacheStat('cache_eviction_queue_empty', 'eviction server candidate queue empty when topping up'),
-    CacheStat('cache_eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
-    CacheStat('cache_eviction_server_evict_attempt', 'evict page attempts by eviction server'),
-    CacheStat('cache_eviction_server_evict_fail', 'evict page failures by eviction server'),
-    # Note cache_eviction_server_evict_attempt - cache_eviction_server_evict_fail = evict page successes by eviction server.
-    CacheStat('cache_eviction_server_skip_checkpointing_trees', 'eviction server skips trees that are being checkpointed'),
-    CacheStat('cache_eviction_server_skip_dirty_pages_during_checkpoint', 'eviction server skips dirty pages during a running checkpoint'),
-    CacheStat('cache_eviction_server_skip_intl_page_with_active_child', 'eviction server skips internal pages as it has an active child.'),
-    CacheStat('cache_eviction_server_skip_metatdata_with_history', 'eviction server skips metadata pages with history'),
-    CacheStat('cache_eviction_server_skip_pages_last_running', 'eviction server skips pages that are written with transactions greater than the last running'),
-    CacheStat('cache_eviction_server_skip_pages_retry', 'eviction server skips pages that previously failed eviction and likely will again'),
-    CacheStat('cache_eviction_server_skip_trees_eviction_disabled', 'eviction server skips trees that disable eviction'),
-    CacheStat('cache_eviction_server_skip_trees_not_useful_before', 'eviction server skips trees that were not useful before'),
-    CacheStat('cache_eviction_server_skip_trees_stick_in_cache', 'eviction server skips trees that are configured to stick in cache'),
-    CacheStat('cache_eviction_server_skip_trees_too_many_active_walks', 'eviction server skips trees because there are too many active walks'),
-    CacheStat('cache_eviction_server_skip_unwanted_pages', 'eviction server skips pages that we do not want to evict'),
-    CacheStat('cache_eviction_server_skip_unwanted_tree', 'eviction server skips tree that we do not want to evict'),
-    CacheStat('cache_eviction_server_slept', 'eviction server slept, because we did not make progress with eviction'),
-    CacheStat('cache_eviction_slow', 'eviction server unable to reach eviction goal'),
-    CacheStat('cache_eviction_stable_state_workers', 'eviction worker thread stable number', 'no_clear'),
-    CacheStat('cache_eviction_state', 'eviction state', 'no_clear,no_scale'),
-    CacheStat('cache_eviction_target_strategy_both_clean_and_dirty', 'eviction walk target strategy both clean and dirty pages'),
-    CacheStat('cache_eviction_target_strategy_clean', 'eviction walk target strategy only clean pages'),
-    CacheStat('cache_eviction_target_strategy_dirty', 'eviction walk target strategy only dirty pages'),
-    CacheStat('cache_eviction_walk', 'pages walked for eviction'),
-    CacheStat('cache_eviction_walk_leaf_notfound', 'eviction server waiting for a leaf page'),
-    CacheStat('cache_eviction_walk_passes', 'eviction passes of a file'),
-    CacheStat('cache_eviction_walk_sleeps', 'eviction walk most recent sleeps for checkpoint handle gathering'),
-    CacheStat('cache_eviction_walks_active', 'files with active eviction walks', 'no_clear,no_scale'),
-    CacheStat('cache_eviction_walks_started', 'files with new eviction walks started'),
-    CacheStat('cache_eviction_worker_evict_attempt', 'evict page attempts by eviction worker threads'),
-    CacheStat('cache_eviction_worker_evict_fail', 'evict page failures by eviction worker threads'),
-    # Note cache_eviction_worker_evict_attempt - cache_eviction_worker_evict_fail = evict page successes by eviction worker threads.
     CacheStat('cache_hazard_checks', 'hazard pointer check calls'),
     CacheStat('cache_hazard_max', 'hazard pointer maximum array length', 'max_aggregate,no_scale'),
     CacheStat('cache_hazard_walks', 'hazard pointer check entries walked'),
@@ -346,10 +279,85 @@ conn_stats = [
     CacheStat('cache_pages_inuse', 'pages currently held in the cache', 'no_clear,no_scale'),
     CacheStat('cache_read_app_count', 'application threads page read from disk to cache count'),
     CacheStat('cache_read_app_time', 'application threads page read from disk to cache time (usecs)'),
-    CacheStat('cache_reentry_hs_eviction_milliseconds', 'total milliseconds spent inside reentrant history store evictions in a reconciliation', 'no_clear,no_scale,size'),
-    CacheStat('cache_timed_out_ops', 'operations timed out waiting for space in cache'),
     CacheStat('cache_write_app_count', 'application threads page write from cache to disk count'),
     CacheStat('cache_write_app_time', 'application threads page write from cache to disk time (usecs)'),
+
+    ##########################################
+    # Eviction statistics
+    ##########################################
+    EvictStat('eviction_active_workers', 'eviction worker thread active', 'no_clear'),
+    EvictStat('eviction_aggressive_set', 'eviction currently operating in aggressive mode', 'no_clear,no_scale'),
+    EvictStat('eviction_app_attempt', 'page evict attempts by application threads'),
+    EvictStat('eviction_app_dirty_attempt', 'modified page evict attempts by application threads'),
+    EvictStat('eviction_app_dirty_fail', 'modified page evict failures by application threads'),
+    EvictStat('eviction_app_fail', 'page evict failures by application threads'),
+    EvictStat('eviction_app_time', 'application thread time evicting (usecs)'),
+    EvictStat('eviction_clear_ordinary', 'pages removed from the ordinary queue to be queued for urgent eviction'),
+    EvictStat('eviction_consider_prefetch', 'pages considered for eviction that were brought in by pre-fetch', 'no_clear,no_scale'),
+    EvictStat('eviction_empty_score', 'eviction empty score', 'no_clear,no_scale'),
+    EvictStat('eviction_fail', 'pages selected for eviction unable to be evicted'),
+    EvictStat('eviction_fail_active_children_on_an_internal_page', 'pages selected for eviction unable to be evicted because of active children on an internal page'),
+    EvictStat('eviction_fail_checkpoint_no_ts', 'pages selected for eviction unable to be evicted because of race between checkpoint and updates without timestamps'),
+    EvictStat('eviction_fail_in_reconciliation', 'pages selected for eviction unable to be evicted because of failure in reconciliation'),
+    EvictStat('eviction_force', 'forced eviction - pages selected count'),
+    EvictStat('eviction_force_clean', 'forced eviction - pages evicted that were clean count'),
+    EvictStat('eviction_force_delete', 'forced eviction - pages selected because of too many deleted items count'),
+    EvictStat('eviction_force_dirty', 'forced eviction - pages evicted that were dirty count'),
+    EvictStat('eviction_force_fail', 'forced eviction - pages selected unable to be evicted count'),
+    EvictStat('eviction_force_hs', 'forced eviction - history store pages selected while session has history store cursor open'),
+    EvictStat('eviction_force_hs_fail', 'forced eviction - history store pages failed to evict while session has history store cursor open'),
+    EvictStat('eviction_force_hs_success', 'forced eviction - history store pages successfully evicted while session has history store cursor open'),
+    EvictStat('eviction_force_long_update_list', 'forced eviction - pages selected because of a large number of updates to a single item'),
+    EvictStat('eviction_force_no_retry', 'forced eviction - do not retry count to evict pages selected to evict during reconciliation'),
+    EvictStat('eviction_get_ref_empty', 'eviction calls to get a page found queue empty'),
+    EvictStat('eviction_get_ref_empty2', 'eviction calls to get a page found queue empty after locking'),
+    EvictStat('eviction_internal_pages_already_queued', 'internal pages seen by eviction walk that are already queued'),
+    EvictStat('eviction_internal_pages_queued', 'internal pages queued for eviction'),
+    EvictStat('eviction_internal_pages_seen', 'internal pages seen by eviction walk'),
+    EvictStat('eviction_maximum_milliseconds', 'maximum milliseconds spent at a single eviction', 'no_clear,no_scale,size'),
+    EvictStat('eviction_maximum_page_size', 'maximum page size seen at eviction', 'no_clear,no_scale,size'),
+    EvictStat('eviction_pages_already_queued', 'pages seen by eviction walk that are already queued'),
+    EvictStat('eviction_pages_in_parallel_with_checkpoint', 'pages evicted in parallel with checkpoint'),
+    EvictStat('eviction_pages_ordinary_queued', 'pages queued for eviction'),
+    EvictStat('eviction_pages_queued_oldest', 'pages queued for urgent eviction during walk'),
+    EvictStat('eviction_pages_queued_post_lru', 'pages queued for eviction post lru sorting'),
+    EvictStat('eviction_pages_queued_urgent', 'pages queued for urgent eviction'),
+    EvictStat('eviction_pages_queued_urgent_hs_dirty', 'pages queued for urgent eviction from history store due to high dirty content'),
+    EvictStat('eviction_queue_empty', 'eviction server candidate queue empty when topping up'),
+    EvictStat('eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
+    EvictStat('eviction_reentry_hs_eviction_milliseconds', 'total milliseconds spent inside reentrant history store evictions in a reconciliation', 'no_clear,no_scale,size'),
+    EvictStat('eviction_server_evict_attempt', 'evict page attempts by eviction server'),
+    EvictStat('eviction_server_evict_fail', 'evict page failures by eviction server'),
+    # Note eviction_server_evict_attempt - eviction_server_evict_fail = evict page successes by eviction server.
+    EvictStat('eviction_server_skip_checkpointing_trees', 'eviction server skips trees that are being checkpointed'),
+    EvictStat('eviction_server_skip_dirty_pages_during_checkpoint', 'eviction server skips dirty pages during a running checkpoint'),
+    EvictStat('eviction_server_skip_intl_page_with_active_child', 'eviction server skips internal pages as it has an active child.'),
+    EvictStat('eviction_server_skip_metatdata_with_history', 'eviction server skips metadata pages with history'),
+    EvictStat('eviction_server_skip_pages_last_running', 'eviction server skips pages that are written with transactions greater than the last running'),
+    EvictStat('eviction_server_skip_pages_retry', 'eviction server skips pages that previously failed eviction and likely will again'),
+    EvictStat('eviction_server_skip_trees_eviction_disabled', 'eviction server skips trees that disable eviction'),
+    EvictStat('eviction_server_skip_trees_not_useful_before', 'eviction server skips trees that were not useful before'),
+    EvictStat('eviction_server_skip_trees_stick_in_cache', 'eviction server skips trees that are configured to stick in cache'),
+    EvictStat('eviction_server_skip_trees_too_many_active_walks', 'eviction server skips trees because there are too many active walks'),
+    EvictStat('eviction_server_skip_unwanted_pages', 'eviction server skips pages that we do not want to evict'),
+    EvictStat('eviction_server_skip_unwanted_tree', 'eviction server skips tree that we do not want to evict'),
+    EvictStat('eviction_server_slept', 'eviction server slept, because we did not make progress with eviction'),
+    EvictStat('eviction_slow', 'eviction server unable to reach eviction goal'),
+    EvictStat('eviction_stable_state_workers', 'eviction worker thread stable number', 'no_clear'),
+    EvictStat('eviction_state', 'eviction state', 'no_clear,no_scale'),
+    EvictStat('eviction_target_strategy_both_clean_and_dirty', 'eviction walk target strategy both clean and dirty pages'),
+    EvictStat('eviction_target_strategy_clean', 'eviction walk target strategy only clean pages'),
+    EvictStat('eviction_target_strategy_dirty', 'eviction walk target strategy only dirty pages'),
+    EvictStat('eviction_timed_out_ops', 'operations timed out waiting for space in cache'),
+    EvictStat('eviction_walk', 'pages walked for eviction'),
+    EvictStat('eviction_walk_leaf_notfound', 'eviction server waiting for a leaf page'),
+    EvictStat('eviction_walk_passes', 'eviction passes of a file'),
+    EvictStat('eviction_walk_sleeps', 'eviction walk most recent sleeps for checkpoint handle gathering'),
+    EvictStat('eviction_walks_active', 'files with active eviction walks', 'no_clear,no_scale'),
+    EvictStat('eviction_walks_started', 'files with new eviction walks started'),
+    EvictStat('eviction_worker_evict_attempt', 'evict page attempts by eviction worker threads'),
+    EvictStat('eviction_worker_evict_fail', 'evict page failures by eviction worker threads'),
+    # Note eviction_worker_evict_attempt - eviction_worker_evict_fail = evict page successes by eviction worker threads.
 
     ##########################################
     # Capacity statistics
@@ -831,35 +839,35 @@ dsrc_stats = [
     BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale,tree_walk'),
 
     ##########################################
-    # Cache and eviction statistics
+    # Eviction statistics
     ##########################################
-    CacheStat('cache_eviction_fail', 'data source pages selected for eviction unable to be evicted'),
-    CacheStat('cache_eviction_walk_passes', 'eviction walk passes of a file'),
+    EvictStat('eviction_fail', 'data source pages selected for eviction unable to be evicted'),
+    EvictStat('eviction_walk_passes', 'eviction walk passes of a file'),
 
     ##########################################
     # Cache content statistics
     ##########################################
-    CacheWalkStat('cache_state_avg_unvisited_age', 'Average time in cache for pages that have not been visited by the eviction server', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_avg_visited_age', 'Average time in cache for pages that have been visited by the eviction server', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_avg_written_size', 'Average on-disk page image size seen', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_gen_avg_gap', 'Average difference between current eviction generation when the page was last considered', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_gen_current', 'Current eviction generation', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_gen_max_gap', 'Maximum difference between current eviction generation when the page was last considered', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_max_pagesize', 'Maximum page size seen', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_memory', 'Pages created in memory and never written', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_min_written_size', 'Minimum on-disk page image size seen', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_not_queueable', 'Pages that could not be queued for eviction', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_pages', 'Total number of pages currently in cache', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_pages_clean', 'Clean pages currently in cache', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_pages_dirty', 'Dirty pages currently in cache', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_pages_internal', 'Internal pages currently in cache', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_pages_leaf', 'Leaf pages currently in cache', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_queued', 'Pages currently queued for eviction', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_refs_skipped', 'Refs skipped during cache traversal', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_root_entries', 'Entries in the root page', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_root_size', 'Size of the root page', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_smaller_alloc_size', 'On-disk page image sizes smaller than a single allocation unit', 'no_clear,no_scale'),
-    CacheWalkStat('cache_state_unvisited_count', 'Number of pages never visited by eviction server', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_avg_unvisited_age', 'Average time in cache for pages that have not been visited by the eviction server', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_avg_visited_age', 'Average time in cache for pages that have been visited by the eviction server', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_avg_written_size', 'Average on-disk page image size seen', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_gen_avg_gap', 'Average difference between current eviction generation when the page was last considered', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_gen_current', 'Current eviction generation', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_gen_max_gap', 'Maximum difference between current eviction generation when the page was last considered', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_max_pagesize', 'Maximum page size seen', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_memory', 'Pages created in memory and never written', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_min_written_size', 'Minimum on-disk page image size seen', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_not_queueable', 'Pages that could not be queued for eviction', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_pages', 'Total number of pages currently in cache', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_pages_clean', 'Clean pages currently in cache', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_pages_dirty', 'Dirty pages currently in cache', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_pages_internal', 'Internal pages currently in cache', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_pages_leaf', 'Leaf pages currently in cache', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_queued', 'Pages currently queued for eviction', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_refs_skipped', 'Refs skipped during cache traversal', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_root_entries', 'Entries in the root page', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_root_size', 'Size of the root page', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_smaller_alloc_size', 'On-disk page image sizes smaller than a single allocation unit', 'no_clear,no_scale'),
+    EvictCacheWalkStat('cache_state_unvisited_count', 'Number of pages never visited by eviction server', 'no_clear,no_scale'),
 
     ##########################################
     # Compression statistics

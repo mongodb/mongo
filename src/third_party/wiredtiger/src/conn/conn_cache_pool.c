@@ -533,6 +533,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
     WT_CACHE *cache;
     WT_CACHE_POOL *cp;
     WT_CONNECTION_IMPL *entry;
+    WT_EVICT *evict;
     uint64_t app_evicts, app_waits, reads;
     uint64_t balanced_size, entries, highest, tmp;
 
@@ -554,6 +555,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
         if (entry->cache_size == 0 || entry->cache == NULL)
             continue;
         cache = entry->cache;
+        evict = entry->evict;
 
         /*
          * Figure out a delta since the last time we did an assessment for each metric we are
@@ -569,7 +571,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
         cache->cp_saved_read = tmp;
 
         /* Update the application eviction count information */
-        tmp = cache->app_evicts;
+        tmp = evict->app_evicts;
         if (tmp >= cache->cp_saved_app_evicts)
             app_evicts = tmp - cache->cp_saved_app_evicts;
         else
@@ -577,7 +579,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
         cache->cp_saved_app_evicts = tmp;
 
         /* Update the eviction wait information */
-        tmp = cache->app_waits;
+        tmp = evict->app_waits;
         if (tmp >= cache->cp_saved_app_waits)
             app_waits = tmp - cache->cp_saved_app_waits;
         else
@@ -621,6 +623,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
     WT_CACHE *cache;
     WT_CACHE_POOL *cp;
     WT_CONNECTION_IMPL *entry;
+    WT_EVICT *evict;
     double pct_full;
     uint64_t adjustment, highest_percentile, pressure, reserved, smallest;
     bool busy, decrease_ok, grow, pool_full;
@@ -649,6 +652,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
          entry != NULL;
          entry = forward ? TAILQ_NEXT(entry, cpq) : TAILQ_PREV(entry, __wt_cache_pool_qh, cpq)) {
         cache = entry->cache;
+        evict = entry->evict;
         reserved = cache->cp_reserved;
         adjustment = 0;
 
@@ -714,7 +718,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
              * connection, which is likely to lead to lower throughput and potentially a negative
              * feedback loop in the balance algorithm.
              */
-            smallest = (uint64_t)((100 * __wt_cache_bytes_inuse(cache)) / cache->eviction_trigger);
+            smallest = (uint64_t)((100 * __wt_cache_bytes_inuse(cache)) / evict->eviction_trigger);
             if (entry->cache_size > smallest)
                 adjustment = WT_MIN(cp->chunk, (entry->cache_size - smallest) / 2);
             adjustment = WT_MIN(adjustment, entry->cache_size - reserved);
@@ -730,7 +734,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
              *  - the pool is less than half distributed
              */
         } else if (!pool_full && (cache->cp_quota == 0 || entry->cache_size < cache->cp_quota) &&
-          __wt_cache_bytes_inuse(cache) >= (entry->cache_size * cache->eviction_target) / 100 &&
+          __wt_cache_bytes_inuse(cache) >= (entry->cache_size * evict->eviction_target) / 100 &&
           (pressure > bump_threshold || cp->currently_used < cp->size * 0.5)) {
             grow = true;
             adjustment = WT_MIN(WT_MIN(cp->chunk, cp->size - cp->currently_used),

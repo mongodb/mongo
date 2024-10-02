@@ -16,7 +16,7 @@ static void
 __evict_stat_walk(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
-    WT_CACHE *cache;
+    WT_EVICT *evict;
     WT_PAGE *page;
     WT_REF *next_walk;
     uint64_t dsk_size, gen_gap, gen_gap_max, gen_gap_sum, max_pagesize;
@@ -27,7 +27,7 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
     uint64_t walk_count, written_size_cnt, written_size_sum;
 
     btree = S2BT(session);
-    cache = S2C(session)->cache;
+    evict = S2C(session)->evict;
     gen_gap_max = gen_gap_sum = max_pagesize = 0;
     num_memory = num_not_queueable = num_queued = 0;
     num_smaller_allocsz = pages_clean = pages_dirty = pages_internal = 0;
@@ -79,12 +79,12 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 
         if (page->evict_pass_gen == 0) {
             unvisited_age_gap_sum +=
-              (__wt_atomic_load64(&cache->evict_pass_gen) - page->cache_create_gen);
+              (__wt_atomic_load64(&evict->evict_pass_gen) - page->cache_create_gen);
             ++unvisited_count;
         } else {
             visited_age_gap_sum +=
-              (__wt_atomic_load64(&cache->evict_pass_gen) - page->cache_create_gen);
-            gen_gap = __wt_atomic_load64(&cache->evict_pass_gen) - page->evict_pass_gen;
+              (__wt_atomic_load64(&evict->evict_pass_gen) - page->cache_create_gen);
+            gen_gap = __wt_atomic_load64(&evict->evict_pass_gen) - page->evict_pass_gen;
             if (gen_gap > gen_gap_max)
                 gen_gap_max = gen_gap;
             gen_gap_sum += gen_gap;
@@ -117,11 +117,11 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_evict_stat_walk --
- *     Initialize the statistics for a cache cache_walk pass.
+ * __wt_evict_cache_stat_walk --
+ *     Initialize the statistics for evict_cache_walk pass.
  */
 void
-__wt_evict_stat_walk(WT_SESSION_IMPL *session)
+__wt_evict_cache_stat_walk(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
     WT_CONNECTION_IMPL *conn;
@@ -132,7 +132,7 @@ __wt_evict_stat_walk(WT_SESSION_IMPL *session)
 
     /* Set statistics that don't require walking the cache. */
     WT_STAT_DSRC_SET(
-      session, cache_state_gen_current, __wt_atomic_load64(&conn->cache->evict_pass_gen));
+      session, cache_state_gen_current, __wt_atomic_load64(&conn->evict->evict_pass_gen));
 
     /* Root page statistics */
     WT_INTL_INDEX_GET_SAFE(btree->root.page, root_idx);

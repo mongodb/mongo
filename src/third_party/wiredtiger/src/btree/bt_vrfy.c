@@ -343,10 +343,10 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
         WT_TRET(bm->checkpoint_unload(bm, session));
 
         /*
-         * We've finished one checkpoint's verification (verification, then cache eviction and
-         * checkpoint unload): if any errors occurred, quit. Done this way because otherwise we'd
-         * need at least two more state variables on error, one to know if we need to discard the
-         * tree from the cache and one to know if we need to unload the checkpoint.
+         * We've finished one checkpoint's verification (verification, then eviction and checkpoint
+         * unload): if any errors occurred, quit. Done this way because otherwise we'd need at least
+         * two more state variables on error, one to know if we need to discard the tree from the
+         * cache and one to know if we need to unload the checkpoint.
          */
         WT_ERR(ret);
 

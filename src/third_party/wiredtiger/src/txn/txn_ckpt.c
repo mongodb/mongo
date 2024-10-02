@@ -534,7 +534,7 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 static WT_INLINE void
 __checkpoint_set_scrub_target(WT_SESSION_IMPL *session, double target)
 {
-    __wt_set_shared_double(&S2C(session)->cache->eviction_scrub_target, target);
+    __wt_set_shared_double(&S2C(session)->evict->eviction_scrub_target, target);
     WT_STAT_CONN_SET(session, checkpoint_scrub_target, (int64_t)target);
 }
 
@@ -548,15 +548,17 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
+    WT_EVICT *evict;
     double current_dirty, prev_dirty;
     uint64_t bytes_written_start, bytes_written_total;
     uint64_t cache_size, max_write;
 
     conn = S2C(session);
     cache = conn->cache;
+    evict = conn->evict;
 
     /* Give up if scrubbing is disabled. */
-    if (cache->eviction_checkpoint_target < DBL_EPSILON)
+    if (evict->eviction_checkpoint_target < DBL_EPSILON)
         return;
 
     bytes_written_start = __wt_atomic_load64(&cache->bytes_written);
@@ -570,14 +572,14 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
         return;
 
     current_dirty = (100.0 * __wt_cache_dirty_leaf_inuse(cache)) / cache_size;
-    if (current_dirty <= cache->eviction_checkpoint_target)
+    if (current_dirty <= evict->eviction_checkpoint_target)
         return;
 
     /* Stop if we write as much dirty data as is currently in cache. */
     max_write = __wt_cache_dirty_leaf_inuse(cache);
 
     /* Set the dirty trigger to the target value. */
-    __checkpoint_set_scrub_target(session, cache->eviction_checkpoint_target);
+    __checkpoint_set_scrub_target(session, evict->eviction_checkpoint_target);
 
     /* Wait while the dirty level is going down. */
     for (;;) {
@@ -586,7 +588,7 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
 
         prev_dirty = current_dirty;
         current_dirty = (100.0 * __wt_cache_dirty_leaf_inuse(cache)) / cache_size;
-        if (current_dirty <= cache->eviction_checkpoint_target || current_dirty >= prev_dirty)
+        if (current_dirty <= evict->eviction_checkpoint_target || current_dirty >= prev_dirty)
             break;
 
         /*
@@ -1101,11 +1103,11 @@ static int
 __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
     struct timespec tsp;
-    WT_CACHE *cache;
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *hs_dhandle;
     WT_DECL_RET;
+    WT_EVICT *evict;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_ISOLATION saved_isolation;
@@ -1121,7 +1123,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     void *saved_meta_next;
 
     conn = S2C(session);
-    cache = conn->cache;
+    evict = conn->evict;
     hs_size = 0;
     hs_dhandle = NULL;
     txn = session->txn;
@@ -1157,9 +1159,9 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     logging = FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED);
 
     /* Reset the statistics tracked per checkpoint. */
-    __wt_atomic_store64(&cache->evict_max_page_size, 0);
-    __wt_atomic_store64(&cache->evict_max_ms, 0);
-    cache->reentry_hs_eviction_ms = 0;
+    __wt_atomic_store64(&evict->evict_max_page_size, 0);
+    __wt_atomic_store64(&evict->evict_max_ms, 0);
+    evict->reentry_hs_eviction_ms = 0;
     __wt_atomic_store32(&conn->heuristic_controls.obsolete_tw_btree_count, 0);
     conn->rec_maximum_hs_wrapup_milliseconds = 0;
     conn->rec_maximum_image_build_milliseconds = 0;

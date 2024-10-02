@@ -292,7 +292,7 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
      */
     if (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD) {
         WT_RET(__wt_page_dirty_and_evict_soon(session, cbt->ref));
-        WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
+        WT_STAT_CONN_INCR(session, eviction_force_delete);
     }
     cbt->page_deleted_count = 0;
 

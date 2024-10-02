@@ -269,7 +269,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
      * function can safely free the updates if it receives an error return.
      */
     if (added_to_txn && modify_type != WT_UPDATE_RESERVE) {
-        if (__wt_log_op(session))
+        if (__wt_txn_log_op_check(session))
             WT_ERR(__wt_txn_log_op(session, cbt));
 
         /*

@@ -128,7 +128,7 @@ __reconcile_save_evict_state(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t fla
     if (LF_ISSET(WT_REC_EVICT)) {
         mod->last_eviction_id = oldest_id;
         __wt_txn_pinned_timestamp(session, &mod->last_eviction_timestamp);
-        mod->last_evict_pass_gen = __wt_atomic_load64(&S2C(session)->cache->evict_pass_gen);
+        mod->last_evict_pass_gen = __wt_atomic_load64(&S2C(session)->evict->evict_pass_gen);
     }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -374,8 +374,8 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     if (rec > conn->rec_maximum_milliseconds)
         conn->rec_maximum_milliseconds = rec;
     if (session->reconcile_timeline.total_reentry_hs_eviction_time >
-      conn->cache->reentry_hs_eviction_ms)
-        conn->cache->reentry_hs_eviction_ms =
+      conn->evict->reentry_hs_eviction_ms)
+        conn->evict->reentry_hs_eviction_ms =
           session->reconcile_timeline.total_reentry_hs_eviction_time;
 
 err:

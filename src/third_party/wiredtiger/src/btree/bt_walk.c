@@ -506,7 +506,7 @@ descend:
              * An expected error, so "couple" is unchanged.
              */
             if (ret == WT_NOTFOUND) {
-                WT_STAT_CONN_INCR(session, cache_eviction_walk_leaf_notfound);
+                WT_STAT_CONN_INCR(session, eviction_walk_leaf_notfound);
                 WT_NOT_READ(ret, 0);
                 break;
             }

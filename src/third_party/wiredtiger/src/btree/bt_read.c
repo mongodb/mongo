@@ -381,7 +381,7 @@ read:
              */
             wont_need = LF_ISSET(WT_READ_WONT_NEED) ||
               F_ISSET(session, WT_SESSION_READ_WONT_NEED) ||
-              (!LF_ISSET(WT_READ_PREFETCH) && F_ISSET(S2C(session)->cache, WT_CACHE_EVICT_NOKEEP));
+              (!LF_ISSET(WT_READ_PREFETCH) && F_ISSET(S2C(session)->evict, WT_EVICT_CACHE_NOKEEP));
             continue;
         case WT_REF_LOCKED:
             if (LF_ISSET(WT_READ_NO_WAIT))
@@ -471,7 +471,7 @@ read:
                      */
 
                     if (F_ISSET(session, WT_SESSION_NO_RECONCILE)) {
-                        WT_STAT_CONN_INCR(session, cache_eviction_force_no_retry);
+                        WT_STAT_CONN_INCR(session, eviction_force_no_retry);
                         evict_skip = true;
                     } else {
                         WT_STAT_CONN_INCR(session, page_forcible_evict_blocked);

@@ -2184,7 +2184,7 @@ __wt_btcur_range_truncate(WT_TRUNCATE_INFO *trunc_info)
 
     session = trunc_info->session;
     btree = CUR2BT(trunc_info->start);
-    logging = __wt_log_op(session);
+    logging = __wt_txn_log_op_check(session);
     start = (WT_CURSOR_BTREE *)trunc_info->start;
     stop = (WT_CURSOR_BTREE *)trunc_info->stop;
 

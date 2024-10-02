@@ -37,6 +37,39 @@ __wt_txn_context_check(WT_SESSION_IMPL *session, bool requires_txn)
 }
 
 /*
+ * __wt_txn_log_op_check --
+ *     Return if an operation should be logged.
+ */
+static WT_INLINE bool
+__wt_txn_log_op_check(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+
+    /*
+     * Objects with checkpoint durability don't need logging unless we're in debug mode. That rules
+     * out almost all log records, check it first.
+     */
+    if (!F_ISSET(S2BT(session), WT_BTREE_LOGGED) &&
+      !FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING))
+        return (false);
+
+    /*
+     * Correct the above check for logging being configured. Files are configured for logging to
+     * turn off timestamps, so stop here if there aren't actually any log files.
+     */
+    if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+        return (false);
+
+    /* No logging during recovery. */
+    if (F_ISSET(conn, WT_CONN_RECOVERING))
+        return (false);
+
+    return (true);
+}
+
+/*
  * __wt_txn_err_set --
  *     Set an error in the current transaction.
  */
@@ -571,7 +604,7 @@ __wt_txn_modify_page_delete(WT_SESSION_IMPL *session, WT_REF *ref)
     if (__txn_should_assign_timestamp(session, op))
         __txn_op_delete_commit_apply_page_del_timestamp(session, op->u.ref);
 
-    if (__wt_log_op(session))
+    if (__wt_txn_log_op_check(session))
         WT_ERR(__wt_txn_log_op(session, NULL));
     return (0);
 

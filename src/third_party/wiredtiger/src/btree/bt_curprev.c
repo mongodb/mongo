@@ -865,7 +865,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
           (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
             (newpage && cbt->page_deleted_count > 0))) {
             WT_ERR(__wt_page_dirty_and_evict_soon(session, cbt->ref));
-            WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
+            WT_STAT_CONN_INCR(session, eviction_force_delete);
         }
         cbt->page_deleted_count = 0;
 

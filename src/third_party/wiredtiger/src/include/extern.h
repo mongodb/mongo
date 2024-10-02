@@ -1875,11 +1875,11 @@ extern void __wt_errx_func(WT_SESSION_IMPL *session, const char *func, int line,
   WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 5, 6)))
     WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler);
+extern void __wt_evict_cache_stat_walk(WT_SESSION_IMPL *session);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
 extern void __wt_evict_priority_clear(WT_SESSION_IMPL *session);
 extern void __wt_evict_priority_set(WT_SESSION_IMPL *session, uint64_t v);
 extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);
-extern void __wt_evict_stat_walk(WT_SESSION_IMPL *session);
 extern void __wt_evict_stats_update(WT_SESSION_IMPL *session);
 extern void __wt_ext_scr_free(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, void *p);
 extern void __wt_ext_spin_destroy(WT_EXTENSION_API *wt_api, WT_EXTENSION_SPINLOCK *ext_spinlock);
@@ -2098,8 +2098,6 @@ static WT_INLINE bool __wt_isprint(u_char c) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_un
 static WT_INLINE bool __wt_isspace(u_char c) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static WT_INLINE bool __wt_log_op(WT_SESSION_IMPL *session)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_off_page(WT_PAGE *page, const void *p)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_op_timer_fired(WT_SESSION_IMPL *session)
@@ -2144,6 +2142,8 @@ static WT_INLINE bool __wt_split_descent_race(WT_SESSION_IMPL *session, WT_REF *
   WT_PAGE_INDEX *saved_pindex) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_txn_has_newest_and_visible_all(WT_SESSION_IMPL *session, uint64_t id,
   wt_timestamp_t timestamp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_txn_log_op_check(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_txn_snap_min_visible(
   WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -2185,7 +2185,7 @@ static WT_INLINE const char *__wt_update_type_str(uint8_t val)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE double __wt_read_shared_double(double *to_read)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static WT_INLINE double __wti_evict_dirty_target(WT_CACHE *cache)
+static WT_INLINE double __wti_evict_dirty_target(WT_EVICT *evict)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE int __wt_btcur_bounds_early_exit(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
   bool next, bool *key_out_of_boundsp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

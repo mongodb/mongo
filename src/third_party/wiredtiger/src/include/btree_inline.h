@@ -661,7 +661,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
      * eviction is stuck.
      */
     if (!F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_NO_PROGRESS))
-        (void)__wt_atomic_addv64(&cache->eviction_progress, 1);
+        (void)__wt_atomic_addv64(&S2C(session)->evict->eviction_progress, 1);
 }
 
 /*
@@ -1873,7 +1873,7 @@ __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
      * a reasonable amount of time is currently pretty arbitrary.
      */
     if (__wt_evict_aggressive(session) ||
-      mod->last_evict_pass_gen + 5 < __wt_atomic_load64(&S2C(session)->cache->evict_pass_gen))
+      mod->last_evict_pass_gen + 5 < __wt_atomic_load64(&S2C(session)->evict->evict_pass_gen))
         return (true);
 
     /* Retry if the global transaction state has moved forward. */

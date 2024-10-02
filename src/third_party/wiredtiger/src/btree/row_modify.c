@@ -291,7 +291,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
      * function can safely free the updates if it receives an error return.
      */
     if (added_to_txn && modify_type != WT_UPDATE_RESERVE) {
-        if (__wt_log_op(session))
+        if (__wt_txn_log_op_check(session))
             WT_ERR(__wt_txn_log_op(session, cbt));
 
         /*
@@ -433,7 +433,7 @@ __wt_update_obsolete_check(
      * This is why we use WT_THOUSAND here.
      */
     if (count > WT_THOUSAND) {
-        WT_STAT_CONN_INCR(session, cache_eviction_force_long_update_list);
+        WT_STAT_CONN_INCR(session, eviction_force_long_update_list);
         __wt_evict_page_soon(session, cbt->ref);
     }
 

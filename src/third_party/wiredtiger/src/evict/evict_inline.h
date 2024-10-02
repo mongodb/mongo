@@ -10,13 +10,13 @@
 
 /*
  * __wt_evict_aggressive --
- *     Indicate if the cache is operating in aggressive mode.
+ *     Indicate if the eviction is operating in aggressive mode.
  */
 static WT_INLINE bool
 __wt_evict_aggressive(WT_SESSION_IMPL *session)
 {
     return (
-      __wt_atomic_load32(&S2C(session)->cache->evict_aggressive_score) >= WT_EVICT_SCORE_CUTOFF);
+      __wt_atomic_load32(&S2C(session)->evict->evict_aggressive_score) >= WT_EVICT_SCORE_CUTOFF);
 }
 
 /*
@@ -26,7 +26,7 @@ __wt_evict_aggressive(WT_SESSION_IMPL *session)
 static WT_INLINE uint64_t
 __evict_read_gen(WT_SESSION_IMPL *session)
 {
-    return (__wt_atomic_load64(&S2C(session)->cache->read_gen));
+    return (__wt_atomic_load64(&S2C(session)->evict->read_gen));
 }
 
 /*
@@ -36,7 +36,7 @@ __evict_read_gen(WT_SESSION_IMPL *session)
 static WT_INLINE void
 __wti_evict_read_gen_incr(WT_SESSION_IMPL *session)
 {
-    (void)__wt_atomic_add64(&S2C(session)->cache->read_gen, 1);
+    (void)__wt_atomic_add64(&S2C(session)->evict->read_gen, 1);
 }
 
 /*
@@ -71,27 +71,25 @@ __wt_evict_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
 static WT_INLINE void
 __wt_evict_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-    WT_CACHE *cache;
-
-    cache = S2C(session)->cache;
-    __wt_atomic_store64(&page->read_gen, (__evict_read_gen(session) + cache->read_gen_oldest) / 2);
+    __wt_atomic_store64(
+      &page->read_gen, (__evict_read_gen(session) + S2C(session)->evict->read_gen_oldest) / 2);
 }
 
 /*
  * __wt_evict_cache_stuck --
- *     Indicate if the cache is stuck (i.e., not making progress).
+ *     Indicate if the cache is stuck (i.e., eviction not making progress).
  */
 static WT_INLINE bool
 __wt_evict_cache_stuck(WT_SESSION_IMPL *session)
 {
-    WT_CACHE *cache;
+    WT_EVICT *evict;
     uint32_t tmp_evict_aggressive_score;
 
-    cache = S2C(session)->cache;
-    tmp_evict_aggressive_score = __wt_atomic_load32(&cache->evict_aggressive_score);
+    evict = S2C(session)->evict;
+    tmp_evict_aggressive_score = __wt_atomic_load32(&evict->evict_aggressive_score);
     WT_ASSERT(session, tmp_evict_aggressive_score <= WT_EVICT_SCORE_MAX);
     return (
-      tmp_evict_aggressive_score == WT_EVICT_SCORE_MAX && F_ISSET(cache, WT_CACHE_EVICT_HARD));
+      tmp_evict_aggressive_score == WT_EVICT_SCORE_MAX && F_ISSET(evict, WT_EVICT_CACHE_HARD));
 }
 
 /*
@@ -114,17 +112,17 @@ __wt_evict_page_soon(WT_SESSION_IMPL *session, WT_REF *ref)
 static WT_INLINE bool
 __wt_evict_clean_pressure(WT_SESSION_IMPL *session)
 {
-    WT_CACHE *cache;
+    WT_EVICT *evict;
     double pct_full;
 
-    cache = S2C(session)->cache;
+    evict = S2C(session)->evict;
     pct_full = 0;
 
     /* Eviction should be done if we hit the eviction clean trigger or come close to hitting it. */
     if (__wt_evict_clean_needed(session, &pct_full))
         return (true);
-    if (pct_full > cache->eviction_target &&
-      pct_full >= WT_EVICT_PRESSURE_THRESHOLD * cache->eviction_trigger)
+    if (pct_full > evict->eviction_target &&
+      pct_full >= WT_EVICT_PRESSURE_THRESHOLD * evict->eviction_trigger)
         return (true);
     return (false);
 }
@@ -136,21 +134,18 @@ __wt_evict_clean_pressure(WT_SESSION_IMPL *session)
 static WT_INLINE bool
 __wt_evict_clean_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 {
-    WT_CACHE *cache;
     uint64_t bytes_inuse, bytes_max;
-
-    cache = S2C(session)->cache;
 
     /*
      * Avoid division by zero if the cache size has not yet been set in a shared cache.
      */
     bytes_max = S2C(session)->cache_size + 1;
-    bytes_inuse = __wt_cache_bytes_inuse(cache);
+    bytes_inuse = __wt_cache_bytes_inuse(S2C(session)->cache);
 
     if (pct_fullp != NULL)
         *pct_fullp = ((100.0 * bytes_inuse) / bytes_max);
 
-    return (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100);
+    return (bytes_inuse > (S2C(session)->evict->eviction_trigger * bytes_max) / 100);
 }
 
 /*
@@ -158,12 +153,12 @@ __wt_evict_clean_needed(WT_SESSION_IMPL *session, double *pct_fullp)
  *     Return the effective dirty target (including checkpoint scrubbing).
  */
 static WT_INLINE double
-__wti_evict_dirty_target(WT_CACHE *cache)
+__wti_evict_dirty_target(WT_EVICT *evict)
 {
     double dirty_target, scrub_target;
 
-    dirty_target = __wt_read_shared_double(&cache->eviction_dirty_target);
-    scrub_target = __wt_read_shared_double(&cache->eviction_scrub_target);
+    dirty_target = __wt_read_shared_double(&evict->eviction_dirty_target);
+    scrub_target = __wt_read_shared_double(&evict->eviction_scrub_target);
 
     return (scrub_target > 0 && scrub_target < dirty_target ? scrub_target : dirty_target);
 }
@@ -176,21 +171,19 @@ __wti_evict_dirty_target(WT_CACHE *cache)
 static WT_INLINE bool
 __wt_evict_dirty_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 {
-    WT_CACHE *cache;
     uint64_t bytes_dirty, bytes_max;
-
-    cache = S2C(session)->cache;
 
     /*
      * Avoid division by zero if the cache size has not yet been set in a shared cache.
      */
-    bytes_dirty = __wt_cache_dirty_leaf_inuse(cache);
+    bytes_dirty = __wt_cache_dirty_leaf_inuse(S2C(session)->cache);
     bytes_max = S2C(session)->cache_size + 1;
 
     if (pct_fullp != NULL)
         *pct_fullp = (100.0 * bytes_dirty) / bytes_max;
 
-    return (bytes_dirty > (uint64_t)(cache->eviction_dirty_trigger * bytes_max) / 100);
+    return (
+      bytes_dirty > (uint64_t)(S2C(session)->evict->eviction_dirty_trigger * bytes_max) / 100);
 }
 
 /*
@@ -201,21 +194,19 @@ __wt_evict_dirty_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 static WT_INLINE bool
 __wti_evict_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 {
-    WT_CACHE *cache;
     uint64_t bytes_max, bytes_updates;
-
-    cache = S2C(session)->cache;
 
     /*
      * Avoid division by zero if the cache size has not yet been set in a shared cache.
      */
     bytes_max = S2C(session)->cache_size + 1;
-    bytes_updates = __wt_cache_bytes_updates(cache);
+    bytes_updates = __wt_cache_bytes_updates(S2C(session)->cache);
 
     if (pct_fullp != NULL)
         *pct_fullp = (100.0 * bytes_updates) / bytes_max;
 
-    return (bytes_updates > (uint64_t)(cache->eviction_updates_trigger * bytes_max) / 100);
+    return (
+      bytes_updates > (uint64_t)(S2C(session)->evict->eviction_updates_trigger * bytes_max) / 100);
 }
 
 /*
@@ -226,11 +217,11 @@ __wti_evict_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 static WT_INLINE bool
 __wt_evict_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double *pct_fullp)
 {
-    WT_CACHE *cache;
+    WT_EVICT *evict;
     double pct_dirty, pct_full, pct_updates;
     bool clean_needed, dirty_needed, updates_needed;
 
-    cache = S2C(session)->cache;
+    evict = S2C(session)->evict;
 
     /*
      * If the connection is closing we do not need eviction from an application thread. The eviction
@@ -256,8 +247,8 @@ __wt_evict_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double *pc
         *pct_fullp = WT_MAX(0.0,
           100.0 -
             WT_MIN(
-              WT_MIN(cache->eviction_trigger - pct_full, cache->eviction_dirty_trigger - pct_dirty),
-              cache->eviction_updates_trigger - pct_updates));
+              WT_MIN(evict->eviction_trigger - pct_full, evict->eviction_dirty_trigger - pct_dirty),
+              evict->eviction_updates_trigger - pct_updates));
 
     /*
      * Only check the dirty trigger when the session is not busy.
@@ -284,12 +275,12 @@ __wti_evict_hs_dirty(WT_SESSION_IMPL *session)
     bytes_max = conn->cache_size;
 
     return (__wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_hs_dirty)) >=
-      ((uint64_t)(cache->eviction_dirty_trigger * bytes_max) / 100));
+      ((uint64_t)(conn->evict->eviction_dirty_trigger * bytes_max) / 100));
 }
 
 /*
  * __wt_evict_app_assist_worker_check --
- *     Evict pages if the cache crosses its boundaries.
+ *     Evict pages if the cache crosses eviction trigger thresholds.
  */
 static WT_INLINE int
 __wt_evict_app_assist_worker_check(

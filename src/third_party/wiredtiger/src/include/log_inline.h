@@ -36,36 +36,3 @@ __wt_lsn_offset(WT_LSN *lsn)
 {
     return (__wt_atomic_load32(&lsn->l.offset));
 }
-
-/*
- * __wt_log_op --
- *     Return if an operation should be logged.
- */
-static WT_INLINE bool
-__wt_log_op(WT_SESSION_IMPL *session)
-{
-    WT_CONNECTION_IMPL *conn;
-
-    conn = S2C(session);
-
-    /*
-     * Objects with checkpoint durability don't need logging unless we're in debug mode. That rules
-     * out almost all log records, check it first.
-     */
-    if (!F_ISSET(S2BT(session), WT_BTREE_LOGGED) &&
-      !FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING))
-        return (false);
-
-    /*
-     * Correct the above check for logging being configured. Files are configured for logging to
-     * turn off timestamps, so stop here if there aren't actually any log files.
-     */
-    if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
-        return (false);
-
-    /* No logging during recovery. */
-    if (F_ISSET(conn, WT_CONN_RECOVERING))
-        return (false);
-
-    return (true);
-}
