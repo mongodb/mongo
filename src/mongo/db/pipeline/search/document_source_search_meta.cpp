@@ -46,6 +46,20 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::list;
 
+namespace {
+/**
+ * Helper to go through the list and clone each stage. Very similar to Pipeline::clone, but doesn't
+ * necessitate use of the Pipeline type, which has auto-dispose behaviors which can cause problems.
+ */
+auto cloneEachOne(std::list<boost::intrusive_ptr<DocumentSource>> stages, const auto& expCtx) {
+    std::list<boost::intrusive_ptr<DocumentSource>> cloned;
+    std::for_each(stages.begin(), stages.end(), [&](const auto& stage) {
+        cloned.push_back(stage->clone(expCtx));
+    });
+    return cloned;
+}
+}  // namespace
+
 REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(searchMeta,
                                        LiteParsedSearchStage::parse,
                                        DocumentSourceSearchMeta::createFromBson,
@@ -54,11 +68,18 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(searchMeta,
                                        boost::none,
                                        true);
 
-Value DocumentSourceSearchMeta::serialize(const SerializationOptions& opts) const {
-    if (!pExpCtx->explain) {
-        return Value(Document{{getSourceName(), serializeWithoutMergePipeline(opts)}});
-    }
-    return DocumentSourceInternalSearchMongotRemote::serialize(opts);
+boost::optional<DocumentSource::DistributedPlanLogic>
+DocumentSourceSearchMeta::distributedPlanLogic() {
+    DistributedPlanLogic logic;
+    logic.shardsStage = this;
+    tassert(6448011, "Expected merging pipeline to be set already", _mergingPipeline);
+    // Please note that it's important for the merging stages to be copied so that we don't share a
+    // pointer to them. If we share a pointer, it can lead to a bug where this $searchMeta stage is
+    // serialized and sent to a remote shard, which causes "_mergingPipeline" to go out of scope and
+    // dispose() each stage. That screws up the other pointers to these stages who now have disposed
+    // DocumentSources which are expected to immediately return EOF.
+    logic.mergingStages = cloneEachOne(_mergingPipeline->getSources(), pExpCtx);
+    return logic;
 }
 
 executor::TaskExecutorCursor DocumentSourceSearchMeta::establishCursor() {

@@ -72,23 +72,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::shared_ptr<executor::TaskExecutor> taskExecutor,
         boost::optional<long long> mongotDocsRequested = boost::none,
-        bool requiresSearchSequenceToken = false)
-        : DocumentSource(kStageName, expCtx),
-          _mergingPipeline(spec.getMergingPipeline()
-                               ? mongo::Pipeline::parse(*spec.getMergingPipeline(), expCtx)
-                               : nullptr),
-          _searchQuery(spec.getMongotQuery().getOwned()),
-          _taskExecutor(taskExecutor),
-          _metadataMergeProtocolVersion(spec.getMetadataMergeProtocolVersion()),
-          _limit(spec.getLimit().value_or(0)),
-          _queryReferencesSearchMeta(spec.getRequiresSearchMetaCursor().value_or(true)),
-          _mongotDocsRequested(mongotDocsRequested),
-          _requiresSearchSequenceToken(requiresSearchSequenceToken) {
-        if (spec.getSortSpec().has_value()) {
-            _sortSpec = spec.getSortSpec()->getOwned();
-            _sortKeyGen.emplace(SortPattern{*_sortSpec, pExpCtx}, pExpCtx->getCollator());
-        }
-    }
+        bool requiresSearchSequenceToken = false);
 
     /**
      * Shorthand constructor from a mongot query only (e.g. no merging pipeline, limit, etc).
@@ -123,17 +107,8 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
         if (_metadataMergeProtocolVersion) {
-            InternalSearchMongotRemoteSpec remoteSpec{_searchQuery, *_metadataMergeProtocolVersion};
-            remoteSpec.setMergingPipeline(_mergingPipeline
-                                              ? boost::optional<std::vector<mongo::BSONObj>>(
-                                                    _mergingPipeline->serializeToBson())
-                                              : boost::none);
-            if (_sortSpec.has_value()) {
-                remoteSpec.setSortSpec(_sortSpec->getOwned());
-            }
-            remoteSpec.setRequiresSearchMetaCursor(_queryReferencesSearchMeta);
             return make_intrusive<DocumentSourceInternalSearchMongotRemote>(
-                std::move(remoteSpec), expCtx, _taskExecutor, _mongotDocsRequested);
+                toSpecObj(), expCtx, _taskExecutor, _mongotDocsRequested);
         } else {
             return make_intrusive<DocumentSourceInternalSearchMongotRemote>(
                 _searchQuery, expCtx, _taskExecutor, _mongotDocsRequested);
@@ -211,10 +186,28 @@ public:
     }
 
 protected:
+    InternalSearchMongotRemoteSpec toSpecObj() const {
+        InternalSearchMongotRemoteSpec specObj;
+        specObj.setMongotQuery(_searchQuery);
+        if (_metadataMergeProtocolVersion.has_value())
+            specObj.setMetadataMergeProtocolVersion(*_metadataMergeProtocolVersion);
+        if (_mergingPipeline)
+            specObj.setMergingPipeline(_mergingPipeline->serializeToBson());
+        if (_sortSpec.has_value())
+            specObj.setSortSpec(_sortSpec->getOwned());
+        specObj.setRequiresSearchMetaCursor(_queryReferencesSearchMeta);
+        return specObj;
+    }
+
     /**
      * Helper serialize method that avoids making mongot call during explain from mongos.
      */
     Value serializeWithoutMergePipeline(const SerializationOptions& opts) const;
+
+    /**
+     * Helper function to add the "mergingPipeline" field to the serialization if it's needed.
+     */
+    Value addMergePipelineIfNeeded(Value innerSpecVal, const SerializationOptions& opts) const;
 
     Value serialize(const SerializationOptions& opts) const override;
 

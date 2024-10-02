@@ -592,6 +592,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     try {
         pipeline = buildPipeline(_fromExpCtx, inputDoc);
+        LOGV2_DEBUG(9497000, 5, "Built pipeline", "pipeline"_attr = pipeline->serializeToBson());
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // If lookup on a sharded collection is disallowed and the foreign collection is sharded,
         // throw a custom exception.
@@ -609,6 +610,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     long long objsize = 0;
     const auto maxBytes = internalLookupStageIntermediateDocumentMaxSizeBytes.load();
 
+    LOGV2_DEBUG(9497001, 5, "Beginning to iterate sub-pipeline");
     while (auto result = pipeline->getNext()) {
         long long safeSum = 0;
         bool hasOverflowed = overflow::add(objsize, result->getApproximateSize(), &safeSum);

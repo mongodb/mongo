@@ -1991,6 +1991,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
     auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
+
+    LOGV2_DEBUG(9497004,
+                5,
+                "Preparing pipeline for execution",
+                "pipeline"_attr = pipeline->serializeToBson());
     if (firstStageCanExecuteWithoutCursor(*pipeline)) {
         // There's no need to attach a cursor here - the first stage provides its own data and
         // is meant to be run locally (e.g. $documents).
@@ -2015,6 +2020,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         "targeting pipeline to attach cursors"_sd,
         [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
             auto pipelineToTarget = pipeline->clone();
+            LOGV2_DEBUG(9497005,
+                        5,
+                        "Cloned pipeline",
+                        "pipelineToTarget"_attr = pipelineToTarget->serializeToBson());
 
             AggregateCommandRequest aggRequest(expCtx->ns, pipeline->serializeToBson());
             LiteParsedPipeline liteParsedPipeline{aggRequest};
