@@ -46,27 +46,14 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
-/**
- * There is up to one 'config.system.preimages' collection per tenant. This pre-images
- * collection contains pre-images for every collection 'nsUUID' with pre-images enabled on the
- * tenant. The pre-images collection is ordered by collection 'nsUUID', so that pre-images belonging
- * to a given collection are grouped together. Additionally, pre-images for a given collection
- * 'nsUUID' are stored in timestamp order, which makes range truncation possible.
- *
- * Implementation of truncate markers for pre-images associated with a single collection 'nsUUID'
- * within a pre-images collection.
- */
 namespace mongo {
 /**
- * Manages the truncation of expired pre-images for pre-images collection(s). There is up to one
- * "system.config.preimages" pre-images collection per tenant.
+ * Manages the truncation of expired pre-images for pre-images collection(s) across all tenants.
+ * There is up to one "system.config.preimages" pre-images collection per tenant.
  *
  * In a single-tenant environment, there is only one "system.config.preimages" pre-images
  * collection. In which case, the corresponding truncate markers are mapped to TenantId
  * 'boost::none'.
- *
- * Responsible for constructing and managing truncate markers across tenants - and for each tenant,
- * across all 'nsUUID's with pre-images enabled on the tenant.
  */
 class PreImagesTruncateManager {
 public:
@@ -106,6 +93,10 @@ private:
     std::shared_ptr<PreImagesTenantMarkers> _getInitializedMarkersForPreImagesCollection(
         OperationContext* opCtx, boost::optional<TenantId> tenantId);
 
+    /**
+     * Returns a shared pointer to 'PreImagesTenantMarkers' installed in the '_tenantMap', provided
+     * the truncate markers were successfully installed. Otherwise, returns a null pointer.
+     */
     std::shared_ptr<PreImagesTenantMarkers> _createAndInstallMarkers(
         OperationContext* opCtx, boost::optional<TenantId> tenantId);
 
