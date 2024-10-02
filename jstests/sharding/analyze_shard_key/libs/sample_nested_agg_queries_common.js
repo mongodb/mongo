@@ -2,7 +2,7 @@
  * Utilities for testing basic support for sampling nested aggregate queries (i.e. ones inside
  * $lookup, $graphLookup, $unionWith) on a sharded cluster.
  */
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a

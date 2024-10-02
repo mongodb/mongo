@@ -4,8 +4,8 @@
  *  featureFlagVectorSearchPublicPreview,
  * ]
  */
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForVectorSearchQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {

@@ -7,7 +7,7 @@ import {
     assertCoveredQueryAndCount,
     getWinningPlan,
     isIndexOnly
-} from "jstests/libs/analyze_plan.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.index_bounds_object;
 coll.drop();

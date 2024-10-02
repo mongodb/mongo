@@ -14,8 +14,8 @@
 //   tenant_migration_incompatible,
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const isSbeEnabled = checkSbeFullyEnabled(db);
 var coll = db.jstests_plan_cache_shell_helpers;

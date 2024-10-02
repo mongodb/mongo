@@ -8,7 +8,7 @@
  * ]
  */
 import {show} from "jstests/libs/golden_test.js";
-import {getPlanSkeleton} from "jstests/libs/optimizer_utils.js";
+import {getPlanSkeleton} from "jstests/libs/query/optimizer_utils.js";
 
 db.setLogLevel(4, "query");
 

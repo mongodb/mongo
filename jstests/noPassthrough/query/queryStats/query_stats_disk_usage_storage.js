@@ -17,7 +17,7 @@ import {
     getFindQueryStatsKey,
     getQueryStatsCountCmd,
     getQueryStatsDistinctCmd
-} from "jstests/libs/query_stats_utils.js";
+} from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

@@ -1,6 +1,6 @@
 // Tests the behavior of $ceil, $floor, $exp, $log10, $ln and $sqrt when used in agg expressions.
 
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 

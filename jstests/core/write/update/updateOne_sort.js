@@ -11,7 +11,7 @@
  * ]
  */
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 var coll = db.getCollection("update_sort_test");
 

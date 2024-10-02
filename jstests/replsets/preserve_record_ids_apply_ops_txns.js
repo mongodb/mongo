@@ -10,7 +10,7 @@
  *   exclude_when_record_ids_replicated
  * ]
  */
-import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 import {
     validateShowRecordIdReplicatesAcrossNodes,
 } from "jstests/libs/replicated_record_ids_utils.js";

@@ -3,8 +3,8 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplicationOnSecondaries,

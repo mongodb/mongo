@@ -24,7 +24,7 @@
  * ]
  */
 
-import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 (function() {
 "use strict";

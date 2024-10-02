@@ -20,9 +20,12 @@
 //   references_foreign_collection,
 // ]
 
-import {getPlanCacheKeyFromPipeline, getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
+import {
+    getPlanCacheKeyFromPipeline,
+    getPlanCacheKeyFromShape
+} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db.jstests_plan_cache_clear;
 coll.drop();

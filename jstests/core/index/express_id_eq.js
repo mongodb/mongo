@@ -14,10 +14,10 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {isExpress, isIdhack, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
 import {
     ClusteredCollectionUtil
 } from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {isExpress, isIdhack, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
 
 const testDB = db.getSiblingDB("express_id_eq");
 assert.commandWorked(testDB.dropDatabase());

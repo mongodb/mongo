@@ -5,9 +5,9 @@
  *   requires_replication,
  * ]
  */
-import {getCachedPlan} from "jstests/libs/analyze_plan.js";
+import {getCachedPlan} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const dbName = "test";
 const collName = "coll";

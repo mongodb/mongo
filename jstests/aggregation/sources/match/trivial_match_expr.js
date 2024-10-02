@@ -10,7 +10,7 @@
 //   # Explicitly testing optimization.
 //   requires_pipeline_optimization,
 // ]
-import {getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.trivial_match_expr;
 coll.drop();

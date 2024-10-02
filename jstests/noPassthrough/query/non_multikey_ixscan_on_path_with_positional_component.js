@@ -3,7 +3,7 @@
  * a positional component. This test was designed to reproduce SERVER-52589.
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanStage} from "jstests/libs/analyze_plan.js";
+import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 // Configure 'internalQueryExecYieldIterations' such that operations will yield on each PlanExecutor
 // iteration.

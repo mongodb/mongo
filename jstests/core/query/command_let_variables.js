@@ -7,9 +7,9 @@
 //   does_not_support_config_fuzzer,
 // ]
 //
-import {getPlanStage, getSingleNodeExplain, planHasStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
+import {getPlanStage, getSingleNodeExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const testDB = db.getSiblingDB("command_let_variables");
 const coll = testDB.command_let_variables;

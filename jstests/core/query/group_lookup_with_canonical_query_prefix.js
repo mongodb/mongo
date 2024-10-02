@@ -19,7 +19,7 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {getEngine} from "jstests/libs/analyze_plan.js";
+import {getEngine} from "jstests/libs/query/analyze_plan.js";
 
 function buildErrorString(found, expected) {
     return "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(found);

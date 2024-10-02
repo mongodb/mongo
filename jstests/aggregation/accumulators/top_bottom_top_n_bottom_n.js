@@ -1,7 +1,7 @@
 /**
  * Basic tests for the $top/$bottom/$topN/$bottomN accumulators.
  */
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 const coll = db[jsTestName()];
 coll.drop();

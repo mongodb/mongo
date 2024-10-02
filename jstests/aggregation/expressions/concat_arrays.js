@@ -11,10 +11,10 @@
 //   # tests from implicit index creation suites.
 //   assumes_no_implicit_index_creation,
 // ]
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db.projection_expr_concat_arrays;
 coll.drop();

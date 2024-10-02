@@ -1,5 +1,5 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 /**
  * Create a collection of tickers and prices.

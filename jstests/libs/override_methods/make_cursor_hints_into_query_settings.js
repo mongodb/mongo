@@ -1,4 +1,3 @@
-import {everyWinningPlan, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
 import {
     getCollectionName,
     getCommandName,
@@ -6,7 +5,8 @@ import {
     getInnerCommand
 } from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
-import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
+import {everyWinningPlan, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
+import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 function isMinMaxQuery(cmdObj) {
     // When using min()/max() a hint of which index to use must be provided.

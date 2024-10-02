@@ -9,8 +9,8 @@
 //   requires_profiling,
 // ]
 
-import {getPlanCacheShapeHashFromExplain} from "jstests/libs/analyze_plan.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
+import {getPlanCacheShapeHashFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const testDB = db.getSiblingDB("plan_cache_shape_hash");
 assert.commandWorked(testDB.dropDatabase());

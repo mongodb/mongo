@@ -19,7 +19,11 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getAggPlanStage, getPlanStage, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
+import {
+    getAggPlanStage,
+    getPlanStage,
+    getSingleNodeExplain
+} from "jstests/libs/query/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     // These dates will all be inserted into individual buckets.

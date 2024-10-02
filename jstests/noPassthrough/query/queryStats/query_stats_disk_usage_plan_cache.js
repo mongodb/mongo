@@ -9,7 +9,7 @@ import {
     exhaustCursorAndGetQueryStats,
     getFindQueryStatsKey,
     runForEachDeployment,
-} from "jstests/libs/query_stats_utils.js";
+} from "jstests/libs/query/query_stats_utils.js";
 
 function makeUnshardedCollection(conn) {
     const coll = conn.getDB("test")[jsTestName()];

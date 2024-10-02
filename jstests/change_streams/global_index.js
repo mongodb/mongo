@@ -12,7 +12,10 @@
 // TODO (SERVER-69932): once sharding has a working global index implementation, rewrite this test
 // to run on mongos (don't use internal commands) and remove assumes_against_mongod_not_mongos.
 
-import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest
+} from "jstests/libs/query/change_stream_util.js";
 
 const adminDB = db.getSiblingDB("admin");
 const cst = new ChangeStreamTest(adminDB);

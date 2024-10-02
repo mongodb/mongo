@@ -10,7 +10,7 @@
  *   does_not_support_retryable_writes
  * ]
  */
-import {getWinningPlanFromExplain} from 'jstests/libs/analyze_plan.js';
+import {getWinningPlanFromExplain} from 'jstests/libs/query/analyze_plan.js';
 
 const timeFieldName = "time";
 const metaFieldName = "tag";

@@ -11,7 +11,7 @@
  *   requires_fcv_80,
  * ]
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.sparse_index_supports_ne_null;
 coll.drop();

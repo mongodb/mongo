@@ -8,8 +8,8 @@
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 // ]
-import {getAggPlanStage, getPlanStage, isCollscan} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getAggPlanStage, getPlanStage, isCollscan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.wildcard_index_count;
 coll.drop();

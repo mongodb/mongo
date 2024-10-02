@@ -6,7 +6,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
+import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.hashed_index_sort;
 coll.drop();

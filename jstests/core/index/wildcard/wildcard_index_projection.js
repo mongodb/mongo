@@ -8,8 +8,8 @@
  * ]
  */
 
-import {getQueryPlanner, getRejectedPlan, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getQueryPlanner, getRejectedPlan, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
 const coll = db[collName];

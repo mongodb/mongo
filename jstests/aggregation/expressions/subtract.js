@@ -1,5 +1,5 @@
 // Tests for $subtract aggregation expression
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 

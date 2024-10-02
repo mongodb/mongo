@@ -5,7 +5,7 @@
 //  not_allowed_with_signed_security_token,
 // ]
 
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const localColl = db.local;
 const foreignColl = db.foreign;

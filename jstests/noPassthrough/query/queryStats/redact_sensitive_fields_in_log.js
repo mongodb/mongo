@@ -3,7 +3,7 @@
  * @tags: [requires_fcv_71]
  */
 
-import {getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";
+import {getQueryStatsFindCmd} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const checkLogForHmacKey = function(conn) {

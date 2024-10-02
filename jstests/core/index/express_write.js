@@ -10,7 +10,7 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {isExpress} from "jstests/libs/analyze_plan.js";
+import {isExpress} from "jstests/libs/query/analyze_plan.js";
 
 const collName = 'express_write_coll';
 const coll = db.getCollection(collName);

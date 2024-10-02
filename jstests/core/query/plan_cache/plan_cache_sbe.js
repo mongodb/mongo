@@ -27,7 +27,7 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db.plan_cache_sbe;
 coll.drop();

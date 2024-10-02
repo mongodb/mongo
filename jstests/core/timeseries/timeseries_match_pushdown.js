@@ -9,7 +9,7 @@
  *   directly_against_shardsvrs_incompatible,
  * ]
  */
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.timeseries_match_pushdown;
 const timeField = 'time';

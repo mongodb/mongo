@@ -5,7 +5,7 @@
  * ]
  */
 
-import {getPlanCacheNumEntries, getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
+import {getPlanCacheNumEntries, getPlanCacheSize} from "jstests/libs/query/plan_cache_utils.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start");

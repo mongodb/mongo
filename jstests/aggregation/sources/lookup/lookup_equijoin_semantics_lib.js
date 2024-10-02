@@ -15,8 +15,8 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 export const JoinAlgorithm = {
     HJ: {name: "HJ", strategy: "HashJoin"},

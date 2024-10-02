@@ -6,7 +6,7 @@
  *
  * @tags: [assumes_against_mongod_not_mongos]
  */
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();

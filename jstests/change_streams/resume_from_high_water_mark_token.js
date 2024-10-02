@@ -1,11 +1,11 @@
 /**
  * Tests that a synthetic high-water-mark (HWM) token obeys the same semantics as a regular token.
  */
-import {runCommandChangeStreamPassthroughAware} from "jstests/libs/change_stream_util.js";
 import {
     assertCreateCollection,
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
+import {runCommandChangeStreamPassthroughAware} from "jstests/libs/query/change_stream_util.js";
 
 // Drop the test collections to assure a clean run.
 const collName = jsTestName();

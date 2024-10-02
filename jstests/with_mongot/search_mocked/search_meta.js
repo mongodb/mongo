@@ -1,9 +1,9 @@
 /**
  * Verify that `$searchMeta` extracts SEARCH_META variable returned by mongot.
  */
-import {getPlanStages} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 

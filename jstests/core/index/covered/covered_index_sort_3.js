@@ -8,7 +8,7 @@
 // Compound index covered query tests with sort
 
 // Include helpers for analyzing explain output.
-import {isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 var coll = db.getCollection("covered_sort_3");
 coll.drop();

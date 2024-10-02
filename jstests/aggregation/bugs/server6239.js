@@ -1,6 +1,6 @@
 // SERVER-6239 reenable $add and $subtract with dates with better semantics
 // Note: error conditions tested also in server6240.js
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 

@@ -1,5 +1,5 @@
 // Tests behavior with invalid 2d bounds.
-import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
+import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
 
 const test = new GeoNearRandomTest('geo_near_bounds_overflow');
 

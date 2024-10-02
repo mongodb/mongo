@@ -10,7 +10,7 @@
 /**
  * Tests the behavior of operations when interacting with a view's default collation.
  */
-import {getAggPlanStage, getAllNodeExplains} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getAllNodeExplains} from "jstests/libs/query/analyze_plan.js";
 
 let viewsDB = db.getSiblingDB("views_collation");
 assert.commandWorked(viewsDB.dropDatabase());

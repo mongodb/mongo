@@ -8,7 +8,7 @@
 /**
  * Tests for returnKey.
  */
-import {isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 var results;
 var explain;

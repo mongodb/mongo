@@ -17,9 +17,9 @@ import {
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {QuerySettingsIndexHintsTests} from "jstests/libs/query_settings_index_hints_tests.js";
-import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
+import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const viewName = "identityView";

@@ -9,13 +9,13 @@
 //   assumes_unsharded_collection,
 //   assumes_read_preference_unchanged
 // ]
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     assertNumChangeStreamDocsReturnedFromShard,
     assertNumMatchingOplogEventsForShard,
     createShardedCollection,
     getExecutionStatsForShard,
-} from "jstests/libs/change_stream_rewrite_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+} from "jstests/libs/query/change_stream_rewrite_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "change_stream_match_pushdown_and_rewrite";

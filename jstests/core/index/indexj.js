@@ -12,8 +12,8 @@
 //   requires_fcv_63,
 // ]
 
-import {getPlanStages} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const t = db[jsTestName()];
 t.drop();

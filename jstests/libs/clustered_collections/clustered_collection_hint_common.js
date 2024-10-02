@@ -1,8 +1,8 @@
 /**
  * Validate $hint on a clustered collection.
  */
-import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
     const clusterKeyFieldName = Object.keys(clusterKey)[0];

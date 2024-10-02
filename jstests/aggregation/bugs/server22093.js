@@ -16,7 +16,7 @@ import {
     getAggPlanStage,
     getQueryPlanner,
     planHasStage
-} from "jstests/libs/analyze_plan.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 var coll = db.countscan;
 coll.drop();

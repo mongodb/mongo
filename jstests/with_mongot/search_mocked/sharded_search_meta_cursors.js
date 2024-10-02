@@ -4,9 +4,9 @@
  * only return one cursor when requiresSearchMetaCursor is explicitly false.
  */
 
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {

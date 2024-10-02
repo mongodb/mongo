@@ -1,11 +1,11 @@
 /**
  * Test that explain of $unionWith resolves views on sharded collections correctly.
  */
-import {getAllNodeExplains} from "jstests/libs/analyze_plan.js";
 import {
     assertDropAndRecreateCollection,
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
+import {getAllNodeExplains} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";

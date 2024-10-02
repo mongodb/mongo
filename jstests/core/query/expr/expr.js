@@ -14,8 +14,8 @@
 //   does_not_support_multiplanning_single_solutions,
 // ]
 
-import "jstests/libs/sbe_assert_error_override.js";
-import {getExecutionStats} from "jstests/libs/analyze_plan.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
+import {getExecutionStats} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.expr;
 

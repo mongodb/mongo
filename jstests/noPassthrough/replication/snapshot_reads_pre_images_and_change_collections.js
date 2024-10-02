@@ -3,7 +3,7 @@
  *
  */
 
-import {getPreImagesCollection} from "jstests/libs/change_stream_util.js";
+import {getPreImagesCollection} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     ChangeStreamMultitenantReplicaSetTest

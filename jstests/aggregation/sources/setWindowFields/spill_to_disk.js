@@ -8,17 +8,17 @@
  * not_allowed_with_signed_security_token,
  * ]
  */
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     seedWithTickerData,
     testAccumAgainstGroup
 } from "jstests/aggregation/extras/window_function_helpers.js";
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Doc size was found through logging the size in the SpillableCache. Partition sizes were chosen

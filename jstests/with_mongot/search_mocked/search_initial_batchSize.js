@@ -3,7 +3,7 @@
  * @tags: [requires_fcv_81]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     getDefaultProtocolVersionForPlanShardedSearch,

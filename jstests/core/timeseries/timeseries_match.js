@@ -16,9 +16,9 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;

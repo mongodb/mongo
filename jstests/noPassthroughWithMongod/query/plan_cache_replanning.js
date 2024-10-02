@@ -3,14 +3,14 @@
  * oscillates. It achieves this by creating two indexes, A and B, on a collection, and interleaving
  * queries which are "ideal" for index A with queries that are "ideal" for index B.
  */
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     getCachedPlan,
     getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject,
     getPlanStage
-} from "jstests/libs/analyze_plan.js";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const isSbePlanCacheEnabled = checkSbeFullFeatureFlagEnabled(db);
 

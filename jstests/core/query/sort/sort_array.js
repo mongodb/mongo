@@ -6,7 +6,7 @@
 /**
  * Tests for sorting documents by fields that contain arrays.
  */
-import {aggPlanHasStage, isQueryPlan, planHasStage} from "jstests/libs/analyze_plan.js";
+import {aggPlanHasStage, isQueryPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.jstests_array_sort;
 

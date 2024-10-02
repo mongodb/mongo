@@ -17,7 +17,7 @@ import {
     getWinningPlan,
     isCollscan,
     isIxscan
-} from "jstests/libs/analyze_plan.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 let explain;
 const coll = db.index_partial_read_ops;

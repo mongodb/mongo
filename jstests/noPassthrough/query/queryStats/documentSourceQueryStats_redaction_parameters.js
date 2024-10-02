@@ -4,7 +4,7 @@
  */
 
 import {assertAdminDBErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
-import {getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";
+import {getQueryStatsFindCmd} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Assert the expected queryStats key with no hmac.

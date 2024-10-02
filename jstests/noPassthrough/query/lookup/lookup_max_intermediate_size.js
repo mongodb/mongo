@@ -5,7 +5,7 @@
 // ]
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Used by testPipeline to sort result documents. All _ids must be primitives.

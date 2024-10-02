@@ -1,11 +1,11 @@
 // Basic tests for $changeStream against all databases in the cluster.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertInvalidChangeStreamNss,
     assertValidChangeStreamNss,
     ChangeStreamTest
-} from "jstests/libs/change_stream_util.js";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+} from "jstests/libs/query/change_stream_util.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const adminDB = testDb.getSiblingDB("admin");

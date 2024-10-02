@@ -6,7 +6,7 @@
  *   requires_sharding,
  * ]
  */
-import {isIndexOnly, isIxscan, planHasStage} from "jstests/libs/analyze_plan.js";
+import {isIndexOnly, isIxscan, planHasStage} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Deliberately inserts orphans outside of migration.

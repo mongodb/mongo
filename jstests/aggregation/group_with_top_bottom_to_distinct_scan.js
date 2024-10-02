@@ -18,7 +18,7 @@
  * ]
  */
 
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {
     addIndex,
     assertPipelineResultsAndExplain,
@@ -28,8 +28,8 @@ import {
     assertPlanUsesIndexScan,
     prepareCollection,
     removeIndex,
-} from "jstests/libs/group_to_distinct_scan_utils.js";
-import {checkSbeCompletelyDisabled} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/group_to_distinct_scan_utils.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
 prepareCollection();
 

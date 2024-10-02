@@ -1,7 +1,7 @@
 /**
  * Basic tests for the $trim, $ltrim, and $rtrim expressions.
  */
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {
     assertErrorCode,

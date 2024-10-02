@@ -5,7 +5,7 @@
 
 "use strict";
 
-import {getPlanStages} from "jstests/libs/analyze_plan.js";
+import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 function testTieBreaking(breakTies, expectedPlanCount, checkAgainstOriginal) {
     const expectedDocsExamined = 1;

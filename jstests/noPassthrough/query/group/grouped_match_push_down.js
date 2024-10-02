@@ -1,7 +1,7 @@
 // Tests classic planner rule to push-down $match with filters on renamed fields with dotted paths
 // over $group and $project in aggregation pipelines.
 
-import {getEngine, getWinningPlanFromExplain} from "jstests/libs/analyze_plan.js";
+import {getEngine, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB('test');

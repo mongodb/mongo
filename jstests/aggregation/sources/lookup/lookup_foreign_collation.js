@@ -6,8 +6,8 @@
  * ]
  */
 import {anyEq} from "jstests/aggregation/extras/utils.js";
-import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const localColl = testDB.local_no_collation;

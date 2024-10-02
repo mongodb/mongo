@@ -5,7 +5,7 @@
  * stats on a nonexistent collection. We use the mock framework because we need to override a server
  * parameter and test on different topologies.
  */
-import {getQueryStats, getValueAtPath} from "jstests/libs/query_stats_utils.js";
+import {getQueryStats, getValueAtPath} from "jstests/libs/query/query_stats_utils.js";
 import {
     MongotMock,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";

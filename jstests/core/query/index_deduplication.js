@@ -14,13 +14,13 @@
  * requires_fcv_80
  * ]
  */
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getPlanStages,
     getQueryPlanner,
     getRejectedPlans,
     getWinningPlan
-} from "jstests/libs/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.index_deduplication;
 coll.drop();

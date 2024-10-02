@@ -7,7 +7,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const kSmallMemoryLimit = 1024;
 const conn = MongoRunner.runMongod(

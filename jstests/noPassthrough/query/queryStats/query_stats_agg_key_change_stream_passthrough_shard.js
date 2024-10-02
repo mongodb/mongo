@@ -9,7 +9,7 @@
 
 import {
     runCommandAndValidateQueryStats,
-} from "jstests/libs/query_stats_utils.js";
+} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();

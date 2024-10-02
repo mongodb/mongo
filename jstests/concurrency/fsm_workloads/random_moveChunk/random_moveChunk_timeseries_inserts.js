@@ -17,8 +17,8 @@ import {
     $config as $baseConfig
 } from 'jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js';
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getPlanStages} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {

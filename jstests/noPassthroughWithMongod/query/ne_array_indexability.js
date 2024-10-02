@@ -4,8 +4,8 @@
 import {
     getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject
-} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
 

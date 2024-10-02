@@ -7,13 +7,13 @@
  * ]
  */
 
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     assertNoFetchFilter,
     getPlanStages,
     getWinningPlanFromExplain,
     isEofPlan
-} from "jstests/libs/analyze_plan.js";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "jstests_explain_find_trivially_false_predicates";
 

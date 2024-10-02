@@ -2,7 +2,7 @@
  * Test that the plan cache hits, misses and skipped serverStatus' counters are updated correctly
  * when serving queries.
  */
-import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB("plan_cache_hits_and_misses_metrics");

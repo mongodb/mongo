@@ -1,7 +1,7 @@
 // @tags: [
 //   assumes_read_concern_local,
 // ]
-import {getQueryPlanner} from "jstests/libs/analyze_plan.js";
+import {getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 
 const t = db.jstests_regex;
 

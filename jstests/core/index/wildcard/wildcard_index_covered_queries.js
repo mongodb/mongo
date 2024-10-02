@@ -12,8 +12,8 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanStages, getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getPlanStages, getWinningPlan, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 

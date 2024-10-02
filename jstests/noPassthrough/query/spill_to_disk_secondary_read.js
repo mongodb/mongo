@@ -3,9 +3,9 @@
  * writeConcern greater than w:1.
  * @tags: [requires_replication, requires_majority_read_concern, requires_persistence]
  */
+import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const kNumNodes = 3;
 const replTest = new ReplSetTest({

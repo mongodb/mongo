@@ -7,7 +7,7 @@ import {
     generateChangeStreamWriteWorkload,
     getAllChangeStreamEvents,
     isPlainObject
-} from "jstests/libs/change_stream_rewrite_util.js";
+} from "jstests/libs/query/change_stream_rewrite_util.js";
 
 const dbName = jsTestName();
 const collName = "coll1";

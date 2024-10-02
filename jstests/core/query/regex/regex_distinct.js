@@ -7,8 +7,8 @@
  * ]
  */
 
-import {getPlanStages} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.regex_distinct;
 coll.drop();

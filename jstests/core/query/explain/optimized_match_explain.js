@@ -5,7 +5,7 @@
 /**
  * Tests that the explain output for $match reflects any optimizations.
  */
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.match_explain;
 coll.drop();

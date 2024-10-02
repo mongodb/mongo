@@ -20,7 +20,7 @@
 
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 

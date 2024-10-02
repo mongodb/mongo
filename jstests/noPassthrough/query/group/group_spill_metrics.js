@@ -7,8 +7,8 @@
  *   requires_persistence,
  * ]
  */
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB('test');

@@ -2,7 +2,11 @@
  * Helpers for testing timeseries arbitrary writes.
  */
 
-import {getExecutionStages, getPlanStage, getQueryPlanner} from "jstests/libs/analyze_plan.js";
+import {
+    getExecutionStages,
+    getPlanStage,
+    getQueryPlanner
+} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 export const timeFieldName = "time";

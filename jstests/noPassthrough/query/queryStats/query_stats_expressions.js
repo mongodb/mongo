@@ -3,7 +3,7 @@
  * proper query shape without issues during re-parsing.
  * @tags: [requires_fcv_71]
  */
-import {getQueryStats, resetQueryStatsStore} from "jstests/libs/query_stats_utils.js";
+import {getQueryStats, resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
 
 // Turn on the collecting of queryStats metrics.
 let options = {

@@ -16,7 +16,7 @@
  *   assumes_balancer_off,
  * ]
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "index_filter_collation";
 const coll = db[collName];

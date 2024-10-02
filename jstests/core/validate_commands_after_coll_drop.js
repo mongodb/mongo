@@ -13,7 +13,7 @@
  * ]
  */
 
-import {getWinningPlanFromExplain, isEofPlan} from "jstests/libs/analyze_plan.js";
+import {getWinningPlanFromExplain, isEofPlan} from "jstests/libs/query/analyze_plan.js";
 
 const docs = [{a: 1}, {a: 2}, {a: 2}, {a: 3}];
 const dbName = "validate_commands_after_coll_drop_db";

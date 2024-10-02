@@ -2,7 +2,11 @@
  * Tests that a $not-$in-$regex query, which cannot be supported by an index, cannot incorrectly
  * hijack the cached plan for an earlier $not-$in query.
  */
-import {getPlanCacheKeyFromShape, getWinningPlan, isCollscan} from "jstests/libs/analyze_plan.js";
+import {
+    getPlanCacheKeyFromShape,
+    getWinningPlan,
+    isCollscan
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.plan_cache_not_in_regex;
 coll.drop();

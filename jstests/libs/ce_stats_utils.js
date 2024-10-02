@@ -3,7 +3,7 @@ import {
     extractLogicalCEFromNode,
     getPlanSkeleton,
     navigateToRootNode,
-} from "jstests/libs/optimizer_utils.js";
+} from "jstests/libs/query/optimizer_utils.js";
 
 /**
  * Returns a simplified skeleton of the physical plan including intervals & logical CE.

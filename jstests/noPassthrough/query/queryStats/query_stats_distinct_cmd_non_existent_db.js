@@ -4,7 +4,10 @@
  * @tags: [requires_fcv_81]
  */
 
-import {getLatestQueryStatsEntry, withQueryStatsEnabled} from "jstests/libs/query_stats_utils.js";
+import {
+    getLatestQueryStatsEntry,
+    withQueryStatsEnabled
+} from "jstests/libs/query/query_stats_utils.js";
 
 const collName = "anything";
 const viewName = "testView";

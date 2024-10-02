@@ -22,11 +22,11 @@
  * ]
  */
 
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     getPlanCacheShapeHashFromExplain,
     getPlanCacheShapeHashFromObject
-} from "jstests/libs/analyze_plan.js";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = assertDropAndRecreateCollection(db, "sbe_plan_cache_duplicate_or_clauses");
 const planCacheShapeHashSet = new Set();

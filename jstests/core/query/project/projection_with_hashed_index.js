@@ -14,7 +14,7 @@ import {
     getPlanStage,
     getShardsFromExplain,
     getWinningPlanFromExplain,
-} from "jstests/libs/analyze_plan.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();

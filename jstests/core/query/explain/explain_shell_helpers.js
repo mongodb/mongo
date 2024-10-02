@@ -22,7 +22,7 @@ import {
     getWinningPlan,
     isIxscan,
     planHasStage
-} from "jstests/libs/analyze_plan.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 var t = db.jstests_explain_helpers;
 t.drop();

@@ -2,8 +2,8 @@
  * This test makes sure that regex control characters in the namespace of changestream targets don't
  * affect what documents appear in a changestream, in response to SERVER-41164.
  */
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 function test_no_leak(dbNameUnrelated, collNameUnrelated, dbNameProblematic, collNameProblematic) {
     const dbUnrelated = db.getSiblingDB(dbNameUnrelated);

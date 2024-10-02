@@ -10,9 +10,12 @@
  *   exclude_when_record_ids_replicated
  * ]
  */
-import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest
+} from "jstests/libs/query/change_stream_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 

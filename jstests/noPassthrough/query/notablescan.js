@@ -16,8 +16,8 @@
 //   tenant_migration_incompatible,
 // ]
 
-import {isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
 
 function checkError(err) {
     assert.includes(err.toString(), "'notablescan'");

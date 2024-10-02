@@ -5,7 +5,7 @@
  * Note that the user's query/filter document may only contain _ONE_ array field for positional
  * projection to work correctly.
  */
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {documentEq} from "jstests/aggregation/extras/utils.js";
 

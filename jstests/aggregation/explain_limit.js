@@ -8,8 +8,8 @@
 //   # Implicit index creation may change the plan/engine used.
 //   assumes_no_implicit_index_creation,
 // ]
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 let coll = db.explain_limit;
 

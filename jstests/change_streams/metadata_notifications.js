@@ -5,13 +5,13 @@
 //   do_not_run_in_whole_cluster_passthrough,
 //   requires_fcv_63,
 // ]
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {
     assertCreateCollection,
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 let cst = new ChangeStreamTest(testDb);

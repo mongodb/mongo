@@ -5,13 +5,16 @@
 //   do_not_wrap_aggregations_in_facets,
 //   uses_multiple_connections,
 // ]
-import {ChangeStreamTest, isChangeStreamPassthrough} from "jstests/libs/change_stream_util.js";
 import {
     assertCreateCollection,
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
+    ChangeStreamTest,
+    isChangeStreamPassthrough
+} from "jstests/libs/query/change_stream_util.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_post_image");

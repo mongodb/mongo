@@ -20,7 +20,7 @@
  *   featureFlagSbeFull,
  * ]
  */
-import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.sbe_plan_cache_autoparameterize_collscan;
 coll.drop();

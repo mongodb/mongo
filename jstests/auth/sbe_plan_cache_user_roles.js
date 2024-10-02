@@ -6,7 +6,7 @@
  *   assumes_standalone_mongod,
  * ]
  */
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const mongod = MongoRunner.runMongod();
 const dbName = "test";

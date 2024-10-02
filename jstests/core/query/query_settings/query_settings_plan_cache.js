@@ -14,9 +14,9 @@
 //   simulate_atlas_proxy_incompatible,
 // ]
 
-import {getPlanCacheKeyFromExplain} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
+import {getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());

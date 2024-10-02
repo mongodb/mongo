@@ -11,9 +11,9 @@
  */
 
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
-import {assertEndOfTransaction, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {assertEndOfTransaction, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const otherCollName = "change_stream_end_of_transaction_2";
 const coll = assertDropAndRecreateCollection(db, "change_stream_end_of_transaction");

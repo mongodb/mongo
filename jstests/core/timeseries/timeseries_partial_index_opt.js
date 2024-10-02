@@ -14,7 +14,7 @@
  *   requires_fcv_70,
  * ]
  */
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.timeseries_partial_index_opt;
 

@@ -10,8 +10,8 @@
  *   requires_scripting
  * ]
  */
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const memoryLimitMb = 1;
 const memoryLimitBytes = 1 * 1024 * 1024;

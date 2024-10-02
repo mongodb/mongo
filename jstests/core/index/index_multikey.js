@@ -6,7 +6,7 @@
  * ]
  */
 // For making assertions about explain output.
-import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.getCollection("index_multikey");
 coll.drop();

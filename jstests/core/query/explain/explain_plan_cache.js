@@ -23,8 +23,8 @@ import {
     getRejectedPlan,
     getRejectedPlans,
     getWinningPlan
-} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const shouldGenerateSbePlan = checkSbeFullyEnabled(db);
 const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);

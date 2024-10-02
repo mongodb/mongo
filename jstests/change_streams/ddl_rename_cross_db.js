@@ -10,7 +10,7 @@
  *  assumes_against_mongod_not_mongos,
  * ]
  */
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 function runTest(watchType, renameType) {
     // Use minimum distinguishable names to keep database name under 64-byte limit.

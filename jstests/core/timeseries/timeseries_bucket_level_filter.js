@@ -12,8 +12,8 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getAggPlanStage, getEngine} from "jstests/libs/analyze_plan.js";
-import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
+import {getAggPlanStage, getEngine} from "jstests/libs/query/analyze_plan.js";
+import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
 
 const coll = db.timeseries_bucket_level_filter;
 coll.drop();

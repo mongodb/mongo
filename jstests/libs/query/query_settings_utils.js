@@ -1,14 +1,14 @@
 /**
  * Utility class for testing query settings.
  */
+import {getCommandName, getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {
     getAggPlanStages,
     getEngine,
     getPlanStages,
     getQueryPlanners,
     getWinningPlanFromExplain
-} from "jstests/libs/analyze_plan.js";
-import {getCommandName, getExplainCommand} from "jstests/libs/cmd_object_utils.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 export class QuerySettingsUtils {
     /**

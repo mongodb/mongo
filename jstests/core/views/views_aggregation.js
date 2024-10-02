@@ -23,11 +23,11 @@
 
 import {assertMergeFailsForAllModesWithCode} from "jstests/aggregation/extras/merge_helpers.js";
 import {arrayEq, assertErrorCode, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 import {
     FixtureHelpers
 } from "jstests/libs/fixture_helpers.js";  // For arrayEq, assertErrorCode, and
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const sbeEnabled = checkSbeFullyEnabled(db);
 

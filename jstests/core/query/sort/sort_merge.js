@@ -5,8 +5,13 @@
  *   assumes_read_concern_local,
  * ]
  */
-import {getPlanStage, getPlanStages, isIndexOnly, isIxscan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
+    getPlanStage,
+    getPlanStages,
+    isIndexOnly,
+    isIxscan
+} from "jstests/libs/query/analyze_plan.js";
 
 const collNamePrefix = 'sort_merge_';
 let collCount = 0;

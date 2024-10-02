@@ -42,6 +42,10 @@
  */
 
 import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
     getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
     getPlanStage,
@@ -55,15 +59,11 @@ import {
     isIdhackOrExpress,
     isIxscan,
     planHasStage,
-} from "jstests/libs/analyze_plan.js";
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+} from "jstests/libs/query/analyze_plan.js";
 import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeRestrictedOrFullyEnabled
-} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/sbe_util.js";
 
 // Flag indicating if index filter commands are running through the query settings interface.
 var isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;

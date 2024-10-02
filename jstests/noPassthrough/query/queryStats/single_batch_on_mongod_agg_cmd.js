@@ -3,7 +3,7 @@
  * results fit into a single batch (and thus don't require a cursor), for agg commands.
  * @tags: [requires_fcv_72]
  */
-import {getQueryStatsAggCmd, verifyMetrics} from "jstests/libs/query_stats_utils.js";
+import {getQueryStatsAggCmd, verifyMetrics} from "jstests/libs/query/query_stats_utils.js";
 
 // Turn on the collecting of queryStats metrics.
 let options = {

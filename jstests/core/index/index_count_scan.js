@@ -12,7 +12,7 @@
 //   # Explain for the aggregate command cannot run within a multi-document transaction.
 //   does_not_support_transactions,
 // ]
-import {getPlanStage, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
+import {getPlanStage, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.index_count;
 coll.drop();
