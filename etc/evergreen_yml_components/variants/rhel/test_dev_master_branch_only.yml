@@ -234,7 +234,7 @@ buildvariants:
       - name: crypt_build_debug_and_test
 
   - <<: *generic_linux_compile_params
-    name: &linux-x86-dynamic-grpc-suggested linux-x86-dynamic-grpc-suggested
+    name: &linux-x86-dynamic-grpc linux-x86-dynamic-grpc
     display_name: "~ Linux x86 Shared Library Enterprise with GRPC"
     cron: "0 0 * * 0" # Once a week on Sunday
     stepback: false
@@ -247,7 +247,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
         ENABLE_GRPC_BUILD=1
-      compile_variant: *linux-x86-dynamic-grpc-suggested
+      compile_variant: *linux-x86-dynamic-grpc
       clang_tidy_toolchain: v4
       large_distro_name: rhel8.8-xlarge
       test_flags: >-

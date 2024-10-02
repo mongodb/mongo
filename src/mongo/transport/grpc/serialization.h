@@ -38,6 +38,7 @@
 #include <grpcpp/support/byte_buffer.h>
 #include <grpcpp/support/status.h>
 
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 
 namespace grpc {
@@ -72,6 +73,7 @@ template <>
 class SerializationTraits<mongo::SharedBuffer> {
 public:
     static Status Deserialize(ByteBuffer* byte_buffer, mongo::SharedBuffer* dest) {
+        const mongo::ScopeGuard freeByteBuffer([&]() { byte_buffer->Clear(); });
         Slice singleSlice;
         if (byte_buffer->TrySingleSlice(&singleSlice).ok()) {
             dest->realloc(singleSlice.size());

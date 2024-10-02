@@ -104,7 +104,7 @@ private:
 
     // Invalidated after setup().
     MockClient::MockResolver _resolver;
-    const HostAndPort& _mockClientAddress;
+    const HostAndPort _mockClientAddress;
 };
 
 }  // namespace mongo::transport::grpc

@@ -37,10 +37,9 @@ namespace mongo::transport::grpc {
 
 class GRPCClientStream : public ClientStream {
 public:
-    explicit GRPCClientStream(::grpc::ClientReaderWriter<ConstSharedBuffer, SharedBuffer>* stream)
-        : _stream{stream} {}
-
-    ~GRPCClientStream() = default;
+    explicit GRPCClientStream(
+        std::unique_ptr<::grpc::ClientReaderWriter<ConstSharedBuffer, SharedBuffer>> stream)
+        : _stream{std::move(stream)} {}
 
     boost::optional<SharedBuffer> read() override {
         SharedBuffer msg;
@@ -61,6 +60,6 @@ public:
     }
 
 private:
-    ::grpc::ClientReaderWriter<ConstSharedBuffer, SharedBuffer>* _stream;
+    std::unique_ptr<::grpc::ClientReaderWriter<ConstSharedBuffer, SharedBuffer>> _stream;
 };
 }  // namespace mongo::transport::grpc

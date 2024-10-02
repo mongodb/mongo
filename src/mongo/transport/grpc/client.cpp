@@ -233,10 +233,12 @@ class StubFactoryImpl : public GRPCClient::StubFactory {
     private:
         std::shared_ptr<ClientStream> _makeStream(::grpc::internal::RpcMethod& method,
                                                   GRPCClientContext* context) {
-            auto readerWriter =
-                ::grpc::internal::ClientReaderWriterFactory<WriteMessageType, ReadMessageType>::
-                    Create(&*_channel, method, context->getGRPCClientContext());
-            return std::shared_ptr<ClientStream>(new GRPCClientStream(readerWriter));
+            std::unique_ptr<::grpc::ClientReaderWriter<ConstSharedBuffer, SharedBuffer>>
+                readerWriter(
+                    ::grpc::internal::ClientReaderWriterFactory<WriteMessageType, ReadMessageType>::
+                        Create(&*_channel, method, context->getGRPCClientContext()));
+
+            return std::make_shared<GRPCClientStream>(std::move(readerWriter));
         }
 
         std::shared_ptr<::grpc::Channel> _channel;

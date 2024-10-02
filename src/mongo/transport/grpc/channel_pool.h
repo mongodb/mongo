@@ -68,7 +68,7 @@ public:
      */
     class ChannelState {
     public:
-        ChannelState(std::shared_ptr<ChannelPool> pool,
+        ChannelState(std::weak_ptr<ChannelPool> pool,
                      HostAndPort remote,
                      bool useSSL,
                      Future<Channel> channel)
@@ -93,8 +93,10 @@ public:
         }
 
         void updateLastUsed() {
-            auto now = _pool->_clockSource->now();
-            **_lastUsed = now;
+            if (std::shared_ptr<ChannelPool> p = _pool.lock()) {
+                auto now = p->_clockSource->now();
+                **_lastUsed = now;
+            }
         }
 
         Date_t lastUsed() const {
@@ -102,7 +104,7 @@ public:
         }
 
     private:
-        std::shared_ptr<ChannelPool> _pool;
+        std::weak_ptr<ChannelPool> _pool;
         const HostAndPort _remote;
         const bool _useSSL;
         Future<Channel> _channel;

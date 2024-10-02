@@ -1,3 +1,7 @@
 #SERVER-74122
 #third party should not be subject to sanitizer
 src:src/third_party/IntelRDFPMathLib20U1/TESTS/readtest.c
+
+# gRPC only supports sanitizers in the native Bazel build (https://github.com/grpc/grpc/issues/19224#issuecomment-610363882)
+# This file has a static init order fiasco.
+src:src/third_party/grpc/dist/src/cpp/util/status.cc

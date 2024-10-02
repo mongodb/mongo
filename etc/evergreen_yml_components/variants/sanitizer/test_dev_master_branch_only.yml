@@ -100,6 +100,12 @@ variables:
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
 
+  # https://github.com/grpc/grpc/issues/21537 -- have to disable checking odr violations on gRPC if it is not in native Bazel build.
+  - grpc_aubsan_options: &grpc_aubsan_options >-
+      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+      ASAN_OPTIONS="detect_odr_violation=0:detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+
   # If you add anything to san_options, make sure the appropriate changes are
   # also made to SConstruct.
   # THIS HAS COPIES IN:
@@ -639,3 +645,48 @@ buildvariants:
       - name: generate_buildid_to_debug_symbols_mapping
         distros:
           - rhel8.8-large
+
+  - name: &linux-debug-aubsan-compile-grpc linux-debug-aubsan-compile-grpc
+    display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Compile with GRPC"
+    tags: ["experimental"]
+    cron: "0 0 * * 0" # Once a week on Sunday
+    run_on:
+      - rhel8.8-large
+    expansions:
+      <<: *generic_linux_compile_expansions
+      separate_debug: off
+      san_options: *grpc_aubsan_options
+      compile_flags: >-
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        --dbg=on
+        --opt=on
+        --allocator=system
+        --sanitize=undefined,address
+        --ssl
+        --ocsp-stapling=off
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --link-model=dynamic
+        ENABLE_GRPC_BUILD=1
+      compile_variant: *linux-debug-aubsan-compile-grpc
+      large_distro_name: rhel80-xlarge
+      test_flags: >-
+        --additionalFeatureFlags "featureFlagGRPC"
+        --excludeWithAnyTags=requires_external_data_source,requires_mongobridge,requires_auth,grpc_incompatible,creates_and_authenticates_user
+        --tlsMode preferTLS
+        --tlsCAFile jstests/libs/ca.pem
+        --shellTls
+        --shellTlsCertificateKeyFile jstests/libs/client.pem
+        --mongosTlsCertificateKeyFile jstests/libs/server.pem
+        --mongodTlsCertificateKeyFile jstests/libs/server.pem
+        --shellGRPC
+    tasks:
+      - name: compile_ninja_quick_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: generate_buildid_to_debug_symbols_mapping
+      # sharding_uninitialized_fcv_jscore_passthrough_gen spawns too many connections
+      # and processes to be used with TLS on a single host.
+      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !embedded_router_jscore_passthrough_with_balancer_gen !.auth !.txns
+      - name: sharded_jscore_txns
+      - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen
