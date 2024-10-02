@@ -107,6 +107,9 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasVectorSearchScore() && other.hasVectorSearchScore()) {
         setVectorSearchScore(other.getVectorSearchScore());
     }
+    if (!hasScore() && other.hasScore()) {
+        setScore(other.getScore());
+    }
 }
 
 void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
@@ -151,6 +154,9 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     }
     if (other.hasVectorSearchScore()) {
         setVectorSearchScore(other.getVectorSearchScore());
+    }
+    if (other.hasScore()) {
+        setScore(other.getScore());
     }
 }
 
@@ -242,6 +248,10 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kVectorSearchScore + 1));
         buf.appendNum(getVectorSearchScore());
     }
+    if (hasScore()) {
+        buf.appendNum(static_cast<char>(MetaType::kScore + 1));
+        buf.appendNum(getScore());
+    }
     buf.appendNum(static_cast<char>(0));
 }
 
@@ -287,6 +297,8 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
         } else if (marker == static_cast<char>(MetaType::kSearchSequenceToken) + 1) {
             out->setSearchSequenceToken(
                 Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kScore) + 1) {
+            out->setScore(buf.read<LittleEndian<double>>());
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -352,6 +364,8 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "$search sequence token";
         case DocumentMetadataFields::kVectorSearchScore:
             return "$vectorSearch distance";
+        case DocumentMetadataFields::kScore:
+            return "$score score";
         default:
             MONGO_UNREACHABLE;
     }

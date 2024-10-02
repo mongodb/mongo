@@ -78,6 +78,7 @@
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
+#include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
@@ -177,6 +178,7 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceRedact,
                        DocumentSourceSample,
                        DocumentSourceSampleFromRandomCursor,
+                       DocumentSourceScore,
                        DocumentSourceSearchMeta,
                        DocumentSourceSearch,
                        DocumentSourceSequentialDocumentCache,

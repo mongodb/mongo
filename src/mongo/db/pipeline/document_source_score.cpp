@@ -30,13 +30,27 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_score_gen.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
+
+using boost::intrusive_ptr;
+
+DocumentSourceScore::DocumentSourceScore(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                                         ScoreSpec spec,
+                                         boost::intrusive_ptr<Expression> parsedScore)
+    : DocumentSource(kStageName, pExpCtx), _spec(spec), _parsedScore(parsedScore) {}
 
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(score,
                                            LiteParsedDocumentSourceDefault::parse,
@@ -44,8 +58,50 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(score,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagSearchHybridScoring);
 
-std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScore::createFromBson(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+constexpr StringData DocumentSourceScore::kStageName;
+
+DocumentSource::GetNextResult DocumentSourceScore::doGetNext() {
+    // Get the next input document.
+    auto input = pSource->getNext();
+
+    // If input is not advanced, return the input.
+    if (!input.isAdvanced()) {
+        return input;
+    }
+
+    Document currentDoc = input.getDocument();
+    // Evaluate and validate the scored expression.
+    Value scoreValue = _parsedScore->evaluate(currentDoc, &(pExpCtx->variables));
+    uassert(9484101,
+            "Invalid expression or evaluated expression is not a valid double",
+            isNumericBSONType(scoreValue.getType()));
+    double scoreDouble = scoreValue.getDouble();
+
+    // Store it in score's metadata (document must be mutable in order for score to be set).
+    MutableDocument output(std::move(currentDoc));
+    output.metadata().setScore(scoreDouble);
+
+    return output.freeze();
+}
+
+Value DocumentSourceScore::serialize(const SerializationOptions& opts) const {
+    return Value(Document{{kStageName, _spec.toBSON()}});
+}
+
+void DocumentSourceScore::addVariableRefs(std::set<Variables::Id>* refs) const {
+    expression::addVariableRefs(_parsedScore.get(), refs);
+}
+
+intrusive_ptr<DocumentSourceScore> DocumentSourceScore::create(
+    const intrusive_ptr<ExpressionContext>& pExpCtx,
+    ScoreSpec spec,
+    boost::intrusive_ptr<Expression> parsedScore) {
+    intrusive_ptr<DocumentSourceScore> source(new DocumentSourceScore(pExpCtx, spec, parsedScore));
+    return source;
+}
+
+intrusive_ptr<DocumentSource> DocumentSourceScore::createFromBson(
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "
@@ -53,7 +109,19 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScore::createFromB
             elem.type() == BSONType::Object);
     auto spec = ScoreSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
-    // TODO (SERVER-94841): Implement 'score' for $score (will return something then)
-    return {};
+    // First parse "score" (required field).
+    auto score = [&]() -> intrusive_ptr<Expression> {
+        auto score = spec.getScore();
+        return Expression::parseOperand(
+            pExpCtx.get(), score.getElement(), pExpCtx->variablesParseState);
+    }();
+
+    // Need a DocumentSourceScore object to access fields within static method (cannot directly
+    // access member functions otw). Intrusive pointer manages object destruction.
+    intrusive_ptr<DocumentSourceScore> doc = create(pExpCtx, spec, score);
+
+    // TODO (SERVER-94842): Implement 'inputNormalization' and 'weight' for $score
+    return doc;
 }
+
 }  // namespace mongo

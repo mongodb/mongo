@@ -3126,9 +3126,11 @@ const std::string searchSequenceTokenName = "searchSequenceToken";
 const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime";
 const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
 const std::string vectorSearchScoreName = "vectorSearchScore";
+const std::string scoreName = "score";
 
 using MetaType = DocumentMetadataFields::MetaType;
 const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
+    {scoreName, MetaType::kScore},
     {vectorSearchScoreName, MetaType::kVectorSearchScore},
     {geoNearDistanceName, MetaType::kGeoNearDist},
     {geoNearPointName, MetaType::kGeoNearPoint},
@@ -3146,6 +3148,7 @@ const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
 };
 
 const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTypeToMetaName = {
+    {MetaType::kScore, scoreName},
     {MetaType::kVectorSearchScore, vectorSearchScoreName},
     {MetaType::kGeoNearDist, geoNearDistanceName},
     {MetaType::kGeoNearPoint, geoNearPointName},
@@ -3216,6 +3219,8 @@ Value ExpressionMeta::serialize(const SerializationOptions& options) const {
 Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const {
     const auto& metadata = root.metadata();
     switch (_metaType) {
+        case MetaType::kScore:
+            return metadata.hasScore() ? Value(metadata.getScore()) : Value();
         case MetaType::kVectorSearchScore:
             return metadata.hasVectorSearchScore() ? Value(metadata.getVectorSearchScore())
                                                    : Value();

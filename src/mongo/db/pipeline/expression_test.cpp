@@ -3308,6 +3308,17 @@ TEST(ExpressionMetaTest, ExpressionMetaVectorSearchScore) {
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
     ASSERT_EQ(val.getDouble(), 1.23);
 }
+
+TEST(ExpressionMetaTest, ExpressionMetaScore) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{$meta: \"score\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    MutableDocument doc;
+    doc.metadata().setScore(1.23);
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
+    ASSERT_EQ(val.getDouble(), 1.23);
+}
 }  // namespace expression_meta_test
 
 namespace ExpressionRegexTest {

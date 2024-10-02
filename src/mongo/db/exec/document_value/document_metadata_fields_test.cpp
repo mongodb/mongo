@@ -56,6 +56,7 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
                                         << "foo"));
     metadata.setSearchSortValues(BSON("a" << 1));
     metadata.setVectorSearchScore(7.6);
+    metadata.setScore(8.1);
 
     BufBuilder builder;
     metadata.serializeForSorter(builder);
@@ -77,6 +78,7 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
                            << "foo"));
     ASSERT_BSONOBJ_EQ(deserialized.getSearchSortValues(), BSON("a" << 1));
     ASSERT_EQ(deserialized.getVectorSearchScore(), 7.6);
+    ASSERT_EQ(deserialized.getScore(), 8.1);
 }
 
 TEST(DocumentMetadataFieldsTest, HasMethodsReturnFalseForEmptyMetadata) {
@@ -93,6 +95,7 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnFalseForEmptyMetadata) {
     ASSERT_FALSE(metadata.hasSearchScoreDetails());
     ASSERT_FALSE(metadata.hasSearchSortValues());
     ASSERT_FALSE(metadata.hasVectorSearchScore());
+    ASSERT_FALSE(metadata.hasScore());
 }
 
 TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
@@ -143,6 +146,10 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
     ASSERT_FALSE(metadata.hasVectorSearchScore());
     metadata.setVectorSearchScore(7.6);
     ASSERT_TRUE(metadata.hasVectorSearchScore());
+
+    ASSERT_FALSE(metadata.hasScore());
+    metadata.setScore(8.1);
+    ASSERT_TRUE(metadata.hasScore());
 }
 
 TEST(DocumentMetadataFieldsTest, MoveConstructor) {
@@ -159,6 +166,7 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
                                         << "foo"));
     metadata.setSearchSortValues(BSON("a" << 1));
     metadata.setVectorSearchScore(7.6);
+    metadata.setScore(8.1);
 
     DocumentMetadataFields moveConstructed(std::move(metadata));
     ASSERT_TRUE(moveConstructed);
@@ -176,6 +184,7 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
                            << "foo"));
     ASSERT_BSONOBJ_EQ(moveConstructed.getSearchSortValues(), BSON("a" << 1));
     ASSERT_EQ(moveConstructed.getVectorSearchScore(), 7.6);
+    ASSERT_EQ(moveConstructed.getScore(), 8.1);
 
     ASSERT_FALSE(metadata);  // NOLINT(bugprone-use-after-move)
 }
@@ -194,6 +203,7 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
                                         << "foo"));
     metadata.setSearchSortValues(BSON("a" << 1));
     metadata.setVectorSearchScore(7.6);
+    metadata.setScore(8.1);
 
     DocumentMetadataFields moveAssigned;
     moveAssigned.setTextScore(12.3);
@@ -214,6 +224,7 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
                            << "foo"));
     ASSERT_BSONOBJ_EQ(moveAssigned.getSearchSortValues(), BSON("a" << 1));
     ASSERT_EQ(moveAssigned.getVectorSearchScore(), 7.6);
+    ASSERT_EQ(moveAssigned.getScore(), 8.1);
 
     ASSERT_FALSE(metadata);  // NOLINT(bugprone-use-after-move)
 }
@@ -269,6 +280,7 @@ TEST(DocumentMetadataFieldsTest, MergeWithOnlyCopiesMetadataThatDestinationDoesN
     ASSERT_FALSE(destination.hasSearchScoreDetails());
     ASSERT_FALSE(destination.hasSearchSortValues());
     ASSERT_FALSE(destination.hasVectorSearchScore());
+    ASSERT_FALSE(destination.hasScore());
 }
 
 TEST(DocumentMetadataFieldsTest, CopyFromCopiesAllMetadataThatSourceHas) {
@@ -296,6 +308,7 @@ TEST(DocumentMetadataFieldsTest, CopyFromCopiesAllMetadataThatSourceHas) {
     ASSERT_FALSE(destination.hasSearchScoreDetails());
     ASSERT_FALSE(destination.hasSearchSortValues());
     ASSERT_FALSE(destination.hasVectorSearchScore());
+    ASSERT_FALSE(destination.hasScore());
 }
 
 TEST(DocumentMetadataFieldsTest, GetTimeseriesBucketMinTimeExists) {
@@ -340,6 +353,7 @@ TEST(DocumentMetadataFieldsTest, MetadataIsMarkedModifiedOnSetMetadataField) {
     testFieldSetter([](DocumentMetadataFields& md) { md.setTimeseriesBucketMaxTime(Date_t()); });
     testFieldSetter([](DocumentMetadataFields& md) { md.setSearchSortValues(BSON("a" << 1)); });
     testFieldSetter([](DocumentMetadataFields& md) { md.setVectorSearchScore(60.0); });
+    testFieldSetter([](DocumentMetadataFields& md) { md.setScore(80.0); });
 }
 
 TEST(DocumentMetadataFieldsTest, MetadataIsConstructedUnmodified) {

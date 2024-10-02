@@ -80,6 +80,7 @@ public:
         kSearchSortValues,
         kVectorSearchScore,
         kSearchSequenceToken,
+        kScore,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -370,6 +371,20 @@ public:
         _holder->searchSequenceToken = details;
     }
 
+    bool hasScore() const {
+        return _holder && _holder->metaFields.test(MetaType::kScore);
+    }
+
+    double getScore() const {
+        tassert(9484100, "score must be present in metadata", hasScore());
+        return _holder->score;
+    }
+
+    void setScore(double score) {
+        _setCommon(MetaType::kScore);
+        _holder->score = score;
+    }
+
     void serializeForSorter(BufBuilder& buf) const;
 
     bool isModified() const {
@@ -418,6 +433,7 @@ private:
         BSONObj searchSortValues;
         double vectorSearchScore{0.0};
         Value searchSequenceToken;
+        double score{0.0};
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.

@@ -827,7 +827,8 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                             "j: {$meta: 'indexKey'}, "
                                                             "k: {$meta: 'sortKey'}, "
                                                             "l: {$meta: 'searchScoreDetails'}}, "
-                                                            "m: {$meta: 'vectorSearchScore'}"));
+                                                            "m: {$meta: 'vectorSearchScore'}, "
+                                                            "n: {$meta: 'score'}}"));
 
     DepsTracker deps;
     inclusion->addDependencies(&deps);
@@ -840,6 +841,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
 
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kRandVal]);
@@ -862,7 +864,8 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMeta
                                                             "j: {$meta: 'indexKey'}, "
                                                             "k: {$meta: 'sortKey'}, "
                                                             "l: {$meta: 'searchScoreDetails'}, "
-                                                            "m: {$meta: 'vectorSearchScore'}}"));
+                                                            "m: {$meta: 'vectorSearchScore'}, "
+                                                            "n: {$meta: 'score'}}"));
 
     MutableDocument inputDocBuilder(Document{{"a", 1}});
     inputDocBuilder.metadata().setTextScore(0.0);
@@ -877,6 +880,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMeta
     inputDocBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
                                                           << "foo"));
     inputDocBuilder.metadata().setVectorSearchScore(9.0);
+    inputDocBuilder.metadata().setScore(10.0);
     Document inputDoc = inputDocBuilder.freeze();
 
     auto result = inclusion->applyTransformation(inputDoc);
@@ -884,7 +888,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMeta
     ASSERT_DOCUMENT_EQ(result,
                        Document{fromjson("{a: 1, c: 0.0, d: 1.0, e: 2.0, f: 'foo', g: 3.0, "
                                          "h: [4, 5], i: 6, j: {foo: 7}, k: [{bar: 8}], "
-                                         "l: {scoreDetails: 'foo'}, m: 9.0}")});
+                                         "l: {scoreDetails: 'foo'}, m: 9.0, n: 10.0}")});
 }
 
 //

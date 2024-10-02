@@ -253,6 +253,7 @@ enum class DocumentSourceType {
     kReshardingOwnershipMatch,              // DocumentSourceReshardingOwnershipMatch
     kSample,                                // DocumentSourceSample
     kSampleFromRandomCursor,                // DocumentSourceSampleFromRandomCursor
+    kScore,                                 // DocumentSourceScore
     kSearch,                                // DocumentSourceSearch
     kSearchMeta,                            // DocumentSourceSearchMeta
     kSequentialDocumentCache,               // DocumentSourceSequentialDocumentCache

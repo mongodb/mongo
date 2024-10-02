@@ -104,7 +104,8 @@ const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore
                                                     Document::metaFieldIndexKey,
                                                     Document::metaFieldSearchScoreDetails,
                                                     Document::metaFieldVectorSearchScore,
-                                                    Document::metaFieldSearchSequenceToken};
+                                                    Document::metaFieldSearchSequenceToken,
+                                                    Document::metaFieldScore};
 
 DocumentStorageIterator::DocumentStorageIterator(DocumentStorage* storage, BSONObjIterator bsonIt)
     : _bsonIt(std::move(bsonIt)),
@@ -514,6 +515,8 @@ void DocumentStorage::loadLazyMetadata() const {
                 _metadataFields.setVectorSearchScore(elem.Double());
             } else if (fieldName == Document::metaFieldSearchSequenceToken) {
                 _metadataFields.setSearchSequenceToken(Value(elem));
+            } else if (fieldName == Document::metaFieldScore) {
+                _metadataFields.setScore(elem.Double());
             }
         }
     }
@@ -585,6 +588,7 @@ constexpr StringData Document::metaFieldSearchHighlights;
 constexpr StringData Document::metaFieldSearchScoreDetails;
 constexpr StringData Document::metaFieldSearchSortValues;
 constexpr StringData Document::metaFieldVectorSearchScore;
+constexpr StringData Document::metaFieldScore;
 
 void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
     toBson(builder);
@@ -620,6 +624,9 @@ void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
     }
     if (metadata().hasVectorSearchScore()) {
         builder->append(metaFieldVectorSearchScore, metadata().getVectorSearchScore());
+    }
+    if (metadata().hasScore()) {
+        builder->append(metaFieldScore, metadata().getScore());
     }
 }
 

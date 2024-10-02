@@ -29,13 +29,23 @@
 
 #pragma once
 
-#include <list>
+#include <set>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_score_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 namespace mongo {
 
@@ -50,21 +60,78 @@ namespace mongo {
  *   being considered a modification.
  * - Provide a way to normalize input scores to the same domain (usually between 0 and 1).
  */
-class DocumentSourceScore final {
+class DocumentSourceScore final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$score"_sd;
+
+    /**
+     * Create a new $score stage.
+     */
+    static boost::intrusive_ptr<DocumentSourceScore> create(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        ScoreSpec spec,
+        boost::intrusive_ptr<Expression> parsedScore);
 
     /**
      * Allows computation of score metadata for non-search pipelines, and also allows weighting or
      * normalizing scores.
      */
-    static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    /**
+     * Specify stage constraints. $score does not modify any documents.
+     */
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        StageConstraints constraints{StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed};
+        constraints.noFieldModifications = true;
+        return constraints;
+    }
+
+    const char* getSourceName() const final {
+        return kStageName.rawData();
+    }
+
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kScore;
+    }
+
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+
+    /**
+     * This stage can be run in parallel.
+     */
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+        return boost::none;
+    }
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final;
+
+    ScoreSpec getSpec() const {
+        return _spec;
+    }
+
+    boost::intrusive_ptr<Expression> getScore() const {
+        return _parsedScore;
+    }
+
 private:
-    // It is illegal to construct a DocumentSourceScore directly, use createFromBson()
-    // instead.
-    DocumentSourceScore() = delete;
+    // It is illegal to construct a DocumentSourceScore directly, use createFromBson
+    // instead. Added a constructor only for use in DocumentSourceScore implementation.
+    DocumentSourceScore(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                        ScoreSpec spec,
+                        boost::intrusive_ptr<Expression> parsedScore);
+    GetNextResult doGetNext() final;
+
+    ScoreSpec _spec;
+    boost::intrusive_ptr<Expression> _parsedScore;
 };
 
 }  // namespace mongo

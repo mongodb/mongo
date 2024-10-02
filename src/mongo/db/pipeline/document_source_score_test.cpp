@@ -26,13 +26,19 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/bson/json.h"
+#include <boost/smart_ptr.hpp>
 
-#include "mongo/unittest/assert.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_score.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -93,6 +99,139 @@ TEST_F(DocumentSourceScoreTest, CheckOnlyWeightSpecified) {
     })");
 
     ASSERT_DOES_NOT_THROW(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
+TEST_F(DocumentSourceScoreTest, CheckIntScoreMetadataUpdated) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            weight: "expression"
+        }
+    })");
+    Document inputDoc = Document{{"myScore", 5}};
+
+    auto docSourceScore = DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
+    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    docSourceScore->setSource(mock.get());
+
+    auto next = docSourceScore->getNext();
+    ASSERT(next.isAdvanced());
+
+    // Assert inputDoc's metadata equals 5.1
+    ASSERT_EQ(next.releaseDocument().metadata().getScore(), 5);
+}
+
+TEST_F(DocumentSourceScoreTest, CheckDoubleScoreMetadataUpdated) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            weight: "expression"
+        }
+    })");
+    Document inputDoc = Document{{"myScore", 5.1}};
+
+    auto docSourceScore = DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
+    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    docSourceScore->setSource(mock.get());
+
+    auto next = docSourceScore->getNext();
+    ASSERT(next.isAdvanced());
+
+    // Assert inputDoc's metadata equals 5.1
+    ASSERT_EQ(next.releaseDocument().metadata().getScore(), 5.1);
+}
+
+TEST_F(DocumentSourceScoreTest, CheckLengthyDocScoreMetadataUpdated) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            weight: "expression"
+        }
+    })");
+    Document inputDoc =
+        Document{{"field1", "hello"_sd}, {"field2", 10}, {"myScore", 5.3}, {"field3", true}};
+
+    auto docSourceScore = DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
+    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    docSourceScore->setSource(mock.get());
+
+    auto next = docSourceScore->getNext();
+    ASSERT(next.isAdvanced());
+
+    // Assert inputDoc's metadata equals 5.1
+    ASSERT_EQ(next.releaseDocument().metadata().getScore(), 5.3);
+}
+
+TEST_F(DocumentSourceScoreTest, ErrorsIfScoreNotDouble) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            weight: "expression"
+        }
+    })");
+    Document inputDoc =
+        Document{{"field1", "hello"_sd}, {"field2", 10}, {"myScore", "5.3"_sd}, {"field3", true}};
+
+    auto docSourceScore = DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
+    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    docSourceScore->setSource(mock.get());
+
+    // Assert cannot evaluate expression into double
+    ASSERT_THROWS_CODE(docSourceScore->getNext(), AssertionException, 9484101);
+}
+
+TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            weight: "expression"
+        }
+    })");
+    Document inputDoc = Document{{"field1", "hello"_sd}, {"field2", 10}, {"field3", true}};
+
+    auto docSourceScore = DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
+    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    docSourceScore->setSource(mock.get());
+
+    // Assert cannot evaluate expression into double
+    ASSERT_THROWS_CODE(docSourceScore->getNext(), AssertionException, 9484101);
+}
+
+TEST_F(DocumentSourceScoreTest, ErrorsIfScoreInvalidExpression) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: { $ad: ['$myScore', '$otherScore'] },
+            weight: "expression"
+        }
+    })");
+    Document inputDoc =
+        Document{{"field1", "hello"_sd}, {"otherScore", 10}, {"myScore", 5.3}, {"field3", true}};
+
+    // Assert cannot parse expression
+    ASSERT_THROWS_CODE(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::InvalidPipelineOperator);
+}
+
+TEST_F(DocumentSourceScoreTest, ChecksScoreMetadatUpdatedValidExpression) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: { $add: ['$myScore', '$otherScore'] },
+            weight: "expression"
+        }
+    })");
+    Document inputDoc =
+        Document{{"field1", "hello"_sd}, {"otherScore", 10}, {"myScore", 5.3}, {"field3", true}};
+
+    auto docSourceScore = DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
+    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    docSourceScore->setSource(mock.get());
+
+    auto next = docSourceScore->getNext();
+    ASSERT(next.isAdvanced());
+
+    // Assert inputDoc's metadata equals 15.3
+    ASSERT_EQ(next.releaseDocument().metadata().getScore(), 15.3);
 }
 }  // namespace
 }  // namespace mongo
