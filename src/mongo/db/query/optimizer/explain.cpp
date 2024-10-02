@@ -58,7 +58,6 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
@@ -1035,102 +1034,6 @@ public:
         nodeCEPropsPrint(printer, n, node);
         return printer;
     }
-
-    template <class T>
-    class BoolExprPrinter {
-    public:
-        using PrinterFn = std::function<void(ExplainPrinter& printer, const T& t)>;
-
-        BoolExprPrinter(const PrinterFn& tPrinter) : _tPrinter(tPrinter) {}
-
-        void operator()(const typename BoolExpr<T>::Node& n,
-                        const typename BoolExpr<T>::Atom& node,
-                        ExplainPrinter& printer,
-                        const size_t extraBraceCount) {
-            for (size_t i = 0; i <= extraBraceCount; i++) {
-                printer.separator("{");
-            }
-            _tPrinter(printer, node.getExpr());
-            for (size_t i = 0; i <= extraBraceCount; i++) {
-                printer.separator("}");
-            }
-        }
-
-        template <bool isConjunction, class NodeType>
-        void print(const NodeType& node, ExplainPrinter& printer, const size_t extraBraceCount) {
-            const auto& children = node.nodes();
-
-            if constexpr (version < ExplainVersion::V3) {
-                if (children.empty()) {
-                    return;
-                }
-                if (children.size() == 1) {
-                    children.front().visit(*this, printer, extraBraceCount + 1);
-                    return;
-                }
-
-                for (size_t i = 0; i <= extraBraceCount; i++) {
-                    printer.separator("{");
-                }
-
-                bool first = true;
-                for (const auto& child : children) {
-                    if (first) {
-                        first = false;
-                    } else if constexpr (isConjunction) {
-                        printer.separator(" ^ ");
-                    } else {
-                        printer.separator(" U ");
-                    }
-
-                    ExplainPrinter local;
-                    child.visit(*this, local, 0 /*extraBraceCount*/);
-                    printer.print(local);
-                }
-
-                for (size_t i = 0; i <= extraBraceCount; i++) {
-                    printer.separator("}");
-                }
-            } else if constexpr (version == ExplainVersion::V3) {
-                std::vector<ExplainPrinter> childResults;
-                for (const auto& child : children) {
-                    ExplainPrinter local;
-                    child.visit(*this, local, 0 /*extraBraceCount*/);
-                    childResults.push_back(std::move(local));
-                }
-
-                if constexpr (isConjunction) {
-                    printer.fieldName("conjunction");
-                } else {
-                    printer.fieldName("disjunction");
-                }
-                printer.print(childResults);
-            } else {
-                MONGO_UNREACHABLE;
-            }
-        }
-
-        void operator()(const typename BoolExpr<T>::Node& n,
-                        const typename BoolExpr<T>::Conjunction& node,
-                        ExplainPrinter& printer,
-                        const size_t extraBraceCount) {
-            print<true /*isConjunction*/>(node, printer, extraBraceCount);
-        }
-
-        void operator()(const typename BoolExpr<T>::Node& n,
-                        const typename BoolExpr<T>::Disjunction& node,
-                        ExplainPrinter& printer,
-                        const size_t extraBraceCount) {
-            print<false /*isConjunction*/>(node, printer, extraBraceCount);
-        }
-
-        void print(ExplainPrinter& printer, const typename BoolExpr<T>::Node& expr) {
-            expr.visit(*this, printer, 0 /*extraBraceCount*/);
-        }
-
-    private:
-        const PrinterFn& _tPrinter;
-    };
 
     ExplainPrinter transport(const ABT::reference_type n,
                              const IndexScanNode& node,

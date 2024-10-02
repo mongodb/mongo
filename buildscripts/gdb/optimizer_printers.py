@@ -641,50 +641,6 @@ class SeekNodePrinter(FixedArityNodePrinter):
         )
 
 
-class ResidualRequirementPrinter(object):
-    """Pretty-printer for ResidualRequirement."""
-
-    def __init__(self, val):
-        """Initialize ResidualRequirementPrinter."""
-        self.val = val
-
-    def to_string(self):
-        key = self.val["_key"]
-        req = self.val["_req"]
-        res = "<"
-        if get_boost_optional(key["_projectionName"]) is not None:
-            res += "refProj: " + str(get_boost_optional(key["_projectionName"])) + ", "
-
-        res += "path: '" + str(key["_path"]).replace("|   ", "").replace("\n", " -> ") + "'"
-
-        if get_boost_optional(req["_boundProjectionName"]) is not None:
-            res += "boundProj: " + str(get_boost_optional(req["_boundProjectionName"])) + ", "
-
-        res += ">"
-        return res
-
-
-class ScanParamsPrinter(object):
-    """Pretty-printer for ScanParams."""
-
-    def __init__(self, val):
-        """Initialize ScanParamsPrinter."""
-        self.val = val
-
-    @staticmethod
-    def display_hint():
-        """Display hint."""
-        return None
-
-    def to_string(self):
-        res = "scan_params: (fields: " + str(self.val["_fieldProjectionMap"]) + ", "
-        residual_reqs = get_boost_optional(self.val["_residualRequirements"])
-        if residual_reqs is not None:
-            res += "residual: " + str(residual_reqs)
-        res += ")"
-        return res
-
-
 class RIDIntersectNodePrinter(FixedArityNodePrinter):
     """Pretty-printer for RIDIntersectNode."""
 
@@ -1027,41 +983,11 @@ class DisjunctionPrinter(ConjunctionPrinter):
         super().__init__(val, " U ")
 
 
-def bool_expr_type(T):
-    return (
-        f"{OPTIMIZER_NS}::algebra::PolyValue<"
-        + f"{OPTIMIZER_NS}::BoolExpr<{T}>::Atom, "
-        + f"{OPTIMIZER_NS}::BoolExpr<{T}>::Conjunction, "
-        + f"{OPTIMIZER_NS}::BoolExpr<{T}>::Disjunction>"
-    )
-
-
 def register_optimizer_printers(pp):
     """Registers a number of pretty printers related to the CQF optimizer."""
 
     # Memo printer.
     pp.add("Memo", f"{OPTIMIZER_NS}::cascades::Memo", False, MemoPrinter)
-
-    # ResidualRequirement printer.
-    pp.add(
-        "ResidualRequirement",
-        f"{OPTIMIZER_NS}::ResidualRequirement",
-        False,
-        ResidualRequirementPrinter,
-    )
-
-    # BoolExpr<ResidualRequirement> is handled by the PolyValue printer, but still need to add
-    # printers for each of the possible bool expr types.
-    bool_expr_types = ["Atom", "Conjunction", "Disjunction"]
-    bool_exprs = ["ResidualRequirement"]
-    for bool_type in bool_expr_types:
-        for expr in bool_exprs:
-            pp.add(
-                bool_type,
-                f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::{expr}>::{bool_type}",
-                False,
-                getattr(sys.modules[__name__], bool_type + "Printer"),
-            )
 
     # Utility types within the optimizer.
     pp.add(
@@ -1073,8 +999,6 @@ def register_optimizer_printers(pp):
         False,
         FieldProjectionMapPrinter,
     )
-
-    pp.add("ScanParams", f"{OPTIMIZER_NS}::ScanParams", False, ScanParamsPrinter)
 
     # Add the sub-printers for each of the possible ABT types.
     # This is the set of known ABT variants that GDB is aware of. When adding to this list, ensure

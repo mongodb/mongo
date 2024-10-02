@@ -86,31 +86,6 @@ static size_t computeDistributionHash(const DistributionRequirement& prop) {
     return resultHash;
 }
 
-template <class T>
-class BoolExprHasher {
-public:
-    size_t transport(const typename T::Atom& node) {
-        // Dispatch to one of the computeHash functions below.
-        return ABTHashGenerator::generate(node.getExpr());
-    }
-
-    size_t transport(const typename T::Conjunction& node, const std::vector<size_t> childResults) {
-        size_t result = 31;
-        for (const size_t childResult : childResults) {
-            updateHash(result, childResult);
-        }
-        return result;
-    }
-
-    size_t transport(const typename T::Disjunction& node, const std::vector<size_t> childResults) {
-        size_t result = 29;
-        for (const size_t childResult : childResults) {
-            updateHash(result, childResult);
-        }
-        return result;
-    }
-};
-
 /**
  * Hasher for ABT nodes. Used in conjunction with memo.
  */

@@ -44,7 +44,6 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-#include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"

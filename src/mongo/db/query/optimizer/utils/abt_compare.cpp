@@ -37,7 +37,6 @@
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
