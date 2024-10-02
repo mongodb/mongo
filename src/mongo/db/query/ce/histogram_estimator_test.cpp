@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/json.h"
 #include "mongo/db/query/ce/test_utils.h"
 #include "mongo/unittest/death_test.h"
 
@@ -41,6 +42,113 @@ using stats::ScalarHistogram;
 using stats::TypeCounts;
 
 auto NumberInt64 = sbe::value::TypeTags::NumberInt64;
+
+TEST(HistogramPredicateEstimationTest, CanEstimateSimpleInterval) {
+    std::vector<BucketData> data{{0, 1.0, 1.0, 1.0}};
+    const Cardinality intCnt = 2;
+    const ScalarHistogram hist = createHistogram(data);
+    const auto ceHist = CEHistogram::make(hist, TypeCounts{{NumberInt64, intCnt}}, intCnt);
+
+    {  // {a: 4}
+        Interval interval(fromjson("{'': 4, '': 4}"), true, true);
+        ASSERT_TRUE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+}
+
+TEST(HistogramPredicateEstimationTest, CanEstimateTypeBracketedInterval) {
+    std::vector<BucketData> data{{0, 1.0, 1.0, 1.0}};
+    const Cardinality intCnt = 2;
+    const ScalarHistogram hist = createHistogram(data);
+    const auto ceHist = CEHistogram::make(hist, TypeCounts{{NumberInt64, intCnt}}, intCnt);
+
+    {  // {a: {$gte: 1}}
+        Interval interval(fromjson("{'': 1, '': Infinity}"), true, true);
+        ASSERT_TRUE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+
+    {  // {a: {$gte: NaN}}
+        Interval interval(fromjson("{'': NaN, '': NaN}"), true, true);
+        ASSERT_TRUE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+
+    {  // {a: {$gte: "abc"}}
+        Interval interval(fromjson("{'': \"abc\", '': {}}"), true, false);
+        ASSERT_TRUE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+
+    {  // The interval is unexpected from IndexBoundBuilder but still estimable like [10, Infinity].
+        Interval interval(fromjson("{'': 10, '':  \"\"}"), true, false);
+        ASSERT_TRUE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+}
+
+// TODO: SERVER-91639 to support estimating via type counts here.
+TEST(HistogramPredicateEstimationTest, CannotEstimateNonHistogrammableInterval) {
+    std::vector<BucketData> data{{0, 1.0, 1.0, 1.0}};
+    const Cardinality intCnt = 2;
+    const ScalarHistogram hist = createHistogram(data);
+    const auto ceHist = CEHistogram::make(hist, TypeCounts{{NumberInt64, intCnt}}, intCnt);
+
+    {  // {a: {$gte: false}}
+        Interval interval(fromjson("{'': false, '': true}"), true, true);
+        ASSERT_FALSE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+
+    {  // {a: {$gte: null}}
+        Interval interval(fromjson("{'': null, '':  null}"), true, true);
+        ASSERT_FALSE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+
+    {  // {a: {$lte: []}}
+        Interval interval(fromjson("{'': [], '': []}"), true, true);
+        ASSERT_FALSE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+
+    {  // {a: {$gte: {}}}
+        Interval interval(fromjson("{'': [], '': {}}"), true, false);
+        ASSERT_FALSE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+
+    {  // {a: {$exists: false}}
+        Interval interval(fromjson("{'': null, '': null}"), true, true);
+        ASSERT_FALSE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+}
+
+TEST(HistogramPredicateEstimationTest, CannotEstimateInestimableInterval) {
+    std::vector<BucketData> data{{0, 1.0, 1.0, 1.0}};
+    const Cardinality intCnt = 2;
+    const ScalarHistogram hist = createHistogram(data);
+    const auto ceHist = CEHistogram::make(hist, TypeCounts{{NumberInt64, intCnt}}, intCnt);
+
+    {  // {a: {b: 1}}
+        Interval interval(fromjson("{'': {b: 1}, '': {b: 1}}"), true, true);
+        ASSERT_FALSE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+
+    {  // {a: {$gte: {b: 1}}}
+        Interval interval(fromjson("{'': {b: 1}, '':  []}"), true, false);
+        ASSERT_FALSE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+
+    {  // The interval is not constructible from IndexBoundBuilder.
+        Interval interval(fromjson("{'': 10, '':  false}"), true, false);
+        ASSERT_FALSE(
+            HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
+    }
+}
 
 TEST(HistogramPredicateEstimationTest, IntHistogramIntervalEstimation) {
     std::vector<BucketData> data{{0, 1.0, 1.0, 1.0},
@@ -97,9 +205,40 @@ TEST(HistogramPredicateEstimationTest, IntHistogramIntervalEstimation) {
                                0.001 /* rounding error */);
     }
 
-    {  // {a: {$and: [{$gte: 30}, {$lte: 40}]}}
+    {  // {a: {$gte: 30, $lte: 40}}
         Interval interval(BSON("" << 30 << "" << 40), true /*startIncluded*/, true /*endIncluded*/);
         ASSERT_EQ(3.0,
+                  HistogramEstimator::estimateCardinality(
+                      *ceHist, intCnt, interval, true /*includeScalar*/));
+    }
+
+    {  // {a: {$gte: 30}}
+        Interval interval(BSON("" << 30 << "" << std::numeric_limits<double>::infinity()),
+                          true /*startIncluded*/,
+                          true /*endIncluded*/);
+        ASSERT_CE_APPROX_EQUAL(14.0,
+                               HistogramEstimator::estimateCardinality(
+                                   *ceHist, intCnt, interval, true /*includeScalar*/),
+                               0.001 /* rounding error */);
+    }
+
+    {  // Interval [30, "") is supposed to have the same estimate as [30, Infinity].
+        Interval interval(BSON("" << 30 << ""
+                                  << ""),
+                          true /*startIncluded*/,
+                          false /*endIncluded*/);
+        ASSERT_CE_APPROX_EQUAL(14.0,
+                               HistogramEstimator::estimateCardinality(
+                                   *ceHist, intCnt, interval, true /*includeScalar*/),
+                               0.001 /* rounding error */);
+    }
+
+    {  // {a: {$gte: -Infinity}}
+        Interval interval(BSON("" << -std::numeric_limits<double>::infinity() << ""
+                                  << std::numeric_limits<double>::infinity()),
+                          true /*startIncluded*/,
+                          true /*endIncluded*/);
+        ASSERT_EQ(54.5,
                   HistogramEstimator::estimateCardinality(
                       *ceHist, intCnt, interval, true /*includeScalar*/));
     }
@@ -190,7 +329,7 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                                0.001 /* rounding error */);
     }
 
-    {  // {a: {$and: [{$gte: "YtzS"}, {$lte: "o9cD4"}]}]}}
+    {  // {a: {$gte: "YtzS", $lte: "o9cD4"}}
         Interval interval(BSON(""
                                << "YtzS"
                                << ""
@@ -198,6 +337,17 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                           true,
                           true);
         ASSERT_EQ(34.0,
+                  HistogramEstimator::estimateCardinality(
+                      *ceHist, strCnt, interval, true /*includeScalar*/));
+    }
+
+    {  // {a: {$gte: "YtzS"}}
+        Interval interval(BSON(""
+                               << "YtzS"
+                               << "" << BSONObj()),
+                          true,
+                          false);
+        ASSERT_EQ(45.0,
                   HistogramEstimator::estimateCardinality(
                       *ceHist, strCnt, interval, true /*includeScalar*/));
     }
@@ -396,7 +546,7 @@ DEATH_TEST(HistogramPredicateEstimationTest,
         Interval interval(
             BSON("" << true << "" << true), true /*startIncluded*/, true /*endIncluded*/);
         ASSERT_EQ(
-            true,
+            false,
             HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
         ASSERT_CE_APPROX_EQUAL(5, /*estimatedCard */
                                estimateIntervalCardinality(*ceHist, interval),
@@ -407,7 +557,7 @@ DEATH_TEST(HistogramPredicateEstimationTest,
         Interval interval(
             BSON("" << BSONNULL << "" << BSONNULL), true /*startIncluded*/, true /*endIncluded*/);
         ASSERT_EQ(
-            true,
+            false,
             HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
         ASSERT_CE_APPROX_EQUAL(5, /*estimatedCard ,*/
                                estimateIntervalCardinality(*ceHist, interval),
@@ -418,7 +568,7 @@ DEATH_TEST(HistogramPredicateEstimationTest,
         Interval interval(
             BSON("" << startTs << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
         ASSERT_EQ(
-            true,
+            false,
             HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
         ASSERT_CE_APPROX_EQUAL(25, /*estimatedCard ,*/
                                estimateIntervalCardinality(*ceHist, interval),
@@ -443,7 +593,7 @@ DEATH_TEST(HistogramPredicateEstimationTest,
         Interval interval(
             BSON("" << BSONNULL << "" << true), true /*startIncluded*/, true /*endIncluded*/);
         ASSERT_EQ(
-            true,
+            false,
             HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
         ASSERT_CE_APPROX_EQUAL(75, /*estimatedCard ,*/
                                estimateIntervalCardinality(*ceHist, interval),
@@ -454,7 +604,7 @@ DEATH_TEST(HistogramPredicateEstimationTest,
         Interval interval(
             BSON("" << false << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
         ASSERT_EQ(
-            true,
+            false,
             HistogramEstimator::canEstimateInterval(*ceHist, interval, true /*includeScalar*/));
         ASSERT_CE_APPROX_EQUAL(50, /*estimatedCard ,*/
                                estimateIntervalCardinality(*ceHist, interval),

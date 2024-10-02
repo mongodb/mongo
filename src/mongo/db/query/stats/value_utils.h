@@ -160,4 +160,27 @@ bool canEstimateTypeViaHistogram(sbe::value::TypeTags tag);
 std::string serialize(sbe::value::TypeTags tag);
 sbe::value::TypeTags deserialize(const std::string& name);
 
+/**
+ * Returns the minimum or maximum bound of the type 'tag'. If 'isMin' is false, returns the maximum
+ * bound.
+ */
+std::pair<stats::SBEValue, bool> getMinMaxBoundForSBEType(const sbe::value::TypeTags& tag,
+                                                          bool isMin);
+
+/**
+ * Returns true if the interval is of the same type. This takes type-bracketing into consideration.
+ * This helps to determine if the interval is estimable solely from a histogram or a type count.
+ *
+ * For example, given a find query {a: {$gt: "abc"}} which is translated into interval ["abc", {}),
+ * the end bound is type-brackted for String such that it is assigned the minimum value of the next
+ * immediate type: Object. Therefore, this returns true for ["abc", {}).
+ *
+ * NOTE: It returns false on the intervals from inequality on MinKey/MaxKey (e.g. [MinKey, MaxKey)),
+ * given that the estimation may often need accesses to both histograms and multiple type counts.
+ */
+bool sameTypeBracketedInterval(sbe::value::TypeTags startTag,
+                               bool endInclusive,
+                               sbe::value::TypeTags endTag,
+                               sbe::value::Value endVal);
+
 }  // namespace mongo::stats

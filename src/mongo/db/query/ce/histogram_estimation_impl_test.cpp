@@ -37,6 +37,7 @@ namespace {
 namespace value = sbe::value;
 
 using stats::CEHistogram;
+using stats::getMinMaxBoundForSBEType;
 using stats::ScalarHistogram;
 using stats::TypeCounts;
 
@@ -738,18 +739,21 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromData) {
     ASSERT_BSONOBJ_EQ(expected, hist.serialize());
 
     // Minimum ObjectId.
-    auto&& [minOid, inclOid] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::ObjectId);
-    auto [minOidTag, minOidVal] = minOid->cast<mongo::optimizer::Constant>()->get();
+    auto&& [minOid, inclOid] = getMinMaxBoundForSBEType(value::TypeTags::ObjectId, true /*isMin*/);
+    auto minOidTag = minOid.getTag();
+    auto minOidVal = minOid.getValue();
     ASSERT_EQ(1.0, estimateCardinality(hist, minOidTag, minOidVal, kEqual).card);
 
     // Minimum date.
-    const auto&& [minDate, inclDate] = getMinMaxBoundForType(true /*isMin*/, Date);
-    const auto [minDateTag, minDateVal] = minDate->cast<mongo::optimizer::Constant>()->get();
+    const auto&& [minDate, inclDate] = getMinMaxBoundForSBEType(Date, true /*isMin*/);
+    const auto minDateTag = minDate.getTag();
+    const auto minDateVal = minDate.getValue();
     ASSERT_EQ(1.0, estimateCardinality(hist, minDateTag, minDateVal, kEqual).card);
 
     // Minimum timestamp.
-    auto&& [minTs, inclTs] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Timestamp);
-    auto [minTsTag, minTsVal] = minTs->cast<mongo::optimizer::Constant>()->get();
+    auto&& [minTs, inclTs] = getMinMaxBoundForSBEType(value::TypeTags::Timestamp, true /*isMin*/);
+    auto minTsTag = minTs.getTag();
+    auto minTsVal = minTs.getValue();
     ASSERT_EQ(1.0, estimateCardinality(hist, minTsTag, minTsVal, kEqual).card);
 
     // Add minimum values to the data set and create another histogram.
@@ -817,8 +821,10 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromData) {
     ASSERT_EQ(3.0, expectedCard.card);
 
     // [minTs, maxTs], estimated by the entire timestamp bucket.
-    auto&& [maxTs, inclMaxTs] = getMinMaxBoundForType(false /*isMin*/, value::TypeTags::Timestamp);
-    const auto [maxTsTag, maxTsVal] = maxTs->cast<mongo::optimizer::Constant>()->get();
+    auto&& [maxTs, inclMaxTs] =
+        getMinMaxBoundForSBEType(value::TypeTags::Timestamp, false /*isMin*/);
+    const auto maxTsTag = maxTs.getTag();
+    const auto maxTsVal = maxTs.getValue();
     expectedCard =
         estimateCardinalityRange(hist2, true, minTsTag, minTsVal, true, maxTsTag, maxTsVal);
     ASSERT_EQ(3.0, expectedCard.card);
@@ -841,19 +847,22 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromBuckets) {
     ASSERT_EQ(500.0, getTotals(hist).card);
 
     // Minimum ObjectId.
-    auto&& [minOid, inclOid] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::ObjectId);
-    auto [minOidTag, minOidVal] = minOid->cast<mongo::optimizer::Constant>()->get();
+    auto&& [minOid, inclOid] = getMinMaxBoundForSBEType(value::TypeTags::ObjectId, true /*isMin*/);
+    auto minOidTag = minOid.getTag();
+    auto minOidVal = minOid.getValue();
     ASSERT_CE_APPROX_EQUAL(
         1.9, estimateCardinality(hist, minOidTag, minOidVal, kEqual).card, kErrorBound);
 
     // Minimum date.
-    const auto&& [minDate, inclDate] = getMinMaxBoundForType(true /*isMin*/, Date);
-    const auto [minDateTag, minDateVal] = minDate->cast<mongo::optimizer::Constant>()->get();
+    const auto&& [minDate, inclDate] = getMinMaxBoundForSBEType(Date, true /*isMin*/);
+    const auto minDateTag = minDate.getTag();
+    const auto minDateVal = minDate.getValue();
     ASSERT_EQ(4.0, estimateCardinality(hist, minDateTag, minDateVal, kEqual).card);
 
     // Minimum timestamp.
-    auto&& [minTs, inclTs] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::Timestamp);
-    auto [minTsTag, minTsVal] = minTs->cast<mongo::optimizer::Constant>()->get();
+    auto&& [minTs, inclTs] = getMinMaxBoundForSBEType(value::TypeTags::Timestamp, true /*isMin*/);
+    auto minTsTag = minTs.getTag();
+    auto minTsVal = minTs.getValue();
     ASSERT_CE_APPROX_EQUAL(
         1.9, estimateCardinality(hist, minTsTag, minTsVal, kEqual).card, kErrorBound);
 

@@ -187,9 +187,8 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
 
     // If the value is minimal for its type, and the operation is $lt or $lte return cardinality up
     // to the previous bucket.
-    auto&& [minConstant, inclusive] = getMinMaxBoundForType(true /*isMin*/, tag);
-    auto [minTag, minVal] = *getConstTypeVal(*minConstant);
-    if (compareValues(minTag, minVal, tag, val) == 0) {
+    auto&& [min, inclusive] = stats::getMinMaxBoundForSBEType(tag, true /*isMin*/);
+    if (compareValues(min.getTag(), min.getValue(), tag, val) == 0) {
         return {resultCard, resultNDV};
     }
 
@@ -244,17 +243,6 @@ EstimationResult estimateRangeQueryOnArray(const ScalarHistogram& histogramAmin,
 }
 
 // --------------------- CE HISTOGRAM ESTIMATION METHODS ---------------------
-
-int compareTypeTags(sbe::value::TypeTags a, sbe::value::TypeTags b) {
-    auto orderOfA = canonicalizeBSONTypeUnsafeLookup(tagToType(a));
-    auto orderOfB = canonicalizeBSONTypeUnsafeLookup(tagToType(b));
-    if (orderOfA < orderOfB) {
-        return -1;
-    } else if (orderOfA > orderOfB) {
-        return 1;
-    }
-    return 0;
-}
 
 EstimationResult estimateCardinalityEq(const stats::CEHistogram& ceHist,
                                        sbe::value::TypeTags tag,
@@ -402,10 +390,9 @@ Cardinality estimateIntervalCardinality(const stats::CEHistogram& ceHist,
         std::swap(startVal, endVal);
     }
 
-    // If 'startTag' and 'endTag' are in the same sort order, they are estimable directly via
-    // either histograms or type counts.
-    // TODO: SERVER-94856 to support estimating type-bracketed interval here.
-    if (compareTypeTags(startTag, endTag) == 0) {
+    // If 'startTag' and 'endTag' are either in the same type or type-bracketed, they
+    // are estimable directly via either histograms or type counts.
+    if (stats::sameTypeBracketedInterval(startTag, endInclusive, endTag, endVal)) {
         if (stats::canEstimateTypeViaHistogram(startTag)) {
             if (stats::compareValues(startTag, startVal, endTag, endVal) == 0) {
                 return estimateCardinalityEq(ceHist, startTag, startVal, includeScalar).card;

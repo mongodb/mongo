@@ -12,7 +12,6 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/query_index_bounds",
         "$BUILD_DIR/mongo/db/query/stats/stats_histograms",
-        "ce_utils",
     ],
 )
 

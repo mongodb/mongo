@@ -49,9 +49,11 @@ bool HistogramEstimator::canEstimateInterval(const stats::CEHistogram& hist,
     sbe::value::ValueGuard startGuard{startTag, startVal};
     sbe::value::ValueGuard endGuard{endTag, endVal};
 
-    if (compareTypeTags(startTag, endTag) == 0) {
-        return stats::canEstimateTypeViaHistogram(startTag) ||
-            canEstimateBound(hist, startTag, includeScalar);
+    // If 'startTag' and 'endTag' are either in the same type or type-bracketed, they are estimable
+    // directly via either histograms or type counts.
+    if (stats::sameTypeBracketedInterval(startTag, interval.endInclusive, endTag, endVal)) {
+        // TODO: SERVER-91639 to support estimating via type counts here.
+        return stats::canEstimateTypeViaHistogram(startTag);
     }
 
     return false;

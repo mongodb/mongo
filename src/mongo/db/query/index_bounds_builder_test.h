@@ -69,7 +69,7 @@ public:
     /**
      * Utility function to create MatchExpression
      */
-    std::pair<std::unique_ptr<MatchExpression>, std::vector<const MatchExpression*>>
+    static std::pair<std::unique_ptr<MatchExpression>, std::vector<const MatchExpression*>>
     parseMatchExpression(const BSONObj& obj, bool shouldNormalize = true) {
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         StatusWithMatchExpression status = MatchExpressionParser::parse(obj, std::move(expCtx));
@@ -86,7 +86,7 @@ public:
      * Make a minimal IndexEntry from just an optional key pattern. A dummy name will be added. An
      * empty key pattern will be used if none is provided.
      */
-    IndexEntry buildSimpleIndexEntry(const BSONObj& kp = BSONObj()) {
+    static IndexEntry buildSimpleIndexEntry(const BSONObj& kp = BSONObj()) {
         return {kp,
                 IndexNames::nameToType(IndexNames::findPluginName(kp)),
                 IndexDescriptor::kLatestIndexVersion,

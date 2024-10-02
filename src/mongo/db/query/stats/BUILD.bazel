@@ -29,6 +29,7 @@ mongo_cc_library(
         "ce_histogram.h",
         "scalar_histogram.h",
         "value_utils.h",
+        "//src/mongo/db/exec:docval_to_sbeval.h",
     ],
     deps = [
         "//src/mongo/db:sbe_values",

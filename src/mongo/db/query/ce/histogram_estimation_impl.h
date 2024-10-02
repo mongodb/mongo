@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/query/ce/bound_utils.h"
 #include "mongo/db/query/ce/histogram_common.h"
 #include "mongo/db/query/stats/value_utils.h"
 
@@ -129,10 +128,5 @@ Cardinality estimateIntervalCardinality(const stats::CEHistogram& ceHist,
 bool canEstimateBound(const stats::CEHistogram& ceHist,
                       sbe::value::TypeTags tag,
                       bool includeScalar);
-
-/**
- * Three ways TypeTags comparison (aka spaceship operator) according to the BSON type sort order.
- */
-int compareTypeTags(sbe::value::TypeTags a, sbe::value::TypeTags b);
 
 }  // namespace mongo::ce

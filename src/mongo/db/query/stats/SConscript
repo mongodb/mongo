@@ -116,3 +116,13 @@ env.CppUnitTest(
         "stats_test_utils",
     ],
 )
+
+env.CppUnitTest(
+    target="value_utils_test",
+    source=[
+        "value_utils_test.cpp",
+    ],
+    LIBDEPS=[
+        "stats_test_utils",
+    ],
+)

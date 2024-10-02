@@ -37,6 +37,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
@@ -342,6 +344,145 @@ value::TypeTags deserialize(const std::string& name) {
     // Trying to deserialize any other types should result in an error.
     uasserted(6660600,
               str::stream() << "String " << name << " is not convertable to SBE type tag.");
+}
+
+std::pair<stats::SBEValue, bool> getMinMaxBoundForSBEType(const sbe::value::TypeTags& tag,
+                                                          const bool isMin) {
+    switch (tag) {
+        case sbe::value::TypeTags::NumberInt32:
+        case sbe::value::TypeTags::NumberInt64:
+        case sbe::value::TypeTags::NumberDouble:
+        case sbe::value::TypeTags::NumberDecimal:
+            if (isMin) {
+                return {{tag,
+                         sbe::value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())},
+                        false};
+            } else {
+                return {sbe::value::makeNewString(""), false};
+            }
+
+        case sbe::value::TypeTags::StringSmall:
+        case sbe::value::TypeTags::StringBig:
+        case sbe::value::TypeTags::bsonString:
+        case sbe::value::TypeTags::bsonSymbol:
+            if (isMin) {
+                return {sbe::value::makeNewString(""), true};
+            } else {
+                return {sbe::value::makeNewObject(), false};
+            }
+
+        case sbe::value::TypeTags::Date:
+            if (isMin) {
+                return {{tag, sbe::value::bitcastFrom<int64_t>(Date_t::min().toMillisSinceEpoch())},
+                        true};
+            } else {
+                return {{tag, sbe::value::bitcastFrom<int64_t>(Date_t::max().toMillisSinceEpoch())},
+                        true};
+            }
+
+        case sbe::value::TypeTags::Timestamp:
+            if (isMin) {
+                return {{tag, sbe::value::bitcastFrom<uint64_t>(Timestamp::min().asULL())}, true};
+            } else {
+                return {{tag, sbe::value::bitcastFrom<uint64_t>(Timestamp::max().asULL())}, true};
+            }
+
+        case sbe::value::TypeTags::Null:
+            return {{tag, 0}, true};
+
+        case sbe::value::TypeTags::bsonUndefined: {
+            return {sbe::value::makeValue(Value(BSONUndefined)), true};
+        }
+
+        case sbe::value::TypeTags::Object:
+        case sbe::value::TypeTags::bsonObject:
+            if (isMin) {
+                return {sbe::value::makeNewObject(), true};
+            } else {
+                return {sbe::value::makeNewArray(), false};
+            }
+
+        case sbe::value::TypeTags::Array:
+        case sbe::value::TypeTags::ArraySet:
+        case sbe::value::TypeTags::ArrayMultiSet:
+        case sbe::value::TypeTags::bsonArray:
+            if (isMin) {
+                return {sbe::value::makeNewArray(), true};
+            } else {
+                return {sbe::value::makeValue(Value(BSONBinData())), false};
+            }
+
+        case sbe::value::TypeTags::bsonBinData:
+            if (isMin) {
+                return {sbe::value::makeValue(Value(BSONBinData())), true};
+            } else {
+                return {sbe::value::makeValue(Value(OID())), false};
+            }
+
+        case sbe::value::TypeTags::Boolean:
+            if (isMin) {
+                return {{tag, sbe::value::bitcastFrom<bool>(false)}, true};
+            } else {
+                return {{tag, sbe::value::bitcastFrom<bool>(true)}, true};
+            }
+
+        case sbe::value::TypeTags::ObjectId:
+        case sbe::value::TypeTags::bsonObjectId:
+            if (isMin) {
+                return {sbe::value::makeValue(Value(OID())), true};
+            } else {
+                return {sbe::value::makeValue(Value(OID::max())), true};
+            }
+
+        case sbe::value::TypeTags::bsonRegex:
+            if (isMin) {
+                return {sbe::value::makeValue(Value(BSONRegEx("", ""))), true};
+            } else {
+                return {sbe::value::makeValue(Value(BSONDBRef())), false};
+            }
+
+        case sbe::value::TypeTags::bsonDBPointer:
+            if (isMin) {
+                return {sbe::value::makeValue(Value(BSONDBRef())), true};
+            } else {
+                return {sbe::value::makeCopyBsonJavascript(StringData("")), false};
+            }
+
+        case sbe::value::TypeTags::bsonJavascript:
+            if (isMin) {
+                return {sbe::value::makeCopyBsonJavascript(StringData("")), true};
+            } else {
+                return {sbe::value::makeValue(Value(BSONCodeWScope())), false};
+            }
+
+        case sbe::value::TypeTags::bsonCodeWScope:
+            if (isMin) {
+                return {sbe::value::makeValue(Value(BSONCodeWScope())), true};
+            } else {
+                return {{sbe::value::TypeTags::MaxKey, 0}, false};
+            }
+
+        default:
+            return {{sbe::value::TypeTags::Nothing, 0}, false};
+    }
+    MONGO_UNREACHABLE;
+}
+
+
+bool sameTypeBracketedInterval(sbe::value::TypeTags startTag,
+                               const bool endInclusive,
+                               sbe::value::TypeTags endTag,
+                               sbe::value::Value endVal) {
+    if (stats::sameTypeClass(startTag, endTag)) {
+        return true;
+    }
+
+    if (endInclusive) {
+        return false;
+    }
+
+    auto [min, minInclusive] = getMinMaxBoundForSBEType(startTag, false /*isMin*/);
+    return stats::compareValues(endTag, endVal, min.getTag(), min.getValue()) == 0;
 }
 
 }  // namespace mongo::stats
