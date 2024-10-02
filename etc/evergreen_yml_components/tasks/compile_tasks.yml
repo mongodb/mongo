@@ -1143,6 +1143,7 @@ tasks:
         "assigned_to_jira_team_devprod_build",
         "release_critical",
         "requires_compile_variant",
+        "requires_large_host",
         "stitch",
         "bazel_check",
       ]
@@ -1185,6 +1186,7 @@ tasks:
         "release_critical",
         "incompatible_mac",
         "requires_compile_variant",
+        "requires_large_host",
         "stitch",
         "bazel_check",
       ]
