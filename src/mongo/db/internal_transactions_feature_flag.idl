@@ -53,9 +53,3 @@ feature_flags:
         default: true
         version: 7.1
         shouldBeFCVGated: true
-
-    featureFlagClusteredConfigTransactions:
-        description: "Create config.transactions as a clustered collection"
-        cpp_varname: gFeatureFlagClusteredConfigTransactions
-        default: false
-        shouldBeFCVGated: true
