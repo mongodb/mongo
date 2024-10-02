@@ -139,6 +139,13 @@ export function RetryableInternalTransactionTest(collectionOptions = {}) {
         assert.commandWorked(mongosTestDB.adminCommand(commitCmdObj));
     }
 
+    function retryCommittedInternalTransaction(cmdObj, initialRes, checkRetryResponseFunc) {
+        runTxnRetryOnTransientError(() => {
+            const retryRes = assert.commandWorked(mongosTestDB.runCommand(cmdObj));
+            checkRetryResponseFunc(initialRes, retryRes);
+        });
+    }
+
     function testNonRetryableBasic(
         cmdObj, {txnOptions, testMode, expectFindAndModifyImageInSideCollection}) {
         // A findAndModify write statement in a non-retryable transaction will not generate a
@@ -209,10 +216,7 @@ export function RetryableInternalTransactionTest(collectionOptions = {}) {
 
         setUpTestMode(testMode);
 
-        // Retry in the initial internal transaction. No need to commit since the transaction has
-        // already committed.
-        const retryRes = assert.commandWorked(mongosTestDB.runCommand(cmdObj));
-        checkRetryResponseFunc(initialRes, retryRes);
+        retryCommittedInternalTransaction(cmdObj, initialRes, checkRetryResponseFunc);
 
         // Retry in a different internal transaction (running in an internal session with a
         // different txnUUID) to simulate a retry from a different mongos.
@@ -245,7 +249,6 @@ export function RetryableInternalTransactionTest(collectionOptions = {}) {
         {txnOptions, testMode, expectFindAndModifyImageInSideCollection, checkRetryResponseFunc}) {
         jsTest.log(
             "Testing retrying a retryable internal transaction with more than one applyOps oplog entry");
-
         let stmtId = 1;
         let makeInsertCmdObj = (docs) => {
             assert.eq(maxNumberOfTransactionOperationsInSingleOplogEntry, docs.length);
@@ -321,10 +324,7 @@ export function RetryableInternalTransactionTest(collectionOptions = {}) {
 
         setUpTestMode(testMode);
 
-        // Retry in the initial internal transaction. No need to commit since the transaction has
-        // already committed.
-        const retryRes = assert.commandWorked(mongosTestDB.runCommand(cmdObj));
-        checkRetryResponseFunc(initialRes, retryRes);
+        retryCommittedInternalTransaction(cmdObj, initialRes, checkRetryResponseFunc);
 
         // Retry in a different internal transaction (running in an internal session with a
         // different txnUUID) to simulate a retry from a different mongos.
