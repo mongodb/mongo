@@ -45,6 +45,27 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         return jsTestName() + "_" + collName;
     }
 
+    /**
+     * TODO (SERVER-88275): Revisit this, see whether we still want to accept the QueryPlanKilled
+     * error.
+     */
+    const find = function(db, collName, queryFilter) {
+        let documents;
+        assert.soon(() => {
+            try {
+                documents = db[collName].find(queryFilter).toArray();
+                return true;
+            } catch (e) {
+                if (e.code === ErrorCodes.QueryPlanKilled) {
+                    // Retry. Can happen due to concurrent move collection.
+                    return false;
+                }
+                throw e;
+            }
+        });
+        return documents;
+    };
+
     const insert = function(db,
                             collName,
                             tid,
@@ -162,11 +183,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.teardown = function(db, collNameSuffix, cluster) {
         $super.teardown.apply(this, [db, collNameSuffix, cluster]);
-        const bucketsRes = db[data.bucketValidationCollName].find();
-        const bucketsToValidate = bucketsRes.toArray();
+
+        const bucketsToValidate = find(db, data.bucketValidationCollName, {});
         const collName = getCollectionName(collNameSuffix);
         const bucketsCollName = "system.buckets." + collName;
-        const numTotalBuckets = db[bucketsCollName].find().itcount();
+        const numTotalBuckets = find(db, bucketsCollName, {}).length;
         // Let's go through all of the buckets that we had set the control.closed field to true for,
         // and validate that they have not been written to since.
         jsTestLog(`Validating ${
@@ -177,7 +198,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         for (let i = 0; i < bucketsToValidate.length; i++) {
             const bucket = bucketsToValidate[i];
             numDocsInBucketWhenClosed += bucket.control.count;
-            const bucketsInCollection = db[bucketsCollName].find({_id: bucket._id}).toArray();
+            const bucketsInCollection = find(db, bucketsCollName, {_id: bucket._id});
             assert.eq(bucketsInCollection.length, 1);
             const bucketInCollection = bucketsInCollection[0];
             const errMsg = `Expected bucket ${tojson(bucket)} and actual bucket ${tojson(bucketInCollection)} did not match; bucket may have had writes to it after the control.closed field was set.`;
