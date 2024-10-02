@@ -875,12 +875,25 @@ Status checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
 Status checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
                                          const std::list<BSONObj>& expectedIndexes,
                                          const std::list<BSONObj>& currentIndexes) {
+    if (expectedIndexes.size() != currentIndexes.size()) {
+        return Status(ErrorCodes::CommandFailed,
+                      str::stream()
+                          << "indexes of target collection " << targetNss.toStringForErrorMsg()
+                          << " changed during processing.");
+    }
+    // Compare every element of the indexes. Sort the list of indexes to ensure same positioning of
+    // every element.
     UnorderedFieldsBSONObjComparator comparator;
-    if (expectedIndexes.size() != currentIndexes.size() ||
-        !(std::equal(expectedIndexes.begin(),
-                     expectedIndexes.end(),
-                     currentIndexes.begin(),
-                     [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) == 0; }))) {
+    auto sortedExpectedIndexes(expectedIndexes);
+    sortedExpectedIndexes.sort(
+        [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) < 0; });
+    auto sortedCurrentIndexes(currentIndexes);
+    sortedCurrentIndexes.sort(
+        [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) < 0; });
+    if (!std::equal(sortedExpectedIndexes.begin(),
+                    sortedExpectedIndexes.end(),
+                    sortedCurrentIndexes.begin(),
+                    [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) == 0; })) {
         return Status(ErrorCodes::CommandFailed,
                       str::stream()
                           << "indexes of target collection " << targetNss.toStringForErrorMsg()
