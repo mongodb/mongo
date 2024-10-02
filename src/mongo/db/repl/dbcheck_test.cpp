@@ -54,7 +54,7 @@ TEST_F(DbCheckTest, DbCheckHasherErrorsOnCollectionCheckTimeout) {
                                         params,
                                         std::numeric_limits<int64_t>::max() /*maxCount*/,
                                         std::numeric_limits<int64_t>::max() /*maxBytes*/,
-                                        Date_t::now() + Milliseconds(1) /*deadlineOnSecondary*/)
+                                        Date_t::now() - Milliseconds(1) /*deadlineOnSecondary*/)
                   .code());
 }
 
@@ -76,7 +76,7 @@ TEST_F(DbCheckTest, DbCheckHasherErrorsOnExtraIndexKeysCheckTimeout) {
                                             params,
                                             std::numeric_limits<int64_t>::max() /*maxCount*/,
                                             std::numeric_limits<int64_t>::max() /*maxBytes*/,
-                                            Date_t::now() + Milliseconds(1) /*deadlineOnSecondary*/)
+                                            Date_t::now() - Milliseconds(1) /*deadlineOnSecondary*/)
                   .code());
 }
 
