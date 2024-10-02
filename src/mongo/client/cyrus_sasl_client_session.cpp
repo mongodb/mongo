@@ -47,7 +47,8 @@ void saslSetError(sasl_conn_t* conn, const std::string& msg) {
 }
 
 SaslClientSession* createCyrusSaslClientSession(const std::string& mech) {
-    if ((mech == "SCRAM-SHA-1") || (mech == "SCRAM-SHA-256") || mech == "MONGODB-AWS") {
+    if ((mech == "SCRAM-SHA-1") || (mech == "SCRAM-SHA-256") || (mech == "PLAIN") ||
+        mech == "MONGODB-AWS") {
         return new NativeSaslClientSession();
     }
     return new CyrusSaslClientSession();
