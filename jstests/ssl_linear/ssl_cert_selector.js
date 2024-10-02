@@ -4,7 +4,11 @@
  */
 
 import {getPython3Binary} from "jstests/libs/python.js";
-import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
+import {
+    requireSSLProvider,
+    TRUSTED_CA_CERT,
+    TRUSTED_SERVER_CERT
+} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider('windows', function() {
     if (_isWindows()) {
@@ -12,7 +16,7 @@ requireSSLProvider('windows', function() {
                   runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
 
         // SChannel backed follows Windows rules and only trusts Root in LocalMachine
-        runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");
+        runProgram("certutil.exe", "-addstore", "-f", "Root", TRUSTED_CA_CERT);
         // Import a pfx file since it contains both a cert and private key and is easy to import
         // via command line.
         runProgram("certutil.exe",
@@ -24,27 +28,21 @@ requireSSLProvider('windows', function() {
     }
 
     try {
-        const conn = MongoRunner.runMongod({
+        const mongod = MongoRunner.runMongod({
             tlsMode: 'requireTLS',
-            tlsCertificateKeyFile: "jstests\\libs\\trusted-server.pem",
+            tlsCertificateKeyFile: TRUSTED_SERVER_CERT,
             setParameter: {tlsUseSystemCA: true},
+            useHostname: false,
         });
 
         const testWithCert = function(certSelector) {
             jsTest.log(`Testing with SSL cert ${certSelector}`);
-            const argv = [
-                'mongo',
-                '--ssl',
-                '--tlsCertificateSelector',
-                certSelector,
-                '--port',
-                conn.port,
-                '--eval',
-                'db.runCommand({buildInfo: 1})'
-            ];
-
-            const exitStatus = runMongoProgram.apply(null, argv);
-            assert.eq(exitStatus, 0, "successfully connected with SSL");
+            const conn = new Mongo(mongod.host, undefined, {
+                tls: {
+                    certificateSelector: certSelector,
+                }
+            });
+            assert.commandWorked(conn.getDB('admin').runCommand({buildinfo: 1}));
         };
 
         const trusted_client_thumbprint = cat('jstests/libs/trusted-client.pem.digest.sha1');
@@ -57,7 +55,7 @@ requireSSLProvider('windows', function() {
             testWithCert("subject=Trusted Kernel Test Client");
         });
 
-        MongoRunner.stopMongod(conn);
+        MongoRunner.stopMongod(mongod);
     } finally {
         if (_isWindows()) {
             const trusted_ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
