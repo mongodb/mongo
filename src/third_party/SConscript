@@ -11,6 +11,7 @@ Import([
     'wiredtiger',
     'releaseBuild',
     'ssl_provider',
+    'http_client',
 ])
 
 icuSuffix = '-57.1'
@@ -86,6 +87,26 @@ def injectMozJS(thisEnv):
         ])
 
 env.AddMethod(injectMozJS, 'InjectMozJS')
+
+if http_client == "on":
+    if env.TargetOSIs("windows"):
+        env.Append(SYSLIBDEPS=["winhttp"])
+    else:
+        env.Append(SYSLIBDEPS=["curl"])
+
+ldap_lib = env.get("MONGO_LDAP_LIB", [])
+if ldap_lib:
+    env.Append(SYSLIBDEPS=ldap_lib)
+
+gssapi_lib = env.get("MONGO_GSSAPI_LIB", [])
+if gssapi_lib:
+    env.Append(SYSLIBDEPS=gssapi_lib)
+
+if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []):
+    env.Append(SYSLIBDEPS=["sasl2"])
+
+if env.ToolchainIs("msvc"):
+    env.Append(SYSLIBDEPS=["synchronization"]) 
 
 if not use_system_version_of_library('tcmalloc-gperf'):
     # GPerftools does this slightly differently than the others.

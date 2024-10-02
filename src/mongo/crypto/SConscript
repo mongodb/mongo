@@ -43,15 +43,6 @@ env.CppUnitTest(
         "jwt",
         "sha_block",
     ],
-    # TODO(SERVER-95322) Remove sys deps after converted to Bazel
-    SYSLIBDEPS=(
-        [
-            "winhttp" if env.TargetOSIs("windows") else "curl",
-        ]
-        if http_client == "on"
-        else []
-    )
-    + (["synchronization"] if env.ToolchainIs("msvc") else []),
 )
 
 if ssl_provider == "openssl":

@@ -811,17 +811,6 @@ env.Program(
         "serverless-test",
         "servers",
     ],
-    # TODO(SERVER-95322) Remove sysdeps after converted to Bazel
-    SYSLIBDEPS=env.get("MONGO_LDAP_LIB", [])
-    + env.get("MONGO_GSSAPI_LIB", [])
-    + (["sasl2"] if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) else [])
-    + (
-        [
-            "winhttp" if env.TargetOSIs("windows") else "curl",
-        ]
-        if http_client == "on"
-        else []
-    ),
 )
 
 env.Library(

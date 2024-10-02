@@ -155,12 +155,6 @@ if not has_option("noshell") and jsEngine:
             "mongo",
             "serverless-test",
         ],
-        # TODO(SERVER-95322) Remove sys deps after converted to Bazel
-        SYSLIBDEPS=[
-            "winhttp" if env.TargetOSIs("windows") else "curl",
-        ]
-        if http_client == "on"
-        else [],
     )
 
 env.CppUnitTest(
