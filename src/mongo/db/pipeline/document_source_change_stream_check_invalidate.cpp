@@ -181,7 +181,8 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
     return nextInput;
 }
 
-Value DocumentSourceChangeStreamCheckInvalidate::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceChangeStreamCheckInvalidate::doSerialize(
+    const SerializationOptions& opts) const {
     BSONObjBuilder builder;
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
@@ -192,7 +193,7 @@ Value DocumentSourceChangeStreamCheckInvalidate::serialize(const SerializationOp
     if (_startAfterInvalidate) {
         spec.setStartAfterInvalidate(ResumeToken(*_startAfterInvalidate));
     }
-    builder.append(DocumentSourceChangeStreamCheckInvalidate::kStageName, spec.toBSON(opts));
+    builder.append(DocumentSourceChangeStreamCheckInvalidate::kStageName, spec.toBSON());
     return Value(builder.obj());
 }
 
