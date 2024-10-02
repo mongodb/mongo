@@ -514,44 +514,6 @@ tasks:
           run_no_feature_flag_tests: "true"
 
   - <<: *gen_task_template
-    name: concurrency_sharded_replication_no_txns_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_repl",
-        "default",
-        "concurrency",
-        "no_txns",
-        "large",
-        "sharded",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          suite: concurrency_sharded_replication
-          resmoke_args: "--excludeWithAnyTags=uses_transactions"
-          use_large_distro: "true"
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
-    name: concurrency_sharded_replication_no_txns_with_balancer_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_repl",
-        "default",
-        "concurrency",
-        "no_txns",
-        "large",
-        "sharded",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          suite: concurrency_sharded_replication_with_balancer
-          resmoke_args: "--excludeWithAnyTags=uses_transactions"
-          use_large_distro: "true"
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
     name: concurrency_sharded_replication_with_balancer_gen
     tags:
       [

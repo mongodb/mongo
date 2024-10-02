@@ -422,27 +422,6 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: concurrency_embedded_router_replication_no_txns_with_balancer_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "concurrency",
-        "no_txns",
-        "large",
-        "sharded",
-        "suggested_excluding_required__for_devprod_mitigation_only",
-        "embedded_router",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          suite: concurrency_embedded_router_replication_with_balancer
-          resmoke_args: "--excludeWithAnyTags=uses_transactions"
-          use_large_distro: "true"
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
     name: concurrency_embedded_router_replication_with_balancer_gen
     tags:
       [
