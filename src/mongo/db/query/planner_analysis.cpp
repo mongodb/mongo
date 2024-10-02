@@ -594,9 +594,11 @@ std::unique_ptr<QuerySolutionNode> analyzeDistinct(const CanonicalQuery& query,
     if (!projectionBSON) {
         // This was likely called from aggregation: add a FETCH stage to make sure we provide all
         // fields.
-        auto fetch = std::make_unique<FetchNode>();
-        fetch->children.push_back(std::move(solnRoot));
-        solnRoot = std::move(fetch);
+        if (!solnRoot->fetched()) {
+            auto fetch = std::make_unique<FetchNode>();
+            fetch->children.push_back(std::move(solnRoot));
+            solnRoot = std::move(fetch);
+        }
         return addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot));
     }
 
