@@ -677,7 +677,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
     // compress-and-write-uncompressed-bucket scenario.
     {
         auto swResult = bucket_catalog::tryInsert(bucketCatalog,
-                                                  bucketsColl->ns().getTimeseriesViewNamespace(),
                                                   bucketsColl->getDefaultCollator(),
                                                   measurementDoc,
                                                   opCtx->getOpID(),
@@ -722,7 +721,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
 
                     return bucket_catalog::insertWithReopeningContext(
                         bucketCatalog,
-                        bucketsColl->ns().getTimeseriesViewNamespace(),
                         bucketsColl->getDefaultCollator(),
                         measurementDoc,
                         opCtx->getOpID(),
@@ -1169,7 +1167,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                         // insert directly on a new bucket.
                         return bucket_catalog::insert(
                             bucketCatalog,
-                            bucketsColl->ns().getTimeseriesViewNamespace(),
                             bucketsColl->getDefaultCollator(),
                             measurementDoc,
                             opCtx->getOpID(),
@@ -1185,7 +1182,6 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
         case BucketReopeningPermittance::kDisallowed:
             return bucket_catalog::insert(
                 bucketCatalog,
-                bucketsColl->ns().getTimeseriesViewNamespace(),
                 bucketsColl->getDefaultCollator(),
                 measurementDoc,
                 opCtx->getOpID(),
@@ -1354,8 +1350,7 @@ void commitTimeseriesBucketsAtomically(
             bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(sideBucketCatalog, batch.get()->bucketId);
-            auto prepareCommitStatus =
-                prepareCommit(sideBucketCatalog, coll->ns().getTimeseriesViewNamespace(), batch);
+            auto prepareCommitStatus = prepareCommit(sideBucketCatalog, batch);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return;
@@ -1382,7 +1377,6 @@ void commitTimeseriesBucketsAtomically(
 
         for (auto batch : batchesToCommit) {
             finish(sideBucketCatalog,
-                   coll->ns(),
                    batch,
                    bucket_catalog::CommitInfo{opTime, electionId},
                    getPostCommitDebugChecks(opCtx, coll->ns()));
@@ -1508,7 +1502,7 @@ getPostCommitDebugChecks(OperationContext* opCtx, const NamespaceString& ns) {
         return nullptr;
     }
 
-    return [opCtx, ns](const timeseries::bucket_catalog::WriteBatch& batch, StringData timeField) {
+    return [opCtx, &ns](const timeseries::bucket_catalog::WriteBatch& batch, StringData timeField) {
         // Check in-memory and disk state, caller still has commit rights.
         DBDirectClient client{opCtx};
         BSONObj queriedBucket = client.findOne(ns, BSON("_id" << batch.bucketId.oid));

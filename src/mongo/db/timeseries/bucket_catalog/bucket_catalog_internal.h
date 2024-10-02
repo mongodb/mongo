@@ -44,7 +44,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
@@ -144,7 +143,6 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
 Bucket* useBucket(BucketCatalog& catalog,
                   Stripe& stripe,
                   WithLock stripeLock,
-                  const NamespaceString& nss,
                   InsertContext& info,
                   AllowBucketCreation mode,
                   const Date_t& time);
@@ -156,7 +154,6 @@ Bucket* useBucket(BucketCatalog& catalog,
 Bucket* useAlternateBucket(BucketCatalog& catalog,
                            Stripe& stripe,
                            WithLock stripeLock,
-                           const NamespaceString& nss,
                            InsertContext& info,
                            const Date_t& time);
 
@@ -197,7 +194,6 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
 StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& catalog,
                                                                Stripe& stripe,
                                                                WithLock stripeLock,
-                                                               const NamespaceString& nss,
                                                                ExecutionStatsController& stats,
                                                                const BucketKey& key,
                                                                Bucket& existingBucket,
@@ -392,7 +388,7 @@ void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
 /**
  * Generates a status with code TimeseriesBucketCleared and an appropriate error message.
  */
-Status getTimeseriesBucketClearedError(const NamespaceString& nss, const OID& oid);
+Status getTimeseriesBucketClearedError(const OID& oid);
 
 /**
  * Close an open bucket, setting the state appropriately and removing it from the catalog.

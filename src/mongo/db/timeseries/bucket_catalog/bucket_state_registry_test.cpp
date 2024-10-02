@@ -768,7 +768,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
                                      stats,
                                      StringData{bucket.timeField.data(), bucket.timeField.size()});
     ASSERT(claimWriteBatchCommitRights(*batch));
-    ASSERT_OK(prepareCommit(*this, ns, batch));
+    ASSERT_OK(prepareCommit(*this, batch));
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kPrepared));
 
     {
@@ -776,7 +776,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
         // this and closes the bucket.
         bucket.rolloverAction = RolloverAction::kHardClose;
         CommitInfo commitInfo{};
-        auto closedBucket = finish(*this, ns, batch, commitInfo);
+        auto closedBucket = finish(*this, batch, commitInfo);
         ASSERT(closedBucket.has_value());
         ASSERT_EQ(closedBucket.value().bucketId.oid, bucketId.oid);
 

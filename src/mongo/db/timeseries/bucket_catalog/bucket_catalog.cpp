@@ -259,7 +259,6 @@ void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builde
 }
 
 StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
-                                   const NamespaceString& nss,
                                    const StringDataComparator* comparator,
                                    const BSONObj& doc,
                                    OperationId opId,
@@ -280,7 +279,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
     stdx::lock_guard stripeLock{stripe.mutex};
 
     Bucket* bucket = internal::useBucket(
-        catalog, stripe, stripeLock, nss, insertContext, internal::AllowBucketCreation::kNo, time);
+        catalog, stripe, stripeLock, insertContext, internal::AllowBucketCreation::kNo, time);
     // If there are no open buckets for our measurement that we can use, we return a
     // reopeningContext to try reopening a closed bucket from disk.
     if (!bucket) {
@@ -320,8 +319,8 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
     // If we were time forward or backward, we might be able to "reopen" a bucket we still have
     // in memory that's set to be closed when pending operations finish.
     if ((*reason == RolloverReason::kTimeBackward || *reason == RolloverReason::kTimeForward)) {
-        if (Bucket* alternate = internal::useAlternateBucket(
-                catalog, stripe, stripeLock, nss, insertContext, time)) {
+        if (Bucket* alternate =
+                internal::useAlternateBucket(catalog, stripe, stripeLock, insertContext, time)) {
             insertionResult = insertIntoBucket(catalog,
                                                stripe,
                                                stripeLock,
@@ -356,7 +355,6 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
 }
 
 StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
-                                                    const NamespaceString& nss,
                                                     const StringDataComparator* comparator,
                                                     const BSONObj& doc,
                                                     OperationId opId,
@@ -402,7 +400,6 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
             swBucket = internal::reuseExistingBucket(catalog,
                                                      stripe,
                                                      stripeLock,
-                                                     nss,
                                                      insertContext.stats,
                                                      insertContext.key,
                                                      *existingBucket,
@@ -446,7 +443,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
     }
 
     Bucket* bucket = useBucket(
-        catalog, stripe, stripeLock, nss, insertContext, internal::AllowBucketCreation::kYes, time);
+        catalog, stripe, stripeLock, insertContext, internal::AllowBucketCreation::kYes, time);
     invariant(bucket);
 
     auto insertionResult = insertIntoBucket(catalog,
@@ -466,7 +463,6 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
 }
 
 StatusWith<InsertResult> insert(BucketCatalog& catalog,
-                                const NamespaceString& nss,
                                 const StringDataComparator* comparator,
                                 const BSONObj& doc,
                                 OperationId opId,
@@ -478,7 +474,7 @@ StatusWith<InsertResult> insert(BucketCatalog& catalog,
     stdx::lock_guard stripeLock{stripe.mutex};
 
     Bucket* bucket = useBucket(
-        catalog, stripe, stripeLock, nss, insertContext, internal::AllowBucketCreation::kYes, time);
+        catalog, stripe, stripeLock, insertContext, internal::AllowBucketCreation::kYes, time);
     invariant(bucket);
 
     auto insertionResult = insertIntoBucket(catalog,
@@ -506,9 +502,7 @@ void waitToInsert(InsertWaiter* waiter) {
     }
 }
 
-Status prepareCommit(BucketCatalog& catalog,
-                     const NamespaceString& nss,
-                     std::shared_ptr<WriteBatch> batch) {
+Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) {
     auto getBatchStatus = [&] {
         return batch->promise.getFuture().getNoThrow().getStatus();
     };
@@ -542,7 +536,7 @@ Status prepareCommit(BucketCatalog& catalog,
                         stripe,
                         stripeLock,
                         batch,
-                        internal::getTimeseriesBucketClearedError(nss, batch->bucketId.oid));
+                        internal::getTimeseriesBucketClearedError(batch->bucketId.oid));
         return getBatchStatus();
     }
 
@@ -553,7 +547,6 @@ Status prepareCommit(BucketCatalog& catalog,
 
 boost::optional<ClosedBucket> finish(
     BucketCatalog& catalog,
-    const NamespaceString& nss,
     std::shared_ptr<WriteBatch> batch,
     const CommitInfo& info,
     const std::function<void(const timeseries::bucket_catalog::WriteBatch&, StringData)>&
@@ -627,7 +620,7 @@ boost::optional<ClosedBucket> finish(
                             stripeLock,
                             *bucket,
                             nullptr,
-                            internal::getTimeseriesBucketClearedError(nss, bucket->bucketId.oid));
+                            internal::getTimeseriesBucketClearedError(bucket->bucketId.oid));
         }
     } else if (allCommitted(*bucket)) {
         switch (bucket->rolloverAction) {

@@ -263,7 +263,6 @@ void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builde
  * 'insert' to insert 'doc', passing any fetched bucket back as a member of the 'ReopeningContext'.
  */
 StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
-                                   const NamespaceString& nss,
                                    const StringDataComparator* comparator,
                                    const BSONObj& doc,
                                    OperationId,
@@ -282,7 +281,6 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
  * bucket if none exists.
  */
 StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
-                                                    const NamespaceString& nss,
                                                     const StringDataComparator* comparator,
                                                     const BSONObj& doc,
                                                     OperationId,
@@ -300,7 +298,6 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
  * We will attempt to find a suitable open bucket, or open a new bucket if none exists.
  */
 StatusWith<InsertResult> insert(BucketCatalog& catalog,
-                                const NamespaceString& nss,
                                 const StringDataComparator* comparator,
                                 const BSONObj& doc,
                                 OperationId,
@@ -322,9 +319,7 @@ void waitToInsert(InsertWaiter* waiter);
  * on the same bucket, or there is an outstanding 'ReopeningRequest' for the same series (metaField
  * value), this operation will block waiting for it to complete.
  */
-Status prepareCommit(BucketCatalog& catalog,
-                     const NamespaceString& nss,
-                     std::shared_ptr<WriteBatch> batch);
+Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch);
 
 /**
  * Records the result of a batch commit. Caller must already have commit rights on batch, and batch
@@ -337,7 +332,6 @@ Status prepareCommit(BucketCatalog& catalog,
  */
 boost::optional<ClosedBucket> finish(
     BucketCatalog& catalog,
-    const NamespaceString& nss,
     std::shared_ptr<WriteBatch> batch,
     const CommitInfo& info,
     const std::function<void(const timeseries::bucket_catalog::WriteBatch&, StringData timeField)>&

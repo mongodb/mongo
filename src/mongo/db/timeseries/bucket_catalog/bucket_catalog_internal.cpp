@@ -277,7 +277,6 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
 Bucket* useBucket(BucketCatalog& catalog,
                   Stripe& stripe,
                   WithLock stripeLock,
-                  const NamespaceString& nss,
                   InsertContext& info,
                   AllowBucketCreation mode,
                   const Date_t& time) {
@@ -314,7 +313,7 @@ Bucket* useBucket(BucketCatalog& catalog,
           stripeLock,
           *bucket,
           nullptr,
-          getTimeseriesBucketClearedError(nss, bucket->bucketId.oid));
+          getTimeseriesBucketClearedError(bucket->bucketId.oid));
 
     return mode == AllowBucketCreation::kYes
         ? &allocateBucket(catalog, stripe, stripeLock, info, time)
@@ -324,7 +323,6 @@ Bucket* useBucket(BucketCatalog& catalog,
 Bucket* useAlternateBucket(BucketCatalog& catalog,
                            Stripe& stripe,
                            WithLock stripeLock,
-                           const NamespaceString& nss,
                            InsertContext& insertContext,
                            const Date_t& time) {
     auto it = stripe.openBucketsByKey.find(insertContext.key);
@@ -365,7 +363,7 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
                   stripeLock,
                   *potentialBucket,
                   nullptr,
-                  getTimeseriesBucketClearedError(nss, potentialBucket->bucketId.oid));
+                  getTimeseriesBucketClearedError(potentialBucket->bucketId.oid));
         }
     }
 
@@ -601,7 +599,6 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
 StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& catalog,
                                                                Stripe& stripe,
                                                                WithLock stripeLock,
-                                                               const NamespaceString& nss,
                                                                ExecutionStatsController& stats,
                                                                const BucketKey& key,
                                                                Bucket& existingBucket,
@@ -617,7 +614,7 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
               stripeLock,
               existingBucket,
               nullptr,
-              getTimeseriesBucketClearedError(nss, existingBucket.bucketId.oid));
+              getTimeseriesBucketClearedError(existingBucket.bucketId.oid));
         return {ErrorCodes::WriteConflict, "Bucket may be stale"};
     } else if (transientlyConflictsWithReopening(state.value())) {
         // Avoid reusing the bucket if it conflicts with reopening.
@@ -1358,13 +1355,9 @@ void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
     addCollectionExecutionStats(stats, *collStats);
 }
 
-Status getTimeseriesBucketClearedError(const NamespaceString& nss, const OID& oid) {
+Status getTimeseriesBucketClearedError(const OID& oid) {
     return {ErrorCodes::TimeseriesBucketCleared,
-            str::stream() << "Time-series bucket " << oid << " for collection "
-                          << (nss.isTimeseriesBucketsCollection()
-                                  ? nss.getTimeseriesViewNamespace().toStringForErrorMsg()
-                                  : nss.toStringForErrorMsg())
-                          << " was cleared"};
+            str::stream() << "Time-series bucket " << oid << " was cleared"};
 }
 
 void closeOpenBucket(BucketCatalog& catalog,

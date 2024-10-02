@@ -2593,7 +2593,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
         timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
 
     auto metadata = getMetadata(bucketCatalog, batch->bucketId);
-    auto status = prepareCommit(bucketCatalog, request.getNamespace(), batch);
+    auto status = prepareCommit(bucketCatalog, batch);
     if (!status.isOK()) {
         invariant(timeseries::bucket_catalog::isWriteBatchFinished(*batch));
         docsToRetry->push_back(index);
@@ -2656,13 +2656,12 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     }
 
     timeseries::getOpTimeAndElectionId(opCtx, opTime, electionId);
-    auto bucketsNs = request.getNamespace().makeTimeseriesBucketsNamespace();
 
     auto closedBucket = finish(bucketCatalog,
-                               bucketsNs,
                                batch,
                                timeseries::bucket_catalog::CommitInfo{*opTime, *electionId},
-                               timeseries::getPostCommitDebugChecks(opCtx, bucketsNs));
+                               timeseries::getPostCommitDebugChecks(
+                                   opCtx, request.getNamespace().makeTimeseriesBucketsNamespace()));
 
     if (closedBucket) {
         // If this write closed a bucket, compress the bucket
@@ -2710,7 +2709,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(bucketCatalog, batch.get()->bucketId);
-            auto prepareCommitStatus = prepareCommit(bucketCatalog, request.getNamespace(), batch);
+            auto prepareCommitStatus = prepareCommit(bucketCatalog, batch);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return false;
@@ -2741,7 +2740,6 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 
         for (auto batch : batchesToCommit) {
             auto closedBucket = finish(bucketCatalog,
-                                       bucketsNs,
                                        batch,
                                        timeseries::bucket_catalog::CommitInfo{*opTime, *electionId},
                                        timeseries::getPostCommitDebugChecks(opCtx, bucketsNs));
