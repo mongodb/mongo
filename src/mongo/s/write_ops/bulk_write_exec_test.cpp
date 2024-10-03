@@ -830,8 +830,6 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsUnordered_OneShard_TwoEndpoints) {
     // ops[3] -> A shardVersion ignored, B shardVersion ignored
     // ops[4] -> A shardVersion included
 
-    // Due to the interleaving of ops, each op should end up split into its own sub-batch, since no
-    // two consecutive ops target the same endpoint with the same shardVersion.
     BulkWriteCommandRequest request(
         {
             BulkWriteUpdateOp(0, BSON("x" << -1), BSON("$set" << BSON("z" << 3))),
@@ -848,74 +846,38 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsUnordered_OneShard_TwoEndpoints) {
 
     TargetedBatchMap targeted;
 
-    // batch with ops[0]
-    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
-    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 1);
-    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[0]->writeOpRef.first, 0);
-    assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointA);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Ready);
-
-    targeted.clear();
-
-    // batch with ops[1]
+    // batch with ops[0], ops[2] and ops[4]
     ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
     ASSERT_EQUALS(targeted.size(), 2u);
-    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 1);
-    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[0]->writeOpRef.first, 1);
-    assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointANoVersion);
-    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1);
-    ASSERT_EQUALS(targeted[shardIdB]->getWrites()[0]->writeOpRef.first, 1);
-    assertEndpointsEqual(targeted[shardIdB]->getWrites()[0]->endpoint, endpointBNoVersion);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Ready);
-
-    targeted.clear();
-
-    // batch with ops[2]
-    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 2);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[0]->writeOpRef.first, 0);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[1]->writeOpRef.first, 4);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointA);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[1]->endpoint, endpointA);
     ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1);
     ASSERT_EQUALS(targeted[shardIdB]->getWrites()[0]->writeOpRef.first, 2);
     assertEndpointsEqual(targeted[shardIdB]->getWrites()[0]->endpoint, endpointB);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Pending);
 
     targeted.clear();
 
-    // batch with ops[3]
+    // batch with ops[1], ops[3]
     ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
     ASSERT_EQUALS(targeted.size(), 2u);
-    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 1);
-    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[0]->writeOpRef.first, 3);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 2);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[0]->writeOpRef.first, 1);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[1]->writeOpRef.first, 3);
     assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointANoVersion);
-    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1);
-    ASSERT_EQUALS(targeted[shardIdB]->getWrites()[0]->writeOpRef.first, 3);
+    assertEndpointsEqual(targeted[shardIdA]->getWrites()[1]->endpoint, endpointANoVersion);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 2);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites()[0]->writeOpRef.first, 1);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[1]->writeOpRef.first, 3);
     assertEndpointsEqual(targeted[shardIdB]->getWrites()[0]->endpoint, endpointBNoVersion);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
-    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(4).getWriteState(), WriteOpState_Ready);
-
-    targeted.clear();
-
-    // batch with ops[4]
-    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
-    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 1);
-    ASSERT_EQUALS(targeted[shardIdA]->getWrites()[0]->writeOpRef.first, 4);
-    assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointA);
+    assertEndpointsEqual(targeted[shardIdB]->getWrites()[1]->endpoint, endpointBNoVersion);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);

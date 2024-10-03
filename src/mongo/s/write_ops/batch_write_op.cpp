@@ -451,11 +451,12 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         }
 
         // If writes are unordered and we already have targeted endpoints, make sure we don't target
-        // the same shard with a different shardVersion.
+        // the same shard with a different shardVersion. We can continue to look for the next writes
+        // that can still be included in the same batch.
         if (!ordered &&
             isNewBatchRequiredUnordered(targeter.getNS(), writes, nsShardIdMap, nsEndpointMap)) {
             writeOp.resetWriteToReady();
-            break;
+            continue;
         }
 
         auto isTimeseriesRetryableUpdate = targeter.isTrackedTimeSeriesBucketsNamespace() &&

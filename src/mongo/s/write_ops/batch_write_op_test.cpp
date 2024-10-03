@@ -868,10 +868,10 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnordered) {
 // Multi-op (unordered) targeting test where first two ops go to one shard, second two ops go to two
 // shards and the last two ops go to the other shard. Multi-target ops will override the endpoint to
 // have ignored placement version. If a shard is already targeted with a different shardVersion, a
-// new batch is required. So this test should result in three batches:
-// 1. shardA: [op1, op2]
+// new batch is required for the multi-target op. Since the operation is unordered, following
+// targeted ops can still be onboarded on the first batch.
+// 1. shardA: [op1, op2], shardB: [op5, op6]
 // 2. shardA: [op3, op4], shardB: [op3, op4]
-// 3. shardB: [op5, op6]
 TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnorderedWithDifferentEndpoints) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardId shardIdA("shardA");
@@ -915,12 +915,15 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnorderedWithDifferentEndpoints) {
     BatchWriteOp batchOp(_opCtx, request);
 
     TargetedBatchMap targeted;
-    // First batch: shardA: [op1, op2].
+    // First batch: shardA: [op1, op2], shardB: [op5, op6].
     ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted.size(), 2u);
     ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 2u);
     assertEndpointsEqual(targeted[shardIdA]->getWrites()[0]->endpoint, endpointA);
     assertEndpointsEqual(targeted[shardIdA]->getWrites()[1]->endpoint, endpointA);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 2u);
+    assertEndpointsEqual(targeted[shardIdB]->getWrites()[0]->endpoint, endpointB);
+    assertEndpointsEqual(targeted[shardIdB]->getWrites()[1]->endpoint, endpointB);
 
     targeted.clear();
     // Second batch: shardA: [op3, op4], shardB: [op3, op4].
@@ -932,14 +935,6 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnorderedWithDifferentEndpoints) {
     ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 2u);
     assertEndpointsEqual(targeted[shardIdB]->getWrites()[0]->endpoint, endpointBVersionIgnored);
     assertEndpointsEqual(targeted[shardIdB]->getWrites()[1]->endpoint, endpointBVersionIgnored);
-
-    targeted.clear();
-    // Third batch: shardB: [op5, op6].
-    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
-    ASSERT_EQUALS(targeted.size(), 1u);
-    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 2u);
-    assertEndpointsEqual(targeted[shardIdB]->getWrites()[0]->endpoint, endpointB);
-    assertEndpointsEqual(targeted[shardIdB]->getWrites()[1]->endpoint, endpointB);
 }
 
 // Multi-op targeting test where two ops go to two separate shards and there's an error on one op on
