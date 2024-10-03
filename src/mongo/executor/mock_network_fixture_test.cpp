@@ -78,7 +78,7 @@ public:
 
         try {
             net()
-                .startCommand(cb, request)
+                .startCommand(cb, request, nullptr, _source.token())
                 .unsafeToInlineFuture()
                 .getAsync([&](StatusWith<RemoteCommandResponse> swRcr) {
                     auto resp = swRcr.getValue();
@@ -127,9 +127,14 @@ public:
         return {{testHost()}, dbName, obj, rpc::makeEmptyMetadata(), nullptr};
     }
 
+    void cancelCommand() {
+        _source.cancel();
+    }
+
 private:
     MockNetwork _mock;
     std::vector<RemoteCommandResponse> _responses;
+    CancellationSource _source;
 };
 
 TEST_F(MockNetworkTest, MockFixtureBasicTest) {

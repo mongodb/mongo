@@ -219,7 +219,8 @@ public:
     virtual SemiFuture<TaskExecutor::ResponseStatus> startCommand(
         const TaskExecutor::CallbackHandle& cbHandle,
         RemoteCommandRequest& request,
-        const BatonHandle& baton = nullptr) = 0;
+        const BatonHandle& baton = nullptr,
+        const CancellationToken& token = CancellationToken::uncancelable()) = 0;
     virtual Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                        RemoteCommandRequest& request,
                                        RemoteCommandOnReplyFn&& onReply,

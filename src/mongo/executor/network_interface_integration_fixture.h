@@ -105,8 +105,10 @@ public:
      * Runs a command, returning a future representing its response. When waiting on this future,
      * use the interruptible returned by interruptible() and only do so from one thread.
      */
-    Future<RemoteCommandResponse> runCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                             RemoteCommandRequest rcroa);
+    Future<RemoteCommandResponse> runCommand(
+        const TaskExecutor::CallbackHandle& cbHandle,
+        RemoteCommandRequest request,
+        const CancellationToken& token = CancellationToken::uncancelable());
 
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
 

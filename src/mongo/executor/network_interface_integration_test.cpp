@@ -460,22 +460,26 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelLocally) {
     stdx::thread runCommandThread;
     ON_BLOCK_EXIT([&] { runCommandThread.join(); });
     auto cbh = makeCallbackHandle();
+    CancellationSource cancellationSource;
 
     auto deferred = [&] {
         // Kick off our operation
         FailPointEnableBlock fpb("networkInterfaceHangCommandsAfterAcquireConn");
 
         auto [promise, future] = makePromiseFuture<RemoteCommandResponse>();
-        runCommandThread = stdx::thread([this, cbh, promise = std::move(promise)]() mutable {
-            promise.setFrom(runCommand(cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()))
-                                .getNoThrow(interruptible()));
-        });
+        runCommandThread =
+            stdx::thread([this, cbh, promise = std::move(promise), cancellationSource]() mutable {
+                promise.setFrom(runCommand(cbh,
+                                           makeTestCommand(kMaxWait, makeEchoCmdObj()),
+                                           cancellationSource.token())
+                                    .getNoThrow(interruptible()));
+            });
 
         waitForHello();
 
         fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
 
-        cancelCommand(cbh);
+        cancellationSource.cancel();
 
         return std::move(future);
     }();
@@ -513,17 +517,20 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotely) {
     int numCurrentOpRan = 0;
 
     auto cbh = makeCallbackHandle();
+    CancellationSource cancellationSource;
     auto deferred = [&] {
         // Kick off an "echo" operation, which should block until cancelCommand causes
         // the operation to be killed.
         auto deferred =
-            runCommand(cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */));
+            runCommand(cbh,
+                       makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */),
+                       cancellationSource.token());
 
         // Wait for the "echo" operation to start.
         numCurrentOpRan += waitForCommandToStart("echo", kMaxWait);
 
-        // Run cancelCommand to kill the above operation.
-        cancelCommand(cbh);
+        // Kill the above operation.
+        cancellationSource.cancel();
 
         return deferred;
     }();
@@ -568,10 +575,13 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
     int numCurrentOpRan = 0;
 
     auto cbh = makeCallbackHandle();
+    CancellationSource cancellationSource;
     auto deferred = [&] {
         // Kick off a blocking "echo" operation.
         auto deferred =
-            runCommand(cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */));
+            runCommand(cbh,
+                       makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */),
+                       cancellationSource.token());
 
         // Wait for the "echo" operation to start.
         numCurrentOpRan += waitForCommandToStart("echo", kMaxWait);
@@ -583,7 +593,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
                                                << BSON_ARRAY("_killOperations") << "errorCode"
                                                << ErrorCodes::NetworkInterfaceExceededTimeLimit));
 
-        cancelCommand(cbh);
+        cancellationSource.cancel();
 
         // Wait for _killOperations for 'echo' to time out.
         cmdFailedFpb->waitForTimesEntered(interruptible(), cmdFailedFpb.initialTimesEntered() + 1);
@@ -604,16 +614,18 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ImmediateCancel) {
     boost::optional<FailPointEnableBlock> fpb("networkInterfaceHangCommandsAfterAcquireConn");
     auto cbh = makeCallbackHandle();
+    CancellationSource cancellationSource;
 
     auto pf = makePromiseFuture<RemoteCommandResponse>();
     auto cmdThread = stdx::thread([&] {
-        pf.promise.setFrom(runCommand(cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()))
-                               .getNoThrow(interruptible()));
+        pf.promise.setFrom(
+            runCommand(cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()), cancellationSource.token())
+                .getNoThrow(interruptible()));
     });
     ON_BLOCK_EXIT([&] { cmdThread.join(); });
 
     fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
-    cancelCommand(cbh);
+    cancellationSource.cancel();
     fpb.reset();
 
     ASSERT_EQ(net().getCounters().sent, 0);
@@ -627,12 +639,14 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ImmediateCancel) {
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, LateCancel) {
     auto cbh = makeCallbackHandle();
+    CancellationSource cancellationSource;
 
-    auto deferred = runCommand(cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()));
+    auto deferred =
+        runCommand(cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()), cancellationSource.token());
 
     // Wait for op to complete, assert that it was not canceled.
     auto result = deferred.get(interruptible());
-    cancelCommand(cbh);
+    cancellationSource.cancel();
 
     ASSERT_OK(result.status);
     ASSERT(result.elapsed);

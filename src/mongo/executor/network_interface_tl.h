@@ -110,7 +110,8 @@ public:
     SemiFuture<TaskExecutor::ResponseStatus> startCommand(
         const TaskExecutor::CallbackHandle& cbHandle,
         RemoteCommandRequest& request,
-        const BatonHandle& baton) override;
+        const BatonHandle& baton,
+        const CancellationToken& token) override;
     Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                RemoteCommandRequest& request,
                                RemoteCommandOnReplyFn&& onReply,
@@ -170,7 +171,8 @@ private:
         CommandStateBase(NetworkInterfaceTL* interface_,
                          RemoteCommandRequest request_,
                          const TaskExecutor::CallbackHandle& cbHandle_,
-                         const BatonHandle& baton_);
+                         const BatonHandle& baton_,
+                         const CancellationToken& token);
         virtual ~CommandStateBase();
 
         using ConnectionHandle = std::shared_ptr<ConnectionPool::ConnectionHandle::element_type>;
@@ -228,7 +230,7 @@ private:
 
         ConnectionHandle conn;
 
-        CancellationSource _cancelSource;
+        CancellationSource cancelSource;
 
         stdx::mutex cancelMutex;
         // Overwrites the generic cancellation status when the operation is cancelled.
@@ -239,8 +241,9 @@ private:
         CommandState(NetworkInterfaceTL* interface,
                      RemoteCommandRequest request,
                      const TaskExecutor::CallbackHandle& cbHandle,
-                     const BatonHandle& baton)
-            : CommandStateBase(interface, std::move(request), cbHandle, baton) {}
+                     const BatonHandle& baton,
+                     const CancellationToken& token = CancellationToken::uncancelable())
+            : CommandStateBase(interface, std::move(request), cbHandle, baton, token) {}
         ~CommandState() override = default;
 
         Future<RemoteCommandResponse> sendRequestImpl(RemoteCommandRequest toSend) override;
@@ -251,8 +254,9 @@ private:
                             RemoteCommandRequest request,
                             const TaskExecutor::CallbackHandle& cbHandle,
                             const BatonHandle& baton,
-                            RemoteCommandOnReplyFn&& onReply)
-            : CommandStateBase(interface, std::move(request), cbHandle, baton),
+                            RemoteCommandOnReplyFn&& onReply,
+                            const CancellationToken& token = CancellationToken::uncancelable())
+            : CommandStateBase(interface, std::move(request), cbHandle, baton, token),
               onReplyFn(std::move(onReply)) {}
         ~ExhaustCommandState() override = default;
 

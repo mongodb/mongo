@@ -433,6 +433,96 @@ TEST_F(NetworkInterfaceMockTest, SetAlarmCanceled) {
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
 }
 
+TEST_F(NetworkInterfaceMockTest, CancelTokenBeforeSchedulingCommand) {
+    startNetwork();
+
+    TaskExecutor::CallbackHandle cb{};
+    RemoteCommandRequest request{kUnimportantRequest};
+    CancellationSource source;
+
+    source.cancel();
+    auto deferred = net().startCommand(cb, request, nullptr, source.token());
+
+    net().enterNetwork();
+    ASSERT(!net().hasReadyRequests());
+
+    net().runReadyNetworkOperations();
+    ASSERT_EQ(deferred.get().status, ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(NetworkInterfaceMockTest, CancelCommandBeforeResponse) {
+    startNetwork();
+
+    TaskExecutor::CallbackHandle cb{};
+    RemoteCommandRequest request{kUnimportantRequest};
+    CancellationSource source;
+
+    auto deferred = net().startCommand(cb, request, nullptr, source.token());
+
+    net().enterNetwork();
+    ASSERT(net().hasReadyRequests());
+
+    source.cancel();
+    ASSERT(!net().hasReadyRequests());
+
+    net().runReadyNetworkOperations();
+    net().exitNetwork();
+
+    ASSERT_EQ(deferred.get().status, ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(NetworkInterfaceMockTest, DestroyCancellationSourceBeforeRunning) {
+    startNetwork();
+
+    TaskExecutor::CallbackHandle cb{};
+    RemoteCommandRequest request{kUnimportantRequest};
+    RemoteCommandResponse resp = RemoteCommandResponse::make_forTest(BSON("foo"
+                                                                          << "bar"),
+                                                                     Milliseconds(30));
+    CancellationSource source;
+
+    auto deferred = net().startCommand(cb, request, nullptr, source.token());
+
+    source = {};
+    net().enterNetwork();
+    ASSERT(net().hasReadyRequests());
+
+    net().scheduleSuccessfulResponse(resp);
+    net().runReadyNetworkOperations();
+    net().exitNetwork();
+
+    ASSERT_OK(deferred.get().status);
+}
+
+TEST_F(NetworkInterfaceMockTest, CancelCommandAfterResponse) {
+    startNetwork();
+
+    TaskExecutor::CallbackHandle cb{};
+    RemoteCommandRequest request{kUnimportantRequest};
+    RemoteCommandResponse resp = RemoteCommandResponse::make_forTest(BSON("foo"
+                                                                          << "bar"),
+                                                                     Milliseconds(30));
+    CancellationSource source;
+
+    auto deferred = net().startCommand(cb, request, nullptr, source.token());
+
+    net().enterNetwork();
+    ASSERT(net().hasReadyRequests());
+
+    auto req = net().getNextReadyRequest();
+    net().scheduleResponse(req, net().now(), resp);
+    net().runReadyNetworkOperations();
+
+    ASSERT_TRUE(req->isFinished());
+
+    auto before = net().getNumResponses();
+    source.cancel();
+    auto after = net().getNumResponses();
+
+    ASSERT_EQ(before, after);
+    ASSERT_OK(deferred.get().status);
+}
+
 TEST_F(NetworkInterfaceMockTest, InShutdown) {
     startNetwork();
     ASSERT_FALSE(net().inShutdown());

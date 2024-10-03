@@ -124,10 +124,13 @@ void NetworkInterfaceIntegrationFixture::resetIsInternalClient(bool isInternalCl
 }
 
 Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
-    const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequest request) {
+    const TaskExecutor::CallbackHandle& cbHandle,
+    RemoteCommandRequest request,
+    const CancellationToken& token) {
     _onSchedulingCommand();
+
     return net()
-        .startCommand(cbHandle, request, baton())
+        .startCommand(cbHandle, request, baton(), token)
         .unsafeToInlineFuture()
         .then([request](TaskExecutor::ResponseStatus resStatus) {
             if (resStatus.isOK()) {

@@ -419,7 +419,7 @@ void NetworkInterfaceTL::_registerCommand(const TaskExecutor::CallbackHandle& cb
     }
 
     // Okay to inline this callback since all it does is log.
-    cmdState->_cancelSource.token().onCancel().unsafeToInlineFuture().getAsync(
+    cmdState->cancelSource.token().onCancel().unsafeToInlineFuture().getAsync(
         [id = cmdState->request.id](Status s) {
             if (!s.isOK()) {
                 return;
@@ -432,12 +432,14 @@ NetworkInterfaceTL::CommandStateBase::CommandStateBase(
     NetworkInterfaceTL* interface_,
     RemoteCommandRequest request_,
     const TaskExecutor::CallbackHandle& cbHandle_,
-    const BatonHandle& baton_)
+    const BatonHandle& baton_,
+    const CancellationToken& token)
     : interface(interface_),
       request(std::move(request_)),
       cbHandle(cbHandle_),
       baton(baton_),
-      timer(interface->_reactor->makeTimer()) {}
+      timer(interface->_reactor->makeTimer()),
+      cancelSource(token) {}
 
 NetworkInterfaceTL::CommandStateBase::~CommandStateBase() {
     invariant(!conn);
@@ -467,7 +469,7 @@ void NetworkInterfaceTL::CommandStateBase::cancel(Status status) {
                     "request"_attr = redact(request.toString()),
                     "reason"_attr = status);
     }
-    _cancelSource.cancel();
+    cancelSource.cancel();
 }
 
 AsyncDBClient* NetworkInterfaceTL::CommandStateBase::getClient(
@@ -560,7 +562,8 @@ void NetworkInterfaceTL::_unregisterCommand(const TaskExecutor::CallbackHandle& 
 SemiFuture<RemoteCommandResponse> NetworkInterfaceTL::startCommand(
     const TaskExecutor::CallbackHandle& cbHandle,
     RemoteCommandRequest& request,
-    const BatonHandle& baton) {
+    const BatonHandle& baton,
+    const CancellationToken& token) {
     if (inShutdown()) {
         uassertStatusOK(kNetworkInterfaceShutdownInProgress);
     }
@@ -570,7 +573,7 @@ SemiFuture<RemoteCommandResponse> NetworkInterfaceTL::startCommand(
 
     appendMetadata(&request, _metadataHook);
 
-    auto cmdState = std::make_shared<CommandState>(this, request, cbHandle, baton);
+    auto cmdState = std::make_shared<CommandState>(this, request, cbHandle, baton, token);
     _registerCommand(cmdState->cbHandle, cmdState);
 
     return _runCommand(cmdState).semi();
@@ -595,7 +598,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequestImpl(
                    checked_cast<connection_pool_tl::TLConnection*>(conn.get())
                        ->getConnAcquiredTimer();
                return getClient(conn)->runCommandRequest(
-                   std::move(req), baton, std::move(connAcquiredTimer), _cancelSource.token());
+                   std::move(req), baton, std::move(connAcquiredTimer), cancelSource.token());
            })
         .then([this](RemoteCommandResponse response) {
             response.target = request.target;
@@ -617,7 +620,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendReque
     finalResponsePromise = std::move(promise);
 
     getClient(conn)
-        ->beginExhaustCommandRequest(req, baton, _cancelSource.token())
+        ->beginExhaustCommandRequest(req, baton, cancelSource.token())
         .thenRunOn(interface->_reactor)
         .getAsync([this](StatusWith<RemoteCommandResponse> swResponse) mutable {
             continueExhaustRequest(swResponse);
@@ -672,7 +675,7 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
     setTimer();
 
     getClient(conn)
-        ->awaitExhaustCommand(baton, _cancelSource.token())
+        ->awaitExhaustCommand(baton, cancelSource.token())
         .thenRunOn(interface->_reactor)
         .getAsync([this](StatusWith<RemoteCommandResponse> swResponse) mutable {
             continueExhaustRequest(swResponse);
@@ -911,7 +914,7 @@ SemiFuture<ConnectionPool::ConnectionHandle> NetworkInterfaceTL::CommandStateBas
     if (!failPointStatus.isOK()) {
         return failPointStatus;
     }
-    return pool->get(request.target, request.sslMode, request.timeout, _cancelSource.token());
+    return pool->get(request.target, request.sslMode, request.timeout, cancelSource.token());
 }
 
 ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::sendRequest(
