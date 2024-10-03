@@ -1329,4 +1329,26 @@ struct EofStats : public SpecificStats {
 
     eof_node::EOFType type;
 };
+
+struct DocumentSourceIdLookupStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<DocumentSourceIdLookupStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const override {
+        return sizeof(*this) +
+            (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    // Tracks the cumulative summary stats for the idLookup sub-pipeline.
+    PlanSummaryStats planSummaryStats;
+};
 }  // namespace mongo

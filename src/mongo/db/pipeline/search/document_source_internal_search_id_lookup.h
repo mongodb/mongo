@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {
@@ -167,6 +168,10 @@ public:
         return _searchIdLookupMetrics;
     }
 
+    const SpecificStats* getSpecificStats() const override {
+        return &_stats;
+    }
+
 protected:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) override;
@@ -178,6 +183,8 @@ private:
 
     std::shared_ptr<SearchIdLookupMetrics> _searchIdLookupMetrics =
         std::make_shared<SearchIdLookupMetrics>();
+
+    DocumentSourceIdLookupStats _stats;
 };
 
 }  // namespace mongo

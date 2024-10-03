@@ -106,6 +106,12 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
     }
     outputSpec["subPipeline"] = Value(Pipeline::parse(pipeline, pExpCtx)->serializeToBson(opts));
 
+    if (opts.verbosity && opts.verbosity.value() >= ExplainOptions::Verbosity::kExecStats) {
+        const PlanSummaryStats& stats = _stats.planSummaryStats;
+        outputSpec["totalDocsExamined"] = Value(static_cast<long long>(stats.totalDocsExamined));
+        outputSpec["totalKeysExamined"] = Value(static_cast<long long>(stats.totalKeysExamined));
+    }
+
     return Value(DOC(getSourceName() << outputSpec.freezeToValue()));
 }
 
@@ -159,6 +165,8 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
                                         << documentKey.toString() << ": [" << result->toString()
                                         << ", " << next->toString() << "]");
             }
+
+            accumulatePipelinePlanSummaryStats(*pipeline, _stats.planSummaryStats);
         }
     }
 

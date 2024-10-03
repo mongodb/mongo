@@ -1,7 +1,10 @@
 /**
  * Verify the query shape that is outputted by $queryStats for $search and $searchMeta queries.
  */
-import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
+import {
+    assertAggregatedMetricsSingleExec,
+    getLatestQueryStatsEntry
+} from "jstests/libs/query/query_stats_utils.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
@@ -41,7 +44,8 @@ const history = [{
     expectedCommand: searchCmd,
     response: {
         ok: 1,
-        cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: []},
+        cursor:
+            {id: NumberLong(0), ns: coll.getFullName(), nextBatch: [{_id: 1}, {_id: 2}, {_id: 4}]},
         vars: {SEARCH_META: {value: 42}}
     }
 }];
@@ -49,19 +53,20 @@ const history = [{
 // Test for $searchMeta
 assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
 coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
-let stats = getQueryStats(conn);
-assert.eq(1, stats.length);
-let queryShape = stats[0]["key"]["queryShape"];
+let stats = getLatestQueryStatsEntry(conn, {collName: coll.getName()});
+let queryShape = stats["key"]["queryShape"];
 assert.eq(queryShape["pipeline"], [{"$searchMeta": "?object"}], queryShape);
+// These metrics are not populated for $searchMeta.
+assertAggregatedMetricsSingleExec(stats, {docsExamined: 0, keysExamined: 0});
 
 // Test for $search
 assert.commandWorked(
     mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 coll.aggregate([{$search: searchQuery}], {cursor: {}});
-stats = getQueryStats(conn);
-assert.eq(3, stats.length);
-queryShape = stats[1]["key"]["queryShape"];
+stats = getLatestQueryStatsEntry(conn, {collName: coll.getName()});
+queryShape = stats["key"]["queryShape"];
 assert.eq(queryShape["pipeline"], [{"$search": "?object"}], queryShape);
+assertAggregatedMetricsSingleExec(stats, {docsExamined: 2, keysExamined: 2});
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();

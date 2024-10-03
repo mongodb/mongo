@@ -84,6 +84,9 @@ public:
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceFacetStats> stats) final {
         accumulate(stats->planSummaryStats);
     }
+    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceIdLookupStats> stats) final {
+        accumulate(stats->planSummaryStats);
+    }
 
 private:
     /**

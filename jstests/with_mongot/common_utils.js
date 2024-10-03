@@ -95,14 +95,24 @@ export function validateMongotStageExplainExecutionStats(
     assert(stage[stageType],
            "Given stage isn't the expected stage. " + stageType + " is not found.");
 
+    const isIdLookup = stageType === "$_internalSearchIdLookup";
+
     if (verbosity != "queryPlanner") {
         assert(stage.hasOwnProperty("nReturned"));
         assert.eq(nReturned, stage["nReturned"]);
         assert(stage.hasOwnProperty("executionTimeMillisEstimate"));
+
+        if (isIdLookup) {
+            const idLookupStage = stage["$_internalSearchIdLookup"];
+            assert(idLookupStage.hasOwnProperty("totalDocsExamined"), idLookupStage);
+            assert.eq(idLookupStage["totalDocsExamined"], nReturned, idLookupStage);
+            assert(idLookupStage.hasOwnProperty("totalKeysExamined"), idLookupStage);
+            assert.eq(idLookupStage["totalKeysExamined"], nReturned, idLookupStage);
+        }
     }
 
     // Non $_internalSearchIdLookup mongot stages must contain an explain object.
-    if (stageType != "$_internalSearchIdLookup") {
+    if (!isIdLookup) {
         const explainStage = stage[stageType];
         assert(explainStage.hasOwnProperty("explain"), explainStage);
         // We don't know the actual value of the explain object for e2e tests and can't check it.

@@ -22,6 +22,8 @@ selector:
     - jstests/with_mongot/e2e_infrastructure_tests/*.js
     - jstests/with_mongot/e2e/lib/*_test.js
     - jstests/with_mongot/e2e/explain_execution_stats/*.js
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
 
 executor:
   config:
