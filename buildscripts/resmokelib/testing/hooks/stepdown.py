@@ -44,7 +44,7 @@ class ContinuousStepdown(interface.Hook):
         terminate=False,
         kill=False,
         randomize_kill=False,
-        use_action_permitted_file=False,
+        is_fsm_workload=False,
         background_reconfig=False,
         auth_options=None,
         should_downgrade=False,
@@ -60,7 +60,7 @@ class ContinuousStepdown(interface.Hook):
             terminate: shut down the node cleanly as a means of stepping it down.
             kill: With a 50% probability, kill the node instead of shutting it down cleanly.
             randomize_kill: Randomly kill, terminate or stepdown.
-            use_action_permitted_file: use a file to control if stepdown thread should do a stepdown.
+            is_fsm_workload: Whether the hook is running as an FSM workload is executing
             auth_options: dictionary of auth options.
             background_reconfig: whether to conduct reconfig in the background.
             should_downgrade: whether dowgrades should be performed as part of the stepdown.
@@ -97,10 +97,15 @@ class ContinuousStepdown(interface.Hook):
         # jstests/concurrency/fsm_libs/resmoke_runner.js.
         dbpath_prefix = fixture.get_dbpath_prefix()
 
-        if use_action_permitted_file:
+        # When running an FSM workload, we use the file-based lifecycle protocol
+        # in which a file is used as a form of communication between the hook and
+        # the FSM workload to decided when the hook is allowed to run.
+        if is_fsm_workload:
+            # Each hook uses a unique set of action files - the uniqueness is brought
+            # about by using the hook's name as a suffix.
             self.__action_files = lifecycle_interface.ActionFiles._make(
                 [
-                    os.path.join(dbpath_prefix, field)
+                    os.path.join(dbpath_prefix, field + "_" + self.__class__.__name__)
                     for field in lifecycle_interface.ActionFiles._fields
                 ]
             )

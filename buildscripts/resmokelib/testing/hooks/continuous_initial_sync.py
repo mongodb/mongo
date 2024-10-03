@@ -32,13 +32,13 @@ class ContinuousInitialSync(interface.Hook):
     # The hook stops the fixture partially during its execution.
     STOPS_FIXTURE = True
 
-    def __init__(self, hook_logger, fixture, use_action_permitted_file=False, sync_interval_secs=8):
+    def __init__(self, hook_logger, fixture, is_fsm_workload=False, sync_interval_secs=8):
         """Initialize the ContinuousInitialSync.
 
         Args:
             hook_logger: the logger instance for this hook.
             fixture: the target fixture (replica sets or a sharded cluster).
-            use_action_permitted_file: use a file to control if the syncer thread should do a failover or initial sync
+            is_fsm_workload: whether or not an FSM workload is running in this suite.
             sync_interval_secs: how often to trigger a new cycle
         """
         interface.Hook.__init__(self, hook_logger, fixture, ContinuousInitialSync.DESCRIPTION)
@@ -57,10 +57,15 @@ class ContinuousInitialSync(interface.Hook):
         # jstests/concurrency/fsm_libs/resmoke_runner.js.
         dbpath_prefix = fixture.get_dbpath_prefix()
 
-        if use_action_permitted_file:
+        # When running an FSM workload, we use the file-based lifecycle protocol
+        # in which a file is used as a form of communication between the hook and
+        # the FSM workload to decided when the hook is allowed to run.
+        if is_fsm_workload:
+            # Each hook uses a unique set of action files - the uniqueness is brought
+            # about by using the hook's name as a suffix.
             self.__action_files = lifecycle_interface.ActionFiles._make(
                 [
-                    os.path.join(dbpath_prefix, field)
+                    os.path.join(dbpath_prefix, field + "_" + self.__class__.__name__)
                     for field in lifecycle_interface.ActionFiles._fields
                 ]
             )

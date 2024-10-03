@@ -151,7 +151,7 @@ executor:
           runningWithShardStepdowns: true
           killShards: true
           traceExceptions: false
-          useActionPermittedFile: true
+          useActionPermittedFile: [ContinuousStepdown]
   hooks:
     # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
     # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
@@ -161,7 +161,7 @@ executor:
       randomize_kill: true
       shard_stepdown: true
       stepdown_interval_ms: 15000
-      use_action_permitted_file: true
+      is_fsm_workload: true
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

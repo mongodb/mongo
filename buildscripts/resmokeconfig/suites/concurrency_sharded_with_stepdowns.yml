@@ -118,12 +118,12 @@ executor:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
           runningWithBalancer: false
-          useActionPermittedFile: true
+          useActionPermittedFile: [ContinuousStepdown]
   hooks:
     - class: ContinuousStepdown
       config_stepdown: true
       shard_stepdown: true
-      use_action_permitted_file: true
+      is_fsm_workload: true
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

@@ -120,11 +120,13 @@ executor:
         TestData:
           runningWithBalancer: true
           shardsAddedRemoved: true
+          useActionPermittedFile: [ContinuousAddRemoveShard]
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true
       add_remove_random_shards: true
+      is_fsm_workload: true
     - class: CheckShardFilteringMetadata
     # Suites that shutdown nodes are not compatible with the CheckReplDBHashInBackground hook, so
     # this suite does not include that hook

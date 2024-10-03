@@ -144,12 +144,12 @@ executor:
           # and generally retry operations.
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
-          useActionPermittedFile: true
+          useActionPermittedFile: [ContinuousInitialSync]
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
 
   hooks:
     - class: ContinuousInitialSync
-      use_action_permitted_file: true
+      is_fsm_workload: true
       sync_interval_secs: 15
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash

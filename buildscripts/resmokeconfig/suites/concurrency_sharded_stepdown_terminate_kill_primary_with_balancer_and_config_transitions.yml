@@ -119,7 +119,7 @@ executor:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
           killShards: true
-          useActionPermittedFile: true
+          useActionPermittedFile: [ContinuousStepdown, ContinuousAddRemoveShard]
           runningWithBalancer: true
           shardsAddedRemoved: true
           shardCollectionProbability: 0.5
@@ -128,12 +128,13 @@ executor:
     - class: ContinuousStepdown
       config_stepdown: true
       shard_stepdown: true
-      use_action_permitted_file: true
+      is_fsm_workload: true
       kill: true
       randomize_kill: true
     - class: ContinuousAddRemoveShard
       transition_configsvr: true
       move_primary_comment: *movePrimaryComment
+      is_fsm_workload: true
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

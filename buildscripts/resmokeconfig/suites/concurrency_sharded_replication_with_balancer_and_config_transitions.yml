@@ -87,12 +87,14 @@ executor:
         TestData:
           runningWithBalancer: true
           shardsAddedRemoved: true
+          useActionPermittedFile: [ContinuousAddRemoveShard]
           shardCollectionProbability: 0.5
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true
       move_primary_comment: *movePrimaryComment
+      is_fsm_workload: true
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHashInBackground
     - class: CheckReplDBHash

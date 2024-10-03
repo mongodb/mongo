@@ -118,14 +118,14 @@ executor:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
           killShards: true
-          useActionPermittedFile: true
+          useActionPermittedFile: [ContinuousStepdown]
           runningWithBalancer: true
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousStepdown
       config_stepdown: true
       shard_stepdown: true
-      use_action_permitted_file: true
+      is_fsm_workload: true
       randomize_kill: true
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash

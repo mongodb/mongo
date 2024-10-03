@@ -25,6 +25,25 @@ function cleanupWorkload(workload, context, cluster, errors, header) {
     return true;
 }
 
+// Writes to the specified FSM synchronization files, suffixed by the
+// hook name for each hook.
+function writeFiles(file) {
+    for (const hook of TestData.useActionPermittedFile) {
+        const path = file + '_' + hook;
+        writeFile(path, '');
+    }
+}
+
+// Attempts to 'cat' the acknowledgement file produced by each hook
+// following the FSM synchronization protocol.
+function readAcks(file) {
+    for (const hook of TestData.useActionPermittedFile) {
+        const path = file + '_' + hook;
+        // The cat() function throws if the file isn't found.
+        cat(path);
+    }
+}
+
 async function runWorkloads(workloads,
                             {cluster: clusterOptions = {}, execution: executionOptions = {}} = {}) {
     assert.gt(workloads.length, 0, 'need at least one workload to run');
@@ -107,7 +126,7 @@ async function runWorkloads(workloads,
         // indicate that it is going to start running because it will eventually after the
         // worker threads have started.
         if (executionOptions.actionFiles !== undefined) {
-            writeFile(executionOptions.actionFiles.permitted, '');
+            writeFiles(executionOptions.actionFiles.permitted);
         }
 
         // Since the worker threads may be running with causal consistency enabled, we set the
@@ -154,13 +173,14 @@ async function runWorkloads(workloads,
             //
             // Signal to the hook thread to stop any actions.
             if (executionOptions.actionFiles !== undefined) {
-                writeFile(executionOptions.actionFiles.idleRequest, '');
+                writeFiles(executionOptions.actionFiles.idleRequest);
 
                 // Wait for the acknowledgement file to be created by the hook thread.
                 assert.soonNoExcept(function() {
-                    // The cat() function will throw an exception if the file isn't found.
                     try {
-                        cat(executionOptions.actionFiles.idleAck);
+                        // The readAcks() function will throw an exception if any hook hasn't
+                        // provided an acknowledgement.
+                        readAcks(executionOptions.actionFiles.idleAck);
                     } catch (ex) {
                         if (ex.code == 13300 /* CANT_OPEN_FILE */) {
                             // capture this exception to prevent soonNoExcept polluting the
@@ -255,8 +275,12 @@ const executionOptions = {
 const resmokeDbPathPrefix = TestData.resmokeDbPathPrefix || ".";
 
 // The action file names need to match the same construction as found in
-// buildscripts/resmokelib/testing/hooks/lifecycle_interface.py.
+// buildscripts/resmokelib/testing/hooks/lifecycle.py.
 if (TestData.useActionPermittedFile) {
+    assert(
+        Array.isArray(TestData.useActionPermittedFile),
+        `TestData.useActionPermittedFile needs to be a list of hooks use action files. Current value: '${
+            tojson()}'`);
     executionOptions.actionFiles = {
         permitted: resmokeDbPathPrefix + '/permitted',
         idleRequest: resmokeDbPathPrefix + '/idle_request',
