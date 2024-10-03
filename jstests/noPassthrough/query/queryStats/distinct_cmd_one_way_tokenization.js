@@ -3,7 +3,10 @@
  *
  * @tags: [requires_fcv_81]
  */
-import {getQueryStatsDistinctCmd, withQueryStatsEnabled} from "jstests/libs/query_stats_utils.js";
+import {
+    getQueryStatsDistinctCmd,
+    withQueryStatsEnabled
+} from "jstests/libs/query/query_stats_utils.js";
 
 const collName = jsTestName();
 

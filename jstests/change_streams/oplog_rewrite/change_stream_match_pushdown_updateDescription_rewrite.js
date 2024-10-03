@@ -13,7 +13,7 @@
 import {
     createShardedCollection,
     verifyChangeStreamOnWholeCluster
-} from "jstests/libs/change_stream_rewrite_util.js";
+} from "jstests/libs/query/change_stream_rewrite_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "change_stream_match_pushdown_updateDescription_rewrite";

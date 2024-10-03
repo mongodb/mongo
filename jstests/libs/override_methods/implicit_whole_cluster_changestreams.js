@@ -10,7 +10,7 @@
 // For the whole_cluster passthrough, we simply override the necessary methods in the whole_db
 // passthrough's ChangeStreamPassthroughHelpers.
 import "jstests/libs/override_methods/implicit_whole_db_changestreams.js";
-import {ChangeStreamWatchMode} from "jstests/libs/change_stream_util.js";
+import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 
 // Any valid single-collection or single-database request is upconvertable to cluster-wide.
 globalThis.ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest =

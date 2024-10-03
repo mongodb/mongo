@@ -2,7 +2,7 @@
  * Test query knobs internalDocumentSourceCursorInitialBatchSize control DocumentSourceCursor batch
  * size, starting from a very small number and grows exponentially.
  */
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");

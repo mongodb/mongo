@@ -3,7 +3,7 @@
  *
  * This test was originally designed to reproduce SERVER-53760.
  */
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");

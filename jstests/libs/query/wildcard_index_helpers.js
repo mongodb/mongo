@@ -1,7 +1,7 @@
 /**
  * Common utility functions for testing functionality of Wildcard Indexes.
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 export const WildcardIndexHelpers = (function() {
     /**

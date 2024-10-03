@@ -10,11 +10,11 @@
  * ]
  */
 
-import {getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {
     validateClusteredCollectionHint
 } from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {getQueryPlanner, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const collatedName = 'clustered_collection_with_collation';
 const collated = db[collatedName];

@@ -2,7 +2,7 @@
  * Test that explained aggregation commands behave correctly with the readConcern option.
  */
 
-import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

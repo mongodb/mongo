@@ -3,7 +3,7 @@
  *
  * @tags: [featureFlagSbeFull]
  */
-import {getAggPlanStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 // Ensure group pushdown is enabled and capture the original value of
 // 'internalQuerySlotBasedExecutionDisableGroupPushdown' to use at the end of the test.

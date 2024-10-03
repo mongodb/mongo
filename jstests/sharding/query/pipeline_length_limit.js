@@ -5,7 +5,7 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getExpectedPipelineLimit} from "jstests/libs/optimizer_utils.js";
+import {getExpectedPipelineLimit} from "jstests/libs/query/optimizer_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function testLimits(testDB, lengthLimit) {

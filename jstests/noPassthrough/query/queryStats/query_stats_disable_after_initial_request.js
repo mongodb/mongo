@@ -6,7 +6,7 @@
  *   requires_fcv_71,
  * ]
  */
-import {getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";
+import {getQueryStatsFindCmd} from "jstests/libs/query/query_stats_utils.js";
 
 // Test that no query stats entry is written when (1) dispatching an initial find query, (2)
 // disabling query stats, then (3) completing the command. Below, we run variations of this test

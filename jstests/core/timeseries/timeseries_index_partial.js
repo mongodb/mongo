@@ -14,14 +14,14 @@
  *   cannot_run_during_upgrade_downgrade,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getAggPlanStage,
     getPlanStages,
     getRejectedPlan,
     getRejectedPlans
-} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.timeseries_index_partial;
 const timeField = 'time';

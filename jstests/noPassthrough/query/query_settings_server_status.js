@@ -14,7 +14,7 @@ import "jstests/multiVersion/libs/multi_cluster.js";
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({name: jsTestName(), shards: 2, mongos: 2, rs: {nodes: 3}});

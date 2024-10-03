@@ -5,7 +5,7 @@
  * TODO SERVER-56443: This test is specific to the classic engine. If/when the classic engine is
  * deleted, this test should be removed as well.
  */
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("test");

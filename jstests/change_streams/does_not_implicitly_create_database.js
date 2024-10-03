@@ -3,7 +3,7 @@
  * created, and will not implicitly create either.
  */
 
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 // Ensure that the test DB does not exist.
 const testDB = db.getSiblingDB(jsTestName());

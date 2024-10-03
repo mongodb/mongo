@@ -12,8 +12,8 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {isExpress} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {isExpress} from "jstests/libs/query/analyze_plan.js";
 
 const collName = 'express_write_explicit_coll_creation';
 const coll = db.getCollection(collName);

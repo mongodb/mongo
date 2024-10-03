@@ -5,7 +5,7 @@
  * Originally intended to reproduce SERVER-71387.
  */
 
-import "jstests/libs/sbe_assert_error_override.js"; // Override error-code-checking APIs.
+import "jstests/libs/query/sbe_assert_error_override.js"; // Override error-code-checking APIs.
 
 const coll = db.set_window_fields_range_wrong_type;
 coll.drop();

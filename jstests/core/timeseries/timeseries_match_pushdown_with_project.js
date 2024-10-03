@@ -8,8 +8,8 @@
  *   directly_against_shardsvrs_incompatible,
  * ]
  */
-import {getAggPlanStages, getEngine, getPlanStage} from "jstests/libs/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getAggPlanStages, getEngine, getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db.timeseries_match_pushdown_with_project;
 const timeField = 'time';

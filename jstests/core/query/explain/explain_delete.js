@@ -10,7 +10,7 @@
  *  incompatible_with_preimages_by_default,
  *  ]
  */
-import {checkNWouldDelete} from "jstests/libs/analyze_plan.js";
+import {checkNWouldDelete} from "jstests/libs/query/analyze_plan.js";
 
 var collName = "jstests_explain_delete";
 var t = db[collName];

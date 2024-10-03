@@ -12,7 +12,6 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());

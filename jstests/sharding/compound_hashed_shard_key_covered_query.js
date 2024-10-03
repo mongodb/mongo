@@ -2,7 +2,7 @@
  * Test to verify the covering behaviour of compound hashed index on a cluster sharded with compound
  * hashed shard key.
  */
-import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
+import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});

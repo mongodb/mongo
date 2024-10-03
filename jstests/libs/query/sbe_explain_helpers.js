@@ -3,7 +3,7 @@
  */
 
 // Include helpers for analyzing explain output.
-import {getPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {getPlanStage, getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 export function isIdIndexScan(db, root, expectedParentStageForIxScan) {
     const parentStage = getPlanStage(root, expectedParentStageForIxScan);

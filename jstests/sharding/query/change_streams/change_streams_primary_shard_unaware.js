@@ -13,7 +13,7 @@
 //   embedded_router_incompatible,
 //   uses_change_streams,
 // ]
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Returns true if the shard is aware that the collection is sharded.

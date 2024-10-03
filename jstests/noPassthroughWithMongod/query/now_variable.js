@@ -1,9 +1,9 @@
 /**
  * Tests for the $$NOW and $$CLUSTER_TIME system variable.
  */
-import "jstests/libs/sbe_assert_error_override.js";
-import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
+import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db[jsTest.name()];
 const otherColl = db[coll.getName() + "_other"];

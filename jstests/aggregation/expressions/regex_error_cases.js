@@ -1,5 +1,5 @@
-import "jstests/libs/sbe_assert_error_override.js";
-import {executeAggregationTestCase} from "jstests/libs/aggregation_pipeline_utils.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
+import {executeAggregationTestCase} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 const coll = db.regex_error_cases;
 coll.drop();

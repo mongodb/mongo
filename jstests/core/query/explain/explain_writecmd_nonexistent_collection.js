@@ -7,7 +7,7 @@
 //    requires_fcv_81,
 //]
 //
-import {getPlanStages, planHasStage} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 function assertCollectionDoesNotExist(collName) {
     const collectionList = db.getCollectionInfos({name: collName});

@@ -15,7 +15,7 @@ import {
     isIndexOnly,
     isIxscan,
     planHasStage,
-} from "jstests/libs/analyze_plan.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.distinct_with_hashed_index;
 coll.drop();

@@ -5,7 +5,7 @@
  *
  */
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 export const $config = (function() {
     var data = {

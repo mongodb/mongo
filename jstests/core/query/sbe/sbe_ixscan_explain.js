@@ -8,7 +8,7 @@
 //   featureFlagSbeFull,
 // ]
 
-import {getPlanStages, getQueryPlanner, isIxscan} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getQueryPlanner, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 function assertStageContainsIndexName(stage) {
     assert(stage.hasOwnProperty("indexName"));

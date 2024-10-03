@@ -6,8 +6,8 @@
  *   requires_mongobridge,
  * ]
  */
-import {getPreImagesCollection} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {getPreImagesCollection} from "jstests/libs/query/change_stream_util.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const nodeOptions = {

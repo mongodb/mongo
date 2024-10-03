@@ -1,9 +1,9 @@
 /**
  * Test of `$search` aggregation stage within $unionWith and $lookup stages.
  */
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {mongotCommandForQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";

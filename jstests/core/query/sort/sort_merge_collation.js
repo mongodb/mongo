@@ -5,7 +5,7 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  * ]
  */
-import {getPlanStages} from "jstests/libs/analyze_plan.js";
+import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const numericOrdering = {
     collation: {locale: "en_US", numericOrdering: true}

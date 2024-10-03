@@ -1,7 +1,7 @@
 /**
  * Verify the query shape that is outputted by $queryStats for $search and $searchMeta queries.
  */
-import {getQueryStats} from "jstests/libs/query_stats_utils.js";
+import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 

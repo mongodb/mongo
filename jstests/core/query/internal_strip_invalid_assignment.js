@@ -9,7 +9,7 @@
  *    assumes_read_concern_local,
  * ]
  */
-import {planHasStage} from 'jstests/libs/analyze_plan.js';
+import {planHasStage} from 'jstests/libs/query/analyze_plan.js';
 
 const coll = db.getCollection(jsTestName());
 

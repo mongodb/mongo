@@ -6,7 +6,7 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
+import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
 
 const collNamePrefix = 'hashed_index_queries_';
 let collCount = 0;

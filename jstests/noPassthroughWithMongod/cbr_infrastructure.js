@@ -6,9 +6,9 @@ import {
     canonicalizePlan,
     getRejectedPlans,
     getWinningPlanFromExplain
-} from "jstests/libs/analyze_plan.js";
+} from "jstests/libs/query/analyze_plan.js";
 
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-92589: Remove this exemption
 if (checkSbeFullyEnabled(db)) {

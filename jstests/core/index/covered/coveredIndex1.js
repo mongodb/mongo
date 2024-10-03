@@ -12,7 +12,7 @@
  * ]
  */
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db["jstests_coveredIndex1"];
 coll.drop();

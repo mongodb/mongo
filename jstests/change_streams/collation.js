@@ -3,16 +3,16 @@
  * default collation, and uses the simple collation if none is provided.
  */
 import {
-    assertChangeStreamEventEq,
-    ChangeStreamTest,
-    isChangeStreamPassthrough,
-    runCommandChangeStreamPassthroughAware,
-} from "jstests/libs/change_stream_util.js";
-import {
     assertCreateCollection,
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest,
+    isChangeStreamPassthrough,
+    runCommandChangeStreamPassthroughAware,
+} from "jstests/libs/query/change_stream_util.js";
 
 let cst = new ChangeStreamTest(db);
 

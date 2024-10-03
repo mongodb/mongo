@@ -12,7 +12,7 @@
  *   requires_getmore,
  * ]
  */
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.timeseries_internal_bounded_sort_compound_mixed_types;
 const buckets = db['system.buckets.' + coll.getName()];

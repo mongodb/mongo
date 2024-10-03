@@ -9,8 +9,8 @@
  * ]
  */
 
-import {getExecutionStages, getPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getExecutionStages, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";

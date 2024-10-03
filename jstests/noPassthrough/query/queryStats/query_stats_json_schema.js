@@ -3,7 +3,7 @@
  * mongod and mongos.
  * @tags: [requires_fcv_81]
  */
-import {getQueryStatsAggCmd, kShellApplicationName} from "jstests/libs/query_stats_utils.js";
+import {getQueryStatsAggCmd, kShellApplicationName} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kHashedDbName = "iDlS7h5jf5HHxWPJpeHRbA+jLTNNZaqxVVkplrEkfko=";

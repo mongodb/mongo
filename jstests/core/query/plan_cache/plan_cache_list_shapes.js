@@ -14,8 +14,8 @@
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
 // ]
-import {getPlanCacheShapeHashFromObject} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getPlanCacheShapeHashFromObject} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 if (checkSbeFullyEnabled(db)) {
     jsTest.log("Skipping test because SBE is enabled.");

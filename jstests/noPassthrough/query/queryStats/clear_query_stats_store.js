@@ -2,7 +2,7 @@
  * Test that the query stats store can be cleared when the cache size is reset to 0.
  * @tags: [requires_fcv_72]
  */
-import {getQueryStats} from "jstests/libs/query_stats_utils.js";
+import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
 
 // Turn on the collecting of queryStats metrics.
 let options = {

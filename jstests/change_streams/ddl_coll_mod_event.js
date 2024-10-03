@@ -9,8 +9,8 @@
  *   exclude_when_record_ids_replicated
  * ]
  */
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 

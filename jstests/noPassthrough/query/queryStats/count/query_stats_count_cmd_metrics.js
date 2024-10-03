@@ -15,7 +15,7 @@ import {
     getQueryStats,
     resetQueryStatsStore,
     withQueryStatsEnabled
-} from "jstests/libs/query_stats_utils.js";
+} from "jstests/libs/query/query_stats_utils.js";
 
 /**
  * Initialize collection for tests.

@@ -4,7 +4,7 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 

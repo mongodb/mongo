@@ -4,7 +4,7 @@
 
 import {
     getAggPlanStage,
-} from "jstests/libs/analyze_plan.js";
+} from "jstests/libs/query/analyze_plan.js";
 import {validateMongotStageExplainExecutionStats} from "jstests/with_mongot/common_utils.js";
 import {
     mongotMultiCursorResponseForBatch,

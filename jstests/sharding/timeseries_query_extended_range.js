@@ -9,7 +9,7 @@
  * ]
  */
 
-import {getQueryPlanner} from "jstests/libs/analyze_plan.js";
+import {getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = 'test';

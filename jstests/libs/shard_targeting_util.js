@@ -1,6 +1,6 @@
 // Contains utilities and helper functions for testing shard targeting of aggregate commands.
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 /**

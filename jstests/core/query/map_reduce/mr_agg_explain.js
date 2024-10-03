@@ -9,7 +9,7 @@
  *   requires_scripting,
  * ]
  */
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.mr_explain;
 coll.drop();

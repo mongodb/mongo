@@ -14,22 +14,22 @@
  * ]
  */
 
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 import {
     blockProcessingTestCases,
     generateMetaVals
-} from "jstests/libs/block_processing_test_cases.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+} from "jstests/libs/query/block_processing_test_cases.js";
 import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeStatus,
     kSbeDisabled,
     kSbeFullyEnabled
-} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/sbe_util.js";
 
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;

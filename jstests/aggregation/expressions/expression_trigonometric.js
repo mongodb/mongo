@@ -1,6 +1,6 @@
 // SERVER-32930: Basic integration tests for trigonometric aggregation expressions.
 
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 

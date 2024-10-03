@@ -6,7 +6,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/explain/explain.js";
-import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     function assertNCounted(num, obj, db) {

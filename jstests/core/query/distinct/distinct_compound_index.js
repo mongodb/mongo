@@ -4,12 +4,12 @@
 //   # Asserts that some queries use a collection scan.
 //   assumes_no_implicit_index_creation,
 // ]
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertStagesForExplainOfCommand,
     getWinningPlan,
     planHasStage
-} from "jstests/libs/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.distinct_multikey_index;
 

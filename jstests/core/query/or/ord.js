@@ -5,8 +5,8 @@
 //   # An index drop does not necessarily cause cursors to be killed on the secondary.
 //   does_not_support_causal_consistency,
 // ]
-import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.jstests_ord;
 coll.drop();

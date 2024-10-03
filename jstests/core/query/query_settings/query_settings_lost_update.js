@@ -15,7 +15,7 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 // Early exit in case we are running on standalone mongod. Standalone mongod does not contain a
 // functioning 'VectorClock' instance. The check we have introduced in this change relies on a

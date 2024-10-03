@@ -6,8 +6,8 @@
  *   requires_fcv_80,
  * ]
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {exhaustFindCursorAndReturnResults} from "jstests/libs/find_cmd_util.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);

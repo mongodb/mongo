@@ -1,7 +1,7 @@
 /**
  * Test the behavior of $derivative.
  */
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 const coll = db.setWindowFields_derivative;
 

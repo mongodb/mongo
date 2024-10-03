@@ -5,9 +5,9 @@
  *     requires_fcv_70
  * ]
  */
-import {getAggPlanStages, getQueryPlanner} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getAggPlanStages, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     getDefaultProtocolVersionForPlanShardedSearch,

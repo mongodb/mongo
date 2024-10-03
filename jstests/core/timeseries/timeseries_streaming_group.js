@@ -10,7 +10,7 @@
  *   requires_timeseries,
  * ]
  */
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const ts = db.timeseries_streaming_group;
 ts.drop();

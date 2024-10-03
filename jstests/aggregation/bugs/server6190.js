@@ -1,6 +1,6 @@
 // $week returns a date's week of the year.  Week zero is comprised of any dates before the first
 // Sunday of the year.  SERVER-6190
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 

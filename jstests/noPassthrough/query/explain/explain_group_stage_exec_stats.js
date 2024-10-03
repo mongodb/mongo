@@ -2,8 +2,8 @@
  * Tests that $group stage reports memory footprint per accumulator when explain is run with
  * verbosities "executionStats" and "allPlansExecution".
  */
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB('test');

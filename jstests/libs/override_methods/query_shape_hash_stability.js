@@ -5,7 +5,7 @@
  **/
 import {getCommandName, getExplainCommand, getInnerCommand} from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
-import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 function assertAllEqual(array) {
     assert(array.every(x => x === array[0]), `not all elements are same: ${array}`);

@@ -31,16 +31,16 @@
 //   multiversion_incompatible,
 // ]
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject,
     getPlanStage
-} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/analyze_plan.js";
+import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 let coll = db.jstests_plan_cache_list_plans;
 coll.drop();

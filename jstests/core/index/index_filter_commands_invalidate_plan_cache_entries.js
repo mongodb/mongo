@@ -20,8 +20,8 @@
  *   assumes_balancer_off,
  * ]
  */
-import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
+import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 // For testing convenience this variable is made an integer "1" if SBE is fully enabled, because the
 // expected amount of plan cache entries differs between the SBE plan cache and the classic one.

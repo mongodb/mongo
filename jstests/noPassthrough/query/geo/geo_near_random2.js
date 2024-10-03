@@ -1,10 +1,10 @@
 // this tests 1% of all points using $near and $nearSphere
-import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
+import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
 
-var test = new GeoNearRandomTest("weekly.geo_near_random2", conn.getDB("test"));
+var test = new GeoNearRandomTest("weekly.query/geo_near_random2", conn.getDB("test"));
 
 test.insertPts(50000);
 

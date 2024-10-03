@@ -1,7 +1,7 @@
 /**
  * Basic tests for the $first/$last accumulators.
  */
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {arrayEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 

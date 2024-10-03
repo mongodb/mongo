@@ -4,8 +4,8 @@
 // used when replanning the find part of the query using the SBE planner, so we expect them to be
 // roughly equal to ensure we are using the correct statistic.
 
-import {getAllPlanStages} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function runExplain(coll, filter, proj, sort) {

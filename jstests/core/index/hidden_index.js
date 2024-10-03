@@ -10,10 +10,10 @@
  * ]
  */
 
-import {getNumberOfIndexScans} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+import {getNumberOfIndexScans} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "hidden_index";
 let coll = assertDropAndRecreateCollection(db, collName);

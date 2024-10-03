@@ -6,13 +6,13 @@
 // ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {
     getQueryStatsFindCmd,
     getQueryStatsShapeHashes,
     resetQueryStatsStore,
     runOnReplsetAndShardedCluster
-} from "jstests/libs/query_stats_utils.js";
+} from "jstests/libs/query/query_stats_utils.js";
 
 runOnReplsetAndShardedCluster((conn, test) => {
     const db = conn.getDB("test");

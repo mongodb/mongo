@@ -4,10 +4,10 @@
 // @tags: [
 //   requires_persistence,
 // ]
-import {getPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");

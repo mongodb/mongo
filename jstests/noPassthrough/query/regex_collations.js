@@ -2,13 +2,13 @@
  * Tests how regex filters are satisfied with different index + query collation combinations
  */
 
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     getPlanStage,
     getWinningPlanFromExplain,
     isCollscan,
     isIxscan
-} from "jstests/libs/analyze_plan.js";
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());

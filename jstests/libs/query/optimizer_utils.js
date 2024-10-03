@@ -1,6 +1,10 @@
-import {getAggPlanStage, getQueryPlanner, isAggregationPlan} from "jstests/libs/analyze_plan.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {
+    getAggPlanStage,
+    getQueryPlanner,
+    isAggregationPlan
+} from "jstests/libs/query/analyze_plan.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 /**

@@ -12,8 +12,8 @@ import {
     exhaustCursorAndGetQueryStats,
     getAggregateQueryStatsKey,
     runForEachDeployment,
-} from "jstests/libs/query_stats_utils.js";
-import {checkSbeCompletelyDisabled} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/query_stats_utils.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
 let collId = 0;
 function getNewCollectionName() {

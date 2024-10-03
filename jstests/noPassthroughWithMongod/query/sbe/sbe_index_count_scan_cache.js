@@ -6,7 +6,7 @@
  *    featureFlagSbeFull,
  * ]
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDb.dropDatabase());

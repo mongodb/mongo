@@ -7,7 +7,7 @@
  * ]
  */
 
-import {getPlanStage} from "jstests/libs/analyze_plan.js";
+import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function validateBatchedDeletes(conn) {

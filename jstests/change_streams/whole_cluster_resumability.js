@@ -1,10 +1,10 @@
 // Basic tests for resuming a $changeStream that is open against all databases in a cluster.
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {
     assertDropAndRecreateCollection,
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 // Create two databases, with one collection in each.
 const testDBs = [db.getSiblingDB(jsTestName()), db.getSiblingDB(jsTestName() + "_other")];

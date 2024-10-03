@@ -11,14 +11,14 @@
  * ]
  */
 
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     getAggPlanStages,
     getPlanStage,
     getPlanStages,
     getWinningPlan
-} from "jstests/libs/analyze_plan.js";
-import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db.or_use_clustered_collection;
 assertDropCollection(db, coll.getName());

@@ -9,7 +9,7 @@
 //   does_not_support_multiplanning_single_solutions,
 // ]
 
-import {getExecutionStats} from "jstests/libs/analyze_plan.js";
+import {getExecutionStats} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_winning_plan;
 coll.drop();

@@ -4,7 +4,10 @@
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 
-import {getQueryStatsFindCmd, getQueryStatsKeyHashes} from "jstests/libs/query_stats_utils.js";
+import {
+    getQueryStatsFindCmd,
+    getQueryStatsKeyHashes
+} from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({

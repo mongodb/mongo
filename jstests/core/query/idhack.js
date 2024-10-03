@@ -4,8 +4,8 @@
 //   requires_non_retryable_writes,
 // ]
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isExpress, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {getWinningPlan, isExpress, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const t = db.idhack;
 t.drop();

@@ -8,8 +8,8 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();

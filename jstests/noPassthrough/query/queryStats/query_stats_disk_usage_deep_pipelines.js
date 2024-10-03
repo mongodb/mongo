@@ -12,7 +12,7 @@ import {
     exhaustCursorAndGetQueryStats,
     getAggregateQueryStatsKey,
     runForEachDeployment,
-} from "jstests/libs/query_stats_utils.js";
+} from "jstests/libs/query/query_stats_utils.js";
 
 let collId = 0;
 function getNewCollectionName() {

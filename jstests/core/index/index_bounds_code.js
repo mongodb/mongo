@@ -3,7 +3,7 @@
 //   assumes_unsharded_collection,
 //   requires_non_retryable_writes,
 // ]
-import {assertCoveredQueryAndCount} from "jstests/libs/analyze_plan.js";
+import {assertCoveredQueryAndCount} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.index_bounds_code;
 coll.drop();

@@ -7,7 +7,7 @@ import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {
     assertChangeStreamEventEq,
     canonicalizeEventForTesting
-} from "jstests/libs/change_stream_util.js";
+} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(collName, shardKey) {

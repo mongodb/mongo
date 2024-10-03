@@ -12,8 +12,8 @@
  *  ]
  */
 
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_per_stage_exec_stats;
 coll.drop();

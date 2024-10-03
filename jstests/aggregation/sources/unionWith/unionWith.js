@@ -6,7 +6,7 @@
  * ]
  */
 
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {anyEq} from "jstests/aggregation/extras/utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

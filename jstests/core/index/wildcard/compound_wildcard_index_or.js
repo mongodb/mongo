@@ -11,7 +11,7 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const documentList = [
     {

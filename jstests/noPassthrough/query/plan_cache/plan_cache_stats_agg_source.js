@@ -7,8 +7,8 @@ import {
     getPlanCacheKeyFromShape,
     getPlanStage,
     getPlanStages,
-} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start up");

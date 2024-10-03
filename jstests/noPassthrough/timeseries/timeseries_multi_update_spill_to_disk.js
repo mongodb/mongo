@@ -6,7 +6,7 @@
  * ]
  */
 
-import {getExecutionStages} from "jstests/libs/analyze_plan.js";
+import {getExecutionStages} from "jstests/libs/query/analyze_plan.js";
 
 const dateTime = ISODate("2021-07-12T16:00:00Z");
 const buckets = ["A", "B", "C", "D", "E", "F", "G"];

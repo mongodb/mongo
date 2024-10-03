@@ -5,7 +5,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 // ]
-import {getPlanStage, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
+import {getPlanStage, getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_multikey;
 const keyPattern = {

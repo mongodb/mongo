@@ -6,7 +6,7 @@
  *   featureFlagSbeFull,
  * ]
  */
-import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
 
 // Lists the names of the setParameters which should result in the SBE plan cache being cleared when
 // the parameter is modified. Along with each parameter, includes a valid new value of the parameter

@@ -5,7 +5,7 @@
  * ]
  */
 
-import {getAggPlanStages, getUnionWithStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {
     verifyE2ESearchExplainOutput,

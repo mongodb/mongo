@@ -8,8 +8,8 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 let testDB = db.getSiblingDB(jsTestName());
 testDB.dropDatabase();

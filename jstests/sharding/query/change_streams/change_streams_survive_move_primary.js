@@ -7,8 +7,8 @@
  *   uses_change_streams,
  * ]
  */
-import {ChangeStreamTest, ChangeStreamWatchMode} from 'jstests/libs/change_stream_util.js';
 import {assertCreateCollection} from 'jstests/libs/collection_drop_recreate.js';
+import {ChangeStreamTest, ChangeStreamWatchMode} from 'jstests/libs/query/change_stream_util.js';
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({

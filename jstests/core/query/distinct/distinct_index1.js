@@ -5,8 +5,8 @@
  *   assumes_read_concern_local,
  * ]
  */
-import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.distinct_index1;
 coll.drop();

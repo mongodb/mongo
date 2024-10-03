@@ -3,7 +3,7 @@
  * @tags: [featureFlagQueryStats]
  */
 
-import {getQueryStatsAggCmd} from "jstests/libs/query_stats_utils.js";
+import {getQueryStatsAggCmd} from "jstests/libs/query/query_stats_utils.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mockPlanShardedSearchResponse,

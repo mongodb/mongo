@@ -4,7 +4,7 @@
 //   requires_getmore,
 // ]
 
-import {deg2rad, metersToRadians} from "jstests/libs/geo_math.js";
+import {deg2rad, metersToRadians} from "jstests/libs/query/geo_math.js";
 
 var t = db.geo_mindistance;
 t.drop();

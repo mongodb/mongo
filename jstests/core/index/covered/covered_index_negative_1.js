@@ -8,7 +8,7 @@
 //   assumes_balancer_off,
 //   does_not_support_stepdowns,
 // ]
-import {getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.covered_negative_1;
 coll.drop();

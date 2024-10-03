@@ -4,7 +4,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-import {getWinningPlan, isCollscan} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan, isCollscan} from "jstests/libs/query/analyze_plan.js";
 
 var coll = db.jstests_bitwise;
 

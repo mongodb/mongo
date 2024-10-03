@@ -8,7 +8,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {isClusteredIxscan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {isClusteredIxscan, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();

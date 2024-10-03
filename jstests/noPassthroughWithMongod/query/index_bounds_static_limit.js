@@ -6,7 +6,7 @@
 //   does_not_support_stepdowns,
 //   featureFlagSbeFull,
 // ]
-import {getPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {getPlanStage, getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.index_bounds_static_limit;
 coll.drop();

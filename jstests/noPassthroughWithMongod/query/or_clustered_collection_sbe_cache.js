@@ -3,7 +3,7 @@
  * CLUSTERED_IXSCAN stages does not use the SBE plan cache.
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const mongod = MongoRunner.runMongod();
 const dbName = "test";

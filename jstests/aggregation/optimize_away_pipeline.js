@@ -15,6 +15,7 @@
 //   not_allowed_with_signed_security_token,
 // ]
 import {isWiredTiger} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     aggPlanHasStage,
     getAggPlanStage,
@@ -22,9 +23,11 @@ import {
     isAggregationPlan,
     isQueryPlan,
     planHasStage,
-} from "jstests/libs/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+} from "jstests/libs/query/analyze_plan.js";
+import {
+    checkSbeFullyEnabled,
+    checkSbeRestrictedOrFullyEnabled
+} from "jstests/libs/query/sbe_util.js";
 
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);

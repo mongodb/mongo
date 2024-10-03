@@ -16,7 +16,7 @@ import {
     getWinningPlan,
     isIndexOnly,
     isIxscan,
-} from "jstests/libs/analyze_plan.js";
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_multi_plan_count;
 coll.drop();

@@ -10,7 +10,7 @@
  *  requires_fcv_61,
  * ]
  */
-import {checkNWouldDelete, getPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {checkNWouldDelete, getPlanStage, getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 export const $config = (function() {
     // 'data' is passed (copied) to each of the worker threads.

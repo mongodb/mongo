@@ -1,6 +1,6 @@
 // SERVER-10689 introduced the $switch expression. In this file, we test the error cases of the
 // expression.
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 

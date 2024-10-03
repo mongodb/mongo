@@ -7,7 +7,7 @@
  *   requires_persistence,
  * ]
  */
-import {getAggPlanStage, getEngine} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getEngine} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod(
     {setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});

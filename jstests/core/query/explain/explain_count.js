@@ -2,8 +2,8 @@
 //
 // @tags: [requires_fastcount]
 
-import {assertExplainCount, getPlanStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {assertExplainCount, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 var collName = "jstests_explain_count";
 var t = db[collName];

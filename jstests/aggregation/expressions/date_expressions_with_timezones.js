@@ -1,4 +1,4 @@
-import "jstests/libs/sbe_assert_error_override.js";
+import "jstests/libs/query/sbe_assert_error_override.js";
 
 const coll = db.date_expressions_with_time_zones;
 coll.drop();

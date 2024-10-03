@@ -11,8 +11,8 @@
  * ]
  */
 
-import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const timeFieldName = "timestamp";

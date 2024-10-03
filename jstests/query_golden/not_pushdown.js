@@ -8,7 +8,7 @@
  *   requires_cqf,
  * ]
  */
-import {findSubtrees} from "jstests/libs/optimizer_utils.js";
+import {findSubtrees} from "jstests/libs/query/optimizer_utils.js";
 
 const coll = db.cqf_not_pushdown;
 coll.drop();
