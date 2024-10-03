@@ -117,6 +117,10 @@ public:
         return _inserterWorkers->getStats();
     }
 
+    int getChunkMigrationConcurrency() const {
+        return _chunkMigrationConcurrency;
+    }
+
 private:
     /**
      * Keeps track of memory usage and makes sure it won't exceed the limit.

@@ -108,11 +108,7 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
     bool parallelFetchingSupported,
     int maxBufferedSizeBytesPerThread)
     : _nss{std::move(nss)},
-      _chunkMigrationConcurrency{
-          // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-          mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCVUnsafe()
-              ? chunkMigrationConcurrency.load()
-              : 1},
+      _chunkMigrationConcurrency{1},
       _sessionId{std::move(sessionId)},
       _inserterWorkers{[&]() {
           ThreadPool::Options options;
@@ -135,6 +131,14 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
       _isParallelFetchingSupported{parallelFetchingSupported},
       _secondaryThrottleTicket(outerOpCtx->getServiceContext(), 1, false /* trackPeakUsed */),
       _bufferSizeTracker(maxBufferedSizeBytesPerThread) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCVUnsafe() &&
+        chunkMigrationConcurrency.load() > 1) {
+        LOGV2_INFO(9532401,
+                   "The ChunkMigrationConcurrency setting has been deprecated and is now fixed at "
+                   "a value of 1");
+    }
+
     _inserterWorkers->startup();
 }
 
