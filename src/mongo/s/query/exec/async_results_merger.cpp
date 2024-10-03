@@ -969,7 +969,7 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock lk, OperationContext* opC
             // the cursor was killed due to a maxTimeMs timeout, the remaining time will be 0, and
             // the remote request will not be sent. To avoid this, we remove the timeout for the
             // remote 'killCursor' command.
-            request.timeout = executor::RemoteCommandRequestBase::kNoTimeout;
+            request.timeout = executor::RemoteCommandRequest::kNoTimeout;
 
             // Send kill request; discard callback handle, if any, or failure report, if not.
             _executor

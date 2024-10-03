@@ -1002,7 +1002,7 @@ TEST_F(AsyncResultsMergerTest, KillCursorCmdHasNoTimeout) {
     auto* opCtx = operationContext();
     opCtx->setDeadlineAfterNowBy(Microseconds::zero(), ErrorCodes::MaxTimeMSExpired);
     auto killFuture = arm->kill(opCtx);
-    ASSERT_EQ(executor::RemoteCommandRequestBase::kNoTimeout, getNthPendingRequest(0u).timeout);
+    ASSERT_EQ(executor::RemoteCommandRequest::kNoTimeout, getNthPendingRequest(0u).timeout);
     killFuture.wait();
 }
 

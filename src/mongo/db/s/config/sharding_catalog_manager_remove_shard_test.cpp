@@ -81,7 +81,6 @@
 namespace mongo {
 namespace {
 
-using executor::RemoteCommandRequest;
 using std::string;
 using std::vector;
 using unittest::assertGet;

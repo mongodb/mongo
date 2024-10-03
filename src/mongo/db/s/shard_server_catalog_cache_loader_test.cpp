@@ -69,7 +69,6 @@
 namespace mongo {
 namespace {
 
-using executor::RemoteCommandRequest;
 using std::vector;
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 

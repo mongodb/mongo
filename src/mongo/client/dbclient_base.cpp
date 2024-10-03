@@ -94,8 +94,6 @@ using std::stringstream;
 using std::unique_ptr;
 using std::vector;
 
-using executor::RemoteCommandRequest;
-
 AtomicWord<long long> DBClientBase::ConnectionIdSequence;
 
 void (*DBClientBase::withConnection_do_not_use)(std::string host,

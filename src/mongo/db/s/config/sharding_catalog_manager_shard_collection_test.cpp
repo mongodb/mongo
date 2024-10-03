@@ -76,7 +76,6 @@
 namespace mongo {
 namespace {
 
-using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
 class ShardCollectionTestBase : public ConfigServerTestFixture {

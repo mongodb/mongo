@@ -80,8 +80,6 @@
 namespace mongo {
 namespace {
 
-using executor::RemoteCommandRequest;
-
 const NamespaceString kNs = NamespaceString::createNamespaceString_forTest("a.b");
 const NamespaceString kOtherNs = NamespaceString::createNamespaceString_forTest("a.b.c");
 const KeyPattern kShardKey(BSON("x" << 1));

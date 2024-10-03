@@ -55,7 +55,6 @@
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(failClassicSearch);
 
-using executor::RemoteCommandRequest;
 using executor::TaskExecutorCursor;
 
 DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemote(

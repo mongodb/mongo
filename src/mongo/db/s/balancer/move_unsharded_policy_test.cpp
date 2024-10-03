@@ -52,8 +52,6 @@
 namespace mongo {
 namespace {
 
-using executor::RemoteCommandRequest;
-
 const DatabaseName kDbName = DatabaseName::createDatabaseName_forTest(boost::none, "TestDb");
 const auto kNamespace = NamespaceString::createNamespaceString_forTest(kDbName, "TestColl");
 const int kSizeOnDisk = 1;

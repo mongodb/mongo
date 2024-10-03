@@ -94,8 +94,6 @@
 namespace mongo {
 namespace {
 
-using executor::RemoteCommandRequest;
-
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);

@@ -78,9 +78,6 @@
 
 
 namespace mongo {
-
-using executor::RemoteCommandRequest;
-
 namespace {
 
 constexpr auto saslClientLogFieldName = "clientLogLevel"_sd;
