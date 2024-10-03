@@ -172,7 +172,7 @@ repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
     if (collectionName.isTimeseriesBucketsCollection()) {
         auto& bucketCatalog =
             timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-        timeseries::bucket_catalog::clear(bucketCatalog, uuid);
+        timeseries::bucket_catalog::drop(bucketCatalog, uuid);
     }
 
     return {};
@@ -195,7 +195,7 @@ void TimeSeriesOpObserver::onReplicationRollback(OperationContext* opCtx,
             timeseries::bucket_catalog::TrackingScope::kBucketStateRegistry),
         rbInfo.rollbackUUIDs.begin(),
         rbInfo.rollbackUUIDs.end());
-    timeseries::bucket_catalog::clear(bucketCatalog, std::move(clearedCollectionUUIDs));
+    timeseries::bucket_catalog::drop(bucketCatalog, std::move(clearedCollectionUUIDs));
 }
 
 }  // namespace mongo

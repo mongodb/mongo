@@ -56,6 +56,7 @@
  * ]
  */
 
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const numShards = 2;
@@ -114,14 +115,16 @@ assert.commandWorked(st.s.adminCommand({
 // Check that timeseries collStats are all 0 on an empty sharded collection
 clusterCollStatsResult = assert.commandWorked(mongosDB.runCommand({collStats: emptyCollName}));
 jsTestLog("Empty cluster collStats command result: " + tojson(clusterCollStatsResult));
-assert.eq(0, clusterCollStatsResult.timeseries.avgBucketSize);
-assert.eq(0, clusterCollStatsResult.timeseries.avgNumMeasurementsPerCommit);
-assert.eq(0, clusterCollStatsResult.timeseries.bucketCount);
-assert.eq(0, clusterCollStatsResult.timeseries.numBucketFetchesFailed);
-assert.eq(0, clusterCollStatsResult.timeseries.numBucketInserts);
-assert.eq(0, clusterCollStatsResult.timeseries.numBucketQueriesFailed);
-assert.eq(0, clusterCollStatsResult.timeseries.numBucketReopeningsFailed);
-assert.eq(0, clusterCollStatsResult.timeseries.numBucketUpdates);
+assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "avgBucketSize"));
+assert.eq(0,
+          TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "avgNumMeasurementsPerCommit"));
+assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "bucketCount"));
+assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketFetchesFailed"));
+assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketInserts"));
+assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketQueriesFailed"));
+assert.eq(0,
+          TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketReopeningsFailed"));
+assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketUpdates"));
 
 // Force splitting numShards chunks.
 const splitPoint = {

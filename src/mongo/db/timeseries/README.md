@@ -455,6 +455,9 @@ See:
 
 **bucket**: A group of measurements with the same meta-data over a limited period of time.
 
+- **active bucket**: A bucket that is either archived or open. It forms the cardinality managed by the
+  BucketCatalog.
+
 - **alternate bucket**: Used in the context of [useAlternateBucket()](https://github.com/mongodb/mongo/blob/4fb9fe8ef26cde41d3fe1c261bae1ef75c2c3bfc/src/mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h#L158-L163) and refers to any eligible bucket
   that can be found in memory for reopening.
 

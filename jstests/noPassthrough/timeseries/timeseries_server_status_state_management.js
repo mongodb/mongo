@@ -46,6 +46,12 @@ const checkServerStatus = function() {
     assert.eq(expected.trackedClearOperations, actual.trackedClearOperations);
 };
 
+const checkServerStatusMissing = function() {
+    const actual = assert.commandWorked(db.runCommand({serverStatus: 1}));
+
+    assert.eq(actual.hasOwnProperty("bucketCatalog"), false);
+};
+
 resetCollection();
 assert.commandWorked(coll.insert({[metaFieldName]: 1, [timeFieldName]: ISODate()}));
 expected.bucketsManaged++;
@@ -71,7 +77,7 @@ checkServerStatus();
 resetCollection();
 expected.currentEra++;
 expected.trackedClearOperations++;
-checkServerStatus();
+checkServerStatusMissing();
 
 // Inserting more measurements will not remove the old bucket for that meta, as the recreated
 // collection has a different UUID. This opens a new one in a new era. The other meta value still

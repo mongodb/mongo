@@ -216,9 +216,6 @@ public:
 
     // Memory usage threshold in bytes after which idle buckets will be expired.
     std::function<uint64_t()> memoryUsageThreshold;
-
-    // Cardinality of opened and archived buckets managed across all stripes.
-    AtomicWord<uint32_t> numberOfActiveBuckets;
 };
 
 /**
@@ -362,9 +359,15 @@ void directWriteFinish(BucketStateRegistry& registry, const BucketId& bucketId);
 
 /**
  * Clears any bucket whose collection UUID has been cleared by removing the bucket from the catalog
- * asynchronously through the BucketStateRegistry.
+ * asynchronously through the BucketStateRegistry. Drops statistics for the affected collections.
  */
-void clear(BucketCatalog& catalog, tracked_vector<UUID> clearedCollectionUUIDs);
+void drop(BucketCatalog& catalog, tracked_vector<UUID> clearedCollectionUUIDs);
+
+/**
+ * Clears the buckets for the given collection UUID by removing the bucket from the catalog
+ * asynchronously through the BucketStateRegistry. Drops statistics for the affected collection.
+ */
+void drop(BucketCatalog& catalog, const UUID& collectionUUID);
 
 /**
  * Clears the buckets for the given collection UUID by removing the bucket from the catalog

@@ -36,8 +36,9 @@ const checkIfBucketReopened = function(
     measurement, willCreateBucket = false, willReopenBucket = false) {
     let stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
-    const prevBucketCount = stats.timeseries['bucketCount'];
-    const prevExpectedReopenedBuckets = stats.timeseries['numBucketsReopened'];
+    const prevBucketCount = TimeseriesTest.getStat(stats.timeseries, 'bucketCount');
+    const prevExpectedReopenedBuckets =
+        TimeseriesTest.getStat(stats.timeseries, 'numBucketsReopened');
 
     const expectedReopenedBuckets =
         (willReopenBucket) ? prevExpectedReopenedBuckets + 1 : prevExpectedReopenedBuckets;
@@ -50,9 +51,11 @@ const checkIfBucketReopened = function(
     if (TestData.runningWithBalancer) {
         // When resharding is happening in the background, it can cause errors that result in
         // operations being retried and the bucket reopening count being too high.
-        assert.gte(stats.timeseries['numBucketsReopened'], expectedReopenedBuckets);
+        assert.gte(TimeseriesTest.getStat(stats.timeseries, 'numBucketsReopened'),
+                   expectedReopenedBuckets);
     } else {
-        assert.eq(stats.timeseries['numBucketsReopened'], expectedReopenedBuckets);
+        assert.eq(TimeseriesTest.getStat(stats.timeseries, 'numBucketsReopened'),
+                  expectedReopenedBuckets);
     }
 };
 

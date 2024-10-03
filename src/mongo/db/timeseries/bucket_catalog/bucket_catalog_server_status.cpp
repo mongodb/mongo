@@ -89,7 +89,7 @@ public:
         }
 
         auto counts = _getBucketCounts(bucketCatalog);
-        auto numActive = bucketCatalog.numberOfActiveBuckets.loadRelaxed();
+        auto numActive = bucketCatalog.globalExecutionStats.numActiveBuckets.loadRelaxed();
         BSONObjBuilder builder;
         builder.appendNumber("numBuckets", static_cast<long long>(numActive));
         builder.appendNumber("numOpenBuckets", static_cast<long long>(counts.open));

@@ -6,6 +6,7 @@
  *  featureFlagTimeseriesUpdatesSupport,
  * ]
  */
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const timeFieldName = 'time';
@@ -46,7 +47,8 @@ const runSideBucketTest = (setAtRuntime) => {
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
     let stats = assert.commandWorked(coll.stats());
-    assert.eq(stats.timeseries.numBucketsArchivedDueToMemoryThreshold, 0);
+    assert.eq(TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToMemoryThreshold"),
+              0);
 
     const numDocs = 100;
     const metaValue = 'a';
