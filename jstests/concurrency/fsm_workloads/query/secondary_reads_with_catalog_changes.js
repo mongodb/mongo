@@ -62,6 +62,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 ErrorCodes.BadValue,
                 // The collection was dropped
                 ErrorCodes.NamespaceNotFound,
+                // Index not found by cached SBE plan during concurrent index drop
+                ErrorCodes.IndexNotFoundCachedPlan,
             ],
             'unexpected error code: ' + res.code + ': ' + res.message);
     };

@@ -936,3 +936,4 @@ error_codes:
       name: RetriableRemoteCommandFailure,
       categories: [Interruption, RetriableError],
     }
+  - {code: 4938500, name: IndexNotFoundCachedPlan}
