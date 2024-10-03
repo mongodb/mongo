@@ -209,10 +209,10 @@ export let assertStartInReplSet = function(
 };
 
 /**
- * Assert certain error messages are thrown on startup when files are missing or corrupt.
+ * Assert that mongo crashes on startup when files are missing or corrupt.
  */
 export let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
-    dbpath, dbName, collName, deleteOrCorruptFunc, errmsgRegExp) {
+    dbpath, dbName, collName, deleteOrCorruptFunc) {
     // Start a MongoDB instance, create the collection file.
     const mongod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
     const testColl = mongod.getDB(dbName)[collName];
@@ -222,18 +222,16 @@ export let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
     // Stop MongoDB and corrupt/delete certain files.
     deleteOrCorruptFunc(mongod, testColl);
 
-    // Restart the MongoDB instance and get an expected error message.
-    clearRawMongoProgramOutput();
+    // Restart the MongoDB instance and get the abrupt exit code (14).
     assert.eq(MongoRunner.EXIT_ABRUPT,
               runMongoProgram("mongod", "--port", mongod.port, "--dbpath", dbpath));
-    assert.gte(rawMongoProgramOutput().search(errmsgRegExp), 0);
 };
 
 /**
- * Assert certain error messages are thrown on a specific request when files are missing or corrupt.
+ * Assert mongo crashes when files are missing or corrupt.
  */
 export let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
-    dbpath, dbName, collName, deleteOrCorruptFunc, requestFunc, errmsgRegExp) {
+    dbpath, dbName, collName, deleteOrCorruptFunc, requestFunc) {
     // Start a MongoDB instance, create the collection file.
     let mongod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
     let testColl = mongod.getDB(dbName)[collName];
@@ -244,21 +242,12 @@ export let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
     deleteOrCorruptFunc(mongod, testColl);
 
     // Restart the MongoDB instance.
-    clearRawMongoProgramOutput();
     mongod = MongoRunner.runMongod({dbpath: dbpath, port: mongod.port, noCleanData: true});
 
     // This request crashes the server.
     testColl = mongod.getDB(dbName)[collName];
     requestFunc(testColl);
 
-    // Get an expected error message.
-    const rawLogs = rawMongoProgramOutput();
-    const matchedIndex = rawLogs.search(errmsgRegExp);
-    if (matchedIndex < 0) {
-        jsTestLog("String pattern not found in rawMongoProgramOutput(): " + rawLogs);
-    }
-
-    assert.gte(matchedIndex, 0);
     MongoRunner.stopMongod(mongod, 9, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 };
 

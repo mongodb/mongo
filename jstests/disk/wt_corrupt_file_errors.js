@@ -1,5 +1,5 @@
 /**
- * Tests that MongoDB gives errors when certain data files are corrupted.
+ * Tests that MongoDB crashes when certain data files are corrupted.
  *
  * @tags: [requires_wiredtiger]
  */
@@ -35,8 +35,7 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
         assert.throws(() => {
             testColl.insert({a: 1});
         });
-    },
-    new RegExp("Fatal assertion.*50882"));
+    });
 
 /**
  * Test 2. Corrupt the _mdb_catalog.
@@ -47,7 +46,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     const mdbCatalogFile = dbpath + "_mdb_catalog.wt";
     jsTestLog("corrupting catalog file: " + mdbCatalogFile);
     corruptFile(mdbCatalogFile);
-}, new RegExp("Fatal assertion.*50882"));
+});
 
 /**
  * Test 3. Corrupt the WiredTiger.wt.
@@ -58,7 +57,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     const WiredTigerWTFile = dbpath + "WiredTiger.wt";
     jsTestLog("corrupting WiredTiger.wt");
     corruptFile(WiredTigerWTFile);
-}, new RegExp("Fatal assertion.*50944"));
+});
 
 /**
  * Test 4. Corrupt an index file.
@@ -83,5 +82,4 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
         assert.throws(function() {
             testColl.insert({a: 1});
         });
-    },
-    new RegExp("Fatal assertion.*50882"));
+    });

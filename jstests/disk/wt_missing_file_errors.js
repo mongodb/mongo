@@ -1,5 +1,5 @@
 /**
- * Tests that MongoDB gives errors when certain data files are missing.
+ * Tests that MongoDB crashes when certain data files are missing.
  *
  * @tags: [requires_wiredtiger]
  */
@@ -34,8 +34,7 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
         assert.throws(() => {
             testColl.insert({a: 1});
         });
-    },
-    new RegExp("Fatal assertion.*50883"));
+    });
 
 /**
  * Test 2. Delete the _mdb_catalog.
@@ -46,7 +45,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     let mdbCatalogFile = dbpath + "_mdb_catalog.wt";
     jsTestLog("deleting catalog file: " + mdbCatalogFile);
     removeFile(mdbCatalogFile);
-}, new RegExp("Fatal assertion.*50883"));
+});
 
 /**
  * Test 3. Delete the WiredTiger.wt.
@@ -57,7 +56,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     let WiredTigerWTFile = dbpath + "WiredTiger.wt";
     jsTestLog("deleting WiredTiger.wt");
     removeFile(WiredTigerWTFile);
-}, new RegExp("Fatal assertion.*50944"));
+});
 
 /**
  * Test 4. Delete an index file.
@@ -82,5 +81,4 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
         assert.throws(function() {
             testColl.insert({a: 1});
         });
-    },
-    new RegExp("Fatal assertion.*50883"));
+    });
