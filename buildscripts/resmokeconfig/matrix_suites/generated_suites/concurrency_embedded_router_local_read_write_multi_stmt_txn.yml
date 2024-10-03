@@ -74,6 +74,7 @@ selector:
     - requires_profiling
     - does_not_support_transactions
     - assumes_unsharded_collection
+    - requires_timeseries
     - temp_disabled_embedded_router_uncategorized
   roots:
     - jstests/concurrency/fsm_workloads/**/*.js

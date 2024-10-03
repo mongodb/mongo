@@ -80,10 +80,6 @@ selector:
     - jstests/concurrency/fsm_workloads/ddl/collMod/collMod_separate_collections.js
     - jstests/concurrency/fsm_workloads/view_catalog/view_catalog.js
     - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_with_drop.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_deletes_and_inserts.js
-    - jstests/concurrency/fsm_workloads/timeseries/timeseries_findAndModify_remove_and_inserts.js
-    - jstests/concurrency/fsm_workloads/timeseries/timeseries_updates_and_inserts.js
-    - jstests/concurrency/fsm_workloads/timeseries/timeseries_upserts.js
 
     ##
     # Denylists specific to this suite
@@ -131,6 +127,8 @@ selector:
     - does_not_support_transactions
     - does_not_support_stepdowns
     - assumes_unsharded_collection
+    # Time-series collections do not support write transactions
+    - requires_timeseries
 
   # Note that "requires_non_retryable_writes" does not need to be denylisted because some writes
   # that are not individually retryable can be retried if they are part of a transaction.

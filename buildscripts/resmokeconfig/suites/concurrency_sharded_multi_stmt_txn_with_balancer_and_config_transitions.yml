@@ -100,6 +100,8 @@ selector:
     # retry indefinitely.
     - catches_command_failures
     - does_not_support_transactions
+    # Time-series collections do not support write transactions
+    - requires_timeseries
 
     # The following tags are excluded specifically for this suite.
     - config_shard_incompatible
@@ -164,7 +166,6 @@ executor:
         skipDroppingHashedShardKeyIndex: true
         reshardingMinimumOperationDurationMillis: 0
         balancerMigrationsThrottlingMs: 250
-        featureFlagReshardingForTimeseries: true
         failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
           data:
             comment: *movePrimaryComment
