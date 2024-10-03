@@ -1721,7 +1721,7 @@ private:
  */
 #define MONGO_REGISTER_COMMAND(...)                                              \
     static auto MONGO_COMMAND_DUMMY_ID_(mongoRegisterCommand_dummy_, __LINE__) = \
-        *CommandConstructionPlan::EntryBuilder::make<__VA_ARGS__>()              \
+        *::mongo::CommandConstructionPlan::EntryBuilder::make<__VA_ARGS__>()     \
              .expr(#__VA_ARGS__)                                                 \
              .location(MONGO_SOURCE_LOCATION_NO_FUNC())
 
