@@ -171,6 +171,11 @@ public:
         // May include empty instances which represent indexes already dropped.
         std::vector<IndexMetaData> indexes;
 
+        // Note that collection cloning (initial sync, mongodump+mongorestore, resharding, etc.)
+        // use listCollections and listIndexes to obtain the collection metadata. Therefore, any
+        // additional field not contained inside options or indexes does not get cloned into the
+        // target collection, which is almost surely problematic; see SERVER-91195 for more details.
+
         // Time-series collections created in versions 5.1 and earlier are allowed to contain
         // measurements with arbitrarily mixed schema in the buckets. When upgrading from these
         // earlier versions and setting FCV to 5.2 and up, this flag will be set to true by default

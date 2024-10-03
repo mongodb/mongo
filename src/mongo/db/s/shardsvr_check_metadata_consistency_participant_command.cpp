@@ -156,12 +156,12 @@ public:
                                            std::make_move_iterator(indexInconsistencies.end()));
                 }
 
-                auto collOptionsInconsistencies =
-                    metadata_consistency_util::checkCollectionOptionsConsistencyAcrossShards(
-                        opCtx, shardId, configsvrCollections);
+                auto collMetadataInconsistencies =
+                    metadata_consistency_util::checkCollectionMetadataConsistencyAcrossShards(
+                        opCtx, configsvrCollections);
                 inconsistencies.insert(inconsistencies.end(),
-                                       std::make_move_iterator(collOptionsInconsistencies.begin()),
-                                       std::make_move_iterator(collOptionsInconsistencies.end()));
+                                       std::make_move_iterator(collMetadataInconsistencies.begin()),
+                                       std::make_move_iterator(collMetadataInconsistencies.end()));
             }
 
             auto exec = metadata_consistency_util::makeQueuedPlanExecutor(

@@ -49,6 +49,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_common.h"
@@ -677,55 +678,50 @@ std::vector<MetadataInconsistencyItem> checkIndexesConsistencyAcrossShards(
 }
 
 
-std::vector<MetadataInconsistencyItem> checkCollectionOptionsConsistencyAcrossShards(
-    OperationContext* opCtx,
-    const ShardId& primaryShardId,
-    const std::vector<CollectionType>& collections) {
+std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistencyAcrossShards(
+    OperationContext* opCtx, const std::vector<CollectionType>& collections) {
 
     const auto getRawPipelineStages = [&](const NamespaceString& nss) {
-        const auto collOptionsOnPrimaryShard = [&]() -> boost::optional<CollectionOptions> {
-            auto coll = acquireCollectionMaybeLockFree(
-                opCtx,
-                CollectionAcquisitionRequest{nss,
-                                             PlacementConcern{},
-                                             repl::ReadConcernArgs::get(opCtx),
-                                             AcquisitionPrerequisites::OperationType::kRead});
-            if (!coll.exists()) {
-                return boost::none;
-            }
-            return coll.getCollectionPtr()->getCollectionOptions();
-        }();
+        auto catalogEntryOnPrimaryShard =
+            MongoProcessInterface::create(opCtx)->getCatalogEntry(opCtx, nss);
 
         /**
-         * The following pipeline is used to check the collection options consistency across shards
+         * The following pipeline is used to check the collection metadata consistency across shards
          * of the given collection. In particular, it checks that all shards owning chunks of a
-         * collection and the DBPrimary of that collection have the same collection options.
+         * collection and the DBPrimary of that collection have the same collection metadata
+         * (excluding indexes, whose consistency is checked separately).
          * The DBPrimary shard must always have the collection created locally and its collection
-         * options must be consistent with other shards regardless if the DBPrimary shard owns
+         * metadata must be consistent with other shards regardless if the DBPrimary shard owns
          * chunks or not.
          * Note that here we aren't checking if the collection is missing on any of
          * those shards, this is already done by
          * metadata_consistency_util::checkCollectionMetadataConsistency().
          *
          * The pipeline is structured as follows:
-         *      1. Use the $listCatalog stage to gather the collection options from all shards
+         *      1. Use the $listCatalog stage to gather the collection metadata from all shards
          *      owning chunks.
-         *      2. Keep just the two meaningful fields for our purpose: `md.options` and `shard`.
-         *      3. Since $listCatalog only targets shards owning chunks, we may skip checking the
+         *      2. Since $listCatalog only targets shards owning chunks, we may skip checking the
          *      existance of the collection on the DBPrimary shard, where the collection must also
-         *      exist. Therefore, in this step we are appending the collection options obtained from
+         *      exist. Therefore, in this step we are appending the catalog entry obtained from
          *      the DBPrimary shard to the list of documents returned by $listCatalog. To do so, we
          *      need to concatenate the following 4 stages: $group, $project, $unwind and
          *      $replaceWith.
-         *      4. Then, group by collection options in order to detect inconsistencies between
-         *      shards. We will end up having one document per every different collection options
-         *      found.
-         *      5. Finally, rename the `_id` field to `options` to deliver the inconsistency to
-         *      the user (if any).
+         *      3. Keep just the two meaningful fields for our purpose: `md` and `shard`.
+         *      4. Then, we split the pipeline in two sub-pipelines using a facet stage. The first
+         *      sub-pipeline finds inconsistencies within the collection options (`md.options`),
+         *      while the second sub-pipeline finds any other inconsistency in the metadata outside
+         *      `md.options` and `md.indexes`. This split lets us keep backwards compatibility, and
+         *      classify both kinds of inconsistencies separately.
+         *      5. Within each sub-pipeline: Group by collection options/metadata in order to
+         *      detect inconsistencies between shards. We will end up having one document per every
+         *      different collection options/metadata found.
+         *      6. Finally, within each sub-pipeline, rename the `_id` field to `options`/`md` to
+         *      deliver the inconsistency to the user (if any).
          *
          *      This is an example of the results obtained if there is a collection options
          *      mismatch between shard0 and shard1,shard2:
-         *          [
+         *          Inconsistency type: CollectionOptionsMismatch
+         *          Inconsistency details: [
          *              {
          *                options: <optionsA>,
          *                shards: [shard0]
@@ -735,43 +731,81 @@ std::vector<MetadataInconsistencyItem> checkCollectionOptionsConsistencyAcrossSh
          *                shards: [shard1,shard2]
          *              }
          *          ]
+         *
+         *      This is an example of the results obtained if there is a collection auxiliary
+         *      metadata mismatch between shard0,shard1 and shard2:
+         *          Inconsistency type: CollectionAuxiliaryMetadataMismatch
+         *          Inconsistency details: [
+         *              {
+         *                collectionMetadata: <metadataA>,
+         *                shards: [shard0,shard1]
+         *              },
+         *              {
+         *                collectionMetadata: <metadataB>,
+         *                shards: [shard2]
+         *              }
+         *          ]
          */
         std::vector<BSONObj> pipeline;
         pipeline.emplace_back(fromjson(R"(
             {$listCatalog: {}})"));
-        pipeline.emplace_back(fromjson(R"(
-            {$project: {
-                options: '$md.options',
-                shard: '$shard'
-            }})"));
-        if (collOptionsOnPrimaryShard) {
+        if (catalogEntryOnPrimaryShard) {
             pipeline.emplace_back(fromjson(R"(
                 {$group: {
                     _id: 0,
                     docs: { $push: "$$ROOT" } 
                 }})"));
-            pipeline.emplace_back(BSON(
-                "$project" << BSON(
-                    "docs" << BSON(
-                        "$concatArrays" << BSON_ARRAY(
-                            "$docs" << BSON_ARRAY(BSON(
-                                "options" << BSON("$literal" << collOptionsOnPrimaryShard->toBSON())
-                                          << "shard" << primaryShardId)))))));
+            pipeline.emplace_back(
+                BSON("$project" << BSON(
+                         "docs" << BSON("$concatArrays" << BSON_ARRAY(
+                                            "$docs" << BSON_ARRAY(BSON(
+                                                "$literal" << *catalogEntryOnPrimaryShard)))))));
             pipeline.emplace_back(fromjson(R"(
                 { $unwind: '$docs' })"));
             pipeline.emplace_back(fromjson(R"(
                 { $replaceWith: '$docs' })"));
         }
         pipeline.emplace_back(fromjson(R"(
-            {$group: {
-                _id: '$options',
-        	    shards: {$addToSet: '$shard'}
+            {$project: {
+                md: '$md',
+                shard: '$shard'
             }})"));
+        // TODO (SERVER-91231): Remove this code once this metadata field is removed.
+        // If the TSBucketingParametersUnchanged feature flag is enabled, this field is updated in
+        // a non cluster-wide atomic way during FCV downgrades, which can transiently be detected
+        // as an inconsistency. Since we plan to delete this field, exclude it from the checks.
         pipeline.emplace_back(fromjson(R"(
             {$project: {
-                _id: 0,
-                options: '$_id',
-                shards: 1
+                'md.timeseriesBucketingParametersHaveChanged': 0
+            }})"));
+        pipeline.emplace_back(fromjson(R"(
+            {$facet: {
+                options: [
+                    {$group: {
+                        _id: '$md.options',
+                        shards: {$addToSet: '$shard'}
+                    }},
+                    {$project: {
+                        _id: 0,
+                        options: "$_id",
+                        shards: 1
+                    }}
+                ],
+                auxiliaryMetadata: [
+                    {$project: {
+                        "md.options": 0,
+                        "md.indexes": 0
+                    }},
+                    {$group: {
+                        _id: "$md",
+                        shards: { $addToSet: "$shard" }
+                    }},
+                    {$project: {
+                        _id: 0,
+                        md: "$_id",
+                        shards: 1
+                    }}
+                ]
             }})"));
         return pipeline;
     };
@@ -781,8 +815,11 @@ std::vector<MetadataInconsistencyItem> checkCollectionOptionsConsistencyAcrossSh
         const auto& nss = coll.getNss();
         AggregateCommandRequest aggRequest{nss, getRawPipelineStages(nss)};
 
-        std::vector<BSONObj> results = _runExhaustiveAggregation(
+        std::vector<BSONObj> facetedResult = _runExhaustiveAggregation(
             opCtx, nss, aggRequest, "Check collection options consistency across shards"_sd);
+        tassert(9089900,
+                "Expected collection metadata consistency check aggregation to return one document",
+                facetedResult.size() == 1);
 
         // Every element on result's vector contains a unique collection option across the cluster
         // for the given collection. Below are listed the 3 different scenarios we can face:
@@ -795,11 +832,36 @@ std::vector<MetadataInconsistencyItem> checkCollectionOptionsConsistencyAcrossSh
         //     C) `results` size is greater than 1: There are 2 or more shards differing on their
         //        collection options, therefore we will return an inconsistency.
         //
-        if (results.size() > 1) {
+        auto optionsField = facetedResult.front().getField("options");
+        tassert(9089901,
+                "Expected collection metadata check document to contain an 'options' field",
+                !optionsField.eoo());
+        std::vector<BSONObj> optionsResults;
+        for (auto elem : optionsField.Array()) {
+            optionsResults.emplace_back(elem.Obj());
+        }
+        if (optionsResults.size() > 1) {
             // Case where two or more shards have different collection options.
             inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
                 MetadataInconsistencyTypeEnum::kCollectionOptionsMismatch,
-                CollectionOptionsMismatchDetails{nss, std::move(results)}));
+                CollectionOptionsMismatchDetails{nss, std::move(optionsResults)}));
+        }
+
+        // The same reasoning applies to metadata inconsistencies outside the collection options.
+        auto auxiliaryMetadataField = facetedResult.front().getField("auxiliaryMetadata");
+        tassert(9089902,
+                "Expected collection metadata check document to have an 'auxiliaryMetadata' field",
+                !auxiliaryMetadataField.eoo());
+        std::vector<BSONObj> auxiliaryMetadataResults;
+        for (auto elem : auxiliaryMetadataField.Array()) {
+            auxiliaryMetadataResults.emplace_back(elem.Obj());
+        }
+        if (auxiliaryMetadataResults.size() > 1) {
+            // Case where two or more shards have different collection auxiliary metadata.
+            inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
+                MetadataInconsistencyTypeEnum::kCollectionAuxiliaryMetadataMismatch,
+                CollectionAuxiliaryMetadataMismatchDetails{nss,
+                                                           std::move(auxiliaryMetadataResults)}));
         }
     }
     return inconsistencies;

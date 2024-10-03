@@ -111,16 +111,14 @@ std::vector<MetadataInconsistencyItem> checkIndexesConsistencyAcrossShards(
 
 /**
  * For every collection, check that all the shards currently owning chunks and the DBPrimary shard
- * for that collection have exactly the same collection options.
+ * for that collection have exactly the same collection metadata (excluding indexes).
  * It is only safe to call this function under the database/collection DDL lock in 'S' mode.
  *
  * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
  * there is no inconsistency, it is returned an empty vector.
  */
-std::vector<MetadataInconsistencyItem> checkCollectionOptionsConsistencyAcrossShards(
-    OperationContext* opCtx,
-    const ShardId& primaryShardId,
-    const std::vector<CollectionType>& collections);
+std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistencyAcrossShards(
+    OperationContext* opCtx, const std::vector<CollectionType>& collections);
 
 /**
  * Check different types of inconsistencies from a given set of chunks owned by a collection.

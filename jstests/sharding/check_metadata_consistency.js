@@ -53,17 +53,38 @@ function assertNoInconsistencies() {
     });
 }
 
+// Checks that all properties from the expected object match those in the actual object.
+// However, we allow the actual object to have additional properties.
+// This is used to ignore extra fields from passthrough suites (e.g. clustered indices).
+function matchingPropertiesEqual(expected, actual) {
+    return Object.keys(expected).every(key => bsonWoCompare(actual[key], expected[key]) === 0);
+}
+
 function assertCollectionOptionsMismatch(inconsistencies, expectedOptionsWithShards) {
     assert(inconsistencies.some(object => {
         return (object.type === "CollectionOptionsMismatch" &&
+                expectedOptionsWithShards.length === object.details.options.length &&
                 expectedOptionsWithShards.every(expectedO => object.details.options.some(o => {
-                    return tojson(o.shards) == tojson(expectedO.shards) &&
-                        Object.keys(expectedO.options)
-                            .every(key => tojson(o.options[key]) == tojson(expectedO.options[key]));
+                    return bsonWoCompare(o.shards, expectedO.shards) === 0 &&
+                        matchingPropertiesEqual(expectedO.options, o.options);
                 })));
     }),
            "Expected CollectionOptionsMismatch options: " + tojson(expectedOptionsWithShards) +
                ", but got " + tojson(inconsistencies));
+}
+
+function assertCollectionAuxiliaryMetadataMismatch(inconsistencies, expectedMetadataWithShards) {
+    assert(inconsistencies.some(object => {
+        return (object.type === "CollectionAuxiliaryMetadataMismatch" &&
+                expectedMetadataWithShards.length === object.details.collectionMetadata.length &&
+                expectedMetadataWithShards.every(
+                    expectedO => object.details.collectionMetadata.some(o => {
+                        return bsonWoCompare(o.shards, expectedO.shards) === 0 &&
+                            matchingPropertiesEqual(expectedO.md, o.md);
+                    })));
+    }),
+           "Expected CollectionAuxiliaryMetadataMismatch metadata: " +
+               tojson(expectedMetadataWithShards) + ", but got " + tojson(inconsistencies));
 }
 
 // TODO SERVER-77915 We can get rid of isTrackedByConfigServer method once all unsharded collections
@@ -502,6 +523,66 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     assertCollectionOptionsMismatch(inconsistencies, [
         {shards: [primaryShard.shardName], options: {timeseriesFields: localTimeseries}},
         {shards: ["config"], options: {timeseriesFields: configTimeseries}}
+    ]);
+
+    // Clean up the database to pass the hooks that detect inconsistencies.
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testTimeseriesAuxiliaryMetadataMismatch() {
+    jsTest.log("Executing testTimeseriesAuxiliaryMetadataMismatch");
+
+    // TODO SERVER-95414 Remove FCV check when 9.0 becomes last LTS.
+    if (!isFcvGraterOrEqualTo('8.1')) {
+        jsTestLog(
+            "Skipping timeseriesMetadataMismatch test because required FCV is less than 8.1.");
+        return;
+    }
+
+    const db = getNewDb();
+    const kSourceCollName = "ts_metadata_inconsistent";
+    const kNss = db.getName() + "." + kSourceCollName;
+    const kBucketNss = db.getName() + ".system.buckets." + kSourceCollName;
+    const primaryShard = st.shard0;
+    const anotherShard = st.shard1;
+
+    // Set a primary shard.
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+
+    // Create a timeseries sharded collection and place data in 2 shards.
+    assert.commandWorked(db.adminCommand({
+        shardCollection: kNss,
+        key: {meta: 1},
+        timeseries: {timeField: "time", metaField: "meta"}
+    }));
+    assert.commandWorked(st.s.adminCommand({split: kBucketNss, middle: {meta: 0}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: kBucketNss, find: {meta: 0}, to: anotherShard.shardName}));
+    assertNoInconsistencies();
+
+    // Set the timeseriesBucketsMayHaveMixedSchemaData field directly on a single shard and
+    // catch the inconsistency.
+    assert.commandWorked(primaryShard.getDB(db.getName()).runCommand({
+        collMod: kSourceCollName,
+        timeseriesBucketsMayHaveMixedSchemaData: true
+    }));
+
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    // Note that due to SERVER-91195, in addition to the CollectionAuxiliaryMetadataMismatch,
+    // there will be a CollectionOptionsMismatch as the timeseriesBucketsMayHaveMixedSchemaData
+    // field is also stored in the options.storageEngine.wiredTiger.configString field.
+    assert.eq(2, inconsistencies.length);
+    assertCollectionAuxiliaryMetadataMismatch(inconsistencies, [
+        {
+            shards: [primaryShard.shardName],
+            md: {ns: kBucketNss, timeseriesBucketsMayHaveMixedSchemaData: true}
+        },
+        {
+            shards: [anotherShard.shardName],
+            md: {ns: kBucketNss, timeseriesBucketsMayHaveMixedSchemaData: false}
+        }
     ]);
 
     // Clean up the database to pass the hooks that detect inconsistencies.
