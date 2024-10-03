@@ -555,6 +555,7 @@ env.Library(
 env.CppUnitTest(
     target='db_storage_test',
     source=[
+        'backup_block_test.cpp',
         'collection_markers_test.cpp',
         'external_record_store_test.cpp',
         'disk_space_monitor_test.cpp',
@@ -592,6 +593,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_mock',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
+        'backup_block',
         'disk_space_monitor',
         'flow_control',
         'flow_control_parameters',
