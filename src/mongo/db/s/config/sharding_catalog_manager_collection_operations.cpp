@@ -396,7 +396,8 @@ void ShardingCatalogManager::commitRefineCollectionShardKey(
 
     // Idempotency check: if the shard key is already the one requested, there is nothing to do
     // except waiting for majority, in case the write haven't been majority written.
-    auto collType = _localCatalogClient->getCollection(opCtx, nss);
+    auto collType =
+        _localCatalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
     if (newTimestamp == collType.getTimestamp()) {
         uassert(7648607,
                 str::stream() << "Expected refined key " << newShardKeyPattern.toBSON() << " but "
