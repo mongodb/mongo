@@ -57,6 +57,14 @@ public:
             std::make_unique<ShardingDDLCoordinatorExternalStateFactoryForTest>());
     }
 
+    void tearDown() override {
+        _executor->shutdown();
+        _executor->join();
+        _executor.reset();
+
+        ShardServerTestFixture::tearDown();
+    }
+
 protected:
     executor::NetworkInterfaceMock* _network;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
