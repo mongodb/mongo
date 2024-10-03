@@ -62,8 +62,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
-#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__sun) || \
-    defined(__OpenBSD__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #define FASTPATH_UNIX 1
 #endif
 

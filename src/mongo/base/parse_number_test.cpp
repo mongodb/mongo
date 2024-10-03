@@ -479,7 +479,7 @@ PARSE_TEST(DoubleNormalParse) {
     ASSERT_PARSES(NumberType, "12e-8", 12e-8);
     ASSERT_PARSES(NumberType, "-485.381e-8", -485.381e-8);
 
-#if !(defined(_WIN32) || defined(__sun))
+#if !defined(_WIN32)
     // Parse hexadecimal representations of a double.  Hex literals not supported by MSVC, and
     // not parseable by the Windows SDK libc or the Solaris libc in the mode we build.
     // See SERVER-14131.
@@ -535,7 +535,7 @@ TEST(Double, TestParsingNormal) {
     ASSERT_PARSES(double, "12e-8", 12e-8);
     ASSERT_PARSES(double, "-485.381e-8", -485.381e-8);
 
-#if !(defined(_WIN32) || defined(__sun))
+#if !defined(_WIN32)
     // Parse hexadecimal representations of a double.  Hex literals not supported by MSVC, and
     // not parseable by the Windows SDK libc or the Solaris libc in the mode we build.
     // See SERVER-14131.

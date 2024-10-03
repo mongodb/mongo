@@ -139,7 +139,6 @@ mongo_cc_library(
         "//src/mongo/logv2:text_formatter.cpp",
         "//src/mongo/platform:decimal128.cpp",
         "//src/mongo/platform:int128.cpp",
-        "//src/mongo/platform:posix_fadvise.cpp",
         "//src/mongo/platform:process_id.cpp",
         "//src/mongo/platform:random.cpp",
         "//src/mongo/platform:rwmutex.cpp",

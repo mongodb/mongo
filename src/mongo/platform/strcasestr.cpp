@@ -29,24 +29,13 @@
 
 #include "mongo/platform/strcasestr.h"
 
-#if defined(__sun)
-#include <dlfcn.h>
-
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/status.h"
-#endif
-
-#if defined(_WIN32) || defined(__sun)
+#if defined(_WIN32)
 
 #include <algorithm>
 #include <cstring>
 #include <string>
 
-#if defined(__sun)
-#define STRCASESTR_EMULATION_NAME strcasestr_emulation
-#else
 #define STRCASESTR_EMULATION_NAME strcasestr
-#endif
 
 #include "mongo/util/ctype.h"
 #include "mongo/util/str.h"
@@ -73,37 +62,7 @@ const char* STRCASESTR_EMULATION_NAME(const char* haystack, const char* needle) 
     return haystack + (pos - hay.begin());
 }
 
-#if defined(__sun)
-
-typedef const char* (*StrCaseStrFunc)(const char* haystack, const char* needle);
-static StrCaseStrFunc strcasestr_switcher = mongo::pal::strcasestr_emulation;
-
-const char* strcasestr(const char* haystack, const char* needle) {
-    return strcasestr_switcher(haystack, needle);
-}
-
-#endif  // #if defined(__sun)
-
 }  // namespace pal
 }  // namespace mongo
 
-#endif  // #if defined(_WIN32) || defined(__sun)
-
-#if defined(__sun)
-
-namespace mongo {
-
-// 'strcasestr()' on Solaris will call the emulation if the symbol is not found
-//
-MONGO_INITIALIZER_GENERAL(SolarisStrCaseCmp, (), ("default"))
-(InitializerContext* context) {
-    void* functionAddress = dlsym(RTLD_DEFAULT, "strcasestr");
-    if (functionAddress != nullptr) {
-        mongo::pal::strcasestr_switcher =
-            reinterpret_cast<mongo::pal::StrCaseStrFunc>(functionAddress);
-    }
-}
-
-}  // namespace mongo
-
-#endif  // __sun
+#endif  // #if defined(_WIN32)

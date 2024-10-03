@@ -64,12 +64,6 @@
 #include <sys/time.h>
 #endif
 
-#ifdef __sun
-// Some versions of Solaris do not have timegm defined, so fall back to our implementation when
-// building on Solaris.  See SERVER-13446.
-extern "C" time_t timegm(struct tm* const tmp);
-#endif
-
 namespace mongo {
 
 AtomicWord<long long> Date_t::lastNowVal;
