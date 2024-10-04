@@ -417,26 +417,55 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                        return _runImpl(executor, token);
                    })
                 .until([this, token](Status status) {
-                    // Retry until either:
-                    //  - The coordinator succeed
-                    //  - The coordinator failed with non-retryable error determined by the
-                    //  coordinator, or an already known retryable error
-                    //  - Cleanup is not planned
-                    //
-                    //  If the token is not cancelled we retry because it could have been generated
-                    //  by a remote node.
-                    if (!status.isOK() && !_completeOnError &&
-                        (getAbortReason() || _mustAlwaysMakeProgress() ||
-                         _isRetriableErrorForDDLCoordinator(status)) &&
-                        !token.isCanceled()) {
+                    const bool shouldRetry = [&]() {
+                        if (status.isOK() || token.isCanceled()) {
+                            // Do not retry on success or PrimaryOnlyService interruption.
+                            return false;
+                        }
+
+                        // From this point on status cannot be OK, and the token is not canceled.
+                        // Proceed to check if the conditions for retrying apply.
+                        if (_completeOnError) {
+                            // The coordinator instance was marked to not retry on error.
+                            return false;
+                        }
+
+                        if (_isRetriableErrorForDDLCoordinator(status)) {
+                            // The error is considered retriable. The 'status' can be a result of an
+                            // error which ocurred locally, or one which ocurred in a remote node.
+                            // Due to this, some errors cannot be unambiguosly classified as
+                            // retriable or non-retriable. We default to treating them as retriable
+                            // and defer to the PrimaryOnlyService infrastructure, which cancels
+                            // execution through the "token" when appropriate. This can result in a
+                            // retry being logged, when in fact the coordinator is going to be
+                            // interrupted immediately after.
+                            return true;
+                        }
+
+                        if (_mustAlwaysMakeProgress()) {
+                            // The coordinator implementation specifically requests to always retry.
+                            return true;
+                        }
+
+                        if (getAbortReason()) {
+                            // An abort reason is provided, meaning _cleanupOnAbort should be
+                            // executed during the retry.
+                            return true;
+                        }
+
+                        // None of the conditions for retrying are met.
+                        return false;
+                    }();
+
+                    if (shouldRetry) {
+                        _firstExecution = false;
                         LOGV2_INFO(5656000,
                                    "Re-executing sharding DDL coordinator",
                                    logv2::DynamicAttributes{getCoordinatorLogAttrs(),
                                                             "reason"_attr = redact(status)});
-                        _firstExecution = false;
-                        return false;
                     }
-                    return true;
+                    // Returning 'false' signals we need to retry.
+                    return !shouldRetry;
                 })
                 .withBackoffBetweenIterations(kExponentialBackoff)
                 .on(**executor, CancellationToken::uncancelable());
