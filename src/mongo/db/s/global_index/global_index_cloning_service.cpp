@@ -139,8 +139,7 @@ GlobalIndexCloningService::CloningStateMachine::CloningStateMachine(
       }())),
       _mutableState(clonerDoc.getMutableState()),
       _fetcherFactory(std::move(fetcherFactory)),
-      _externalState(std::move(externalState)),
-      _metrics{GlobalIndexMetrics::initializeFrom(clonerDoc, serviceContext)} {}
+      _externalState(std::move(externalState)) {}
 
 SemiFuture<void> GlobalIndexCloningService::CloningStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -231,8 +230,6 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_cleanup(
                         // This is to handle cases where the state document hasn't been inserted.
                         _cloningService->releaseInstance(instanceId, Status::OK());
                     }
-
-                    _metrics->onStateTransition(GlobalIndexClonerStateEnum::kDone, boost::none);
                 });
         })
         .onTransientError([](const auto& status) {})
@@ -310,7 +307,7 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_runUntilDo
 boost::optional<BSONObj> GlobalIndexCloningService::CloningStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode,
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
-    return _metrics->reportForCurrentOp();
+    return boost::none;
 }
 
 void GlobalIndexCloningService::CloningStateMachine::checkIfOptionsConflict(
@@ -366,8 +363,6 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_persistSta
                 stdx::unique_lock lk(_mutex);
                 _mutableState.setState(GlobalIndexClonerStateEnum::kCloning);
             }
-
-            _metrics->onStateTransition(boost::none, GlobalIndexClonerStateEnum::kCloning);
         })
         .onTransientError([](const Status& status) {})
         .onUnrecoverableError([](const Status& status) {})
@@ -383,8 +378,6 @@ GlobalIndexCloningService::CloningStateMachine::_transitionToReadyToCommit(
         // majority, so just return an empty opTime.
         return ExecutorFuture<repl::OpTime>(**executor, repl::OpTime());
     }
-
-    _metrics->setEndFor(GlobalIndexMetrics::TimedPhase::kCloning, now());
 
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor](auto& cancelableFactory) {
@@ -420,8 +413,6 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_clone(
         return ExecutorFuture<void>(**executor);
     }
 
-    _metrics->setStartFor(GlobalIndexMetrics::TimedPhase::kCloning, now());
-
     return AsyncTry([this, executor, cancelToken, cancelableOpCtxFactory] {
                auto cancelableOpCtx =
                    cancelableOpCtxFactory.makeOperationContext(Client::getCurrent());
@@ -440,11 +431,6 @@ void GlobalIndexCloningService::CloningStateMachine::_fetchNextBatch(OperationCo
     }
 
     int totalSize = 0;
-    Timer timer;
-    ON_BLOCK_EXIT([&] {
-        _metrics->onCloningRemoteBatchRetrieval(duration_cast<Milliseconds>(timer.elapsed()));
-    });
-
     do {
         if (auto next = _fetcher->getNext(opCtx)) {
             totalSize += next->indexKeyValues.objsize();
@@ -473,12 +459,6 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_processBat
 
                _lastProcessedIdSinceStepUp = Value(next.documentKey["_id"]);
                _fetcher->setResumeId(_lastProcessedIdSinceStepUp);
-
-               _metrics->onDocumentsProcessed(1,
-                                              next.documentKey.objsize() +
-                                                  next.indexKeyValues.objsize(),
-                                              duration_cast<Milliseconds>(timer.elapsed()));
-
                _fetchedDocs.pop();
            })
         .until([this](const Status& status) { return !status.isOK() || _fetchedDocs.empty(); })
@@ -570,10 +550,7 @@ void GlobalIndexCloningService::CloningStateMachine::_updateMutableState(
                  BSON(GlobalIndexClonerDoc::kIndexCollectionUUIDFieldName
                       << _metadata.getIndexCollectionUUID()),
                  update);
-
-    const auto oldState = _mutableState.getState();
     _mutableState = std::move(newMutableState);
-    _metrics->onStateTransition(oldState, _mutableState.getState());
 }
 
 Date_t GlobalIndexCloningService::CloningStateMachine::now() const {

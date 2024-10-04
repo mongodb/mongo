@@ -183,13 +183,6 @@ public:
         Metrics::getForMoveCollection(sCtx)->reportForServerStatus(bob);
         Metrics::getForBalancerMoveCollection(sCtx)->reportForServerStatus(bob);
         Metrics::getForUnshardCollection(sCtx)->reportForServerStatus(bob);
-
-        // The serverStatus command is run before the FCV is initialized so we ignore it when
-        // checking whether the global index feature is enabled here.
-        if (gFeatureFlagGlobalIndexes.isEnabledUseLatestFCVWhenUninitialized(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            Metrics::getForGlobalIndexes(sCtx)->reportForServerStatus(bob);
-        }
     }
 };
 auto& shardingStatisticsServerStatus =

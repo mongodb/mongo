@@ -53,7 +53,6 @@
 #include "mongo/db/s/global_index/global_index_cloner_fetcher_factory.h"
 #include "mongo/db/s/global_index/global_index_cloner_gen.h"
 #include "mongo/db/s/global_index/global_index_inserter.h"
-#include "mongo/db/s/global_index/global_index_metrics.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -271,8 +270,6 @@ private:
     SharedPromise<void> _readyToCommitPromise;                   // (TS)
     SharedPromise<void> _waitForCleanupPromise;                  // (M)
     const std::unique_ptr<CloningExternalState> _externalState;  // (TS)
-
-    std::unique_ptr<GlobalIndexMetrics> _metrics;  // (TS)
 };
 
 }  // namespace global_index

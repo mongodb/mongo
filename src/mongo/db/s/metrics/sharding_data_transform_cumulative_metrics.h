@@ -99,7 +99,6 @@ public:
     static ShardingDataTransformCumulativeMetrics* getForBalancerMoveCollection(
         ServiceContext* context);
     static ShardingDataTransformCumulativeMetrics* getForUnshardCollection(ServiceContext* context);
-    static ShardingDataTransformCumulativeMetrics* getForGlobalIndexes(ServiceContext* context);
     static ShardingDataTransformCumulativeMetrics* getForMovePrimary(ServiceContext* context);
 
     ShardingDataTransformCumulativeMetrics(const std::string& rootSectionName,

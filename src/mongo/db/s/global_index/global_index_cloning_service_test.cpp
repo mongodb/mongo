@@ -691,29 +691,6 @@ TEST_F(GlobalIndexClonerServiceTest, ClonerShouldAutoRetryOnNetworkError) {
     checkIndexCollection(rawOpCtx);
 }
 
-TEST_F(GlobalIndexClonerServiceTest, MetricsGetsUpdatedWhileRunning) {
-    auto doc = makeStateDocument();
-    auto opCtx = makeOperationContext();
-    auto rawOpCtx = opCtx.get();
-
-    auto cloner = GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
-    auto readyToCommitFuture = cloner->getReadyToCommitFuture();
-    readyToCommitFuture.get();
-
-    auto currentOpBSONOpt =
-        cloner->reportForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode::kIncludeIdle,
-                                   MongoProcessInterface::CurrentOpSessionsMode::kIncludeIdle);
-    ASSERT_TRUE(currentOpBSONOpt);
-    const auto currentOpBSON = *currentOpBSONOpt;
-
-    ASSERT_EQ("ready-to-commit", currentOpBSON["recipientState"].str()) << currentOpBSON;
-    ASSERT_EQ(1, currentOpBSON["keysWrittenFromScan"].safeNumberInt()) << currentOpBSON;
-    ASSERT_EQ(35, currentOpBSON["bytesWritten"].safeNumberInt()) << currentOpBSON;
-
-    cloner->cleanup();
-    cloner->getCompletionFuture().get();
-}
-
 }  // namespace
 }  // namespace global_index
 }  // namespace mongo

@@ -34,7 +34,6 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -54,7 +53,6 @@ struct Metrics {
     ReshardingCumulativeMetrics _moveCollection;
     ReshardingCumulativeMetrics _balancerMoveCollection;
     ReshardingCumulativeMetrics _unshardCollection;
-    global_index::GlobalIndexCumulativeMetrics _globalIndexes;
 
     Metrics()
         : _moveCollection{"moveCollection"},
@@ -92,12 +90,6 @@ ShardingDataTransformCumulativeMetrics*
 ShardingDataTransformCumulativeMetrics::getForUnshardCollection(ServiceContext* context) {
     auto& metrics = getMetrics(context);
     return &metrics->_unshardCollection;
-}
-
-ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::getForGlobalIndexes(
-    ServiceContext* context) {
-    auto& metrics = getMetrics(context);
-    return &metrics->_globalIndexes;
 }
 
 ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(
