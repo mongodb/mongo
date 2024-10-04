@@ -1,8 +1,8 @@
 version: 1.0.0
 filters:
-  - "ssl*":
-    approvers:
-      - 10gen/server-security
   - "*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "ssl*":
+    approvers:
+      - 10gen/server-security

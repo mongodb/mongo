@@ -1436,8 +1436,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/util/cryptd/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/util/net/OWNERS.yml
-/src/mongo/util/net/**/ssl* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/util/net/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/util/net/**/ssl* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/util/net/ocsp/OWNERS.yml
 /src/mongo/util/net/ocsp/**/* @10gen/server-security @svc-auto-approve-bot
