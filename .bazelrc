@@ -115,10 +115,14 @@ build:windows --cxxopt=-DNTDDI_VERSION=0x0A000000
 #                     sets COMPILER_MSVC on windows.
 build:windows --cxxopt=-UCOMPILER_MSVC
 
-# remote execution is the default, but only mongodb employees will be able to access
-# the engflow cluster. External builders should use the local option below
-# remote execution configs
+# Remote execution and caching is the default, but only mongodb employees will be able to access
+# the engflow cluster. External builders should use the --config=local option
+
+# Enable remote build execution:
 build:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
+build:linux --jobs=200
+
+# Enable remote cache (also necessary for remote build execution):
 build --remote_cache=grpcs://sodalite.cluster.engflow.com
 build --bes_backend=grpcs://sodalite.cluster.engflow.com
 build --bes_results_url=https://sodalite.cluster.engflow.com/invocation/
@@ -126,7 +130,6 @@ build --experimental_remote_cache_compression=true
 build --grpc_keepalive_time=30s
 build --nolegacy_important_outputs
 build --bes_keywords=repo:mongo
-build --jobs=200
 common --remote_upload_local_results=False
 
 # Settings specific for clang-tidy
