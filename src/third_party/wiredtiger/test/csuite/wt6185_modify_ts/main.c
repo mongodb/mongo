@@ -34,6 +34,7 @@ extern char *__wt_optarg;
 #define KEYNO 50
 #define MAX_MODIFY_ENTRIES 5
 #define MAX_OPS 25
+#define MAX_STR 8 * 1024
 #define RUNS 250
 #define VALUE_SIZE 80
 
@@ -50,7 +51,7 @@ static u_int tnext;
 
 static uint64_t ts; /* Current timestamp. */
 
-static char keystr[100], modify_repl[256], tmp[4 * 1024];
+static char keystr[100], modify_repl[256], tmp[MAX_STR];
 static uint64_t keyrecno;
 
 static bool use_columns = false;
@@ -224,6 +225,14 @@ modify(WT_SESSION *session, WT_CURSOR *c)
         list[lnext].v = dstrdup(v);
 
         trace("modify read-ts=%" PRIu64 ", commit-ts=%" PRIu64, ts, ts + 1);
+        /*
+         * NOTE: the modify algorithm generally keeps the string length stable since there is an
+         * equal chance of increasing or decreasing the length. But if the RNG hits an unlucky
+         * streak that biases in favor of increasing the length then it may eventually exceed the
+         * maximum size of the trace buffer. This is exceedingly rare but possible so assert before
+         * calling the trace function where it can be a problem.
+         */
+        testutil_assert(strlen(v) < MAX_STR - strlen("returned {}"));
         trace("returned {%s}", v);
 
         testutil_snprintf(tmp, sizeof(tmp), "commit_timestamp=%" PRIx64, ts + 1);

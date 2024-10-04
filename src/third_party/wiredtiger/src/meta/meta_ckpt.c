@@ -1462,7 +1462,7 @@ err:
  */
 int
 __wt_meta_ckptlist_set(
-  WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_CKPT *ckptbase, WT_LSN *ckptlsn)
+  WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_CKPT *ckptbase, WT_ITEM *ckptlsn_str)
 {
     WT_CKPT *ckpt;
     WT_DECL_ITEM(buf);
@@ -1483,10 +1483,11 @@ __wt_meta_ckptlist_set(
                 WT_ERR(__ckpt_check_backup_blocks(session, ckpt, fname));
         }
 
-    has_lsn = ckptlsn != NULL;
-    if (ckptlsn != NULL)
-        WT_ERR(__wt_buf_catfmt(session, buf, ",checkpoint_lsn=(%" PRIu32 ",%" PRIuMAX ")",
-          ckptlsn->l.file, (uintmax_t)__wt_lsn_offset(ckptlsn)));
+    /* "If provided, the metadata needs the LSN of this checkpoint for recovery. */
+    has_lsn = ckptlsn_str != NULL;
+
+    if (ckptlsn_str != NULL)
+        WT_ERR(__wt_buf_catfmt(session, buf, ",checkpoint_lsn=(%s)", (char *)ckptlsn_str->mem));
 
     if (__wt_atomic_load_enum(&dhandle->type) == WT_DHANDLE_TYPE_TIERED)
         WT_ERR(__wt_tiered_set_metadata(session, (WT_TIERED *)dhandle, buf));
@@ -1739,7 +1740,7 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session, bool full, const char *name, siz
 
     /* Print what we did. */
 
-    __wt_verbose(session, WT_VERB_CHECKPOINT_PROGRESS,
+    __wt_verbose_info(session, WT_VERB_CHECKPOINT_PROGRESS,
       "saving checkpoint snapshot min: %" PRIu64 ", snapshot max: %" PRIu64
       " snapshot count: %" PRIu32
       ", oldest timestamp: %s , meta checkpoint timestamp: %s"

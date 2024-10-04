@@ -388,7 +388,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
     if (time_start != 0) {
         time_stop = __wt_clock(session);
-        __wt_verbose(session, WT_VERB_CHECKPOINT,
+        __wt_verbose_debug2(session, WT_VERB_CHECKPOINT,
           "__sync_file WT_SYNC_%s wrote: %" PRIu64 " leaf pages (%" PRIu64 "B), %" PRIu64
           " internal pages (%" PRIu64 "B), and took %" PRIu64 "ms",
           syncop == WT_SYNC_WRITE_LEAVES ? "WRITE_LEAVES" : "CHECKPOINT", leaf_pages, leaf_bytes,

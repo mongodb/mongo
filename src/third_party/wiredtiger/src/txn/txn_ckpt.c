@@ -621,7 +621,7 @@ __checkpoint_prepare_progress(WT_SESSION_IMPL *session, bool final)
     time_diff = WT_TIMEDIFF_SEC(cur_time, conn->ckpt_timer_start);
 
     if (final || (time_diff / WT_PROGRESS_MSG_PERIOD) > conn->ckpt_progress_msg_count) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_PROGRESS,
+        __wt_verbose_info(session, WT_VERB_CHECKPOINT_PROGRESS,
           "Checkpoint prepare %s for %" PRIu64 " seconds and it has gathered %" PRIu64
           " dhandles and skipped %" PRIu64 " dhandles",
           final ? "ran" : "has been running", time_diff, conn->ckpt_apply, conn->ckpt_skip);
@@ -647,7 +647,7 @@ __wt_checkpoint_progress(WT_SESSION_IMPL *session, bool closing)
     time_diff = WT_TIMEDIFF_SEC(cur_time, conn->ckpt_timer_start);
 
     if (closing || (time_diff / WT_PROGRESS_MSG_PERIOD) > conn->ckpt_progress_msg_count) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_PROGRESS,
+        __wt_verbose_info(session, WT_VERB_CHECKPOINT_PROGRESS,
           "Checkpoint %s for %" PRIu64 " seconds and wrote: %" PRIu64 " pages (%" PRIu64 " MB)",
           closing ? "ran" : "has been running", time_diff, conn->ckpt_write_pages,
           conn->ckpt_write_bytes / WT_MEGABYTE);
@@ -723,7 +723,7 @@ __checkpoint_verbose_track(WT_SESSION_IMPL *session, const char *msg)
 
     /* Get time diff in milliseconds. */
     msec = WT_TIMEDIFF_MS(stop, conn->ckpt_timer_start);
-    __wt_verbose(session, WT_VERB_CHECKPOINT,
+    __wt_verbose_debug1(session, WT_VERB_CHECKPOINT,
       "time: %" PRIu64 " ms, gen: %" PRIu64 ": Full database checkpoint %s", msec,
       __wt_gen(session, WT_GEN_CHECKPOINT), msg);
 }
@@ -2344,6 +2344,7 @@ __checkpoint_tree(WT_SESSION_IMPL *session, bool is_checkpoint, const char *cfg[
     WT_BTREE *btree;
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;
+    WT_DECL_ITEM(ckptlsn_str);
     WT_DECL_RET;
     WT_LSN ckptlsn;
     WT_TIME_AGGREGATE ta;
@@ -2449,7 +2450,9 @@ fake:
     if (WT_IS_METADATA(dhandle) || !F_ISSET(session->txn, WT_TXN_RUNNING))
         WT_ERR(__wt_checkpoint_sync(session, NULL));
 
-    WT_ERR(__wt_meta_ckptlist_set(session, dhandle, btree->ckpt, &ckptlsn));
+    WT_ERR(__wt_scr_alloc(session, 0, &ckptlsn_str));
+    WT_ERR(__wt_lsn_string(session, &ckptlsn, ckptlsn_str));
+    WT_ERR(__wt_meta_ckptlist_set(session, dhandle, btree->ckpt, ckptlsn_str));
 
     /*
      * If we wrote a checkpoint (rather than faking one), we have to resolve it. Normally, tracking
@@ -2472,6 +2475,8 @@ fake:
         WT_ERR(__wt_txn_checkpoint_log(session, false, WT_TXN_LOG_CKPT_STOP, NULL));
 
 err:
+    __wt_scr_free(session, &ckptlsn_str);
+
     /* Resolved the checkpoint for the block manager in the error path. */
     if (resolve_bm)
         WT_TRET(bm->checkpoint_resolve(bm, session, ret != 0));
