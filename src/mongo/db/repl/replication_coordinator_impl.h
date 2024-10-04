@@ -2156,7 +2156,8 @@ private:
             // fail it here.
             if (!_promise->getFuture().isReady()) {
                 _promise->setError({ErrorCodes::PrimarySteppedDown,
-                                    "Primary stepped down while waiting for replication"});
+                                    "Primary stepped down while waiting for majority read "
+                                    "availability)"});
             }
             _promise = nullptr;
         }

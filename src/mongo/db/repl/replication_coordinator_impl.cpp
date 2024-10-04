@@ -2584,7 +2584,7 @@ ReplicationCoordinatorImpl::_startWaitingForReplication(WithLock wl,
     auto checkForStepDown = [&]() -> Status {
         if (isReplSet && !_memberState.primary()) {
             return {ErrorCodes::PrimarySteppedDown,
-                    "Primary stepped down while waiting for replication"};
+                    "Primary stepped down before starting to wait for replication"};
         }
 
         auto term = opTime.getTerm();
