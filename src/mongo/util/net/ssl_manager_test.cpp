@@ -29,6 +29,7 @@
 
 
 #include <asio.hpp>
+#include <boost/filesystem.hpp>
 #include <fstream>
 
 #include "mongo/config.h"
@@ -55,6 +56,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
+namespace fs = boost::filesystem;
 
 namespace mongo {
 namespace {
@@ -64,6 +66,11 @@ namespace {
 constexpr const char* caFile = TEST_CERTS_DIR "ca.pem";
 constexpr const char* serverKeyFile = TEST_CERTS_DIR "server.pem";
 constexpr const char* clientKeyFile = TEST_CERTS_DIR "client.pem";
+
+constexpr const char* intermediateACaFile = TEST_CERTS_DIR "intermediate-ca.pem";
+constexpr const char* intermediateALeafKeyFile = TEST_CERTS_DIR "server-intermediate-leaf.pem";
+constexpr const char* intermediateBCaFile = TEST_CERTS_DIR "intermediate-ca-B.pem";
+constexpr const char* intermediateBLeafKeyFile = TEST_CERTS_DIR "intermediate-ca-B-leaf.pem";
 
 // certs rooted in trusted-ca.pem
 constexpr const char* trustedCaFile = TEST_CERTS_DIR "trusted-ca.pem";
@@ -121,6 +128,74 @@ std::string loadFile(const std::string& name) {
     std::ifstream input(name);
     std::string str((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     return str;
+}
+
+// Reads the input stream until EOF or a valid PEM block is encountered.
+// Skips private key PEM blocks if includePrivateKeys is true.
+// Returns the parsed PEM block as a string (with newlines), or an empty
+// string if none is found or a read error occurs.
+std::string readOnePEMBlock(std::ifstream& inputStrm, bool includePrivateKeys) {
+    std::string line;
+    for (;;) {
+        std::stringstream output;
+        bool foundBegin = false;
+        bool foundEnd = false;
+        bool discard = false;
+
+        while (!foundBegin && std::getline(inputStrm, line)) {
+            foundBegin = (line.starts_with("-----BEGIN ") && line.ends_with("-----"));
+        }
+        if (!foundBegin) {
+            return "";
+        }
+
+        discard = (!includePrivateKeys && line.find("PRIVATE KEY") != std::string::npos);
+        output << line << std::endl;
+
+        while (!foundEnd && std::getline(inputStrm, line)) {
+            output << line << std::endl;
+            foundEnd = (line.starts_with("-----END ") && line.ends_with("-----"));
+        }
+        if (!foundEnd) {
+            return "";
+        }
+        if (!discard) {
+            return output.str();
+        }
+    }
+}
+
+struct PEMFileSpec {
+    std::string path;
+    bool includePrivateKeys{false};
+    void serialize(BSONObjBuilder* bob) const {
+        bob->append("path", path);
+        bob->append("includePrivateKeys", includePrivateKeys);
+    }
+};
+// Given a list of PEM files, this concatenates the PEM blocks in those files
+// (optionally filtering out private keys) and writes the result into a temporary
+// file. Returns the path to the temp file.
+std::string combinePEMFiles(const std::vector<PEMFileSpec>& pemSpecs) {
+    // make a temp file for the output
+    auto path = fs::temp_directory_path() / fs::unique_path("tmpfile_%%%%_%%%%_%%%%_%%%%.pem");
+    std::ofstream outStream(path.string());
+    invariant(outStream.is_open());
+
+    LOGV2(
+        9476600, "Combining PEM files", "output"_attr = path.string(), "pemFiles"_attr = pemSpecs);
+
+    // read & parse the PEM files; append PEM blocks to output
+    for (auto& pemSpec : pemSpecs) {
+        std::ifstream input(pemSpec.path);
+        std::string pemBlock;
+        do {
+            pemBlock = readOnePEMBlock(input, pemSpec.includePrivateKeys);
+            outStream << pemBlock;
+        } while (!pemBlock.empty());
+    }
+    outStream.close();
+    return path.string();
 }
 
 TEST(SSLManager, matchHostname) {
@@ -1404,6 +1479,106 @@ TEST(SSLManager, transientSSLParamsOverrideGlobalParamsTests) {
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
         checkValidationResults(result, test.serverPass, test.clientPass);
+    }
+}
+
+// Tests that SSL validation can build its chain of trust given different CAFile & peer certificate
+// configurations that include intermediate CA certificates.
+// Caveats:
+// - Apple: allows intermediate certs (without root CA cert) to be the root of trust
+//          when validating chains.
+TEST(SSLManager, intermediateCATests) {
+    struct TestCase {
+        std::string clientCAFile;
+        std::string serverKeyFile;
+        bool clientPass;
+        void serialize(BSONObjBuilder* bob) const {
+            bob->append("clientCAFile", clientCAFile);
+            bob->append("serverKeyFile", serverKeyFile);
+            bob->append("clientPass", clientPass);
+        }
+    };
+
+    // intermediate-ca.pem + server-intermediate-leaf.pem bundle
+    const std::string intermediateALeafWithIssuerCertKeyFile = combinePEMFiles(
+        {{intermediateALeafKeyFile, true /*includePrivKey*/}, {intermediateACaFile}});
+    // ca.pem + intermediate-ca.pem + server-intermediate-leaf.pem bundle
+    const std::string intermediateALeafWithAllIssuerCertsKeyFile = combinePEMFiles(
+        {{intermediateALeafWithIssuerCertKeyFile, true /*includePrivKey*/}, {caFile}});
+    // intermediate-ca.pem + ca.pem
+    const std::string intermediateAWithRootCaFile =
+        combinePEMFiles({{intermediateACaFile}, {caFile}});
+    // intermediate-ca-B.pem + intermediate-ca-B-leaf.pem bundle
+    const std::string intermediateBLeafWithIssuerCertKeyFile = combinePEMFiles(
+        {{intermediateBLeafKeyFile, true /*includePrivKey*/}, {intermediateBCaFile}});
+
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
+    // Apple allows intermediate CA certs to be the root of trust when validating a chain.
+    const bool allowsIntermediateTrustRoot = true;
+#else
+    const bool allowsIntermediateTrustRoot = false;
+#endif
+
+    std::vector<TestCase> testCases = {
+        // Client configured with CAFile = intermediate-ca.pem only (ie. no root trust anchor)
+        // None of these should pass validation in the client:
+        // 1. server key = server-intermediate-leaf.pem
+        // 2. server key = server.pem
+        // 3. server key = intermediate-ca.pem + server-intermediate-leaf.pem bundle
+        // 4. server key = ca.pem + intermediate-ca.pem + server-intermediate-leaf.pem bundle
+        {intermediateACaFile, intermediateALeafKeyFile, allowsIntermediateTrustRoot},
+        {intermediateACaFile, serverKeyFile, false},
+        {intermediateACaFile, intermediateALeafWithIssuerCertKeyFile, allowsIntermediateTrustRoot},
+        {intermediateACaFile,
+         intermediateALeafWithAllIssuerCertsKeyFile,
+         allowsIntermediateTrustRoot},
+
+        // Client configured with CAFile = intermediate-ca.pem + ca.pem bundle (ie. w/ trust anchor)
+        // The following should pass validation in the client:
+        // 1. server key = server-intermediate-leaf.pem
+        // 2. server key = server.pem
+        // 3. server key = intermediate-ca-B.pem + intermediate-ca-B-leaf.pem bundle
+        //                 (leaf not signed by intermediate-ca.pem, but chain rooted in ca.pem)
+        // These should fail validation in the client:
+        // 4. server key = intermediate-ca-B-leaf.pem (no path to trusted root)
+        {intermediateAWithRootCaFile, intermediateALeafKeyFile, true},
+        {intermediateAWithRootCaFile, serverKeyFile, true},
+        {intermediateAWithRootCaFile, intermediateBLeafWithIssuerCertKeyFile, true},
+        {intermediateAWithRootCaFile, intermediateBLeafKeyFile, false},
+
+        // Client configured with CAFile = ca.pem
+        // The following should fail validation in the client:
+        // 1. server key = server-intermediate-leaf.pem
+        // 2. server key = intermediate-ca-B-leaf.pem
+        // The following should pass validation in the client:
+        // 3. server key = intermediate-ca.pem + server-intermediate-leaf.pem bundle
+        // 4. server key = intermediate-ca-B.pem + intermediate-ca-B-leaf.pem bundle
+        {caFile, intermediateALeafKeyFile, false},
+        {caFile, intermediateBLeafKeyFile, false},
+        {caFile, intermediateALeafWithIssuerCertKeyFile, true},
+        {caFile, intermediateBLeafWithIssuerCertKeyFile, true},
+    };
+
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslPEMKeyFile = trustedClientKeyFile;
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = trustedCaFile;
+
+    for (auto& test : testCases) {
+        clientParams.sslCAFile = test.clientCAFile;
+        serverParams.sslPEMKeyFile = test.serverKeyFile;
+
+        LOGV2(9476601, "Running test case", "test"_attr = test);
+
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, true /*expectIngressPass*/, test.clientPass);
     }
 }
 
