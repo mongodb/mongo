@@ -279,13 +279,19 @@ std::string NetworkInterfaceTL::getHostName() {
 }
 
 void NetworkInterfaceTL::startup() {
+    stdx::lock_guard lk(_mutex);
+    if (_state != kDefault) {
+        LOGV2_INFO(9446800,
+                   "Skipping NetworkInterface startup: interface is in an invalid startup state",
+                   "state"_attr = toString(_state));
+        return;
+    }
+
     _ioThread = stdx::thread([this] {
         setThreadName(_instanceName);
         _run();
     });
 
-    stdx::lock_guard lk(_mutex);
-    invariant(_state == kDefault, "Network interface has already started");
     _state = kStarted;
 }
 
