@@ -1058,6 +1058,11 @@ DEBUG_TYPES_SECTION_FLAGS = select({
     "//bazel/config:linux_clang_linkstatic": [
         "-fdebug-types-section",
     ],
+    # SUSE15 gcc builds system libraries with dwarf32 and needs -fdebug-types-section to keep
+    # the size of the debug information under the 4GB limit.
+    "//bazel/config:suse15_gcc_linkstatic": [
+        "-fdebug-types-section",
+    ],
     "//conditions:default": [],
 })
 

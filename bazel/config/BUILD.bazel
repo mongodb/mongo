@@ -120,6 +120,16 @@ config_setting(
 )
 
 selects.config_setting_group(
+    name = "suse15_gcc_linkstatic",
+    match_all = [
+        "@platforms//os:linux",
+        "//bazel/platforms:suse15",
+        ":compiler_type_gcc",
+        ":linkstatic_enabled",
+    ],
+)
+
+selects.config_setting_group(
     name = "linux_clang",
     match_all = [
         "@platforms//os:linux",
