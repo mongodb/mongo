@@ -22,11 +22,6 @@ buildvariants:
         --link-model=dynamic
       large_distro_name: amazon2023.3-arm64-large
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
-      # The gcov instrumentation saves the path the .gcno files were created in as the default path
-      # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
-      # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
-      # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
-      gcov_environment: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
       # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
       exec_timeout_secs: 32400 # 9 hour timeout
       timeout_secs: 18000 # 5 hour idle timeout
@@ -64,11 +59,6 @@ buildvariants:
         --link-model=dynamic
       large_distro_name: rhel93-medium
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
-      # The gcov instrumentation saves the path the .gcno files were created in as the default path
-      # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
-      # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
-      # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
-      gcov_environment: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
       # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
       exec_timeout_secs: 32400 # 9 hour timeout
       timeout_secs: 18000 # 5 hour idle timeout
