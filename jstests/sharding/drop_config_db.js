@@ -2,6 +2,7 @@
  * Test that dropping the config DB does not crash the server.
  * @tags: [
  *   disables_test_commands,
+ *   config_shard_incompatible
  * ]
  */
 TestData.enableTestCommands = false;

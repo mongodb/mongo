@@ -32,6 +32,7 @@ selector:
     - jstests/sharding/analyze_shard_key/*[aA]uth*.js
     - jstests/sharding/query/**/*[aA]uth*.js
     - jstests/sharding/advance_cluster_time_action_type.js
+    - jstests/sharding/client_disconnect_during_sign_logical_time.js
     - jstests/sharding/query/agg/agg_currentop.js
     - jstests/sharding/internal_txns/internal_client_restrictions.js
     - jstests/sharding/kill_sessions.js
@@ -46,6 +47,7 @@ selector:
     - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
     - jstests/sharding/cluster_time_across_add_shard.js
     - jstests/sharding/set_user_write_block_mode.js
+    - jstests/sharding/drop_config_db.js
   roots:
     - jstests/sharding/**/*.js
 test_kind: js_test

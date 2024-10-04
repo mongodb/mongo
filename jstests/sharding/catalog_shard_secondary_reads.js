@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_80,
+ *   multiversion_incompatible,
  * ]
  */
 import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";

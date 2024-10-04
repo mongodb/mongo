@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_80,
+ *   config_shard_incompatible
  * ]
  */
 
