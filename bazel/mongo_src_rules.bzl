@@ -451,9 +451,6 @@ GCC_OR_CLANG_WARNINGS_COPTS = select({
         # search path but can't be used.
         "-Winvalid-pch",
 
-        # Warn when hiding a virtual function.
-        "-Woverloaded-virtual",
-
         # This warning was added in g++-4.8.
         "-Wno-unused-local-typedefs",
 
@@ -477,9 +474,6 @@ GCC_OR_CLANG_WARNINGS_COPTS = select({
         # SERVER-76472 we don't try to maintain ABI so disable warnings about
         # possible ABI issues.
         "-Wno-psabi",
-
-        # Warn about moves of prvalues, which can inhibit copy elision.
-        "-Wpessimizing-move",
     ],
     "//conditions:default": [],
 })
@@ -1054,6 +1048,11 @@ GDWARF_FEATURES = select({
     "//conditions:default": [],
 })
 
+OVERLOADED_VIRTUAL_FEATURES = select({
+    "@platforms//os:linux": ["overloaded_virtual_warning"],
+    "//conditions:default": [],
+})
+
 DEBUG_TYPES_SECTION_FLAGS = select({
     "//bazel/config:linux_clang_linkstatic": [
         "-fdebug-types-section",
@@ -1297,7 +1296,7 @@ MONGO_GLOBAL_LINKFLAGS = (
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES + SASL_WINDOWS_LIB_FILES
 
-MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES
+MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES + OVERLOADED_VIRTUAL_FEATURES
 
 MONGO_COPTS_THIRD_PARTY = UBSAN_OPTS_THIRD_PARTY
 
