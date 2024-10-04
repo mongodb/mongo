@@ -57,6 +57,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_truncation.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -358,16 +359,33 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
                                  StringData timeFieldName,
                                  const NamespaceString& ns,
                                  bool validateDecompression) try {
+    // Compressing already compressed buckets is a no-op.
+    if (isCompressedBucket(bucketDoc)) {
+        CompressionResult res;
+        res.compressedBucket = bucketDoc.getOwned();
+        return res;
+    }
     auto result = _compressBucket(bucketDoc, timeFieldName, ns, validateDecompression);
-    tassert(8000400,
-            fmt::format("Couldn't compress time-series bucket {} for collection {}",
-                        bucketDoc.toString(),
-                        ns.toStringForErrorMsg()),
-            result.compressedBucket ||
-                MONGO_unlikely(simulateBsonColumnCompressionDataLoss.shouldFail()));
+    if (!result.compressedBucket &&
+        !MONGO_unlikely(simulateBsonColumnCompressionDataLoss.shouldFail())) {
+        LOGV2_ERROR_OPTIONS(8000400,
+                            {logv2::LogTruncation::Disabled},
+                            "Couldn't compress time-series bucket",
+                            "bucket"_attr =
+                                redact(base64::encode(bucketDoc.objdata(), bucketDoc.objsize())),
+                            "ns"_attr = ns.toStringForErrorMsg());
+        // Also log without any risk of PII
+        BSONElement id;
+        bucketDoc.getObjectID(id);
+        LOGV2_ERROR(9547401,
+                    "Couldn't compress time-series bucket",
+                    "bucketId"_attr = id,
+                    "ns"_attr = ns.toStringForErrorMsg());
+        return {};
+    }
     return result;
 } catch (...) {
-    // Skip compression if we encounter any exception
+    // Make sure no exceptions leak out of this function
     LOGV2_DEBUG(5857800,
                 1,
                 "Exception when compressing timeseries bucket, leaving it uncompressed",
