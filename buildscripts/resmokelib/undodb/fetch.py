@@ -2,7 +2,6 @@
 
 import os
 from typing import List, Optional
-import subprocess
 import tempfile
 from urllib.request import urlopen
 from shutil import copyfileobj

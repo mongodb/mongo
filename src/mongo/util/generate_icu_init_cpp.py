@@ -28,7 +28,6 @@
 # it in the license file.
 
 import optparse
-import os
 import sys
 
 

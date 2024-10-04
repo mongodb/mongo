@@ -23,8 +23,6 @@
 Pseudo-builders for building and registering benchmarks.
 """
 
-from SCons.Script import Action
-
 from site_scons.mongo import insort_wrapper
 
 

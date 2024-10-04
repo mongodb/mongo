@@ -1,6 +1,5 @@
 # -*- mode: python; -*-
 
-import re
 
 Import("env")
 Import("get_option")

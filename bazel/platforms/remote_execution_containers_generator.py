@@ -3,12 +3,9 @@
 
 import argparse
 from datetime import datetime
-import json
 import os
 import pathlib
 import subprocess
-import tempfile
-import urllib.request
 
 
 def log_subprocess_run(*args, **kwargs):

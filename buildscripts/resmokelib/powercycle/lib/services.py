@@ -25,8 +25,6 @@ def _try_import(module, name=None):
 
 if _IS_WINDOWS:
     # These modules are used on both sides for dumping python stacks.
-    import win32api
-    import win32event
 
     # These modules are used on the 'server' side.
     _try_import("ntsecuritycon")

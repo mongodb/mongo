@@ -35,14 +35,10 @@ web service if not debug.
 import os
 from pathlib import Path
 import argparse
-import shutil
 import subprocess
-import platform
 import threading
-import copy
 import textwrap
 
-import flask
 from werkzeug.serving import is_running_from_reloader
 
 from graph_visualizer_web_stack.flask.flask_backend import BackendServer

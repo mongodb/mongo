@@ -35,7 +35,6 @@ from enum import Enum
 from itertools import chain
 from typing import Generic, Sequence, TypeVar
 import numpy as np
-import random
 
 __all__ = ["RangeGenerator", "DataType", "RandomDistribution"]
 

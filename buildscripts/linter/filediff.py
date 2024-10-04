@@ -2,7 +2,7 @@
 
 import os
 import sys
-from typing import Tuple, List, Dict, Callable
+from typing import Tuple, List, Callable
 
 from git import Repo
 import structlog

@@ -5,7 +5,6 @@ import argparse
 import logging
 import os
 import sys
-from typing import Dict, List
 
 import structlog
 
@@ -15,7 +14,6 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(mongo_dir)
 
 # pylint: disable=wrong-import-position
-from buildscripts.linter.filediff import gather_changed_files_for_lint
 from buildscripts.linter import runner
 from buildscripts.linter import ruffchecker
 from buildscripts.linter import ruffformatter

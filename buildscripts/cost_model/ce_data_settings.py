@@ -29,7 +29,6 @@
 
 from pathlib import Path
 from datetime import datetime
-import random
 from typing import Sequence
 import config
 from random_generator import (

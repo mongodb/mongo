@@ -1,16 +1,12 @@
 """Unit tests for buildscripts/resmokelib/testing/hooks/fuzz_runtime_parameters.py."""
 
-import logging
-import os
 import unittest
 import random
 import sys
 
 import mock
 
-from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import fuzz_runtime_parameters as _runtime_fuzzer
-from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 
 # pylint: disable=protected-access
 

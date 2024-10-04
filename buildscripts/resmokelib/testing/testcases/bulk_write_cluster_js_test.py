@@ -3,7 +3,6 @@
 from typing import Optional
 
 from buildscripts.resmokelib import logging
-from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 
 

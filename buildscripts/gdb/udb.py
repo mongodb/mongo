@@ -2,7 +2,6 @@
 
 import os
 import re
-from typing import Optional
 import gdb
 
 # Pattern to match output of 'info files'

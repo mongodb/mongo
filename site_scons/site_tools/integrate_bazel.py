@@ -1,5 +1,3 @@
-import copy
-from enum import Enum
 import errno
 import getpass
 import hashlib
@@ -27,7 +25,6 @@ import atexit
 import SCons
 
 import mongo.platform as mongo_platform
-import mongo.generators as mongo_generators
 
 # Disable retries locally
 _LOCAL_MAX_RETRY_ATTEMPTS = 1

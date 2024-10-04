@@ -1,6 +1,5 @@
 # -*- mode: python -*-
 
-from site_scons.mongo import insort_wrapper
 
 Import("env")
 

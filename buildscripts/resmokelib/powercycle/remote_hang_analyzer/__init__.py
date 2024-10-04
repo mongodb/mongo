@@ -1,6 +1,5 @@
 """Run the hang analyzer on the remote powercycle instance."""
 
-import os
 import re
 
 from buildscripts.resmokelib.powercycle import powercycle_constants

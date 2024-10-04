@@ -1,9 +1,5 @@
 """The unittest.TestCase to run tests in a try/catch block."""
 
-import hashlib
-import threading
-
-from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 
 

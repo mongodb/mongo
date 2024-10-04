@@ -17,7 +17,6 @@ import io
 import json
 import os
 import re
-import sys
 import uuid
 import argparse
 import xml.etree.ElementTree as ET

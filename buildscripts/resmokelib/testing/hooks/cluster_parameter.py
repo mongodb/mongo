@@ -3,8 +3,6 @@
 A hook to set the given cluster server parameter on a replica set fixture.
 """
 
-from time import sleep
-
 from buildscripts.resmokelib.testing.hooks import interface
 
 

@@ -1,7 +1,6 @@
 import functools
 import time
 import psutil
-import subprocess
 
 import memory_profiler
 import SCons

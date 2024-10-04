@@ -1,7 +1,6 @@
 """Unit tests for buildscripts/resmokelib/testing/hooks/stepdown.py."""
 
 import logging
-import os
 import unittest
 
 import mock

@@ -21,7 +21,6 @@
 #
 """Pseudo-builders for building and registering tests for pretty printers."""
 
-import subprocess
 import os
 import sys
 

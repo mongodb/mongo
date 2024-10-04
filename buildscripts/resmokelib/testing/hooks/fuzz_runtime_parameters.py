@@ -1,14 +1,11 @@
 """Test hook that periodically makes the primary of a replica set step down."""
 
-import collections
 import copy
-import os.path
 import random
 import threading
 import time
 import sys
 
-import pymongo.errors
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.mongo_fuzzer_configs import generate_normal_mongo_parameters

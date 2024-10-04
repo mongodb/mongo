@@ -15,6 +15,8 @@ from buildscripts.resmokelib.multiversion.multiversion_service import (
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.testing.suite import Suite
 
+__all__ = ["MultiversionService", "MongoReleases", "MongoVersion"]
+
 TEST_DISCOVERY_SUBCOMMAND = "test-discovery"
 SUITECONFIG_SUBCOMMAND = "suiteconfig"
 

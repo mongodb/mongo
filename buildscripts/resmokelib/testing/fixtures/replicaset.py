@@ -1,14 +1,12 @@
 """Replica set fixture for executing JSTests against."""
 
 import os.path
-import random
 import time
 
 import bson
 import pymongo
 import pymongo.errors
 import pymongo.write_concern
-from pymongo import ReadPreference
 
 from buildscripts.resmokelib.testing.fixtures import interface
 

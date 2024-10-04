@@ -5,7 +5,6 @@ import os
 from typing import Optional
 
 from buildscripts.resmokelib import core, logging, utils
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.testcases import interface
 
 

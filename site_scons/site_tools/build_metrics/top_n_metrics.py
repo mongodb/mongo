@@ -1,5 +1,4 @@
 import json
-import sys
 import datetime
 import argparse
 import logging

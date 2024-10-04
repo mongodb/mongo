@@ -30,7 +30,6 @@ import argparse
 import logging
 import os
 import sys
-import re
 import shutil
 from subprocess import check_output
 from typing import List

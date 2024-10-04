@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 from json import JSONDecoder
-from typing import Optional, Tuple, Generator, Dict, List, NamedTuple
+from typing import Optional, Generator, Dict, List, NamedTuple
 
 import requests
 

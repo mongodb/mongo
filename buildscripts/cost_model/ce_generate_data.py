@@ -28,21 +28,18 @@
 """Data generation entry point."""
 
 import asyncio
-import dataclasses
 from datetime import datetime
 import json
 import math
 import os
 import re
-import subprocess
 from pathlib import Path
 import seaborn as sns
 import bson
 import matplotlib.pyplot as plt
 from config import CollectionTemplate, FieldTemplate
-from data_generator import CollectionInfo, DataGenerator
+from data_generator import DataGenerator
 from database_instance import DatabaseInstance
-import parameters_extractor
 from random_generator import DataType
 from ce_data_settings import database_config, data_generator_config
 

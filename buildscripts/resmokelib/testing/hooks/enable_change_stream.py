@@ -6,11 +6,8 @@ environment.
 
 from time import sleep
 from bson.objectid import ObjectId
-from pymongo import MongoClient
 import os.path
-import json
 
-from buildscripts.resmokelib import config
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import jsfile
 

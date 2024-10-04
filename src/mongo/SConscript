@@ -1,6 +1,5 @@
 # -*- mode: python; -*-
 
-import re
 import sys
 
 Import(

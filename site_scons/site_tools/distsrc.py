@@ -23,9 +23,6 @@
 import git
 import SCons
 import os
-import os.path as ospath
-import subprocess
-import shutil
 import tarfile
 import time
 import zipfile

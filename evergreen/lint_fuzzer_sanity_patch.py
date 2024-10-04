@@ -6,7 +6,6 @@ import glob
 from concurrent import futures
 from pathlib import Path
 import time
-from typing import List, Tuple
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:

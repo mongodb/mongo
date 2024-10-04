@@ -3,7 +3,7 @@
 import copy
 
 from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.testing.fixtures.fixturelib import with_naive_retry
+from buildscripts.resmokelib.testing.retry import with_naive_retry
 from buildscripts.resmokelib.testing.hooks import interface
 
 

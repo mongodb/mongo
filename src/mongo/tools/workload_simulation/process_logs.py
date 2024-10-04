@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import sys
 import json
-from os.path import abspath
 import argparse
 import matplotlib.pyplot as pyplot
 

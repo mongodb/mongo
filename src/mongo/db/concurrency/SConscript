@@ -1,5 +1,4 @@
 # -*- mode: python -*-
-import sys
 
 Import("env")
 

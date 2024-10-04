@@ -25,8 +25,6 @@ import re
 import subprocess
 import winreg
 
-import SCons
-
 
 def exists(env):
     result = "msvc" in env["TOOLS"]

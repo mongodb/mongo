@@ -4,7 +4,7 @@ import unittest
 import textwrap
 import random
 import os
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import patch
 from click.testing import CliRunner
 
 from buildscripts.jepsen_report import parse, ParserOutput, main

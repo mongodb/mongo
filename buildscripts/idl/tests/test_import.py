@@ -32,7 +32,6 @@
 import io
 import textwrap
 import unittest
-from typing import Any, Dict
 
 # import package so that it works regardless of whether we run as a module or file
 if __package__ is None:

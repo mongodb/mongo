@@ -18,7 +18,6 @@ import time
 from typing import Optional, Dict, Any, List, NamedTuple
 
 import distro
-import structlog
 import yaml
 
 from requests.exceptions import HTTPError

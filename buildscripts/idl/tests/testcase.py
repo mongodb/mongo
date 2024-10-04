@@ -29,7 +29,6 @@
 
 import io
 import unittest
-from typing import Any, Tuple
 
 if __name__ == "testcase":
     import sys

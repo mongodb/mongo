@@ -3,7 +3,6 @@
 
 import argparse
 import http.server
-import json
 import logging
 import time
 import urllib.parse

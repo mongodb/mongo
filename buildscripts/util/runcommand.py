@@ -3,7 +3,6 @@
 import os
 import pipes
 import shlex
-import sys
 import subprocess
 
 from . import fileops

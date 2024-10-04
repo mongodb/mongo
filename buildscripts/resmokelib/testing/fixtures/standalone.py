@@ -14,8 +14,6 @@ import pymongo.errors
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
-from buildscripts.resmokelib.testing.fixtures.interface import _FIXTURES
-from buildscripts.resmokelib.testing.fixtures.mongot import MongoTFixture
 from buildscripts.resmokelib.utils.history import HistoryDict
 
 

@@ -3,7 +3,7 @@
 import json
 import pathlib
 import os
-from typing import List, Dict, Optional
+from typing import List
 from typing_extensions import TypedDict
 import click
 

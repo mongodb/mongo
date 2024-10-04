@@ -6,7 +6,6 @@ import logging
 import os
 import re
 import sys
-import threading
 from typing import List
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.

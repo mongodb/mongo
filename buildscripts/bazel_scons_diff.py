@@ -6,7 +6,6 @@ import argparse
 import os
 import platform
 import re
-import shutil
 import subprocess
 import sys
 from buildscripts.install_bazel import install_bazel

@@ -5,7 +5,6 @@ Utility to interact with golden data test outputs, produced by golden data test 
 For details on the golden data test framework see: docs/golden_data_test_framework.md.
 """
 
-import json
 import os
 import pathlib
 import platform
@@ -13,7 +12,7 @@ import re
 import sys
 import shutil
 
-from subprocess import call, CalledProcessError, check_output, STDOUT, DEVNULL
+from subprocess import call, check_output
 import click
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.

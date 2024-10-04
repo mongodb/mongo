@@ -1,6 +1,5 @@
 """Generate mongod.conf and mongos.conf using config fuzzer."""
 
-import json
 import os.path
 import shutil
 

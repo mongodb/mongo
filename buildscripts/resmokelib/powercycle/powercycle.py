@@ -4,7 +4,6 @@ import atexit
 import collections
 import copy
 import datetime
-import distutils.spawn
 import importlib
 import json
 import logging
@@ -41,7 +40,6 @@ from buildscripts.resmokelib.powercycle import powercycle_config, powercycle_con
 
 # See https://docs.python.org/2/library/sys.html#sys.platform
 from buildscripts.resmokelib.powercycle.lib.services import WindowsService, PosixService
-from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 
 _IS_WINDOWS = sys.platform in ["win32", "cygwin"]
 _IS_LINUX = sys.platform.startswith("linux")

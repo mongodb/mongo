@@ -6,7 +6,6 @@ import glob
 import os
 import shutil
 import tarfile
-import tempfile
 import zipfile
 
 import requests

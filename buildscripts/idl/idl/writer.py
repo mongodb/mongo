@@ -27,9 +27,6 @@
 #
 """Text Writing Utilites."""
 
-import io
-from typing import Callable, List, Mapping
-
 from . import common
 
 # Number of spaces to indent code

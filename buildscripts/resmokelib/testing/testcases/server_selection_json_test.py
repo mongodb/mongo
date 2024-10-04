@@ -6,7 +6,6 @@ from typing import Optional
 
 from buildscripts.resmokelib import config, logging, core, errors, utils
 from buildscripts.resmokelib.testing.testcases import interface
-from buildscripts.resmokelib.utils import globstar
 
 
 class ServerSelectionJsonTestCase(interface.ProcessTestCase):

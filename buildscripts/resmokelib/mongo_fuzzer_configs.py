@@ -20,7 +20,6 @@ def generate_normal_wt_parameters(rng, value):
 
 def generate_special_eviction_configs(rng, ret, fuzzer_stress_mode, params):
     """Returns the value assigned the WiredTiger eviction parameters based on the fields of the parameters in config_fuzzer_wt_limits.py for special parameters (parameters with different assignment behaviors)."""
-    from buildscripts.resmokelib.config_fuzzer_wt_limits import target_bytes_max
 
     # eviction_trigger is relative to eviction_target, so you have to leave them excluded to ensure
     # eviction_trigger is fuzzed first.

@@ -22,7 +22,7 @@ from opentelemetry.trace.status import StatusCode
 
 from buildscripts.resmokelib.hang_analyzer.dumper import Dumper
 from buildscripts.resmokelib.setup_multiversion.download import DownloadError
-from buildscripts.resmokelib.run import compare_start_time
+from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
     _DownloadOptions,
     SetupMultiversion,

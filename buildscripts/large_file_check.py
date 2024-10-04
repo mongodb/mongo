@@ -11,7 +11,7 @@ import pathlib
 import sys
 import textwrap
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
 

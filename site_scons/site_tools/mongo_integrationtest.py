@@ -23,8 +23,6 @@
 Pseudo-builders for building and registering integration tests.
 """
 
-from SCons.Script import Action
-
 from site_scons.mongo import insort_wrapper
 
 

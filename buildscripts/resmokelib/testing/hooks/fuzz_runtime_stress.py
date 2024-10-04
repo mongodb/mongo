@@ -4,7 +4,6 @@ import time
 import multiprocessing
 import os
 import math
-import sys
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import interface

@@ -9,3 +9,15 @@ from buildscripts.resmokelib import sighandler
 from buildscripts.resmokelib import suitesconfig
 from buildscripts.resmokelib import testing
 from buildscripts.resmokelib import utils
+
+__all__ = [
+    "config",
+    "errors",
+    "logging",
+    "parser",
+    "reportfile",
+    "sighandler",
+    "suitesconfig",
+    "testing",
+    "utils",
+]

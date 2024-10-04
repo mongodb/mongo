@@ -20,7 +20,6 @@ import lldb
 try:
     import bson
     from bson import json_util
-    from bson.codec_options import CodecOptions
     from bson.codec_options import DEFAULT_CODEC_OPTIONS
     from bson import Decimal128
 except ImportError:

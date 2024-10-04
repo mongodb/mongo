@@ -1,7 +1,6 @@
-import time
 from typing import Tuple, List, Any, Optional
 
-from typing_extensions import Protocol, TypedDict
+from typing_extensions import TypedDict
 from .protocol import BuildMetricsCollector
 import SCons.Script
 

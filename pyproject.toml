@@ -198,7 +198,6 @@ ignore = [
     "E721", # type-comparison
     "E722", # bare-except
     "E741", # ambiguous-variable-name
-    "F401", # unused-import
     "F402", # import-shadowed-by-loop-var
     "F403", # undefined-local-with-import-star
     "F405", # undefined-local-with-import-star-usage

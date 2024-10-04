@@ -9,7 +9,6 @@ will simulate automatically logging in as a human would.
 """
 
 import argparse
-import os
 import json
 import traceback
 

@@ -8,7 +8,6 @@ import time
 
 import pymongo.errors
 
-import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset

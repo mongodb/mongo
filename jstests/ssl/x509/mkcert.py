@@ -8,7 +8,6 @@ Optionally providing a cert ID to only regenerate a single cert.
 
 import argparse
 import binascii
-import datetime
 import os
 import random
 import subprocess

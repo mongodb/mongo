@@ -21,8 +21,6 @@
 #
 """Pseudo-builders for building workload simulators."""
 
-from SCons.Script import Action
-
 from site_scons.mongo import insort_wrapper
 
 

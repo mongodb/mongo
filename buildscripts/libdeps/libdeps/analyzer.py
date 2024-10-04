@@ -29,9 +29,7 @@ graph generated from SCons generate-libdeps-graph target. The graph
 represents the dependency information between all binaries from the build.
 """
 
-import sys
 import textwrap
-import copy
 import json
 import inspect
 import functools

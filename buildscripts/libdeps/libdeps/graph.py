@@ -28,7 +28,6 @@ These are used for attributing data across the build scripts and analyzer script
 """
 
 from enum import Enum, auto
-from pathlib import Path
 import json
 
 import networkx

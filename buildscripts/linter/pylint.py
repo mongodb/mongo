@@ -1,10 +1,6 @@
 """PyLint linter support module."""
 
-import os
-from typing import List
-
 from . import base
-from . import git
 
 
 class PyLintLinter(base.LinterBase):

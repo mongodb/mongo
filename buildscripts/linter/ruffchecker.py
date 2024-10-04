@@ -1,7 +1,5 @@
 """Ruff linter support module."""
 
-from typing import List
-
 from . import base
 
 

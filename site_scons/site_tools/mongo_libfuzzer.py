@@ -21,8 +21,6 @@
 #
 """Pseudo-builders for building and registering libfuzzer tests."""
 
-from SCons.Script import Action
-
 
 def exists(env):
     return True

@@ -7,8 +7,6 @@ Assembles json documents which are fed to the mongosymb library. See mongosymb.p
 
 import argparse
 import json
-import re
-import subprocess
 import sys
 import mongosymb
 

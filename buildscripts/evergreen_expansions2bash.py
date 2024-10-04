@@ -1,9 +1,7 @@
 """Convert Evergreen's expansions.yml to an eval-able shell script."""
 
 import sys
-import platform
 from shlex import quote
-from typing import Any
 
 
 def _error(msg: str) -> None:

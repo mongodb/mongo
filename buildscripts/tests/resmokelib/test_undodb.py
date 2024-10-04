@@ -1,8 +1,7 @@
 """Fetch subcommand unittest."""
 
-import os
 import unittest
-from mock import MagicMock, Mock, patch, call
+from mock import MagicMock, patch
 import evergreen
 from buildscripts.resmokelib.undodb import fetch
 

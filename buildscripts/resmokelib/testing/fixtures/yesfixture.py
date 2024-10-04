@@ -3,7 +3,6 @@
 import signal
 
 from buildscripts.resmokelib.testing.fixtures import interface
-from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
 
 class YesFixture(interface.Fixture):  # pylint: disable=abstract-method

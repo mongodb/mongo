@@ -1,9 +1,6 @@
 # -*- mode: python -*-
 
 from site_scons.mongo import insort_wrapper
-import subprocess
-import sys
-import os
 
 Import(
     [

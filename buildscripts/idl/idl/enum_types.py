@@ -34,12 +34,11 @@ Support the code generation for enums
 from abc import ABCMeta, abstractmethod
 import json
 import textwrap
-from typing import cast, List, Optional, Union
+from typing import cast
 import bson
 
 from . import ast
 from . import common
-from . import syntax
 from . import writer
 
 

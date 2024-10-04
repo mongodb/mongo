@@ -1,5 +1,4 @@
 # -*- mode: python -*-
-import os
 import SCons
 
 Import("env")

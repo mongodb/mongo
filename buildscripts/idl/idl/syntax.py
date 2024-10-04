@@ -34,10 +34,9 @@ it follows the rules of the IDL, etc.
 """
 
 import itertools
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing import cast
 
 from . import common
-from . import errors
 
 
 class IDLParsedSpec(object):

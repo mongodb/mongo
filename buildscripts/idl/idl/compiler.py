@@ -35,7 +35,6 @@ import io
 import logging
 import os
 import platform
-from typing import Any, List
 
 from . import binder
 from . import errors

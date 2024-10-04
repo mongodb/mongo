@@ -1,7 +1,6 @@
 import threading
 import time
 import psutil
-import sys
 from .util import timestamp_now
 from .protocol import BuildMetricsCollector
 

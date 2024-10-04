@@ -1,6 +1,5 @@
 """Unit tests for buildscripts/resmokelib/utils/history.py."""
 
-import sched
 import unittest
 
 from buildscripts.resmokelib.utils.history import HistoryDict, make_historic

@@ -1,8 +1,5 @@
 """Class to support running various linters in a common framework."""
 
-from typing import Dict, List, Optional
-
-import difflib
 import logging
 import os
 import re

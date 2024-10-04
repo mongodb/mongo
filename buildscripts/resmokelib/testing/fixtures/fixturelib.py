@@ -8,7 +8,6 @@ from buildscripts.resmokelib.core import network
 from buildscripts.resmokelib.utils.dictionary import merge_dicts
 from buildscripts.resmokelib.utils.history import HistoryDict, make_historic as _make_historic
 from buildscripts.resmokelib.testing.fixtures import _builder
-from buildscripts.resmokelib.testing.retry import with_naive_retry
 
 
 class FixtureLib:

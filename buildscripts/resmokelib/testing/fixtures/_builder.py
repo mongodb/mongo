@@ -19,7 +19,7 @@ from buildscripts.resmokelib.testing.fixtures.shardedcluster import (
     _RouterView,
 )
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
-from buildscripts.resmokelib.utils import autoloader, default_if_none, pick_catalog_shard_node
+from buildscripts.resmokelib.utils import default_if_none, pick_catalog_shard_node
 
 MONGO_REPO_LOCATION = "."
 FIXTURE_DIR = "buildscripts/resmokelib/testing/fixtures"

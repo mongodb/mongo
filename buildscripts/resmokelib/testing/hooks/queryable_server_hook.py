@@ -1,8 +1,7 @@
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import HTTPServer
 
 from buildscripts.resmokelib.testing.hooks import interface
-from buildscripts.resmokelib.testing.hooks import jsfile
 from buildscripts.resmokelib.testing import queryable_server
 
 

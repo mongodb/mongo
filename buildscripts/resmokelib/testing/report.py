@@ -5,7 +5,6 @@ This is used to support additional test status and timing information for the re
 """
 
 import copy
-import os
 import threading
 import time
 import unittest

@@ -1,4 +1,3 @@
-import os
 import sys
 
 EXPECTED_B_CPP = """

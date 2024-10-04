@@ -11,9 +11,6 @@ Import("has_option")
 if not env.TargetOSIs("windows"):
     Return()
 
-import re
-import subprocess
-import winreg
 
 env = env.Clone()
 

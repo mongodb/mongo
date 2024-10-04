@@ -1,5 +1,4 @@
 import pathlib
-import yaml
 import json
 import shutil
 import os

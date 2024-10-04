@@ -6,7 +6,7 @@ import unittest
 from mock import MagicMock, mock
 
 from buildscripts import evergreen_activate_gen_tasks as under_test
-from evergreen import Build, EvergreenApi, Task, Version
+from evergreen import EvergreenApi, Task, Version
 
 
 def build_mock_task(display_name, task_id):

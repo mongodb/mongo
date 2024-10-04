@@ -10,7 +10,6 @@ import time
 import traceback
 import uuid
 import requests
-import shutil
 import tarfile
 import subprocess
 

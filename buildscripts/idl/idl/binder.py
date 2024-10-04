@@ -30,7 +30,7 @@
 import collections
 import re
 import typing
-from typing import Type, TypeVar, cast, List, Set, Union, Optional
+from typing import cast
 
 from . import ast
 from . import bson

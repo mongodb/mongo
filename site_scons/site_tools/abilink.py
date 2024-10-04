@@ -21,7 +21,6 @@
 #
 
 import SCons
-import subprocess
 
 # TODO: Make a SUFF variable for the suffix to write to
 # TODO: Prevent using abilink when -gsplit-dwarf is in play, since it doesn't work

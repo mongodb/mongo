@@ -3,13 +3,9 @@
 import collections
 import os.path
 import threading
-import time
 
-import pymongo.errors
 
 import buildscripts.resmokelib.utils.filesystem as fs
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.hooks import interface
 
 ActionFiles = collections.namedtuple("ActionFiles", ["permitted", "idle_request", "idle_ack"])
 

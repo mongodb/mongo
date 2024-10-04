@@ -8,6 +8,8 @@ from buildscripts.resmokelib.utils import autoloader as _autoloader
 EXTERNAL_FIXTURE_CLASS = _ExternalFixture.REGISTERED_NAME
 NOOP_FIXTURE_CLASS = _NoOpFixture.REGISTERED_NAME
 
+__all__ = ["make_fixture"]
+
 # We dynamically load all modules in the fixtures/ package so that any Fixture classes declared
 # within them are automatically registered.
 _autoloader.load_all_modules(name=__name__, path=__path__)  # type: ignore

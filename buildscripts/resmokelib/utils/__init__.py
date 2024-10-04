@@ -10,6 +10,8 @@ import yaml
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.utils import archival
 
+__all__ = ["archival"]
+
 
 @contextlib.contextmanager
 def open_or_use_stdout(filename):

@@ -1,6 +1,5 @@
 """GDB commands for MongoDB."""
 
-import datetime
 import json
 import os
 import re

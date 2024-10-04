@@ -40,7 +40,7 @@ import abt_calibrator
 import workload_execution
 from workload_execution import Query, QueryParameters
 import parameters_extractor
-from calibration_settings import distributions, main_config
+from calibration_settings import main_config
 
 __all__ = []
 

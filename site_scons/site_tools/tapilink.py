@@ -21,7 +21,6 @@
 #
 
 import SCons
-import subprocess
 
 # TODO: DRY this with abilink.py by moving duplicated code out to a common
 # support module.

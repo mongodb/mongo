@@ -20,8 +20,6 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import SCons
-
 
 def generate(env):
     env["AR"] = "libtool"

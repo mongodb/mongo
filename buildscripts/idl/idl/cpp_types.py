@@ -30,9 +30,7 @@
 from abc import ABCMeta, abstractmethod
 
 import textwrap
-from typing import Any, List, Optional
 
-from . import ast
 from . import bson
 from . import common
 from . import writer

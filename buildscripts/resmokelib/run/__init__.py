@@ -33,7 +33,6 @@ from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.run import generate_multiversion_exclude_tags
 from buildscripts.resmokelib.run import runtime_recorder
 from buildscripts.resmokelib.run import list_tags
-from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
 from buildscripts.resmokelib.suitesconfig import get_suite_files
 from buildscripts.resmokelib.testing.docker_cluster_image_builder import build_images
 from buildscripts.resmokelib.testing.suite import Suite

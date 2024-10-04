@@ -2,3 +2,5 @@
 
 from buildscripts.resmokelib.testing import executor
 from buildscripts.resmokelib.testing import suite
+
+__all__ = ["executor", "suite"]
