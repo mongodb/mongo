@@ -257,6 +257,12 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
     cmd.setCreateCollectionRequest(createRequest);
     return cmd;
 }
+
+CollectionOptions makeCollectionOptions(OperationContext* opCtx,
+                                        const ShardsvrCreateCollectionRequest& request) {
+    return CollectionOptions::fromCreateCommand(
+        create_collection_util::makeCreateCommand(opCtx, {}, request));
+}
 }  // namespace create_collection_util
 
 namespace {
@@ -963,6 +969,9 @@ void logStartCreateCollection(OperationContext* opCtx,
         "collection",
         NamespaceStringUtil::serialize(originalNss, SerializationContext::stateDefault()));
     collectionDetail.append("primary", ShardingState::get(opCtx)->shardId().toString());
+    const auto options =
+        create_collection_util::makeCollectionOptions(opCtx, request).toBSON(false);
+    collectionDetail.append("options", options);
     auto operationStr =
         isUnsplittable(request) ? "createCollection.start" : "shardCollection.start";
     ShardingLogging::get(opCtx)->logChange(

@@ -87,6 +87,28 @@ jsTest.log('When "capped" is true, the "size" field needs to be present.');
         ErrorCodes.InvalidOptions);
 }
 
+jsTest.log(
+    "Check that by creating a valid unsharded collection, relevant events are logged on the CSRS");
+{
+    // Create a non-sharded collection
+    const kDataColl = 'unsplittable_collection_on_create_collection_capped_size_2';
+    const kNs = kDbName + "." + kDataColl;
+    let kCollOptions = {capped: true, size: 5242880, max: 5000};
+    assert.commandWorked(st.s.getDB(kDbName).createCollection(kDataColl, kCollOptions));
+
+    // Verify that the create collection end event has been logged
+    const startLogCount =
+        st.config.changelog.countDocuments({what: 'createCollection.start', ns: kNs});
+    assert.gte(startLogCount, 1, "createCollection start event not found in changelog");
+
+    const endLogCount = st.config.changelog.countDocuments({what: 'createCollection.end', ns: kNs});
+    assert.gte(endLogCount, 1, "createCollection start event not found in changelog");
+
+    // Verify the options are reported
+    let doc = st.config.changelog.find({what: 'createCollection.start', ns: kNs}).toArray()[0];
+    assert.docEq(doc.details.options, kCollOptions);
+}
+
 jsTest.log('If a view already exists with same namespace fail with NamespaceExists');
 {
     const kDataColl = 'simple_view';
