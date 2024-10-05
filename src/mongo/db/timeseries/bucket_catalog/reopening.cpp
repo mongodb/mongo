@@ -152,6 +152,10 @@ void ReopeningContext::clear(WithLock) {
     _cleared = true;
 }
 
+ArchivedBucket::ArchivedBucket(const BucketId& b, const tracked_string& t)
+    : bucketId{b}, timeField{t} {}
+
+
 ReopeningRequest::ReopeningRequest(ExecutionStatsController&& s, boost::optional<OID> o)
     : stats{std::move(s)}, oid{o} {}
 

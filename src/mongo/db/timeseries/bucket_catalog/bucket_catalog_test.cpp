@@ -2226,10 +2226,14 @@ TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopenin
                                  nullptr,
                                  options.getMetaField()}};
     auto minTime = roundTimestampToGranularity(doc["time"].Date(), options);
-    BucketId id{_uuid1, OID::gen(), BucketKey::signature(key.hash)};
+    BucketId id{_uuid1, OID::gen(), 0};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id));
-    _bucketCatalog->stripes[0]->archivedBuckets[std::make_tuple(_uuid1, key.hash, minTime)] =
-        ArchivedBucket{id.oid};
+    _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
+        minTime,
+        ArchivedBucket{id,
+                       make_tracked_string(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                              TrackingScope::kArchivedBuckets),
+                                           options.getTimeField().toString())});
 
     // Should try to reopen archived bucket.
     boost::optional<StatusWith<InsertResult>> result1 =
@@ -2265,12 +2269,14 @@ TEST_F(BucketCatalogTest,
                                  nullptr,
                                  options.getMetaField()}};
     auto minTime1 = roundTimestampToGranularity(doc1["time"].Date(), options);
-    BucketId id1{_uuid1, OID::gen(), BucketKey::signature(key.hash)};
+    BucketId id1{_uuid1, OID::gen(), 0};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id1));
-    _bucketCatalog->stripes[0]->archivedBuckets[std::make_tuple(_uuid1, key.hash, minTime1)] =
-        ArchivedBucket{
-            id1.oid,
-        };
+    _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
+        minTime1,
+        ArchivedBucket{id1,
+                       make_tracked_string(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                              TrackingScope::kArchivedBuckets),
+                                           options.getTimeField().toString())});
 
     // Should try to reopen archived bucket.
     boost::optional<StatusWith<InsertResult>> result1 =
@@ -2285,12 +2291,14 @@ TEST_F(BucketCatalogTest,
     // Inject another archived record on the same series, but a different bucket.
     BSONObj doc2 = ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},"tag":"c"})");
     auto minTime2 = roundTimestampToGranularity(doc2["time"].Date(), options);
-    BucketId id2{_uuid1, OID::gen(), BucketKey::signature(key.hash)};
+    BucketId id2{_uuid1, OID::gen(), 0};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id2));
-    _bucketCatalog->stripes[0]->archivedBuckets[std::make_tuple(_uuid1, key.hash, minTime2)] =
-        ArchivedBucket{
-            id2.oid,
-        };
+    _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
+        minTime2,
+        ArchivedBucket{id2,
+                       make_tracked_string(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                              TrackingScope::kArchivedBuckets),
+                                           options.getTimeField().toString())});
 
     // A second attempt should block.
     boost::optional<StatusWith<InsertResult>> result2 =

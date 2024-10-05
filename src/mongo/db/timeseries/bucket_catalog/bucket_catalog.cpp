@@ -166,10 +166,10 @@ Stripe::Stripe(TrackingContexts& trackingContexts)
       idleBuckets(make_tracked_list<Bucket*>(
           getTrackingContext(trackingContexts, TrackingScope::kIdleBuckets))),
       archivedBuckets(
-          make_tracked_btree_map<ArchivedKey, ArchivedBucket, std::greater<ArchivedKey>>(
+          make_tracked_unordered_map<BucketKey::Hash,
+                                     tracked_map<Date_t, ArchivedBucket, std::greater<Date_t>>,
+                                     BucketHasher>(
               getTrackingContext(trackingContexts, TrackingScope::kArchivedBuckets))),
-      collectionTimeFields(make_tracked_unordered_map<UUID, std::pair<tracked_string, int64_t>>(
-          getTrackingContext(trackingContexts, TrackingScope::kArchivedBuckets))),
       outstandingReopeningRequests(
           make_tracked_unordered_map<
               BucketKey,

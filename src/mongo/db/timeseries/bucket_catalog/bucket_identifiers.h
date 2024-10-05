@@ -60,11 +60,7 @@ struct BucketKey {
     }
 
     Signature signature() const {
-        return signature(hash);
-    }
-
-    static Signature signature(BucketKey::Hash keyHash) {
-        return static_cast<Signature>(keyHash & 0xFFFFFFFFull);
+        return static_cast<Signature>(hash & 0xFFFFFFFFull);
     }
 
     template <typename H>
