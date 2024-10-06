@@ -72,7 +72,7 @@ public:
     // Overrides for `OutOfLineExecutor`
     void schedule(Task func) noexcept override;
 
-    // Overrides for `Waitable` and `Notifyable`
+    // Overrides for `Waitable` and `Notifiable`
     void notify() noexcept override;
 
     Waitable::TimeoutState run_until(ClockSource* clkSource, Date_t deadline) noexcept override;

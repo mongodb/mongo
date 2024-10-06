@@ -25,5 +25,6 @@ mongo_cc_library(
         "unordered_map.h",
         "unordered_set.h",
         "utility.h",
+        "//src/mongo/util:parking_lot.h",
     ],
 )
