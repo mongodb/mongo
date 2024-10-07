@@ -53,8 +53,6 @@ selector:
     - jstests/core/views/invalid_view_prevents_creating_new_view.js
     # Sharding command "splictVector" is not tenant aware.
     - jstests/core/**/splitvector.js
-    # Sharding command "_shardsvrCreateGlobalIndex" is not tenant aware.
-    - jstests/core/txns/global_index.js
     # Operations on config.system.sessions are not tenant aware, so cannot be tested with the injected dollar tenant.
     - jstests/core/**/list_all_sessions.js
     - jstests/core/**/list_sessions.js

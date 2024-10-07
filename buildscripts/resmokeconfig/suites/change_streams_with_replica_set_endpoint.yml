@@ -13,15 +13,6 @@ selector:
     # TODO (SERVER-87633): Investigate why change_streams/shell_helper.js fails when run against
     # a sharded cluster.
     - jstests/change_streams/shell_helper.js
-    # This test runs a transaction with the internal _shardsvrDeleteGlobalIndexKey command. This
-    # command does not exist in the router command registry so the replica set endpoint allows it
-    # to bypass the router. This causes issues when the test tries to commit the transaction since
-    # the commitTransaction command does exist in the router command registry so the replica set
-    # forces it to go through the router which does not know about this transaction. So it fails
-    # with "Cannot recover the transaction decision without a recoveryToken". This issue is test-only
-    # since _shardsvrDeleteGlobalIndexKey will always be run by an internal client and the
-    # replica set endpoint allows all comments from an internal client to bypass the router.
-    - jstests/change_streams/global_index.js
   exclude_with_any_tags:
     ##
     # The next tags correspond to the special errors thrown by the
