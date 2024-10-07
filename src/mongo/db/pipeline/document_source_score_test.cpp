@@ -37,6 +37,9 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_score.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -45,6 +48,11 @@ namespace mongo {
 namespace {
 
 using DocumentSourceScoreTest = AggregationContextFixture;
+
+// Sigmoid function: 1/(1+exp(-x))
+double testEvaluateSigmoid(double score) {
+    return 1 / (1 + std::exp((-1 * score)));
+}
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfNoScoreField) {
     auto spec = fromjson(R"({
@@ -60,11 +68,15 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfNoScoreField) {
 TEST_F(DocumentSourceScoreTest, CheckNoOptionalArgsIncluded) {
     auto spec = fromjson(R"({
         $score: {
-            score: "expression"
+            score: "$myScore"
         }
     })");
 
-    ASSERT_DOES_NOT_THROW(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx()));
+    Document inputDoc = Document{{"myScore", 5}};
+    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+
+    ASSERT_DOES_NOT_THROW(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx())
+                              ->setSource(mock.get()));
 }
 
 TEST_F(DocumentSourceScoreTest, CheckAllOptionalArgsIncluded) {
@@ -72,7 +84,7 @@ TEST_F(DocumentSourceScoreTest, CheckAllOptionalArgsIncluded) {
         $score: {
             score: "expression",
             normalizeFunction: "none",
-            weight: "expression"
+            weight: 1.0
         }
     })");
 
@@ -93,19 +105,50 @@ TEST_F(DocumentSourceScoreTest, CheckOnlyNormalizeFunctionSpecified) {
 TEST_F(DocumentSourceScoreTest, CheckOnlyWeightSpecified) {
     auto spec = fromjson(R"({
         $score: {
-            score: "expression",
-            weight: "expression"
+            score: "$myScore",
+            weight: 1.0
         }
     })");
 
-    ASSERT_DOES_NOT_THROW(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx()));
+    Document inputDoc = Document{{"myScore", 5}};
+    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+
+    ASSERT_DOES_NOT_THROW(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx())
+                              ->setSource(mock.get()));
+}
+
+TEST_F(DocumentSourceScoreTest, ErrorsIfWrongNormalizeFunctionType) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "expression",
+            normalizeFunction: 1.0
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST_F(DocumentSourceScoreTest, ErrorsIfWrongWeightType) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "expression",
+            weight: "1.0"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceScoreTest, CheckIntScoreMetadataUpdated) {
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            weight: "expression"
+            normalizeFunction: "none",
+            weight: 1.0
         }
     })");
     Document inputDoc = Document{{"myScore", 5}};
@@ -125,7 +168,8 @@ TEST_F(DocumentSourceScoreTest, CheckDoubleScoreMetadataUpdated) {
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            weight: "expression"
+            normalizeFunction: "none",
+            weight: 1.0
         }
     })");
     Document inputDoc = Document{{"myScore", 5.1}};
@@ -145,7 +189,7 @@ TEST_F(DocumentSourceScoreTest, CheckLengthyDocScoreMetadataUpdated) {
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            weight: "expression"
+            normalizeFunction: "none"
         }
     })");
     Document inputDoc =
@@ -166,7 +210,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreNotDouble) {
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            weight: "expression"
+            normalizeFunction: "none"
         }
     })");
     Document inputDoc =
@@ -184,7 +228,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            weight: "expression"
+            normalizeFunction: "none"
         }
     })");
     Document inputDoc = Document{{"field1", "hello"_sd}, {"field2", 10}, {"field3", true}};
@@ -201,7 +245,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreInvalidExpression) {
     auto spec = fromjson(R"({
         $score: {
             score: { $ad: ['$myScore', '$otherScore'] },
-            weight: "expression"
+            normalizeFunction: "none"
         }
     })");
     Document inputDoc =
@@ -217,7 +261,7 @@ TEST_F(DocumentSourceScoreTest, ChecksScoreMetadatUpdatedValidExpression) {
     auto spec = fromjson(R"({
         $score: {
             score: { $add: ['$myScore', '$otherScore'] },
-            weight: "expression"
+            normalizeFunction: "none"
         }
     })");
     Document inputDoc =
@@ -233,5 +277,151 @@ TEST_F(DocumentSourceScoreTest, ChecksScoreMetadatUpdatedValidExpression) {
     // Assert inputDoc's metadata equals 15.3
     ASSERT_EQ(next.releaseDocument().metadata().getScore(), 15.3);
 }
+
+TEST_F(DocumentSourceScoreTest, CheckNormFuncSigmoidScoreMetadataUpdated) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            normalizeFunction: "sigmoid"
+        }
+    })");
+    double myScore = 5.3;
+    Document inputDoc = Document{
+        {"field1", "hello"_sd}, {"otherScore", 10}, {"myScore", myScore}, {"field3", true}};
+
+    boost::intrusive_ptr<ExpressionContextForTest> pExpCtx = getExpCtx();
+    auto docSourceScore = DocumentSourceScore::createFromBson(spec.firstElement(), pExpCtx);
+    auto mock = DocumentSourceMock::createForTest(inputDoc, pExpCtx);
+    docSourceScore->setSource(mock.get());
+
+    auto next = docSourceScore->getNext();
+    ASSERT(next.isAdvanced());
+
+    double sigmoidDbl = testEvaluateSigmoid(myScore);
+
+    // Assert inputDoc's score metadata is sigmoid(5.3)
+    ASSERT_EQ(next.releaseDocument().metadata().getScore(), sigmoidDbl);
+}
+
+TEST_F(DocumentSourceScoreTest, CheckNormFuncSigmoidWeightScoreMetadataUpdated) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            normalizeFunction: "sigmoid",
+            weight: 0.5
+        }
+    })");
+    double myScore = 5.3;
+    Document inputDoc = Document{
+        {"field1", "hello"_sd}, {"otherScore", 10}, {"myScore", myScore}, {"field3", true}};
+
+    boost::intrusive_ptr<ExpressionContextForTest> pExpCtx = getExpCtx();
+    auto docSourceScore = DocumentSourceScore::createFromBson(spec.firstElement(), pExpCtx);
+    auto mock = DocumentSourceMock::createForTest(inputDoc, pExpCtx);
+    docSourceScore->setSource(mock.get());
+
+    auto next = docSourceScore->getNext();
+    ASSERT(next.isAdvanced());
+
+    double sigmoidDbl = testEvaluateSigmoid(myScore) * 0.5;
+
+    // Assert inputDoc's score metadata is (0.5 * sigmoid(5.3))
+    ASSERT_EQ(next.releaseDocument().metadata().getScore(), sigmoidDbl);
+}
+
+TEST_F(DocumentSourceScoreTest, CheckWeightScoreMetadataUpdated) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            weight: 0.5
+        }
+    })");
+    double myScore = 5.3;
+    Document inputDoc = Document{
+        {"field1", "hello"_sd}, {"otherScore", 10}, {"myScore", myScore}, {"field3", true}};
+
+    boost::intrusive_ptr<ExpressionContextForTest> pExpCtx = getExpCtx();
+    auto docSourceScore = DocumentSourceScore::createFromBson(spec.firstElement(), pExpCtx);
+    auto mock = DocumentSourceMock::createForTest(inputDoc, pExpCtx);
+    docSourceScore->setSource(mock.get());
+
+    auto next = docSourceScore->getNext();
+    ASSERT(next.isAdvanced());
+
+    double sigmoidDbl = testEvaluateSigmoid(myScore) * 0.5;
+
+    // Assert inputDoc's score metadata is (0.5 * sigmoid(5.3))
+    ASSERT_EQ(next.releaseDocument().metadata().getScore(), sigmoidDbl);
+}
+
+TEST_F(DocumentSourceScoreTest, ErrorsNormFuncSigmoidInvalidWeight) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            normalizeFunction: "sigmoid",
+            weight: -0.5
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceScoreTest, ErrorsInvalidWeight) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            weight: 1.5
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceScoreTest, ErrorsInvalidNormalizeFunction) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            normalizeFunction: "Sigmoid",
+            weight: 0.5
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceScoreTest, CheckNormFuncNoneWeightScoreZeroMetadataUpdated) {
+    auto spec = fromjson(R"({
+        $score: {
+            score: "$myScore",
+            normalizeFunction: "none",
+            weight: 0
+        }
+    })");
+    double myScore = 5.3;
+    Document inputDoc = Document{
+        {"field1", "hello"_sd}, {"otherScore", 10}, {"myScore", myScore}, {"field3", true}};
+
+    boost::intrusive_ptr<ExpressionContextForTest> pExpCtx = getExpCtx();
+    auto docSourceScore = DocumentSourceScore::createFromBson(spec.firstElement(), pExpCtx);
+    auto mock = DocumentSourceMock::createForTest(inputDoc, pExpCtx);
+    docSourceScore->setSource(mock.get());
+
+    auto next = docSourceScore->getNext();
+    ASSERT(next.isAdvanced());
+
+    double sigmoidDbl = testEvaluateSigmoid(myScore) * 0;
+
+    // Assert inputDoc's score metadata is (0 * 5.3)
+    ASSERT_EQ(next.releaseDocument().metadata().getScore(), sigmoidDbl);
+}
+
+// TODO SERVER-94600: Add minMaxScaler Testcases
+
 }  // namespace
 }  // namespace mongo

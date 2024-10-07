@@ -70,7 +70,9 @@ public:
     static boost::intrusive_ptr<DocumentSourceScore> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         ScoreSpec spec,
-        boost::intrusive_ptr<Expression> parsedScore);
+        boost::intrusive_ptr<Expression> parsedScore,
+        boost::intrusive_ptr<Expression> parsedNormalizeFunction,
+        double parsedWeight);
 
     /**
      * Allows computation of score metadata for non-search pipelines, and also allows weighting or
@@ -122,16 +124,32 @@ public:
         return _parsedScore;
     }
 
+    boost::intrusive_ptr<Expression> getNormalizeFunction() const {
+        return _parsedNormalizeFunction;
+    }
+
+    double getWeight() const {
+        return _parsedWeight;
+    }
+
 private:
     // It is illegal to construct a DocumentSourceScore directly, use createFromBson
     // instead. Added a constructor only for use in DocumentSourceScore implementation.
     DocumentSourceScore(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                         ScoreSpec spec,
-                        boost::intrusive_ptr<Expression> parsedScore);
+                        boost::intrusive_ptr<Expression> parsedScore,
+                        boost::intrusive_ptr<Expression> parsedNormalizeFunction,
+                        double parsedWeight);
     GetNextResult doGetNext() final;
 
     ScoreSpec _spec;
     boost::intrusive_ptr<Expression> _parsedScore;
+    boost::intrusive_ptr<Expression> _parsedNormalizeFunction;
+    double _parsedWeight;
+
+    void setNormalizeFunction(boost::intrusive_ptr<Expression> newNormalizeFunction) {
+        _parsedNormalizeFunction = std::move(newNormalizeFunction);
+    }
 };
 
 }  // namespace mongo

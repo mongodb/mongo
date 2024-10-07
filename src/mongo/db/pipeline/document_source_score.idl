@@ -27,8 +27,19 @@
 #
 global:
   cpp_namespace: "mongo"
+
 imports:
   - "mongo/db/basic_types.idl"
+
+enums:
+  NormalizeFunction:
+    description: Normalize function options
+    type: string
+    values:
+      kNone : "none"
+      kSigmoid : "sigmoid"
+      kMinMaxScaler : "minMaxScaler"
+
 structs:
   ScoreSpec:
     description: Specification for a $score stage.
@@ -40,10 +51,12 @@ structs:
         optional: false
       normalizeFunction: 
         description: Type of score normalization function (none, sigmoid, minMaxScaler)
-        type: string
+        type: NormalizeFunction
         optional: true
       weight: 
         description: Number to multiply the 'score' expression by, after normalization
-        type: IDLAnyType
+        type: safeDouble
         optional: true
-      
+        validator:
+          lte: 1.0
+          gte: 0.0

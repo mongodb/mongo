@@ -5386,9 +5386,8 @@ const char* ExpressionSlice::getOpName() const {
  *     ]
  * }
  */
-static intrusive_ptr<Expression> parseExpressionSigmoid(ExpressionContext* const expCtx,
-                                                        BSONElement expr,
-                                                        const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionSigmoid::parseExpressionSigmoid(
+    ExpressionContext* const expCtx, BSONElement expr, const VariablesParseState& vps) {
     // TODO SERVER-92973: Improve error handling so that any field or expression that resolves to a
     // non-numeric input is handled by $sigmoid instead of the desugared $multiply.
 
@@ -5423,7 +5422,7 @@ static intrusive_ptr<Expression> parseExpressionSigmoid(ExpressionContext* const
 }
 
 REGISTER_EXPRESSION_WITH_FEATURE_FLAG(sigmoid,
-                                      parseExpressionSigmoid,
+                                      ExpressionSigmoid::parseExpressionSigmoid,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
                                       feature_flags::gFeatureFlagSearchHybridScoringPrerequisites);

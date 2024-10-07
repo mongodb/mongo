@@ -3158,6 +3158,12 @@ public:
     }
 };
 
+class ExpressionSigmoid final {
+public:
+    static boost::intrusive_ptr<Expression> parseExpressionSigmoid(ExpressionContext* expCtx,
+                                                                   BSONElement expr,
+                                                                   const VariablesParseState& vps);
+};
 
 class ExpressionIsArray final : public ExpressionFixedArity<ExpressionIsArray, 1> {
 public:
