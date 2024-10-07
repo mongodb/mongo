@@ -583,6 +583,12 @@ class NinjaState:
                 "description": "Checked $out",
                 "pool": "local_pool",
             },
+            "BAZEL_BUILD_INDIRECTION": {
+                "command": "$NOOP",
+                "description": "Checking Bazel outputs...",
+                "pool": "local_pool",
+                "restat": 1,
+            },
             "INSTALL": {
                 "command": "$COPY $in $out",
                 "description": "Installed $out",
@@ -1039,17 +1045,17 @@ class NinjaState:
 
         ninja_sorted_build(
             ninja,
-            outputs=["set_to_always_run_bazel", "bazel_run_first"],
+            outputs=["bazel_run_first_internal"],
             inputs=[],
             rule="RUN_BAZEL_BUILD",
         )
 
         ninja_sorted_build(
             ninja,
-            outputs=self.env["NINJA_BAZEL_OUTPUTS"],
+            outputs=self.env["NINJA_BAZEL_OUTPUTS"] + ["bazel_run_first"],
             inputs=[],
-            implicit=["set_to_always_run_bazel", "bazel_run_first"],
-            rule="phony",
+            implicit=["bazel_run_first_internal"],
+            rule="BAZEL_BUILD_INDIRECTION",
         )
 
         # This sets up a dependency edge between build.ninja.in and build.ninja
