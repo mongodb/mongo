@@ -62,6 +62,26 @@ public:
         return _sectionName;
     }
 
+    ClusterRole getClusterRole() const {
+        return _role;
+    }
+
+    /**
+     * True if the section is relevant to `serviceRole`. `serviceRole` must be one of _exactly_
+     * ClusterRole::ShardServer or ClusterRole::RouterServer, and it holds the ClusterRole that some
+     * Service is associated with. A ServerStatusSection is relevant to a service if the section's
+     * _role has any overlap with the `serviceRole` for the service.
+     */
+    bool relevantTo(const ClusterRole& serviceRole) const {
+        constexpr static std::array allRoles{ClusterRole::ShardServer, ClusterRole::RouterServer};
+        // TODO SERVER-87512 - Once all roles are tagged, remove the exception for
+        // ClusterRole::None. Sections not tagged with a role are relevant to all services.
+        return std::any_of(allRoles.begin(),
+                           allRoles.end(),
+                           [&](auto&& r) { return _role.has(r) && serviceRole.has(r); }) ||
+            _role.hasExclusively(ClusterRole::None);
+    }
+
     /**
      * if this returns true, if the user doesn't mention this section
      * it will be included in the result
@@ -131,7 +151,9 @@ private:
  */
 class ServerStatusSectionRegistry {
 public:
-    using SectionMap = std::map<std::string, std::unique_ptr<ServerStatusSection>>;
+    enum class RoleTag { shard, router, shardAndRouter };
+    using KeyType = std::pair<std::string, RoleTag>;
+    using SectionMap = std::map<KeyType, std::unique_ptr<ServerStatusSection>>;
 
     /** Get the singleton ServerStatusSectionRegistry for the process. */
     static ServerStatusSectionRegistry* instance();
@@ -146,8 +168,9 @@ public:
     SectionMap::const_iterator end();
 
 private:
-    AtomicWord<bool> _runCalled{false};
+    RoleTag getTagForRole(ClusterRole);
 
+    Atomic<bool> _runCalled{false};
     SectionMap _sections;
 };
 

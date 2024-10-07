@@ -170,6 +170,10 @@ public:
                 continue;
             }
 
+            if (!section->relevantTo(opCtx->getService()->role())) {
+                continue;
+            }
+
             section->appendSection(opCtx, elem, &result);
             timeBuilder.appendNumber(
                 static_cast<std::string>(str::stream() << "after " << section->getSectionName()),

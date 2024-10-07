@@ -57,7 +57,8 @@ public:
     }
 };
 auto& defaultRWConcernServerStatus =
-    *ServerStatusSectionBuilder<ReadWriteConcernDefaultsServerStatus>("defaultRWConcern");
+    *ServerStatusSectionBuilder<ReadWriteConcernDefaultsServerStatus>("defaultRWConcern")
+         .forRouter();
 
 }  // namespace
 }  // namespace mongo

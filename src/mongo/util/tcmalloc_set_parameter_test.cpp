@@ -339,11 +339,11 @@ TEST(SamplingRate, EnsureProfileSamplingRateIsZero) {
 }
 
 ServerStatusSection* getSection(StringData name) {
-    auto section = std::find_if(ServerStatusSectionRegistry::instance()->begin(),
-                                ServerStatusSectionRegistry::instance()->end(),
-                                [&](auto& kvp) { return kvp.first == name; });
+    auto& registry = *ServerStatusSectionRegistry::instance();
+    auto section = std::find_if(
+        registry.begin(), registry.end(), [&](auto&& kvp) { return kvp.first.first == name; });
 
-    ASSERT_NE(section, ServerStatusSectionRegistry::instance()->end());
+    ASSERT(section != registry.end());
 
     return section->second.get();
 }

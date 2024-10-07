@@ -14,7 +14,7 @@ testDB.adminCommand({shardCollection: 'test.user', key: {_id: 1}});
 // Initialize shard metadata in shards
 testDB.user.insert({x: 1});
 
-var checkShardingServerStatus = function(doc) {
+var checkShardingServerStatus = function(doc, role) {
     var shardingSection = doc.sharding;
     assert.neq(shardingSection, null);
 
@@ -23,6 +23,24 @@ var checkShardingServerStatus = function(doc) {
     var configHello = configConn.getDB('admin').runCommand({hello: 1});
 
     var configOpTimeObj = shardingSection.lastSeenConfigServerOpTime;
+
+    let commitTypesSection = doc.transactions.commitTypes;
+    let opCountersReplSection = doc.opcountersRepl;
+
+    if (role === "router") {
+        // Router role should have the commitTypes section, but not the opCountersRepl section.
+        assert.neq(commitTypesSection, undefined);
+        assert(commitTypesSection.hasOwnProperty("noShards"), tojson(commitTypesSection));
+        assert(commitTypesSection.hasOwnProperty("singleShard"), tojson(commitTypesSection));
+
+        assert.eq(opCountersReplSection, undefined);
+    } else {
+        assert.eq(role, "shard");
+        assert.neq(opCountersReplSection, undefined);
+        assert(opCountersReplSection.hasOwnProperty("insert"), tojson(opCountersReplSection));
+
+        assert.eq(commitTypesSection, undefined);
+    }
 
     assert.gt(configConnStr.indexOf('/'), 0);
     assert.gte(configHello.configsvr, 1);  // If it's a shard, this field won't exist.
@@ -34,9 +52,9 @@ var checkShardingServerStatus = function(doc) {
 };
 
 var mongosServerStatus = testDB.adminCommand({serverStatus: 1});
-checkShardingServerStatus(mongosServerStatus);
+checkShardingServerStatus(mongosServerStatus, "router");
 
 var mongodServerStatus = st.rs0.getPrimary().getDB('admin').runCommand({serverStatus: 1});
-checkShardingServerStatus(mongodServerStatus);
+checkShardingServerStatus(mongodServerStatus, "shard");
 
 st.stop();
