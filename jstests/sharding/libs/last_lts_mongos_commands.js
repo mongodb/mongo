@@ -5,6 +5,7 @@
 // test defined without always existing on the servers being used.
 export const commandsRemovedFromMongosSinceLastLTS = [
     "waitForOngoingChunkSplits",
+    "_getAuditConfigGeneration",  // Removed in 8.1
 ];
 
 // These commands were added in mongos since the last LTS version, so will not appear in the

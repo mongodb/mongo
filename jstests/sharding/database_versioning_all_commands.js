@@ -272,7 +272,6 @@ let testCases = {
         {skip: "executed locally on a mongos (not sent to any remote node)"},
     _clusterWriteWithoutShardKey:
         {skip: "executed locally on a mongos (not sent to any remote node)"},
-    _getAuditConfigGeneration: {skip: "not on a user database", conditional: true},
     _hashBSONElement: {skip: "executes locally on mongos (not sent to any remote node)"},
     _isSelf: {skip: "executes locally on mongos (not sent to any remote node)"},
     _killOperations: {skip: "executes locally on mongos (not sent to any remote node)"},

@@ -135,7 +135,6 @@ let testCases = {
     _flushReshardingStateChange: {skip: "internal command"},
     _flushRoutingTableCacheUpdates: {skip: "internal command"},
     _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: "internal command"},
-    _getAuditConfigGeneration: {skip: "does not accept read or write concern"},
     _getNextSessionMods: {skip: "internal command"},
     _getUserCacheGeneration: {skip: "internal command"},
     _hashBSONElement: {skip: "internal command"},
