@@ -1655,6 +1655,73 @@ TEST_F(ConnectionPoolTest, dropConnections) {
     ASSERT(reachedB);
 }
 
+TEST_F(ConnectionPoolTest, DropAllConnectionsWithKeepOpen) {
+    ConnectionPool::Options options;
+
+    options.maxConnections = 2;
+    options.refreshRequirement = Seconds(1);
+    options.refreshTimeout = Seconds(2);
+    auto pool = makePool(options);
+
+    PoolImpl::setNow(Date_t::now());
+
+    auto requestConnection = [&](HostAndPort hp,
+                                 CancellationToken token = CancellationToken::uncancelable()) {
+        return getFromPool(hp, transport::kGlobalSSLMode, Seconds{5}, token);
+    };
+
+    HostAndPort hostKeepOpen("a");
+    HostAndPort hostNoKeepOpen("b");
+
+    // Initialize pools for two hosts by getting connections from them so we can control
+    // keepOpen for those pools individually. Keep a connection checked out from each one so
+    // that the next request won't immediately ready a connection.
+    ConnectionImpl::pushSetup(Status::OK());
+    auto ch1 = requestConnection(hostKeepOpen).get();
+    ConnectionImpl::pushSetup(Status::OK());
+    auto ch2 = requestConnection(hostNoKeepOpen).get();
+
+    ScopeGuard cleanupHandles([&] {
+        if (ch1)
+            doneWith(ch1);
+        if (ch2)
+            doneWith(ch2);
+    });
+
+    ASSERT(ch1);
+    ASSERT(ch2);
+
+    // Pools for hosts have been created, set keepOpen accordingly.
+    pool->setKeepOpen(hostKeepOpen, true);
+    pool->setKeepOpen(hostNoKeepOpen, false);
+
+    // Request a connection from the non-keepOpen pool. We should see that fail once we drop
+    // connections.
+    auto noKeepOpenConnFuture = requestConnection(hostNoKeepOpen);
+
+    // Request a connection from the keepOpen pool. This one should not be dropped. We'll later
+    // cancel it instead of messing with pushSetup (which at this point would fulfill the request
+    // above that we want to see get dropped).
+    CancellationSource keepOpenCancelSource;
+    auto keepOpenConnFuture = requestConnection(hostKeepOpen, keepOpenCancelSource.token());
+
+    // Dropping connections should fail the pending request on the non-keepOpen pool.
+    ASSERT_FALSE(noKeepOpenConnFuture.isReady());
+    pool->dropConnections();
+    {
+        auto swConn = std::move(noKeepOpenConnFuture).getNoThrow();
+        ASSERT_EQ(swConn.getStatus().code(), ErrorCodes::PooledConnectionsDropped);
+    }
+
+    // Cancel the keepOpen pool request.
+    ASSERT_FALSE(keepOpenConnFuture.isReady());
+    keepOpenCancelSource.cancel();
+    {
+        auto swConn = std::move(keepOpenConnFuture).getNoThrow();
+        ASSERT_EQ(swConn.getStatus().code(), ErrorCodes::CallbackCanceled);
+    }
+}
+
 /**
  * Verify that setup timeouts time out other pending requests. This is in adherence with
  * the SDAM specification which states that timeouts during setup should mark the timed
