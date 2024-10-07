@@ -40,10 +40,10 @@ ShardId GlobalIndexCloningStateImpl::myShardId(ServiceContext* service) const {
     return ShardingState::get(service)->shardId();
 }
 
-ChunkManager GlobalIndexCloningStateImpl::getShardedCollectionPlacementInfo(
+ChunkManager GlobalIndexCloningStateImpl::getCollectionPlacementInfo(
     OperationContext* opCtx, const NamespaceString& nss) const {
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return catalogCache->getShardedCollectionRoutingInfo(opCtx, nss).cm;
+    return uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss))
+        .cm;
 }
 
 }  // namespace global_index

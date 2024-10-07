@@ -2154,45 +2154,44 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
     return resharding::WithAutomaticRetry([this, executor] {
                auto cancelableOpCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                auto opCtx = cancelableOpCtx.get();
-               boost::optional<ChunkManager> cm;
 
                // Ensure indexes are loaded in the catalog cache, along with the collection
                // placement.
                if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
 
-                   auto cri = uassertStatusOK(RoutingInformationCache::get(opCtx)
-                                                  ->getTrackedCollectionRoutingInfoWithRefresh(
-                                                      opCtx, _coordinatorDoc.getSourceNss()));
-                   cm.emplace(cri.cm);
-               } else {
-
-                   auto cri =
-                       uassertStatusOK(RoutingInformationCache::get(opCtx)
-                                           ->getTrackedCollectionRoutingInfoWithPlacementRefresh(
-                                               opCtx, _coordinatorDoc.getSourceNss()));
-                   cm.emplace(cri.cm);
+                   uassertStatusOK(
+                       RoutingInformationCache::get(opCtx)->getCollectionIndexInfoWithRefresh(
+                           opCtx, _coordinatorDoc.getSourceNss()));
                }
+
+               const auto cm = uassertStatusOK(
+                   RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(
+                       opCtx, _coordinatorDoc.getSourceNss()));
+
+               uassert(ErrorCodes::NamespaceNotFound,
+                       fmt::format("Expected collection '{}' to be tracked on cluster catalog",
+                                   _coordinatorDoc.getSourceNss().toStringForErrorMsg()),
+                       cm.hasRoutingTable());
 
                if (resharding::isMoveCollection(_metadata.getProvenance())) {
                    // Verify if the moveCollection is redundant by checking if the operation is
                    // attempting to move to the same shard.
                    std::set<ShardId> shardIdsSet;
-                   cm->getAllShardIds(&shardIdsSet);
+                   cm.getAllShardIds(&shardIdsSet);
                    const auto toShard =
                        _coordinatorDoc.getShardDistribution().get().front().getShard();
                    return shardIdsSet.find(toShard) != shardIdsSet.end();
                } else if (_metadata.getProvenance() &&
                           _metadata.getProvenance().get() == ProvenanceEnum::kUnshardCollection) {
                    std::set<ShardId> shardIdsSet;
-                   cm->getAllShardIds(&shardIdsSet);
+                   cm.getAllShardIds(&shardIdsSet);
                    const auto toShard =
                        _coordinatorDoc.getShardDistribution().get().front().getShard();
-                   return !cm->isSharded() && cm->hasRoutingTable() &&
-                       shardIdsSet.find(toShard) != shardIdsSet.end();
+                   return !cm.isSharded() && shardIdsSet.find(toShard) != shardIdsSet.end();
                }
 
-               const auto currentShardKey = cm->getShardKeyPattern().getKeyPattern();
+               const auto currentShardKey = cm.getShardKeyPattern().getKeyPattern();
                // Verify if there is any work to be done by the resharding operation by checking
                // if the existing shard key matches the desired new shard key.
                bool isOpRedundant = SimpleBSONObjComparator::kInstance.evaluate(

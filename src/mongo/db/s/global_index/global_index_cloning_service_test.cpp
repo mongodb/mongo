@@ -117,8 +117,8 @@ public:
         return kRecipientShardId;
     }
 
-    ChunkManager getShardedCollectionPlacementInfo(OperationContext* opCtx,
-                                                   const NamespaceString& nss) const override {
+    ChunkManager getCollectionPlacementInfo(OperationContext* opCtx,
+                                            const NamespaceString& nss) const override {
         invariant(nss == kSourceNss);
 
         const OID epoch = OID::gen();
