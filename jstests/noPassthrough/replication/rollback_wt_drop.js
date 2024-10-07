@@ -57,25 +57,14 @@ let RollbackOps = (node) => {
     const collectionsBeforeDrop = listCollections(mydb);
     assert(coll.drop());
     const collectionsAfterDrop = listCollections(mydb);
-    const supportsPendingDrops = mydb.serverStatus().storageEngine.supportsPendingDrops;
-    jsTestLog('supportsPendingDrops = ' + supportsPendingDrops);
-    if (!supportsPendingDrops) {
-        assert.eq(collectionsAfterDrop.length,
-                  collectionsBeforeDrop.length,
-                  'listCollections did not report the same number of collections in database ' +
-                      mydb.getName() + ' after dropping collection ' + coll.getFullName() +
-                      '. Before: ' + tojson(collectionsBeforeDrop) +
-                      '. After: ' + tojson(collectionsAfterDrop));
-    } else {
-        assert.lt(collectionsAfterDrop.length,
-                  collectionsBeforeDrop.length,
-                  'listCollections did not report fewer collections in database ' + mydb.getName() +
-                      ' after dropping collection ' + coll.getFullName() + '. Before: ' +
-                      tojson(collectionsBeforeDrop) + '. After: ' + tojson(collectionsAfterDrop));
-        assert.gt(mydb.serverStatus().storageEngine.dropPendingIdents,
-                  0,
-                  'There is no drop pending ident in the storage engine.');
-    }
+    assert.lt(collectionsAfterDrop.length,
+              collectionsBeforeDrop.length,
+              'listCollections did not report fewer collections in database ' + mydb.getName() +
+                  ' after dropping collection ' + coll.getFullName() + '. Before: ' +
+                  tojson(collectionsBeforeDrop) + '. After: ' + tojson(collectionsAfterDrop));
+    assert.gt(mydb.serverStatus().storageEngine.dropPendingIdents,
+              0,
+              'There is no drop pending ident in the storage engine.');
 
     const renameTargetColl = node.getCollection(renameTargetCollName);
     assert.commandWorked(renameTargetColl.insert({_id: 10, b: 10}));
