@@ -62,20 +62,27 @@ namespace mongo {
 namespace {
 
 #define TEST_CERTS_DIR "jstests/libs/"
-// certs rooted in ca.pem
+// certs & CRLs rooted in ca.pem
 constexpr const char* caFile = TEST_CERTS_DIR "ca.pem";
 constexpr const char* serverKeyFile = TEST_CERTS_DIR "server.pem";
 constexpr const char* clientKeyFile = TEST_CERTS_DIR "client.pem";
+constexpr const char* revokedClientKeyFile = TEST_CERTS_DIR "client_revoked.pem";
 
 constexpr const char* intermediateACaFile = TEST_CERTS_DIR "intermediate-ca.pem";
 constexpr const char* intermediateALeafKeyFile = TEST_CERTS_DIR "server-intermediate-leaf.pem";
 constexpr const char* intermediateBCaFile = TEST_CERTS_DIR "intermediate-ca-B.pem";
 constexpr const char* intermediateBLeafKeyFile = TEST_CERTS_DIR "intermediate-ca-B-leaf.pem";
+constexpr const char* emptyCRL = TEST_CERTS_DIR "crl.pem";
+constexpr const char* expiredCRL = TEST_CERTS_DIR "crl_expired.pem";
+constexpr const char* clientRevokedCRL = TEST_CERTS_DIR "crl_client_revoked.pem";
+constexpr const char* intermediateBRevokedCRL = TEST_CERTS_DIR "crl_intermediate_ca_B_revoked.pem";
+constexpr const char* intermediateBCRL = TEST_CERTS_DIR "crl_from_intermediate_ca_B.pem";
 
-// certs rooted in trusted-ca.pem
+// certs & CRLs rooted in trusted-ca.pem
 constexpr const char* trustedCaFile = TEST_CERTS_DIR "trusted-ca.pem";
 constexpr const char* trustedServerKeyFile = TEST_CERTS_DIR "trusted-server.pem";
 constexpr const char* trustedClientKeyFile = TEST_CERTS_DIR "trusted-client.pem";
+constexpr const char* trustedEmptyCRL = TEST_CERTS_DIR "crl_from_trusted_ca.pem";
 
 // Test implementation needed by ASIO transport.
 class SessionManagerUtil : public transport::SessionManager {
@@ -1581,6 +1588,213 @@ TEST(SSLManager, intermediateCATests) {
         checkValidationResults(result, true /*expectIngressPass*/, test.clientPass);
     }
 }
+
+// Tests that validation fails if configured CRL for the issuer of the peer certificate being
+// validated has expired.
+// Caveats:
+// - Apple: CRL unsupported; test disabled
+// - Windows: validation fails, but with misleading error message
+#if MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_APPLE
+TEST(SSLManager, expiredCRLTest) {
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslCAFile = caFile;
+    clientParams.sslPEMKeyFile = clientKeyFile;
+    clientParams.sslCRLFile = expiredCRL;
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = serverKeyFile;
+    serverParams.sslCRLFile = expiredCRL;
+
+    SSLTestFixture tf(serverParams, clientParams);
+    tf.doHandshake();
+    auto result = tf.runIngressEgressValidation();
+    checkValidationResults(result, false /*expectIngressPass*/, false /*expectEgressPass*/);
+
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+    constexpr const char* cause = "revocation server was offline";
+#else
+    constexpr const char* cause = "expired";
+#endif
+    ASSERT_NE(result.ingress.getStatus().reason().find(cause), std::string::npos);
+    ASSERT_NE(result.egress.getStatus().reason().find(cause), std::string::npos);
+}
+
+// Tests peer cert validation behavior if multiple CRLs from the same issuer are included
+// in the CRL PEM file.
+// Caveats:
+// - Apple: CRL unsupported; test disabled
+// - Windows: not allowed; setup fails with "The object or property already exists"
+// - OpenSSL: allowed, even with some CRLs having already expired
+TEST(SSLManager, multipleCRLsFromSameIssuerTests) {
+    // Combine two CRLs from the same issuer, one is valid and the other is expired.
+    const auto expiredCRLWithNonExpiredCRL = combinePEMFiles({{clientRevokedCRL}, {expiredCRL}});
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = serverKeyFile;
+    serverParams.sslCRLFile = expiredCRLWithNonExpiredCRL;
+
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslCAFile = caFile;
+
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+    ASSERT_THROWS_CODE_AND_WHAT(
+        SSLManagerInterface::create(serverParams, true),
+        DBException,
+        ErrorCodes::InvalidSSLConfiguration,
+        "CertAddCRLContextToStore Failed  The object or property already exists.");
+#else
+    {
+        clientParams.sslPEMKeyFile = clientKeyFile;
+        LOGV2(9476700, "Running with client key file", "keyfile"_attr = clientKeyFile);
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, true /*expectIngressPass*/, true);
+    }
+    {
+        clientParams.sslPEMKeyFile = revokedClientKeyFile;
+        LOGV2(9476701, "Running with client key file", "keyfile"_attr = revokedClientKeyFile);
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, false, true);
+        ASSERT_NE(result.ingress.getStatus().reason().find("revoked"), std::string::npos);
+    }
+#endif
+}
+
+// Tests basic CRL revocation works on ingress if the client is configured with a revoked key.
+// Caveats:
+// - Apple: CRL unsupported; test disabled
+TEST(SSLManager, basicCRLRevocationTests) {
+    struct TestCase {
+        std::string serverCRLFile;
+        bool serverPass;
+        void serialize(BSONObjBuilder* bob) const {
+            bob->append("serverCRLFile", serverCRLFile);
+            bob->append("serverPass", serverPass);
+        }
+    };
+
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslCAFile = trustedCaFile;
+    clientParams.sslPEMKeyFile = revokedClientKeyFile;
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = trustedServerKeyFile;
+
+    {
+        serverParams.sslCRLFile = emptyCRL;
+        LOGV2(9476702, "Running test case", "CRLFile"_attr = emptyCRL, "pass"_attr = true);
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, true, true /*expectEgressPass*/);
+    }
+    {
+        serverParams.sslCRLFile = clientRevokedCRL;
+        LOGV2(9476703, "Running test case", "CRLFile"_attr = clientRevokedCRL, "pass"_attr = false);
+        SSLTestFixture tf(serverParams, clientParams);
+        tf.doHandshake();
+        auto result = tf.runIngressEgressValidation();
+        checkValidationResults(result, false, true /*expectEgressPass*/);
+        ASSERT_NE(result.ingress.getStatus().reason().find("revoked"), std::string::npos);
+    }
+}
+
+// Tests validation behavior on ingress (or egress) if CRL checking is enabled, but no suitable
+// CRL is found from same issuer of the peer cert being validated.
+// Caveats:
+// - Apple: CRL unsupported; test disabled
+// - Windows: validation passes if no CRL is found
+// - OpenSSL: validation fails if no CRL is found
+TEST(SSLManager, noCRLFoundTests) {
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslCAFile = caFile;
+    clientParams.sslPEMKeyFile = clientKeyFile;
+    clientParams.sslCRLFile = trustedEmptyCRL;  // CRL issued by trusted-ca.pem, not ca.pem
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = serverKeyFile;
+    serverParams.sslCRLFile = trustedEmptyCRL;
+
+    SSLTestFixture tf(serverParams, clientParams);
+    tf.doHandshake();
+    auto result = tf.runIngressEgressValidation();
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+    checkValidationResults(result, true, true);
+#else
+    checkValidationResults(result, false, false);
+    constexpr const char* expectedError = "unable to get certificate CRL";
+    ASSERT_NE(result.ingress.getStatus().reason().find(expectedError), std::string::npos);
+    ASSERT_NE(result.egress.getStatus().reason().find(expectedError), std::string::npos);
+#endif
+}
+
+// Tests whether validation passes if an intermediate CA issuer cert is revoked, but
+// the end-entity cert is not.
+// Caveats:
+// - Apple: CRL unsupported; test disabled
+// - Windows: multiple CRLs (root CRL + intermediate CRL) is not allowed
+// TODO: SERVER-95583 investigate why windows behaves like this.
+// - OpenSSL: passes; only leaf cert is checked against CRL
+// TODO: SERVER-95445 should fix this openssl issue.
+TEST(SSLManager, revocationWithCRLsIntermediateTests) {
+    // intermediate-ca-B.pem + intermediate-ca-B-leaf.pem bundle
+    const std::string intermediateBLeafWithIssuerCertKeyFile = combinePEMFiles(
+        {{intermediateBLeafKeyFile, true /*includePrivKey*/}, {intermediateBCaFile}});
+    // crl_from_intermediate_ca_B.pem + crl_intermediate_ca_B_revoked.pem
+    const std::string crlsFromRootAndIntermediateB =
+        combinePEMFiles({{intermediateBRevokedCRL}, {intermediateBCRL}});
+
+    SSLParams clientParams;
+    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    clientParams.sslAllowInvalidHostnames = true;
+    clientParams.sslCAFile = caFile;
+    clientParams.sslPEMKeyFile = clientKeyFile;
+    clientParams.sslCRLFile = crlsFromRootAndIntermediateB;
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslAllowInvalidHostnames = true;
+    serverParams.sslCAFile = caFile;
+    serverParams.sslPEMKeyFile = intermediateBLeafWithIssuerCertKeyFile;
+
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+    ASSERT_THROWS_CODE_AND_WHAT(
+        SSLManagerInterface::create(clientParams, true),
+        DBException,
+        ErrorCodes::InvalidSSLConfiguration,
+        "CertAddCRLContextToStore Failed  The object or property already exists.");
+#else
+    SSLTestFixture tf(serverParams, clientParams);
+    tf.doHandshake();
+    auto result = tf.runIngressEgressValidation();
+    checkValidationResults(result, true, true);
+#endif
+}
+
+#endif  // MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_APPLE
 
 #endif  // MONGO_CONFIG_SSL
 }  // namespace
