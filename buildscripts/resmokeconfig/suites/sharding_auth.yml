@@ -16,7 +16,6 @@ selector:
     - jstests/sharding/query/**/*[aA]uth*.js
 
     - jstests/sharding/advance_cluster_time_action_type.js
-    - jstests/sharding/client_disconnect_during_sign_logical_time.js
     - jstests/sharding/query/agg/agg_currentop.js
     - jstests/sharding/internal_txns/internal_client_restrictions.js
     - jstests/sharding/kill_sessions.js
@@ -36,8 +35,6 @@ selector:
     # Skip because this suite implicitly authenticates as __system, which allows bypassing user write
     # blocking.
     - jstests/sharding/set_user_write_block_mode.js
-    # Skip because this suite sets roleGraphInvalidationIsFatal to true and this test does not enable test commands
-    - jstests/sharding/drop_config_db.js
 
 executor:
   archive:

@@ -2,7 +2,6 @@
  * Tests index consistency metrics in the serverStatus output.
  * @tags: [
  *   requires_sharding,
- *   config_shard_incompatible
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

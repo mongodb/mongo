@@ -11,15 +11,13 @@ delete TestData.setParametersMongos.featureFlagTransitionToCatalogShard;
 
 const st = new ShardingTest({
     mongos: 1,
+    mongosOptions: {setParameter: {featureFlagTransitionToCatalogShard: false}},
     config: 1,
+    configOptions: {setParameter: {featureFlagTransitionToCatalogShard: false}},
     shards: 1,
     rs: {nodes: 1},
+    rsOptions: {setParameter: {featureFlagTransitionToCatalogShard: false}},
 });
-st.stopAllConfigServers({}, true);
-st.restartAllConfigServers(
-    {configsvr: "", setParameter: {featureFlagTransitionToCatalogShard: false}});
-
-st.restartMongos(0, {setParameter: {featureFlagTransitionToCatalogShard: false}, restart: true});
 
 // None of the transition commands can be run on mongos or the config server.
 assert.commandFailedWithCode(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}), 8454804);

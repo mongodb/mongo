@@ -8,7 +8,7 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const st = new ShardingTest({mongos: 1, shards: 1, keyFile: "jstests/libs/key1"});
+const st = new ShardingTest({mongos: 1, shards: 0, keyFile: "jstests/libs/key1"});
 
 assert.commandFailedWithCode(st.s.adminCommand({
     configureFailPoint: "throwClientDisconnectInSignLogicalTimeForExternalClients",
