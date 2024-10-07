@@ -1415,12 +1415,13 @@ void BulkWriteOp::noteChildBatchResponse(
         // staleness/cache busy error is received the size of replyItems will be <= the size of the
         // number of operations. When this is the case, we treat all the remaining operations which
         // may not have a replyItem as having failed due to the same cause.
-        if (batchWillContinue && lastError &&
+        bool isStaleError = lastError &&
             (lastError->getStatus().code() == ErrorCodes::StaleDbVersion ||
              ErrorCodes::isStaleShardVersionError(lastError->getStatus()) ||
              lastError->getStatus().code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
-             lastError->getStatus() == ErrorCodes::CannotImplicitlyCreateCollection) &&
-            (replyIndex == (int)replyItems.size())) {
+             lastError->getStatus() == ErrorCodes::CannotImplicitlyCreateCollection);
+
+        if (batchWillContinue && isStaleError && (replyIndex == (int)replyItems.size())) {
             // Decrement the replyIndex so it keeps pointing to the same error (i.e. the
             // last error, which is a staleness error).
             LOGV2_DEBUG(7695304,
@@ -1463,7 +1464,11 @@ void BulkWriteOp::noteChildBatchResponse(
             continue;
         }
 
-        _approximateSize += reply.getApproximateSize();
+        // A staleness error will end up being retried by mongos so we should not consider this
+        // result final and count towards the maximum size limit for a response.
+        if (!isStaleError) {
+            _approximateSize += reply.getApproximateSize();
+        }
 
         if (shouldDeferWriteWithoutShardKeyReponse) {
             if (!_deferredResponses) {
