@@ -115,7 +115,9 @@ def _validate_options(parser, args):
 
 
 def _validate_config(parser):
-    """Do validation on the config settings."""
+    from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
+
+    """Do validation on the config settings and config fuzzer limits."""
 
     if _config.REPEAT_TESTS_MAX:
         if not _config.REPEAT_TESTS_SECS:
@@ -170,6 +172,26 @@ def _validate_config(parser):
     if not _config.SHELL_TLS_ENABLED:
         if _config.SHELL_TLS_CERTIFICATE_KEY_FILE:
             parser.error("--shellTlsCertificateKeyFile requires --shellTls")
+
+    # Ranges through param specs and checks that they are valid parameter declarations.
+    for param_type in config_fuzzer_params:
+        _validate_params_spec(parser, config_fuzzer_params[param_type])
+
+
+def _validate_params_spec(parser, spec):
+    valid_fuzz_at_vals = {"startup", "runtime"}
+    for key, value in spec.items():
+        if "fuzz_at" not in value:
+            parser.error(
+                f"Invalid parameter fuzz config entry for key '{key}' : {value}.\nPlease add a 'fuzz_at' key for the parameter."
+            )
+        fuzz_at_list = value["fuzz_at"]
+        if not (
+            isinstance(value, dict)
+            and fuzz_at_list
+            and all(fuzz_at_val in valid_fuzz_at_vals for fuzz_at_val in fuzz_at_list)
+        ):
+            parser.error(f"Invalid parameter fuzz config entry for key '{key}' : {value}")
 
 
 def _find_resmoke_wrappers():
@@ -455,7 +477,7 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
             _config.CONFIG_FUZZ_SEED = int(_config.CONFIG_FUZZ_SEED)
 
         _config.MONGOS_SET_PARAMETERS = mongo_fuzzer_configs.fuzz_mongos_set_parameters(
-            _config.FUZZ_MONGOS_CONFIGS, _config.CONFIG_FUZZ_SEED, _config.MONGOS_SET_PARAMETERS
+            _config.CONFIG_FUZZ_SEED, _config.MONGOS_SET_PARAMETERS
         )
 
     _config.MONGOCRYPTD_SET_PARAMETERS = _merge_set_params(config.pop("mongocryptd_set_parameters"))

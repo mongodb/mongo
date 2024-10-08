@@ -94,20 +94,28 @@ class FuzzRuntimeParameters(interface.Hook):
         self._add_fixture(self._fixture)
 
         from buildscripts.resmokelib.config_fuzzer_limits import (
-            runtime_parameter_fuzzer_params,
+            config_fuzzer_params,
         )
 
-        validate_runtime_parameter_spec(runtime_parameter_fuzzer_params["mongod"])
-        validate_runtime_parameter_spec(runtime_parameter_fuzzer_params["mongos"])
+        # Get only the mongod and mongos parameters that have "runtime" in the "fuzz_at" param value.
+        runtime_mongod_params = {
+            param: val
+            for param, val in config_fuzzer_params["mongod"].items()
+            if "runtime" in val.get("fuzz_at", [])
+        }
+        runtime_mongos_params = {
+            param: val
+            for param, val in config_fuzzer_params["mongos"].items()
+            if "runtime" in val.get("fuzz_at", [])
+        }
+
+        validate_runtime_parameter_spec(runtime_mongod_params)
+        validate_runtime_parameter_spec(runtime_mongos_params)
         # Construct the runtime state before the suite begins.
         # The initial lastSet time of each parameter is the start time of the suite.
-        self._mongod_param_state = RuntimeParametersState(
-            runtime_parameter_fuzzer_params["mongod"], self._seed
-        )
+        self._mongod_param_state = RuntimeParametersState(runtime_mongod_params, self._seed)
 
-        self._mongos_param_state = RuntimeParametersState(
-            runtime_parameter_fuzzer_params["mongos"], self._seed
-        )
+        self._mongos_param_state = RuntimeParametersState(runtime_mongos_params, self._seed)
 
         self._setParameter_thread = _SetParameterThread(
             self.logger,

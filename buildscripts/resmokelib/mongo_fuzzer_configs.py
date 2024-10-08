@@ -378,7 +378,12 @@ def generate_mongod_parameters(rng, fuzzer_stress_mode):
     """Return a dictionary with values for each mongod parameter."""
     from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
 
-    params = config_fuzzer_params["mongod"]
+    # Get only the mongod parameters that have "startup" in the "fuzz_at" param value.
+    params = {
+        param: val
+        for param, val in config_fuzzer_params["mongod"].items()
+        if "startup" in val.get("fuzz_at", [])
+    }
 
     # Parameter sets with different behaviors.
     flow_control_params = [
@@ -433,11 +438,17 @@ def generate_mongod_parameters(rng, fuzzer_stress_mode):
     return ret
 
 
-def generate_mongos_parameters(rng, fuzzer_stress_mode):
+def generate_mongos_parameters(rng):
     """Return a dictionary with values for each mongos parameter."""
     from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
 
-    params = config_fuzzer_params["mongos"]
+    # Get only the mongos parameters that have "startup" in the "fuzz_at" param value.
+    params = {
+        param: val
+        for param, val in config_fuzzer_params["mongos"].items()
+        if "startup" in val.get("fuzz_at", [])
+    }
+
     return {key: generate_normal_mongo_parameters(rng, value) for key, value in params.items()}
 
 
@@ -470,12 +481,12 @@ def fuzz_mongod_set_parameters(fuzzer_stress_mode, seed, user_provided_params):
     )
 
 
-def fuzz_mongos_set_parameters(fuzzer_stress_mode, seed, user_provided_params):
+def fuzz_mongos_set_parameters(seed, user_provided_params):
     """Randomly generate mongos configurations."""
     rng = random.Random(seed)
 
     ret = {}
-    params = generate_mongos_parameters(rng, fuzzer_stress_mode)
+    params = generate_mongos_parameters(rng)
     for key, value in params.items():
         ret[key] = value
 
