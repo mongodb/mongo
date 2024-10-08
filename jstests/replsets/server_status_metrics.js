@@ -107,7 +107,12 @@ var rt = new ReplSetTest({
     oplogSize: 100,
     // Set a smaller periodicNoopIntervalSecs to aid sync source selection later in the test. Only
     // enable periodic noop writes when we actually need it to avoid races in other metrics tests.
-    nodeOptions: {setParameter: {writePeriodicNoops: false, periodicNoopIntervalSecs: 2}}
+    nodeOptions: {setParameter: {writePeriodicNoops: false, periodicNoopIntervalSecs: 2}},
+    settings: {
+        // Set the heartbeat interval to a low value to reduce the amount of time spent waiting for
+        // a heartbeat from sync source candidates.
+        heartbeatIntervalMillis: 250,
+    },
 });
 rt.startSet();
 // Initiate the replica set with high election timeout to avoid accidental elections.
