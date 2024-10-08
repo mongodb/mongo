@@ -156,7 +156,6 @@ build:local --tls_client_key=
 build:local --experimental_remote_cache_compression=false
 build:local --grpc_keepalive_time=0s
 build:local --legacy_important_outputs
-build:local --//bazel/config:local_build=True
 build:local --jobs=auto
 
 # Disable remote execution and caching for public releases

@@ -48,8 +48,12 @@ def _setup_local_config_platform(ctx):
 
     # EngFlow's "default" pool is ARM64
     remote_execution_pool = "x86_64" if arch == "amd64" else "default"
-
-    if distro != None and distro in REMOTE_EXECUTION_CONTAINERS:
+    result = None
+    if ctx.os.environ.get("USE_NATIVE_TOOLCHAIN"):
+        exec_props = ""
+        result = {"USE_NATIVE_TOOLCHAIN": "1"}
+    elif distro != None and distro in REMOTE_EXECUTION_CONTAINERS:
+        constraints_str += ',\n        "@//bazel/platforms:use_mongo_toolchain"'
         container_url = REMOTE_EXECUTION_CONTAINERS[distro]["container-url"]
         web_url = REMOTE_EXECUTION_CONTAINERS[distro]["web-url"]
         dockerfile = REMOTE_EXECUTION_CONTAINERS[distro]["dockerfile"]
@@ -61,20 +65,12 @@ def _setup_local_config_platform(ctx):
         "Pool": "%s",
     },
 """ % (container_url, remote_execution_pool)
+        result = {"DISTRO": distro}
     else:
+        result = {"USE_NATIVE_TOOLCHAIN": "1"}
         exec_props = ""
 
     platform_constraints_str = constraints_str
-    if os != "windows":
-        result = ctx.execute([
-            "uname",
-            "-r",
-        ])
-        version_numbers = result.stdout.split(".")
-        if int(version_numbers[0]) > 4 or (int(version_numbers[0]) == 4 and int(version_numbers[1]) > 3):
-            platform_constraints_str = constraints_str + ',\n        "@//bazel/platforms:kernel_version_4_4_or_greater"'
-        else:
-            platform_constraints_str = constraints_str + ',\n        "@//bazel/platforms:kernel_version_less_than_4_4"'
 
     substitutions = {
         "{constraints}": constraints_str,
@@ -94,7 +90,7 @@ def _setup_local_config_platform(ctx):
         substitutions = substitutions,
     )
 
-    return None
+    return result
 
 setup_local_config_platform = repository_rule(
     implementation = _setup_local_config_platform,
@@ -108,4 +104,5 @@ setup_local_config_platform = repository_rule(
             doc = "Template modeling the builtin local config platform constraints file.",
         ),
     },
+    environ = ["USE_NATIVE_TOOLCHAIN"],
 )

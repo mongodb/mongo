@@ -23,6 +23,7 @@ from buildscripts.install_bazel import install_bazel
 import atexit
 
 import SCons
+from SCons.Script import ARGUMENTS
 
 import mongo.platform as mongo_platform
 
@@ -400,7 +401,10 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
         extra_args += ["--build_tag_filters=scons_link_lists"]
 
     bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
-    print(f"Bazel build command:\n{' '.join(bazel_cmd)}")
+    if ninja_generate:
+        print("Generating bazel link deps...")
+    else:
+        print(f"Bazel build command:\n{' '.join(bazel_cmd)}")
     if env.GetOption("coverity-build"):
         print(
             "--coverity-build selected, assuming bazel targets were built in a previous coverity run. Not running bazel build."
@@ -546,10 +550,15 @@ def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
         "bazel_cmd": Globals.bazel_base_build_command,
         "compiledb_cmd": [Globals.bazel_executable, "run"]
         + env["BAZEL_FLAGS_STR"]
+        + ["--features=-thin_archive"]
         + ["//:compiledb", "--"]
-        + env["BAZEL_FLAGS_STR"],
+        + env["BAZEL_FLAGS_STR"]
+        + ["--features=-thin_archive"],
         "defaults": [str(t) for t in SCons.Script.DEFAULT_TARGETS],
         "targets": Globals.scons2bazel_targets,
+        "CC": env.get("CC", ""),
+        "CXX": env.get("CXX", ""),
+        "USE_NATIVE_TOOLCHAIN": os.environ.get("USE_NATIVE_TOOLCHAIN"),
     }
     with open(".bazel_info_for_ninja.txt", "w") as f:
         json.dump(ninja_bazel_build_json, f)
@@ -730,10 +739,42 @@ def add_libdeps_time(env, delate_time):
     count_of_libdeps_links += 1
 
 
+def prefetch_toolchain(env):
+    bazel_bin_dir = (
+        env.GetOption("evergreen-tmp-dir")
+        if env.GetOption("evergreen-tmp-dir")
+        else os.path.expanduser("~/.local/bin")
+    )
+    if not os.path.exists(bazel_bin_dir):
+        os.makedirs(bazel_bin_dir)
+    Globals.bazel_executable = install_bazel(bazel_bin_dir)
+    if platform.system() == "Linux" and not ARGUMENTS.get("CC") and not ARGUMENTS.get("CXX"):
+        exec_root = ""
+        proc = subprocess.run([Globals.bazel_executable, "info"], capture_output=True, text=True)
+        if proc.returncode != 0:
+            print("ERROR: Finding bazel exec root.")
+            print(proc.stdout)
+            print(proc.stderr)
+            sys.exit(1)
+        else:
+            output_base_str = "output_base: "
+            for line in proc.stdout.split("\n"):
+                if line.startswith(output_base_str):
+                    exec_root = line[len(output_base_str) :].strip()
+        if exec_root and not os.path.exists(f"{exec_root}/external/mongo_toolchain"):
+            print("Prefetch the mongo toolchain...")
+            proc = subprocess.run([Globals.bazel_executable, "fetch", "@mongo_toolchain"])
+            if proc.returncode != 0:
+                print("ERROR: Bazel fetch failed!")
+                sys.exit(1)
+        return exec_root
+
+
 # Required boilerplate function
 def exists(env: SCons.Environment.Environment) -> bool:
     # === Bazelisk ===
 
+    env.AddMethod(prefetch_toolchain, "PrefetchToolchain")
     env.AddMethod(load_bazel_builders, "LoadBazelBuilders")
     return True
 
@@ -848,14 +889,18 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--gcov={env.GetOption("gcov") is not None}',
         f'--pgo_profile={env.GetOption("pgo-profile") is not None}',
         f'--server_js={env.GetOption("server-js") == "on"}',
-        f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}",
-        f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}",
         f'--ssl={"True" if env.GetOption("ssl") == "on" else "False"}',
         f'--js_engine={env.GetOption("js-engine")}',
         "--define",
         f"MONGO_VERSION={env['MONGO_VERSION']}",
         "--compilation_mode=dbg",  # always build this compilation mode as we always build with -g
     ]
+
+    if not os.environ.get("USE_NATIVE_TOOLCHAIN"):
+        bazel_internal_flags += [
+            f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}",
+            f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}",
+        ]
 
     if "MONGO_ENTERPRISE_VERSION" in env:
         enterprise_features = env.GetOption("enterprise_features")
@@ -898,6 +943,9 @@ def generate(env: SCons.Environment.Environment) -> None:
     if normalized_arch not in ["arm64", "amd64"]:
         bazel_internal_flags.append("--config=local")
         bazel_internal_flags.append("--jobs=4")
+    elif os.environ.get("USE_NATIVE_TOOLCHAIN"):
+        print("Custom toolchain detected, using --config=local for bazel build.")
+        bazel_internal_flags.append("--config=local")
 
     # Disable remote execution for public release builds.
     if env.GetOption("release") == "on" and (
@@ -913,16 +961,6 @@ def generate(env: SCons.Environment.Environment) -> None:
     Globals.max_retry_attempts = (
         _CI_MAX_RETRY_ATTEMPTS if os.environ.get("CI") is not None else _LOCAL_MAX_RETRY_ATTEMPTS
     )
-
-    bazel_bin_dir = (
-        env.GetOption("evergreen-tmp-dir")
-        if env.GetOption("evergreen-tmp-dir")
-        else os.path.expanduser("~/.local/bin")
-    )
-    if not os.path.exists(bazel_bin_dir):
-        os.makedirs(bazel_bin_dir)
-
-    Globals.bazel_executable = install_bazel(bazel_bin_dir)
 
     Globals.bazel_base_build_command = (
         [

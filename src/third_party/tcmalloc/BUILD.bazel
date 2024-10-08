@@ -139,15 +139,7 @@ COPTS = [
     "//conditions:default": [],
 })
 
-# The kernel supported logic is split into 2 select statements to avoid an "ambiguous match" error.
-# The first select statement checks if the local build is enabled and if so, requires a kernel version of 4.4 or greater.
-# The second select statement checks if the platform is s390x or ppc64le and if so, overrides the kernel supported logic.
-# When Bazel evaluates the added result of the 2 select statements, it understands that `...:incompatible` overrides
-# the `...:kernel_version_4_4_or_greater` logic.
-KERNEL_SUPPORTED = select({
-    "//bazel/config:local_build_enabled": ["//bazel/platforms:kernel_version_4_4_or_greater"],
-    "//conditions:default": [],
-}) + select({
+PLATFORM_SUPPORTED = select({
     "//bazel/config:linux_s390x": ["@platforms//:incompatible"],
     "//bazel/config:linux_ppc64le": ["@platforms//:incompatible"],
     "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -165,7 +157,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_common_8k_pages",
         "tcmalloc_experiment",
@@ -194,7 +186,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
         "tcmalloc_internal_sysinfo",
@@ -214,7 +206,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = ["//src/third_party/abseil-cpp:absl_base"],
 )
 
@@ -228,7 +220,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_environment",
         "tcmalloc_malloc_extension",
@@ -250,7 +242,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
         "tcmalloc_internal_page_size",
@@ -269,7 +261,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_page_size",
         "//src/third_party/abseil-cpp:absl_base",
@@ -286,7 +278,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_environment",
         "tcmalloc_internal_logging",
@@ -307,7 +299,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "//src/third_party/abseil-cpp:absl_base",
     ],
@@ -329,7 +321,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
         "tcmalloc_internal_sysinfo",
@@ -348,7 +340,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
         "//src/third_party/abseil-cpp:absl_base",
@@ -366,7 +358,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_mincore",
         "tcmalloc_internal_percpu",
@@ -385,7 +377,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_util",
         "//src/third_party/abseil-cpp:absl_base",
@@ -403,7 +395,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "//src/third_party/abseil-cpp:absl_base",
         "//src/third_party/abseil-cpp:absl_strings",
@@ -453,7 +445,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_experiment",
         "tcmalloc_internal_cache_topology",
@@ -489,7 +481,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_internal_environment",
         "tcmalloc_internal_logging",
@@ -507,7 +499,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "//src/third_party/abseil-cpp:absl_malloc_internal",
         "//src/third_party/abseil-cpp:absl_strings",
@@ -525,7 +517,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "//src/third_party/abseil-cpp:absl_status",
         "//src/third_party/abseil-cpp:absl_statusor",
@@ -542,7 +534,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_malloc_extension",
     ],
@@ -558,7 +550,7 @@ mongo_cc_library(
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
-    target_compatible_with = KERNEL_SUPPORTED,
+    target_compatible_with = PLATFORM_SUPPORTED,
     deps = [
         "tcmalloc_malloc_extension",
     ],

@@ -1,6 +1,7 @@
 # This file exists to describe "mongo_toolchain", the http_archive defined in WORKSPACE.bazel
 
 load("@//bazel/toolchains:mongo_cc_toolchain_config.bzl", "mongo_cc_toolchain_config")
+load("@mongo_toolchain//:mongo_toolchain_flags.bzl", "COMMON_LINK_FLAGS", "COMMON_BUILTIN_INCLUDE_DIRECTORIES", "COMMON_INCLUDE_DIRECTORIES", "COMMON_BINDIRS", "GCC_INCLUDE_DIRS", "CLANG_INCLUDE_DIRS")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -18,51 +19,16 @@ filegroup(
 # referenced by: mongo_toolchain (of type toolchain)
 # referenced by: toolchain_suite (of type cc_toolchain_suite)
 
-COMMON_LINK_FLAGS = [
-    # Make sure that our toolchain libraries are used for linking
-    "-Lexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0",
-    "-Lexternal/mongo_toolchain/v4/lib",
-    "-Lexternal/mongo_toolchain/v4/lib64",
-]
 
-COMMON_INCLUDE_DIRECTORIES = [
-    "/usr/include",
-    "/usr/include/openssl",
-    # See undocumented %package() syntax: https://cs.opensource.google/bazel/bazel/+/6d448136d13ddab92da8bb29ea6e8387821369d9:src/main/java/com/google/devtools/build/lib/rules/cpp/CcToolchainProviderHelper.java;l=309-329
-    "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0)%",
-    "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0/{arch}-mongodb-linux)%",
-]
 
 mongo_cc_toolchain_config(
     name = "cc_gcc_toolchain_config",
-    bin_dirs = [
-        # Make sure that the toolchain binaries are available
-        "external/mongo_toolchain/v4/bin",
-        "external/mongo_toolchain/stow/gcc-v4/libexec/gcc/{arch}-mongodb-linux/11.3.0",
-        "external/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0",
-        "external/mongo_toolchain/stow/llvm-v4/bin",
-        # Use the host system's glibc dynamic libraries
-        "/lib/{arch}-linux-gnu",
-        "/usr/lib/{arch}-linux-gnu",
-        "/usr/include",
-    ],
+    bin_dirs = COMMON_BINDIRS,
     compiler = "gcc",
     cpu = "{platforms_arch}",
-    cxx_builtin_include_directories = COMMON_INCLUDE_DIRECTORIES + [
-        # See undocumented %package() syntax: https://cs.opensource.google/bazel/bazel/+/6d448136d13ddab92da8bb29ea6e8387821369d9:src/main/java/com/google/devtools/build/lib/rules/cpp/CcToolchainProviderHelper.java;l=309-329
-        "%package(@mongo_toolchain//stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0/include)%",
-        "%package(@mongo_toolchain//stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0/include-fixed)%",
-    ],
-    extra_ldflags = COMMON_LINK_FLAGS,
-    includes = [
-        # These isystems make sure that toolchain includes are used in place of any remote system
-        "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0",
-        "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/{arch}-mongodb-linux",
-        "external/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0/include",
-        "external/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0/include-fixed",
-        # Use the host system's glibc headers
-        "/usr/include/{arch}-linux-gnu",
-    ],
+    cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    extra_ldflags = ["-L"+flag for flag in COMMON_LINK_FLAGS],
+    includes = GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
     tool_paths = {
         # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
         # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
@@ -86,35 +52,12 @@ mongo_cc_toolchain_config(
 
 mongo_cc_toolchain_config(
     name = "cc_clang_toolchain_config",
-    bin_dirs = [
-        # Make sure that the toolchain binaries are available
-        "external/mongo_toolchain/v4/bin",
-        "external/mongo_toolchain/stow/gcc-v4/libexec/gcc/{arch}-mongodb-linux/11.3.0",
-        "external/mongo_toolchain/stow/llvm-v4/lib/clang/12.0.1",
-        "external/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0",
-        "external/mongo_toolchain/stow/llvm-v4/bin",
-        # Use the host system's glibc dynamic libraries
-        "/lib/{arch}-linux-gnu",
-        "/usr/lib/{arch}-linux-gnu",
-    ],
+    bin_dirs = COMMON_BINDIRS,
     compiler = "clang",
     cpu = "{platforms_arch}",
-    cxx_builtin_include_directories = COMMON_INCLUDE_DIRECTORIES + [
-        # See undocumented %package() syntax: https://cs.opensource.google/bazel/bazel/+/6d448136d13ddab92da8bb29ea6e8387821369d9:src/main/java/com/google/devtools/build/lib/rules/cpp/CcToolchainProviderHelper.java;l=309-329
-        "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0/backward)%",
-        "%package(@mongo_toolchain//stow/llvm-v4/lib/clang/12.0.1/include)%",
-    ],
-    extra_ldflags = COMMON_LINK_FLAGS,
-    includes = [
-        # These isystems make sure that toolchain includes are used in place of any remote system
-        "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0",
-        "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/{arch}-mongodb-linux",
-        "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/backward",
-        "external/mongo_toolchain/stow/llvm-v4/lib/clang/12.0.1/include",
-        # Use the host system's glibc headers
-        "/usr/include/{arch}-linux-gnu",
-        "/usr/include",
-    ],
+    cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    extra_ldflags = ["-L"+flag for flag in COMMON_LINK_FLAGS],
+    includes = CLANG_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
     tool_paths = {
         # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
         # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
@@ -159,10 +102,12 @@ toolchain(
     exec_compatible_with = [
         "@platforms//os:linux",
         "@platforms//cpu:{platforms_arch}",
+        "@//bazel/platforms:use_mongo_toolchain",
     ],
     target_compatible_with = [
         "@platforms//os:linux",
         "@platforms//cpu:{platforms_arch}",
+        "@//bazel/platforms:use_mongo_toolchain",
     ],
     toolchain = ":cc_mongo_toolchain",
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",

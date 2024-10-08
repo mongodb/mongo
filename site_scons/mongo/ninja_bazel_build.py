@@ -75,7 +75,18 @@ if args.verbose:
     extra_args = []
 else:
     extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
-bazel_proc = subprocess.run(ninja_build_info["bazel_cmd"] + extra_args + targets_to_build)
+
+bazel_env = os.environ.copy()
+if ninja_build_info.get("USE_NATIVE_TOOLCHAIN"):
+    bazel_env["CC"] = ninja_build_info.get("CC")
+    bazel_env["CXX"] = ninja_build_info.get("CXX")
+    bazel_env["USE_NATIVE_TOOLCHAIN"] = "1"
+sys.stderr.write(
+    f"Running bazel command:\n{' '.join(ninja_build_info['bazel_cmd'] + extra_args + targets_to_build)}\n"
+)
+bazel_proc = subprocess.run(
+    ninja_build_info["bazel_cmd"] + extra_args + targets_to_build, env=bazel_env
+)
 if bazel_proc.returncode != 0:
     print("Command that failed:")
     print(" ".join(ninja_build_info["bazel_cmd"] + extra_args + targets_to_build))
@@ -84,7 +95,7 @@ if (
     "compiledb" in ninja_command_line_targets
     or "compile_commands.json" in ninja_command_line_targets
 ):
-    bazel_proc = subprocess.run(ninja_build_info["compiledb_cmd"])
+    bazel_proc = subprocess.run(ninja_build_info["compiledb_cmd"], env=bazel_env)
     if bazel_proc.returncode != 0:
         print("Command that failed:")
         print(" ".join(ninja_build_info["compiledb_cmd"]))

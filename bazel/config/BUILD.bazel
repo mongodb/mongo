@@ -19,7 +19,6 @@ load(
     "libunwind",
     "linker",
     "linkstatic",
-    "local_build",
     "lsan",
     "msan",
     "opt",
@@ -894,14 +893,6 @@ selects.config_setting_group(
     ],
 )
 
-selects.config_setting_group(
-    name = "tcmalloc_google_local_build",
-    match_all = [
-        ":local_build_enabled",
-        "//bazel/platforms:kernel_version_4_4_or_greater",
-    ],
-)
-
 # --------------------------------------
 # gdbserver options
 # --------------------------------------
@@ -1644,22 +1635,6 @@ selects.config_setting_group(
         ":visibility_support_enabled_setting",
         ":linkstatic_disabled",
     ],
-)
-
-# --------------------------------------
-# local_build
-# --------------------------------------
-
-local_build(
-    name = "local_build",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "local_build_enabled",
-    flag_values = {
-        "//bazel/config:local_build": "True",
-    },
 )
 
 # --------------------------------------

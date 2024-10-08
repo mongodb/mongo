@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import urllib
+import hashlib
 
 from pkg_resources import parse_version
 
@@ -186,9 +187,11 @@ def generate(env):
 
         # This is what we are going to call the file names as known to SCons on disk. We do the
         # subst early so that we can call `replace` on the result.
-        setupEnv["ICECC_VERSION_ID"] = setupEnv.subst(
-            "icecc-create-env.${CC}${CXX}.tar.gz"
-        ).replace("/", "_")
+        cc_names = setupEnv.subst("${CC}${CXX}")
+        # file name limit is 256
+        if len(cc_names) > 100:
+            cc_names = hashlib.md5(cc_names.encode()).hexdigest()
+        setupEnv["ICECC_VERSION_ID"] = f"icecc-create-env.{cc_names}.tar.gz".replace("/", "_")
 
         setupEnv["ICECC_VERSION"] = icecc_version_file = setupEnv.Command(
             target="$ICECREAM_TARGET_DIR/$ICECC_VERSION_ID",

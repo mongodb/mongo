@@ -133,7 +133,7 @@ def _impl(ctx):
         ],
     )
 
-    omitted_timestamps_feature = feature(
+    thin_archive_feature = feature(
         name = "thin_archive",
         enabled = True,
         flag_sets = [
@@ -674,6 +674,7 @@ def _impl(ctx):
         sysroot_feature,
         unfiltered_compile_flags_feature,
         omitted_timestamps_feature,
+        thin_archive_feature,
         extra_cflags_feature,
         extra_cxxflags_feature,
         extra_ldflags_feature,

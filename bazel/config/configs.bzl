@@ -428,19 +428,6 @@ release = rule(
 )
 
 # =========
-# local_build
-# =========
-local_build_provider = provider(
-    doc = """Allows configurations based on local builds""",
-    fields = ["enabled"],
-)
-
-local_build = rule(
-    implementation = lambda ctx: local_build_provider(enabled = ctx.build_setting_value),
-    build_setting = config.bool(flag = True),
-)
-
-# =========
 # dwarf_version
 # =========
 dwarf_version_values = ["4", "5"]

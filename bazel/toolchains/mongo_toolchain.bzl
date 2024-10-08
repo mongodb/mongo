@@ -1,5 +1,6 @@
 load("//bazel:utils.bzl", "get_host_distro_major_version", "retry_download_and_extract")
 load("//bazel/toolchains:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
+load("//bazel/toolchains:mongo_toolchain_flags.bzl", "ARCH_NORMALIZE_MAP")
 
 _OS_MAP = {
     "macos": "@platforms//os:osx",
@@ -14,15 +15,6 @@ _ARCH_MAP = {
     "s390x": "@platforms//cpu:s390x",
 }
 
-_ARCH_NORMALIZE_MAP = {
-    "amd64": "x86_64",
-    "x86_64": "x86_64",
-    "arm64": "aarch64",
-    "aarch64": "aarch64",
-    "ppc64le": "ppc64le",
-    "s390x": "s390x",
-}
-
 def _toolchain_download(ctx):
     if ctx.attr.os:
         os = ctx.attr.os
@@ -34,7 +26,7 @@ def _toolchain_download(ctx):
     else:
         arch = ctx.os.arch
 
-    arch = _ARCH_NORMALIZE_MAP[arch]
+    arch = ARCH_NORMALIZE_MAP[arch]
 
     if os != "linux":
         # BUILD file is required for a no-op
@@ -46,6 +38,11 @@ def _toolchain_download(ctx):
         ctx.template(
             "BUILD.bazel",
             ctx.attr.build_tpl,
+            substitutions = substitutions,
+        )
+        ctx.template(
+            "mongo_toolchain_flags.bzl",
+            ctx.attr.flags_tpl,
             substitutions = substitutions,
         )
         ctx.report_progress("mongo toolchain not supported on " + os + " and " + arch)
@@ -100,6 +97,11 @@ def _toolchain_download(ctx):
             ctx.attr.build_tpl,
             substitutions = substitutions,
         )
+        ctx.template(
+            "mongo_toolchain_flags.bzl",
+            ctx.attr.flags_tpl,
+            substitutions = substitutions,
+        )
     else:
         fail("Mongo toolchain not supported on " + distro + " and " + arch + ". Toolchain key not found: " + toolchain_key)
 
@@ -119,6 +121,10 @@ toolchain_download = repository_rule(
         "build_tpl": attr.label(
             default = "//bazel/toolchains:mongo_toolchain.BUILD",
             doc = "Label denoting the BUILD file template that get's installed in the repo.",
+        ),
+        "flags_tpl": attr.label(
+            default = "//bazel/toolchains:mongo_toolchain_flags.bzl",
+            doc = "Label denoting the toolchain flags template.",
         ),
     },
 )
