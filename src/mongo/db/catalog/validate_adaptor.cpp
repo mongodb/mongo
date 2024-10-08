@@ -238,8 +238,8 @@ Status _validateTimeSeriesIdTimestamp(const CollectionPtr& collection, const BSO
         1000;
     int64_t oidEmbeddedTimestamp =
         recordBson.getField(timeseries::kBucketIdFieldName).OID().getTimestamp();
-    // TODO SERVER-87065: Re-enable this check in testing.
-    if (minTimestamp != oidEmbeddedTimestamp && !TestingProctor::instance().isEnabled()) {
+    if (minTimestamp != oidEmbeddedTimestamp &&
+        !collection->getRequiresTimeseriesExtendedRangeSupport()) {
         return Status(
             ErrorCodes::InvalidIdField,
             fmt::format("Mismatch between the embedded timestamp {} in the time-series "
@@ -369,14 +369,14 @@ Status _validateTimeSeriesMinMax(const CollectionPtr& coll,
             // at greater than or equal to the control.min time-field.
             // TODO (SERVER-94872): Reinstate the strict equality check.
             return timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(),
-                                                           options) >= controlMin.Date() &&
+                                                           options) >=
+                timeseries::roundTimestampToGranularity(controlMin.Date(), options) &&
                 controlMax.Date() == max.getField(fieldName).Date();
         } else {
             return controlMin.wrap().woCompare(min) == 0 && controlMax.wrap().woCompare(max) == 0;
         }
     };
-    // TODO SERVER-87065: re-enable in testing.
-    if (!checkMinAndMaxMatch() && !TestingProctor::instance().isEnabled()) {
+    if (!checkMinAndMaxMatch()) {
         return Status(
             ErrorCodes::BadValue,
             fmt::format(

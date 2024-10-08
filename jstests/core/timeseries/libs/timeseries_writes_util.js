@@ -119,8 +119,12 @@ export function prepareCollection({dbToUse, collName, initialDocList, timeseries
             ...timeseriesOptions,
         }
     }));
+    jsTestLog(`Inserting initial documents into collection: ${tojson(initialDocList)}`);
     assert.commandWorked(coll.insert(initialDocList));
-
+    const bucketDocs = dbToUse["system.buckets." + collName].find().toArray();
+    for (let index in bucketDocs) {
+        jsTestLog("Resulting bucket: " + tojson(bucketDocs[index]));
+    }
     return coll;
 }
 

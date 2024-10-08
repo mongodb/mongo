@@ -172,11 +172,9 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$set": {"control.min.temp": -200}}));
 assert.commandWorked(bucket.update({}, {"$set": {"control.max.temp": 500}}));
 res = assert.commandWorked(coll.validate());
-
-// TODO SERVER-87065: This should catch the timestamp error.
-assert(res.valid, tojson(res));
-assert(res.errors.length == 0, tojson(res));
-assert(res.nNonCompliantDocuments == 0, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
+assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Updates the 'control' min and max temperature without an update in recorded temperature, when
 // there is also a gap in observed temperature (i.e, one or more of the data entries does not have a
@@ -190,10 +188,9 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$set": {"control.min.temp": -200}}));
 assert.commandWorked(bucket.update({}, {"$set": {"control.max.temp": 500}}));
 res = assert.commandWorked(coll.validate());
-// TODO SERVER-87065: Validation should error on the incorrect min temperature.
-assert(res.valid, tojson(res));
-assert(res.errors.length == 0, tojson(res));
-assert(res.nNonCompliantDocuments == 0, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
+assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Updates the 'control' max _id without an update in recorded temperature.
 setUpCollection(weatherData);
@@ -204,10 +201,9 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(
     bucket.update({}, {"$set": {"control.max._id": ObjectId("62bcc728f3c51f43297eea43")}}));
 res = assert.commandWorked(coll.validate());
-// TODO SERVER-87065: Validation should error on the incorrect max temperature.
-assert(res.valid, tojson(res));
-assert(res.errors.length == 0, tojson(res));
-assert(res.nNonCompliantDocuments == 0, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
+assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Updates the 'control' min timestamp without an update in recorded temperature.
 setUpCollection(weatherData);
@@ -218,21 +214,9 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(
     bucket.update({}, {"$set": {"control.min.timestamp": ISODate("2021-05-19T13:00:00.000Z")}}));
 res = assert.commandWorked(coll.validate());
-// TODO SERVER-87065: Validation should error on the incorrect min temperature.
-
-if (FeatureFlagUtil.isPresentAndEnabled(db, "TSBucketingParametersUnchanged")) {
-    // Errors due to SERVER-91754 because min is > then some of the record timestamps rounded
-    // down with granularity.
-    assert(!res.valid, tojson(res));
-    assert(res.errors.length == 1, tojson(res));
-    assert.contains(
-        "A time series bucketing parameter was changed in this collection but timeseriesBucketingParametersChanged is not true. For more info, see logs with log id 9175400.",
-        res.errors);
-} else {
-    assert(res.valid, tojson(res));
-    assert(res.errors.length == 0, tojson(res));
-}
-assert(res.nNonCompliantDocuments == 0, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
+assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Adds an extra field to the 'control' min object.
 setUpCollection(weatherData);
@@ -256,10 +240,9 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$set": {"control.min.str": "-200"}}));
 assert.commandWorked(bucket.update({}, {"$set": {"control.max.str": "zzz"}}));
 res = assert.commandWorked(coll.validate());
-// TODO SERVER-87065: Validation should error on the incorrect min temperature.
-assert(res.valid, tojson(res));
-assert(res.errors.length == 0, tojson(res));
-assert(res.nNonCompliantDocuments == 0, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
+assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests whether discrepancies with array values are caught.
 setUpCollection(arrayData);
@@ -270,10 +253,9 @@ bucket = db.getCollection(bucketName);
 assert.commandWorked(
     bucket.update({}, {"$set": {"control.max.arr": ["zzzzz", {"field": -2}, 30]}}));
 res = assert.commandWorked(coll.validate());
-// TODO SERVER-87065: Validation should error on the incorrect max temperature.
-assert(res.valid, tojson(res));
-assert(res.errors.length == 0, tojson(res));
-assert(res.nNonCompliantDocuments == 0, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
+assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests whether discrepancies with nested objects are caught.
 setUpCollection(objectData);
@@ -283,10 +265,9 @@ coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
 assert.commandWorked(bucket.update({}, {"$set": {"control.max.obj": {"nestedObj": {"field": 2}}}}));
 res = assert.commandWorked(coll.validate());
-// TODO SERVER-87065: Validation should error on the incorrect min temperature.
-assert(res.valid, tojson(res));
-assert(res.errors.length == 0, tojson(res));
-assert(res.nNonCompliantDocuments == 0, tojson(res));
+assert(!res.valid, tojson(res));
+assert(res.errors.length == 1, tojson(res));
+assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests collections with 'control.version' : 2, which represents compressed buckets
 jsTestLog("Running validate on a version 2 bucket with incorrect 'max' object field.");
@@ -297,10 +278,9 @@ bucket.updateOne(
     {"meta.sensorId": 2, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
     {"$set": {"control.max.temp": 800}});
 res = bucket.validate({checkBSONConformance: true});
-// TODO SERVER-87065: Validation should error on the incorrect min temperature.
-assert(res.valid, tojson(res));
-assert.eq(res.nNonCompliantDocuments, 0);
-assert.eq(res.errors.length, 0);
+assert(!res.valid, tojson(res));
+assert.eq(res.nNonCompliantDocuments, 1);
+assert.eq(res.errors.length, 1);
 
 // "Checks no errors are thrown with a valid closed bucket."
 jsTestLog(
