@@ -185,11 +185,13 @@ protected:
                     opCtx, CollectionPtr(), nss, {}, BSONObj(), OplogSlot(), false);
                 opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none);
                 opObserver.onDropDatabase(opCtx, nss.dbName(), false /*fromMigrate*/);
-                opObserver.onDropCollection(opCtx,
-                                            nss,
-                                            uuid,
-                                            0,
-                                            /*markFromMigrate=*/false);
+                opObserver.onDropCollection(
+                    opCtx,
+                    nss,
+                    uuid,
+                    0,
+                    UserWriteBlockModeOpObserver::CollectionDropType::kOnePhase,
+                    /*markFromMigrate=*/false);
                 opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj());
                 // For renames, make sure we check both from and to for the given namespace
                 opObserver.preRenameCollection(opCtx,
@@ -242,11 +244,13 @@ protected:
                           AssertionException);
             ASSERT_THROWS(opObserver.onDropDatabase(opCtx, nss.dbName(), false /*fromMigrate*/),
                           AssertionException);
-            ASSERT_THROWS(opObserver.onDropCollection(opCtx,
-                                                      nss,
-                                                      uuid,
-                                                      0,
-                                                      /*markFromMigrate=*/false),
+            ASSERT_THROWS(opObserver.onDropCollection(
+                              opCtx,
+                              nss,
+                              uuid,
+                              0,
+                              UserWriteBlockModeOpObserver::CollectionDropType::kOnePhase,
+                              /*markFromMigrate=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj()),
                           AssertionException);

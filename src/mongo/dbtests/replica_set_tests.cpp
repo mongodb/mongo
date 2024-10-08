@@ -38,6 +38,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
@@ -63,6 +64,8 @@ protected:
     void setUp() override {
         auto opCtx = makeOpCtx();
         _storageInterface = std::make_unique<repl::StorageInterfaceImpl>();
+        _dropPendingCollectionReaper =
+            std::make_unique<repl::DropPendingCollectionReaper>(_storageInterface.get());
         auto consistencyMarkers =
             std::make_unique<repl::ReplicationConsistencyMarkersImpl>(_storageInterface.get());
         auto recovery = std::make_unique<repl::ReplicationRecoveryImpl>(_storageInterface.get(),
@@ -70,7 +73,10 @@ protected:
         _replicationProcess = std::make_unique<repl::ReplicationProcess>(
             _storageInterface.get(), std::move(consistencyMarkers), std::move(recovery));
         _replCoordExternalState = std::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
-            opCtx->getServiceContext(), _storageInterface.get(), _replicationProcess.get());
+            opCtx->getServiceContext(),
+            _dropPendingCollectionReaper.get(),
+            _storageInterface.get(),
+            _replicationProcess.get());
         ASSERT_OK(_replCoordExternalState->createLocalLastVoteCollection(opCtx.get()));
     }
 
@@ -80,6 +86,7 @@ protected:
         client.dropCollection(NamespaceString::kLastVoteNamespace);
 
         _replCoordExternalState.reset();
+        _dropPendingCollectionReaper.reset();
         _storageInterface.reset();
         _replicationProcess.reset();
     }
@@ -95,6 +102,7 @@ protected:
 private:
     std::unique_ptr<repl::ReplicationCoordinatorExternalStateImpl> _replCoordExternalState;
     std::unique_ptr<repl::StorageInterface> _storageInterface;
+    std::unique_ptr<repl::DropPendingCollectionReaper> _dropPendingCollectionReaper;
     std::unique_ptr<repl::ReplicationProcess> _replicationProcess;
 };
 

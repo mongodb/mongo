@@ -366,6 +366,7 @@ repl::OpTime TenantMigrationDonorOpObserver::onDropCollection(OperationContext* 
                                                               const NamespaceString& collectionName,
                                                               const UUID& uuid,
                                                               std::uint64_t numRecords,
+                                                              const CollectionDropType dropType,
                                                               bool markFromMigrate) {
     if (collectionName == NamespaceString::kTenantMigrationDonorsNamespace) {
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(

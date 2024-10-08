@@ -16,6 +16,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Returns a list of all collections in a given database. Use 'args' as the
 // 'listCollections' command arguments.
@@ -24,6 +25,16 @@ function listCollections(database, args) {
     var failMsg = "'listCollections' command failed";
     var res = assert.commandWorked(database.runCommand("listCollections", args), failMsg);
     return res.cursor.firstBatch;
+}
+
+// Returns a list of 'drop-pending' collections. The collection names should be of the
+// format "system.drop.<optime>.<collectionName>", where 'optime' is the optime of the
+// collection drop operation, encoded as a string, and 'collectionName' is the original
+// collection name.
+function listDropPendingCollections(database) {
+    var pendingDropRegex = new RegExp("system\.drop\..*\." + collNameToDrop + "$");
+    var collections = listCollections(database, {includePendingDrops: true});
+    return collections.filter(c => pendingDropRegex.test(c.name));
 }
 
 // Returns a list of all collection names in a given database.
@@ -91,6 +102,21 @@ assert.soonNoExcept(
     'Primary ' + primary.host + ' failed to prepare two phase drop of collection ' +
         collToDrop.getFullName());
 
+// 'collToDrop' is no longer visible with its original name. If 'system.drop' two phase drops
+// are supported by the storage engine, check for the drop-pending namespace using
+// listCollections.
+const supportsDropPendingNamespaces =
+    TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replTest);
+if (supportsDropPendingNamespaces) {
+    var dropPendingCollections = listDropPendingCollections(dbToDrop);
+    assert.eq(1,
+              dropPendingCollections.length,
+              "Collection was not found in the 'system.drop' namespace. " +
+                  "Full drop-pending collection list: " + tojson(dropPendingCollections));
+    jsTestLog('Primary ' + primary.host + ' successfully started two phase drop of collection ' +
+              collToDrop.getFullName());
+}
+
 // Commands that manipulate the database being dropped or perform destructive catalog operations
 // should fail with the DatabaseDropPending error code while the database is in a drop-pending
 // state.
@@ -110,6 +136,16 @@ restartServerReplication(secondary);
 
 jsTestLog("Waiting for collection drop operation to replicate to all nodes.");
 replTest.awaitReplication();
+
+// Make sure the collection has been fully dropped. It should not appear as
+// a normal collection or under the 'system.drop' namespace any longer. Physical collection
+// drops may happen asynchronously, any time after the drop operation is committed, so we wait
+// to make sure the collection is eventually dropped.
+assert.soonNoExcept(function() {
+    var dropPendingCollections = listDropPendingCollections(dbToDrop);
+    jsTestLog('Drop pending collections: ' + tojson(dropPendingCollections));
+    return dropPendingCollections.length == 0;
+});
 
 jsTestLog('Waiting for dropDatabase command on ' + primary.host + ' to complete.');
 var exitCode = dropDatabaseProcess();

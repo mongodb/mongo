@@ -477,9 +477,9 @@ private:
     void _summarizeRollback(OperationContext* opCtx) const;
 
     /**
-     * Confirm that every database has an _id index.
+     * Aligns the drop pending reaper's state with the catalog.
      */
-    void _checkForAllIdIndexes(OperationContext* opCtx);
+    void _resetDropPendingState(OperationContext* opCtx);
 
     // Guards access to member variables.
     mutable stdx::mutex _mutex;  // (S)

@@ -104,6 +104,10 @@ bool ReplicationCoordinator::isOplogDisabledForNS(const NamespaceString& nss) {
         return true;
     }
 
+    if (nss.isDropPendingNamespace()) {
+        return true;
+    }
+
     return false;
 }
 

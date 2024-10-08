@@ -85,6 +85,7 @@ repl::OpTime ConfigServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                       const NamespaceString& collectionName,
                                                       const UUID& uuid,
                                                       std::uint64_t numRecords,
+                                                      const CollectionDropType dropType,
                                                       bool markFromMigrate) {
     if (collectionName == VersionType::ConfigNS) {
         if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {

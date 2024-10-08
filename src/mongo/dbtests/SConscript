@@ -150,6 +150,7 @@ env.Program(
         "$BUILD_DIR/mongo/db/query/query_settings/manager",
         "$BUILD_DIR/mongo/db/query/write_ops/write_ops",
         "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper",
         "$BUILD_DIR/mongo/db/repl/oplog_entry_test_helpers",
         "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
         "$BUILD_DIR/mongo/db/repl/replication_consistency_markers_impl",

@@ -149,6 +149,7 @@ repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
+                                              const CollectionDropType dropType,
                                               bool markFromMigrate) {
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("drop" << collectionName.coll());

@@ -374,11 +374,12 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
+                                  const CollectionDropType dropType,
                                   bool markFromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& observer : this->_observers) {
             auto time = observer->onDropCollection(
-                opCtx, collectionName, uuid, numRecords, markFromMigrate);
+                opCtx, collectionName, uuid, numRecords, dropType, markFromMigrate);
             invariant(time.isNull());
         }
         return _getOpTimeToReturn(times.get().reservedOpTimes);

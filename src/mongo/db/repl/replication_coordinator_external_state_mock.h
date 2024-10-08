@@ -117,6 +117,7 @@ public:
     void updateLastAppliedSnapshot(const OpTime& optime) override;
     bool snapshotsEnabled() const override;
     void notifyOplogMetadataWaiters(const OpTime& committedOpTime) override;
+    boost::optional<OpTime> getEarliestDropPendingOpTime() const final;
     double getElectionTimeoutOffsetLimitFraction() const override;
     bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const override;
     std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const override;

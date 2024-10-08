@@ -7,11 +7,14 @@
  * ]
  */
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
-// Returns list of collections in database.
+// Returns list of collections in database, including pending drops.
 // Assumes all collections fit in first batch of results.
 function listCollections(database) {
-    return assert.commandWorked(database.runCommand({listCollections: 1})).cursor.firstBatch;
+    return assert
+        .commandWorked(database.runCommand({listCollections: 1, includePendingDrops: true}))
+        .cursor.firstBatch;
 }
 
 // Operations that will be present on both nodes, before the common point.
@@ -30,6 +33,7 @@ let CommonOps = (node) => {
     const collToDrop = mydb.getCollection(replicatedDropCollName);
     assert.commandWorked(mydb.createCollection(collToDrop.getName()));
     assert(collToDrop.drop());
+    TwoPhaseDropCollectionTest.waitForDropToComplete(mydb, replicatedDropCollName);
 
     // This collection will be dropped during a rename.
     const renameTargetColl = node.getCollection(renameTargetCollName);
@@ -57,14 +61,25 @@ let RollbackOps = (node) => {
     const collectionsBeforeDrop = listCollections(mydb);
     assert(coll.drop());
     const collectionsAfterDrop = listCollections(mydb);
-    assert.lt(collectionsAfterDrop.length,
-              collectionsBeforeDrop.length,
-              'listCollections did not report fewer collections in database ' + mydb.getName() +
-                  ' after dropping collection ' + coll.getFullName() + '. Before: ' +
-                  tojson(collectionsBeforeDrop) + '. After: ' + tojson(collectionsAfterDrop));
-    assert.gt(mydb.serverStatus().storageEngine.dropPendingIdents,
-              0,
-              'There is no drop pending ident in the storage engine.');
+    const supportsPendingDrops = mydb.serverStatus().storageEngine.supportsPendingDrops;
+    jsTestLog('supportsPendingDrops = ' + supportsPendingDrops);
+    if (!supportsPendingDrops) {
+        assert.eq(collectionsAfterDrop.length,
+                  collectionsBeforeDrop.length,
+                  'listCollections did not report the same number of collections in database ' +
+                      mydb.getName() + ' after dropping collection ' + coll.getFullName() +
+                      '. Before: ' + tojson(collectionsBeforeDrop) +
+                      '. After: ' + tojson(collectionsAfterDrop));
+    } else {
+        assert.lt(collectionsAfterDrop.length,
+                  collectionsBeforeDrop.length,
+                  'listCollections did not report fewer collections in database ' + mydb.getName() +
+                      ' after dropping collection ' + coll.getFullName() + '. Before: ' +
+                      tojson(collectionsBeforeDrop) + '. After: ' + tojson(collectionsAfterDrop));
+        assert.gt(mydb.serverStatus().storageEngine.dropPendingIdents,
+                  0,
+                  'There is no drop pending ident in the storage engine.');
+    }
 
     const renameTargetColl = node.getCollection(renameTargetCollName);
     assert.commandWorked(renameTargetColl.insert({_id: 10, b: 10}));

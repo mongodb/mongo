@@ -168,6 +168,7 @@ repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
                                                     const NamespaceString& collectionName,
                                                     const UUID& uuid,
                                                     std::uint64_t numRecords,
+                                                    CollectionDropType dropType,
                                                     bool markFromMigrate) {
     if (collectionName.isTimeseriesBucketsCollection()) {
         auto& bucketCatalog =

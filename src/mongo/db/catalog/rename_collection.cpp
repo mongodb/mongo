@@ -488,7 +488,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         if (!targetColl && uuidToDrop) {
             invariant(options.dropTarget);
             auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, uuidToDrop.value());
-            if (collToDropBasedOnUUID) {
+            if (collToDropBasedOnUUID && !collToDropBasedOnUUID->isDropPendingNamespace()) {
                 invariant(collToDropBasedOnUUID->isEqualDb(target));
                 targetColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                     opCtx, *collToDropBasedOnUUID);
@@ -942,6 +942,12 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
                   "allowed");
     }
 
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "renameCollection cannot accept a source collection that is in a "
+                             "drop-pending state: "
+                          << source.toStringForErrorMsg(),
+            !source.isDropPendingNamespace());
+
     uassert(ErrorCodes::IllegalOperation,
             "renaming system.views collection or renaming to system.views is not allowed",
             !source.isSystemDotViews() && !target.isSystemDotViews());
@@ -998,6 +1004,13 @@ Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,
                         const NamespaceString& target,
                         const RenameCollectionOptions& options) {
+    if (source.isDropPendingNamespace()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "renameCollection() cannot accept a source "
+                                       "collection that is in a drop-pending state: "
+                                    << source.toStringForErrorMsg());
+    }
+
     if (source.isSystemDotViews() || target.isSystemDotViews()) {
         return Status(
             ErrorCodes::IllegalOperation,
@@ -1099,7 +1112,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
         MODE_X,
         AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
 
-    if (!sourceColl) {
+    if (sourceNss.isDropPendingNamespace() || !sourceColl) {
         boost::optional<NamespaceString> dropTargetNss;
 
         if (options.dropTarget)

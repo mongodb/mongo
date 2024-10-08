@@ -69,6 +69,7 @@
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
@@ -190,6 +191,8 @@ public:
         repl::StorageInterface::set(_svcCtx, std::make_unique<repl::StorageInterfaceImpl>());
         _storageInterface = repl::StorageInterface::get(_svcCtx);
 
+        repl::DropPendingCollectionReaper::set(
+            _svcCtx, std::make_unique<repl::DropPendingCollectionReaper>(_storageInterface));
         IndexBuildsCoordinator::set(_svcCtx, std::make_unique<IndexBuildsCoordinatorMongod>());
 
         auto registry = std::make_unique<OpObserverRegistry>();

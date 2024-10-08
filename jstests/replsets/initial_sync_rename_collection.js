@@ -5,6 +5,7 @@
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Set up replica set. Disallow chaining so nodes always sync from primary.
 const testName = "initial_sync_rename_collection";
@@ -82,6 +83,16 @@ function finishTest({failPoint, expectedLog, createNew, renameAcrossDBs}) {
         to: target.getFullName(),
         dropTarget: false
     }));
+
+    // Only set for test cases that use 'system.drop' namespaces when dropping collections.
+    // In those tests the variable 'dropPendingNss' represents such a namespace. Used for
+    // expectedLog. See test cases 6 and 8 below.
+    let dropPendingNss;
+    const dropPendingColl =
+        TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(primaryDB, collName);
+    if (dropPendingColl) {
+        dropPendingNss = dbName + "." + dropPendingColl["name"];
+    }
 
     if (createNew) {
         jsTestLog("Creating a new collection with the same name: " + primaryColl.getFullName());
@@ -164,6 +175,13 @@ runRenameTest({
 // Double escape the backslash as eval will do unescaping
 let expectedLogFor6and8 =
     '`CollectionCloner stopped because collection was dropped on source","attr":{"namespace":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`';
+
+// Since the cloner queries collection by UUID, it will observe the first drop phase as a rename.
+// We still want to check that initial sync succeeds in such a case.
+if (TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replTest)) {
+    expectedLogFor6and8 =
+        '`Sync process retrying cloner stage due to error","attr":{"cloner":"CollectionCloner","stage":"query","error":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${dropPendingNss}\'. UUID ${uuid}`';
+}
 
 jsTestLog("[6] Testing cross-DB rename between getMores.");
 runRenameTest({

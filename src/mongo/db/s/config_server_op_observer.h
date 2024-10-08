@@ -87,6 +87,7 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
+                                  CollectionDropType dropType,
                                   bool markFromMigrate) override;
 
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;

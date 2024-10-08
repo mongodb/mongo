@@ -52,6 +52,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -156,6 +157,9 @@ protected:
 
     // ReplicationProcess used to access consistency markers.
     std::unique_ptr<ReplicationProcess> _replicationProcess;
+
+    // DropPendingCollectionReaper used to clean up and roll back dropped collections.
+    DropPendingCollectionReaper* _dropPendingCollectionReaper = nullptr;
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 

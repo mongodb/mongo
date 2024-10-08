@@ -184,6 +184,10 @@ Status _dropDatabase(OperationContext* opCtx,
     std::size_t numCollectionsToDrop = 0;
     std::size_t numCollections = 0;
 
+    // We have to wait for the last drop-pending collection to be removed if there are no
+    // collections to drop.
+    repl::OpTime latestDropPendingOpTime;
+
     const auto tenantLockMode{
         boost::make_optional(dbName.tenantId() && dbName.isConfigDB(), MODE_X)};
     {
@@ -325,6 +329,16 @@ Status _dropDatabase(OperationContext* opCtx,
                   logAttrs(dbName),
                   "namespace"_attr = nss);
 
+            if (nss.isDropPendingNamespace() && replCoord->getSettings().isReplSet() &&
+                opCtx->writesAreReplicated()) {
+                LOGV2(20339,
+                      "dropDatabase - found drop-pending collection",
+                      logAttrs(dbName),
+                      "namespace"_attr = nss);
+                latestDropPendingOpTime = std::max(
+                    latestDropPendingOpTime, uassertStatusOK(nss.getDropPendingNamespaceOpTime()));
+                continue;
+            }
             if (replCoord->isOplogDisabledFor(opCtx, nss)) {
                 continue;
             }
@@ -359,7 +373,7 @@ Status _dropDatabase(OperationContext* opCtx,
         }
 
         // If there are no collection drops to wait for, we complete the drop database operation.
-        if (numCollectionsToDrop == 0U) {
+        if (numCollectionsToDrop == 0U && latestDropPendingOpTime.isNull()) {
             _finishDropDatabase(
                 opCtx, dbName, db, numCollections, abortIndexBuilds, markFromMigrate);
             return Status::OK();
@@ -377,9 +391,12 @@ Status _dropDatabase(OperationContext* opCtx,
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     auto awaitOpTime = [&]() {
-        invariant(numCollectionsToDrop > 0U);
-        const auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
-        return clientInfo.getLastOp();
+        if (numCollectionsToDrop > 0U) {
+            const auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+            return clientInfo.getLastOp();
+        }
+        invariant(!latestDropPendingOpTime.isNull());
+        return latestDropPendingOpTime;
     }();
 
     // The user-supplied wTimeout should be used when waiting for majority write concern.
@@ -400,7 +417,8 @@ Status _dropDatabase(OperationContext* opCtx,
           logAttrs(dbName),
           "awaitOpTime"_attr = awaitOpTime,
           "dropDatabaseWriteConcern"_attr = dropDatabaseWriteConcern.toBSON(),
-          "numCollectionsToDrop"_attr = numCollectionsToDrop);
+          "numCollectionsToDrop"_attr = numCollectionsToDrop,
+          "latestDropPendingOpTime"_attr = latestDropPendingOpTime);
 
     auto result = replCoord->awaitReplication(opCtx, awaitOpTime, dropDatabaseWriteConcern);
 

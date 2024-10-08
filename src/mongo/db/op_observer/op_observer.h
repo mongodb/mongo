@@ -192,6 +192,15 @@ public:
         NamespaceFilter deleteFilter;  // onDelete
     };
 
+    enum class CollectionDropType {
+        // The collection is being dropped immediately, in one step.
+        kOnePhase,
+
+        // The collection is being dropped in two phases, by renaming to a drop pending collection
+        // which is registered to be reaped later.
+        kTwoPhase,
+    };
+
     virtual ~OpObserver() = default;
 
     // Used by the OpObserverRegistry to filter out CRUD operations.
@@ -400,6 +409,7 @@ public:
                                           const NamespaceString& collectionName,
                                           const UUID& uuid,
                                           std::uint64_t numRecords,
+                                          CollectionDropType dropType,
                                           bool markFromMigrate) = 0;
 
 

@@ -235,6 +235,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
                 coll->ns(),
                 coll->uuid(),
                 coll->numRecords(opCtx),
+                OpObserver::CollectionDropType::kOnePhase,
                 /*markFromMigrate=*/false);
         }
 

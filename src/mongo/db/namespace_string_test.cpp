@@ -203,6 +203,95 @@ TEST_F(NamespaceStringTest, IsLegalClientSystemNamespace) {
     ASSERT_FALSE(makeNamespaceString(boost::none, "test.system.roles").isLegalClientSystemNS());
 }
 
+TEST_F(NamespaceStringTest, IsDropPendingNamespace) {
+    ASSERT_TRUE(
+        makeNamespaceString(boost::none, "test.system.drop.0i0t-1.foo").isDropPendingNamespace());
+    ASSERT_TRUE(makeNamespaceString(boost::none, "test.system.drop.1234567i8t9.foo")
+                    .isDropPendingNamespace());
+    ASSERT_TRUE(
+        makeNamespaceString(boost::none, "test.system.drop.1234.foo").isDropPendingNamespace());
+    ASSERT_TRUE(makeNamespaceString(boost::none, "test.system.drop.foo").isDropPendingNamespace());
+
+    ASSERT_FALSE(makeNamespaceString(boost::none, "test.system.drop").isDropPendingNamespace());
+    ASSERT_FALSE(makeNamespaceString(boost::none, "test.drop.1234.foo").isDropPendingNamespace());
+    ASSERT_FALSE(makeNamespaceString(boost::none, "test.drop.foo").isDropPendingNamespace());
+    ASSERT_FALSE(makeNamespaceString(boost::none, "test.foo").isDropPendingNamespace());
+    ASSERT_FALSE(makeNamespaceString(boost::none, "test.$cmd").isDropPendingNamespace());
+
+    ASSERT_FALSE(makeNamespaceString(boost::none, "$cmd.aggregate.foo").isDropPendingNamespace());
+    ASSERT_FALSE(makeNamespaceString(boost::none, "$cmd.listCollections").isDropPendingNamespace());
+}
+
+TEST_F(NamespaceStringTest, MakeDropPendingNamespace) {
+    ASSERT_EQUALS(
+        makeNamespaceString(boost::none, "test.system.drop.0i0t-1.foo"),
+        makeNamespaceString(boost::none, "test.foo").makeDropPendingNamespace(repl::OpTime()));
+    ASSERT_EQUALS(
+        makeNamespaceString(boost::none, "test.system.drop.1234567i8t9.foo"),
+        makeNamespaceString(boost::none, "test.foo")
+            .makeDropPendingNamespace(repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
+
+    std::string collName(NamespaceString::MaxNsCollectionLen, 't');
+    NamespaceString nss = makeNamespaceString(boost::none, "test", collName);
+    ASSERT_EQUALS(makeNamespaceString(boost::none, "test.system.drop.1234567i8t9." + collName),
+                  nss.makeDropPendingNamespace(repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
+}
+
+TEST_F(NamespaceStringTest, GetDropPendingNamespaceOpTime) {
+    // Null optime is acceptable.
+    ASSERT_EQUALS(
+        repl::OpTime(),
+        unittest::assertGet(makeNamespaceString(boost::none, "test.system.drop.0i0t-1.foo")
+                                .getDropPendingNamespaceOpTime()));
+
+    // Valid optime.
+    ASSERT_EQUALS(
+        repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL),
+        unittest::assertGet(makeNamespaceString(boost::none, "test.system.drop.1234567i8t9.foo")
+                                .getDropPendingNamespaceOpTime()));
+
+    // Original collection name is optional.
+    ASSERT_EQUALS(
+        repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL),
+        unittest::assertGet(makeNamespaceString(boost::none, "test.system.drop.1234567i8t9")
+                                .getDropPendingNamespaceOpTime()));
+
+    // No system.drop. prefix.
+    ASSERT_EQUALS(
+        ErrorCodes::BadValue,
+        makeNamespaceString(boost::none, "test.1234.foo").getDropPendingNamespaceOpTime());
+
+    // Missing 'i' separator.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  makeNamespaceString(boost::none, "test.system.drop.1234t8.foo")
+                      .getDropPendingNamespaceOpTime());
+
+    // Missing 't' separator.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  makeNamespaceString(boost::none, "test.system.drop.1234i56.foo")
+                      .getDropPendingNamespaceOpTime());
+
+    // Timestamp seconds is not a number.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  makeNamespaceString(boost::none, "test.system.drop.wwwi56t123.foo")
+                      .getDropPendingNamespaceOpTime());
+
+    // Timestamp increment is not a number.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  makeNamespaceString(boost::none, "test.system.drop.1234iaaat123.foo")
+                      .getDropPendingNamespaceOpTime());
+
+    // Timestamp increment must be an unsigned number.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  makeNamespaceString(boost::none, "test.system.drop.1234i-100t123.foo")
+                      .getDropPendingNamespaceOpTime());
+
+    // Term is not a number.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  makeNamespaceString(boost::none, "test.system.drop.1234i111taaa.foo")
+                      .getDropPendingNamespaceOpTime());
+}
+
 TEST_F(NamespaceStringTest, CollectionComponentValidNamesWithNamespaceString) {
     ASSERT(NamespaceString::validCollectionComponent(makeNamespaceString(boost::none, "a.b")));
     ASSERT(!NamespaceString::validCollectionComponent(makeNamespaceString(boost::none, "a.")));

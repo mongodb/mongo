@@ -9,6 +9,7 @@ import {
 } from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 testDB.dropDatabase();
@@ -47,6 +48,10 @@ const resumeToken = change._id;
 
 // For whole-db streams, it is possible to resume at a point before a collection is dropped.
 assertDropCollection(testDB, collAgg.getName());
+// Wait for two-phase drop to complete, so that the UUID no longer exists.
+assert.soon(function() {
+    return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(testDB, collAgg.getName());
+});
 assert.commandWorked(testDB.runCommand(
     {aggregate: 1, pipeline: [{$changeStream: {resumeAfter: resumeToken}}], cursor: {}}));
 

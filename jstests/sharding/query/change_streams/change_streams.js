@@ -9,6 +9,7 @@ import {
     canonicalizeEventForTesting
 } from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 function runTest(collName, shardKey) {
     const st = new ShardingTest({
@@ -182,6 +183,9 @@ function runTest(collName, shardKey) {
     jsTestLog('Testing getMore command closes cursor for invalidate entries with shard key' +
               shardKey);
     mongosColl.drop();
+    // Wait for the drop to actually happen.
+    assert.soon(() => !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(
+                    mongosColl.getDB(), mongosColl.getName()));
     assert.soon(() => changeStream.hasNext());
     assert.eq(changeStream.next().operationType, "drop");
     assert.soon(() => changeStream.hasNext());

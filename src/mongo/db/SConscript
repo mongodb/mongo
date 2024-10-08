@@ -712,6 +712,7 @@ env.Library(
         "query/client_cursor/client_cursor",
         "query/query_settings/manager",
         "query/stats/stats",
+        "repl/drop_pending_collection_reaper",
         "repl/initial_syncer",
         "repl/repl_coordinator_impl",
         "repl/replication_recovery",

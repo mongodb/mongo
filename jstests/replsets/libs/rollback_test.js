@@ -43,6 +43,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
 /**
@@ -273,7 +274,10 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
                   State.kSteadyStateOps,
                   "Not in kSteadyStateOps state, cannot check data consistency");
 
+        // We must wait for collection drops to complete so that we don't get spurious failures
+        // in the consistency checks.
         rst.awaitSecondaryNodes();
+        rst.nodes.forEach(TwoPhaseDropCollectionTest.waitForAllCollectionDropsToComplete);
 
         const name = rst.name;
         rst.checkOplogs(name);

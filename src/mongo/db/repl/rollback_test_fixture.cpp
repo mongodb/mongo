@@ -91,6 +91,7 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
+                                  const CollectionDropType dropType,
                                   bool markFromMigrate) override {
         // If the oplog is not disabled for this namespace, then we need to reserve an op time for
         // the drop.
@@ -118,6 +119,9 @@ void RollbackTest::setUp() {
         std::make_unique<ReplicationRecoveryImpl>(_storageInterface, consistencyMarkers.get());
     _replicationProcess = std::make_unique<ReplicationProcess>(
         _storageInterface, std::move(consistencyMarkers), std::move(recovery));
+    _dropPendingCollectionReaper = new DropPendingCollectionReaper(_storageInterface);
+    DropPendingCollectionReaper::set(
+        serviceContext, std::unique_ptr<DropPendingCollectionReaper>(_dropPendingCollectionReaper));
     StorageInterface::set(serviceContext, std::unique_ptr<StorageInterface>(_storageInterface));
     _coordinator = new ReplicationCoordinatorRollbackMock(serviceContext);
     ReplicationCoordinator::set(serviceContext,

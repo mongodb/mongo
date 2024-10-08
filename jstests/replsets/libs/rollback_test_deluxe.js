@@ -37,6 +37,7 @@
 
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
 Random.setRandomSeed();
@@ -213,6 +214,16 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
         assert.eq(curState,
                   State.kSteadyStateOps,
                   "Not in kSteadyStateOps state; cannot check data consistency");
+
+        // Wait for collection drops to complete so that we don't get spurious failures during
+        // consistency checks.
+        rst.nodes.forEach(node => {
+            if (node.getDB('admin').isMaster('admin').arbiterOnly === true) {
+                log(`Skipping waiting for collection drops on arbiter ${node.host}`);
+                return;
+            }
+            TwoPhaseDropCollectionTest.waitForAllCollectionDropsToComplete(node);
+        });
 
         const name = rst.name;
         rst.checkOplogs(name);

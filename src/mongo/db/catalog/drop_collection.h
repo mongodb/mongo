@@ -89,12 +89,14 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
                                  DropCollectionSystemCollectionMode systemCollectionMode);
 
 /**
- * If we are in a replset, every replicated collection must have an _id index. Issues a warning if
- * one is not found.
+ * If we are in a replset, every replicated collection must have an _id index. As we scan each
+ * database, we also gather a list of drop-pending collection namespaces for the
+ * DropPendingCollectionReaper to clean up eventually.
  *
  * The caller must have the database locked in at least IX mode.
  */
-void checkForIdIndexes(OperationContext* opCtx, const DatabaseName& dbName);
+void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
+                                                const DatabaseName& dbName);
 
 /**
  * Deletes all temporary collections under the specified database.

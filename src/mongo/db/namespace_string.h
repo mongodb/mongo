@@ -647,9 +647,28 @@ public:
     bool isLegalClientSystemNS() const;
 
     /**
+     * Returns true if this namespace refers to a drop-pending collection.
+     */
+    bool isDropPendingNamespace() const;
+
+    /**
      * Returns true if operations on this namespace must be applied in their own oplog batch.
      */
     bool mustBeAppliedInOwnOplogBatch() const;
+
+    /**
+     * Returns the drop-pending namespace name for this namespace, provided the given optime.
+     *
+     * Example:
+     *     test.foo -> test.system.drop.<timestamp seconds>i<timestamp increment>t<term>.foo
+     */
+    NamespaceString makeDropPendingNamespace(const repl::OpTime& opTime) const;
+
+    /**
+     * Returns the optime used to generate the drop-pending namespace.
+     * Returns an error if this namespace is not drop-pending.
+     */
+    StatusWith<repl::OpTime> getDropPendingNamespaceOpTime() const;
 
     /**
      * Returns true if the namespace is valid. Special namespaces for internal use are considered as

@@ -1364,6 +1364,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
+                                              const CollectionDropType dropType,
                                               bool markFromMigrate) {
     uassert(50715,
             "dropping the server configuration collection (admin.system.version) is not allowed.",
