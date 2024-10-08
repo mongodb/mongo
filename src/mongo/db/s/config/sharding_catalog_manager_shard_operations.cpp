@@ -1680,15 +1680,23 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
     // 1) note about moving or dropping databases in a shard
     // 2) list of databases (excluding 'local' database) that need to be moved
     const auto dbInfo = [&] {
-        BSONObjBuilder dbInfoBuilder;
-        dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
-
-        BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
+        std::vector<DatabaseName> userDatabases;
         for (const auto& dbName : databases) {
             if (!dbName.isLocalDB()) {
-                dbs.append(
-                    DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()));
+                userDatabases.push_back(dbName);
             }
+        }
+
+        BSONObjBuilder dbInfoBuilder;
+        if (!userDatabases.empty()) {
+            dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
+        }
+
+        // Note the `dbsToMove` field could be excluded if we have no user database to move but we
+        // enforce it for backcompatibilty.
+        BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
+        for (const auto& dbName : userDatabases) {
+            dbs.append(DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()));
         }
         dbs.doneFast();
 

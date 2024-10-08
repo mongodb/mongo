@@ -31,6 +31,7 @@ assert.commandFailedWithCode(s.s0.adminCommand({removeshard: s.shard1.shardName}
 var removeResult = assert.commandWorked(
     s.s0.adminCommand({[removeShardOrTransitionToDedicated]: s.shard0.shardName}));
 assert.eq(removeResult.dbsToMove, ['needToMove'], "didn't show db to move");
+assert(removeResult.note !== undefined);
 
 s.s0.getDB('needToMove').dropDatabase();
 
