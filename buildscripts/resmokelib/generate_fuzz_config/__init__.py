@@ -70,9 +70,7 @@ class GenerateFuzzConfig(Subcommand):
         filename = "mongos.conf"
         output_file = os.path.join(self._output_path, filename)
         user_param = utils.dump_yaml({})
-        set_parameters = mongo_fuzzer_configs.fuzz_mongos_set_parameters(
-            self._mongos_mode, self._seed, user_param
-        )
+        set_parameters = mongo_fuzzer_configs.fuzz_mongos_set_parameters(self._seed, user_param)
         set_parameters = utils.load_yaml(set_parameters)
         conf = {"setParameter": set_parameters}
         if self._template_path is not None:
