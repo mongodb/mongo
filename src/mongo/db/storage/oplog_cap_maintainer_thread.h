@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/background.h"
 
 namespace mongo {
@@ -60,7 +61,7 @@ private:
     /**
      * Returns true iff there was an oplog to delete from.
      */
-    bool _deleteExcessDocuments();
+    bool _deleteExcessDocuments(OperationContext* opCtx);
 
     std::string _name =
         std::string("OplogCapMaintainerThread-") + NamespaceString::kRsOplogNamespace.toString();

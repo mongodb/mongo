@@ -215,6 +215,8 @@ public:
 
     Status updateOplogSize(OperationContext* opCtx, long long newOplogSize) final;
 
+    std::shared_ptr<CollectionTruncateMarkers> getCollectionTruncateMarkers() override;
+
     const std::string& getURI() const {
         return _uri;
     }
@@ -247,8 +249,6 @@ public:
     void setDataSize(long long dataSize);
 
     bool isOpHidden_forTest(const RecordId& id) const;
-
-    bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) override;
 
     /**
      * Attempts to truncate oplog entries before the pinned oplog timestamp. Truncation will occur
