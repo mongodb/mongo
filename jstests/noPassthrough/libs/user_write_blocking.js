@@ -129,6 +129,10 @@ export const UserWriteBlockHelpers = (function() {
         assertFCV(expectedFCV) {
             throw "UNIMPLEMENTED";
         }
+
+        applyOps(params) {
+            throw "UNIMPLEMENTED";
+        }
     }
 
     class ReplicaFixture extends Fixture {
@@ -238,6 +242,10 @@ export const UserWriteBlockHelpers = (function() {
                                   .featureCompatibilityVersion.version;
             assert.eq(expectedFCV, actualFCV);
         }
+
+        applyOps(params) {
+            assert.commandWorked(this.adminConn.getDB('admin').runCommand({applyOps: params}));
+        }
     }
 
     class ShardingFixture extends Fixture {
@@ -320,6 +328,14 @@ export const UserWriteBlockHelpers = (function() {
                                       {getParameter: 1, featureCompatibilityVersion: 1}))
                                   .featureCompatibilityVersion.version;
             assert.eq(actualFCV, expectedFCV);
+        }
+
+        applyOps(params) {
+            const backend = this.st.rs0.getPrimary();
+            return authutil.asCluster(
+                backend,
+                keyfile,
+                () => assert.commandWorked(backend.getDB('admin').runCommand({applyOps: params})));
         }
     }
 

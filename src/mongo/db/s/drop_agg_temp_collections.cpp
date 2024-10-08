@@ -32,6 +32,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/write_block_bypass.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -91,6 +92,10 @@ void dropAggTempCollections(OperationContext* opCtx) {
                 ThreadClient tc{"dropAggTempCollections",
                                 serviceContext->getService(ClusterRole::ShardServer)};
                 const auto opCtx = tc->makeOperationContext();
+
+                // Enable write blocking bypass to allow dropping temporary collections when user
+                // writes are blocked.
+                WriteBlockBypass::get(opCtx.get()).set(true);
 
                 try {
                     dropTempCollection(opCtx.get(), nss);

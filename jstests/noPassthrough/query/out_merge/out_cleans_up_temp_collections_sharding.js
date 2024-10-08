@@ -78,7 +78,7 @@ function failFn_dropDbAndKillOp() {
     failFn_killOp();
 }
 
-function testFn(timeseries, failFn) {
+function testFn(timeseries, failFn, userWriteBlockMode = false) {
     assert.eq(0, getTempCollections().length);
 
     const shardPrimaryNode = st.rs0.getPrimary();
@@ -104,8 +104,16 @@ function testFn(timeseries, failFn) {
               shardPrimaryNode.getDB('config')['agg_temp_collections'].count(
                   {_id: dbName + '.' + tempCollections[0]}));
 
+    if (userWriteBlockMode) {
+        assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: true}));
+    }
+
     // Provoke failure.
     failFn();
+
+    if (userWriteBlockMode) {
+        assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
+    }
 
     outShell();
 
@@ -122,6 +130,9 @@ function testFn(timeseries, failFn) {
 
 jsTest.log("Running test with normal collection and SIGKILL");
 testFn(false, failFn_sigkill);
+
+jsTest.log("Running test with normal collection, SIGKILL and user writes blocked");
+testFn(false /* timeseries */, failFn_sigkill, true /* userWriteBlockMode */);
 
 jsTest.log("Running test with normal collection and dropDbAndSigKill");
 testFn(false, failFn_dropDbAndSigKill);
