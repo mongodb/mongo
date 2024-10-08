@@ -47,6 +47,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -235,6 +236,16 @@ Status checkForTimeseriesTimeFieldKeyRange(const ChunkRange& range, StringData t
     return Status::OK();
 }
 
+BSONObj inferKeyPatternFromChunkRange(const ChunkRange& chunkRange) {
+    const auto inferredShardKeyPatternMin = Helpers::inferKeyPattern(chunkRange.getMin());
+    const auto inferredShardKeyPatternMax = Helpers::inferKeyPattern(chunkRange.getMax());
+    uassert(ErrorCodes::ShardKeyNotFound,
+            str::stream() << "the shard key of min " << chunkRange.getMin()
+                          << " doesn't match with the shard key of max " << chunkRange.getMax(),
+            inferredShardKeyPatternMin.woCompare(inferredShardKeyPatternMax) == 0);
+    return inferredShardKeyPatternMin.getOwned();
+}
+
 }  // namespace
 
 Status ShardingCatalogManager::addShardToZone(OperationContext* opCtx,
@@ -362,7 +373,7 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
             includeFullShardKey(opCtx, _localConfigShard.get(), nss, givenRange, &keyPattern);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
         // range remains the same as 'givenRange'
-        uassertStatusOK(givenRange.extractKeyPattern(&keyPattern));
+        keyPattern = inferKeyPatternFromChunkRange(givenRange);
     }
 
     uassertStatusOK(checkHashedShardKeyRange(actualRange, keyPattern));
@@ -409,7 +420,7 @@ void ShardingCatalogManager::removeKeyRangeFromZone(OperationContext* opCtx,
             includeFullShardKey(opCtx, _localConfigShard.get(), nss, givenRange, &keyPattern);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
         // range remains the same as 'givenRange'
-        uassertStatusOK(givenRange.extractKeyPattern(&keyPattern));
+        keyPattern = inferKeyPatternFromChunkRange(givenRange);
     }
 
     BSONObjBuilder removeBuilder;

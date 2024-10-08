@@ -96,8 +96,6 @@ public:
         return _maxKey;
     }
 
-    Status extractKeyPattern(KeyPattern* shardKeyPatternOut) const;
-
     /**
      * Checks whether the specified key is within the bounds of this chunk range.
      */
