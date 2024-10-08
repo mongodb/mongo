@@ -1085,9 +1085,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/config/**/index_on_config* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/initial_split_policy* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/db/s/global_index/OWNERS.yml
-/src/mongo/db/s/global_index/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/db/s/metrics/OWNERS.yml
 /src/mongo/db/s/metrics/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 

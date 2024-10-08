@@ -226,11 +226,6 @@ NSS_CONSTANT(kSetChangeStreamStateCoordinatorNamespace,
              DatabaseName::kConfig,
              "change_stream_coordinator"_sd)
 
-// Namespace used for storing global index cloner state documents.
-NSS_CONSTANT(kGlobalIndexClonerNamespace,
-             DatabaseName::kConfig,
-             "localGlobalIndexOperations.cloner"_sd)
-
 // Namespace used by an analyzeShardKey command to store the split points for the shard key being
 // analyzed.
 NSS_CONSTANT(kConfigAnalyzeShardKeySplitPointsNamespace,
