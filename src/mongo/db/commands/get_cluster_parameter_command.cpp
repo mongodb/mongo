@@ -83,6 +83,16 @@ public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
+            // We need to use isEnabledUseLastLTSFCVWhenUninitialized here because
+            // getClusterParameter is allowed to run on initial sync nodes.
+            if (!feature_flags::gFeatureFlagAuditConfigClusterParameter
+                     .isEnabledUseLastLTSFCVWhenUninitialized(
+                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                uassert(ErrorCodes::IllegalOperation,
+                        str::stream() << Request::kCommandName << " cannot be run on standalones",
+                        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
+            }
+
             GetClusterParameterInvocation invocation;
             return invocation.getCachedParameters(opCtx, request());
         }

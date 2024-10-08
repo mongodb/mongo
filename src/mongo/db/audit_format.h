@@ -40,5 +40,7 @@ enum class AuditFormat {
     AuditFormatMock = 4,
 };
 
+enum class AuditConfigFormat { WithGeneration = 0, WithTimestamp = 1 };
+
 }  // namespace audit
 }  // namespace mongo

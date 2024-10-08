@@ -84,6 +84,7 @@ let testCases = {
     _flushReshardingStateChange: {skip: "does not return user data"},
     _flushRoutingTableCacheUpdates: {skip: "does not return user data"},
     _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: "does not return user data"},
+    _getAuditConfigGeneration: {skip: "does not return user data"},
     _getUserCacheGeneration: {skip: "does not return user data"},
     _hashBSONElement: {skip: "does not return user data"},
     _isSelf: {skip: "does not return user data"},

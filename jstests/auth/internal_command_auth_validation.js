@@ -347,6 +347,10 @@ const internalCommandsMap = {
         testname: "_flushRoutingTableCacheUpdatesWithWriteConcern",
         command: {_flushRoutingTableCacheUpdatesWithWriteConcern: ns, writeConcern: {w: 2}},
     },
+    _getAuditConfigGeneration: {
+        testname: "_getAuditConfigGeneration",
+        command: {_getAuditConfigGeneration: 1},
+    },
     _getNextSessionMods: {
         testname: "_getNextSessionMods",
         command: {_getNextSessionMods: "a-b"},

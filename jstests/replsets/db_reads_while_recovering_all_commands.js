@@ -71,6 +71,7 @@ const allCommands = {
     _flushReshardingStateChange: {skip: isPrimaryOnly},
     _flushRoutingTableCacheUpdates: {skip: isPrimaryOnly},
     _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: isPrimaryOnly},
+    _getAuditConfigGeneration: {skip: isNotAUserDataRead},
     _getNextSessionMods: {skip: isPrimaryOnly},
     _getUserCacheGeneration: {skip: isNotAUserDataRead},
     _hashBSONElement: {skip: isNotAUserDataRead},

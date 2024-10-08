@@ -88,6 +88,9 @@ extern std::function<void(OperationContext*)> initializeManager;
 extern std::function<void(OpObserverRegistry*)> opObserverRegistrar;
 extern std::function<void(ServiceContext*)> initializeSynchronizeJob;
 extern std::function<void()> shutdownSynchronizeJob;
+extern std::function<void(OperationContext*, boost::optional<Timestamp>)> migrateOldToNew;
+extern std::function<void(OperationContext*)> removeOldConfig;
+extern std::function<void(OperationContext*)> updateAuditConfigOnDowngrade;
 
 /**
  * Struct that temporarily stores client information when an audit hook
