@@ -1046,8 +1046,20 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    "TOOLCHAIN_CCFLAGS",
+    help="Sets flags for the C and C++ compiler specific to the toolchain",
+    converter=variable_shlex_converter,
+)
+
+env_vars.Add(
     "NON_CONF_LINKFLAGS",
     help="Sets flags for the C and C++ linker that are not used in configure checks",
+    converter=variable_shlex_converter,
+)
+
+env_vars.Add(
+    "TOOLCHAIN_LINKFLAGS",
+    help="Sets flags for the C and C++ linker specific to the toolchain",
     converter=variable_shlex_converter,
 )
 
@@ -1724,6 +1736,9 @@ if get_option("build-tools") == "next":
 env = Environment(variables=env_vars, **envDict)
 del envDict
 env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), "AddOption")
+
+env.Prepend(CCFLAGS="$TOOLCHAIN_CCFLAGS")
+env.Prepend(LINKFLAGS="$TOOLCHAIN_LINKFLAGS")
 
 if not mongo_toolchain_execroot:
     os.environ["CC"] = env.get("CC", os.environ.get("CC"))
