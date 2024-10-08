@@ -1004,6 +1004,7 @@ if wiredtiger:
             "resource_yielder_test.cpp",
             "thread_client_test.cpp",
             "wire_version_test.cpp",
+            "service_context_test.cpp",
         ],
         LIBDEPS=[
             "$BUILD_DIR/mongo/transport/transport_layer_mock",
