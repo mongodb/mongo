@@ -750,22 +750,38 @@ def prefetch_toolchain(env):
     Globals.bazel_executable = install_bazel(bazel_bin_dir)
     if platform.system() == "Linux" and not ARGUMENTS.get("CC") and not ARGUMENTS.get("CXX"):
         exec_root = ""
-        proc = subprocess.run([Globals.bazel_executable, "info"], capture_output=True, text=True)
-        if proc.returncode != 0:
+
+        try:
+            results = retry_call(
+                subprocess.run,
+                [[Globals.bazel_executable, "info"]],
+                fkwargs={"capture_output": True, "text": True},
+                tries=Globals.max_retry_attempts,
+                exceptions=(subprocess.CalledProcessError,),
+            )
+        except subprocess.CalledProcessError as ex:
             print("ERROR: Finding bazel exec root.")
-            print(proc.stdout)
-            print(proc.stderr)
+            print(ex)
+            print("Please ask about this in #ask-devprod-build slack channel.")
             sys.exit(1)
-        else:
-            output_base_str = "output_base: "
-            for line in proc.stdout.split("\n"):
-                if line.startswith(output_base_str):
-                    exec_root = line[len(output_base_str) :].strip()
+
+        output_base_str = "output_base: "
+        for line in results.stdout.split("\n"):
+            if line.startswith(output_base_str):
+                exec_root = line[len(output_base_str) :].strip()
         if exec_root and not os.path.exists(f"{exec_root}/external/mongo_toolchain"):
             print("Prefetch the mongo toolchain...")
-            proc = subprocess.run([Globals.bazel_executable, "fetch", "@mongo_toolchain"])
-            if proc.returncode != 0:
+            try:
+                results = retry_call(
+                    subprocess.run,
+                    [[Globals.bazel_executable, "fetch", "@mongo_toolchain"]],
+                    tries=Globals.max_retry_attempts,
+                    exceptions=(subprocess.CalledProcessError,),
+                )
+            except subprocess.CalledProcessError as ex:
                 print("ERROR: Bazel fetch failed!")
+                print(ex)
+                print("Please ask about this in #ask-devprod-build slack channel.")
                 sys.exit(1)
         return exec_root
 
