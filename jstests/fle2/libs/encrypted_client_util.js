@@ -275,21 +275,13 @@ export var EncryptedClient = class {
 
         // All our tests use "last" as the key to query on so shard on "last" instead of "_id"
         if (this.useImplicitSharding) {
-            let resShard = this._db.adminCommand({enableSharding: this._db.getName()});
-
-            // enableSharding may only be called once for a database.
-            if (resShard.code !== ErrorCodes.AlreadyInitialized) {
-                assert.commandWorked(
-                    resShard, "enabling sharding on the '" + this._db.getName() + "' db failed");
-            }
-
             let shardCollCmd = {
                 shardCollection: this._db.getName() + "." + name,
                 key: {last: "hashed"},
                 collation: {locale: "simple"}
             };
 
-            resShard = this._db.adminCommand(shardCollCmd);
+            let resShard = this._db.adminCommand(shardCollCmd);
 
             jsTestLog("Sharding: " + tojson(shardCollCmd));
         }
