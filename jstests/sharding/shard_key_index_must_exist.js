@@ -1,4 +1,4 @@
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+// @tags: [requires_fcv_50]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 1});
@@ -63,75 +63,48 @@ let checkIndex = function(collName, expectedIndexNames) {
 })();
 
 (() => {
-    const feautureFlagDropHashedShardKeyIndexes = FeatureFlagUtil.isPresentAndEnabled(
-        st.shard0.getDB('admin'), "ShardKeyIndexOptionalHashedSharding");
-    if (feautureFlagDropHashedShardKeyIndexes) {
-        // Users are allowed to drop hashed shard key indexes. This includes any compound index
-        // that is prefixed by the hashed shard key.
-        assert.commandWorked(
-            st.s.adminCommand({shardCollection: 'test.hashed', key: {x: 'hashed'}}));
+    // Users are allowed to drop hashed shard key indexes. This includes any compound index
+    // that is prefixed by the hashed shard key.
+    assert.commandWorked(st.s.adminCommand({shardCollection: 'test.hashed', key: {x: 'hashed'}}));
 
-        assert.commandWorked(testDB.runCommand(
-            {createIndexes: 'hashed', indexes: [{key: {x: 1, y: 1}, name: 'xy'}]}));
-        // This will also drop the hashed shard key index.
-        assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: '*'}));
-        checkIndex('hashed', ['_id_']);
+    assert.commandWorked(
+        testDB.runCommand({createIndexes: 'hashed', indexes: [{key: {x: 1, y: 1}, name: 'xy'}]}));
+    // This will also drop the hashed shard key index.
+    assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: '*'}));
+    checkIndex('hashed', ['_id_']);
 
-        assert.commandWorked(testDB.runCommand(
-            {createIndexes: 'hashed', indexes: [{key: {x: 'hashed'}, name: 'x_hashed'}]}));
-        assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: 'x_hashed'}));
-        checkIndex('hashed', ['_id_']);
+    assert.commandWorked(testDB.runCommand(
+        {createIndexes: 'hashed', indexes: [{key: {x: 'hashed'}, name: 'x_hashed'}]}));
+    assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: 'x_hashed'}));
+    checkIndex('hashed', ['_id_']);
 
-        assert.commandWorked(testDB.runCommand({
-            createIndexes: 'hashed',
-            indexes: [{key: {x: 'hashed', y: 1}, name: 'x_hashed_y_1'}]
-        }));
-        assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: '*'}));
-        checkIndex('hashed', ['_id_']);
+    assert.commandWorked(testDB.runCommand(
+        {createIndexes: 'hashed', indexes: [{key: {x: 'hashed', y: 1}, name: 'x_hashed_y_1'}]}));
+    assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: '*'}));
+    checkIndex('hashed', ['_id_']);
 
-        assert.commandWorked(testDB.runCommand({
-            createIndexes: 'hashed',
-            indexes: [{key: {x: 'hashed', y: 1}, name: 'x_hashed_y_1'}]
-        }));
-        assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: 'x_hashed_y_1'}));
-        checkIndex('hashed', ['_id_']);
+    assert.commandWorked(testDB.runCommand(
+        {createIndexes: 'hashed', indexes: [{key: {x: 'hashed', y: 1}, name: 'x_hashed_y_1'}]}));
+    assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: 'x_hashed_y_1'}));
+    checkIndex('hashed', ['_id_']);
 
-        // Check dropping indexes in a non-empty collection.
-        assert.commandWorked(testDB.runCommand(
-            {createIndexes: 'hashed', indexes: [{key: {x: 'hashed'}, name: 'x_hashed'}]}));
-        assert.commandWorked(testDB.runCommand({insert: 'hashed', documents: [{x: 1}]}));
-        assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: 'x_hashed'}));
-        checkIndex('hashed', ['_id_']);
+    // Check dropping indexes in a non-empty collection.
+    assert.commandWorked(testDB.runCommand(
+        {createIndexes: 'hashed', indexes: [{key: {x: 'hashed'}, name: 'x_hashed'}]}));
+    assert.commandWorked(testDB.runCommand({insert: 'hashed', documents: [{x: 1}]}));
+    assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: 'x_hashed'}));
+    checkIndex('hashed', ['_id_']);
 
-        assert.commandWorked(testDB.runCommand({
-            createIndexes: 'hashed',
-            indexes: [{key: {x: 'hashed', y: 1}, name: 'x_hashed_y_1'}]
-        }));
-        assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: '*'}));
-        checkIndex('hashed', ['_id_']);
+    assert.commandWorked(testDB.runCommand(
+        {createIndexes: 'hashed', indexes: [{key: {x: 'hashed', y: 1}, name: 'x_hashed_y_1'}]}));
+    assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: '*'}));
+    checkIndex('hashed', ['_id_']);
 
-        // Check that making a hashed shard key compatible index hidden succeeds.
-        assert.commandWorked(testDB.runCommand(
-            {createIndexes: 'hashed', indexes: [{key: {x: 'hashed'}, name: 'x_hashed'}]}));
-        assert.commandWorked(
-            testDB.runCommand({collMod: 'hashed', index: {name: 'x_hashed', hidden: true}}));
-
-    } else {
-        assert.commandWorked(
-            st.s.adminCommand({shardCollection: 'test.hashed', key: {x: 'hashed'}}));
-
-        assert.commandWorked(testDB.runCommand(
-            {createIndexes: 'hashed', indexes: [{key: {x: 1, y: 1}, name: 'xy'}]}));
-
-        assert.commandWorked(testDB.runCommand({dropIndexes: 'hashed', index: '*'}));
-
-        checkIndex('hashed', ['_id_', 'x_hashed']);
-
-        assert.commandFailedWithCode(testDB.runCommand({dropIndexes: 'hashed', index: 'x_hashed'}),
-                                     ErrorCodes.CannotDropShardKeyIndex);
-
-        checkIndex('hashed', ['_id_', 'x_hashed']);
-    }
+    // Check that making a hashed shard key compatible index hidden succeeds.
+    assert.commandWorked(testDB.runCommand(
+        {createIndexes: 'hashed', indexes: [{key: {x: 'hashed'}, name: 'x_hashed'}]}));
+    assert.commandWorked(
+        testDB.runCommand({collMod: 'hashed', index: {name: 'x_hashed', hidden: true}}));
 
     assert.commandWorked(testDB.runCommand({drop: 'hashed'}));
 })();

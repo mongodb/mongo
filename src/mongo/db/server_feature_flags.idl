@@ -84,12 +84,6 @@ feature_flags:
         cpp_varname: gFeatureFlagAllMongodsAreSharded
         default: false
         shouldBeFCVGated: true
-    featureFlagShardKeyIndexOptionalHashedSharding:
-        description: "Feature flag to make a supporting shard key index for hashed sharding optional"
-        cpp_varname: gFeatureFlagShardKeyIndexOptionalHashedSharding
-        default: true
-        version: 7.0
-        shouldBeFCVGated: true
     featureFlagBanEncryptionOptionsInCollectionCreation:
         description: "Feature flag that bans encryption options from being used in createCollection
         commands"

@@ -110,13 +110,8 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
         // Check that the collection has an index that supports the shard key. If so, check that
         // exists an index that supports the shard key and is not multikey. We allow users to drop
         // hashed shard key indexes, and therefore we don't require hashed shard keys to have a
-        // supporting index. (Ignore FCV check) Note that the feature flag ignores FCV. If this node
-        // is the primary of the replica set shard, it will handle the missing hashed shard key
-        // index regardless of FCV, so we skip reporting it as an inconsistency.
-        const bool skipHashedShardKeyCheck =
-            gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabledAndIgnoreFCVUnsafe() &&
-            ShardKeyPattern(shardKey).isHashedPattern();
-        if (!skipHashedShardKeyCheck &&
+        // supporting index.
+        if (!ShardKeyPattern(shardKey).isHashedPattern() &&
             !findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
             inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
                 MetadataInconsistencyTypeEnum::kMissingShardKeyIndex,

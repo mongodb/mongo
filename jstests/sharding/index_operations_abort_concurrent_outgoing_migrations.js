@@ -1,5 +1,6 @@
 /*
  * Test that the index commands abort concurrent outgoing migrations.
+ * @tags: [requires_fcv_50]
  */
 import {
     moveChunkStepNames,
@@ -7,7 +8,6 @@ import {
     unpauseMoveChunkAtStep,
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -171,32 +171,25 @@ stepNames.forEach((stepName) => {
     }
 });
 
-// TODO: Remove feature flag check once project is backported.
-if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB('admin'),
-                                        "ShardKeyIndexOptionalHashedSharding") &&
-    FeatureFlagUtil.isPresentAndEnabled(st.shard1.getDB('admin'),
-                                        "ShardKeyIndexOptionalHashedSharding")) {
-    stepNames.forEach((stepName) => {
-        jsTest.log(
-            `Testing that dropIndex of a hashed shard key index aborts concurrent outgoing migrations that are in step ${
-                stepName}...`);
-        const collName = "testDropHashedShardKeyIndexMoveChunkStep" + stepName;
-        const ns = dbName + "." + collName;
-        const hashedShardKey = {_id: "hashed"};
+stepNames.forEach((stepName) => {
+    jsTest.log(
+        `Testing that dropIndex of a hashed shard key index aborts concurrent outgoing migrations that are in step ${
+            stepName}...`);
+    const collName = "testDropHashedShardKeyIndexMoveChunkStep" + stepName;
+    const ns = dbName + "." + collName;
+    const hashedShardKey = {_id: "hashed"};
 
-        assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: hashedShardKey}));
-        ShardedIndexUtil.assertIndexExistsOnShard(st.shard0, dbName, collName, hashedShardKey);
-        ShardedIndexUtil.assertIndexExistsOnShard(st.shard1, dbName, collName, hashedShardKey);
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: hashedShardKey}));
+    ShardedIndexUtil.assertIndexExistsOnShard(st.shard0, dbName, collName, hashedShardKey);
+    ShardedIndexUtil.assertIndexExistsOnShard(st.shard1, dbName, collName, hashedShardKey);
 
-        assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, () => {
-            assert.commandWorked(st.s.getCollection(ns).dropIndexes(hashedShardKey));
-        });
-
-        // Verify dropping the shard key index succeeds.
-        ShardedIndexUtil.assertIndexDoesNotExistOnShard(
-            st.shard0, dbName, collName, hashedShardKey);
-        // TODO (SERVER-91380): assert the shard key is not present on recipient shard1 as well.
+    assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, () => {
+        assert.commandWorked(st.s.getCollection(ns).dropIndexes(hashedShardKey));
     });
-}
+
+    // Verify dropping the shard key index succeeds.
+    ShardedIndexUtil.assertIndexDoesNotExistOnShard(st.shard0, dbName, collName, hashedShardKey);
+    // TODO (SERVER-91380): assert the shard key is not present on recipient shard1 as well.
+});
 
 st.stop();

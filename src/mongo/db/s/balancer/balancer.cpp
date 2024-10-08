@@ -471,10 +471,7 @@ bool processRebalanceResponse(OperationContext* opCtx,
         return true;
     }
 
-    if (status == ErrorCodes::IndexNotFound &&
-        gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-
+    if (status == ErrorCodes::IndexNotFound) {
         const auto [cm, _] = uassertStatusOK(
             RoutingInformationCache::get(opCtx)->getCollectionRoutingInfoWithRefresh(
                 opCtx, migrateInfo.nss));

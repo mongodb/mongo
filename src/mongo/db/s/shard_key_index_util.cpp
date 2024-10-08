@@ -202,9 +202,7 @@ bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
     }
 
     // Users are allowed to drop hashed shard key indexes.
-    if (gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        ShardKeyPattern(shardKey).isHashedPattern()) {
+    if (ShardKeyPattern(shardKey).isHashedPattern()) {
         return false;
     }
 

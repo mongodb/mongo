@@ -335,18 +335,14 @@ void dropReadyIndexes(OperationContext* opCtx,
                     if (desc->isIdIndex()) {
                         return false;
                     }
-                    // For any index that is compatible with the shard key, if
-                    // gFeatureFlagShardKeyIndexOptionalHashedSharding is enabled and
-                    // the shard key is hashed, allow users to drop the hashed index. Note
-                    // skipDroppingHashedShardKeyIndex is used in some tests to prevent dropIndexes
-                    // from dropping the hashed shard key index so we can continue to test chunk
-                    // migration with hashed sharding. Otherwise, dropIndexes with '*' would drop
-                    // the index and prevent chunk migration from running.
+                    // Allow users to drop the hashed index for any index that is compatible with
+                    // the shard key. Note skipDroppingHashedShardKeyIndex is used in some tests to
+                    // prevent dropIndexes from dropping the hashed shard key index so we can
+                    // continue to test chunk migration with hashed sharding. Otherwise, dropIndexes
+                    // with '*' would drop the index and prevent chunk migration from running.
                     const auto& shardKey = collDescription.getShardKeyPattern();
-                    const bool skipDropIndex = skipDroppingHashedShardKeyIndex ||
-                        !(gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabled(
-                              serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                          shardKey.isHashedPattern());
+                    const bool skipDropIndex =
+                        skipDroppingHashedShardKeyIndex || !shardKey.isHashedPattern();
                     if (isCompatibleWithShardKey(opCtx,
                                                  CollectionPtr(collection),
                                                  desc->getEntry(),
