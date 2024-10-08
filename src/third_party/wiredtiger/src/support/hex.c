@@ -90,11 +90,11 @@ __wt_raw_to_esc_hex(WT_SESSION_IMPL *session, const uint8_t *from, size_t size, 
 }
 
 /*
- * __wt_hex2byte --
+ * __wti_hex2byte --
  *     Convert a pair of hex characters into a byte.
  */
 int
-__wt_hex2byte(const u_char *from, u_char *to)
+__wti_hex2byte(const u_char *from, u_char *to)
 {
     uint8_t byte;
 
@@ -278,7 +278,7 @@ __wt_nhex_to_raw(WT_SESSION_IMPL *session, const char *from, size_t size, WT_ITE
     WT_RET(__wt_buf_init(session, to, size / 2));
 
     for (p = (u_char *)from, t = to->mem; size > 0; p += 2, size -= 2, ++t)
-        if (__wt_hex2byte(p, t))
+        if (__wti_hex2byte(p, t))
             return (__hex_fmterr(session));
 
     to->size = WT_PTRDIFF(t, to->mem);
@@ -302,7 +302,7 @@ __wt_esc_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)
             continue;
         ++p;
         if (p[0] != '\\') {
-            if (p[0] == '\0' || p[1] == '\0' || __wt_hex2byte(p, t))
+            if (p[0] == '\0' || p[1] == '\0' || __wti_hex2byte(p, t))
                 return (__hex_fmterr(session));
             ++p;
         }

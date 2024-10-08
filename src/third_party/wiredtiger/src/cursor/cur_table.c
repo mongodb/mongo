@@ -96,9 +96,9 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx, WT_CURSOR *cur,
       __wt_cursor_notsup,                             /* prev */
       __wt_cursor_notsup,                             /* reset */
       __wt_cursor_notsup,                             /* search */
-      __wti_cursor_search_near_notsup,                /* search-near */
+      __wt_cursor_search_near_notsup,                 /* search-near */
       __curextract_insert,                            /* insert */
-      __wti_cursor_modify_notsup,                     /* modify */
+      __wt_cursor_modify_notsup,                      /* modify */
       __wt_cursor_notsup,                             /* update */
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
@@ -1060,7 +1060,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __curtable_search,                             /* search */
       __curtable_search_near,                        /* search-near */
       __curtable_insert,                             /* insert */
-      __wti_cursor_modify_notsup,                    /* modify */
+      __wt_cursor_modify_notsup,                     /* modify */
       __curtable_update,                             /* update */
       __curtable_remove,                             /* remove */
       __curtable_reserve,                            /* reserve */
@@ -1144,7 +1144,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
     WT_ERR(__wt_cursor_init(cursor, cursor->internal_uri, owner, cfg, cursorp));
 
     if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
-        WT_ERR(__wti_json_column_init(cursor, uri, table->key_format, NULL, &table->colconf));
+        WT_ERR(__wt_json_column_init(cursor, uri, table->key_format, NULL, &table->colconf));
 
     /*
      * Open the colgroup cursors immediately: we're going to need them for

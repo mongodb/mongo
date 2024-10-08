@@ -47,9 +47,9 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 {
     WT_CURSOR *child;
     WT_CURSOR_DUMP *cdump;
-    WT_CURSOR_JSON *json;
     WT_DECL_RET;
     WT_ITEM item, *itemp;
+    WT_JSON *json;
     WT_SESSION_IMPL *session;
     size_t size;
     uint64_t recno;
@@ -63,7 +63,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
     CURSOR_API_CALL(cursor, session, ret, get_key, NULL);
 
     if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
-        json = (WT_CURSOR_JSON *)cursor->json_private;
+        json = (WT_JSON *)cursor->json_private;
         WT_ASSERT(session, json != NULL);
         if (WT_CURSOR_RECNO(cursor)) {
             WT_ERR(child->get_key(child, &recno));
@@ -80,7 +80,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
                 fmt = cursor->key_format;
         }
         va_start(ap, cursor);
-        ret = __wti_json_alloc_unpack(session, buffer, size, fmt, json, true, ap);
+        ret = __wt_json_alloc_unpack(session, buffer, size, fmt, json, true, ap);
         va_end(ap);
     } else {
         if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -168,8 +168,8 @@ __curdump_set_keyv(WT_CURSOR *cursor, va_list ap)
 
     json = F_ISSET(cursor, WT_CURSTD_DUMP_JSON);
     if (json)
-        WT_ERR(__wti_json_to_item(session, p, cursor->key_format,
-          (WT_CURSOR_JSON *)cursor->json_private, true, &cursor->key));
+        WT_ERR(__wt_json_to_item(
+          session, p, cursor->key_format, (WT_JSON *)cursor->json_private, true, &cursor->key));
 
     if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
         if (json) {
@@ -217,9 +217,9 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 {
     WT_CURSOR *child;
     WT_CURSOR_DUMP *cdump;
-    WT_CURSOR_JSON *json;
     WT_DECL_RET;
     WT_ITEM item, *itemp;
+    WT_JSON *json;
     WT_SESSION_IMPL *session;
     const char *fmt;
     va_list ap;
@@ -230,12 +230,12 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
     CURSOR_API_CALL(cursor, session, ret, get_value, NULL);
 
     if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
-        json = (WT_CURSOR_JSON *)cursor->json_private;
+        json = (WT_JSON *)cursor->json_private;
         WT_ASSERT(session, json != NULL);
         WT_ERR(__wt_cursor_get_raw_value(child, &item));
         fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
         va_start(ap, cursor);
-        ret = __wti_json_alloc_unpack(session, item.data, item.size, fmt, json, false, ap);
+        ret = __wt_json_alloc_unpack(session, item.data, item.size, fmt, json, false, ap);
         va_end(ap);
     } else {
         WT_ERR(child->get_value(child, &item));
@@ -284,8 +284,8 @@ __curdump_set_valuev(WT_CURSOR *cursor, va_list ap)
         p = va_arg(ap, const char *);
 
     if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
-        WT_ERR(__wti_json_to_item(session, p, cursor->value_format,
-          (WT_CURSOR_JSON *)cursor->json_private, false, &cursor->value));
+        WT_ERR(__wt_json_to_item(session, p, cursor->value_format, (WT_JSON *)cursor->json_private,
+          false, &cursor->value));
     else
         WT_ERR(__dump_to_raw(session, p, &cursor->value, F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
 
@@ -379,7 +379,7 @@ err:
         WT_TRET(child->close(child));
     /* We shared the child's URI. */
     cursor->internal_uri = NULL;
-    __wti_json_close(session, cursor);
+    __wt_json_close(session, cursor);
     __wt_cursor_close(cursor);
 
     API_END_RET(session, ret);
@@ -405,7 +405,7 @@ __wti_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
       __curdump_search,                             /* search */
       __curdump_search_near,                        /* search-near */
       __curdump_insert,                             /* insert */
-      __wti_cursor_modify_notsup,                   /* modify */
+      __wt_cursor_modify_notsup,                    /* modify */
       __curdump_update,                             /* update */
       __curdump_remove,                             /* remove */
       __wt_cursor_notsup,                           /* reserve */
@@ -418,8 +418,8 @@ __wti_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
       __curdump_close);                             /* close */
     WT_CURSOR *cursor;
     WT_CURSOR_DUMP *cdump;
-    WT_CURSOR_JSON *json;
     WT_DECL_RET;
+    WT_JSON *json;
     WT_SESSION_IMPL *session;
     const char *cfg[2];
 

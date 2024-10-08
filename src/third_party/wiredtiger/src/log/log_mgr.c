@@ -875,7 +875,7 @@ __log_wrlsn_server(void *arg)
      * On close we need to do this one more time because there could be straggling log writes that
      * need to be written.
      */
-    WT_ERR(__wt_log_force_write(session, true, NULL));
+    WT_ERR(__wti_log_force_write(session, true, NULL));
     __wti_log_wrlsn(session, NULL);
     if (0) {
 err:
@@ -930,7 +930,7 @@ __log_server(void *arg)
          */
         if (conn->log_force_write_wait == 0 ||
           force_write_timediff >= conn->log_force_write_wait * WT_THOUSAND) {
-            WT_ERR_ERROR_OK(__wt_log_force_write(session, false, &did_work), EBUSY, false);
+            WT_ERR_ERROR_OK(__wti_log_force_write(session, false, &did_work), EBUSY, false);
             force_write_time_start = __wt_clock(session);
         }
         /*

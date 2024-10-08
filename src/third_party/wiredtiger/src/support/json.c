@@ -315,12 +315,12 @@ __json_struct_unpackv(WT_SESSION_IMPL *session, const void *buffer, size_t size,
 }
 
 /*
- * __wti_json_alloc_unpack --
+ * __wt_json_alloc_unpack --
  *     Allocate space for, and unpack an entry into JSON format.
  */
 int
-__wti_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt,
-  WT_CURSOR_JSON *json, bool iskey, va_list ap)
+__wt_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt,
+  WT_JSON *json, bool iskey, va_list ap)
 {
     WT_CONFIG_ITEM *names;
     size_t needed;
@@ -343,15 +343,15 @@ __wti_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t siz
 }
 
 /*
- * __wti_json_close --
+ * __wt_json_close --
  *     Release any json related resources.
  */
 void
-__wti_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
+__wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
-    WT_CURSOR_JSON *json;
+    WT_JSON *json;
 
-    if ((json = (WT_CURSOR_JSON *)cursor->json_private) != NULL) {
+    if ((json = (WT_JSON *)cursor->json_private) != NULL) {
         __wt_free(session, json->key_buf);
         __wt_free(session, json->value_buf);
         __wt_free(session, json->key_names.str);
@@ -383,20 +383,20 @@ __wt_json_unpack_str(u_char *dest, size_t dest_len, const u_char *src, size_t sr
 }
 
 /*
- * __wti_json_column_init --
+ * __wt_json_column_init --
  *     Set json_key_names, json_value_names to comma separated lists of column names.
  */
 int
-__wti_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat,
+__wt_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat,
   const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf)
 {
-    WT_CURSOR_JSON *json;
+    WT_JSON *json;
     WT_SESSION_IMPL *session;
     size_t len;
     uint32_t keycnt, nkeys;
     const char *beginkey, *end, *lparen, *p;
 
-    json = (WT_CURSOR_JSON *)cursor->json_private;
+    json = (WT_JSON *)cursor->json_private;
     session = CUR2S(cursor);
     beginkey = colconf->str;
     end = beginkey + colconf->len;
@@ -509,7 +509,7 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype, const cha
                     const u_char *uc;
 
                     uc = (const u_char *)src;
-                    if (__wt_hex2byte(&uc[1], &ignored) || __wt_hex2byte(&uc[3], &ignored))
+                    if (__wti_hex2byte(&uc[1], &ignored) || __wti_hex2byte(&uc[3], &ignored))
                         WT_RET_MSG(session, EINVAL, "invalid Unicode within JSON string");
                     src += 4;
                 }
@@ -806,13 +806,13 @@ __json_pack_size(WT_SESSION_IMPL *session, const char *fmt, WT_CONFIG_ITEM *name
 }
 
 /*
- * __wti_json_to_item --
+ * __wt_json_to_item --
  *     Convert a JSON input string for either key/value to a raw WT_ITEM. Checks that the input
  *     matches the expected format.
  */
 int
-__wti_json_to_item(WT_SESSION_IMPL *session, const char *jstr, const char *format,
-  WT_CURSOR_JSON *json, bool iskey, WT_ITEM *item)
+__wt_json_to_item(WT_SESSION_IMPL *session, const char *jstr, const char *format, WT_JSON *json,
+  bool iskey, WT_ITEM *item)
 {
     size_t sz;
     sz = 0; /* Initialize because GCC 4.1 is paranoid */
@@ -842,10 +842,10 @@ __wt_json_strlen(const char *src, size_t srclen) WT_GCC_FUNC_ATTRIBUTE((visibili
         /* JSON can include any UTF-8 expressed in 4 hex chars. */
         if (*src == '\\') {
             if (*++src == 'u') {
-                if (__wt_hex2byte((const u_char *)++src, &hi))
+                if (__wti_hex2byte((const u_char *)++src, &hi))
                     return (-1);
                 src += 2;
-                if (__wt_hex2byte((const u_char *)src, &lo))
+                if (__wti_hex2byte((const u_char *)src, &lo))
                     return (-1);
                 src += 2;
                 if (hi != 0)
@@ -888,8 +888,8 @@ __wt_json_strncpy(WT_SESSION *wt_session, char **pdst, size_t dstlen, const char
         if ((ch = *src++) == '\\')
             switch (ch = *src++) {
             case 'u':
-                if (__wt_hex2byte((const u_char *)src, &hi) ||
-                  __wt_hex2byte((const u_char *)src + 2, &lo))
+                if (__wti_hex2byte((const u_char *)src, &hi) ||
+                  __wti_hex2byte((const u_char *)src + 2, &lo))
                     WT_RET_MSG(session, EINVAL, "invalid Unicode within JSON string");
                 src += 4;
                 if (hi != 0)

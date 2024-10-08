@@ -573,7 +573,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __curindex_search,                              /* search */
       __curindex_search_near,                         /* search-near */
       __wt_cursor_notsup,                             /* insert */
-      __wti_cursor_modify_notsup,                     /* modify */
+      __wt_cursor_modify_notsup,                      /* modify */
       __wt_cursor_notsup,                             /* update */
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
@@ -659,7 +659,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
 
     if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
         WT_ERR(
-          __wti_json_column_init(cursor, uri, table->key_format, &idx->colconf, &table->colconf));
+          __wt_json_column_init(cursor, uri, table->key_format, &idx->colconf, &table->colconf));
 
     if (0) {
 err:

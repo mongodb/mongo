@@ -97,8 +97,6 @@ src/cursor/cur_file.c
 src/cursor/cur_hs.c
 src/cursor/cur_index.c
 src/cursor/cur_join.c
-src/cursor/cur_json.c
-src/cursor/cur_log.c
 src/cursor/cur_metadata.c
 src/cursor/cur_stat.c
 src/cursor/cur_std.c
@@ -115,6 +113,7 @@ src/history/hs_rec.c
 src/history/hs_verify.c
 src/log/log.c
 src/log/log_auto.c
+src/log/log_cursor.c
 src/log/log_mgr.c
 src/log/log_slot.c
 src/log/log_sys.c
@@ -224,6 +223,7 @@ src/support/hash_city.c
 src/support/hash_fnv.c
 src/support/hazard.c
 src/support/hex.c
+src/support/json.c
 src/support/lock_ext.c
 src/support/modify.c
 src/support/mtx_rw.c
