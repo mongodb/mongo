@@ -68,7 +68,7 @@ export var FSMShardingTest = class {
                 }
                 this._shard_rsts.push(shard_rst);
 
-                shard = new Mongo(shard_rst.getURL());
+                shard = new Mongo(shard_rst.getURL(), undefined, {gRPC: false});
                 shard.name = shard_rst.getURL();
             } else {
                 shard = new Mongo(shardTopology.mongod);

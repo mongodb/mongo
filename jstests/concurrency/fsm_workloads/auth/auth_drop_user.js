@@ -6,7 +6,11 @@ TestData.runInsideTransaction = false;
  *
  * Repeatedly creates a new user on a database, and subsequently
  * drops the user from the database.
- * @tags: [incompatible_with_concurrency_simultaneous, assumes_against_mongod_not_mongos]
+ * @tags: [
+ *  incompatible_with_concurrency_simultaneous,
+ *  assumes_against_mongod_not_mongos,
+ *  requires_auth,
+ * ]
  */
 
 export const $config = (function() {

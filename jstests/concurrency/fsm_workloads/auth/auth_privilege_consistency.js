@@ -6,7 +6,8 @@
  * @tags: [
  *  incompatible_with_concurrency_simultaneous,
  *  # simulate_atlas_proxy.js does not override the "db" of role.
- *  simulate_atlas_proxy_incompatible
+ *  simulate_atlas_proxy_incompatible,
+ *  requires_auth,
  * ]
  */
 import {dropRoles} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js";

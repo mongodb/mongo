@@ -4,7 +4,8 @@
  * Repeatedly creates new roles on a database.
  *
  * @tags: [
- *  assumes_against_mongod_not_mongos
+ *  assumes_against_mongod_not_mongos,
+ *  requires_auth,
  * ]
  */
 import {dropRoles} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js";

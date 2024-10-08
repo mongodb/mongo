@@ -6,6 +6,7 @@
  * @tags: [
  *  incompatible_with_concurrency_simultaneous,
  *  assumes_against_mongod_not_mongos,
+ *  requires_auth,
  * ]
  */
 // UMC commands are not supported in transactions.
