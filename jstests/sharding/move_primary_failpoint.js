@@ -5,7 +5,8 @@
  * - The donor shard still has user data for that database (i.e. untracked unsharded
  *   collections that are movable by moveCollection).
  *
- * @tags: [requires_fcv_80]
+ * @tags: [requires_fcv_80, featureFlagTrackUnshardedCollectionUponCreation,
+ * featureFlagReshardingForTimeseries]
  */
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

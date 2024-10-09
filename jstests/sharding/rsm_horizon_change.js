@@ -5,7 +5,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest(
-    {mongos: [{setParameter: {replicaSetMonitorProtocol: "streamable"}}], config: 1, shards: 0});
+    {mongos: [{setParameter: {replicaSetMonitorProtocol: "streamable"}}], config: 1, shards: 1});
 const configRSPrimary = st.configRS.getPrimary();
 
 const unknownTopologyChangeRegex = new RegExp(

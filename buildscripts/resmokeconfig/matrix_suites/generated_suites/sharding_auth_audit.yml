@@ -46,6 +46,7 @@ selector:
     - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
     - jstests/sharding/cluster_time_across_add_shard.js
     - jstests/sharding/set_user_write_block_mode.js
+    - jstests/sharding/drop_config_db.js
   roots:
     - jstests/sharding/**/*.js
 test_kind: js_test
