@@ -73,7 +73,6 @@ public:
                                const CallbackResponseSaver& callbackResponseSaver,
                                const ResponseStatus& response);
     void processNetworkResponse(const ResponseStatus& response);
-    void runReadyNetworkOperations();
 
 protected:
     void setUp() override;
@@ -154,12 +153,6 @@ void RemoteCommandRetrySchedulerTest::processNetworkResponse(const ResponseStatu
     ASSERT_TRUE(net->hasReadyRequests());
     auto noi = net->getNextReadyRequest();
     net->scheduleResponse(noi, net->now(), response);
-    net->runReadyNetworkOperations();
-}
-
-void RemoteCommandRetrySchedulerTest::runReadyNetworkOperations() {
-    auto net = getNet();
-    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
     net->runReadyNetworkOperations();
 }
 

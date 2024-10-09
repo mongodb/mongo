@@ -49,28 +49,23 @@ namespace mongo::executor {
  */
 class ExhaustResponseReaderTL : public NetworkInterface::ExhaustResponseReader {
 public:
-    static std::shared_ptr<ExhaustResponseReader> make_forTest(
-        RemoteCommandRequest originalRequest,
-        ConnectionPool::ConnectionHandle conn,
-        std::shared_ptr<Baton> baton,
-        std::shared_ptr<transport::Reactor> reactor,
-        const CancellationToken& token = CancellationToken::uncancelable());
-
-    ~ExhaustResponseReaderTL() override;
-    SemiFuture<RemoteCommandResponse> next() final;
-
-private:
     ExhaustResponseReaderTL(RemoteCommandRequest originalRequest,
+                            RemoteCommandResponse initialResponse,
                             ConnectionPool::ConnectionHandle conn,
                             std::shared_ptr<Baton> baton,
                             std::shared_ptr<transport::Reactor> reactor,
                             const CancellationToken& token = CancellationToken::uncancelable());
 
+    ~ExhaustResponseReaderTL() override;
+    SemiFuture<RemoteCommandResponse> next() final;
+
+private:
     void _recordConnectionOutcome(Status outcome);
 
     Future<RemoteCommandResponse> _read();
 
     RemoteCommandRequest _originatingRequest;
+    boost::optional<RemoteCommandResponse> _initialResponse;
 
     Atomic<bool> _finished{false};
     ConnectionPool::ConnectionHandle _conn;

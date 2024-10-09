@@ -530,8 +530,8 @@ protected:
         if (_executorThreadShutdownComplete) {
             return;
         }
-        getExecutor().shutdown();
-        getExecutor().join();
+        shutdownExecutorThread();
+        joinExecutorThread();
         _clonerExecutor->shutdown();
         _clonerExecutor->join();
         _executorThreadShutdownComplete = true;
@@ -825,6 +825,7 @@ TEST_F(InitialSyncerTest, StartupReturnsShutdownInProgressIfInitialSyncerIsShutt
     // SyncSourceSelector returns an invalid sync source so InitialSyncer is stuck waiting for
     // another sync source in 'Options::syncSourceRetryWait' ms.
     ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, initialSyncer->startup(opCtx.get(), maxAttempts));
 }
 
@@ -1042,6 +1043,7 @@ TEST_F(InitialSyncerTest,
     // This will cancel the _chooseSyncSourceCallback() task scheduled at getNet()->now() +
     // '_options.syncSourceRetryWait'.
     ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
 
     initialSyncer->join();
 

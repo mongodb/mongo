@@ -75,6 +75,9 @@ public:
      */
     void shutdownAndJoin();
 
+    void shutdown_forTest();
+    void join_forTest();
+
     /**
      * Adds 'executors' and 'fixedExecutor' to the pool. May be called at most once to initialize an
      * empty pool.

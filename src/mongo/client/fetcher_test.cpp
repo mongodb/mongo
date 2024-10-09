@@ -135,8 +135,8 @@ void FetcherTest::setUp() {
 }
 
 void FetcherTest::tearDown() {
-    getExecutor().shutdown();
-    getExecutor().join();
+    shutdownExecutorThread();
+    joinExecutorThread();
     // Executor may still invoke fetcher's callback before shutting down.
     fetcher.reset();
 }
@@ -551,7 +551,7 @@ TEST_F(FetcherTest, ScheduleButShutdown) {
     ASSERT_TRUE(fetcher->isActive());
     ASSERT_EQUALS(Fetcher::State::kRunning, fetcher->getState_forTest());
 
-    getExecutor().shutdown();
+    shutdownExecutorThread();
 
     ASSERT_OK(fetcher->join(Interruptible::notInterruptible()));
     ASSERT_FALSE(fetcher->isActive());
@@ -1017,13 +1017,9 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
 
     // killCursors command request will be canceled by executor on shutdown.
     tearDown();
-    ASSERT_EQUALS(
-        1,
-        countBSONFormatLogLinesIsSubset(BSON("msg"
-                                             << "killCursors command task failed"
-                                             << "attr"
-                                             << BSON("error"
-                                                     << "CallbackCanceled: Callback canceled"))));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(BSON("msg"
+                                                       << "killCursors command task failed")));
 }
 
 void setNextActionToNoAction(const StatusWith<Fetcher::QueryResponse>& fetchResult,
@@ -1168,6 +1164,8 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
 
+    runReadyNetworkOperations();
+
     // Fetcher should attempt (unsuccessfully) to schedule a killCursors command.
     ASSERT_EQUALS(1,
                   countBSONFormatLogLinesIsSubset(
@@ -1175,7 +1173,7 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
                            << "Failed to schedule killCursors command"
                            << "attr"
                            << BSON("error"
-                                   << "ShutdownInProgress: Shutdown in progress"))));
+                                   << "ShutdownInProgress: TaskExecutor shutdown in progress"))));
 
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
 }

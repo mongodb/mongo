@@ -543,6 +543,7 @@ TEST_F(AsyncWorkSchedulerTest, ShutdownInterruptsNotYetScheduledTasks) {
 
     async.shutdown({ErrorCodes::InternalError, "Test internal error"});
     ASSERT_EQ(0, numInvocations.load());
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     ASSERT_THROWS_CODE(future1.get(), AssertionException, ErrorCodes::InternalError);
     ASSERT_THROWS_CODE(future2.get(), AssertionException, ErrorCodes::InternalError);

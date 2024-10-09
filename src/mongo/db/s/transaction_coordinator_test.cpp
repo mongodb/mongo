@@ -1264,6 +1264,8 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesCommitDecisionOnTwoCommitRes
     auto commitDecision = commitDecisionFuture.get();
     ASSERT_EQ(static_cast<int>(commitDecision), static_cast<int>(txn::CommitDecision::kCommit));
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
     coordinator->onCompletion().get();
     coordinator->shutdown();
 }
@@ -1290,6 +1292,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnAbortAndCommi
 
     ASSERT_THROWS_CODE(
         commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), AssertionException, ErrorCodes::NoSuchTransaction);
     coordinator->shutdown();
@@ -1318,6 +1321,7 @@ TEST_F(TransactionCoordinatorTest,
 
     ASSERT_THROWS_CODE(
         commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), AssertionException, ErrorCodes::NoSuchTransaction);
     coordinator->shutdown();
@@ -1346,6 +1350,7 @@ TEST_F(TransactionCoordinatorTest,
 
     ASSERT_THROWS_CODE(
         commitDecisionFuture.get(), AssertionException, ErrorCodes::TxnRetryCounterTooOld);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), AssertionException, ErrorCodes::TxnRetryCounterTooOld);
     coordinator->shutdown();
@@ -1371,6 +1376,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnSingleAbortRe
 
     ASSERT_THROWS_CODE(
         commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), AssertionException, ErrorCodes::NoSuchTransaction);
     coordinator->shutdown();
@@ -1404,6 +1410,7 @@ TEST_F(TransactionCoordinatorTest,
 
     ASSERT_THROWS_CODE(
         commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), AssertionException, ErrorCodes::NoSuchTransaction);
     coordinator->shutdown();
@@ -1434,6 +1441,7 @@ TEST_F(TransactionCoordinatorTest,
 
     ASSERT_THROWS_CODE(
         commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), AssertionException, ErrorCodes::NoSuchTransaction);
     coordinator->shutdown();
@@ -1470,6 +1478,7 @@ TEST_F(TransactionCoordinatorTest,
     auto commitDecision = commitDecisionFuture.get();
     ASSERT_EQ(static_cast<int>(commitDecision), static_cast<int>(txn::CommitDecision::kCommit));
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     coordinator->onCompletion().get();
     coordinator->shutdown();
 }
@@ -1500,6 +1509,7 @@ TEST_F(TransactionCoordinatorTest,
 
     ASSERT_THROWS_CODE(
         commitDecisionFuture.get(), AssertionException, ErrorCodes::ReadConcernMajorityNotEnabled);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(coordinator->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::ReadConcernMajorityNotEnabled);
@@ -1520,6 +1530,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesEndOfTransactionOplogEntry) 
     assertPrepareSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     coordinator->onCompletion().get();
     coordinator->shutdown();
 
@@ -1709,6 +1720,8 @@ protected:
         assertPrepareSentAndRespondWithSuccess();
         assertCommitSentAndRespondWithSuccess();
         assertCommitSentAndRespondWithSuccess();
+
+        executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
         coordinator->onCompletion().get();
         coordinator->shutdown();
@@ -2032,8 +2045,10 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     // the coordinator's completion.
 
     future.timed_get(kLongFutureTimeout);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     coordinator->onCompletion().get();
     coordinator->shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -2079,9 +2094,11 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorIsCanceledWhileInactive) {
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
 
     coordinator->cancelIfCommitNotYetStarted();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), DBException, ErrorCodes::TransactionCoordinatorCanceled);
     coordinator->shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -2128,10 +2145,12 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
 
     awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(coordinator->onCompletion().get(),
                        DBException,
                        ErrorCodes::InterruptedDueToReplStateChange);
     coordinator->shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -2198,9 +2217,11 @@ TEST_F(TransactionCoordinatorMetricsTest,
     killClientOpCtx(getServiceContext(),
                     "hangBeforeWaitingForParticipantListWriteConcern",
                     ErrorCodes::InterruptedAtShutdown);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), DBException, ErrorCodes::InterruptedAtShutdown);
     coordinator->shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -2345,10 +2366,12 @@ TEST_F(TransactionCoordinatorMetricsTest,
     killClientOpCtx(getServiceContext(),
                     "hangBeforeWaitingForDecisionWriteConcern",
                     ErrorCodes::InterruptedAtShutdown);
+    future.timed_get(kLongFutureTimeout);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), DBException, ErrorCodes::InterruptedAtShutdown);
     coordinator->shutdown();
-
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -2509,10 +2532,12 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
     // The last thing the coordinator will do on the hijacked commit response thread is signal
     // the coordinator's completion.
     future.timed_get(kLongFutureTimeout);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(coordinator->onCompletion().get(),
                        DBException,
                        ErrorCodes::InterruptedDueToReplStateChange);
     coordinator->shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -2578,6 +2603,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
     killClientOpCtx(getServiceContext(),
                     "hangBeforeWaitingForDecisionWriteConcern",
                     ErrorCodes::InterruptedAtShutdown);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), DBException, ErrorCodes::InterruptedAtShutdown);
     coordinator->shutdown();
@@ -2623,6 +2649,8 @@ TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionsUnderSlowMSThres
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
     coordinator->onCompletion().get();
     coordinator->shutdown();
     stopCapturingLogMessages();
@@ -2658,6 +2686,8 @@ TEST_F(
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
     coordinator->onCompletion().get();
     coordinator->shutdown();
     stopCapturingLogMessages();
@@ -2691,6 +2721,8 @@ TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionsOverSlowMSThreshold) {
 
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     coordinator->onCompletion().get();
     coordinator->shutdown();
@@ -2738,6 +2770,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTerminationCauseFor
     assertPrepareSentAndRespondWithNoSuchTransaction();
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     ASSERT_THROWS_CODE(
         coordinator->onCompletion().get(), AssertionException, ErrorCodes::NoSuchTransaction);
@@ -2843,6 +2877,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesStepDurationsAndTot
     // The last thing the coordinator will do on the hijacked commit response thread is signal
     // the coordinator's completion.
     futureOption->timed_get(kLongFutureTimeout);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     coordinator->onCompletion().get();
     coordinator->shutdown();
 
@@ -2917,6 +2952,8 @@ TEST_F(TransactionCoordinatorMetricsTest, RecoveryFromFailureIndicatedInReportSt
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
     coordinator->onCompletion().get();
     coordinator->shutdown();
 }
@@ -2960,6 +2997,8 @@ TEST_F(TransactionCoordinatorMetricsTest, ClientInformationIncludedInReportState
 
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     coordinator->onCompletion().get();
     coordinator->shutdown();

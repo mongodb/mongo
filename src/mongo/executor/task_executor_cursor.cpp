@@ -359,5 +359,9 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     }
 }
 
+std::shared_ptr<executor::TaskExecutor> TaskExecutorCursor::getExecutor_forTest() {
+    return _executor;
+}
+
 }  // namespace executor
 }  // namespace mongo

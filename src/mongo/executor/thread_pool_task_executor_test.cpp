@@ -48,6 +48,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace executor {
@@ -72,11 +73,12 @@ TEST_F(ThreadPoolExecutorTest, TimelyCancellationOfScheduleWorkAt) {
     const auto startTime = net->now();
     net->enterNetwork();
     net->runUntil(startTime + Milliseconds(200));
-    net->exitNetwork();
     executor.cancel(cb1);
+    net->runUntil(startTime + Milliseconds(300));
+    net->exitNetwork();
     executor.wait(cb1);
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status1);
-    ASSERT_EQUALS(startTime + Milliseconds(200), net->now());
+    ASSERT_EQUALS(startTime + Milliseconds(300), net->now());
 }
 
 TEST_F(ThreadPoolExecutorTest, Schedule) {
@@ -91,14 +93,15 @@ TEST_F(ThreadPoolExecutorTest, Schedule) {
     barrier.countDownAndWait();
     ASSERT_OK(status1);
     // Wait for the executor to stop to ensure the scheduled job does not outlive current scope.
-    executor.shutdown();
-    executor.join();
+    shutdownExecutorThread();
+    joinExecutorThread();
 }
 
 TEST_F(ThreadPoolExecutorTest, ScheduleAfterShutdown) {
     auto& executor = getExecutor();
     auto status1 = getDetectableErrorStatus();
-    executor.shutdown();
+    launchExecutorThread();
+    shutdownExecutorThread();
     executor.schedule([&](Status status) { status1 = status; });
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status1);
 }
@@ -120,18 +123,56 @@ TEST_F(ThreadPoolExecutorTest, OnEvent) {
     barrier.countDownAndWait();
     ASSERT_OK(status1);
     // Wait for the executor to stop to ensure the scheduled job does not outlive current scope.
-    executor.shutdown();
-    executor.join();
+    shutdownExecutorThread();
+    joinExecutorThread();
+}
+
+TEST_F(ThreadPoolExecutorTest, OnEventCancel) {
+    auto& executor = getExecutor();
+    launchExecutorThread();
+
+    auto swEvent = executor.makeEvent();
+    ASSERT_OK(swEvent);
+
+    auto pf = makePromiseFuture<void>();
+    auto swCbh =
+        executor.onEvent(swEvent.getValue(), [&](auto args) { pf.promise.setFrom(args.status); });
+    ASSERT_OK(swCbh);
+
+    ASSERT_FALSE(pf.future.isReady());
+    executor.cancel(swCbh.getValue());
+    ASSERT_EQ(pf.future.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(ThreadPoolExecutorTest, WaitForEvent) {
+    auto& executor = getExecutor();
+    launchExecutorThread();
+
+    auto swEvent = executor.makeEvent();
+    ASSERT_OK(swEvent);
+
+    auto pf = makePromiseFuture<void>();
+    auto th = stdx::thread([&] {
+        executor.waitForEvent(swEvent.getValue());
+        pf.promise.emplaceValue();
+    });
+    ON_BLOCK_EXIT([&] { th.join(); });
+
+    ASSERT_FALSE(pf.future.isReady());
+    executor.signalEvent(swEvent.getValue());
+
+    ASSERT_OK(pf.future.getNoThrow());
 }
 
 TEST_F(ThreadPoolExecutorTest, OnEventAfterShutdown) {
+    launchExecutorThread();
     auto& executor = getExecutor();
     auto status1 = getDetectableErrorStatus();
     auto event = executor.makeEvent().getValue();
     TaskExecutor::CallbackFn cb = [&](const TaskExecutor::CallbackArgs& args) {
         status1 = args.status;
     };
-    executor.shutdown();
+    shutdownExecutorThread();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress,
                   executor.onEvent(event, std::move(cb)).getStatus());
 
@@ -229,8 +270,8 @@ TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleWorkRaceDoesNotCrash) {
     fpTPTE1->setMode(FailPoint::alwaysOn);
     barrier.countDownAndWait();
     (*fpTPTE1).pauseWhileSet();
-    executor.shutdown();
-    executor.join();
+    shutdownExecutorThread();
+    joinExecutorThread();
     ASSERT_OK(status1);
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status2);
 }
@@ -261,8 +302,8 @@ TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
     fpTPTE1->setMode(FailPoint::alwaysOn);
     barrier.countDownAndWait();
     (*fpTPTE1).pauseWhileSet();
-    executor.shutdown();
-    executor.join();
+    shutdownExecutorThread();
+    joinExecutorThread();
     ASSERT_OK(status1);
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status2);
 }

@@ -186,9 +186,13 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, ReceiveMultipleResponses) {
     auto client = getClient(conn);
 
     auto request = makeExhaustHello(Milliseconds(150));
-    assertOK(client->beginExhaustCommandRequest(request).getNoThrow());
-    auto rdr = ExhaustResponseReaderTL::make_forTest(
-        request, std::move(conn), nullptr, getReactor(), cancelSource.token());
+    auto rdr = std::make_shared<ExhaustResponseReaderTL>(
+        request,
+        assertOK(client->beginExhaustCommandRequest(request).getNoThrow()),
+        std::move(conn),
+        nullptr,
+        getReactor(),
+        cancelSource.token());
 
     for (int i = 0; i < 3; i++) {
         auto next = assertReadOK(*rdr);
@@ -218,9 +222,16 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CancelRead) {
     auto request = makeExhaustHello(Seconds(30));
     request.timeout = Seconds(15);
 
-    assertOK(client->beginExhaustCommandRequest(request).getNoThrow());
-    auto rdr = ExhaustResponseReaderTL::make_forTest(
-        request, std::move(conn), nullptr, getReactor(), cancelSource.token());
+    auto rdr = std::make_shared<ExhaustResponseReaderTL>(
+        request,
+        assertOK(client->beginExhaustCommandRequest(request).getNoThrow()),
+        std::move(conn),
+        nullptr,
+        getReactor(),
+        cancelSource.token());
+
+    // First response is retrieved from the initial command.
+    assertReadOK(*rdr);
 
     // Subsequent responses will come every maxAwaitTimeMS.
     auto respFut = rdr->next();
@@ -257,7 +268,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
 
     FindCommandRequest find(nss);
     find.setSort(BSON("_id" << 1));
-    find.setBatchSize(1);
+    find.setBatchSize(0);
     auto findResp = assertOK(
         client->runCommandRequest(makeTestRequest(nss.dbName(), find.toBSON())).getNoThrow());
     auto cursorReply = CursorInitialReply::parse(IDLParserContext("findReply"), findResp.data);
@@ -266,12 +277,14 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
     getMore.setDbName(nss.dbName());
     getMore.setBatchSize(1);
     auto getMoreRequest = makeTestRequest(nss.dbName(), getMore.toBSON());
-    assertOK(client->beginExhaustCommandRequest(getMoreRequest).getNoThrow());
-    auto rdr = ExhaustResponseReaderTL::make_forTest(
-        getMoreRequest, std::move(conn), nullptr, getReactor());
+    auto rdr = std::make_shared<ExhaustResponseReaderTL>(
+        getMoreRequest,
+        assertOK(client->beginExhaustCommandRequest(getMoreRequest).getNoThrow()),
+        std::move(conn),
+        nullptr,
+        getReactor());
 
-    // Skip one for the find request and one for the initial getMore.
-    for (size_t i = 2; i < documents.size(); i++) {
+    for (size_t i = 0; i < documents.size(); i++) {
         auto& expected = documents[i];
 
         auto resp = assertReadOK(*rdr);
@@ -314,9 +327,15 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, RemoteCancel) {
     auto clientOperationKey = UUID::gen();
     auto request = makeExhaustHello(Seconds(60), clientOperationKey);
     request.timeout = Seconds(30);
-    assertOK(client->beginExhaustCommandRequest(request).getNoThrow());
-    auto rdr =
-        ExhaustResponseReaderTL::make_forTest(request, std::move(conn), nullptr, getReactor());
+    auto rdr = std::make_shared<ExhaustResponseReaderTL>(
+        request,
+        assertOK(client->beginExhaustCommandRequest(request).getNoThrow()),
+        std::move(conn),
+        nullptr,
+        getReactor());
+
+    // First response will be available immediately from the initial command.
+    assertReadOK(*rdr);
 
     // The next one will not be received until maxAwaitTimeMS is hit.
     auto respFut = rdr->next();
@@ -353,9 +372,15 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, LocalTimeout) {
     auto request = makeExhaustHello(Milliseconds(60000));
     request.timeout = Milliseconds(500);
 
-    assertOK(client->beginExhaustCommandRequest(request).getNoThrow());
-    auto rdr =
-        ExhaustResponseReaderTL::make_forTest(request, std::move(conn), nullptr, getReactor());
+    auto rdr = std::make_shared<ExhaustResponseReaderTL>(
+        request,
+        assertOK(client->beginExhaustCommandRequest(request).getNoThrow()),
+        std::move(conn),
+        nullptr,
+        getReactor());
+
+    // The initial response wil be available immediately.
+    assertReadOK(*rdr);
 
     // The next one will not be received until maxAwaitTimeMS is hit, so the 500ms local timeout
     // will cancel the operation early.

@@ -42,16 +42,25 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/executor/connection_pool.h"
+#include "mongo/executor/executor_integration_test_fixture.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -59,8 +68,12 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -71,17 +84,32 @@ namespace mongo {
 namespace executor {
 namespace {
 
-class TaskExecutorFixture : public mongo::unittest::Test {
+class TaskExecutorFixture : public ExecutorIntegrationTestFixture {
 public:
     TaskExecutorFixture() = default;
 
     void setUp() override {
-        std::shared_ptr<NetworkInterface> net = makeNetworkInterface("TaskExecutorTest");
-        auto tp = std::make_unique<NetworkInterfaceThreadPool>(net.get());
-
-        _executor = ThreadPoolTaskExecutor::create(std::move(tp), std::move(net));
+        _executor = makeExecutor("TaskExecutorTest");
         _executor->startup();
+
+        _testExecutor = makeExecutor("TaskExecutorTestSetup");
+        _testExecutor->startup();
     };
+
+    std::shared_ptr<ThreadPoolTaskExecutor> makeExecutor(StringData name) {
+        ConnectionPool::Options cpOptions{};
+        cpOptions.minConnections = 0;
+        std::shared_ptr<NetworkInterface> net =
+            makeNetworkInterface(name.toString(), nullptr, nullptr, std::move(cpOptions));
+
+        ThreadPool::Options tpOptions;
+        tpOptions.threadNamePrefix = "TaskExecutorTestThreadPool-";
+        tpOptions.poolName = "TaskExecutorTestThreadPool";
+        tpOptions.maxThreads = 4;
+
+        return ThreadPoolTaskExecutor::create(std::make_unique<ThreadPool>(tpOptions),
+                                              std::move(net));
+    }
 
     void tearDown() override {
         _executor->shutdown();
@@ -90,6 +118,20 @@ public:
 
     TaskExecutor* executor() {
         return _executor.get();
+    }
+
+    TaskExecutor* setupExecutor() {
+        return _testExecutor.get();
+    }
+
+    BSONObj runSetupCommandSync(const DatabaseName& db, BSONObj cmdObj) override {
+        auto pf = makePromiseFuture<RemoteCommandResponse>();
+        auto res = assertOK(
+            setupExecutor()
+                ->scheduleRemoteCommand(RemoteCommandRequest(getServer(), db, cmdObj, nullptr),
+                                        CancellationToken::uncancelable())
+                .getNoThrow());
+        return res.data;
     }
 
     bool waitUntilNoTasksOrDeadline(Date_t deadline) {
@@ -102,14 +144,34 @@ public:
         return false;
     }
 
+    ConnectionStatsPer getPoolStats() {
+        ConnectionPoolStats stats;
+        _executor->getNetworkInterface()->appendConnectionStats(&stats);
+        return stats.statsByHost[getServer()];
+    }
+
+    /*
+     * Asserts that the connection pool stats reach a certain value within a 30 second window. The
+     * connection pool stats to test and the value they must reach are defined in f.
+     * TODO: SERVER-66126 We should be able to test directly without any wait once continuations get
+     * destructed right after they run.
+     */
+    void assertConnectionStatsSoon(std::function<bool(const ConnectionStatsPer&)> f,
+                                   StringData errMsg) {
+        auto start = getGlobalServiceContext()->getFastClockSource()->now();
+        while (getGlobalServiceContext()->getFastClockSource()->now() - start < Seconds(30)) {
+            if (f(getPoolStats())) {
+                return;
+            }
+            sleepFor(Milliseconds(100));
+        }
+        FAIL(errMsg.toString());
+    }
+
     std::shared_ptr<ThreadPoolTaskExecutor> _executor;
 
 private:
-    unittest::MinimumLoggedSeverityGuard networkSeverityGuard{
-        logv2::LogComponent::kNetwork,
-        logv2::LogSeverity::Debug(NetworkInterface::kDiagnosticLogLevel)};
-    unittest::MinimumLoggedSeverityGuard executorSeverityGuard{logv2::LogComponent::kExecutor,
-                                                               logv2::LogSeverity::Debug(3)};
+    std::shared_ptr<ThreadPoolTaskExecutor> _testExecutor;
 };
 
 class RequestHandlerUtil {
@@ -160,6 +222,128 @@ private:
         };
 };
 
+TEST_F(TaskExecutorFixture, ScheduleWorkAt) {
+    auto start = executor()->now();
+    auto target = start + Milliseconds(50);
+    auto pf = makePromiseFuture<void>();
+    auto swCbh =
+        executor()->scheduleWorkAt(target, [&](auto args) { pf.promise.setFrom(args.status); });
+    ASSERT_OK(swCbh);
+    ASSERT_OK(pf.future.getNoThrow());
+    ASSERT_GTE(executor()->now(), target);
+}
+
+TEST_F(TaskExecutorFixture, ScheduleWorkAtCancel) {
+    auto client = getGlobalServiceContext()->getService()->makeClient("ScheduleWorkAtCancel");
+    auto opCtx = client->makeOperationContext();
+
+    auto start = executor()->now();
+    auto pf = makePromiseFuture<void>();
+    auto swCbh = executor()->scheduleWorkAt(start + Seconds(60),
+                                            [&](auto args) { pf.promise.setFrom(args.status); });
+    ASSERT_OK(swCbh);
+    ASSERT_FALSE(pf.future.isReady());
+    executor()->cancel(swCbh.getValue());
+    opCtx->setDeadlineAfterNowBy(Seconds(30), ErrorCodes::ExceededTimeLimit);
+    ASSERT_EQ(pf.future.getNoThrow(opCtx.get()), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(TaskExecutorFixture, Shutdown) {
+    auto client = getGlobalServiceContext()->getService()->makeClient("TaskExecutorShutdown");
+    auto opCtx = client->makeOperationContext();
+
+    auto fp = configureFailCommand("ping", {}, Milliseconds(60000));
+
+    auto clientOpKey = UUID::gen();
+    auto req = makeTestCommand(
+        RemoteCommandRequest::kNoTimeout, BSON("ping" << 1), nullptr, false, {}, clientOpKey);
+    auto pf = makePromiseFuture<RemoteCommandResponse>();
+    auto swCbHandle =
+        executor()->scheduleRemoteCommand(req, [&](TaskExecutor::RemoteCommandCallbackArgs args) {
+            pf.promise.emplaceValue(args.response);
+        });
+    ASSERT_OK(swCbHandle);
+    ON_BLOCK_EXIT([&] { killOp(clientOpKey); });
+
+    auto exhPf = makePromiseFuture<void>();
+    auto exhaustReq =
+        makeTestCommand(RemoteCommandRequest::kNoTimeout,
+                        BSON("hello" << 1 << "maxAwaitTimeMS" << 100 << "topologyVersion"
+                                     << TopologyVersion(OID::max(), 0).toBSON()));
+    auto swExCbh = executor()->scheduleExhaustRemoteCommand(exhaustReq, [&](auto args) {
+        if (!args.response.isOK()) {
+            exhPf.promise.setFrom(args.response.status);
+        }
+    });
+    ASSERT_OK(swExCbh);
+
+    fp.waitForAdditionalTimesEntered(1);
+    ASSERT_FALSE(pf.future.isReady());
+    ASSERT_FALSE(exhPf.future.isReady());
+
+    executor()->shutdown();
+    executor()->join();
+
+    ASSERT_TRUE(pf.future.isReady());
+    ASSERT_EQ(pf.future.get().status, ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(exhPf.future.getNoThrow(), ErrorCodes::CallbackCanceled);
+
+    assertConnectionStatsSoon(
+        [](const ConnectionStatsPer& stats) {
+            return stats.inUse + stats.available + stats.leased == 0;
+        },
+        "Connection pools should be drained after shutdown + join");
+}
+
+TEST_F(TaskExecutorFixture, ScheduleRemoteCommand) {
+    auto client = getGlobalServiceContext()->getService()->makeClient("TaskExecutorExhaustTest");
+    auto opCtx = client->makeOperationContext();
+
+    RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
+                             DatabaseName::kAdmin,
+                             BSON("ping" << 1),
+                             nullptr);
+
+    auto pf = makePromiseFuture<RemoteCommandResponse>();
+    auto swCbHandle = executor()->scheduleRemoteCommand(
+        std::move(rcr), [&](TaskExecutor::RemoteCommandCallbackArgs args) {
+            pf.promise.emplaceValue(args.response);
+        });
+    ASSERT_OK(swCbHandle.getStatus());
+    auto cbHandle = swCbHandle.getValue();
+
+    opCtx->setDeadlineAfterNowBy(Seconds(30), ErrorCodes::ExceededTimeLimit);
+    auto resp = pf.future.get(opCtx.get());
+    ASSERT_OK(resp.status);
+    ASSERT_OK(getStatusFromCommandResult(resp.data));
+}
+
+TEST_F(TaskExecutorFixture, ScheduleRemoteCommandCancel) {
+    auto client = getGlobalServiceContext()->getService()->makeClient("TaskExecutorExhaustTest");
+    auto opCtx = client->makeOperationContext();
+    auto opKey = UUID::gen();
+
+    auto fpGuard = configureFailCommand("ping", {}, Milliseconds(60000));
+
+    auto pf = makePromiseFuture<RemoteCommandResponse>();
+    auto request = makeTestCommand(
+        RemoteCommandRequest::kNoTimeout, BSON("ping" << 1), nullptr, false, {}, opKey);
+    auto swCbh = executor()->scheduleRemoteCommand(
+        request, [&](TaskExecutor::RemoteCommandCallbackArgs args) {
+            pf.promise.emplaceValue(args.response);
+        });
+    ASSERT_OK(swCbh);
+    ON_BLOCK_EXIT([&] { killOp(opKey); });
+
+    fpGuard.waitForAdditionalTimesEntered(1);
+    ASSERT_FALSE(pf.future.isReady());
+    executor()->cancel(swCbh.getValue());
+
+    opCtx->setDeadlineAfterNowBy(Seconds(30), ErrorCodes::ExceededTimeLimit);
+    auto resp = pf.future.get(opCtx.get());
+    ASSERT_EQ(resp.status, ErrorCodes::CallbackCanceled);
+}
+
 TEST_F(TaskExecutorFixture, RunExhaustShouldReceiveMultipleResponses) {
     auto client = getGlobalServiceContext()->getService()->makeClient("TaskExecutorExhaustTest");
     auto opCtx = client->makeOperationContext();
@@ -201,6 +385,12 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldReceiveMultipleResponses) {
 
     // The tasks should be removed after 'isMaster' fails
     ASSERT_TRUE(waitUntilNoTasksOrDeadline(Date_t::now() + Seconds(5)));
+
+    assertConnectionStatsSoon(
+        [](const ConnectionStatsPer& stats) {
+            return stats.inUse + stats.available + stats.leased == 0;
+        },
+        "Connection should be discarded after exhaust cancel");
 }
 
 TEST_F(TaskExecutorFixture, RunExhaustFutureShouldReceiveMultipleResponses) {
@@ -234,6 +424,12 @@ TEST_F(TaskExecutorFixture, RunExhaustFutureShouldReceiveMultipleResponses) {
     // The tasks should be removed after 'isMaster' fails
     ASSERT_TRUE(waitUntilNoTasksOrDeadline(Date_t::now() + Seconds(5)));
     ASSERT_FALSE(swFuture.getNoThrow().isOK());
+
+    assertConnectionStatsSoon(
+        [](const ConnectionStatsPer& stats) {
+            return stats.inUse + stats.available + stats.leased == 0;
+        },
+        "Connection should be discarded after exhaust cancel");
 }
 
 TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
@@ -315,7 +511,137 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
 
         // The tasks should be removed after 'isMaster' fails
         ASSERT_TRUE(waitUntilNoTasksOrDeadline(Date_t::now() + Seconds(5)));
+
+        assertConnectionStatsSoon(
+            [](const ConnectionStatsPer& stats) {
+                return stats.inUse == 0 && stats.available == 1 && stats.leased == 0;
+            },
+            "Connection should be returned to the pool after exhaust command completion");
     }
+}
+
+/**
+ * This test simulates the case where exhaust responses are produced faster than they can be
+ * processed by the TaskExecutor. It does so via the following steps:
+ *
+ *   - Insert documents with _id in [1, n]
+ *   - Opens an exhaust cursor in ascending _id order
+ *   - Upon receiving response(s), blocks in the thread executing the callback until the server has
+ *     fully exhausted the cursor.
+ *   - Pushes responses into a queue as they are received.
+ *
+ * We should expect to see all of the responses processed in order.
+ */
+TEST_F(TaskExecutorFixture, FastExhaustResponses) {
+    // This test assumes that the TCP buffer can fit ~100 bytes.
+    // If that isn't the case, the test will fail due to the cursor never becoming fully exhausted,
+    // as the server-side will block indefinitely when trying to send a response once the buffer has
+    // filled.
+    constexpr size_t kNumResponses = 10;
+
+    auto client = getGlobalServiceContext()->getService()->makeClient("FastExhaustResponsesTest");
+    auto opCtx = client->makeOperationContext();
+
+    std::vector<BSONObj> documents;
+    for (size_t x = 0; x < kNumResponses; x++) {
+        documents.push_back(BSON("_id" << std::int32_t(x)));
+    }
+
+    const auto nss =
+        NamespaceStringUtil::deserialize(DatabaseName::kMdbTesting, "FastExhaustResponses");
+
+    runSetupCommandSync(nss.dbName(), BSON("drop" << nss.coll()));
+
+    write_ops::InsertCommandRequest insert(nss);
+    insert.setDocuments(documents);
+    runSetupCommandSync(nss.dbName(), insert.toBSON());
+
+    FindCommandRequest find(nss);
+    find.setSort(BSON("_id" << 1));
+    find.setBatchSize(0);
+    auto findReq = RemoteCommandRequest(getServer(), nss.dbName(), find.toBSON(), opCtx.get());
+    auto cursorReply = [&]() {
+        auto resp =
+            executor()->scheduleRemoteCommand(findReq, CancellationToken::uncancelable()).get();
+        ASSERT_OK(resp.status);
+        ASSERT_OK(getStatusFromCommandResult(resp.data));
+        return CursorInitialReply::parseOwned(IDLParserContext("findReply"), std::move(resp.data));
+    }();
+
+    Notification<void> cursorOpened;
+    Notification<void> cursorExhausted;
+
+    Atomic<bool> firstResponse = true;
+    SingleProducerSingleConsumerQueue<RemoteCommandResponse> queue;
+
+    auto cursorId = cursorReply.getCursor()->getCursorId();
+    GetMoreCommandRequest getMore(cursorId, nss.coll().toString());
+    getMore.setDbName(nss.dbName());
+    getMore.setBatchSize(1);
+    RemoteCommandRequest getMoreRequest(getServer(), nss.dbName(), getMore.toBSON(), opCtx.get());
+    auto swCbHandle = executor()->scheduleExhaustRemoteCommand(
+        getMoreRequest, [&](TaskExecutor::RemoteCommandCallbackArgs args) {
+            if (firstResponse.swap(false)) {
+                cursorOpened.set();
+            }
+            cursorExhausted.get();
+            auto shouldClose = !args.response.moreToCome;
+            queue.push(std::move(args.response));
+
+            if (shouldClose) {
+                queue.closeProducerEnd();
+            }
+        });
+    ASSERT_OK(swCbHandle);
+    ON_BLOCK_EXIT([&] {
+        executor()->cancel(swCbHandle.getValue());
+        executor()->wait(swCbHandle.getValue());
+    });
+
+    cursorOpened.waitFor(opCtx.get(), Seconds(60));
+    while (true) {
+        AggregateCommandRequest agg(
+            NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin));
+        agg.setPipeline({BSON("$currentOp" << BSON("idleCursors" << true)),
+                         BSON("$match" << BSON("cursor.cursorId" << cursorId))});
+        auto out = runSetupCommandSync(DatabaseName::kAdmin, agg.toBSON());
+        auto aggReply = CursorInitialReply::parse(IDLParserContext("aggReply"), out);
+
+        // Once cursor is exhausted, signal to handler thread it can start processing responses.
+        if (!aggReply.getCursor() || aggReply.getCursor()->getFirstBatch().empty()) {
+            LOGV2(9311409, "Cursor exhausted, unblocking TaskExecutor threads");
+            cursorExhausted.set();
+            break;
+        }
+    }
+
+    size_t nReceived = 0;
+    opCtx->setDeadlineAfterNowBy(Seconds(120), ErrorCodes::ExceededTimeLimit);
+    while (queue.waitForNonEmptyNoThrow(opCtx.get()).isOK()) {
+        auto resp = queue.pop();
+        ASSERT_OK(resp.status);
+
+        auto parsed = CursorGetMoreReply::parse(IDLParserContext("CursorGetMoreReply"), resp.data);
+        auto batch = parsed.getCursor().getNextBatch();
+
+        ASSERT_LTE(batch.size(), 1);
+        nReceived += batch.size();
+        ASSERT_LTE(nReceived, documents.size());
+
+        if (nReceived < documents.size()) {
+            ASSERT_TRUE(resp.moreToCome);
+        }
+
+        if (batch.empty()) {
+            // Exhaust command should be complete once we receive an empty batch.
+            executor()->wait(swCbHandle.getValue(), opCtx.get());
+        } else {
+            auto& expected = documents[nReceived - 1];
+            ASSERT_BSONOBJ_EQ(batch[0], expected);
+        }
+    }
+
+    ASSERT_EQ(nReceived, documents.size());
 }
 
 }  // namespace

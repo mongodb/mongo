@@ -56,9 +56,12 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
+#include "mongo/executor/exhaust_response_reader_tl.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_tl_gen.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -69,6 +72,7 @@
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_utils.h"
@@ -479,7 +483,7 @@ void NetworkInterfaceTL::CommandStateBase::cancel(Status status) {
 }
 
 AsyncDBClient* NetworkInterfaceTL::CommandStateBase::getClient(
-    const ConnectionHandle& conn) noexcept {
+    const ConnectionPool::ConnectionHandle& conn) noexcept {
     if (!conn) {
         return nullptr;
     }
@@ -597,7 +601,7 @@ void NetworkInterfaceTL::testEgress(const HostAndPort& hostAndPort,
     }
 }
 
-Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequestImpl(
+ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequestImpl(
     RemoteCommandRequest req) {
     return makeReadyFutureWith([this, req = std::move(req)] {
                const auto connAcquiredTimer =
@@ -606,112 +610,71 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequestImpl(
                return getClient(conn)->runCommandRequest(
                    std::move(req), baton, std::move(connAcquiredTimer), cancelSource.token());
            })
-        .then([this](RemoteCommandResponse response) {
-            response.target = request.target;
-            uassertStatusOK(doMetadataHook(response));
-            return response;
-        });
+        .thenRunOn(makeGuaranteedExecutor())
+        .onCompletion(
+            [this, anchor = shared_from_this()](StatusWith<RemoteCommandResponse> swResp) {
+                auto status = swResp.isOK() ? swResp.getValue().status : swResp.getStatus();
+                returnConnection(status);
+                return swResp;
+            });
 }
 
-Status NetworkInterfaceTL::CommandStateBase::doMetadataHook(const RemoteCommandResponse& response) {
-    if (auto& hook = interface->_metadataHook) {
-        return hook->readReplyMetadata(nullptr, response.data);
+void NetworkInterfaceTL::CommandStateBase::doMetadataHook(const RemoteCommandResponse& response) {
+    if (auto& hook = interface->_metadataHook; hook && response.isOK()) {
+        uassertStatusOK(hook->readReplyMetadata(nullptr, response.data));
     }
-    return Status::OK();
 }
 
-Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendRequestImpl(
+ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendRequestImpl(
     RemoteCommandRequest req) try {
-    auto [promise, future] = makePromiseFuture<RemoteCommandResponse>();
-    finalResponsePromise = std::move(promise);
-
-    getClient(conn)
+    return getClient(conn)
         ->beginExhaustCommandRequest(req, baton, cancelSource.token())
-        .thenRunOn(interface->_reactor)
-        .getAsync([this](StatusWith<RemoteCommandResponse> swResponse) mutable {
-            continueExhaustRequest(swResponse);
-        });
-    return std::move(future);
+        .thenRunOn(makeGuaranteedExecutor());
 } catch (const DBException& ex) {
-    return ex.toStatus();
+    return ExecutorFuture<RemoteCommandResponse>(makeGuaranteedExecutor(), ex.toStatus());
 }
 
-void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
-    StatusWith<RemoteCommandResponse> swResponse) {
-    RemoteCommandResponse response;
-    if (!swResponse.isOK()) {
-        response = RemoteCommandResponse(request.target, std::move(swResponse.getStatus()));
-    } else {
-        response = std::move(swResponse.getValue());
-    }
-
-    if (interface->inShutdown() || ErrorCodes::isCancellationError(response.status)) {
-        finalResponsePromise.emplaceValue(response);
-        return;
-    }
-
-    response.target = request.target;
-    if (Status metadataHookStatus = doMetadataHook(response); !metadataHookStatus.isOK()) {
-        finalResponsePromise.setError(metadataHookStatus);
-        return;
-    }
-
-    // If the command failed, we will call 'onReply' as a part of the future chain paired with
-    // the promise. This is to be sure that all error paths will run 'onReply' only once upon
-    // future completion.
-    if (!response.status.isOK() || !getStatusFromCommandResult(response.data).isOK()) {
-        // The moreToCome bit should *not* be set if the command failed
-        invariant(!response.moreToCome);
-
-        finalResponsePromise.emplaceValue(response);
-        return;
-    }
-
-    onReplyFn(response);
-
-    // Reset the stopwatch to measure the correct duration for the following reply
-    {
-        stdx::lock_guard<stdx::mutex> lk(stopwatchMutex);
-        stopwatch.restart();
-    }
-    if (deadline != kNoExpirationDate) {
-        deadline = stopwatch.start() + request.timeout;
-    }
-
-    setTimer();
-
-    getClient(conn)
-        ->awaitExhaustCommand(baton, cancelSource.token())
-        .thenRunOn(interface->_reactor)
-        .getAsync([this](StatusWith<RemoteCommandResponse> swResponse) mutable {
-            continueExhaustRequest(swResponse);
-        });
-}
-
-Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                               RemoteCommandRequest& request,
-                                               RemoteCommandOnReplyFn&& onReply,
-                                               const BatonHandle& baton) try {
+SemiFuture<std::shared_ptr<NetworkInterface::ExhaustResponseReader>>
+NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                        RemoteCommandRequest& request,
+                                        const BatonHandle& baton,
+                                        const CancellationToken& cancelToken) {
     if (inShutdown()) {
-        return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
+        uassertStatusOK(kNetworkInterfaceShutdownInProgress);
     }
 
-    LOGV2_DEBUG(
-        23909, kDiagnosticLogLevel, "startCommand", "request"_attr = redact(request.toString()));
+    LOGV2_DEBUG(23909,
+                kDiagnosticLogLevel,
+                "startExhaustCommand",
+                "request"_attr = redact(request.toString()));
 
     appendMetadata(&request, _metadataHook);
 
     auto cmdState =
-        std::make_shared<ExhaustCommandState>(this, request, cbHandle, baton, std::move(onReply));
+        std::make_shared<ExhaustCommandState>(this, request, cbHandle, baton, cancelToken);
     _registerCommand(cbHandle, cmdState);
-    _runCommand(cmdState).getAsync([cmdState](StatusWith<RemoteCommandResponse> swResponse) {
-        invariant(swResponse);
-        cmdState->onReplyFn(swResponse.getValue());
-    });
+    return _runCommand(cmdState)
+        .onCompletion([this, cmdState, cancelToken](StatusWith<RemoteCommandResponse> swr)
+                          -> StatusWith<std::shared_ptr<ExhaustResponseReader>> {
+            invariant(swr);
+            auto& resp = swr.getValue();
 
-    return Status::OK();
-} catch (const DBException& ex) {
-    return ex.toStatus();
+            if (!resp.isOK()) {
+                if (cmdState->conn) {
+                    cmdState->returnConnection(resp.status);
+                }
+                return resp.status;
+            }
+
+            invariant(cmdState->conn);
+            return std::make_shared<ExhaustResponseReaderTL>(cmdState->request,
+                                                             resp,
+                                                             std::exchange(cmdState->conn, {}),
+                                                             cmdState->baton,
+                                                             _reactor,
+                                                             cancelToken);
+        })
+        .semi();
 }
 
 void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
@@ -753,7 +716,8 @@ void NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill) try {
         nullptr,
         kCancelCommandTimeout);
     auto cbHandle = executor::TaskExecutor::CallbackHandle();
-    auto killOpCmdState = std::make_shared<CommandState>(this, killOpRequest, cbHandle, nullptr);
+    auto killOpCmdState = std::make_shared<CommandState>(
+        this, killOpRequest, cbHandle, nullptr, CancellationToken::uncancelable());
     _registerCommand(cbHandle, killOpCmdState);
     _runCommand(killOpCmdState)
         .getAsync([this, operationKey, killOpRequest](StatusWith<RemoteCommandResponse> swr) {
@@ -902,7 +866,7 @@ SemiFuture<std::unique_ptr<NetworkInterface::LeasedStream>> NetworkInterfaceTL::
 }
 
 SemiFuture<ConnectionPool::ConnectionHandle> NetworkInterfaceTL::CommandStateBase::getConnection(
-    std::shared_ptr<ConnectionPool> pool) {
+    ConnectionPool& pool) {
     Status failPointStatus = Status::OK();
     forceConnectionNetworkTimeout.executeIf(
         [&](const BSONObj& data) {
@@ -920,7 +884,7 @@ SemiFuture<ConnectionPool::ConnectionHandle> NetworkInterfaceTL::CommandStateBas
     if (!failPointStatus.isOK()) {
         return failPointStatus;
     }
-    return pool->get(request.target, request.sslMode, request.timeout, cancelSource.token());
+    return pool.get(request.target, request.sslMode, request.timeout, cancelSource.token());
 }
 
 ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::sendRequest(
@@ -965,14 +929,7 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
     }
 
     setTimer();
-    return sendRequestImpl(std::move(requestToSend))
-        .thenRunOn(makeGuaranteedExecutor(baton, interface->_reactor))
-        .onCompletion(
-            [this, anchor = shared_from_this()](StatusWith<RemoteCommandResponse> swResp) {
-                auto status = swResp.isOK() ? swResp.getValue().status : swResp.getStatus();
-                returnConnection(status);
-                return swResp;
-            });
+    return sendRequestImpl(std::move(requestToSend));
 }
 
 Status NetworkInterfaceTL::CommandStateBase::handleConnectionAcquisitionError(Status status) {
@@ -996,15 +953,23 @@ Status NetworkInterfaceTL::CommandStateBase::handleConnectionAcquisitionError(St
     return status;
 }
 
+ExecutorPtr NetworkInterfaceTL::CommandStateBase::makeGuaranteedExecutor() {
+    return mongo::makeGuaranteedExecutor(baton, interface->_reactor);
+}
+
 ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
     std::shared_ptr<CommandStateBase> cmdState) {
-    return cmdState->getConnection(_pool)
-        .thenRunOn(makeGuaranteedExecutor(cmdState->baton, _reactor))
+    return cmdState->getConnection(*_pool)
+        .thenRunOn(cmdState->makeGuaranteedExecutor())
         .onError([cmdState](Status status) -> StatusWith<ConnectionPool::ConnectionHandle> {
             return cmdState->handleConnectionAcquisitionError(status);
         })
         .then([this, cmdState](ConnectionPool::ConnectionHandle retrievedConn) {
             return cmdState->sendRequest(std::move(retrievedConn))
+                .then([cmdState](RemoteCommandResponse resp) {
+                    cmdState->doMetadataHook(resp);
+                    return resp;
+                })
                 .onError([this, cmdState](Status err) -> StatusWith<RemoteCommandResponse> {
                     if (auto opKey = cmdState->request.operationKey) {
                         _killOperation(cmdState.get());
@@ -1030,7 +995,6 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
                                                  cmdState->stopwatch.elapsed());
                 }
             }();
-            response.target = cmdState->request.target;
 
             // The command has resolved one way or another.
             cmdState->timer->cancel(cmdState->baton);

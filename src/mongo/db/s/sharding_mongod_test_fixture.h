@@ -88,14 +88,6 @@ protected:
     ClusterCursorManager* clusterCursorManager() const;
     executor::TaskExecutorPool* executorPool() const;
 
-    /**
-     * Shuts down the TaskExecutorPool and remembers that it has been shut down, so that it is not
-     * shut down again on tearDown.
-     *
-     * Not safe to call from multiple threads.
-     */
-    void shutdownExecutorPool();
-
     repl::ReplicationCoordinatorMock* replicationCoordinator() const;
 
     // Methods for creating and returning sharding components. Some of these methods have been
@@ -152,9 +144,6 @@ private:
         HostAndPort("node1:12345"), HostAndPort("node2:12345"), HostAndPort("node3:12345")};
 
     repl::ReplicationCoordinatorMock* _replCoord = nullptr;
-
-    // Records if a component has been shut down, so that it is only shut down once.
-    bool _executorPoolShutDown = false;
 
     // Whether the test fixture should set a committed snapshot during setup so that tests can
     // perform majority reads without doing any writes.

@@ -84,7 +84,16 @@ protected:
         auto netForFixedTaskExecutor = std::make_unique<executor::NetworkInterfaceMock>();
         _network = netForFixedTaskExecutor.get();
 
-        _threadPool = makeThreadPoolTestExecutor(std::move(netForFixedTaskExecutor));
+        _executor = executor::ShardingTaskExecutor::create(
+            makeThreadPoolTestExecutor(std::move(netForFixedTaskExecutor)));
+        _executor->startup();
+    }
+
+    void tearDown() override {
+        ShardingTestFixture::tearDown();
+        _executor->shutdown();
+        executor::NetworkInterfaceMock::InNetworkGuard(_network)->runReadyNetworkOperations();
+        _executor->join();
     }
 
     void assertOpCtxLsidEqualsCmdObjLsid(const BSONObj& cmdObj) {
@@ -99,17 +108,18 @@ protected:
         ASSERT_EQ(opCtxLsid->getUid(), *cmdObjLsid.getUid());
     }
 
+    std::shared_ptr<executor::ShardingTaskExecutor>& getExecutor() {
+        return _executor;
+    }
+
     executor::NetworkInterfaceMock* _network{nullptr};
 
-    std::shared_ptr<executor::ThreadPoolTaskExecutor> _threadPool;
+    std::shared_ptr<executor::ShardingTaskExecutor> _executor;
 };
 
 TEST_F(ShardingTaskExecutorTest, MissingLsidAddsLsidInCommand) {
     operationContext()->setLogicalSessionId(constructFullLsid());
     ASSERT(operationContext()->getLogicalSessionId());
-
-    auto executor = executor::ShardingTaskExecutor::create(std::move(_threadPool));
-    executor->startup();
 
     NetworkInterfaceMock::InNetworkGuard ing(_network);
 
@@ -120,8 +130,11 @@ TEST_F(ShardingTaskExecutorTest, MissingLsidAddsLsidInCommand) {
                                             << "doc"),
                                        operationContext());
 
-    TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor->scheduleRemoteCommand(
-        request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {}, nullptr));
+    TaskExecutor::CallbackHandle cbHandle =
+        unittest::assertGet(getExecutor()->scheduleRemoteCommand(
+            request,
+            [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {},
+            nullptr));
 
     ASSERT(_network->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = _network->getNextReadyRequest();
@@ -134,8 +147,6 @@ TEST_F(ShardingTaskExecutorTest, IncompleteLsidAddsLsidInCommand) {
     operationContext()->setLogicalSessionId(constructFullLsid());
     ASSERT(operationContext()->getLogicalSessionId());
 
-    auto executor = executor::ShardingTaskExecutor::create(std::move(_threadPool));
-    executor->startup();
     NetworkInterfaceMock::InNetworkGuard ing(_network);
 
     BSONObjBuilder bob;
@@ -152,8 +163,11 @@ TEST_F(ShardingTaskExecutorTest, IncompleteLsidAddsLsidInCommand) {
         bob.obj(),
         operationContext());
 
-    TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor->scheduleRemoteCommand(
-        request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {}, nullptr));
+    TaskExecutor::CallbackHandle cbHandle =
+        unittest::assertGet(getExecutor()->scheduleRemoteCommand(
+            request,
+            [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {},
+            nullptr));
 
     ASSERT(_network->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = _network->getNextReadyRequest();

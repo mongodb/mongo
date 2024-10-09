@@ -71,17 +71,30 @@ void TaskExecutorTest::setUp() {
 }
 
 void TaskExecutorTest::tearDown() {
+    shutdownExecutorThread();
+    joinExecutorThread();
     _executor.reset();
     _net = nullptr;
 }
 
+void TaskExecutorTest::runReadyNetworkOperations() {
+    executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+    getNet()->runReadyNetworkOperations();
+}
+
 void TaskExecutorTest::launchExecutorThread() {
     _executor->startup();
+    _needsShutDown = true;
     postExecutorThreadLaunch();
 }
 
 void TaskExecutorTest::shutdownExecutorThread() {
+    if (!_needsShutDown) {
+        return;
+    }
+
     _executor->shutdown();
+    runReadyNetworkOperations();
 }
 
 void TaskExecutorTest::joinExecutorThread() {

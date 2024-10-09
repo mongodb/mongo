@@ -104,6 +104,7 @@ void ThreadPoolMock::schedule(Task task) {
     }
 
     _tasks.emplace_back(std::move(task));
+    _net->signalWorkAvailable();
 }
 
 void ThreadPoolMock::_consumeOneTask(stdx::unique_lock<stdx::mutex>& lk) {

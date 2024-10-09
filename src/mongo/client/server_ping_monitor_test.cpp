@@ -94,6 +94,7 @@ protected:
     void tearDown() override {
         _topologyListener.reset();
         _executor->shutdown();
+        executor::NetworkInterfaceMock::InNetworkGuard(_net)->runReadyNetworkOperations();
         _executor->join();
         _executor.reset();
     }

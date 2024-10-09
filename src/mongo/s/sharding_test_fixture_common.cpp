@@ -79,6 +79,21 @@ void ShardingTestFixtureCommon::tearDown() {
     _opCtxHolder.reset();
 }
 
+void ShardingTestFixtureCommon::shutdownExecutorPool() {
+    auto grid = Grid::get(getServiceContext());
+
+    if (!grid || !grid->isInitialized() || !grid->getExecutorPool() || _executorPoolShutDown) {
+        return;
+    }
+    _executorPoolShutDown = true;
+
+    grid->getExecutorPool()->shutdown_forTest();
+    executor::NetworkInterfaceMock::InNetworkGuard(_mockNetwork)->runReadyNetworkOperations();
+    executor::NetworkInterfaceMock::InNetworkGuard(_mockNetworkForPool)
+        ->runReadyNetworkOperations();
+    grid->getExecutorPool()->join_forTest();
+}
+
 OperationContext* ShardingTestFixtureCommon::operationContext() const {
     invariant(_opCtxHolder,
               "ShardingTestFixtureCommon::setUp() must have been called before this method");

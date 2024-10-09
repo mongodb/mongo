@@ -680,7 +680,7 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 8}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     auto killFuture = arm->kill(operationContext());
-    executor()->shutdown();
+    shutdownExecutor();
     killFuture.wait();
 }
 
@@ -813,7 +813,7 @@ TEST_F(AsyncResultsMergerTest, NextEventAfterTaskExecutorShutdown) {
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
     auto arm = makeARMFromExistingCursors(std::move(cursors));
 
-    executor()->shutdown();
+    shutdownExecutor();
     ASSERT_EQ(ErrorCodes::ShutdownInProgress, arm->nextEvent().getStatus());
     auto killFuture = arm->kill(operationContext());
     killFuture.wait();
@@ -832,7 +832,7 @@ TEST_F(AsyncResultsMergerTest, KillAfterTaskExecutorShutdownWithOutstandingBatch
     blackHoleNextRequest();
 
     // Executor shuts down before a response is received.
-    executor()->shutdown();
+    shutdownExecutor();
     auto killFuture = arm->kill(operationContext());
     killFuture.wait();
 

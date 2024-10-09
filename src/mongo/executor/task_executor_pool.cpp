@@ -76,6 +76,20 @@ void TaskExecutorPool::shutdownAndJoin() {
     }
 }
 
+void TaskExecutorPool::shutdown_forTest() {
+    _fixedExecutor->shutdown();
+    for (auto&& exec : _executors) {
+        exec->shutdown();
+    }
+}
+
+void TaskExecutorPool::join_forTest() {
+    _fixedExecutor->join();
+    for (auto&& exec : _executors) {
+        exec->join();
+    }
+}
+
 void TaskExecutorPool::addExecutors(std::vector<std::shared_ptr<TaskExecutor>> executors,
                                     std::shared_ptr<TaskExecutor> fixedExecutor) {
     invariant(_executors.empty());

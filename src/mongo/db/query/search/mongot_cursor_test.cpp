@@ -637,6 +637,8 @@ public:
     }
 
     void DefaultStartPrefetchAfterThreeBatchesTest() {
+        std::shared_ptr<executor::TaskExecutor> pinnedExecutor;
+
         // See comments in "BasicDocsRequestedTest" for why this thread monitor setup is necessary
         // throughout the test.
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {
@@ -684,7 +686,17 @@ public:
             ASSERT_TRUE(tryWaitUntilReadyRequests());
             // Black hole the pre-fetched fourth batch since it won't be necessary.
             blackHoleNextOutgoingRequest();
+
+            // Grab shared ownership of the cursor's executor so that we can drain the killCursors
+            // command emitted from the cursor's destructor.
+            pinnedExecutor = tec->getExecutor_forTest();
         });
+
+        // Shutdown and drain the cursor's executor to avoid deadlock.
+        // TODO SERVER-93757: handle this more gracefully.
+        pinnedExecutor->shutdown();
+        Base::runReadyNetworkOperations();
+        pinnedExecutor->join();
     }
 
     /*

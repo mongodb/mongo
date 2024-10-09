@@ -33,8 +33,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -67,6 +69,9 @@ public:
     executor::NetworkInterfaceMock* getNet() {
         return _net;
     }
+
+    void runReadyNetworkOperations();
+
     TaskExecutor& getExecutor() {
         return *_executor;
     }
@@ -103,6 +108,13 @@ private:
 
     NetworkInterfaceMock* _net;
     std::shared_ptr<TaskExecutor> _executor;
+    bool _needsShutDown{false};
+
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{
+        logv2::LogComponent::kNetwork,
+        logv2::LogSeverity::Debug(NetworkInterface::kDiagnosticLogLevel)};
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardExecutor{logv2::LogComponent::kExecutor,
+                                                                  logv2::LogSeverity::Debug(3)};
 };
 
 }  // namespace executor

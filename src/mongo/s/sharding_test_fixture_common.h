@@ -73,11 +73,30 @@ protected:
     void setUp() override;
     void tearDown() override;
 
+    /**
+     * Shuts down the TaskExecutorPool and remembers that it has been shut down, so that it is not
+     * shut down again on tearDown.
+     *
+     * Not safe to call from multiple threads.
+     */
+    void shutdownExecutorPool();
+
     OperationContext* operationContext() const;
 
+    /**
+     * Returns the NetworkInterfaceMock associated with the fixed TaskExecutor.
+     */
     executor::NetworkInterfaceMock* network() const {
         invariant(_mockNetwork);
         return _mockNetwork;
+    }
+
+    /**
+     * Returns the NetworkInterfaceMock associated with the TaskExecutorPool's executors.
+     */
+    executor::NetworkInterfaceMock* networkForPool() const {
+        invariant(_mockNetworkForPool);
+        return _mockNetworkForPool;
     }
 
     RemoteCommandTargeterFactoryMock* targeterFactory() const {
@@ -108,15 +127,19 @@ protected:
     }
 
     // Since a NetworkInterface is a private member of a TaskExecutor, we store a raw pointer to the
-    // fixed TaskExecutor's NetworkInterface here.
+    // fixed and arbitrary TaskExecutors NetworkInterfaces here.
     //
     // TODO(Esha): Currently, some fine-grained synchronization of the network and task executor is
     // outside of NetworkTestEnv's capabilities. If all control of the network is done through
-    // _networkTestEnv, storing this raw pointer is not necessary.
+    // _networkTestEnv, storing these raw pointers is not necessary.
     executor::NetworkInterfaceMock* _mockNetwork{nullptr};
+    executor::NetworkInterfaceMock* _mockNetworkForPool{nullptr};
 
     // Allows for processing tasks through the NetworkInterfaceMock/ThreadPoolMock subsystem
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
+
+    // Records if a component has been shut down, so that it is only shut down once.
+    bool _executorPoolShutDown = false;
 
     // Since the RemoteCommandTargeterFactory is currently a private member of ShardFactory, we
     // store a raw pointer to it here.

@@ -48,6 +48,7 @@
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/functional.h"
@@ -212,7 +213,7 @@ public:
     /**
      * Starts asynchronous execution of the command described by "request".
      *
-     * The request mutated to append request metadata to be merged into the request messages.
+     * The provided request will be mutated to include additional metadata.
      *
      * This may throw exceptions if a command is unable to be scheduled.
      */
@@ -221,10 +222,26 @@ public:
         RemoteCommandRequest& request,
         const BatonHandle& baton = nullptr,
         const CancellationToken& token = CancellationToken::uncancelable()) = 0;
-    virtual Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                       RemoteCommandRequest& request,
-                                       RemoteCommandOnReplyFn&& onReply,
-                                       const BatonHandle& baton = nullptr) = 0;
+
+    /**
+     * Starts asynchronous execution of the exhaust command described by "request", returning an
+     * ExhaustResponseReader which may be used to receive responses pushed by the remote.
+     *
+     * The provided request will be mutated to include additional metadata.
+     *
+     * This may throw exceptions if a command is unable to be scheduled.
+     *
+     * The cancellation token passed to this method will be forwarded to the returned
+     * ExhaustResponseReader, so the source that produced that token can be used to cancel any
+     * requests made by the ExhaustResponseReader. Once the source has been canceled, the entire
+     * exhaust command is canceled and no further responses can be read.
+     */
+    virtual SemiFuture<std::shared_ptr<NetworkInterface::ExhaustResponseReader>>
+    startExhaustCommand(
+        const TaskExecutor::CallbackHandle& cbHandle,
+        RemoteCommandRequest& request,
+        const BatonHandle& baton = nullptr,
+        const CancellationToken& cancelToken = CancellationToken::uncancelable()) = 0;
 
     /**
      * Requests cancellation of the network activity associated with "cbHandle" if it has not yet

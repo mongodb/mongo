@@ -151,7 +151,7 @@ ShardingTestFixture::ShardingTestFixture(
 
     auto netForPool = std::make_unique<executor::NetworkInterfaceMock>();
     netForPool->setEgressMetadataHook(makeShardingEgressHooksList(service));
-    auto _mockNetworkForPool = netForPool.get();
+    _mockNetworkForPool = netForPool.get();
     auto execForPool = makeShardingTestExecutor(std::move(netForPool));
     _networkTestEnvForPool =
         std::make_unique<NetworkTestEnv>(execForPool.get(), _mockNetworkForPool);
@@ -219,9 +219,7 @@ ShardingTestFixture::ShardingTestFixture(
 
 ShardingTestFixture::~ShardingTestFixture() {
     if (auto grid = Grid::get(getServiceContext())) {
-        if (grid->getExecutorPool()) {
-            grid->getExecutorPool()->shutdownAndJoin();
-        }
+        shutdownExecutorPool();
         if (grid->shardRegistry()) {
             grid->shardRegistry()->shutdown();
         }
@@ -234,8 +232,11 @@ std::shared_ptr<RemoteCommandTargeterMock> ShardingTestFixture::configTargeter()
 }
 
 void ShardingTestFixture::shutdownExecutor() {
-    if (_fixedExecutor)
-        _fixedExecutor->shutdown();
+    if (!_fixedExecutor) {
+        return;
+    }
+    _fixedExecutor->shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(_mockNetwork)->runReadyNetworkOperations();
 }
 
 ShardingCatalogClient* ShardingTestFixture::catalogClient() const {

@@ -71,6 +71,7 @@ protected:
 
     void tearDown() override {
         _coordinatorCatalog->onStepDown();
+        advanceClockAndExecuteScheduledTasks();
         _coordinatorCatalog.reset();
 
         TransactionCoordinatorTestFixture::tearDown();
@@ -190,6 +191,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
 
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(coordinator1InCatalog->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
@@ -265,6 +267,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
 
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(coordinator1InCatalog->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
@@ -279,6 +282,7 @@ TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalo
     auto coordinator = _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter);
 
     coordinator->cancelIfCommitNotYetStarted();
+    advanceClockAndExecuteScheduledTasks();
     coordinator->onCompletion().wait();
 
     // Wait for the coordinator to be removed before attempting to call getLatestOnSession() since
@@ -343,6 +347,7 @@ TEST_F(
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
 
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(coordinator1InCatalog->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
@@ -378,13 +383,16 @@ TEST_F(
 
     assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
     assertCommandSentAndRespondWith("commitTransaction", kOk, boost::none);
+    advanceClockAndExecuteScheduledTasks();
     coordinator1->onCompletion().get();
 
     coordinator2->cancelIfCommitNotYetStarted();
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(coordinator2->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::TransactionCoordinatorCanceled);
     coordinator2->shutdown();
+    advanceClockAndExecuteScheduledTasks();
 }
 
 TEST_F(TransactionCoordinatorCatalogTest,
@@ -417,9 +425,11 @@ TEST_F(TransactionCoordinatorCatalogTest,
                        6032301);
 
     assertCommandSentAndRespondWith("commitTransaction", kOk, boost::none);
+    advanceClockAndExecuteScheduledTasks();
     coordinator1->onCompletion().get();
 
     coordinator2->cancelIfCommitNotYetStarted();
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(coordinator2->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::TransactionCoordinatorCanceled);

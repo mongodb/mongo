@@ -199,6 +199,8 @@ public:
         return _options.yieldPolicy.get();
     }
 
+    std::shared_ptr<executor::TaskExecutor> getExecutor_forTest();
+
 private:
     /**
      * Runs a remote command and pipes the output back to this object

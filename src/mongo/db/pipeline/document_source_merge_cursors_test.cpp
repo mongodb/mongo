@@ -348,8 +348,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldNotKillCursorsIfTheyAreNotOwned) {
 
     pipeline.reset();  // Delete the pipeline before using it.
 
-    network()->enterNetwork();
-    ASSERT_FALSE(network()->hasReadyRequests());
+    ASSERT_FALSE(executor::NetworkInterfaceMock::InNetworkGuard(network())->hasReadyRequests());
 }
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {

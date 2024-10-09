@@ -82,6 +82,7 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
@@ -1091,94 +1092,25 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest,
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
-class ExhaustRequestHandlerUtil {
-public:
-    struct responseOutcomeCount {
-        int _success = 0;
-        int _failed = 0;
-    };
-
-    std::function<void(const RemoteCommandResponse&)>&& getExhaustRequestCallbackFn() {
-        return std::move(_callbackFn);
-    }
-
-    ExhaustRequestHandlerUtil::responseOutcomeCount getCountersWhenReady() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        _cv.wait(_mutex, [&] { return _replyUpdated; });
-        _replyUpdated = false;
-        return _responseOutcomeCount;
-    }
-
-private:
-    // set to true once '_responseOutcomeCount' has been updated. Used to indicate that a new
-    // response has been sent.
-    bool _replyUpdated = false;
-
-    // counter of how many successful and failed responses were received.
-    responseOutcomeCount _responseOutcomeCount;
-
-    stdx::mutex _mutex;
-    stdx::condition_variable _cv;
-
-    // called when a server sends a new isMaster exhaust response. Updates _responseOutcomeCount
-    // and _replyUpdated.
-    std::function<void(const RemoteCommandResponse&)> _callbackFn =
-        [&](const executor::RemoteCommandResponse& response) {
-            {
-                stdx::unique_lock<stdx::mutex> lk(_mutex);
-                if (response.status.isOK()) {
-                    _responseOutcomeCount._success++;
-                } else {
-                    _responseOutcomeCount._failed++;
-                }
-                _replyUpdated = true;
-            }
-
-            _cv.notify_all();
-        };
-};
-
 TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldReceiveMultipleResponses) {
+    CancellationSource cancelSource;
     auto isMasterCmd = BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
                                        << TopologyVersion(OID::max(), 0).toBSON());
 
     auto request = makeTestCommand(kNoTimeout, isMasterCmd);
     auto cbh = makeCallbackHandle();
-    ExhaustRequestHandlerUtil exhaustRequestHandler;
+    auto reader = net().startExhaustCommand(cbh, request, nullptr, cancelSource.token()).get();
 
-    auto exhaustFuture = startExhaustCommand(
-        cbh, std::move(request), exhaustRequestHandler.getExhaustRequestCallbackFn());
+    // The server sends a response either when a topology change occurs or when it has not sent
+    // a response in 'maxAwaitTimeMS'. In this case we expect a response every 'maxAwaitTimeMS'
+    // = 1000 (set in the isMaster cmd above)
+    assertOK(reader->next().getNoThrow());
+    assertOK(reader->next().getNoThrow());
 
-    {
-        // The server sends a response either when a topology change occurs or when it has not sent
-        // a response in 'maxAwaitTimeMS'. In this case we expect a response every 'maxAwaitTimeMS'
-        // = 1000 (set in the isMaster cmd above)
-        auto counters = exhaustRequestHandler.getCountersWhenReady();
-        ASSERT(!exhaustFuture.isReady());
-
-        // The first response should be successful
-        ASSERT_EQ(counters._success, 1);
-        ASSERT_EQ(counters._failed, 0);
-    }
-
-    {
-        auto counters = exhaustRequestHandler.getCountersWhenReady();
-        ASSERT(!exhaustFuture.isReady());
-
-        // The second response should also be successful
-        ASSERT_EQ(counters._success, 2);
-        ASSERT_EQ(counters._failed, 0);
-    }
-
-    cancelCommand(cbh);
-    auto error = exhaustFuture.getNoThrow();
-    ASSERT((error == ErrorCodes::CallbackCanceled) || (error == ErrorCodes::HostUnreachable));
-
-    auto counters = exhaustRequestHandler.getCountersWhenReady();
-
-    // The command was cancelled so the 'fail' counter should be incremented
-    ASSERT_EQ(counters._success, 2);
-    ASSERT_EQ(counters._failed, 1);
+    cancelSource.cancel();
+    auto swResp = reader->next().getNoThrow();
+    ASSERT_OK(swResp);
+    ASSERT_EQ(swResp.getValue().status, ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldStopOnFailure) {
@@ -1207,49 +1139,13 @@ TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldStopOnFailure) {
 
     auto request = makeTestCommand(kNoTimeout, isMasterCmd);
     auto cbh = makeCallbackHandle();
-    ExhaustRequestHandlerUtil exhaustRequestHandler;
 
-    auto exhaustFuture = startExhaustCommand(
-        cbh, std::move(request), exhaustRequestHandler.getExhaustRequestCallbackFn());
+    auto reader = net().startExhaustCommand(cbh, request).get();
+    auto failedResp = reader->next().get();
+    ASSERT_EQ(getStatusFromCommandResult(failedResp.data), ErrorCodes::CommandFailed);
+    ASSERT_FALSE(failedResp.moreToCome);
 
-    {
-        auto counters = exhaustRequestHandler.getCountersWhenReady();
-        // Despite the command failing with ok: 0, the overall interaction is considered successful
-        // from a networking perspective.
-        ASSERT_OK(exhaustFuture.getNoThrow());
-        ASSERT_EQ(counters._success, 1);
-        ASSERT_EQ(counters._failed, 0);
-    }
-}
-
-TEST_F(NetworkInterfaceTest, ExhaustCommandCancelRunsOutOfLine) {
-    thread_local bool inCancellationContext = false;
-    auto pf = makePromiseFuture<bool>();
-    auto cbh = makeCallbackHandle();
-    auto callback = [&](auto&&) mutable {
-        pf.promise.emplaceValue(inCancellationContext);
-    };
-
-    auto deferred = [&] {
-        FailPointEnableBlock fpb("networkInterfaceHangCommandsAfterAcquireConn");
-
-        auto deferred = startExhaustCommand(
-            cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()), std::move(callback));
-
-        waitForHello();
-
-        fpb->waitForTimesEntered(interruptible(), fpb.initialTimesEntered() + 1);
-
-        inCancellationContext = true;
-        cancelCommand(cbh);
-        inCancellationContext = false;
-        return deferred;
-    }();
-
-    auto result = deferred.getNoThrow();
-    ASSERT_EQ(ErrorCodes::CallbackCanceled, result);
-    bool cancellationRanInline = pf.future.get();
-    ASSERT_FALSE(cancellationRanInline);
+    ASSERT_EQ(reader->next().get().status, ErrorCodes::ExhaustCommandFinished);
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TearDownWaitsForInProgress) {

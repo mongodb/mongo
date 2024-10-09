@@ -56,11 +56,13 @@ namespace mongo {
 namespace executor {
 
 ExhaustResponseReaderTL::ExhaustResponseReaderTL(RemoteCommandRequest originatingRequest,
+                                                 RemoteCommandResponse initialResponse,
                                                  ConnectionPool::ConnectionHandle conn,
                                                  std::shared_ptr<Baton> baton,
                                                  std::shared_ptr<transport::Reactor> reactor,
                                                  const CancellationToken& token)
     : _originatingRequest(std::move(originatingRequest)),
+      _initialResponse(std::move(initialResponse)),
       _conn(std::move(conn)),
       _baton(std::move(baton)),
       _reactor(std::move(reactor)),
@@ -80,20 +82,6 @@ ExhaustResponseReaderTL::ExhaustResponseReaderTL(RemoteCommandRequest originatin
                         "requestId"_attr = request.id,
                         "request"_attr = redact(request.toString()));
         });
-}
-
-std::shared_ptr<NetworkInterface::ExhaustResponseReader> ExhaustResponseReaderTL::make_forTest(
-    RemoteCommandRequest originatingRequest,
-    ConnectionPool::ConnectionHandle conn,
-    std::shared_ptr<Baton> baton,
-    std::shared_ptr<transport::Reactor> reactor,
-    const CancellationToken& token) {
-    return std::shared_ptr<ExhaustResponseReaderTL>(
-        new ExhaustResponseReaderTL(std::move(originatingRequest),
-                                    std::move(conn),
-                                    std::move(baton),
-                                    std::move(reactor),
-                                    token));
 }
 
 ExhaustResponseReaderTL::~ExhaustResponseReaderTL() {
@@ -124,7 +112,9 @@ void ExhaustResponseReaderTL::_recordConnectionOutcome(Status outcome) {
 }
 
 Future<RemoteCommandResponse> ExhaustResponseReaderTL::_read() {
-    if (_finished.load()) {
+    if (_initialResponse) {
+        return std::exchange(_initialResponse, {}).value();
+    } else if (_finished.load()) {
         return Status(ErrorCodes::ExhaustCommandFinished,
                       "No further exhaust responses available to read");
     }

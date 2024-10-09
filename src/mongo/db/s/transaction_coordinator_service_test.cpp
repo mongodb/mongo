@@ -64,6 +64,9 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -339,6 +342,8 @@ TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepUpRecoverTxnRetryCou
     assertPrepareSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
     ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
               static_cast<int>(txn::CommitDecision::kCommit));
 }
@@ -351,12 +356,14 @@ TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepDownBeforeStepUpTask
     // Should cancel all outstanding tasks (including the recovery task started by onStepUp above,
     // which has not yet run)
     service()->onStepDown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     // Do another onStepUp to ensure it runs successfully
     service()->onStepUp(operationContext());
 
     // Step-down the service so that the destructor does not complain
     service()->onStepDown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 }
 
 class TransactionCoordinatorServiceTest : public TransactionCoordinatorServiceTestFixture {
@@ -369,6 +376,7 @@ protected:
 
     void tearDown() override {
         service()->onStepDown();
+        executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
         service()->joinPreviousRound();
 
         TransactionCoordinatorServiceTestFixture::tearDown();
@@ -419,6 +427,17 @@ TEST_F(TransactionCoordinatorServiceTest,
         decisionFuture.get();
     }
 
+    // Need to run network operations in another thread, since the exception handling path of
+    // createCoordinator both cancels the commit and then waits for that cancellation to complete,
+    // which requires the network interface to make progress.
+    Atomic<bool> createDone{false};
+    auto networkThread = stdx::thread([&] {
+        while (!createDone.load()) {
+            executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+            sleepFor(Milliseconds(5));
+        }
+    });
+    ScopeGuard join([&] { networkThread.join(); });
     TxnNumberAndRetryCounter otherTxnNumberAndRetryCounter{
         _txnNumberAndRetryCounter.getTxnNumber(),
         *_txnNumberAndRetryCounter.getTxnRetryCounter() + 1};
@@ -427,6 +446,9 @@ TEST_F(TransactionCoordinatorServiceTest,
             operationContext(), _lsid, otherTxnNumberAndRetryCounter, kCommitDeadline),
         AssertionException,
         6032301);
+    createDone.store(true);
+    join.dismiss();
+    networkThread.join();
 
     auto completionFuture =
         *coordinatorService->recoverCommit(operationContext(), _lsid, _txnNumberAndRetryCounter);
@@ -652,6 +674,8 @@ TEST_F(TransactionCoordinatorServiceTest,
     coordinatorService->createCoordinator(
         operationContext(), _lsid, newTxnNumberAndRetryCounter, kCommitDeadline);
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
     ASSERT_THROWS_CODE(
         commitDecisionFuture.get(), AssertionException, ErrorCodes::TransactionCoordinatorCanceled);
 }
@@ -677,6 +701,8 @@ TEST_F(
     auto oldTxnCommitCompletionFuture = coordinatorService->coordinateCommit(
         operationContext(), _lsid, _txnNumberAndRetryCounter, kTwoShardIdSet);
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
     // The old transaction should now be canceled.
     if (oldTxnCommitCompletionFuture) {
         ASSERT_THROWS_CODE(oldTxnCommitCompletionFuture->get(),
@@ -697,6 +723,17 @@ TEST_F(TransactionCoordinatorServiceTest,
     auto completionFuture = *coordinatorService->coordinateCommit(
         operationContext(), _lsid, _txnNumberAndRetryCounter, kOneShardIdSet);
 
+    // Need to run network operations in another thread, since the exception handling path of
+    // createCoordinator both cancels the commit and then waits for that cancellation to complete,
+    // which requires the network interface to make progress.
+    Atomic<bool> createDone{false};
+    auto networkThread = stdx::thread([&] {
+        while (!createDone.load()) {
+            executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+            sleepFor(Milliseconds(5));
+        }
+    });
+    ScopeGuard join([&] { networkThread.join(); });
     TxnNumberAndRetryCounter newTxnNumberAndRetryCounter{
         _txnNumberAndRetryCounter.getTxnNumber(),
         *_txnNumberAndRetryCounter.getTxnRetryCounter() + 1};
@@ -704,9 +741,13 @@ TEST_F(TransactionCoordinatorServiceTest,
                            operationContext(), _lsid, newTxnNumberAndRetryCounter, kCommitDeadline),
                        AssertionException,
                        6032300);
+    createDone.store(true);
+    join.dismiss();
+    networkThread.join();
 
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(completionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 

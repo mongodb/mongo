@@ -469,6 +469,9 @@ TEST_F(AbstractAsyncComponentTest,
     auto handle =
         unittest::assertGet(executor->scheduleWorkAt(executor->now() + Seconds(1), callback));
     component.cancelHandle_forTest(handle);
+    getNet()->enterNetwork();
+    getNet()->runReadyNetworkOperations();
+    getNet()->exitNetwork();
     executor->wait(handle);
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status);
 }

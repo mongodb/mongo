@@ -324,6 +324,12 @@ TEST_F(PinnedConnectionTaskExecutorTest, CancelNonRPC) {
     auto cbHandle = swCbHandle.getValue();
     pinnedTE->cancel(cbHandle);
 
+    // Process the NetworkInterface timer's cancellation.
+    {
+        NetworkInterfaceMock::InNetworkGuard ing(getNet());
+        getNet()->runReadyNetworkOperations();
+    }
+
     ASSERT_EQ(pf.future.getNoThrow(), TaskExecutor::kCallbackCanceledErrorStatus);
 
     pinnedTE->shutdown();

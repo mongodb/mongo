@@ -130,8 +130,8 @@ void SyncSourceResolverTest::setUp() {
 }
 
 void SyncSourceResolverTest::tearDown() {
-    getExecutor().shutdown();
-    getExecutor().join();
+    shutdownExecutorThread();
+    joinExecutorThread();
 
     _resolver.reset();
     _selector.reset();
@@ -381,7 +381,7 @@ TEST_F(SyncSourceResolverTest,
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
-    getExecutor().shutdown();
+    shutdownExecutorThread();
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());

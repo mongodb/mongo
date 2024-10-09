@@ -317,6 +317,10 @@ public:
 
     void tearDown() override {
         _threadPoolExecutorMock->shutdown();
+        {
+            executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+            getNet()->runReadyNetworkOperations();
+        }
         _threadPoolExecutorMock->join();
 
         auto authFp = globalFailPointRegistry().find("skipTenantMigrationRecipientAuth");

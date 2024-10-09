@@ -160,6 +160,7 @@ env.CppUnitTest(
 env.CppIntegrationTest(
     target="executor_integration_test",
     source=[
+        "executor_integration_test_fixture.cpp",
         "exhaust_response_reader_integration_test.cpp",
         "network_interface_integration_test.cpp",
         "task_executor_cursor_integration_test.cpp",

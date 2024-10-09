@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/baton.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
@@ -58,7 +59,6 @@ class ThreadPoolInterface;
 namespace executor {
 
 struct ConnectionPoolStats;
-class NetworkInterface;
 
 /**
  * Implementation of a TaskExecutor that uses a pool of threads to execute work items.
@@ -120,8 +120,7 @@ public:
     void appendNetworkInterfaceStats(BSONObjBuilder&) const override;
 
     /**
-     * Returns true if there are any tasks in any of _poolInProgressQueue, _networkInProgressQueue,
-     * or _sleepersQueue.
+     * Returns true if there are any tasks currently running or waiting to run.
      */
     bool hasTasks() override;
 
@@ -132,8 +131,10 @@ public:
 
 private:
     class CallbackState;
+    struct LocalCallbackState;
+    struct RemoteCallbackState;
     class EventState;
-    using WorkQueue = std::list<std::shared_ptr<CallbackState>>;
+
     using EventList = std::list<std::shared_ptr<EventState>>;
 
     /**
@@ -161,21 +162,9 @@ private:
      * makeEvent().
      */
     static EventList makeSingletonEventList();
+    StatusWith<CallbackHandle> _registerCallbackState(std::shared_ptr<CallbackState> cbState);
 
-    /**
-     * Returns an object suitable for passing to enqueueCallbackState_inlock that represents
-     * executing "work" no sooner than "when" (defaults to ASAP). This function may and should be
-     * called outside of _mutex.
-     */
-    static WorkQueue makeSingletonWorkQueue(CallbackFn work,
-                                            const BatonHandle& baton,
-                                            Date_t when = {});
-
-    /**
-     * Moves the single callback in "wq" to the end of "queue". It is required that "wq" was
-     * produced via a call to makeSingletonWorkQueue().
-     */
-    StatusWith<CallbackHandle> enqueueCallbackState_inlock(WorkQueue* queue, WorkQueue* wq);
+    void _unregisterCallbackState(const std::shared_ptr<CallbackState>& cbState);
 
     /**
      * Signals the given event.
@@ -183,48 +172,20 @@ private:
     void signalEvent_inlock(const EventHandle& event, stdx::unique_lock<stdx::mutex> lk);
 
     /**
-     * Schedules all items from "fromQueue" into the thread pool and moves them into
-     * _poolInProgressQueue.
-     */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue, stdx::unique_lock<stdx::mutex> lk);
-
-    /**
-     * Schedules the given item from "fromQueue" into the thread pool and moves it into
-     * _poolInProgressQueue.
-     */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue,
-                                 boost::optional<WorkQueue::iterator> iter,
-                                 stdx::unique_lock<stdx::mutex> lk);
-
-    /**
-     * Schedules entries from "begin" through "end" in "fromQueue" into the thread pool
-     * and moves them into _poolInProgressQueue.
-     */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue,
-                                 boost::optional<WorkQueue::iterator>& begin,
-                                 boost::optional<WorkQueue::iterator>& end,
-                                 stdx::unique_lock<stdx::mutex> lk);
-
-    /**
-     * Schedules cbState into the thread pool and places it into _poolInProgressQueue. Does not
-     * remove the entry from the original queue.
-     */
-    void scheduleExhaustIntoPool_inlock(std::shared_ptr<CallbackState> cbState,
-                                        stdx::unique_lock<stdx::mutex> lk);
-    /**
      * Executes the callback specified by "cbState".
      */
-    void runCallback(std::shared_ptr<CallbackState> cbState);
+    void runCallback(std::shared_ptr<LocalCallbackState> cbState, Status s);
 
-    /**
-     * Executes the callback specified by "cbState". Will not mark cbState as finished.
-     */
-    void runCallbackExhaust(std::shared_ptr<CallbackState> cbState,
-                            WorkQueue::iterator expectedExhaustIter);
+    TaskExecutor::RemoteCommandCallbackArgs makeRemoteCallbackArgs(
+        const CallbackHandle& cbHandle,
+        const RemoteCallbackState& cbState,
+        StatusWith<RemoteCommandResponse> swr);
 
     bool _inShutdown_inlock() const;
     void _setState_inlock(State newState);
-    stdx::unique_lock<stdx::mutex> _join(stdx::unique_lock<stdx::mutex> lk);
+    void _continueExhaustCommand(CallbackHandle cbHandle,
+                                 std::shared_ptr<RemoteCallbackState> cbState,
+                                 std::shared_ptr<NetworkInterface::ExhaustResponseReader> rdr);
 
     // The network interface used for remote command execution and waiting.
     std::shared_ptr<NetworkInterface> _net;
@@ -235,17 +196,19 @@ private:
     // Mutex guarding all remaining fields.
     mutable stdx::mutex _mutex;
 
-    // Queue containing all items currently scheduled into the thread pool but not yet completed.
-    WorkQueue _poolInProgressQueue;
-
-    // Queue containing all items currently scheduled into the network interface.
-    WorkQueue _networkInProgressQueue;
-
-    // Queue containing all items waiting for a particular point in time to execute.
-    WorkQueue _sleepersQueue;
-
     // List of all events that have yet to be signaled.
     EventList _unsignaledEvents;
+
+    // List of all callbacks that have yet to be fully completed. This includes those that are
+    // actively running, those that are waiting to run, and those that are waiting on the network
+    // for responses. join() will not return until this list is empty.
+    std::list<std::shared_ptr<CallbackState>> _inProgress;
+
+    // Number of tasks that are waiting for a particular point in time to execute.
+    Atomic<size_t> _sleepers;
+
+    // Number of networking tasks are in progress.
+    Atomic<size_t> _networkInProgress;
 
     // Lifecycle state of this executor.
     stdx::condition_variable _stateChange;

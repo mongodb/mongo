@@ -112,10 +112,11 @@ public:
         RemoteCommandRequest& request,
         const BatonHandle& baton,
         const CancellationToken& token) override;
-    Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                               RemoteCommandRequest& request,
-                               RemoteCommandOnReplyFn&& onReply,
-                               const BatonHandle& baton) override;
+    SemiFuture<std::shared_ptr<NetworkInterface::ExhaustResponseReader>> startExhaustCommand(
+        const TaskExecutor::CallbackHandle& cbHandle,
+        RemoteCommandRequest& request,
+        const BatonHandle& baton,
+        const CancellationToken& cancelToken) override;
 
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
                        const BatonHandle& baton) override;
@@ -166,7 +167,6 @@ private:
      * remote command. As part of running a remote command, `NITL` sends out a request
      * to the specified target.
      */
-
     struct CommandStateBase : public std::enable_shared_from_this<CommandStateBase> {
         CommandStateBase(NetworkInterfaceTL* interface_,
                          RemoteCommandRequest request_,
@@ -175,16 +175,13 @@ private:
                          const CancellationToken& token);
         virtual ~CommandStateBase();
 
-        using ConnectionHandle = std::shared_ptr<ConnectionPool::ConnectionHandle::element_type>;
-        using WeakConnectionHandle = std::weak_ptr<ConnectionPool::ConnectionHandle::element_type>;
-
-        SemiFuture<ConnectionPool::ConnectionHandle> getConnection(
-            std::shared_ptr<ConnectionPool> pool);
+        SemiFuture<ConnectionPool::ConnectionHandle> getConnection(ConnectionPool& pool);
 
         Status handleConnectionAcquisitionError(Status status);
 
         ExecutorFuture<RemoteCommandResponse> sendRequest(ConnectionPool::ConnectionHandle conn);
-        virtual Future<RemoteCommandResponse> sendRequestImpl(RemoteCommandRequest toSend) = 0;
+        virtual ExecutorFuture<RemoteCommandResponse> sendRequestImpl(
+            RemoteCommandRequest toSend) = 0;
 
         /**
          * Return the current connection to the pool and unset it locally.
@@ -202,7 +199,7 @@ private:
         /**
          * Return the client for a given connection
          */
-        static AsyncDBClient* getClient(const ConnectionHandle& conn) noexcept;
+        static AsyncDBClient* getClient(const ConnectionPool::ConnectionHandle& conn) noexcept;
 
         /**
          * Cancel the operation with the provided status.
@@ -213,7 +210,13 @@ private:
          * Run the NetworkInterface's MetadataHook on a given request if this Command isn't already
          * finished.
          */
-        Status doMetadataHook(const RemoteCommandResponse& response);
+        void doMetadataHook(const RemoteCommandResponse& response);
+
+        /**
+         * Returns a GuaranteedExecutor that schedules work on the Baton associated with this
+         * CommandStateBase if available or on the reactor otherwise.
+         */
+        ExecutorPtr makeGuaranteedExecutor();
 
         NetworkInterfaceTL* interface;
 
@@ -228,7 +231,7 @@ private:
         BatonHandle baton;
         std::unique_ptr<transport::ReactorTimer> timer;
 
-        ConnectionHandle conn;
+        ConnectionPool::ConnectionHandle conn;
 
         CancellationSource cancelSource;
 
@@ -238,29 +241,16 @@ private:
     };
 
     struct CommandState final : public CommandStateBase {
-        CommandState(NetworkInterfaceTL* interface,
-                     RemoteCommandRequest request,
-                     const TaskExecutor::CallbackHandle& cbHandle,
-                     const BatonHandle& baton,
-                     const CancellationToken& token = CancellationToken::uncancelable())
-            : CommandStateBase(interface, std::move(request), cbHandle, baton, token) {}
+        using CommandStateBase::CommandStateBase;
         ~CommandState() override = default;
-
-        Future<RemoteCommandResponse> sendRequestImpl(RemoteCommandRequest toSend) override;
+        ExecutorFuture<RemoteCommandResponse> sendRequestImpl(RemoteCommandRequest toSend) override;
     };
 
     struct ExhaustCommandState final : public CommandStateBase {
-        ExhaustCommandState(NetworkInterfaceTL* interface,
-                            RemoteCommandRequest request,
-                            const TaskExecutor::CallbackHandle& cbHandle,
-                            const BatonHandle& baton,
-                            RemoteCommandOnReplyFn&& onReply,
-                            const CancellationToken& token = CancellationToken::uncancelable())
-            : CommandStateBase(interface, std::move(request), cbHandle, baton, token),
-              onReplyFn(std::move(onReply)) {}
+        using CommandStateBase::CommandStateBase;
         ~ExhaustCommandState() override = default;
 
-        Future<RemoteCommandResponse> sendRequestImpl(RemoteCommandRequest toSend) override;
+        ExecutorFuture<RemoteCommandResponse> sendRequestImpl(RemoteCommandRequest toSend) override;
 
         void continueExhaustRequest(StatusWith<RemoteCommandResponse> swResponse);
 

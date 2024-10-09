@@ -43,6 +43,7 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
@@ -171,6 +172,12 @@ protected:
     CancellationToken _cancellationToken{CancellationToken::uncancelable()};
 
 private:
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{
+        logv2::LogComponent::kNetwork,
+        logv2::LogSeverity::Debug(NetworkInterface::kDiagnosticLogLevel)};
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardExecutor{logv2::LogComponent::kExecutor,
+                                                                  logv2::LogSeverity::Debug(3)};
+
     std::shared_ptr<NetworkTestEnv> _networkTestEnv;
     std::shared_ptr<TaskExecutor> _executor;
     std::shared_ptr<NetworkInterfaceMock> _net;

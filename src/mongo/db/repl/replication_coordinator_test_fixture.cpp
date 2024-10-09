@@ -75,6 +75,7 @@
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -502,8 +503,25 @@ void ReplCoordTest::runSingleNodeElection(OperationContext* opCtx) {
 
 void ReplCoordTest::shutdown(OperationContext* opCtx) {
     invariant(_callShutdown);
+    _callShutdown = false;
+
+    if (!_repl->getSettings().isReplSet()) {
+        return;
+    }
+
     _net->exitNetwork();
-    _repl->shutdown(opCtx, nullptr /* shutdownTimeElapsedBuilder */);
+
+    // ReplCoordinator shutdown shuts down the ThreadPoolTaskExecutor and joins it, but we need to
+    // advance the NetworkInterfaceMock "thread" to complete cancellation tasks created during
+    // shutdown. To achieve this, we shut down the coordinator in a separate thread. We use the fail
+    // point as signal for when the main thread can consume networking tasks.
+    boost::optional<FailPointEnableBlock> fp("tpteHangsBeforeDrainingCallbacks");
+    auto shutdownThread =
+        stdx::thread([&] { _repl->shutdown(opCtx, nullptr /* shutdownTimeElapsedBuilder */); });
+    ON_BLOCK_EXIT([&] { shutdownThread.join(); });
+    (*fp)->waitForTimesEntered(fp->initialTimesEntered() + 1);
+    NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
+    fp.reset();
     _callShutdown = false;
 }
 

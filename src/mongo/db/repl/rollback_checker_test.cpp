@@ -73,7 +73,6 @@ protected:
 void RollbackCheckerTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     launchExecutorThread();
-    getNet()->enterNetwork();
     _rollbackChecker = std::make_unique<RollbackChecker>(&getExecutor(), HostAndPort());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _hasRolledBackResult = {ErrorCodes::NotYetInitialized, ""};
@@ -120,9 +119,12 @@ TEST_F(RollbackCheckerTest, reset) {
     ASSERT(cbh);
 
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    getNet()->scheduleSuccessfulResponse(commandResponse);
-    getNet()->runReadyNetworkOperations();
-    getNet()->exitNetwork();
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->scheduleSuccessfulResponse(commandResponse);
+        getNet()->runReadyNetworkOperations();
+    }
 
     getExecutor().wait(cbh);
     ASSERT_EQUALS(getRollbackChecker()->getBaseRBID(), 3);
@@ -138,8 +140,11 @@ TEST_F(RollbackCheckerTest, RollbackRBID) {
     auto refreshCBH = unittest::assertGet(getRollbackChecker()->reset(callback));
     ASSERT(refreshCBH);
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    getNet()->scheduleSuccessfulResponse(commandResponse);
-    getNet()->runReadyNetworkOperations();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->scheduleSuccessfulResponse(commandResponse);
+        getNet()->runReadyNetworkOperations();
+    }
     getExecutor().wait(refreshCBH);
     ASSERT_EQUALS(getRollbackChecker()->getBaseRBID(), 3);
     {
@@ -154,9 +159,11 @@ TEST_F(RollbackCheckerTest, RollbackRBID) {
     ASSERT(rbCBH);
 
     commandResponse = BSON("ok" << 1 << "rbid" << 4);
-    getNet()->scheduleSuccessfulResponse(commandResponse);
-    getNet()->runReadyNetworkOperations();
-    getNet()->exitNetwork();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->scheduleSuccessfulResponse(commandResponse);
+        getNet()->runReadyNetworkOperations();
+    }
 
     getExecutor().wait(rbCBH);
     ASSERT_EQUALS(getRollbackChecker()->getLastRBID_forTest(), 4);
@@ -176,8 +183,11 @@ TEST_F(RollbackCheckerTest, NoRollbackRBID) {
     auto refreshCBH = unittest::assertGet(getRollbackChecker()->reset(callback));
     ASSERT(refreshCBH);
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    getNet()->scheduleSuccessfulResponse(commandResponse);
-    getNet()->runReadyNetworkOperations();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->scheduleSuccessfulResponse(commandResponse);
+        getNet()->runReadyNetworkOperations();
+    }
     getExecutor().wait(refreshCBH);
     ASSERT_EQUALS(getRollbackChecker()->getBaseRBID(), 3);
     {
@@ -192,9 +202,11 @@ TEST_F(RollbackCheckerTest, NoRollbackRBID) {
     ASSERT(rbCBH);
 
     commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    getNet()->scheduleSuccessfulResponse(commandResponse);
-    getNet()->runReadyNetworkOperations();
-    getNet()->exitNetwork();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->scheduleSuccessfulResponse(commandResponse);
+        getNet()->runReadyNetworkOperations();
+    }
 
     getExecutor().wait(rbCBH);
     ASSERT_EQUALS(getRollbackChecker()->getLastRBID_forTest(), 3);

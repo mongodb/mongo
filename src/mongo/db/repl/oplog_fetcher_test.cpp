@@ -660,7 +660,7 @@ TEST_F(OplogFetcherTest, ShuttingExecutorDownAfterStartupButBeforeRunQuerySchedu
     ASSERT_OK(oplogFetcher->startup());
     ASSERT_TRUE(oplogFetcher->isActive());
 
-    getExecutor().shutdown();
+    shutdownExecutorThread();
 
     oplogFetcher->join();
 
@@ -686,6 +686,8 @@ TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeRunQ
     ASSERT_TRUE(oplogFetcher->isActive());
 
     oplogFetcher->shutdown();
+    // Deliver cancellation signal to callback.
+    executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
 
     oplogFetcher->join();
 
@@ -701,6 +703,8 @@ TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownAfterRunQu
     auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
 
     oplogFetcher->shutdown();
+    // Deliver cancellation signal to callback.
+    executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
 
     oplogFetcher->join();
 
@@ -723,6 +727,8 @@ TEST_F(OplogFetcherTest, OplogFetcherShutsDownConnectionIfShutdownWhileBlockedOn
     ASSERT_TRUE(blockedOnNetworkSoon(mockConn));
 
     oplogFetcher->shutdown();
+    // Deliver cancellation signal to callback.
+    executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
 
     oplogFetcher->join();
 
