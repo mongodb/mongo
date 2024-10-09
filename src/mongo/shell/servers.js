@@ -1479,6 +1479,23 @@ function appendSetParameterArgs(argArray) {
                 argArray.push(...["--setParameter", "backtraceLogFile=" + backtraceLogFilePath]);
             }
 
+            if (programMajorMinorVersion >= 800) {
+                const parameters = jsTest.options().setParameters;
+                const reshardingDefaults = {
+                    'reshardingDelayBeforeRemainingOperationTimeQueryMillis': 0
+                };
+
+                Object.entries(reshardingDefaults).forEach(([key, value]) => {
+                    const keyIsNotParameter =
+                        (parameters === undefined || parameters[key] === undefined);
+                    const keyIsNotArgument = !argArrayContainsSetParameterValue(`${key}=`);
+
+                    if (keyIsNotParameter && keyIsNotArgument) {
+                        argArray.push('--setParameter', `${key}=${value}`);
+                    }
+                });
+            }
+
             // New mongod-specific option in 4.9.x.
             if (programMajorMinorVersion >= 490) {
                 const parameters = jsTest.options().setParameters;
