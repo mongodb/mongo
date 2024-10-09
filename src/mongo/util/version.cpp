@@ -162,6 +162,15 @@ void appendMacOSInfo(BSONObjBuilder* builder) {
 }  // namespace
 #endif
 
+void VersionInfoInterface::appendVersionInfoOnly(BSONObjBuilder* result) const {
+    result->append("version"_sd, version());
+    BSONArrayBuilder(result->subarrayStart("versionArray"))
+        .append(majorVersion())
+        .append(minorVersion())
+        .append(patchVersion())
+        .append(extraVersion());
+}
+
 void VersionInfoInterface::appendBuildInfo(BSONObjBuilder* result) const {
     BSONObjBuilder& o = *result;
     o.append("version", version());

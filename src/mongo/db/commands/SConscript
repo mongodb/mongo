@@ -128,6 +128,7 @@ env.Library(
         "$BUILD_DIR/mongo/s/sharding_router_api",
         "$BUILD_DIR/mongo/util/log_and_backoff",
         "$BUILD_DIR/mongo/util/net/http_client",
+        "buildinfo_common",
         "core",
         "create_command",
         "fsync_locked",

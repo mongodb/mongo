@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/buildinfo_common.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/request_execution_context.h"
@@ -81,46 +82,12 @@ const auto clusterBuildInfoExecutorRegisterer = ServiceContext::ConstructorActio
         getClusterBuildInfoExecutor(ctx).stop();
     }};
 
-class ClusterCmdBuildInfo : public BasicCommand {
+class ClusterCmdBuildInfo : public CmdBuildInfoBase {
 public:
-    ClusterCmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    bool adminOnly() const final {
-        return false;
-    }
-
-    bool allowedWithSecurityToken() const override {
-        return true;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const final {
-        return false;
-    }
-
-    Status checkAuthForOperation(OperationContext*,
-                                 const DatabaseName&,
-                                 const BSONObj&) const override {
-        // No explicit privileges required. Any authenticated user may call.
-        return Status::OK();
-    }
-
-    std::string help() const final {
-        return "get version #, etc.\n"
-               "{ buildinfo:1 }";
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& jsobj,
-             BSONObjBuilder& result) final {
+    using CmdBuildInfoBase::CmdBuildInfoBase;
+    void generateBuildInfo(OperationContext*, BSONObjBuilder& result) final {
         VersionInfoInterface::instance().appendBuildInfo(&result);
-        return true;
     }
-
     Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, const DatabaseName&) final {
         auto opCtx = rec->getOpCtx();
         return ClusterBuildInfoExecutor::get(opCtx->getServiceContext())->schedule(std::move(rec));

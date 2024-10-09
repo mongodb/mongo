@@ -61,6 +61,7 @@
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/coll_mod_reply_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/buildinfo_common.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
@@ -798,49 +799,17 @@ const auto buildInfoExecutorRegisterer = ServiceContext::ConstructorActionRegist
         getBuildInfoExecutor(ctx).stop();
     }};
 
-class CmdBuildInfo : public BasicCommand {
+class CmdBuildInfo : public CmdBuildInfoBase {
 public:
-    CmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
+    using CmdBuildInfoBase::CmdBuildInfoBase;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    bool adminOnly() const final {
-        return false;
-    }
-
-    bool allowedWithSecurityToken() const final {
-        return true;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const final {
-        return false;
-    }
-
-    Status checkAuthForOperation(OperationContext*,
-                                 const DatabaseName&,
-                                 const BSONObj&) const override {
-        // No explicit privileges required. Any authenticated user may call.
-        return Status::OK();
-    }
-
-    std::string help() const final {
-        return "get version #, etc.\n"
-               "{ buildinfo:1 }";
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& jsobj,
-             BSONObjBuilder& result) final {
-        // Critical to monitoring and observability, categorize the command as immediate
-        // priority.
+    void generateBuildInfo(OperationContext* opCtx, BSONObjBuilder& result) final {
+        // Critical to monitoring and observability,
+        // categorize the command as immediate priority.
         ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
             opCtx, AdmissionContext::Priority::kExempt);
         VersionInfoInterface::instance().appendBuildInfo(&result);
         appendStorageEngineList(opCtx->getServiceContext(), &result);
-        return true;
     }
 
     Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, const DatabaseName&) final {

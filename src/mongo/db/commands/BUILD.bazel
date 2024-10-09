@@ -33,6 +33,26 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "buildinfo_common_gen",
+    src = "buildinfo_common.idl",
+)
+
+mongo_cc_library(
+    name = "buildinfo_common",
+    srcs = [
+        "buildinfo_common.cpp",
+        "buildinfo_common.h",
+        ":buildinfo_common_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth",
+    ],
+)
+
+idl_generator(
     name = "set_feature_compatibility_version_gen",
     src = "set_feature_compatibility_version.idl",
     deps = [
