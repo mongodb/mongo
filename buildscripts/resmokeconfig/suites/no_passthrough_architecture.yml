@@ -1,0 +1,21 @@
+test_kind: js_test
+description: |
+  "Passthrough" means running a test against different runtime Cluster
+  configurations, including topology, runtime flags, fault injections, and other
+  parameters. Most tests by default are able to run in "passthrough" suites.
+  NoPassthrough is an exception, where tests here only run in the exact
+  configuration predefined in the tests themselves. This variant runs the
+  noPassthroughs in the architecture/ folder.
+
+selector:
+  roots:
+    - jstests/noPassthrough/architecture/*.js
+    # TODO: SERVER-95548 remove these special cases once the tests are owned by us.
+    - jstests/noPassthrough/replication/awaitable_hello_metrics.js
+    - jstests/noPassthrough/replication/awaitable_hello.js
+
+# noPassthrough tests start their own mongod's.
+executor:
+  config:
+    shell_options:
+      nodb: ""

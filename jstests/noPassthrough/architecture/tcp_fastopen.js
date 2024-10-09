@@ -1,5 +1,5 @@
 // Attempt to verify that connections can make use of TCP_FASTOPEN
-// @tags: [multiversion_incompatible, does_not_support_stepdowns]
+// @tags: [multiversion_incompatible, does_not_support_stepdowns, grpc_incompatible]
 
 import {getNetStatObj} from "jstests/libs/netstat.js";
 

@@ -875,6 +875,14 @@ export class ReplSetTest {
             printjson(this.routerPorts);
         }
 
+        if (jsTestOptions().shellGRPC) {
+            const nextPort = this._allocatePortForNode();
+            print("ReplSetTest Next gRPC port: " + nextPort);
+
+            this.grpcPorts.push(nextPort);
+            printjson(this.grpcPorts);
+        }
+
         var nextId = this.nodes.length;
         printjson(this.nodes);
 
@@ -977,7 +985,7 @@ export class ReplSetTest {
             }
             let members = res.members;
             if (nodes) {
-                members = res.members.filter((m) => nodes.some((node) => m.name === node.host));
+                members = res.members.filter((m) => nodes.some((node) => m.name === node.name));
             }
             return members.every((m) => hasSameConfig(m));
         });
@@ -2452,6 +2460,9 @@ export class ReplSetTest {
         if (this.isRouterServer) {
             defaults.routerPort = this.routerPorts[n];
         }
+        if (jsTestOptions().shellGRPC) {
+            defaults.grpcPort = this.grpcPorts[n];
+        }
 
         if (this.useAutoBootstrapProcedure) {
             if (n == 0) {
@@ -2963,7 +2974,7 @@ export class ReplSetTest {
         // Wait for all processes to terminate.
         for (let i = 0; i < this.ports.length; i++) {
             let conn = this._useBridge ? this._unbridgedNodes[i] : this.nodes[i];
-            let port = parseInt(conn.port);
+            let port = parseInt(conn.name.split(":")[1]);
             print("ReplSetTest stopSet waiting for mongo program on port " + port + " to stop.");
             let exitCode = waitMongoProgram(port);
             if (exitCode !== MongoRunner.EXIT_CLEAN && !opts.skipValidatingExitCode) {
@@ -3186,6 +3197,10 @@ function _constructStartNewInstances(rst, opts) {
 
     if (rst.isRouterServer) {
         rst.routerPorts = Array.from({length: numNodes}, rst._allocatePortForNode);
+    }
+
+    if (jsTestOptions().shellGRPC) {
+        rst.grpcPorts = Array.from({length: numNodes}, rst._allocatePortForNode);
     }
 }
 

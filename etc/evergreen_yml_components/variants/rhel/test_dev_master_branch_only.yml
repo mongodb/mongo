@@ -273,6 +273,7 @@ buildvariants:
       - name: sharded_jscore_txns
       - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen
       - name: .concurrency !.auth !.embedded_router !concurrency_replication_causal_consistency_gen !concurrency_replication_multi_stmt_txn_gen !concurrency_replication_gen !concurrency_simultaneous_replication_gen !config_fuzzer_concurrency_replication_gen !config_fuzzer_concurrency_simultaneous_replication_gen
+      - name: .grpc_misc_js
       - name: .lint
       - name: libdeps_graph_linting
         distros:

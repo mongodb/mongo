@@ -2,6 +2,8 @@
  * @tags: [
  *   requires_sharding,
  *   sets_replica_set_matching_strategy,
+ *   # Gets its host list based on a call to system.replset.findOne().
+ *   grpc_incompatible,
  * ]
  */
 

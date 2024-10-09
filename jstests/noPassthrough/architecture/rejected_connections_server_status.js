@@ -22,11 +22,13 @@ function verifyStats({expectedCurrentCount, expectedRejectedCount}) {
     jsTestLog(`calling verifyStats with expectedCurrentCount: ${
         expectedCurrentCount}, expectedRejectedCount: ${expectedRejectedCount}`);
     let serverStatus = getStats();
+    let connectionStats =
+        jsTestOptions().shellGRPC ? serverStatus.gRPC.streams : serverStatus.connections;
 
     assert.soon(
         () => {
-            const actualCurrentCount = serverStatus.connections.current;
-            const actualRejectedCount = serverStatus.connections.rejected;
+            const actualCurrentCount = connectionStats.current;
+            const actualRejectedCount = connectionStats.rejected;
 
             jsTestLog(`expectedCurrentCount: ${expectedCurrentCount}, expectedRejectedCount: ${
                 expectedRejectedCount}, actualCurrentCount: ${
@@ -34,11 +36,10 @@ function verifyStats({expectedCurrentCount, expectedRejectedCount}) {
             return expectedCurrentCount == actualCurrentCount &&
                 expectedRejectedCount == actualRejectedCount;
         },
-        "Failed to verify initial conditions. serverStatus.connections: " +
-            tojson(serverStatus.connections),
+        "Failed to verify initial conditions. serverStatus.connections: " + tojson(connectionStats),
         10000);
 
-    assert.eq(serverStatus.connections["available"], configuredMaxConns - expectedCurrentCount);
+    assert.eq(connectionStats["available"], configuredMaxConns - expectedCurrentCount);
 }
 
 let conns = [];

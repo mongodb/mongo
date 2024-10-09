@@ -111,6 +111,7 @@ void GRPCSessionManager::appendStats(BSONObjBuilder* bob) const {
         const auto current = numOpenSessions();
         appendI64(&streams, "current"_sd, current);
         appendI64(&streams, "available"_sd, maxOpenSessions() - current);
+        appendI64(&streams, "rejected"_sd, numRejectedSessions());
         appendI64(&streams, "total"_sd, numCreatedSessions());
         appendI64(&streams, "successful"_sd, _successfulSessions.load());
 

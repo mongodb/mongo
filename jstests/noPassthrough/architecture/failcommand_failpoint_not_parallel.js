@@ -95,7 +95,7 @@ function startIncrementRunIdThread() {
         }));
 
         jsTest.log("Successfully applied update");
-    }, conn.name, kDbName, latch);
+    }, conn.host, kDbName, latch);
     thread.start();
     latch.await();
     return thread;

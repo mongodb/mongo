@@ -67,7 +67,8 @@ var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',',
 
     assert.neq(conn, null, `Expected ${optMongos ? "mongos" : "mongod"} to start okay`);
 
-    const defaultUNIXSocket = `/tmp/mongodb-${conn.port}.sock`;
+    const defaultUNIXSocket = jsTestOptions().shellGRPC ? `/tmp/mongodb-grpc-${conn.port}.sock`
+                                                        : `/tmp/mongodb-${conn.port}.sock`;
     var checkPath = defaultUNIXSocket;
     if (expectSockPath) {
         checkPath = `${MongoRunner.dataDir}/${expectSockPath}`;
@@ -76,11 +77,14 @@ var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',',
     checkSocket(checkPath);
 
     // Test the naming of the unix socket
-    var log = conn.adminCommand({getLog: 'global'});
-    assert.commandWorked(log, "Expected getting the log to work");
-    var ll = log.log;
-    var re = new RegExp("anonymous unix socket");
-    assert(doesLogMatchRegex(ll, re), "Log message did not contain 'anonymous unix socket'");
+    // Due to https://github.com/grpc/grpc/issues/35006, gRPC unix sockets are unnamed.
+    if (!jsTestOptions().shellGRPC) {
+        var log = conn.adminCommand({getLog: 'global'});
+        assert.commandWorked(log, "Expected getting the log to work");
+        var ll = log.log;
+        var re = new RegExp("anonymous unix socket");
+        assert(doesLogMatchRegex(ll, re), "Log message did not contain 'anonymous unix socket'");
+    }
 
     if (optMongos) {
         shards.stop();
@@ -94,11 +98,6 @@ var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',',
 // Check that the default unix sockets work
 testSockOptions();
 testSockOptions(undefined, undefined, undefined, ',', true);
-
-// TODO: SERVER-84437 Unskip the remainder of this test when using TLS.
-if (jsTestOptions().tlsMode && jsTestOptions().tlsMode != "disabled") {
-    quit();
-}
 
 // Check that a custom unix socket path works
 testSockOptions("testsock.socket", "testsock.socket");
@@ -126,13 +125,24 @@ assert.throws(function() {
 // Check the unixSocketPrefix option
 var socketPrefix = `${MongoRunner.dataDir}/socketdir`;
 mkdir(socketPrefix);
-var port = allocatePort();
-testSockOptions(
-    undefined, `socketdir/mongodb-${port}.sock`, {unixSocketPrefix: socketPrefix, port: port});
 
-port = allocatePort();
-testSockOptions(undefined,
-                `socketdir/mongodb-${port}.sock`,
-                {unixSocketPrefix: socketPrefix, port: port},
-                ',',
-                true);
+if (jsTestOptions().shellGRPC) {
+    var grpcPort = allocatePort();
+    let sockName = `socketdir/mongodb-grpc-${grpcPort}.sock`;
+    testSockOptions(undefined, sockName, {unixSocketPrefix: socketPrefix, grpcPort: grpcPort});
+} else {
+    var port = allocatePort();
+    let sockName = `socketdir/mongodb-${port}.sock`;
+    testSockOptions(undefined, sockName, {unixSocketPrefix: socketPrefix, port: port});
+}
+
+if (jsTestOptions().shellGRPC) {
+    var grpcPort = allocatePort();
+    var sockName = `socketdir/mongodb-grpc-${grpcPort}.sock`;
+    testSockOptions(
+        undefined, sockName, {unixSocketPrefix: socketPrefix, grpcPort: grpcPort}, ',', true);
+} else {
+    var port = allocatePort();
+    var sockName = `socketdir/mongodb-${port}.sock`;
+    testSockOptions(undefined, sockName, {unixSocketPrefix: socketPrefix, port: port}, ',', true);
+}

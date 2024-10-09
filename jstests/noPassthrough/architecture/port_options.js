@@ -17,8 +17,14 @@ function runTest(bindIP, expectOk) {
         // We use assert.soonNoExcept() here because the mongod may not be logging yet.
         assert.soonNoExcept(() => {
             const logContents = rawMongoProgramOutput();
-            const found = logContents.match(
-                /"id":23016,\s*(?:"svc":".",\s*)?"ctx":"listener","msg":"Waiting for connections","attr":{"port":(\d+)/);
+            let found;
+            if (jsTestOptions().shellGRPC) {
+                found = logContents.match(
+                    /"id":7401305,\s*(?:"svc":".",\s*)?"ctx":"initandlisten","msg":"Started gRPC server","attr":{"addresses":\["127.0.0.1:(\d+)/);
+            } else {
+                found = logContents.match(
+                    /"id":23016,\s*(?:"svc":".",\s*)?"ctx":"listener","msg":"Waiting for connections","attr":{"port":(\d+)/);
+            }
             if (found !== null) {
                 print("Found message from mongod with port it is listening on: " + found[0]);
                 port = found[1];

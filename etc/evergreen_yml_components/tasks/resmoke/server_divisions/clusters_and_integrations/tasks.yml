@@ -751,6 +751,22 @@ tasks:
         vars:
           resmoke_jobs_max: 1
 
+  - <<: *task_template
+    name: noPassthrough_architecture
+    tags:
+      [
+        "assigned_to_jira_team_server_networking_and_observability",
+        "experimental",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_windows",
+        "grpc_misc_js",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
   - name: server_discovery_and_monitoring_json_test
     tags:
       [

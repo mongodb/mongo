@@ -1,4 +1,6 @@
 // tests for the traffic_recording commands.
+// @tags: [requires_auth]
+
 // Variables for this test
 const recordingDir = MongoRunner.toRealDir("$dataDir/traffic_recording/");
 const recordingFile = "recording.txt";

@@ -7,7 +7,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const kThisFile = "jstests/noPassthrough/grpc_disconnect_cleanup.js";
+const kThisFile = "jstests/noPassthrough/architecture/grpc_disconnect_cleanup.js";
 const kTestName = "grpc_disconnect_cleanup";
 
 function setupShardedCollection(st, dbName, collName) {
@@ -201,7 +201,6 @@ if (typeof inner == 'undefined') {
 
     setupShardedCollection(st, kTestName, kTestName);
 
-    const mongosHost = st.s.host.split(":")[0];
     const grpcUri = `mongodb://localhost:${st.s.fullOptions.grpcPort}/?gRPC=true`;
     jsTestLog("Outer shell: launching inner shell to connect over gRPC to " + grpcUri);
 

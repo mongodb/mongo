@@ -169,10 +169,12 @@ public:
                     this->shared_from_this(), remote, useSSL, std::move(pf.future));
                 _channels.insert({key, state});
                 lk.unlock();
-                LOGV2_INFO(7401801,
-                           "Creating a new gRPC channel",
-                           "remote"_attr = remote,
-                           "useSSL"_attr = useSSL);
+                if (!serverGlobalParams.quiet.load()) {
+                    LOGV2_INFO(7401801,
+                               "Creating a new gRPC channel",
+                               "remote"_attr = remote,
+                               "useSSL"_attr = useSSL);
+                }
                 pf.promise.setWith([&] { return _channelFactory(remote, useSSL); });
                 return state;
             }

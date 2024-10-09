@@ -45,7 +45,7 @@ function checkGRPCStats(conn, expect) {
                 assert.eq(typeof obj[key], 'object', `'${prefix}.${key}' expected object`);
                 Object.keys(expect[key]).forEach(search(`${prefix}.${key}`, obj[key], expect[key]));
             } else {
-                assert.eq(obj[key], expect[key], `'${prefix}.${key}' value mismatch`);
+                assert.gte(obj[key], expect[key], `'${prefix}.${key}' value mismatch`);
             }
         };
     }

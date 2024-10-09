@@ -1,4 +1,5 @@
 // tests for the traffic_recording commands.
+// @tags: [requires_auth]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function getDB(client) {

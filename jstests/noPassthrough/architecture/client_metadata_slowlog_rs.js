@@ -16,7 +16,7 @@ rst.initiate();
 rst.awaitReplication();
 
 // Build a new connection based on the replica set URL
-var conn = new Mongo(rst.getURL());
+var conn = new Mongo(rst.getURL(), undefined, {gRPC: false});
 
 let coll = conn.getCollection("test.foo");
 assert.commandWorked(coll.insert({_id: 1}, {writeConcern: {w: numNodes, wtimeout: 5000}}));

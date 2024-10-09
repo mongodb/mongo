@@ -1,3 +1,9 @@
+/**
+ * Tests that the max connections overrides are respected for exempt IPs.
+ *
+ * TODO: SERVER-95504 renable this test with gRPC.
+ * @tags: [grpc_incompatible]
+ */
 import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 
 const configuredMaxConns = 5;

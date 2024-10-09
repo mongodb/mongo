@@ -885,7 +885,7 @@ export class ShardingTest {
         }
 
         this["rs" + n].awaitSecondaryNodes();
-        this._connections[n] = new Mongo(this["rs" + n].getURL());
+        this._connections[n] = new Mongo(this["rs" + n].getURL(), undefined, {gRPC: false});
         this._connections[n].shardName = prevShardName;
         this._connections[n].rs = this["rs" + n];
         this["shard" + n] = this._connections[n];
@@ -1495,12 +1495,16 @@ export class ShardingTest {
                     rstConfig.writeConcernMajorityJournalDefault = true;
                 }
 
+                const makeNodeHost = (node) => {
+                    const [_, port] = node.name.split(":");
+                    return `127.0.0.1:${port}`;
+                };
                 return {
                     rst,
                     // Arguments for creating instances of each replica set within parallel threads.
                     rstArgs: {
                         name: rst.name,
-                        nodeHosts: rst.nodes.map(node => `127.0.0.1:${node.port}`),
+                        nodeHosts: rst.nodes.map(node => makeNodeHost(node)),
                         nodeOptions: rst.nodeOptions,
                         // Mixed-mode SSL tests may specify a keyFile per replica set rather than
                         // one for the whole cluster.
@@ -1601,7 +1605,7 @@ export class ShardingTest {
 
                 this._connections.push(null);
 
-                let rsConn = new Mongo(rs.getURL());
+                let rsConn = new Mongo(rs.getURL(), undefined, {gRPC: false});
                 rsConn.name = rs.getURL();
 
                 this._connections[i] = rsConn;
@@ -1655,6 +1659,9 @@ export class ShardingTest {
                     options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown || 0;
 
                 options.port = options.port || _allocatePortForMongos();
+                if (jsTestOptions().shellGRPC) {
+                    options.grpcPort = options.grpcPort || _allocatePortForMongos();
+                }
 
                 mongosOptions.push(options);
             }
@@ -2077,15 +2084,15 @@ function connectionURLTheSame(a, b) {
     if (!a || !b)
         return false;
 
-    if (a.host)
-        return connectionURLTheSame(a.host, b);
-    if (b.host)
-        return connectionURLTheSame(a, b.host);
-
     if (a.name)
         return connectionURLTheSame(a.name, b);
     if (b.name)
         return connectionURLTheSame(a, b.name);
+
+    if (a.host)
+        return connectionURLTheSame(a.host, b);
+    if (b.host)
+        return connectionURLTheSame(a, b.host);
 
     if (a.indexOf("/") < 0 && b.indexOf("/") < 0) {
         a = a.split(":");
@@ -2208,7 +2215,7 @@ function replicaSetsToTerminate(st, shardRS) {
                 // Arguments for each replica set within parallel threads.
                 rstArgs: {
                     name: rst.name,
-                    nodeHosts: liveNodes.map(node => `${node.host}`),
+                    nodeHosts: liveNodes.map(node => `${node.name}`),
                     nodeOptions: rst.nodeOptions,
                     // Mixed-mode SSL tests may specify a keyFile per replica set rather
                     // than one for the whole cluster.

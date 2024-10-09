@@ -84,7 +84,7 @@ let runTest = (connectionHealthLoggingOn) => {
     assert.commandWorked(st.s.adminCommand(
         {setParameter: 1, slowConnectionThresholdMillis: kConnectionEstablishmentDelayMillis}));
     assert.commandWorked(
-        st.s.adminCommand({dropConnections: 1, hostAndPort: [st.rs0.getPrimary().host]}));
+        st.s.adminCommand({dropConnections: 1, hostAndPort: [st.rs0.getPrimary().name]}));
 
     jsTestLog("Running the query.");
 
@@ -97,7 +97,7 @@ let runTest = (connectionHealthLoggingOn) => {
                               .getCollection(collName)
                               .find({primaryOnly: true, [keyName]: 42})
                               .itcount());
-            }, db.getMongo().host, db.getName(), kCollectionName, kKeyName), null, true);
+            }, db.getMongo().name, db.getName(), kCollectionName, kKeyName), null, true);
     }
     let queryShell = runTestQuery(db);
 

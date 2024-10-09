@@ -12,6 +12,7 @@ var shellVersion = version;
 // port. This map is cleared when MongoRunner._startWithArgs and MongoRunner.stopMongod/s are
 // called.
 var serverExitCodeMap = {};
+var grpcToMongoRpcPortMap = {};
 
 var _parsePath = function() {
     var dbpath = "";
@@ -96,9 +97,13 @@ MongoRunner.getMongoShellPath = function() {
 
 MongoRunner.parsePort = function() {
     var port = "";
-    for (var i = 0; i < arguments.length; ++i)
-        if (arguments[i] == "--port")
+    const portKey = jsTestOptions().shellGRPC ? "--grpcPort" : "--port";
+
+    for (var i = 0; i < arguments.length; ++i) {
+        if (arguments[i] == portKey) {
             port = arguments[i + 1];
+        }
+    }
 
     if (port == "")
         throw Error("No port specified");
@@ -625,6 +630,9 @@ MongoRunner.mongoOptions = function(opts) {
         opts.tlsMode = jsTestOptions().tlsMode;
         if (opts.tlsMode != "disabled") {
             opts.tlsAllowInvalidHostnames = "";
+            if (!jsTestOptions().shellTlsCertificateKeyFile) {
+                opts.tlsAllowConnectionsWithoutCertificates = "";
+            }
         }
     }
     if (jsTestOptions().tlsCAFile && !opts.tlsCAFile) {
@@ -636,6 +644,7 @@ MongoRunner.mongoOptions = function(opts) {
         (opts.sslMode && opts.sslMode != "disabled");
     if (setParameters.featureFlagGRPC && tlsEnabled) {
         opts.grpcPort = opts.grpcPort || allocatePort();
+        grpcToMongoRpcPortMap[opts.grpcPort] = opts.port;
     }
 
     opts.pathOpts =
@@ -1005,10 +1014,12 @@ MongoRunner.runMongod = function(opts) {
     }
 
     mongod.commandLine = MongoRunner.arrToOpts(opts);
+    let connectPort =
+        (jsTestOptions().shellGRPC ? mongod.commandLine.grpcPort : mongod.commandLine.port);
     mongod.hostNoPort = useHostName ? getHostName() : "localhost";
     mongod.name = mongod.hostNoPort + ":" + mongod.commandLine.port;
-    mongod.host = mongod.name;
-    mongod.port = parseInt(mongod.commandLine.port);
+    mongod.host = mongod.hostNoPort + ":" + connectPort;
+    mongod.port = parseInt(connectPort);
     mongod.routerPort =
         mongod.commandLine.routerPort ? parseInt(mongod.commandLine.routerPort) : undefined;
     // Connect to the router port of this mongod, if open, with `new Mongo(conn.routerHost)`;
@@ -1052,9 +1063,11 @@ MongoRunner.runMongos = function(opts) {
     }
 
     mongos.commandLine = MongoRunner.arrToOpts(opts);
+    let connectPort =
+        (jsTestOptions().shellGRPC ? mongos.commandLine.grpcPort : mongos.commandLine.port);
     mongos.name = MongoRunner.getMongosName(mongos.commandLine.port, useHostName);
-    mongos.host = mongos.name;
-    mongos.port = parseInt(mongos.commandLine.port);
+    mongos.host = MongoRunner.getMongosName(connectPort, useHostName);
+    mongos.port = parseInt(connectPort);
     mongos.runId = runId || ObjectId();
     mongos.savedOptions = MongoRunner.savedOptions[mongos.runId];
     mongos.fullOptions = fullOptions;
@@ -1149,7 +1162,10 @@ var stopMongoProgram = function(conn, signal, opts, waitpid) {
 
     var port = parseInt(conn.port);
 
-    var pid = conn.pid;
+    if (grpcToMongoRpcPortMap[port]) {
+        port = grpcToMongoRpcPortMap[port];
+    }
+
     // If the return code is in the serverExitCodeMap, it means the server crashed on startup.
     // We just use the recorded return code instead of stopping the program.
     var returnCode;
@@ -1706,10 +1722,16 @@ function _getMongoProgramArguments(args) {
             !args.includes('--tlsCertificateKeyFile')) {
             newArgs.push('--tlsCertificateKeyFile', jsTestOptions().shellTlsCertificateKeyFile);
         }
+        if (jsTestOptions().shellGRPC && !args.includes('--gRPC')) {
+            newArgs.push('--gRPC');
+        }
     } else {
         if (jsTestOptions().tlsMode && !args.includes('--tlsMode')) {
             newArgs.push('--tlsMode', jsTestOptions().tlsMode);
             newArgs.push('--tlsAllowInvalidHostnames');
+            if (!jsTestOptions().shellTlsCertificateKeyFile) {
+                newArgs.push('--tlsAllowConnectionsWithoutCertificates');
+            }
         }
 
         if (!args.includes('--tlsCertificateKeyFile')) {

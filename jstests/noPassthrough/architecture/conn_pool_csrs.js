@@ -71,8 +71,6 @@ const connectMongodServer = () => {
 const awaitUpdateHost = targetHost => {
     let hits;
     assert.soon(() => {
-        let log = checkLog.getGlobalLog(st.s);
-        // jsTestLog(`Fetched log: """${log}"""`);
         hits = checkLog.getGlobalLog(mongos)
                    .map(line => JSON.parse(line))
                    .filter(o => o.id == poolSizeLogId)
@@ -91,20 +89,20 @@ for (const [min, max] of [[4, 6], [10, 20], [2, 4], [-1, -1]]) {
     jsTestLog(`Try ConfigServer pool bounds [${min},${max}]`);
     setCSPoolBounds(min, max);
 
-    adminCmd({dropConnections: 1, hostAndPort: [configServer.host]});
+    adminCmd({dropConnections: 1, hostAndPort: [configServer.name]});
     adminCmd({clearLog: 'global'});
     connectConfigServer();
-    for (let o of awaitUpdateHost(configServer.host)) {
+    for (let o of awaitUpdateHost(configServer.name)) {
         const cascade = (x, fallback) => x >= 0 ? x : fallback;
         assert.eq(o.attr.minConns, cascade(min, rsMin));
         assert.eq(o.attr.maxConns, cascade(max, rsMax));
     }
 
     // Make sure the setting doesn't affect non-ConfigServer pools.
-    adminCmd({dropConnections: 1, hostAndPort: [mongod.host]});
+    adminCmd({dropConnections: 1, hostAndPort: [mongod.name]});
     adminCmd({clearLog: 'global'});
     connectMongodServer();
-    for (let o of awaitUpdateHost(mongod.host)) {
+    for (let o of awaitUpdateHost(mongod.name)) {
         assert.eq(o.attr.minConns, rsMin);
         assert.eq(o.attr.maxConns, rsMax);
     }
