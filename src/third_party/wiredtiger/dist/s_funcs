@@ -28,7 +28,7 @@ l=$(
     # functions that only appear once
     echo "$search"
 
-    sed -n '/^#define/,/[^\\]$/p' ../src/include/*.h ../src/include/*.in | $FGREP -wo "$search" &
+    sed -n '/^#define/,/[^\\]$/p' ../src/*/*.h ../src/include/*.in | $FGREP -wo "$search" &
 
     echo "$l" | xargs $XARGS_P -n 30 bash -c "sed -n '/{/,/^}/p' \"\$@\" | $FGREP -wo \"$search\" > $t-par-\$\$.out" -bash
 

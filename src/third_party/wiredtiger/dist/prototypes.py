@@ -39,7 +39,8 @@ COPYRIGHT = """\
 
 """
 
-if not [f for f in filter_if_fast(source_files(), prefix="../")]:
+files = [f for f in source_files()]
+if not [f for f in filter_if_fast(files + ["../dist/prototypes.py"], prefix="../")]:
     sys.exit(0)
 
 def clean_function_name(filename, fn):

@@ -18,7 +18,7 @@ build() {
     [[ -z "$(
         {
             echo ../src/include/wt_internal.h
-            ls -1 ../src/include/*.h ../src/include/*.in
+            ls -1 ../src/*/*.h ../src/include/*.in
         } | filter_if_fast ../
     )" ]] && return
 
@@ -29,7 +29,7 @@ build() {
         -e 'q' \
         -e '}' < $f || exit $?
 
-    l=`ls ../src/include/*.h ../src/include/*.in |
+    l=`ls ../src/*/*.h ../src/include/*.in |
         sed -e '/wiredtiger.*/d' -e '/queue.h/d'` || exit $?
     grep -E -h \
         '^[[:space:]]*(((struct|union)[[:space:]].*__wt_.*{)|WT_PACKED_STRUCT_BEGIN)' \
@@ -67,7 +67,7 @@ check() {
 
     (
     # Get the list of typedefs
-    search=`cat ../src/include/*.h ../src/include/*.in |
+    search=`cat ../src/*/*.h ../src/include/*.in |
         sed -e 's/^struct.*typedef.* \(.*\);$/\1/p' \
             -e 's/^union.*typedef.* \(.*\);$/\1/p' \
             -e d |
