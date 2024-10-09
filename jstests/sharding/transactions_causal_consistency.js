@@ -9,13 +9,20 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     disableStaleVersionAndSnapshotRetriesWithinTransactions,
     enableStaleVersionAndSnapshotRetriesWithinTransactions,
+    kShardOptionsForDisabledStaleShardVersionRetries
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-const st = new ShardingTest({shards: 2, mongos: 2});
+const st = new ShardingTest({
+    shards: 2,
+    mongos: 2,
+    other: {
+        shardOptions: kShardOptionsForDisabledStaleShardVersionRetries,
+    }
+});
 
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 

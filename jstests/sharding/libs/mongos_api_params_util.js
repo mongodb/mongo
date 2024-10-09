@@ -1616,58 +1616,77 @@ export let MongosAPIParametersUtil = (function() {
                 runOrExplain.shardPrimary ? runOrExplain.shardPrimary() : st.rs0.getPrimary();
             const context = {apiParameters: apiParameters};
 
-            const commandDbName = runOrExplain.runsAgainstAdminDb ? "admin" : "db";
-            if (inTransaction) {
-                context.session = st.s0.startSession();
-                context.session.startTransaction();
-                context.db = context.session.getDatabase(commandDbName);
-            } else {
-                context.db = st.s0.getDB(commandDbName);
-            }
+            withRetryOnTransientTxnError(
+                () => {
+                    const commandDbName = runOrExplain.runsAgainstAdminDb ? "admin" : "db";
+                    if (inTransaction) {
+                        context.session = st.s0.startSession();
+                        context.session.startTransaction();
+                        context.db = context.session.getDatabase(commandDbName);
+                    } else {
+                        context.db = st.s0.getDB(commandDbName);
+                    }
 
-            if (runOrExplain.setUp) {
-                jsTestLog(`setUp function for ${commandName}`);
-                runOrExplain.setUp(context);
-                jsTestLog(`setUp function for ${commandName} completed`);
-            }
+                    if (runOrExplain.setUp) {
+                        jsTestLog(`setUp function for ${commandName}`);
+                        runOrExplain.setUp(context);
+                        jsTestLog(`setUp function for ${commandName} completed`);
+                    }
 
-            // Make a copy of the test's command body, and set its API parameters.
-            const commandBody = runOrExplain.command(context);
-            const commandWithAPIParams =
-                Object.assign(Object.assign({}, commandBody), apiParameters);
+                    // Make a copy of the test's command body, and set its API parameters.
+                    const commandBody = runOrExplain.command(context);
+                    const commandWithAPIParams =
+                        Object.assign(Object.assign({}, commandBody), apiParameters);
 
-            assert.commandWorked(configPrimary.adminCommand({clearLog: "global"}));
-            assert.commandWorked(shardPrimary.adminCommand({clearLog: "global"}));
-            const message =
-                `[${i + 1} of ${testInstances.length}]: command ${tojson(commandWithAPIParams)}` +
-                ` ${shardedCollection ? "sharded" : "unsharded"},` +
-                ` ${inTransaction ? "in" : "outside"} transaction` +
-                ` on "${commandDbName}" database`;
+                    assert.commandWorked(configPrimary.adminCommand({clearLog: "global"}));
+                    assert.commandWorked(shardPrimary.adminCommand({clearLog: "global"}));
+                    const message = `[${i + 1} of ${testInstances.length}]: command ${
+                                        tojson(commandWithAPIParams)}` +
+                        ` ${shardedCollection ? "sharded" : "unsharded"},` +
+                        ` ${inTransaction ? "in" : "outside"} transaction` +
+                        ` on "${commandDbName}" database`;
 
-            flushRoutersAndRefreshShardMetadata(st, {ns: "db.collection"});
+                    flushRoutersAndRefreshShardMetadata(st, {ns: "db.collection"});
 
-            jsTestLog(`Running ${message}`);
-            setLogVerbosity([configPrimary, st.rs0.getPrimary(), st.rs1.getPrimary()],
-                            {"command": {"verbosity": 2}});
+                    jsTestLog(`Running ${message}`);
+                    setLogVerbosity([configPrimary, st.rs0.getPrimary(), st.rs1.getPrimary()],
+                                    {"command": {"verbosity": 2}});
 
-            const res = context.db.runCommand(commandWithAPIParams);
-            jsTestLog(`Command result: ${tojson(res)}`);
-            if (runOrExplain.expectedFailureCode) {
-                assert.commandFailedWithCode(res, runOrExplain.expectedFailureCode);
-            } else {
-                assert.commandWorked(res);
-            }
+                    const res = context.db.runCommand(commandWithAPIParams);
+                    jsTestLog(`Command result: ${tojson(res)}`);
+                    if (runOrExplain.expectedFailureCode) {
+                        assert.commandFailedWithCode(res, runOrExplain.expectedFailureCode);
+                    } else {
+                        assert.commandWorked(res);
+                    }
 
-            if (inTransaction) {
-                const commitCmd = {
-                    commitTransaction: 1,
-                    txnNumber: context.session.getTxnNumber_forTesting(),
-                    autocommit: false
-                };
+                    if (inTransaction) {
+                        const commitCmd = {
+                            commitTransaction: 1,
+                            txnNumber: context.session.getTxnNumber_forTesting(),
+                            autocommit: false
+                        };
 
-                assert.commandWorked(context.session.getDatabase("admin").runCommand(
-                    Object.assign(commitCmd, apiParameters)));
-            }
+                        assert.commandWorked(context.session.getDatabase("admin").runCommand(
+                            Object.assign(commitCmd, apiParameters)));
+                    }
+                },
+                () => {
+                    if (inTransaction) {
+                        jsTestLog(`handling transactional retry for ${commandName}`);
+                        context.session.abortTransaction();
+
+                        setLogVerbosity([configPrimary, st.rs0.getPrimary(), st.rs1.getPrimary()],
+                                        {"command": {"verbosity": 0}});
+
+                        st.s0.getDB("db").runCommand({dropDatabase: 1});
+                        if (runOrExplain.cleanUp) {
+                            jsTestLog(`cleanUp function for ${commandName}`);
+                            runOrExplain.cleanUp(context);
+                            jsTestLog(`cleanUp function for ${commandName} completed`);
+                        }
+                    }
+                });
 
             const configServerCommandName = runOrExplain.configServerCommandName;
             const shardCommandName = runOrExplain.shardCommandName;

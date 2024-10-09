@@ -7,12 +7,19 @@ import {
     assertNoSuchTransactionOnAllShards,
     disableStaleVersionAndSnapshotRetriesWithinTransactions,
     enableStaleVersionAndSnapshotRetriesWithinTransactions,
+    kShardOptionsForDisabledStaleShardVersionRetries
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
 
-const st = new ShardingTest({shards: 2, mongos: 1});
+const st = new ShardingTest({
+    shards: 2,
+    mongos: 1,
+    other: {
+        shardOptions: kShardOptionsForDisabledStaleShardVersionRetries,
+    }
+});
 
 // Database versioning tests only make sense when all collections are not tracked.
 const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(

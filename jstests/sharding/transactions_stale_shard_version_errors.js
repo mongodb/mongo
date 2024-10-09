@@ -8,9 +8,6 @@
 // ]
 import "jstests/multiVersion/libs/verify_versions.js";
 
-import {
-    withAbortAndRetryOnTransientTxnError
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -18,6 +15,7 @@ import {
     assertNoSuchTransactionOnAllShards,
     disableStaleVersionAndSnapshotRetriesWithinTransactions,
     enableStaleVersionAndSnapshotRetriesWithinTransactions,
+    kShardOptionsForDisabledStaleShardVersionRetries
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 function expectChunks(st, ns, chunks) {
@@ -35,12 +33,19 @@ const ns = dbName + '.' + collName;
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on shards and cause them to refresh their sharding metadata.
-const nodeOptions = {
+const configOptions = {
     setParameter: {enableShardedIndexConsistencyCheck: false}
 };
 
-const st = new ShardingTest(
-    {shards: 3, mongos: 2, other: {configOptions: nodeOptions, enableBalancer: false}});
+const st = new ShardingTest({
+    shards: 3,
+    mongos: 2,
+    other: {
+        shardOptions: kShardOptionsForDisabledStaleShardVersionRetries,
+        configOptions: configOptions,
+        enableBalancer: false
+    }
+});
 
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
@@ -93,13 +98,11 @@ const sessionDB = session.getDatabase(dbName);
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}));
 expectChunks(st, ns, [1, 1, 0]);
 
-withAbortAndRetryOnTransientTxnError(session, () => {
-    session.startTransaction();
-    // Targets Shard1, which is stale.
-    assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
+session.startTransaction();
+// Targets Shard1, which is stale.
+assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
-    assert.commandWorked(session.commitTransaction_forTesting());
-});
+assert.commandWorked(session.commitTransaction_forTesting());
 
 //
 // Stale shard version on second command to a shard should fail.
@@ -113,12 +116,10 @@ assert.commandWorked(
     st.s.adminCommand({moveChunk: otherNs, find: {_id: 5}, to: st.shard1.shardName}));
 expectChunks(st, otherNs, [1, 1, 0]);
 
-withAbortAndRetryOnTransientTxnError(session, () => {
-    session.startTransaction();
+session.startTransaction();
 
-    // Targets Shard1 for the first ns, which is not stale.
-    assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
-});
+// Targets Shard1 for the first ns, which is not stale.
+assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
 // Targets the other sharded collection on Shard1, which is stale. Because a previous statement
 // has executed on Shard1, the retry will not restart the transaction, and will fail when it
@@ -142,17 +143,15 @@ assert.commandWorked(
     st.s.adminCommand({moveChunk: otherNs, find: {_id: 5}, to: st.shard0.shardName}));
 expectChunks(st, otherNs, [2, 0, 0]);
 
-withAbortAndRetryOnTransientTxnError(session, () => {
-    session.startTransaction();
+session.startTransaction();
 
-    // Targets Shard1 for the first ns, which is not stale.
-    assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
+// Targets Shard1 for the first ns, which is not stale.
+assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
-    // Targets Shard0 for the other ns, which is stale.
-    assert.commandWorked(sessionDB.runCommand({find: otherCollName, filter: {_id: 5}}));
+// Targets Shard0 for the other ns, which is stale.
+assert.commandWorked(sessionDB.runCommand({find: otherCollName, filter: {_id: 5}}));
 
-    assert.commandWorked(session.commitTransaction_forTesting());
-});
+assert.commandWorked(session.commitTransaction_forTesting());
 
 //
 // Stale mongos aborts on old shard.
@@ -165,15 +164,13 @@ assert.commandWorked(
     otherMongos.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard0.shardName}));
 expectChunks(st, ns, [2, 0, 0]);
 
-withAbortAndRetryOnTransientTxnError(session, () => {
-    session.startTransaction();
+session.startTransaction();
 
-    // Targets Shard1, which hits a stale version error, then re-targets Shard0, which is also
-    // stale but should succeed.
-    assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
+// Targets Shard1, which hits a stale version error, then re-targets Shard0, which is also
+// stale but should succeed.
+assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
-    assert.commandWorked(session.commitTransaction_forTesting());
-});
+assert.commandWorked(session.commitTransaction_forTesting());
 
 // Verify there is no in-progress transaction on Shard1.
 res = assert.commandFailedWithCode(st.rs1.getPrimary().getDB(dbName).runCommand({
@@ -197,14 +194,12 @@ expectChunks(st, ns, [1, 0, 1]);
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: -5}, to: st.shard1.shardName}));
 expectChunks(st, ns, [0, 1, 1]);
 
-withAbortAndRetryOnTransientTxnError(session, () => {
-    session.startTransaction();
+session.startTransaction();
 
-    // Targets all shards, two of which are stale.
-    assert.commandWorked(sessionDB.runCommand({find: collName}));
+// Targets all shards, two of which are stale.
+assert.commandWorked(sessionDB.runCommand({find: collName}));
 
-    assert.commandWorked(session.commitTransaction_forTesting());
-});
+assert.commandWorked(session.commitTransaction_forTesting());
 
 //
 // Can retry a stale write on the first statement.
@@ -214,14 +209,12 @@ withAbortAndRetryOnTransientTxnError(session, () => {
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}));
 expectChunks(st, ns, [0, 2, 0]);
 
-withAbortAndRetryOnTransientTxnError(session, () => {
-    session.startTransaction();
+session.startTransaction();
 
-    // Targets Shard1, which is stale.
-    assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: 6}]}));
+// Targets Shard1, which is stale.
+assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: 6}]}));
 
-    assert.commandWorked(session.commitTransaction_forTesting());
-});
+assert.commandWorked(session.commitTransaction_forTesting());
 
 //
 // Can retry a stale write past the first statement if the write has been sent to only new
@@ -235,17 +228,15 @@ withAbortAndRetryOnTransientTxnError(session, () => {
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard2.shardName}));
 expectChunks(st, ns, [0, 1, 1]);
 
-withAbortAndRetryOnTransientTxnError(session, () => {
-    session.startTransaction();
+session.startTransaction();
 
-    // Targets Shard1, which is not stale.
-    assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: -4}]}));
+// Targets Shard1, which is not stale.
+assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: -4}]}));
 
-    // Targets Shard2, which is stale.
-    assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: 7}]}));
+// Targets Shard2, which is stale.
+assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: 7}]}));
 
-    assert.commandWorked(session.commitTransaction_forTesting());
-});
+assert.commandWorked(session.commitTransaction_forTesting());
 
 //
 // The final StaleConfig error should be returned if the router exhausts its retries.
@@ -255,12 +246,10 @@ withAbortAndRetryOnTransientTxnError(session, () => {
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: -5}, to: st.shard0.shardName}));
 expectChunks(st, ns, [1, 0, 1]);
 
-withAbortAndRetryOnTransientTxnError(session, () => {
-    session.startTransaction();
+session.startTransaction();
 
-    // Target Shard2, to verify the transaction on it is aborted implicitly later.
-    assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
-});
+// Target Shard2, to verify the transaction on it is aborted implicitly later.
+assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
 // Make metadata refreshes on the stale shard indefinitely return StaleConfig.
 const fp = configureFailPoint(st.rs0.getPrimary(), "alwaysThrowStaleConfigInfo");

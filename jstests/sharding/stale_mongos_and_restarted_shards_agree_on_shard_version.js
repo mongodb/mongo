@@ -10,6 +10,7 @@
  * ]
  *
  */
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -121,27 +122,40 @@ const staleMongoS = st.s1;
         staleMongoS.getDB(kDatabaseName).TestAggregateColl.aggregate([{$count: 'total'}]).toArray();
     assert.eq(2, count[0].total);
 }
-{
-    jsTest.log('Testing: Transactions with unsharded collection, which is unknown on the shard');
-    st.restartShardRS(0);
-    st.restartShardRS(1);
+var session = null;
+withRetryOnTransientTxnError(
+    () => {
+        jsTest.log(
+            'Testing: Transactions with unsharded collection, which is unknown on the shard');
+        st.restartShardRS(0);
+        st.restartShardRS(1);
 
-    var session = staleMongoS.startSession();
-    session.startTransaction();
-    session.getDatabase(kDatabaseName).TestTransactionColl.insert({Key: 1});
-    session.commitTransaction();
-}
-{
-    jsTest.log('Testing: Create collection as first op inside transaction works');
-    st.restartShardRS(0);
-    st.restartShardRS(1);
+        session = staleMongoS.startSession();
+        session.startTransaction();
+        session.getDatabase(kDatabaseName).TestTransactionColl.insert({Key: 1});
+        session.commitTransaction();
+    },
+    () => {
+        session.abortTransaction();
+        session.getDatabase(kDatabaseName).TestTransactionColl.drop();
+    });
 
-    session = staleMongoS.startSession();
-    session.startTransaction();
-    session.getDatabase(kDatabaseName).createCollection('TestTransactionCollCreation');
-    session.getDatabase(kDatabaseName).TestTransactionCollCreation.insertOne({Key: 0});
-    session.commitTransaction();
-}
+withRetryOnTransientTxnError(
+    () => {
+        jsTest.log('Testing: Create collection as first op inside transaction works');
+        st.restartShardRS(0);
+        st.restartShardRS(1);
+
+        session = staleMongoS.startSession();
+        session.startTransaction();
+        session.getDatabase(kDatabaseName).createCollection('TestTransactionCollCreation');
+        session.getDatabase(kDatabaseName).TestTransactionCollCreation.insertOne({Key: 0});
+        session.commitTransaction();
+    },
+    () => {
+        session.abortTransaction();
+        session.getDatabase(kDatabaseName).TestTransactionCollCreation.drop();
+    });
 
 {
     const kNumThreadsForConvoyTest = 20;

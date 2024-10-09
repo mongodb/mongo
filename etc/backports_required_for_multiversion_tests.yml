@@ -323,6 +323,12 @@ last-continuous:
       ticket: SERVER-95075
     - test_file: jstests/sharding/direct_shard_connection_write_after_restart.js
       ticket: SERVER-95244
+    - test_file: jstests/sharding/transactions_causal_consistency.js
+      ticket: SERVER-92530
+    - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
+      ticket: SERVER-92530
+    - test_file: jstests/sharding/transactions_stale_database_version_errors.js
+      ticket: SERVER-92530
   suites: null
 last-lts:
   all:
@@ -660,4 +666,10 @@ last-lts:
       ticket: SERVER-95075
     - test_file: jstests/sharding/direct_shard_connection_write_after_restart.js
       ticket: SERVER-95244
+    - test_file: jstests/sharding/transactions_causal_consistency.js
+      ticket: SERVER-92530
+    - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
+      ticket: SERVER-92530
+    - test_file: jstests/sharding/transactions_stale_database_version_errors.js
+      ticket: SERVER-92530
   suites: null

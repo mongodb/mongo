@@ -143,6 +143,8 @@ export function enableStaleVersionAndSnapshotRetriesWithinTransactions(st) {
 }
 
 // TODO SERVER-39704: Remove this function.
+// Note: tests relying on this function should use kShardOptionsForDisabledStaleShardVersionRetries
+// as part of their ShardingTest initialisation.
 export function disableStaleVersionAndSnapshotRetriesWithinTransactions(st) {
     assert.commandWorked(st.s.adminCommand({
         configureFailPoint: "enableStaleVersionAndSnapshotRetriesWithinTransactions",
@@ -156,6 +158,18 @@ export function disableStaleVersionAndSnapshotRetriesWithinTransactions(st) {
         });
     });
 }
+
+// Override value for the ShardingTest.other.shardOptions field to safely use
+// disableStaleVersionAndSnapshotRetriesWithinTransactions().
+export const kShardOptionsForDisabledStaleShardVersionRetries = {
+    // Relax the default constraint for in-transaction metadata refreshes to avoid spurious
+    // timeouts on low-performant test environments.
+    // For ease of implementation, this reconfiguration is preferred  over the usage of
+    // transaction retry loops, since:
+    // - failpoints are used to alter the behaviour of the transaction machinery
+    // - tests disabling retries are expected check for specific transaction error codes.
+    setParameter: {metadataRefreshInTransactionMaxWaitMS: 5000}
+};
 
 // Flush each router's metadata and force refreshes on each shard for the given namespace and/or
 // database names.
