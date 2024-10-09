@@ -57,6 +57,7 @@ using DensifyExplicitNumericTest = AggregationContextFixture;
 using DensifyPartitionNumericTest = AggregationContextFixture;
 using DensifyCloneTest = AggregationContextFixture;
 using DensifyStepTest = AggregationContextFixture;
+using DensifySpecTest = AggregationContextFixture;
 using DensifyRedactionTest = AggregationContextFixture;
 
 Date_t makeDate(std::string dateStr) {
@@ -1534,6 +1535,72 @@ TEST(DensifyStepTest, InternalDensifyIsOffStepForDaysWithLargeDateStep) {
     auto base = DensifyValue(makeDate("2021-01-01T00:00:00.000Z"));
 
     ASSERT_FALSE(isOnStepRelativeTo(val, base, range));
+}
+
+TEST_F(DensifySpecTest, InvalidDensifyField) {
+    auto spec = fromjson(R"({
+        $densify: {
+            field: "a",
+            partitionByFields: ["a"],
+            range: {
+                step: 1,
+                unit: "hour",
+                bounds: [
+                    {$date: "2023-04-23T00:00:00.000Z"},
+                    {$date: "2023-04-23T08:00:00.000Z"}
+                ]
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(
+        DocumentSourceInternalDensify::createFromBson(spec.firstElement(), getExpCtx()),
+        AssertionException,
+        8993000);
+}
+
+TEST_F(DensifySpecTest, InvalidNestedDensifyField) {
+    auto spec = fromjson(R"({
+        $densify: {
+            field: "a.b",
+            partitionByFields: ["a"],
+            range: {
+                step: 1,
+                unit: "hour",
+                bounds: [
+                    {$date: "2023-04-23T00:00:00.000Z"},
+                    {$date: "2023-04-23T08:00:00.000Z"}
+                ]
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(
+        DocumentSourceInternalDensify::createFromBson(spec.firstElement(), getExpCtx()),
+        AssertionException,
+        9554500);
+}
+
+TEST_F(DensifySpecTest, InvalidNestedPartitionByFields) {
+    auto spec = fromjson(R"({
+        $densify: {
+            field: "a",
+            partitionByFields: ["a.b"],
+            range: {
+                step: 1,
+                unit: "hour",
+                bounds: [
+                    {$date: "2023-04-23T00:00:00.000Z"},
+                    {$date: "2023-04-23T08:00:00.000Z"}
+                ]
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(
+        DocumentSourceInternalDensify::createFromBson(spec.firstElement(), getExpCtx()),
+        AssertionException,
+        8993000);
 }
 
 TEST_F(DensifyRedactionTest, RedactionDateBounds) {

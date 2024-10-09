@@ -38,6 +38,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 #include <iterator>
 #include <memory>
 #include <tuple>
@@ -172,10 +173,23 @@ list<intrusive_ptr<DocumentSource>> createFromBsonInternal(
     if (spec.getPartitionByFields()) {
         auto partitionFields = (*spec.getPartitionByFields());
         for (auto& partitionField : partitionFields) {
+            // The densified field cannot be included in a partition field.
             uassert(8993000,
-                    str::stream() << DocumentSourceInternalDensify::kPartitionByFieldsFieldName
-                                  << " cannot include field that is being densified",
-                    spec.getField() != partitionField);
+                    fmt::format("{} '{}' cannot include {} '{}' that is being densified.",
+                                DocumentSourceInternalDensify::kPartitionByFieldsFieldName,
+                                partitionField,
+                                DocumentSourceInternalDensify::kFieldFieldName,
+                                spec.getField()),
+                    !partitionField.starts_with(spec.getField()));
+
+            // A partition field cannot be included in the densified field.
+            uassert(9554500,
+                    fmt::format("{} '{}' that is being densified cannot include {} '{}'.",
+                                DocumentSourceInternalDensify::kFieldFieldName,
+                                spec.getField(),
+                                DocumentSourceInternalDensify::kPartitionByFieldsFieldName,
+                                partitionField),
+                    !spec.getField().starts_with(partitionField));
             partitions.push_back(FieldPath(partitionField));
         }
     }
