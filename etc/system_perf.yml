@@ -21,6 +21,8 @@ include:
     module: dsi
   - filename: evergreen/system_perf/shared_tasks.yml
     module: dsi
+  - filename: evergreen/system_perf/8.0/genny_tasks.yml
+    module: genny
   ### lint_yaml trim end ###
 
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
@@ -52,19 +54,6 @@ variables:
     - PrivateWorkloads
     - flamegraph
 
-  _schedule_variant_auto_tasks_task: &schedule_variant_auto_tasks_task
-    name: schedule_variant_auto_tasks
-    activate: false
-    depends_on:
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-
-  _schedule_patch_auto_tasks_task: &schedule_patch_auto_tasks_task
-    name: schedule_patch_auto_tasks
-    activate: false
-    depends_on:
-      - name: schedule_global_auto_tasks
-        variant: task_generation
 
   _shared_compile_expansions: &shared_compile_expansions
     platform: linux
