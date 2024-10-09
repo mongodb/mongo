@@ -553,7 +553,8 @@ Status validate(OperationContext* opCtx,
                 ValidateResults* results,
                 BSONObjBuilder* output,
                 const SerializationContext& sc) {
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair);
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair ||
+              storageGlobalParams.validate);
 
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.

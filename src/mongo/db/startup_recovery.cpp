@@ -55,6 +55,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -799,6 +800,51 @@ void startupRepair(OperationContext* opCtx,
     }
 }
 
+// Perform collection validation for all collections in all databases
+void offlineValidate(OperationContext* opCtx) {
+    invariant(!storageGlobalParams.queryableBackupMode);
+    bool allResultsValid = true;
+
+    for (const auto& dbName : CollectionCatalog::get(opCtx)->getAllDbNames()) {
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+        databaseHolder->openDb(opCtx, dbName);
+
+        for (const auto& nss :
+             CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName)) {
+            opCtx->checkForInterrupt();
+
+            ValidateResults validateResults;
+            BSONObjBuilder results;
+            Status status = CollectionValidation::validate(
+                opCtx,
+                nss,
+                {CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount,
+                 CollectionValidation::RepairMode::kNone,
+                 /*logDiagnostics=*/false},
+                &validateResults,
+                &results);
+
+            if (!status.isOK()) {
+                uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
+                                 str::stream()
+                                     << "Validation of collection " << nss.toStringForErrorMsg()
+                                     << " failed with error " << status.toString()
+                                     << ", see logs for more details"});
+                return;
+            } else {
+                allResultsValid &= validateResults.isValid();
+                validateResults.appendToResultObj(&results, /*debug=*/false);
+                LOGV2(9437301, "Offline validation result", "results"_attr = results.done());
+            }
+        }
+    }
+    if (allResultsValid) {
+        LOGV2(9437303, "Offline validation successfully validated all collections");
+    } else {
+        LOGV2(9437304, "Offline validation found issues in some collections, see logs for details");
+    }
+}
+
 // Perform routine startup recovery procedure.
 // The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
 // this function into one single builder that records the time elapsed during startup. Its default
@@ -894,6 +940,8 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 
     if (storageGlobalParams.repair) {
         startupRepair(opCtx, storageEngine, startupTimeElapsedBuilder);
+    } else if (storageGlobalParams.validate) {
+        offlineValidate(opCtx);
     } else {
         startupRecovery(opCtx,
                         storageEngine,

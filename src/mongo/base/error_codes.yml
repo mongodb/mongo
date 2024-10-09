@@ -848,6 +848,7 @@ error_codes:
   - {code: 430, name: IndexKeyOrderViolation}
 
   - {code: 431, name: ChunkMetadataInconsistency}
+  - {code: 432, name: OfflineValidationFailedToComplete}
 
   # Error codes 4000-8999 are reserved.
 

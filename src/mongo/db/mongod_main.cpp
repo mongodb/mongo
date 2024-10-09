@@ -704,6 +704,14 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
             "Wrong mongod version",
             "error"_attr = error.toStatus().reason());
         exitCleanly(ExitCode::needDowngrade);
+    } catch (const ExceptionFor<ErrorCodes::OfflineValidationFailedToComplete>& e) {
+        LOGV2_ERROR(9437300, "Offline validation failed", "error"_attr = e.toString());
+        exitCleanly(ExitCode::fail);
+    }
+
+    if (storageGlobalParams.validate) {
+        LOGV2(9437302, "Finished validating collections");
+        exitCleanly(ExitCode::clean);
     }
 
     // If we are on standalone, load cluster parameters from disk. If we are replicated, this is not

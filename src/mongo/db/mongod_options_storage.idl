@@ -139,6 +139,11 @@ configs:
         arg_vartype: Switch
         source: [ cli, ini ]
 
+    validate:
+        description: 'Run validation on all collections'
+        arg_vartype: Switch
+        source: [ cli, ini ]
+
     restore:
         description: >-
             This should only be used when restoring from a backup. Mongod will behave differently by

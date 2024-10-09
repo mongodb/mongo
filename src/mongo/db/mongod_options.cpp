@@ -561,6 +561,9 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.upgrade = 1;  // --repair implies --upgrade
         storageGlobalParams.repair = 1;
     }
+    if (params.count("validate") && params["validate"].as<bool>() == true) {
+        storageGlobalParams.validate = 1;
+    }
     if (params.count("upgrade") && params["upgrade"].as<bool>() == true) {
         storageGlobalParams.upgrade = 1;
     }

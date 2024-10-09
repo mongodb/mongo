@@ -74,6 +74,10 @@ struct StorageGlobalParams {
     // Runs a repair routine on all databases.
     bool repair;
 
+    // --validate
+    // Runs validation on all collections.
+    bool validate;
+
     // --restore
     // This should only be used when restoring from a backup. Mongod will behave differently by
     // handling collections with missing data files, allowing database renames, skipping oplog

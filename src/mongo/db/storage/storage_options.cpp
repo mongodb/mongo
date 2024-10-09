@@ -51,6 +51,7 @@ void StorageGlobalParams::reset() {
     dbpath = kDefaultDbPath;
     upgrade = false;
     repair = false;
+    validate = false;
     restore = false;
     magicRestore = false;
 
