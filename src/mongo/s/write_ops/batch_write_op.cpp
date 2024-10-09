@@ -769,12 +769,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
         }
     }
 
-    // Only return a write concern error if everything succeeded (unordered or ordered)
-    // OR if something succeeded and we're unordered
-    const bool orderedOps = _clientRequest.getWriteCommandRequestBase().getOrdered();
-    const bool reportWCError =
-        errOps.empty() || (!orderedOps && errOps.size() < _clientRequest.sizeWriteOps());
-    if (!_wcErrors.empty() && reportWCError) {
+    if (!_wcErrors.empty()) {
         WriteConcernErrorDetail* error = new WriteConcernErrorDetail;
 
         // Generate the multi-error message below
