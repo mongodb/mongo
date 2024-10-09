@@ -1740,9 +1740,9 @@ env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), "AddOption
 env.Prepend(CCFLAGS="$TOOLCHAIN_CCFLAGS")
 env.Prepend(LINKFLAGS="$TOOLCHAIN_LINKFLAGS")
 
-if not mongo_toolchain_execroot:
-    os.environ["CC"] = env.get("CC", os.environ.get("CC"))
-    os.environ["CXX"] = env.get("CXX", os.environ.get("CXX"))
+if ARGUMENTS.get("CC") and ARGUMENTS.get("CXX"):
+    os.environ["CC"] = env.get("CC")
+    os.environ["CXX"] = env.get("CXX")
     os.environ["USE_NATIVE_TOOLCHAIN"] = "1"
 
 # Early load to setup env functions

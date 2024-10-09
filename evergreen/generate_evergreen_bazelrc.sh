@@ -9,8 +9,14 @@ set -o verbose
 # Use the Evergreen temp directory to avoid filling up the disk.
 mkdir -p $TMPDIR
 if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
+  mkdir -p Z:/bazel_tmp
+  touch Z:/bazel_tmp/mci_path
   # TODO(SERVER-94605): remove when Windows temp directory is cleared between task runs
-  rm -rf Z:/bazel_tmp/* || true
+  if [[ "$PWD" != "$(cat Z:/bazel_tmp/mci_path)" ]]; then
+    echo "Clearing bazel output root from previous task mci '$(cat Z:/bazel_tmp/mci_path)'"
+    rm -rf Z:/bazel_tmp/* || true
+    echo $PWD > Z:/bazel_tmp/mci_path
+  fi
 
   # Z:/ path is necessary to avoid running into MSVC's file length limit,
   # see https://jira.mongodb.org/browse/DEVPROD-11126
