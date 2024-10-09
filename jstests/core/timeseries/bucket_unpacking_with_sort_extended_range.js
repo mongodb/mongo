@@ -23,31 +23,34 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
+const dbName = jsTestName();
+const testDB = db.getSiblingDB(dbName);
+
 function getNonConfigShards() {
-    const shards = db.getSiblingDB('config').shards.find({_id: {$ne: "config"}}).toArray();
+    const shards = testDB.getSiblingDB('config').shards.find({_id: {$ne: "config"}}).toArray();
     return shards.map(doc => doc._id);
 }
 
 const nonConfigShards = getNonConfigShards();
 
 if (FixtureHelpers.isMongos(db)) {
-    const dbName = db.getName();
-    db.getSiblingDB(dbName).dropDatabase();
+    testDB.dropDatabase();
     assert.commandWorked(
-        db.adminCommand({enableSharding: dbName, primaryShard: nonConfigShards[0]}));
+        testDB.adminCommand({enableSharding: dbName, primaryShard: nonConfigShards[0]}));
 }
 
 // Create unindexed collection
-const coll = db.timeseries_internal_bounded_sort_extended_range;
-const buckets = db['system.buckets.' + coll.getName()];
+const coll = testDB.timeseries_internal_bounded_sort_extended_range;
+const buckets = testDB['system.buckets.' + coll.getName()];
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 't'}}));
+assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: 't'}}));
 
 // Create collection indexed on time
-const collIndexed = db.timeseries_internal_bounded_sort_extended_range_with_index;
-const bucketsIndexed = db['system.buckets.' + collIndexed.getName()];
+const collIndexed = testDB.timeseries_internal_bounded_sort_extended_range_with_index;
+const bucketsIndexed = testDB['system.buckets.' + collIndexed.getName()];
 collIndexed.drop();
-assert.commandWorked(db.createCollection(collIndexed.getName(), {timeseries: {timeField: 't'}}));
+assert.commandWorked(
+    testDB.createCollection(collIndexed.getName(), {timeseries: {timeField: 't'}}));
 assert.commandWorked(collIndexed.createIndex({'t': 1}));
 
 jsTestLog(collIndexed.getIndexes());
