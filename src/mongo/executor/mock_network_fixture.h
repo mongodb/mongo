@@ -42,10 +42,15 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
@@ -202,6 +207,19 @@ public:
             return _allowedTimes == 0;
         }
 
+        int executionsRemaining() const {
+            return _allowedTimes;
+        }
+
+        virtual void logIfUnsatisfied() {
+            if (!isSatisfied()) {
+                LOGV2(9467602,
+                      "Unsatisfied expectation found",
+                      "executionsRemaining"_attr = executionsRemaining(),
+                      "expectedResponse"_attr = _action(BSONObj()));
+            }
+        }
+
         // May throw.
         virtual void checkSatisfied() {}
 
@@ -254,6 +272,10 @@ public:
 
         bool isDefault() const override {
             return true;
+        }
+
+        void logIfUnsatisfied() override {
+            // We do not want to log default expectations.
         }
     };
 
@@ -353,11 +375,13 @@ public:
     void runUntilIdle();
 
     // Run until both the executor and the network are idle and all expectations are satisfied.
-    // Otherwise, it hangs forever.
-    void runUntilExpectationsSatisfied();
+    // Otherwise, it fatal logs after timeoutSeconds.
+    void runUntilExpectationsSatisfied(
+        std::chrono::seconds timeoutSeconds = std::chrono::seconds(120));
 
 private:
     bool _allExpectationsSatisfied() const;
+    void _logUnsatisfiedExpectations() const;
 
     std::vector<std::unique_ptr<Expectation>> _expectations;
     std::unique_ptr<Sequence> _activeSequence;
@@ -367,3 +391,5 @@ private:
 }  // namespace mock
 }  // namespace test
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

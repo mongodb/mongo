@@ -28,17 +28,11 @@
  */
 
 
-#include <list>
-
+#include "mongo/executor/mock_network_fixture.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/executor/mock_network_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/intrusive_counter.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -64,6 +58,12 @@ bool MockNetwork::_allExpectationsSatisfied() const {
     return std::all_of(_expectations.begin(), _expectations.end(), [](const auto& exp) {
         return exp->isDefault() || exp->isSatisfied();
     });
+}
+
+void MockNetwork::_logUnsatisfiedExpectations() const {
+    for (const auto& expectation : _expectations) {
+        expectation->logIfUnsatisfied();
+    }
 }
 
 void MockNetwork::runUntilIdle() {
@@ -133,11 +133,16 @@ void MockNetwork::runUntilIdle() {
     } while (_net->hasReadyNetworkOperations());
 }
 
-void MockNetwork::runUntilExpectationsSatisfied() {
+void MockNetwork::runUntilExpectationsSatisfied(std::chrono::seconds timeoutSeconds) {
+    Timer timer;
     // If there exist extra threads beside the executor and the mock/test thread, when the
     // network is idle, the extra threads may be running and will schedule new requests. As a
     // result, the current best practice is to busy-loop to prepare for that.
     while (!_allExpectationsSatisfied()) {
+        if (timer.seconds() > timeoutSeconds.count()) {
+            _logUnsatisfiedExpectations();
+            LOGV2_FATAL(9467601, "Still waiting on expectations past the timeout period.");
+        }
         runUntilIdle();
     }
 }
