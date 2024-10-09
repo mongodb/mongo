@@ -154,14 +154,6 @@ ChangeSyncSourceAction DataReplicatorExternalStateBackgroundSync::shouldStopFetc
     const rpc::OplogQueryMetadata& oqMetadata,
     const OpTime& previousOpTimeFetched,
     const OpTime& lastOpTimeFetched) const {
-    if (getReplicationCoordinator()->shouldDropSyncSourceAfterShardSplit(
-            replMetadata.getReplicaSetId())) {
-        // Drop the last batch of message following a change of replica set due to a shard split.
-        LOGV2(6493902,
-              "Choosing new sync source because we have joined a new replica set following a shard "
-              "split.");
-        return ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
-    }
 
     if (_bgsync->shouldStopFetching()) {
         return ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch;

@@ -573,10 +573,6 @@ bool ReplicationCoordinatorMock::getMaintenanceMode() {
     return false;
 }
 
-bool ReplicationCoordinatorMock::shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const {
-    return false;
-}
-
 Status ReplicationCoordinatorMock::processReplSetSyncFrom(OperationContext* opCtx,
                                                           const HostAndPort& target,
                                                           BSONObjBuilder* resultObj) {

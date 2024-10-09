@@ -1464,14 +1464,6 @@ void ReplicationCoordinatorImpl::signalWriterDrainComplete(OperationContext* opC
                                                            long long termWhenExhausted) noexcept {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    if (_oplogSyncState == OplogSyncState::WriterDrainingForShardSplit) {
-        _oplogSyncState = OplogSyncState::ApplierDrainingForShardSplit;
-        auto memberState = _getMemberState(lk);
-        invariant(memberState.secondary() || memberState.startup());
-        _externalState->onWriterDrainComplete(opCtx);
-        return;
-    }
-
     if (_oplogSyncState != OplogSyncState::WriterDraining) {
         LOGV2(8938400, "Writer already left draining state, exiting");
         return;
@@ -1489,23 +1481,6 @@ void ReplicationCoordinatorImpl::signalWriterDrainComplete(OperationContext* opC
 
 void ReplicationCoordinatorImpl::signalApplierDrainComplete(OperationContext* opCtx,
                                                             long long termWhenExhausted) noexcept {
-    {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (_oplogSyncState ==
-            ReplicationCoordinator::OplogSyncState::ApplierDrainingForShardSplit) {
-            _oplogSyncState = OplogSyncState::Stopped;
-            auto memberState = _getMemberState(lk);
-            invariant(memberState.secondary() || memberState.startup());
-            _externalState->onApplierDrainComplete(opCtx);
-
-            if (_finishedDrainingPromise) {
-                _finishedDrainingPromise->emplaceValue();
-                _finishedDrainingPromise = boost::none;
-            }
-
-            return;
-        }
-    }
 
     // This logic is a little complicated in order to avoid acquiring the RSTL in mode X
     // unnecessarily.  This is important because the applier may call signalApplierDrainComplete()
@@ -3987,13 +3962,6 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* opCtx, b
     return Status::OK();
 }
 
-bool ReplicationCoordinatorImpl::shouldDropSyncSourceAfterShardSplit(const OID replicaSetId) const {
-    if (!_settings.isServerless()) {
-        return false;
-    }
-    return replicaSetId != _rsConfig.getConfig().getReplicaSetId();
-}
-
 Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* opCtx,
                                                           const HostAndPort& target,
                                                           BSONObjBuilder* resultObj) {
@@ -5462,19 +5430,6 @@ void ReplicationCoordinatorImpl::_enterDrainMode(WithLock) {
     _externalState->stopProducer();
 }
 
-Future<void> ReplicationCoordinatorImpl::_drainForShardSplit() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(!_finishedDrainingPromise.has_value());
-    auto [promise, future] = makePromiseFuture<void>();
-    _finishedDrainingPromise = std::move(promise);
-    _oplogSyncState = feature_flags::gReduceMajorityWriteLatency.isEnabled(
-                          serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
-        ? OplogSyncState::WriterDrainingForShardSplit
-        : OplogSyncState::ApplierDrainingForShardSplit;
-    _externalState->stopProducer();
-    return std::move(future);
-}
-
 ReplicationCoordinatorImpl::PostMemberStateUpdateAction
 ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
                                                 OperationContext* opCtx,
@@ -5900,14 +5855,6 @@ ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSource(
     const rpc::OplogQueryMetadata& oqMetadata,
     const OpTime& previousOpTimeFetched,
     const OpTime& lastOpTimeFetched) const {
-    if (shouldDropSyncSourceAfterShardSplit(replMetadata.getReplicaSetId())) {
-        // Drop the last batch of message following a change of replica set due to a shard split.
-        LOGV2(6394902,
-              "Choosing new sync source because we left the replica set due to a shard split.",
-              "currentReplicaSetId"_attr = _rsConfig.getConfig().getReplicaSetId(),
-              "otherReplicaSetId"_attr = replMetadata.getReplicaSetId());
-        return ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent;
-    }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     const auto now = _replExecutor->now();

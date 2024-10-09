@@ -493,10 +493,6 @@ ChangeSyncSourceAction ReplicationCoordinatorNoOp::shouldChangeSyncSource(
     MONGO_UNREACHABLE;
 }
 
-bool ReplicationCoordinatorNoOp::shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const {
-    MONGO_UNREACHABLE;
-}
-
 void ReplicationCoordinatorNoOp::advanceCommitPoint(const OpTimeAndWallTime&, bool fromSyncSource) {
     MONGO_UNREACHABLE;
 }

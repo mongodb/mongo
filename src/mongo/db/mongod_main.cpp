@@ -198,8 +198,6 @@
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_lifecycle_monitor.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/serverless/shard_split_donor_op_observer.h"
-#include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_rs_endpoint.h"
 #include "mongo/db/service_entry_point_shard_role.h"
@@ -446,7 +444,6 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     if (getGlobalReplSettings().isServerless()) {
         services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
         services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
-        services.push_back(std::make_unique<ShardSplitDonorService>(serviceContext));
         services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
     }
 
@@ -1513,7 +1510,6 @@ void setUpObservers(ServiceContext* serviceContext) {
                 std::make_unique<repl::TenantMigrationDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-            opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
@@ -1543,7 +1539,6 @@ void setUpObservers(ServiceContext* serviceContext) {
                 std::make_unique<repl::TenantMigrationDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-            opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }

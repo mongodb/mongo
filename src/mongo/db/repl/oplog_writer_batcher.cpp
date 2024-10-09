@@ -225,8 +225,7 @@ boost::optional<long long> OplogWriterBatcher::_isBufferExhausted(OperationConte
 
     // Draining state guarantees the producer has already been fully stopped and no more
     // operations will be pushed in to the oplog buffer until the OplogSyncState changes.
-    auto isDraining = syncState == ReplicationCoordinator::OplogSyncState::WriterDraining ||
-        syncState == ReplicationCoordinator::OplogSyncState::WriterDrainingForShardSplit;
+    auto isDraining = syncState == ReplicationCoordinator::OplogSyncState::WriterDraining;
 
     if (isDraining && _oplogBuffer->isEmpty()) {
         return termWhenExhausted;

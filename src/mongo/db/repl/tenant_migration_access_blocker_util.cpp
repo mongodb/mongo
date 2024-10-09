@@ -68,7 +68,6 @@
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
-#include "mongo/db/serverless/shard_split_state_machine_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/task_executor.h"
@@ -615,56 +614,6 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
 
     mergeRecipientStore.forEach(opCtx, {}, [&](const ShardMergeRecipientDocument& doc) {
         return recoverShardMergeRecipientAccessBlockers(opCtx, doc);
-    });
-
-    // Recover TenantMigrationDonorAccessBlockers for ShardSplit.
-    PersistentTaskStore<ShardSplitDonorDocument> shardSplitDonorStore(
-        NamespaceString::kShardSplitDonorsNamespace);
-
-    shardSplitDonorStore.forEach(opCtx, {}, [&](const ShardSplitDonorDocument& doc) {
-        // Skip creating a TenantMigrationDonorAccessBlocker for terminal shard split that have been
-        // marked as garbage collected.
-        if (doc.getExpireAt() &&
-            (doc.getState() == ShardSplitDonorStateEnum::kCommitted ||
-             doc.getState() == ShardSplitDonorStateEnum::kAborted)) {
-            return true;
-        }
-
-        auto optionalTenants = doc.getTenantIds();
-        invariant(optionalTenants);
-        for (const auto& tenantId : optionalTenants.value()) {
-            auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-                opCtx->getServiceContext(), doc.getId());
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .add(tenantId, mtab);
-
-            switch (doc.getState()) {
-                case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
-                    break;
-                case ShardSplitDonorStateEnum::kBlocking:
-                case ShardSplitDonorStateEnum::kRecipientCaughtUp:
-                    invariant(doc.getBlockOpTime());
-                    mtab->startBlockingWrites();
-                    mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
-                    break;
-                case ShardSplitDonorStateEnum::kCommitted:
-                    invariant(doc.getBlockOpTime());
-                    mtab->startBlockingWrites();
-                    mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
-                    mtab->setCommitOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
-                    break;
-                case ShardSplitDonorStateEnum::kAborted:
-                    if (doc.getBlockOpTime()) {
-                        mtab->startBlockingWrites();
-                        mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
-                    }
-                    mtab->setAbortOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
-                    break;
-                case ShardSplitDonorStateEnum::kUninitialized:
-                    MONGO_UNREACHABLE;
-            }
-        }
-        return true;
     });
 }
 

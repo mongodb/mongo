@@ -19,6 +19,7 @@ const fullNs = dbName + "." + collName;
 const isAnInternalCommand = "internal command";
 const isNotAUserDataRead = "does not return user data";
 const isPrimaryOnly = "primary only";
+const isDeprecated = "deprecated command";
 
 const allCommands = {
     _addShard: {skip: isPrimaryOnly},
@@ -250,9 +251,9 @@ const allCommands = {
     donorForgetMigration: {skip: isPrimaryOnly},
     donorStartMigration: {skip: isPrimaryOnly},
     donorWaitForMigrationToCommit: {skip: isPrimaryOnly},
-    abortShardSplit: {skip: isPrimaryOnly},
-    commitShardSplit: {skip: isPrimaryOnly},
-    forgetShardSplit: {skip: isPrimaryOnly},
+    abortShardSplit: {skip: isDeprecated},
+    commitShardSplit: {skip: isDeprecated},
+    forgetShardSplit: {skip: isDeprecated},
     drop: {skip: isPrimaryOnly},
     dropAllRolesFromDatabase: {skip: isPrimaryOnly},
     dropAllUsersFromDatabase: {skip: isPrimaryOnly},

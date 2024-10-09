@@ -264,8 +264,6 @@ public:
 
     Status setMaintenanceMode(OperationContext*, bool) final;
 
-    bool shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const final;
-
     Status processReplSetSyncFrom(OperationContext*, const HostAndPort&, BSONObjBuilder*) final;
 
     Status processReplSetFreeze(int, BSONObjBuilder*) final;

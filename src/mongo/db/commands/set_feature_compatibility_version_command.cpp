@@ -112,7 +112,6 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -1642,11 +1641,6 @@ private:
                 ->lookupServiceByName(
                     repl::TenantMigrationRecipientService::kTenantMigrationRecipientServiceName));
         recipientService->abortAllMigrations(opCtx);
-
-        auto splitDonorService = checked_cast<ShardSplitDonorService*>(
-            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                ->lookupServiceByName(ShardSplitDonorService::kServiceName));
-        splitDonorService->abortAllSplits(opCtx);
 
         auto mergeRecipientService = checked_cast<repl::ShardMergeRecipientService*>(
             repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())

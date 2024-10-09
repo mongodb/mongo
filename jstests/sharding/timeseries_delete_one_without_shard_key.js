@@ -105,7 +105,7 @@ const data = [
 // Set up a sharded time-series collection and split up the data points across 2 shards.
 const setUpShardedTimeseriesCollection = function(collName) {
     const testColl = testDB[collName];
-    let shardSplitObject = null;
+    let splitObject = null;
 
     if (collName == collNameWithoutMeta) {
         assert.commandWorked(testDB.createCollection(
@@ -115,14 +115,14 @@ const setUpShardedTimeseriesCollection = function(collName) {
 
         // In the measurements used for this test, timestamps use either year 2000 or year 2010 so
         // this split key in the year 2005 splits measurements across 2 shards accordingly.
-        shardSplitObject = {"control.min.time": ISODate("2005-05-18T08:00:00.000Z")};
+        splitObject = {"control.min.time": ISODate("2005-05-18T08:00:00.000Z")};
     } else {
         assert.commandWorked(testDB.createCollection(
             collName,
             {timeseries: {timeField: "time", metaField: "location", granularity: "hours"}}));
         assert.commandWorked(testDB.adminCommand(
             {shardCollection: testColl.getFullName(), key: {"location.shardNumber": 1}}));
-        shardSplitObject = {"meta.shardNumber": 1};
+        splitObject = {"meta.shardNumber": 1};
     }
 
     assert.commandWorked(testColl.insertMany(data, {ordered: false}));
@@ -131,12 +131,12 @@ const setUpShardedTimeseriesCollection = function(collName) {
 
     // Shard 0 :   2 Corks   |   2 Dublins   |   1 New York City
     // Shard 1 :   2 Dublins |   2 Galways   |   2 New York Citys
-    assert.commandWorked(st.s.adminCommand({split: bucketCollFullName, middle: shardSplitObject}));
+    assert.commandWorked(st.s.adminCommand({split: bucketCollFullName, middle: splitObject}));
 
     // Move chunks to the other shard.
     assert.commandWorked(st.s.adminCommand({
         movechunk: bucketCollFullName,
-        find: shardSplitObject,
+        find: splitObject,
         to: otherShard.shardName,
         _waitForDelete: true
     }));

@@ -560,39 +560,6 @@ server_parameters:
             gte: 0
         redact: false
 
-    maxShardSplitDonorServiceThreadPoolSize:
-        description: >-
-            The maximum number of threads in the shard split donor service's thread pool.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: maxShardSplitDonorServiceThreadPoolSize
-        default: 8
-        validator:
-            gte: 1
-        redact: false
-    
-    minShardSplitDonorServiceThreadPoolSize:
-        description: >-
-            The minimum number of threads in the shard split donor service's thread pool.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: minShardSplitDonorServiceThreadPoolSize
-        default: 0
-        validator:
-            gte: 1
-        redact: false
-
-    shardSplitTimeoutMS:
-        description: >-
-            Period of time, in milliseconds, after which a shard split should be interrupted.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: shardSplitTimeoutMS
-        default: 10000
-        validator:
-            gte: 1
-        redact: false
-
     tenantMigrationBlockingStateTimeoutMS:
         description: >-
             Period of time, in milliseconds, after which the blocking state should be interrupted.
@@ -734,17 +701,6 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: allowMultipleArbiters
         default: false
-        redact: false
-
-    shardSplitGarbageCollectionDelayMS:
-        description: >-
-            The amount of time in milliseconds that the donor should wait before
-            removing the shard split state document after receiving  forgetShardSplit.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: shardSplitGarbageCollectionDelayMS
-        default:
-            expr: 15 * 60 * 1000
         redact: false
 
     slowServiceOnStepUpBeginThresholdMS:

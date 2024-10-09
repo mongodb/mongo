@@ -380,8 +380,6 @@ public:
 
     bool getMaintenanceMode() override;
 
-    bool shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const override;
-
     Status processReplSetSyncFrom(OperationContext* opCtx,
                                   const HostAndPort& target,
                                   BSONObjBuilder* resultObj) override;
@@ -1806,12 +1804,6 @@ private:
      * Finish catch-up mode and start drain mode.
      */
     void _enterDrainMode(WithLock);
-
-    /**
-     * Enter drain mode which does not result in a primary stepup. Returns a future which becomes
-     * ready when the oplog buffers have completed draining.
-     */
-    Future<void> _drainForShardSplit();
 
     /**
      * Waits for the config state to leave kConfigStartingUp, which indicates that start() has

@@ -80,7 +80,6 @@ const StringDataSet kConfigCollections{
     NamespaceString::kShardIndexCatalogNamespace.coll(),
     NamespaceString::kShardingDDLCoordinatorsNamespace.coll(),
     NamespaceString::kShardingRenameParticipantsNamespace.coll(),
-    NamespaceString::kShardSplitDonorsNamespace.coll(),
     NamespaceString::kTenantMigrationDonorsNamespace.coll(),
     NamespaceString::kTenantMigrationRecipientsNamespace.coll(),
     NamespaceString::kTransactionCoordinatorsNamespace.coll(),

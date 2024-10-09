@@ -614,17 +614,11 @@ public:
      *
      * When a node steps down during catchup mode, the states remain the same (producer: Running,
      * writer: Running, applier: Running).
-     *
-     * WriterDrainingForShardSplit and ApplierDrainingForShardSplit follow the same state diagram
-     * as Draining, they only exist to hint the signalApplierDrainComplete method that it should
-     * not follow the primary step-up logic.
      */
     enum class OplogSyncState {
         Running,
         WriterDraining,
-        WriterDrainingForShardSplit,
         ApplierDraining,
-        ApplierDrainingForShardSplit,
         Stopped,
     };
 
@@ -837,13 +831,6 @@ public:
      * Retrieves the current count of maintenanceMode and returns 'true' if greater than 0.
      */
     virtual bool getMaintenanceMode() = 0;
-
-    /**
-     * Returns true if serverless mode is enabled and the replicaSetId differs from the current
-     * replicaSetId. It signals the sync source should be dropped and the new batch of oplogs should
-     * be discarded.
-     */
-    virtual bool shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const = 0;
 
     /**
      * Handles an incoming replSetSyncFrom command. Adds BSON to 'result'

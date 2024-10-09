@@ -82,6 +82,7 @@ import {
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
 const isUnrelated = "is unrelated";
+const isDeprecated = "deprecated command";
 
 let viewsCommandTests = {
     _addShard: {skip: isAnInternalCommand},
@@ -382,9 +383,9 @@ let viewsCommandTests = {
     donorForgetMigration: {skip: isUnrelated},
     donorStartMigration: {skip: isUnrelated},
     donorWaitForMigrationToCommit: {skip: isUnrelated},
-    abortShardSplit: {skip: isUnrelated},
-    commitShardSplit: {skip: isUnrelated},
-    forgetShardSplit: {skip: isUnrelated},
+    abortShardSplit: {skip: isDeprecated},
+    commitShardSplit: {skip: isDeprecated},
+    forgetShardSplit: {skip: isDeprecated},
     drop: {command: {drop: "view"}},
     dropAllRolesFromDatabase: {skip: isUnrelated},
     dropAllUsersFromDatabase: {skip: isUnrelated},

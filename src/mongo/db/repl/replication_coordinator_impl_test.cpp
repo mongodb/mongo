@@ -2619,62 +2619,6 @@ TEST_F(ReplCoordTest, ShouldChangeSyncSource) {
               ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch);
 }
 
-TEST_F(ReplCoordTest, ServerlessNodeShouldChangeSyncSourceAfterSplit) {
-    // Test that ReplicationCoordinator will correctly stop enqueuing messages from the donor and
-    // change sync source when started in serverless mode and the replicaSetId changes.
-
-    ReplSettings settings;
-    settings.setServerlessMode();
-    init(settings);
-
-    const OID replicaSetId = OID::gen();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1 << "settings"
-                             << BSON("replicaSetId" << replicaSetId));
-
-    assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplSetConfig config = assertMakeRSConfig(configObj);
-
-    getTopoCoord().updateConfig(config, 1, getNet()->now());
-
-    OplogQueryMetadata opMetaData(OpTimeAndWallTime(),
-                                  OpTime(Timestamp(1, 1), 1),
-                                  OpTime(Timestamp(1, 1), 1),
-                                  1,
-                                  0 /* currentPrimaryIndex */,
-                                  1,
-                                  "");
-    ReplSetMetadata rsMeta(
-        0, OpTimeAndWallTime(), OpTime(), 1, 0, replicaSetId, 1, true /* isPrimary */);
-
-    // Continue syncing when the node is in the replica set and the replicaSetId is the same.
-    ASSERT_EQ(getReplCoord()->shouldChangeSyncSource(
-                  HostAndPort("node1", 12345), rsMeta, opMetaData, OpTime(), OpTime()),
-              ChangeSyncSourceAction::kContinueSyncing);
-
-    // Enqueue final message but stop syncing when the replicaSetId is the same but the node is not
-    // in the replica set anymore.
-    ASSERT_EQ(getReplCoord()->shouldChangeSyncSource(
-                  HostAndPort("node4", 12345), rsMeta, opMetaData, OpTime(), OpTime()),
-              ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch);
-
-    // Discard messages and stop syncing when the node is not in the replica set anymore and the
-    // replicaSetId has changed. This case occurs after a successfull shard split.
-    ReplSetMetadata rsMeta2(
-        0, OpTimeAndWallTime(), OpTime(), 1, 0, OID::gen(), 1, false /* isPrimary */);
-    ASSERT_EQ(getReplCoord()->shouldChangeSyncSource(
-                  HostAndPort("node4", 12345), rsMeta2, opMetaData, OpTime(), OpTime()),
-              ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent);
-}
-
 TEST_F(ReplCoordTest, SingleNodeReplSetUnfreeze) {
     init();
 

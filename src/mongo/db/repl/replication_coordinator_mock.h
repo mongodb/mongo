@@ -300,8 +300,6 @@ public:
 
     bool getMaintenanceMode() override;
 
-    bool shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const override;
-
     Status processReplSetSyncFrom(OperationContext* opCtx,
                                   const HostAndPort& target,
                                   BSONObjBuilder* resultObj) override;

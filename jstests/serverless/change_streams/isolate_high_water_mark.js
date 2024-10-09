@@ -14,10 +14,8 @@ import {
 } from "jstests/serverless/libs/change_collection_util.js";
 
 const tenantIds = [ObjectId(), ObjectId()];
-const rst = new ChangeStreamMultitenantReplicaSetTest({
-    nodes: 3,
-    nodeOptions: {setParameter: {shardSplitGarbageCollectionDelayMS: 0, ttlMonitorSleepSecs: 1}}
-});
+const rst = new ChangeStreamMultitenantReplicaSetTest(
+    {nodes: 3, nodeOptions: {setParameter: {ttlMonitorSleepSecs: 1}}});
 
 const primary = rst.getPrimary();
 const tenant1Conn =

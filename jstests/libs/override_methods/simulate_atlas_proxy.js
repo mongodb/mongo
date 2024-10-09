@@ -1,7 +1,7 @@
 /**
  * Overrides the runCommand method to prefix all databases and namespaces ("config", "admin",
  * "local" excluded) with a tenant prefix, so that the accessed data will be migrated by the
- * background operations run by the ContinuousTenantMigration and ContinuousShardSplit hooks.
+ * background operations run by the ContinuousTenantMigration hooks.
  */
 
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
@@ -90,13 +90,6 @@ function closeRoutingConnection(conn) {
 
     // For all other connections we are safe to call close directly
     conn.close();
-}
-
-/**
- * @returns Whether we are running a shard split passthrough.
- */
-function isShardSplitPassthrough() {
-    return !!TestData.splitPassthrough;
 }
 
 /**
@@ -264,7 +257,7 @@ function convertServerConnectionStringToURI(input) {
  * that there is only one such operation.
  */
 function getOperationStateDocument(conn) {
-    const collection = isShardSplitPassthrough() ? "shardSplitDonors" : "tenantMigrationDonors";
+    const collection = "tenantMigrationDonors";
     let filter = {tenantId: TestData.tenantId};
     if (usingMultipleTenants()) {
         let tenantIds = [];
@@ -280,10 +273,6 @@ function getOperationStateDocument(conn) {
     assert.eq(docs.length, 1, tojson(docs));
 
     const result = docs[0];
-    if (isShardSplitPassthrough()) {
-        result.recipientConnectionString =
-            convertServerConnectionStringToURI(result.recipientConnectionString);
-    }
 
     return result;
 }
@@ -535,10 +524,6 @@ function runCommandRetryOnTenantMigrationErrors(
                 });
 
                 recordRerouteDueToTenantMigration(donorConnection, migrationStateDoc);
-
-                if (isShardSplitPassthrough()) {
-                    closeRoutingConnection(donorConnection);
-                }
             } else if (migrationAbortedErr) {
                 jsTestLog(`Got TenantMigrationAborted for command against database ${
                               dbNameWithTenantId} after trying ${numAttempts} times: ` +

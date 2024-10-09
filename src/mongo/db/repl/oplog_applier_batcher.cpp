@@ -421,9 +421,7 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
 
             // Draining state guarantees the producer has already been fully stopped and no more
             // operations will be pushed in to the oplog buffer until the OplogSyncState changes.
-            auto isDraining =
-                syncState == ReplicationCoordinator::OplogSyncState::ApplierDraining ||
-                syncState == ReplicationCoordinator::OplogSyncState::ApplierDrainingForShardSplit;
+            auto isDraining = syncState == ReplicationCoordinator::OplogSyncState::ApplierDraining;
 
             // Check the oplog buffer after the applier state to ensure the producer is stopped.
             if (isDraining && _oplogBuffer->isEmpty()) {

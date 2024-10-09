@@ -59,7 +59,6 @@
 #include "mongo/db/s/query_analysis_op_observer_shardsvr.h"
 #include "mongo/db/s/resharding/resharding_op_observer.h"
 #include "mongo/db/s/shard_server_op_observer.h"
-#include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/timeseries/timeseries_op_observer.h"
@@ -171,7 +170,6 @@ void setUpObservers(ServiceContext* serviceContext, ClusterRole clusterRole, boo
                 std::make_unique<repl::TenantMigrationDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-            opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
@@ -201,7 +199,6 @@ void setUpObservers(ServiceContext* serviceContext, ClusterRole clusterRole, boo
                 std::make_unique<repl::TenantMigrationDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-            opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }

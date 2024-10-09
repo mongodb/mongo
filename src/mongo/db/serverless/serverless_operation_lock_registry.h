@@ -54,7 +54,7 @@ public:
 
     static const ServiceContext::Decoration<ServerlessOperationLockRegistry> get;
 
-    enum LockType { kShardSplit, kTenantDonor, kTenantRecipient, kMergeRecipient };
+    enum LockType { kTenantDonor, kTenantRecipient, kMergeRecipient };
 
     /**
      * Acquire the serverless lock for LockType and adds operationId to the set of

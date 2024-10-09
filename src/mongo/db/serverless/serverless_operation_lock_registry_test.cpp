@@ -36,7 +36,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/serverless/serverless_operation_lock_registry.h"
-#include "mongo/db/serverless/shard_split_statistics.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -48,8 +47,8 @@ TEST(ServerlessOperationLockRegistryTest, InsertRemoveOne) {
     ServerlessOperationLockRegistry registry;
 
     auto id = UUID::gen();
-    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
-    registry.releaseLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, id);
+    registry.releaseLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, id);
 
     ASSERT_FALSE(registry.getActiveOperationType_forTest());
 }
@@ -60,15 +59,15 @@ DEATH_TEST(ServerlessOperationLockRegistryTest,
     ServerlessOperationLockRegistry registry;
 
     auto id = UUID::gen();
-    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
-    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, id);
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, id);
 }
 
 TEST(ServerlessOperationLockRegistryTest, AcquireDifferentNamespaceFail) {
     ServerlessOperationLockRegistry registry;
 
     auto id = UUID::gen();
-    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, id);
 
     ASSERT_THROWS_CODE(
         registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantDonor, UUID::gen()),
@@ -82,7 +81,7 @@ DEATH_TEST(ServerlessOperationLockRegistryTest,
     ServerlessOperationLockRegistry registry;
 
     auto id = UUID::gen();
-    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, id);
     registry.releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor, id);
 }
 
@@ -92,15 +91,15 @@ DEATH_TEST(ServerlessOperationLockRegistryTest,
            "Cannot release a serverless lock if the given operationId does not own the lock.") {
     ServerlessOperationLockRegistry registry;
 
-    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, UUID::gen());
-    registry.releaseLock(ServerlessOperationLockRegistry::LockType::kShardSplit, UUID::gen());
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, UUID::gen());
+    registry.releaseLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, UUID::gen());
 }
 
 TEST(ServerlessOperationLockRegistryTest, ClearReleasesAllLocks) {
     ServerlessOperationLockRegistry registry;
 
-    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, UUID::gen());
-    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, UUID::gen());
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, UUID::gen());
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, UUID::gen());
 
     registry.clear();
 
@@ -117,16 +116,16 @@ TEST(ServerlessOperationLockRegistryTest, LockIsReleasedWhenAllInstanceAreRemove
     }
 
     for (auto& id : ids) {
-        registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
+        registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, id);
     }
 
     // Verify the lock is held;
     ASSERT_EQ(*registry.getActiveOperationType_forTest(),
-              ServerlessOperationLockRegistry::LockType::kShardSplit);
+              ServerlessOperationLockRegistry::LockType::kTenantRecipient);
 
 
     for (auto& id : ids) {
-        registry.releaseLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
+        registry.releaseLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, id);
     }
 
     // Verify the lock has been released.
@@ -142,22 +141,22 @@ TEST(ServerlessOperationLockRegistryTest, LockIsNotReleasedWhenNotAllInstanceAre
     }
 
     for (auto& id : ids) {
-        registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
+        registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, id);
     }
     // Add an additional id;
-    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, UUID::gen());
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, UUID::gen());
 
     // Verify the lock is held;
     ASSERT_EQ(*registry.getActiveOperationType_forTest(),
-              ServerlessOperationLockRegistry::LockType::kShardSplit);
+              ServerlessOperationLockRegistry::LockType::kTenantRecipient);
 
     for (auto& id : ids) {
-        registry.releaseLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
+        registry.releaseLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, id);
     }
 
     // Verify the lock is held;
     ASSERT_EQ(*registry.getActiveOperationType_forTest(),
-              ServerlessOperationLockRegistry::LockType::kShardSplit);
+              ServerlessOperationLockRegistry::LockType::kTenantRecipient);
 }
 
 TEST(ServerlessOperationLockRegistryTest, LockTypeDropCollection) {
@@ -166,8 +165,8 @@ TEST(ServerlessOperationLockRegistryTest, LockTypeDropCollection) {
     registry.acquireLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient, id);
     ASSERT_DOES_NOT_THROW(
         registry.onDropStateCollection(ServerlessOperationLockRegistry::LockType::kMergeRecipient));
-    ASSERT_DOES_NOT_THROW(
-        registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, UUID::gen()));
+    ASSERT_DOES_NOT_THROW(registry.acquireLock(
+        ServerlessOperationLockRegistry::LockType::kTenantRecipient, UUID::gen()));
 }
 
 DEATH_TEST(ServerlessOperationLockRegistryTest,
@@ -200,19 +199,6 @@ TEST(ServerlessOperationLockRegistryTest, ServerlessAppendInfoBSONObj) {
     BSONObjBuilder newAppendedBSON;
     registry.appendInfoForServerStatus(&newAppendedBSON);
     ASSERT_TRUE(newAppendedBSON.obj().getField(StringData("operationLock")).Int() == 4);
-}
-
-TEST(ShardSplitStatsTest, ShardSplitAppendInfoBSONObj) {
-    mongo::ShardSplitStatistics stat;
-    BSONObjBuilder appendedBSON;
-    stat.appendInfoForServerStatus(&appendedBSON);
-
-    const BSONObj bsonObject = appendedBSON.obj();
-    ASSERT_TRUE(bsonObject.getField(StringData("totalCommitted")).Long() == 0);
-    ASSERT_TRUE(bsonObject.getField(StringData("totalCommittedDurationMillis")).Long() == 0);
-    ASSERT_TRUE(
-        bsonObject.getField(StringData("totalCommittedDurationWithoutCatchupMillis")).Long() == 0);
-    ASSERT_TRUE(bsonObject.getField(StringData("totalAborted")).Long() == 0);
 }
 
 

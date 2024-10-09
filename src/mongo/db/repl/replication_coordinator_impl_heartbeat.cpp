@@ -33,8 +33,6 @@
 #define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(                               \
         ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
-#define LOGV2_FOR_SHARD_SPLIT(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kTenantMigration}, MESSAGE, ##__VA_ARGS__)
 
 #include <algorithm>
 #include <boost/smart_ptr.hpp>
@@ -722,27 +720,6 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
                 _heartbeatReconfigStore(cbData, newConfig);
                 return;
             }
-
-            LOGV2(8423366, "Waiting for oplog buffer to drain before applying recipient config.");
-            _drainForShardSplit().getAsync([this,
-                                            resolvedConfig = swConfig.getValue(),
-                                            replExecutor = _replExecutor.get(),
-                                            isSplitRecipientConfig =
-                                                isSplitRecipientConfig](Status status) {
-                if (!status.isOK()) {
-                    stdx::lock_guard<stdx::mutex> lg(_mutex);
-                    _setConfigState(lg,
-                                    !_rsConfig.getConfig(lg).isInitialized() ? kConfigUninitialized
-                                                                             : kConfigSteady);
-                    return;
-                }
-
-                replExecutor
-                    ->scheduleWork([=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
-                        _heartbeatReconfigStore(cbData, resolvedConfig, isSplitRecipientConfig);
-                    })
-                    .status_with_transitional_ignore();
-            });
         })
         .status_with_transitional_ignore();
 }
@@ -914,17 +891,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
         if (!isArbiter && myIndex.isOK() && myIndex.getValue() != -1) {
             shouldStartDataReplication = true;
-        }
-
-        if (isSplitRecipientConfig) {
-            // Donor access blockers are removed from donor nodes via the shard split op observer.
-            // Donor access blockers are removed from recipient nodes when the node applies the
-            // recipient config. When the recipient primary steps up it will delete its state
-            // document, the call to remove access blockers there will be a no-op.
-
-            LOGV2_FOR_SHARD_SPLIT(8423354, 1, "Removing donor access blockers on recipient node.");
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
         }
 
         LOGV2_FOR_HEARTBEATS(

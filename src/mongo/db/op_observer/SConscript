@@ -18,7 +18,6 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/repl/tenant_migration_donor_service",
         "$BUILD_DIR/mongo/db/repl/tenant_migration_recipient_service",
         "$BUILD_DIR/mongo/db/s/sharding_runtime_d",
-        "$BUILD_DIR/mongo/db/serverless/shard_split_donor_service",
         "$BUILD_DIR/mongo/db/service_context_d",
         "$BUILD_DIR/mongo/db/timeseries/timeseries_op_observer",
         "$BUILD_DIR/mongo/idl/cluster_server_parameter_op_observer",

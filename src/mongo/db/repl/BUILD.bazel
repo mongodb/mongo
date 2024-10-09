@@ -1531,7 +1531,6 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/commands:tenant_migration_cmds_request",
         "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/serverless:shard_split_state_machine",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:thread_pool_task_executor",
         "//src/mongo/util:future_util",

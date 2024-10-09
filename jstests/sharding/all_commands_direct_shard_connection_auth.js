@@ -524,9 +524,9 @@ const allCommands = {
     donorAbortMigration: {skip: isAnInternalCommand},
     donorForgetMigration: {skip: isAnInternalCommand},
     donorStartMigration: {skip: isAnInternalCommand},
-    abortShardSplit: {skip: isAnInternalCommand},
-    commitShardSplit: {skip: isAnInternalCommand},
-    forgetShardSplit: {skip: isAnInternalCommand},
+    abortShardSplit: {skip: isDeprecated},
+    commitShardSplit: {skip: isDeprecated},
+    forgetShardSplit: {skip: isDeprecated},
     drop: {
         setUp: function(mongoS) {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({create: collName}));

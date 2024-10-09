@@ -441,9 +441,9 @@ let testCases = {
     donorForgetMigration: {skip: "does not accept read or write concern"},
     donorStartMigration: {skip: "does not accept read or write concern"},
     donorWaitForMigrationToCommit: {skip: "does not accept read or write concern"},
-    abortShardSplit: {skip: "internal command"},
-    commitShardSplit: {skip: "internal command"},
-    forgetShardSplit: {skip: "internal command"},
+    abortShardSplit: {skip: "deprecated command"},
+    commitShardSplit: {skip: "deprecated command"},
+    forgetShardSplit: {skip: "deprecated command"},
     drop: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
