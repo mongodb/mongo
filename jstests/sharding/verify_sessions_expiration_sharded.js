@@ -123,7 +123,12 @@ const testSessionUpdates = (shardingTest) => {
         refreshSessionsAndVerifyExistence(test.mongosConfig, test.shardConfig, sessionIDs);
         verifyOpenCursorCount(test.mongosConfig, 5);
 
-        const sessionsCollectionArray = getSessions(test.mongosConfig);
+        // Get the sessions that are opened for the cursors
+        const sessionsCollectionArray = getSessions(test.mongosConfig).filter(session => {
+            return sessionIDs.some(s => {
+                return bsonBinaryEqual(s, session._id.id);
+            });
+        });
         assert.eq(sessionsCollectionArray.length, cursors.length);
 
         sessionsCollectionArray.forEach((session, idx) =>
