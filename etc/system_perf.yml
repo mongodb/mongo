@@ -50,20 +50,6 @@ variables:
     - PrivateWorkloads
     - flamegraph
 
-  _schedule_variant_auto_tasks_task: &schedule_variant_auto_tasks_task
-    name: schedule_variant_auto_tasks
-    activate: false
-    depends_on:
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-
-  _schedule_patch_auto_tasks_task: &schedule_patch_auto_tasks_task
-    name: schedule_patch_auto_tasks
-    activate: false
-    depends_on:
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-
   _shared_compile_expansions: &shared_compile_expansions
     platform: linux
     project_dir: dsi
