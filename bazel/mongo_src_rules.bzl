@@ -710,17 +710,6 @@ PCRE2_DEFINES = ["PCRE2_STATIC"]
 
 SAFEINT_DEFINES = ["SAFEINT_USE_INTRINSICS=0"]
 
-LINKER_ERROR_MESSAGE = """
-Error:
-  --//bazel/config:linker=lld is not supported on s390x
-"""
-
-LINKER_LINKFLAGS = select({
-    "//bazel/config:linker_default": [],
-    "//bazel/config:linker_gold": ["-fuse-ld=gold"],
-    "//bazel/config:linker_lld_valid_settings": ["-fuse-ld=lld"],
-}, no_match_error = LINKER_ERROR_MESSAGE)
-
 REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE = """
 Error:
   libunwind=on is only supported on linux"
@@ -1274,7 +1263,6 @@ MONGO_GLOBAL_LINKFLAGS = (
     UNDEFINED_SANITIZER_LINKFLAGS +
     THREAD_SANITIZER_LINKFLAGS +
     LIBCXX_LINKFLAGS +
-    LINKER_LINKFLAGS +
     DETECT_ODR_VIOLATIONS_LINKFLAGS +
     WINDOWS_LINKFLAGS +
     BIND_AT_LOAD_LINKFLAGS +

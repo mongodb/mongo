@@ -550,10 +550,8 @@ def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
         "bazel_cmd": Globals.bazel_base_build_command,
         "compiledb_cmd": [Globals.bazel_executable, "run"]
         + env["BAZEL_FLAGS_STR"]
-        + ["--features=-thin_archive"]
         + ["//:compiledb", "--"]
-        + env["BAZEL_FLAGS_STR"]
-        + ["--features=-thin_archive"],
+        + env["BAZEL_FLAGS_STR"],
         "defaults": [str(t) for t in SCons.Script.DEFAULT_TARGETS],
         "targets": Globals.scons2bazel_targets,
         "CC": env.get("CC", ""),

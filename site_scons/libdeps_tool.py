@@ -1606,17 +1606,6 @@ def setup_environment(env, emitting_shared=False, debug="off", linting="on"):
             if not env.WhereIs(bin):
                 env.FatalError(f"'{bin}' not found, Libdeps graph generation requires {bin}.")
 
-        # The find_symbols binary is a small fast C binary which will extract the missing
-        # symbols from the target library, and discover what linked libraries supply it. This
-        # setups the binary to be built.
-        find_symbols_env = env.Clone()
-        find_symbols_env.VariantDir("${BUILD_DIR}/libdeps", "buildscripts/libdeps", duplicate=0)
-        find_symbols_env.Program(
-            target="${BUILD_DIR}/libdeps/find_symbols",
-            source=["${BUILD_DIR}/libdeps/find_symbols.c"],
-            CFLAGS=["-O3"],
-        )
-
         # Here we are setting up some functions which will return single instance of the
         # network graph and symbol deps list. We also setup some environment variables
         # which are used along side the functions.

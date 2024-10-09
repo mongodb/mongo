@@ -246,7 +246,6 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
-        BAZEL_FLAGS="--features=-thin_archive"
         ENABLE_GRPC_BUILD=1
       compile_variant: *linux-x86-dynamic-grpc
       clang_tidy_toolchain: v4

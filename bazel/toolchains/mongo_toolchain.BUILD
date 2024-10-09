@@ -19,7 +19,18 @@ filegroup(
 # referenced by: mongo_toolchain (of type toolchain)
 # referenced by: toolchain_suite (of type cc_toolchain_suite)
 
+LINKER_ERROR_MESSAGE = """
+Error:
+  --//bazel/config:linker=lld is not supported on s390x
+"""
 
+LINKER_LINKFLAGS = select({
+    "@//bazel/config:linker_default": [],
+    "@//bazel/config:linker_gold": ["-fuse-ld=gold"],
+    "@//bazel/config:linker_lld_valid_settings": ["-fuse-ld=lld"],
+}, no_match_error = LINKER_ERROR_MESSAGE)
+
+LINK_FLAGS = ["-L"+flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
 
 mongo_cc_toolchain_config(
     name = "cc_gcc_toolchain_config",
@@ -27,7 +38,7 @@ mongo_cc_toolchain_config(
     compiler = "gcc",
     cpu = "{platforms_arch}",
     cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
-    extra_ldflags = ["-L"+flag for flag in COMMON_LINK_FLAGS],
+    extra_ldflags = LINK_FLAGS,
     includes = GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
     tool_paths = {
         # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
@@ -56,7 +67,7 @@ mongo_cc_toolchain_config(
     compiler = "clang",
     cpu = "{platforms_arch}",
     cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
-    extra_ldflags = ["-L"+flag for flag in COMMON_LINK_FLAGS],
+    extra_ldflags = LINK_FLAGS,
     includes = CLANG_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
     tool_paths = {
         # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel

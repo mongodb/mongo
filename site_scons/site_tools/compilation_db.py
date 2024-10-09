@@ -197,10 +197,8 @@ def WriteCompilationDb(target, source, env):
         env.RunBazelCommand(
             [env["SCONS2BAZEL_TARGETS"].bazel_executable, "run"]
             + env["BAZEL_FLAGS_STR"]
-            + ["--features=-thin_archive"]
             + ["//:compiledb", "--"]
             + env["BAZEL_FLAGS_STR"]
-            + ["--features=-thin_archive"]
         )
 
     subprocess.run(
