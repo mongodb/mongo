@@ -14,7 +14,7 @@ const bucketsCollName = "system.buckets." + collName;
 const timeFieldName = "time";
 const metaFieldName = "tag";
 // {
-//     "_id": ObjectId("64dd4ae9ac4fd7e3ebbd9af3"),
+//     "_id": ObjectId("64dd4adcac4fd7e3ebbd9af3"),
 //     "control": {
 //         "version": 1,
 //         "min":
@@ -32,17 +32,19 @@ const metaFieldName = "tag";
 //     }
 // };
 const compressedBucketDoc = {
-    "_id": ObjectId("66fdde800c625dc44b9004d2"),
+    "_id": ObjectId("64dd4adcac4fd7e3ebbd9af3"),
     "control": {
         "version": 2,
         "min":
-            {"_id": ObjectId("66feda942c8fee9e3a54f3a1"), "time": ISODate("2024-10-03T00:00:00Z")},
-        "max":
-            {"_id": ObjectId("66feda942c8fee9e3a54f3a1"), "time": ISODate("2024-10-03T13:52:00Z")},
+            {"_id": ObjectId("64dd4ae9a2c44e75d1151285"), "time": ISODate("2023-08-16T00:00:00Z")},
+        "max": {
+            "_id": ObjectId("64dd4ae9a2c44e75d1151285"),
+            "time": ISODate("2023-08-16T22:17:13.749Z")
+        },
         "count": 1
     },
     "meta": 1,
-    "data": {"_id": BinData(7, "BwBm/tqULI/unjpU86EA"), "time": BinData(7, "CQAA3KZSkgEAAAA=")}
+    "data": {"_id": BinData(7, "BwBk3UrposROddEVEoUA"), "time": BinData(7, "CQAVoWwAigEAAAA=")}
 };
 
 function runTest(cmd, validateFn) {
@@ -82,14 +84,14 @@ function updateValidateFn(coll) {
 
 runTest({
     delete: bucketsCollName,
-    deletes: [{q: {_id: ObjectId("66fdde800c625dc44b9004d2")}, limit: 1}]
+    deletes: [{q: {_id: ObjectId("64dd4adcac4fd7e3ebbd9af3")}, limit: 1}]
 },
         removeValidateFn);
 
 runTest({
     update: bucketsCollName,
     updates: [{
-        q: {_id: ObjectId("66fdde800c625dc44b9004d2")},
+        q: {_id: ObjectId("64dd4adcac4fd7e3ebbd9af3")},
         u: {$set: {"control.closed": true}},
         multi: false
     }]

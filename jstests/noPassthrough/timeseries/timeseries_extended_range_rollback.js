@@ -65,4 +65,8 @@ rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true}
 // Make sure the collections get flagged properly again during rollback.
 assert.eq(1, getExtendedRangeCount(rollbackNode));
 
-rollbackTest.stop(null);
+// As of SERVER-86451, time-series inconsistencies detected during validation
+// will error in testing, instead of being warnings. In this case,
+// validation on shutdown would fail, where before only a warning would be thrown.
+// TODO SERVER-87065: Look into re-enabling validation on shutdown.
+rollbackTest.stop(null, true);

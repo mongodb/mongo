@@ -171,7 +171,7 @@ validateTimeseriesBucketingParametersChangeFail(
     0, {granularity: "seconds"}, {granularity: "hours"}, ISODate("2024-04-01T13:25:00.000Z"));
 
 // The timestamp is rounded-down to: 2024-04-01T00:00:00.000+00:00
-// After the bucketMaxSpanSeconds/bucketRoundingSeconds change, the timestamp will be in bucket:
+// After the bucketMaxSpanSeconds/buckerRoundingSeconds change, the timestamp will be in bucket:
 // 2024-04-01T13:24:00.000+00:00
 jsTestLog(
     "Testing timeseriesBucketingParametersChange for changes to the bucketRoundingSeconds and bucketMaxSpanSeconds bucketing parameters.");
