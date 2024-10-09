@@ -811,15 +811,26 @@ if args.command == "release":
             Test(os_name=test_os, packages_urls=urls, edition=edition, version=server_version)
         )
 
-docker_client = docker.client.from_env()
-docker_username = os.environ.get("docker_username")
-docker_password = os.environ.get("docker_password")
-if all((docker_username, docker_password)):
-    logging.info("Logging into docker.io")
-    response = docker_client.login(username=docker_username, password=docker_password)
-    logging.debug("Login response: %s", response)
-else:
-    logging.warning("Skipping docker login")
+for i in range(5):
+    try:
+        docker_client = docker.client.from_env()
+        docker_username = os.environ.get("docker_username")
+        docker_password = os.environ.get("docker_password")
+        if all((docker_username, docker_password)):
+            logging.info("Logging into docker.io")
+            response = docker_client.login(username=docker_username, password=docker_password)
+            logging.debug("Login response: %s", response)
+        else:
+            logging.warning("Skipping docker login")
+        break
+    except Exception as ex:
+        logging.warning("Caught exception when trying to create docker client: %s", ex)
+        if i == 4:
+            logging.error("Failed to create docker client after 5 tries, exiting")
+            sys.exit(1)
+        else:
+            logging.warning("Retrying...")
+            time.sleep(5)
 
 report = Report(results=[], failures=0)
 with futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as tpe:
