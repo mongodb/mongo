@@ -700,6 +700,14 @@ public:
     }
 
 private:
+    void updateHandleForBufferData(CURL* handle, BufReader* bufReader) const {
+        curl_easy_setopt(handle, CURLOPT_READFUNCTION, ReadMemoryCallback);
+        curl_easy_setopt(handle, CURLOPT_READDATA, bufReader);
+
+        curl_easy_setopt(handle, CURLOPT_SEEKFUNCTION, SeekMemoryCallback);
+        curl_easy_setopt(handle, CURLOPT_SEEKDATA, bufReader);
+    }
+
     HttpReply request(CURL* handle, HttpMethod method, StringData url, ConstDataRange cdr) const {
         uassert(ErrorCodes::InternalError, "Curl initialization failed", handle);
 
@@ -713,31 +721,35 @@ private:
                 uassert(ErrorCodes::BadValue,
                         "Request body not permitted with GET requests",
                         cdr.length() == 0);
-                // Per https://curl.se/libcurl/c/CURLOPT_POST.html
-                // We need to reset the type of request we want to make when reusing the request
+                // Per https://curl.se/libcurl/c/CURLOPT_CUSTOMREQUEST.html
+                // We need to explicitly unset CURLOPT_CUSTOMREQUEST when reusing the request
+                curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
                 curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
                 break;
             case HttpMethod::kPOST:
-                curl_easy_setopt(handle, CURLOPT_PUT, 0);
+                curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
                 curl_easy_setopt(handle, CURLOPT_POST, 1);
-
-                curl_easy_setopt(handle, CURLOPT_READFUNCTION, ReadMemoryCallback);
-                curl_easy_setopt(handle, CURLOPT_READDATA, &bufReader);
+                updateHandleForBufferData(handle, &bufReader);
                 curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, (long)bufReader.remaining());
-
-                curl_easy_setopt(handle, CURLOPT_SEEKFUNCTION, SeekMemoryCallback);
-                curl_easy_setopt(handle, CURLOPT_SEEKDATA, &bufReader);
                 break;
             case HttpMethod::kPUT:
-                curl_easy_setopt(handle, CURLOPT_POST, 0);
+                curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
                 curl_easy_setopt(handle, CURLOPT_PUT, 1);
-
-                curl_easy_setopt(handle, CURLOPT_READFUNCTION, ReadMemoryCallback);
-                curl_easy_setopt(handle, CURLOPT_READDATA, &bufReader);
+                updateHandleForBufferData(handle, &bufReader);
+                curl_easy_setopt(handle, CURLOPT_UPLOAD, 1L);
                 curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, (long)bufReader.remaining());
-
-                curl_easy_setopt(handle, CURLOPT_SEEKFUNCTION, SeekMemoryCallback);
-                curl_easy_setopt(handle, CURLOPT_SEEKDATA, &bufReader);
+                break;
+            case HttpMethod::kPATCH:
+                curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, "PATCH");
+                updateHandleForBufferData(handle, &bufReader);
+                curl_easy_setopt(handle, CURLOPT_UPLOAD, 1L);
+                curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, (long)bufReader.remaining());
+                break;
+            case HttpMethod::kDELETE:
+                uassert(ErrorCodes::BadValue,
+                        "Request body not permitted with DELETE requests",
+                        cdr.length() == 0);
+                curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, "DELETE");
                 break;
             default:
                 MONGO_UNREACHABLE;

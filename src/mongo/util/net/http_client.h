@@ -49,11 +49,7 @@ constexpr Seconds kTotalRequestTimeout{120};
  */
 class HttpClient {
 public:
-    enum class HttpMethod {
-        kGET,
-        kPOST,
-        kPUT,
-    };
+    enum class HttpMethod { kGET, kPOST, kPUT, kPATCH, kDELETE };
 
     struct HttpReply {
         std::uint16_t code;

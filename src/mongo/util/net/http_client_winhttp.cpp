@@ -163,6 +163,15 @@ public:
             case HttpMethod::kPUT:
                 method = L"PUT";
                 break;
+            case HttpMethod::kPATCH:
+                method = L"PATCH";
+                break;
+            case HttpMethod::kDELETE:
+                uassert(ErrorCodes::BadValue,
+                        "DELETE requests do not support content",
+                        cdrData.length() == 0);
+                method = L"DELETE";
+                break;
             default:
                 MONGO_UNREACHABLE;
         }
