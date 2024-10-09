@@ -179,6 +179,7 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
     invariant(deadline);
 
     HelloMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
+
     lk.unlock();
 
     if (MONGO_unlikely(waitForHelloResponseMongos.shouldFail())) {
@@ -212,11 +213,8 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
         status = Status(ErrorCodes::Error(errorCode),
                         "Set by setCustomErrorInHelloResponseMongoS fail point.");
     });
-
-    if (!status.isOK()) {
-        LOGV2_DEBUG(6208205, 1, "Error while waiting for hello response", "status"_attr = status);
-
-        // We decrement the counter on most errors. Note that some errors may already be covered
+    ON_BLOCK_EXIT([&, opCtx] {
+        // We decrement the counter. Note that some errors may already be covered
         // by calls to resetNumAwaitingTopologyChanges(), which sets the counter to zero, so we
         // only decrement non-zero counters. This is safe so long as:
         // 1) Increment + decrement calls always occur at a 1:1 ratio and in that order.
@@ -226,10 +224,15 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
             HelloMetrics::get(opCtx)->getNumAwaitingTopologyChanges() > 0) {
             HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
         }
+    });
+
+    if (!status.isOK()) {
+        LOGV2_DEBUG(6208205, 1, "Error while waiting for hello response", "status"_attr = status);
 
         // Return a MongosHelloResponse with the current topology version on timeout when
         // waiting for a topology change.
         if (status == ErrorCodes::ExceededTimeLimit) {
+            stdx::lock_guard lk(_mutex);
             return _makeHelloResponse(lk);
         }
     }

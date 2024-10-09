@@ -2860,13 +2860,10 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
         status = Status(ErrorCodes::Error(errorCode),
                         "Set by setCustomErrorInHelloResponseMongoD fail point.");
     });
-
-    if (!status.isOK()) {
-        LOGV2_DEBUG(6208204, 1, "Error while waiting for hello response", "status"_attr = status);
-
-        // We decrement the counter on most errors. Note that some errors may already be covered
-        // by calls to resetNumAwaitingTopologyChangesForAllSessionManagers(), which sets the
-        // counter to zero, so we only decrement non-zero counters. This is safe so long as:
+    ON_BLOCK_EXIT([&, opCtx] {
+        // We decrement the counter. Note that some errors may already be covered
+        // by calls to resetNumAwaitingTopologyChanges(), which sets the counter to zero, so we
+        // only decrement non-zero counters. This is safe so long as:
         // 1) Increment + decrement calls always occur at a 1:1 ratio and in that order.
         // 2) All callers to increment/decrement/reset take locks.
         stdx::lock_guard lk(_mutex);
@@ -2874,12 +2871,16 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
             HelloMetrics::get(opCtx)->getNumAwaitingTopologyChanges() > 0) {
             HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
         }
+    });
+    if (!status.isOK()) {
+        LOGV2_DEBUG(6208204, 1, "Error while waiting for hello response", "status"_attr = status);
 
         // Return a HelloResponse with the current topology version on timeout when waiting for
         // a topology change.
         if (status == ErrorCodes::ExceededTimeLimit) {
             // A topology change has not occured within the deadline so horizonString is still a
             // good indicator of whether we have a valid config.
+            stdx::lock_guard lk(_mutex);
             const bool hasValidConfig = horizonString != boost::none;
             return _makeHelloResponse(horizonString, lk, hasValidConfig);
         }
