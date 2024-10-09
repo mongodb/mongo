@@ -73,6 +73,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/tracking/tracked_btree_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo::timeseries::bucket_catalog {
@@ -161,15 +162,17 @@ struct Stripe {
     IdleList idleBuckets;
 
     // Buckets that are not currently in the catalog, but which are eligible to receive more
-    // measurements. The top-level map is keyed by the hash of the BucketKey, while the stored
-    // map is keyed by the bucket's minimum timestamp.
-    //
-    // We invert the key comparison in the inner map so that we can use lower_bound to efficiently
-    // find an archived bucket that is a candidate for an incoming measurement.
-    tracked_unordered_map<BucketKey::Hash,
-                          tracked_map<Date_t, ArchivedBucket, std::greater<Date_t>>,
-                          BucketHasher>
-        archivedBuckets;
+    // measurements. A btree with a compound key is used for maximum memory efficiency. The
+    // comparison is inverted so we can use lower_bound to efficiently find an archived bucket that
+    // is a candidate for an incoming measurement.
+    using ArchivedKey = std::tuple<UUID, BucketKey::Hash, Date_t>;
+    tracked_btree_map<ArchivedKey, ArchivedBucket, std::greater<ArchivedKey>> archivedBuckets;
+
+    // Mapping of timeField for UUID. The integer in the value represent a reference count of how
+    // many buckets it exist in 'archivedBuckets' for this UUID.
+    // TODO SERVER-70605: Remove this mapping, only needed when usingAlwaysCompressedBuckets is
+    // disabled.
+    tracked_unordered_map<UUID, std::tuple<tracked_string, int64_t>> collectionTimeFields;
 
     // All series currently with outstanding reopening operations. Used to coordinate disk access
     // between reopenings and regular writes to prevent stale reads and corrupted updates.

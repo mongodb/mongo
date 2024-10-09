@@ -559,17 +559,19 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
     }
 
     // If this bucket was archived, we need to remove it from the set of archived buckets.
-    if (auto setIt = stripe.archivedBuckets.find(key.hash); setIt != stripe.archivedBuckets.end()) {
-        auto& archivedSet = setIt->second;
-        if (auto bucketIt = archivedSet.find(bucket->minTime);
-            bucketIt != archivedSet.end() && bucket->bucketId == bucketIt->second.bucketId) {
-            if (archivedSet.size() == 1) {
-                stripe.archivedBuckets.erase(setIt);
-            } else {
-                archivedSet.erase(bucketIt);
+    auto archivedKey = std::make_tuple(key.collectionUUID, key.hash, bucket->minTime);
+    if (auto it = stripe.archivedBuckets.find(archivedKey); it != stripe.archivedBuckets.end()) {
+        // Decrement refCount and cleanup collectionTimeFields if needed
+        if (auto timeFieldIt = stripe.collectionTimeFields.find(key.collectionUUID);
+            timeFieldIt != stripe.collectionTimeFields.end()) {
+            int64_t& refCount = std::get<int64_t>(timeFieldIt->second);
+            if (--refCount == 0) {
+                stripe.collectionTimeFields.erase(timeFieldIt);
             }
-            stats.decNumActiveBuckets();
         }
+
+        stripe.archivedBuckets.erase(it);
+        stats.decNumActiveBuckets();
     }
 
     // Pass ownership of the reopened bucket to the bucket catalog.
@@ -845,15 +847,22 @@ void archiveBucket(BucketCatalog& catalog,
                    Bucket& bucket,
                    ExecutionStatsController& stats,
                    ClosedBuckets& closedBuckets) {
-    bool archived = false;
-    auto& archivedSet = stripe.archivedBuckets[bucket.key.hash];
-    auto it = archivedSet.find(bucket.minTime);
-    if (it == archivedSet.end()) {
-        archivedSet.emplace(bucket.minTime, ArchivedBucket{bucket.bucketId, bucket.timeField});
-        archived = true;
-    }
+    bool archived =
+        stripe.archivedBuckets
+            .emplace(
+                std::make_tuple(bucket.bucketId.collectionUUID, bucket.key.hash, bucket.minTime),
+                ArchivedBucket{bucket.bucketId.oid})
+            .second;
 
     if (archived) {
+        // If we have an archived bucket, ensure that we've stored the timeField for this UUID
+        auto& [timeField, refCount] = stripe.collectionTimeFields[bucket.bucketId.collectionUUID];
+        // Set timeField if we constructed the entry above
+        if (timeField.empty()) {
+            timeField = bucket.timeField;
+        }
+        // Always increase ref-count when archiving
+        ++refCount;
         // If we have an archived bucket, we still want to account for it in numberOfActiveBuckets
         // so we will increase it here since removeBucket decrements the count.
         stats.incNumActiveBuckets();
@@ -868,42 +877,51 @@ void archiveBucket(BucketCatalog& catalog,
 
 boost::optional<OID> findArchivedCandidate(
     BucketCatalog& catalog, Stripe& stripe, WithLock stripeLock, InsertContext& info, Date_t time) {
-    auto setIt = stripe.archivedBuckets.find(info.key.hash);
-    if (setIt == stripe.archivedBuckets.end()) {
+
+    // We want to find the largest time that is not greater than info.time. Generally
+    // lower_bound will return the smallest element not less than the search value, but we are
+    // using std::greater instead of std::less for the map's comparisons. This means the order
+    // of keys will be reversed, and lower_bound will return what we want.
+    auto it = stripe.archivedBuckets.lower_bound(
+        std::make_tuple(info.key.collectionUUID, info.key.hash, time));
+    if (it == stripe.archivedBuckets.end()) {
         return boost::none;
     }
 
-    auto& archivedSet = setIt->second;
-
-    // We want to find the largest time that is not greater than info.time. Generally lower_bound
-    // will return the smallest element not less than the search value, but we are using
-    // std::greater instead of std::less for the map's comparisons. This means the order of keys
-    // will be reversed, and lower_bound will return what we want.
-    auto it = archivedSet.lower_bound(time);
-    if (it == archivedSet.end()) {
+    // Ensure we have an exact match on UUID and BucketKey::Hash
+    const auto& uuid = std::get<UUID>(it->first);
+    const auto& hash = std::get<BucketKey::Hash>(it->first);
+    if (uuid != info.key.collectionUUID || hash != info.key.hash) {
         return boost::none;
     }
 
-    const auto& [candidateTime, candidateBucket] = *it;
+    const auto& candidateTime = std::get<Date_t>(it->first);
     invariant(candidateTime <= time);
     // We need to make sure our measurement can fit without violating max span. If not, we
     // can't use this bucket.
     if (time - candidateTime < Seconds(*info.options.getBucketMaxSpanSeconds())) {
-        auto bucketState = getBucketState(catalog.bucketStateRegistry, candidateBucket.bucketId);
+        BucketId bucketId(uuid, it->second.oid, BucketKey::signature(hash));
+        auto bucketState = getBucketState(catalog.bucketStateRegistry, bucketId);
         if (bucketState && !transientlyConflictsWithReopening(bucketState.value())) {
-            return candidateBucket.bucketId.oid;
+            return bucketId.oid;
         } else {
             if (bucketState) {
                 // If the bucket is represented by a state in the registry, it conflicts with
-                // reopening so we can mark it as untracked to drop the state once the directWrite
-                // finishes.
-                stopTrackingBucketState(catalog.bucketStateRegistry, candidateBucket.bucketId);
+                // reopening so we can mark it as untracked to drop the state once the
+                // directWrite finishes.
+                stopTrackingBucketState(catalog.bucketStateRegistry, bucketId);
             }
-            if (archivedSet.size() == 1) {
-                stripe.archivedBuckets.erase(setIt);
-            } else {
-                archivedSet.erase(it);
+
+            // Decrement refCount and cleanup collectionTimeFields if needed
+            if (auto timeFieldIt = stripe.collectionTimeFields.find(uuid);
+                timeFieldIt != stripe.collectionTimeFields.end()) {
+                int64_t& refCount = std::get<int64_t>(timeFieldIt->second);
+                if (--refCount == 0) {
+                    stripe.collectionTimeFields.erase(timeFieldIt);
+                }
             }
+
+            stripe.archivedBuckets.erase(it);
             info.stats.decNumActiveBuckets();
         }
     }
@@ -1094,20 +1112,30 @@ void expireIdleBuckets(BucketCatalog& catalog,
            getMemoryUsage(catalog) > catalog.memoryUsageThreshold() &&
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
 
-        auto& [hash, archivedSet] = *stripe.archivedBuckets.begin();
-        invariant(!archivedSet.empty());
+        auto it = stripe.archivedBuckets.begin();
+        const auto& [key, archived] = *it;
+        const auto& uuid = std::get<UUID>(key);
+        const auto& hash = std::get<BucketKey::Hash>(key);
 
-        auto& [timestamp, bucket] = *archivedSet.begin();
-        ExecutionStatsController& stats = statsForBucket(bucket.bucketId);
+        BucketId bucketId(uuid, archived.oid, BucketKey::signature(hash));
+        ExecutionStatsController& stats = statsForBucket(bucketId);
 
-        closeArchivedBucket(catalog, bucket, closedBuckets);
-        if (archivedSet.size() == 1) {
-            // If this is the only entry, erase the whole map so we don't leave it empty.
-            stripe.archivedBuckets.erase(stripe.archivedBuckets.begin());
-        } else {
-            // Otherwise just erase this bucket from the map.
-            archivedSet.erase(archivedSet.begin());
+        StringData timeField;
+        auto timeFieldIt = stripe.collectionTimeFields.find(uuid);
+        if (timeFieldIt != stripe.collectionTimeFields.end()) {
+            const tracked_string& tf = std::get<tracked_string>(timeFieldIt->second);
+            timeField = {tf.data(), tf.size()};
         }
+
+        closeArchivedBucket(catalog, bucketId, timeField, closedBuckets);
+
+        if (timeFieldIt != stripe.collectionTimeFields.end()) {
+            int64_t& refCount = std::get<int64_t>(timeFieldIt->second);
+            if (--refCount == 0) {
+                stripe.collectionTimeFields.erase(timeFieldIt);
+            }
+        }
+        stripe.archivedBuckets.erase(it);
 
         stats.decNumActiveBuckets();
         stats.incNumBucketsClosedDueToMemoryThreshold();
@@ -1488,22 +1516,22 @@ void closeOpenBucket(BucketCatalog& catalog,
 }
 
 void closeArchivedBucket(BucketCatalog& catalog,
-                         ArchivedBucket& bucket,
+                         const BucketId& bucket,
+                         StringData timeField,
                          ClosedBuckets& closedBuckets) {
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Remove the bucket from the bucket state registry.
-        stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
+        stopTrackingBucketState(catalog.bucketStateRegistry, bucket);
         return;
     }
 
     try {
-        closedBuckets.emplace_back(
-            &catalog.bucketStateRegistry,
-            bucket.bucketId,
-            std::string{bucket.timeField.data(), bucket.timeField.size()},
-            boost::none,
-            getOrInitializeExecutionStats(catalog, bucket.bucketId.collectionUUID));
+        closedBuckets.emplace_back(&catalog.bucketStateRegistry,
+                                   bucket,
+                                   timeField.toString(),
+                                   boost::none,
+                                   getOrInitializeExecutionStats(catalog, bucket.collectionUUID));
     } catch (...) {
     }
 }
