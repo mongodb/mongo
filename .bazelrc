@@ -163,6 +163,11 @@ build:local --grpc_keepalive_time=0s
 build:local --legacy_important_outputs
 build:local --jobs=auto
 
+# Disable remote execution but keep remote cache enabled
+--config=no-remote-exec
+common:no-remote-exec --remote_executor=
+common:no-remote-exec --jobs=auto
+
 # Disable remote execution and caching for public releases
 --config=public-release
 build:public-release --remote_executor=
