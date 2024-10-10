@@ -404,7 +404,7 @@ void ServiceContext::setKillAllOperations(const std::set<std::string>& excludedC
     // Shared by mongos and mongod shutdown code paths
     LOGV2(4695300, "Interrupted all currently running operations", "opsKilled"_attr = opsKilled);
 
-    // Notify any listeners who need to reach to the server shutting down
+    // Notify any listeners who need to react to the server shutting down
     for (const auto listener : _killOpListeners) {
         try {
             listener->interruptAll(svcCtxLock);
