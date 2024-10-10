@@ -2028,7 +2028,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
             uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
         }
 
-        forceShardFilteringMetadataRefresh(opCtx, _nss);
+        FilteringMetadataCache::get(opCtx)->forceShardFilteringMetadataRefresh(opCtx, _nss);
     } catch (const DBException& ex) {
         LOGV2_DEBUG(5899103,
                     2,

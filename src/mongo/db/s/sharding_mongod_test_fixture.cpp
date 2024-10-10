@@ -55,6 +55,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
@@ -213,6 +214,8 @@ Status ShardingMongoDTestFixture::initializeGlobalShardingStateForMongodForTest(
                makeBalancerConfiguration(),
                std::move(executorPoolPtr),
                _mockNetwork);
+
+    FilteringMetadataCache::init(getServiceContext());
 
     return Status::OK();
 }

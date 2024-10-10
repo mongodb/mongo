@@ -178,7 +178,8 @@ public:
         // Check that the preconditions for split chunk are met and throw StaleShardVersion
         // otherwise.
         {
-            onCollectionPlacementVersionMismatch(opCtx, nss, boost::none);
+            FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+                opCtx, nss, boost::none);
             const auto [metadata, indexInfo] = checkCollectionIdentity(
                 opCtx, nss, expectedCollectionEpoch, expectedCollectionTimestamp);
             checkShardKeyPattern(opCtx, nss, metadata, indexInfo, chunkRange);

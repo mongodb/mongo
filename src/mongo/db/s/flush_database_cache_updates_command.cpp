@@ -210,7 +210,8 @@ public:
 
             if (Base::request().getSyncFromConfig()) {
                 LOGV2_DEBUG(21981, 1, "Forcing remote routing table refresh", "db"_attr = dbName);
-                uassertStatusOK(onDbVersionMismatchNoExcept(opCtx, dbName, boost::none));
+                uassertStatusOK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatchNoExcept(
+                    opCtx, dbName, boost::none));
             }
 
             // A config server could receive this command even if not in config shard mode if the CS

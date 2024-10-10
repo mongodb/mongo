@@ -254,7 +254,8 @@ Status splitChunk(OperationContext* opCtx,
         }
         return boost::none;
     }();
-    onCollectionPlacementVersionMismatch(opCtx, nss, chunkVersionReceived);
+    FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+        opCtx, nss, chunkVersionReceived);
 
     // Check commandStatus and writeConcernStatus
     auto commandStatus = cmdResponse.commandStatus;

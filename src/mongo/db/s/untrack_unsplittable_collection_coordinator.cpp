@@ -155,7 +155,7 @@ void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(
     // Force a refresh of the filtering metadata to clean up the data structure held by the
     // CollectionShardingRuntime (Note also that this code is indirectly used to notify to secondary
     // nodes to clear their filtering information).
-    forceShardFilteringMetadataRefresh(opCtx, nss());
+    FilteringMetadataCache::get(opCtx)->forceShardFilteringMetadataRefresh(opCtx, nss());
     CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss());
 
     // Ensures the refresh of the catalog cache will be waited majority at the end of the

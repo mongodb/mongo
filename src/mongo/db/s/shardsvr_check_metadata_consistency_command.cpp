@@ -256,7 +256,7 @@ public:
                     } else {
                         // In case the shard doesn't know about the database, we perform a refresh
                         // and re-try the metadata checks.
-                        (void)onDbVersionMismatchNoExcept(
+                        (void)FilteringMetadataCache::get(opCtx)->onDbVersionMismatchNoExcept(
                             opCtx, dbNss.dbName(), extraInfo->getVersionReceived());
 
                         skippedMetadataChecks = !checkMetadataForDb().isOK();

@@ -42,60 +42,97 @@
 
 namespace mongo {
 
-class OperationContext;
-
 /**
- * Must be invoked whenever code, which is executing on a shard encounters a StaleConfig error and
- * should be passed the placement version from the 'version received' in the exception. If the
- * shard's current placement version is behind 'chunkVersionReceived', causes the shard's filtering
- * metadata to be refreshed from the config server, otherwise does nothing and immediately returns.
- * If there are other threads currently performing refresh, blocks so that only one of them hits the
- * config server.
- *
- * If refresh fails for any reason (most commonly ExceededTimeLimit), returns a failed status.
- *
- * NOTE: Does network I/O and acquires collection lock on the specified namespace, so it must not be
- * called with a lock
- *
- * NOTE: This method is not expected to throw, because it is used in places where StaleConfig
- * exception was just caught and if it were to throw, it would overwrite any accumulated command
- * execution state in the response. This is specifically problematic for write commands, which are
- * expected to return the set of write batch entries that succeeded.
+ * The `FilteringMetadataCache` class is responsible for storing and providing access to the current
+ * sharding metadata for a given database or collection, and provides the functionality to refresh
+ * it when necessary.
  */
-Status onCollectionPlacementVersionMismatchNoExcept(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    boost::optional<ChunkVersion> chunkVersionReceived) noexcept;
+class FilteringMetadataCache {
+public:
+    static void init(ServiceContext* serviceCtx);
 
-void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          boost::optional<ChunkVersion> chunkVersionReceived);
+    static FilteringMetadataCache* get(ServiceContext* serviceCtx);
 
-/**
- * Unconditionally get the shard's filtering metadata from the config server on the calling thread.
- * Returns the metadata if the nss is sharded, otherwise default unsharded metadata.
- *
- * NOTE: Does network I/O, so it must not be called with a lock
- */
-CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const NamespaceString& nss);
+    static FilteringMetadataCache* get(OperationContext* opCtx);
 
-/**
- * Unconditionally causes the shard's filtering metadata to be refreshed from the config server and
- * returns the resulting placement version (which might not have changed), or throws.
- *
- * NOTE: Does network I/O and acquires collection lock on the specified namespace, so it must not be
- * called with a lock
- */
-ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
-                                                const NamespaceString& nss);
+    /**
+     * Must be invoked whenever code, which is executing on a shard encounters a StaleConfig error
+     * and should be passed the placement version from the 'version received' in the exception. If
+     * the shard's current placement version is behind 'chunkVersionReceived', causes the shard's
+     * filtering metadata to be refreshed from the config server, otherwise does nothing and
+     * immediately returns. If there are other threads currently performing refresh, blocks so that
+     * only one of them hits the config server.
+     *
+     * If refresh fails for any reason (most commonly ExceededTimeLimit), returns a failed status.
+     *
+     * NOTE: Does network I/O and acquires collection lock on the specified namespace, so it must
+     * not be called with a lock
+     *
+     * NOTE: This method is not expected to throw, because it is used in places where StaleConfig
+     * exception was just caught and if it were to throw, it would overwrite any accumulated command
+     * execution state in the response. This is specifically problematic for write commands, which
+     * are expected to return the set of write batch entries that succeeded.
+     */
+    Status onCollectionPlacementVersionMismatchNoExcept(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<ChunkVersion> chunkVersionReceived) noexcept;
 
-/**
- * Should be called when any client request on this shard generates a StaleDbVersion exception.
- *
- * Invalidates the cached database version, schedules a refresh of the database info, waits for the
- * refresh to complete, and updates the cached database version.
- */
-Status onDbVersionMismatchNoExcept(OperationContext* opCtx,
-                                   const DatabaseName& dbName,
-                                   boost::optional<DatabaseVersion> clientDbVersion) noexcept;
+    void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              boost::optional<ChunkVersion> chunkVersionReceived);
+
+    /**
+     * Should be called when any client request on this shard generates a StaleDbVersion exception.
+     *
+     * Invalidates the cached database version, schedules a refresh of the database info, waits for
+     * the refresh to complete, and updates the cached database version.
+     */
+    Status onDbVersionMismatchNoExcept(OperationContext* opCtx,
+                                       const DatabaseName& dbName,
+                                       boost::optional<DatabaseVersion> clientDbVersion) noexcept;
+
+    /**
+     * Unconditionally get the shard's filtering metadata from the config server on the calling
+     * thread. Returns the metadata if the nss is sharded, otherwise default unsharded metadata.
+     *
+     * NOTE: Does network I/O, so it must not be called with a lock
+     */
+    CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Unconditionally causes the shard's filtering metadata to be refreshed from the config server
+     * and returns the resulting placement version (which might not have changed), or throws.
+     *
+     * NOTE: Does network I/O and acquires collection lock on the specified namespace, so it must
+     * not be called with a lock
+     */
+    ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
+                                                    const NamespaceString& nss);
+
+private:
+    /**
+     * Unconditionally refreshes the database metadata from the config server.
+     *
+     * NOTE: Does network I/O and acquires the database lock in X mode.
+     */
+    Status _refreshDbMetadata(OperationContext* opCtx,
+                              const DatabaseName& dbName,
+                              CancellationToken cancellationToken);
+
+    SharedSemiFuture<void> _recoverRefreshDbVersion(OperationContext* opCtx,
+                                                    const DatabaseName& dbName,
+                                                    const CancellationToken& cancellationToken);
+
+    void _onDbVersionMismatch(OperationContext* opCtx,
+                              const DatabaseName& dbName,
+                              boost::optional<DatabaseVersion> receivedDbVersion);
+
+    SharedSemiFuture<void> _recoverRefreshCollectionPlacementVersion(
+        ServiceContext* serviceContext,
+        const NamespaceString& nss,
+        bool runRecover,
+        CancellationToken cancellationToken);
+};
+
 }  // namespace mongo

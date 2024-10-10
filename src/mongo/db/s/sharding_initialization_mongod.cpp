@@ -80,6 +80,7 @@
 #include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -375,6 +376,8 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
     globalConnPool.addHook(new ShardingConnectionHook(makeShardingEgressHooksList(service)));
 
     auto catalogCache = std::make_unique<CatalogCache>(service, CatalogCacheLoader::get(opCtx));
+
+    FilteringMetadataCache::init(service);
 
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.

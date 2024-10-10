@@ -197,7 +197,8 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
             hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(newOpCtx);
 
             try {
-                onCollectionPlacementVersionMismatch(newOpCtx, nss, boost::none);
+                FilteringMetadataCache::get(newOpCtx)->onCollectionPlacementVersionMismatch(
+                    newOpCtx, nss, boost::none);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // Can throw NamespaceNotFound if the collection/database was dropped
             }
@@ -621,7 +622,8 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
 
             hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(opCtx);
 
-            auto currentMetadata = forceGetCurrentMetadata(opCtx, doc.getNss());
+            auto currentMetadata =
+                FilteringMetadataCache::get(opCtx)->forceGetCurrentMetadata(opCtx, doc.getNss());
 
             if (hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
                     .shouldFail()) {
@@ -847,7 +849,8 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
     while (store.count(opCtx)) {
         store.forEach(opCtx, BSONObj(), [opCtx](const MigrationCoordinatorDocument& doc) {
             try {
-                onCollectionPlacementVersionMismatch(opCtx, doc.getNss(), boost::none);
+                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+                    opCtx, doc.getNss(), boost::none);
             } catch (DBException& ex) {
                 ex.addContext(str::stream() << "Failed to recover pending migration for document "
                                             << doc.toBSON());

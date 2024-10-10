@@ -232,7 +232,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
     // Make sure the latest placement version is recovered as of the time of the invocation of the
     // command.
-    onCollectionPlacementVersionMismatch(_opCtx, nss(), boost::none);
+    FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+        _opCtx, nss(), boost::none);
 
     const auto shardId = ShardingState::get(opCtx)->shardId();
 
@@ -673,7 +674,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                             "migrationId"_attr = _coordinator->getMigrationId(),
                             logAttrs(nss()));
 
-        forceShardFilteringMetadataRefresh(_opCtx, nss());
+        FilteringMetadataCache::get(_opCtx)->forceShardFilteringMetadataRefresh(_opCtx, nss());
 
         LOGV2_DEBUG_OPTIONS(4817405,
                             2,
@@ -699,7 +700,9 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         scopedGuard.dismiss();
         _cleanup(false);
         // Best-effort recover of the chunk version.
-        onCollectionPlacementVersionMismatchNoExcept(_opCtx, nss(), boost::none).ignore();
+        FilteringMetadataCache::get(_opCtx)
+            ->onCollectionPlacementVersionMismatchNoExcept(_opCtx, nss(), boost::none)
+            .ignore();
         throw;
     }
 

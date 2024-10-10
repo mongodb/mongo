@@ -445,8 +445,9 @@ void clearFilteringMetadata(OperationContext* opCtx,
             ThreadClient tc("TriggerReshardingRecovery",
                             svcCtx->getService(ClusterRole::ShardServer));
             auto opCtx = tc->makeOperationContext();
-            onCollectionPlacementVersionMismatch(
-                opCtx.get(), nss, boost::none /* chunkVersionReceived */);
+            FilteringMetadataCache::get(opCtx.get())
+                ->onCollectionPlacementVersionMismatch(
+                    opCtx.get(), nss, boost::none /* chunkVersionReceived */);
         })
             .until([](const Status& status) {
                 if (!status.isOK()) {

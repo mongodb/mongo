@@ -155,7 +155,8 @@ public:
 
             if (Base::request().getSyncFromConfig()) {
                 LOGV2_DEBUG(21982, 1, "Forcing remote routing table refresh", logAttrs(ns()));
-                onCollectionPlacementVersionMismatch(opCtx, ns(), boost::none);
+                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+                    opCtx, ns(), boost::none);
             }
 
             // A config server could receive this command even if not in config shard mode if the CS

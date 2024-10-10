@@ -235,8 +235,9 @@ auto withOneStaleConfigRetry(OperationContext* opCtx, Callable&& callable) {
             bool shardRefreshSucceeded;
             if (!sce->getVersionWanted()) {
                 shardRefreshSucceeded =
-                    onCollectionPlacementVersionMismatchNoExcept(
-                        opCtx, sce->getNss(), sce->getVersionReceived().placementVersion())
+                    FilteringMetadataCache::get(opCtx)
+                        ->onCollectionPlacementVersionMismatchNoExcept(
+                            opCtx, sce->getNss(), sce->getVersionReceived().placementVersion())
                         .isOK();
             }
 

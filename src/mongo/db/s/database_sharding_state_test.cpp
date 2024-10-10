@@ -159,7 +159,8 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
         };
 
         getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
-        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kDbName, newDbVersion));
+        ASSERT_OK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatchNoExcept(
+            opCtx, kDbName, newDbVersion));
 
         auto activeDbVersion = getActiveDbVersion();
         ASSERT_TRUE(activeDbVersion);
@@ -184,7 +185,8 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
         auto opCtx = operationContext();
 
         getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
-        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kDbName, boost::none));
+        ASSERT_OK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatchNoExcept(
+            opCtx, kDbName, boost::none));
 
         boost::optional<DatabaseVersion> activeDbVersion = [&] {
             AutoGetDb autoDb(opCtx, kDbName, MODE_IS);

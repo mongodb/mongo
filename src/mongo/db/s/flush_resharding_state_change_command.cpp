@@ -137,8 +137,9 @@ public:
                     ThreadClient tc("FlushReshardingStateChange",
                                     svcCtx->getService(ClusterRole::ShardServer));
                     auto opCtx = tc->makeOperationContext();
-                    onCollectionPlacementVersionMismatch(
-                        opCtx.get(), nss, boost::none /* chunkVersionReceived */);
+                    FilteringMetadataCache::get(opCtx.get())
+                        ->onCollectionPlacementVersionMismatch(
+                            opCtx.get(), nss, boost::none /* chunkVersionReceived */);
                 })
                 .onError([](const Status& status) {
                     LOGV2_WARNING(5808100,

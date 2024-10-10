@@ -683,13 +683,14 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
                             *nss, staleInfo->getVersionWanted());
                     }
 
-                    onCollectionPlacementVersionMismatchNoExcept(
-                        opCtx,
-                        *nss,
-                        staleInfo->getVersionWanted()
-                            ? boost::make_optional(
-                                  staleInfo->getVersionWanted()->placementVersion())
-                            : boost::none)
+                    FilteringMetadataCache::get(opCtx)
+                        ->onCollectionPlacementVersionMismatchNoExcept(
+                            opCtx,
+                            *nss,
+                            staleInfo->getVersionWanted()
+                                ? boost::make_optional(
+                                      staleInfo->getVersionWanted()->placementVersion())
+                                : boost::none)
                         .ignore();
                 })
                 .getAsync([](auto) {});

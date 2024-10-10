@@ -182,7 +182,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
 
                 // Make sure the latest placement version is recovered as of the time of the
                 // invocation of the command.
-                onCollectionPlacementVersionMismatch(opCtx, nss(), boost::none);
+                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+                    opCtx, nss(), boost::none);
                 {
                     AutoGetCollection coll{
                         opCtx,
