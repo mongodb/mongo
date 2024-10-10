@@ -6114,6 +6114,7 @@ tasks:
 
 - name: sync_repo_with_copybara
   tags: []
+  patchable: false
   commands:
   - command: manifest.load
   - *git_get_project
