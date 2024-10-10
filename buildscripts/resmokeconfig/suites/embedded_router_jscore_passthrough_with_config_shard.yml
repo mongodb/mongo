@@ -36,17 +36,11 @@ selector:
     # we expect a second drop to return status OK.
     - jstests/core/**/explain_upsert.js
 
-    # Explicit auth is not supported in embedded router mode yet.
-    # TODO SERVER-77578: Enable authentication testing.
-    - jstests/core/**/*[aA]uth*.js
-
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
     # system.profile collection doesn't exist on mongos.
     - requires_profiling
-    # TODO SERVER-77578 Embedded router mode doesn't yet support auth
-    - requires_auth
 
 executor:
   archive:

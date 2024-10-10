@@ -37,10 +37,6 @@ selector:
     # we expect a second drop to return status OK.
     - jstests/core/**/explain_upsert.js
 
-    # Explicit auth is not supported in embedded router mode yet.
-    # TODO SERVER-77578: Enable authentication testing.
-    - jstests/core/**/*[aA]uth*.js
-
     # The following tests fail because they count indexes. These counts do not take into account the
     # additional hashed shard key indexes that are automatically added by this passthrough.
     - jstests/core/**/apitest_dbcollection.js
