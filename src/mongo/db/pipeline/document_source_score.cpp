@@ -58,11 +58,16 @@ DocumentSourceScore::DocumentSourceScore(const boost::intrusive_ptr<ExpressionCo
       _parsedNormalizeFunction(parsedNormalizeFunction),
       _parsedWeight(parsedWeight) {}
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(score,
-                                           LiteParsedDocumentSourceDefault::parse,
-                                           DocumentSourceScore::createFromBson,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           feature_flags::gFeatureFlagSearchHybridScoring);
+/** Register $score as a DocumentSource without feature flag and check that the hybrid scoring
+ * feature flag is enabled in createFromBson() instead of via
+ * REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG. This method of feature flag checking avoids hitting
+ * QueryFeatureNotAllowed and duplicate parser map errors in $scoreFusion tests ($scoreFusion is
+ * gated behind the same feature flag).
+ */
+REGISTER_DOCUMENT_SOURCE(score,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceScore::createFromBson,
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 constexpr StringData DocumentSourceScore::kStageName;
 
@@ -126,6 +131,11 @@ intrusive_ptr<DocumentSourceScore> DocumentSourceScore::create(
 
 intrusive_ptr<DocumentSource> DocumentSourceScore::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            "$score is not allowed in the current configuration. You may need to enable the "
+            "correponding feature flag",
+            feature_flags::gFeatureFlagSearchHybridScoring.isEnabledUseLatestFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "
@@ -157,7 +167,7 @@ intrusive_ptr<DocumentSource> DocumentSourceScore::createFromBson(
 
     // Parse "normalizeFunction" (optional field). If not specified, default is "sigmoid."
 
-    // Moved this logic below (after creating an instance of DocumentSourceScore) so spec member
+    // Parsing logic done after creating an instance of DocumentSourceScore so spec member
     // variable can be accessed in parseExpressionSigmoid().
     if ((!normFuncExists) ||
         (normFuncExists && *normalizeFunctionField == NormalizeFunctionEnum::kSigmoid)) {

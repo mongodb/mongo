@@ -32,8 +32,10 @@
 #include "mongo/unittest/assert.h"
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_score_fusion.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -702,6 +704,305 @@ TEST_F(DocumentSourceScoreFusionTest, CheckSomeOptionalArgsUnspecified) {
 
     ASSERT_DOES_NOT_THROW(
         DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
+TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArgumentsAllowed) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $score: { score : 5.0 } }
+                ],
+                as: "matchAuthor"
+               },
+               {
+                pipeline: [
+                    {
+                        $search: {
+                            index: "search_index",
+                            text: {
+                                query: "mystery",
+                                path: "genres"
+                            }
+                        }
+                    }
+                ],
+                as: "matchGenres"
+               },
+               {
+                pipeline: [
+                    {
+                        $vectorSearch: {
+                            queryVector: [1.0, 2.0, 3.0],
+                            path: "plot_embedding",
+                            numCandidates: 300,
+                            index: "vector_index",
+                            limit: 10
+                        }
+                    }
+                ],
+                as: "matchPlot"
+               }
+            ],
+            inputNormalization: "none"
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithFirstPipelineValid) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $score: { score : 5.0 } }
+                ]
+               },
+               {
+                pipeline: [
+                    { $match : { age : 50 } }
+                ]
+               }
+            ],
+            inputNormalization: "none"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9402500);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithSecondPipelineValid) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { age : 50 } }
+                ]
+               },
+               {
+ 	            pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $score: { score : 5.0 } }
+                ]
+
+               }
+            ],
+            inputNormalization: "none"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9402500);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchMetaUsed) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $score: { score : 5.0 } }
+                ],
+                as: "matchAuthor"
+               },
+               {
+                pipeline: [
+                    {
+                        $searchMeta: {
+                            index: "search_index",
+                            text: {
+                                query: "mystery",
+                                path: "genres"
+                            }
+                        }
+                    },
+                    { $score: { score : 5.0 } }
+                ],
+                as: "matchGenres"
+               }
+            ],
+            inputNormalization: "none"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9402502);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchStoredSourceUsed) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $score: { score : 5.0 } }
+                ],
+                as: "matchAuthor"
+               },
+               {
+                pipeline: [
+                    {
+                        $search: {
+                            index: "search_index",
+                            text: {
+                                query: "mystery",
+                                path: "genres"
+                            },
+                            "returnStoredSource": true
+                        }
+                    },
+                    { $sort: {genres: 1} }
+                ],
+                as: "matchGenres"
+               }
+            ],
+            inputNormalization: "none"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9402501);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $score: { score : 5.0 } }
+                ],
+                as: "matchAuthor"
+               },
+               {
+                pipeline: [
+                    {
+                        $_internalSearchMongotRemote: {
+                            index: "search_index",
+                            text: {
+                                query: "mystery",
+                                path: "genres"
+                            }
+                        }
+                    },
+                    { $score: { score : 5.0 } }
+                ],
+                as: "matchGenres"
+               }
+            ],
+            inputNormalization: "none"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       16436);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleAllowed) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $sample: { size: 10 } },
+                    { $score: { score : 5.0 } },
+                    { $limit: 10 }
+                ]
+               }
+            ],
+            inputNormalization: "none"
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnionWith) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    auto expCtx = getExpCtx();
+    auto nsToUnionWith1 =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "novels");
+    expCtx->addResolvedNamespaces({nsToUnionWith1});
+
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $sample: { size: 10 } },
+                    { $score: { score : 5.0 } },
+                    { $limit: 10 }
+                ]
+               },
+               {
+                pipeline: [
+                    { $unionWith: 
+                        { coll: "novels" } 
+                    },
+                    { $score: { score : 5.0 } }
+                ]
+               }
+               
+            ],
+            inputNormalization: "none"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), expCtx),
+                       AssertionException,
+                       9402502);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfIncludeProject) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $score: { score : 5.0 } }
+                ]
+               },
+               {
+                pipeline: [
+                    { $match : { age : 50 } },
+                    { $score: { score : 5.0 } },
+                    { $project: { author: 1 } }
+                ]
+               }
+            ],
+            inputNormalization: "none"
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9402502);
 }
 
 }  // namespace

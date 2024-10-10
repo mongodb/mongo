@@ -35,6 +35,8 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_score_fusion_gen.h"
+#include "mongo/db/pipeline/document_source_score_fusion_inputs_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {

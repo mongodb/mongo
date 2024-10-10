@@ -55,14 +55,14 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(rankFusion,
 namespace {
 /**
  * Checks that the input pipeline is a valid ranked pipeline. This means it is either one of
- * $search, $vectorSearch, $geoNear, $rankFusion (which have ordered output) or has an explicit
- * $sort stage. A ranked pipeline must also be a 'selection pipeline', which means no stage can
- * modify the documents in any way. Only stages that retrieve, limit, or order documents are
+ * $search, $vectorSearch, $geoNear, $rankFusion, $scoreFusion (which have ordered output) or has an
+ * explicit $sort stage. A ranked pipeline must also be a 'selection pipeline', which means no stage
+ * can modify the documents in any way. Only stages that retrieve, limit, or order documents are
  * allowed.
  */
 static void rankFusionPipelineValidator(const Pipeline& pipeline) {
-    // Note that we don't check for $rankFusion explicitly because it will be desugared by this
-    // point.
+    // Note that we don't check for $rankFusion and $scoreFusion explicitly because it will be
+    // desugared by this point.
     static const std::set<StringData> implicitlyOrderedStages{
         DocumentSourceVectorSearch::kStageName,
         DocumentSourceSearch::kStageName,
@@ -76,7 +76,8 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
     uassert(9191100,
             str::stream()
                 << "All subpipelines to the $rankFusion stage must begin with one of $search, "
-                   "$vectorSearch, $geoNear, $rankFusion or have a custom $sort in the pipeline.",
+                   "$vectorSearch, $geoNear, $scoreFusion, $rankFusion or have a custom $sort in "
+                   "the pipeline.",
             isRankedPipeline);
 
     std::for_each(sources.begin(), sources.end(), [](auto& stage) {

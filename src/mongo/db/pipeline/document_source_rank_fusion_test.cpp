@@ -349,8 +349,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleAllowed) {
-    auto expCtx = getExpCtx();
-
     auto spec = fromjson(R"({
         $rankFusion: {
             inputs: [
@@ -365,7 +363,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleAllowed) {
         }
     })");
 
-    ASSERT_DOES_NOT_THROW(DocumentSourceRankFusion::createFromBson(spec.firstElement(), expCtx));
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnionWith) {

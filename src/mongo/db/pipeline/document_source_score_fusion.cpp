@@ -27,16 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_rank_fusion.h"
+#include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_score_fusion.h"
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
+#include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/query/allowed_contexts.h"
 
 namespace mongo {
@@ -47,9 +52,56 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(scoreFusion,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagSearchHybridScoring);
 
+namespace {
+/**
+ * Checks that the input pipeline is a valid scored pipeline. This means it is either one of
+ * $search, $vectorSearch, $scoreFusion, $rankFusion (which have scored output) or has an explicit
+ * $score stage. A scored pipeline must also be a 'selection pipeline', which means no stage can
+ * modify the documents in any way. Only stages that retrieve, limit, or order documents are
+ * allowed.
+ */
+static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
+    // Note that we don't check for $rankFusion and $scoreFusion explicitly because it will be
+    // desugared by this point.
+    static const std::set<StringData> implicitlyScoredStages{DocumentSourceVectorSearch::kStageName,
+                                                             DocumentSourceSearch::kStageName};
+    auto sources = pipeline.getSources();
+    auto firstStageName = sources.front()->getSourceName();
+    auto isScoredPipeline = implicitlyScoredStages.contains(firstStageName) ||
+        std::any_of(sources.begin(), sources.end(), [](auto& stage) {
+                                return stage->getSourceName() == DocumentSourceScore::kStageName;
+                            });
+    uassert(
+        9402500,
+        str::stream()
+            << "All subpipelines to the $scoreFusion stage must begin with one of $search, "
+               "$vectorSearch, $rankFusion, $scoreFusion or have a custom $score in the pipeline.",
+        isScoredPipeline);
+
+
+    std::for_each(sources.begin(), sources.end(), [](auto& stage) {
+        if (stage->getSourceName() == DocumentSourceSearch::kStageName) {
+            uassert(
+                9402501,
+                str::stream()
+                    << "$search can be used in a $scoreFusion subpipeline but not when "
+                       "returnStoredSource is set to true because it modifies the output fields. "
+                       "Only stages that retrieve, limit, or order documents are allowed.",
+                stage->constraints().noFieldModifications);
+        } else {
+            uassert(9402502,
+                    str::stream() << stage->getSourceName()
+                                  << " is not allowed in a $scoreFusion subpipeline because it "
+                                     "modifies the documents or transforms their fields. Only "
+                                     "stages that retrieve, limit, or order documents are allowed.",
+                    stage->constraints().noFieldModifications);
+        }
+    });
+}
+}  // namespace
+
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "
@@ -57,12 +109,15 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
             elem.type() == BSONType::Object);
     auto spec = ScoreFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
+    std::list<std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
+    // Ensure that all pipelines are valid scored selection pipelines.
     for (const auto& input : spec.getInputs()) {
-        auto pipeline =
-            Pipeline::parse(input.getPipeline(), pExpCtx->copyForSubPipeline(pExpCtx->ns));
+        inputPipelines.push_back(Pipeline::parse(input.getPipeline(),
+                                                 pExpCtx->copyForSubPipeline(pExpCtx->ns),
+                                                 scoreFusionPipelineValidator));
     }
 
-    // TODO SERVER-94025: Validate that these are scored pipelines.
+    // TODO SERVER-94022: Desugar $scoreFusion (will return something then)
     return {};
 }
 }  // namespace mongo
