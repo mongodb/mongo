@@ -687,7 +687,11 @@ buildvariants:
       - name: generate_buildid_to_debug_symbols_mapping
       # sharding_uninitialized_fcv_jscore_passthrough_gen spawns too many connections
       # and processes to be used with TLS on a single host.
-      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !embedded_router_jscore_passthrough_with_balancer_gen !.auth !.txns
+      # aggregation_sharded_collections_causally_consistent_passthrough,
+      # aggregation_sharded_collections_passthrough, and
+      # sharding_jscore_passthrough_with_balancer_gen are too resource intensive with TLS and
+      # gRPC to run under the sanitizer.
+      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !embedded_router_jscore_passthrough_with_balancer_gen !sharding_jscore_passthrough_with_balancer_gen !.auth !.txns
       - name: sharded_jscore_txns
-      - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen
+      - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen !aggregation_sharded_collections_causally_consistent_passthrough !aggregation_sharded_collections_passthrough
       - name: .grpc_misc_js
