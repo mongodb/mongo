@@ -14,7 +14,7 @@ extends:
   # The continous step down hook spawns a thread, which might cause a stepdown to happen while the
   # EnableChangeStream hook is running, causing it to fail. Keep the hook to enable change streams
   # first in the list.
-  - "stepdown_primary_change_streams.replica_sets_hooks_with_legacy_validate"
+  - "stepdown_primary_change_streams.replica_sets_hooks"
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_aggregation"

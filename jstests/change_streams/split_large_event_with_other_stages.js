@@ -8,9 +8,6 @@
 const testDB = db.getSiblingDB("test");
 const testColl = testDB[jsTestName()];
 
-assert.commandWorked(
-    db.adminCommand({appendOplogNote: 1, data: {msg: "dummy write to advance cluster time"}}));
-
 // Capture cluster time before any events.
 const startClusterTime = testDB.hello().$clusterTime.clusterTime;
 

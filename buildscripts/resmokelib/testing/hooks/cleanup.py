@@ -1,9 +1,7 @@
 """Test hook for cleaning up data files created by the fixture."""
 
 import os
-import pymongo
 
-from buildscripts.resmokelib.testing.fixtures.interface import MultiClusterFixture
 from buildscripts.resmokelib.testing.hooks import interface
 
 
@@ -17,9 +15,7 @@ class CleanEveryN(interface.Hook):
 
     DEFAULT_N = 20
 
-    def __init__(
-        self, hook_logger, fixture, n=DEFAULT_N, shell_options=None, skip_database_deletion=False
-    ):
+    def __init__(self, hook_logger, fixture, n=DEFAULT_N):
         """Initialize CleanEveryN."""
         description = "CleanEveryN (restarts the fixture after running `n` tests)"
         interface.Hook.__init__(self, hook_logger, fixture, description)
@@ -35,40 +31,11 @@ class CleanEveryN(interface.Hook):
 
         self.n = n  # pylint: disable=invalid-name
         self.tests_run = 0
-        self.shell_options = shell_options
-        self.skip_database_deletion = skip_database_deletion
 
     def after_test(self, test, test_report):
         """After test cleanup."""
         self.tests_run += 1
         if self.tests_run < self.n:
-            if self.skip_database_deletion:
-                return
-            clusters = (
-                [self.fixture]
-                if not isinstance(self.fixture, MultiClusterFixture)
-                else self.fixture.get_independent_clusters()
-            )
-            for cluster in clusters:
-                if self.shell_options and "authenticationMechanism" in self.shell_options:
-                    client = pymongo.MongoClient(
-                        cluster.get_driver_connection_url(),
-                        username=self.shell_options["username"],
-                        password=self.shell_options["password"],
-                        authSource=self.shell_options["authenticationDatabase"],
-                        authMechanism=self.shell_options["authenticationMechanism"],
-                    )
-                else:
-                    client = pymongo.MongoClient(cluster.get_driver_connection_url())
-
-                for db_name in client.list_database_names():
-                    if db_name in ["admin", "config", "local", "$external"]:
-                        continue
-                    self.logger.info(
-                        f"Dropping database to ensure it isn't validated again: {db_name}"
-                    )
-                    client.drop_database(db_name)
-                    self.logger.info(f"Successfully dropped database: {db_name}")
             return
 
         hook_test_case = CleanEveryNTestCase.create_after_test(test.logger, test, self)

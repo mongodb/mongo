@@ -41,17 +41,6 @@
       hooks:
         - class: PeriodicKillSecondaries
 
-- name: hooks_with_legacy_validate
-  value:
-    executor:
-      archive:
-        tests: true
-        hooks:
-          - PeriodicKillSecondaries
-      hooks:
-        - class: PeriodicKillSecondaries
-          use_legacy_validate: true
-
 - name: hooks_with_oplog_application_lag
   value:
     executor:

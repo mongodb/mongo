@@ -2,11 +2,6 @@
 config_variables:
   - &keyFile jstests/libs/authTestsKey
   - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
-  - &authOptions
-    authenticationDatabase: local
-    authenticationMechanism: SCRAM-SHA-256
-    password: *keyFileData
-    username: __system
 
 test_kind: js_test
 
@@ -28,11 +23,12 @@ executor:
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
       eval: jsTest.authenticate(db.getMongo())
-      <<: *authOptions
+      authenticationDatabase: local
+      authenticationMechanism: SCRAM-SHA-256
+      password: *keyFileData
+      username: __system
   hooks:
     - class: CleanEveryN
-      shell_options:
-        <<: *authOptions
       n: 20
   fixture:
     class: MongoDFixture
