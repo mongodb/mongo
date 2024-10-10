@@ -207,10 +207,14 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         _dumpCatalog(opCtx);
     }
 
+    LOGV2(9529901,
+          "Initializing durable catalog",
+          "numRecords"_attr = _catalogRecordStore->numRecords(opCtx));
     _catalog.reset(new DurableCatalog(
         _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes, this));
     _catalog->init(opCtx);
 
+    LOGV2(9529902, "Retrieving all idents from storage engine");
     std::vector<std::string> identsKnownToStorageEngine = _engine->getAllIdents(opCtx);
     std::sort(identsKnownToStorageEngine.begin(), identsKnownToStorageEngine.end());
 
@@ -322,6 +326,10 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         // Let the CollectionCatalog know that we are maintaining timestamps from minValidTs
         catalog.catalogIdTracker().rollback(minValidTs);
     });
+
+    LOGV2(9529903,
+          "Initializing all collections in durable catalog",
+          "numEntries"_attr = catalogEntries.size());
     for (DurableCatalog::EntryIdentifier entry : catalogEntries) {
         if (_options.forRestore) {
             // When restoring a subset of user collections from a backup, the collections not

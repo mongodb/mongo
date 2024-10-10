@@ -2418,6 +2418,11 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
         opCtx->sleepFor(Seconds(1));
     } while (ret == EBUSY);
 
+    LOGV2_FOR_ROLLBACK(9529900,
+                       0,
+                       "Rolling back to the stable timestamp completed by storage engine",
+                       "attempts"_attr = attempts);
+
     if (ret) {
         // Dump the storage engine's internal state to assist in diagnosis.
         dump();
