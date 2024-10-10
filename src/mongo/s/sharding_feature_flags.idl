@@ -185,3 +185,8 @@ feature_flags:
     cpp_varname: feature_flags::gFeatureFlagHashedShardKeyIndexOptionalUponShardingCollection
     default: false
     shouldBeFCVGated: true
+  featureFlagCreateDatabaseDDLCoordinator:
+    description: "Feature flag for enabling the sharding DDL coordinator for database creation."
+    cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
+    default: false
+    shouldBeFCVGated: true
