@@ -816,16 +816,4 @@ Status storeMongodOptions(const moe::Environment& params) {
     setGlobalReplSettings(replSettings);
     return Status::OK();
 }
-
-namespace {
-std::function<ExitCode(ServiceContext* svcCtx)> _magicRestoreMainFn = nullptr;
-}
-
-void setMagicRestoreMain(std::function<ExitCode(ServiceContext* svcCtx)> magicRestoreMainFn) {
-    _magicRestoreMainFn = magicRestoreMainFn;
-}
-std::function<ExitCode(ServiceContext* svcCtx)> getMagicRestoreMain() {
-    return _magicRestoreMainFn;
-}
-
 }  // namespace mongo
