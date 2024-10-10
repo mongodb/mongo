@@ -742,6 +742,7 @@ env.CppUnitTest(
         "config/sharding_catalog_manager_clear_jumbo_flag_test.cpp",
         "config/sharding_catalog_manager_commit_chunk_migration_test.cpp",
         "config/sharding_catalog_manager_config_initialization_test.cpp",
+        "config/sharding_catalog_manager_configure_collection_balancing_test.cpp",
         "config/sharding_catalog_manager_database_operations_test.cpp",
         "config/sharding_catalog_manager_ensure_chunk_version_is_greater_than_test.cpp",
         "config/sharding_catalog_manager_merge_chunks_test.cpp",
