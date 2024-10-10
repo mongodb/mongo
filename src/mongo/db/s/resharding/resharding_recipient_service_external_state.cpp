@@ -161,7 +161,7 @@ void RecipientStateMachineExternalStateImpl::refreshCatalogCache(OperationContex
 
 CollectionRoutingInfo RecipientStateMachineExternalStateImpl::getTrackedCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss) {
-    const auto cri =
+    auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
     uassert(ErrorCodes::NamespaceNotFound,
