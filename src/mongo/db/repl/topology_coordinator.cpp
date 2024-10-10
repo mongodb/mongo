@@ -363,7 +363,8 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
                                        lastOpTimeFetched,
                                        readPreference,
                                        attempts == 0 /* firstAttempt */,
-                                       true /* shouldCheckStaleness */)) {
+                                       true /* shouldCheckStaleness */,
+                                       false /* limitLogFrequency */)) {
                 // Node is not a viable sync source candidate.
                 continue;
             }
@@ -444,7 +445,8 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
                                                 const OpTime& lastOpTimeFetched,
                                                 ReadPreference readPreference,
                                                 const bool firstAttempt,
-                                                const bool shouldCheckStaleness) const {
+                                                const bool shouldCheckStaleness,
+                                                const bool limitLogFrequency) {
     // Don't consider ourselves.
     if (candidateIndex == _selfIndex) {
         return false;
@@ -454,18 +456,30 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
     const auto syncSourceCandidate = memberConfig.getHostAndPort();
     const auto memberData = _memberData[candidateIndex];
 
+    // Only log this message if it has not been logged in the last second.
+    bool shouldLogIneligibleCandidate =
+        (limitLogFrequency &&
+         ((_recentSyncSourceChanges.lastLoggedIneligibleSrc + Milliseconds(1000)) < now));
+
     // Candidate must be up to be considered.
     if (!memberData.up()) {
-        LOGV2_INFO(3873106,
-                   "Cannot select sync source because it is not up",
-                   "syncSourceCandidate"_attr = syncSourceCandidate);
+        if (shouldLogIneligibleCandidate) {
+            _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
+            LOGV2_INFO(3873106,
+                       "Cannot select sync source because it is not up",
+                       "syncSourceCandidate"_attr = syncSourceCandidate);
+        }
+
         return false;
     }
     // Candidate must be PRIMARY or SECONDARY state to be considered.
     if (!memberData.getState().readable()) {
-        LOGV2_INFO(3873107,
-                   "Cannot select sync source because it is not readable",
-                   "syncSourceCandidate"_attr = syncSourceCandidate);
+        if (shouldLogIneligibleCandidate) {
+            _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
+            LOGV2_INFO(3873107,
+                       "Cannot select sync source because it is not readable",
+                       "syncSourceCandidate"_attr = syncSourceCandidate);
+        }
         return false;
     }
 
@@ -473,10 +487,13 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
     if (readPreference == ReadPreference::SecondaryOnly ||
         (readPreference == ReadPreference::SecondaryPreferred && firstAttempt)) {
         if (memberData.getState().primary()) {
-            LOGV2_INFO(3873101,
-                       "Cannot select sync source because it is a primary and we are "
-                       "looking for a secondary",
-                       "syncSourceCandidate"_attr = syncSourceCandidate);
+            if (shouldLogIneligibleCandidate) {
+                _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
+                LOGV2_INFO(3873101,
+                           "Cannot select sync source because it is a primary and we are "
+                           "looking for a secondary",
+                           "syncSourceCandidate"_attr = syncSourceCandidate);
+            }
             return false;
         }
     }
@@ -485,66 +502,87 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
     if (firstAttempt) {
         // Candidate must be a voter if we are a voter.
         if (_selfConfig().isVoter() && !memberConfig.isVoter()) {
-            LOGV2_INFO(3873108,
-                       "Cannot select sync source because we are a voter and it is not",
-                       "syncSourceCandidate"_attr = syncSourceCandidate);
+            if (shouldLogIneligibleCandidate) {
+                _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
+                LOGV2_INFO(3873108,
+                           "Cannot select sync source because we are a voter and it is not",
+                           "syncSourceCandidate"_attr = syncSourceCandidate);
+            }
             return false;
         }
         // Candidates must not be hidden.
         if (memberConfig.isHidden()) {
-            LOGV2_INFO(3873109,
-                       "Cannot select sync source because it is hidden",
-                       "syncSourceCandidate"_attr = syncSourceCandidate);
+            if (shouldLogIneligibleCandidate) {
+                _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
+                LOGV2_INFO(3873109,
+                           "Cannot select sync source because it is hidden",
+                           "syncSourceCandidate"_attr = syncSourceCandidate);
+            }
             return false;
         }
         // Candidates cannot be excessively behind, if we are checking for staleness.
         if (shouldCheckStaleness) {
             const auto oldestSyncOpTime = _getOldestSyncOpTime();
             if (memberData.getHeartbeatAppliedOpTime() < oldestSyncOpTime) {
-                LOGV2_INFO(3873110,
-                           "Cannot select sync source because it is too far behind",
-                           "syncSourceCandidate"_attr = syncSourceCandidate,
-                           "syncSourceCandidateOpTime"_attr =
-                               memberData.getHeartbeatAppliedOpTime(),
-                           "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
+                if (shouldLogIneligibleCandidate) {
+                    _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
+                    LOGV2_INFO(3873110,
+                               "Cannot select sync source because it is too far behind",
+                               "syncSourceCandidate"_attr = syncSourceCandidate,
+                               "syncSourceCandidateOpTime"_attr =
+                                   memberData.getHeartbeatAppliedOpTime(),
+                               "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
+                }
                 return false;
             }
         }
         // Candidate must not have a configured delay larger than ours.
         if (_selfConfig().getSecondaryDelay() < memberConfig.getSecondaryDelay()) {
-            LOGV2_INFO(3873111,
-                       "Cannot select sync source with larger secondaryDelaySecs than ours",
-                       "syncSourceCandidate"_attr = syncSourceCandidate,
-                       "syncSourceCandidateSecondaryDelaySecs"_attr =
-                           memberConfig.getSecondaryDelay(),
-                       "secondaryDelaySecs"_attr = _selfConfig().getSecondaryDelay());
+            if (shouldLogIneligibleCandidate) {
+                _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
+                LOGV2_INFO(3873111,
+                           "Cannot select sync source with larger secondaryDelaySecs than ours",
+                           "syncSourceCandidate"_attr = syncSourceCandidate,
+                           "syncSourceCandidateSecondaryDelaySecs"_attr =
+                               memberConfig.getSecondaryDelay(),
+                           "secondaryDelaySecs"_attr = _selfConfig().getSecondaryDelay());
+            }
             return false;
         }
     }
     // Candidate must build indexes if we build indexes, to be considered.
     if (_selfConfig().shouldBuildIndexes()) {
         if (!memberConfig.shouldBuildIndexes()) {
-            LOGV2_INFO(3873112,
-                       "Cannot select sync source which does not build indexes when we do",
-                       "syncSourceCandidate"_attr = syncSourceCandidate);
+            if (shouldLogIneligibleCandidate) {
+                _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
+                LOGV2_INFO(3873112,
+                           "Cannot select sync source which does not build indexes when we do",
+                           "syncSourceCandidate"_attr = syncSourceCandidate);
+            }
             return false;
         }
     }
     // Only select a candidate that is ahead of me, if we are checking for staleness.
     if (shouldCheckStaleness && memberData.getHeartbeatAppliedOpTime() <= lastOpTimeFetched) {
-        LOGV2_INFO(3873113,
-                   "Cannot select sync source which is not ahead of me",
-                   "syncSourceCandidate"_attr = syncSourceCandidate,
-                   "syncSourceCandidateLastAppliedOpTime"_attr =
-                       memberData.getHeartbeatAppliedOpTime().toBSON(),
-                   "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON());
+        if (shouldLogIneligibleCandidate) {
+            _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
+            LOGV2_INFO(3873113,
+                       "Cannot select sync source which is not ahead of me",
+                       "syncSourceCandidate"_attr = syncSourceCandidate,
+                       "syncSourceCandidateLastAppliedOpTime"_attr =
+                           memberData.getHeartbeatAppliedOpTime().toBSON(),
+                       "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON());
+        }
         return false;
     }
     // Candidate cannot be denylisted.
     if (_memberIsDenylisted(memberConfig, now)) {
-        LOGV2_INFO(3873115,
-                   "Cannot select sync source which is denylisted",
-                   "syncSourceCandidate"_attr = syncSourceCandidate);
+        if (shouldLogIneligibleCandidate) {
+            _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
+            LOGV2_INFO(3873115,
+                       "Cannot select sync source which is denylisted",
+                       "syncSourceCandidate"_attr = syncSourceCandidate);
+        }
         return false;
     }
     // This candidate has passed all tests.
@@ -3149,7 +3187,7 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
                                                  const rpc::ReplSetMetadata& replMetadata,
                                                  const rpc::OplogQueryMetadata& oqMetadata,
                                                  const OpTime& lastOpTimeFetched,
-                                                 Date_t now) const {
+                                                 Date_t now) {
     // Methodology:
     // If there exists a viable sync source member other than currentSource, whose oplog has
     // reached an optime greater than _options.maxSyncSourceLagSecs later than currentSource's,
@@ -3202,7 +3240,7 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
 
 bool TopologyCoordinator::shouldChangeSyncSourceOnError(const HostAndPort& currentSource,
                                                         const OpTime& lastOpTimeFetched,
-                                                        Date_t now) const {
+                                                        Date_t now) {
     // We change sync source on error if
     // 1) A forced sync source change has been requested.
     // 2) Chaining is disabled and a new primary has been detected.
@@ -3328,7 +3366,7 @@ bool TopologyCoordinator::_shouldChangeSyncSourceToBreakCycle(
 bool TopologyCoordinator::_shouldChangeSyncSourceDueToLag(const HostAndPort& currentSource,
                                                           const OpTime& currentSourceOpTime,
                                                           const OpTime& lastOpTimeFetched,
-                                                          Date_t now) const {
+                                                          Date_t now) {
     if (MONGO_unlikely(disableMaxSyncSourceLagSecs.shouldFail())) {
         LOGV2(
             21833,
@@ -3349,7 +3387,8 @@ bool TopologyCoordinator::_shouldChangeSyncSourceDueToLag(const HostAndPort& cur
                                       lastOpTimeFetched,
                                       ReadPreference::Nearest,
                                       true /* firstAttempt */,
-                                      true /* shouldCheckStaleness */)) {
+                                      true /* shouldCheckStaleness */,
+                                      false /* limitLogFrequency */)) {
                 invariant(i != (size_t)_selfIndex,
                           str::stream()
                               << "Node " << i << " was eligible as a sync source for itself");
@@ -3373,7 +3412,7 @@ bool TopologyCoordinator::_shouldChangeSyncSourceDueToBetterEligibleSource(
     const HostAndPort& currentSource,
     const int currentSourceIndex,
     const OpTime& lastOpTimeFetched,
-    Date_t now) const {
+    Date_t now) {
     // Change sync source if our current sync source is not a preferred sync source node choice due
     // to non-staleness issues, such as being a non-voter when we are a voter, or being hidden, or
     // any of the other conditions checked in _isEligibleSyncSource with firstAttempt=true, and
@@ -3388,7 +3427,8 @@ bool TopologyCoordinator::_shouldChangeSyncSourceDueToBetterEligibleSource(
                                lastOpTimeFetched,
                                ReadPreference::Nearest,
                                true /* firstAttempt */,
-                               false /* shouldCheckStaleness */)) {
+                               false /* shouldCheckStaleness */,
+                               false /* limitLogFrequency */)) {
 
         for (size_t i = 0; i < _memberData.size(); i++) {
             if (_isEligibleSyncSource(i,
@@ -3396,7 +3436,8 @@ bool TopologyCoordinator::_shouldChangeSyncSourceDueToBetterEligibleSource(
                                       lastOpTimeFetched,
                                       ReadPreference::Nearest,
                                       true /* firstAttempt */,
-                                      true /* shouldCheckStaleness */)) {
+                                      true /* shouldCheckStaleness */,
+                                      false /* limitLogFrequency */)) {
                 invariant(i != (size_t)_selfIndex,
                           str::stream()
                               << "Node " << i << " was eligible as a sync source for itself");
@@ -3500,7 +3541,8 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
                                   previousOpTimeFetched,
                                   readPreference,
                                   true /* firstAttempt */,
-                                  true /* shouldCheckStaleness */)) {
+                                  true /* shouldCheckStaleness */,
+                                  true /* limitLogFrequency */)) {
             LOGV2(4744901,
                   "Choosing new sync source because we have found another potential sync "
                   "source that is significantly closer than our current sync source",

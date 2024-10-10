@@ -126,6 +126,12 @@ public:
          */
         std::queue<Date_t> getChanges_forTest();
 
+        /**
+         * Tracks the last time there was a log saying a node is an ineligible sync source during
+         * shouldChangeSyncSourceDueToPingTime.
+         */
+        Date_t lastLoggedIneligibleSrc = Date_t::fromMillisSinceEpoch(0);
+
     private:
         std::queue<Date_t> _recentChanges;
     };
@@ -294,7 +300,7 @@ public:
                                 const rpc::ReplSetMetadata& replMetadata,
                                 const rpc::OplogQueryMetadata& oqMetadata,
                                 const OpTime& lastOpTimeFetched,
-                                Date_t now) const;
+                                Date_t now);
 
     /*
      * Clear this node's sync source.
@@ -308,7 +314,7 @@ public:
      */
     bool shouldChangeSyncSourceOnError(const HostAndPort& currentSource,
                                        const OpTime& lastOpTimeFetched,
-                                       Date_t now) const;
+                                       Date_t now);
     /**
      * Returns true if we find an eligible sync source that is significantly closer than our current
      * sync source.
@@ -1011,14 +1017,14 @@ private:
     bool _shouldChangeSyncSourceDueToLag(const HostAndPort& currentSource,
                                          const OpTime& currentSourceOpTime,
                                          const OpTime& lastOpTimeFetched,
-                                         Date_t now) const;
+                                         Date_t now);
 
     // Returns true if we should choose a new sync source because our current sync source does
     // not match our strict criteria for sync source candidates, but another member does.
     bool _shouldChangeSyncSourceDueToBetterEligibleSource(const HostAndPort& currentSource,
                                                           int currentSourceIndex,
                                                           const OpTime& lastOpTimeFetched,
-                                                          Date_t now) const;
+                                                          Date_t now);
 
     /**
      * Sets this node's sync source. It will also update whether the sync source was forced and add
@@ -1036,7 +1042,8 @@ private:
                                const OpTime& lastOpTimeFetched,
                                ReadPreference readPreference,
                                bool firstAttempt,
-                               bool shouldCheckStaleness) const;
+                               bool shouldCheckStaleness,
+                               bool limitLogFrequency);
 
     // Returns the current "ping" value for the given member by their address.
     Milliseconds _getPing(const HostAndPort& host);
