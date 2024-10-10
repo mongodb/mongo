@@ -159,6 +159,11 @@ static AtomicWord<bool> atPrompt(false);  // can eval before getting to prompt
 const std::string kDefaultMongoHost = "127.0.0.1"s;
 const std::string kDefaultMongoPort = "27017"s;
 const std::string kDefaultMongoURL = "mongodb://"s + kDefaultMongoHost + ":"s + kDefaultMongoPort;
+#ifdef MONGO_CONFIG_GRPC
+const std::string kDefaultMongoGRPCPort = "27021"s;
+const std::string kDefaultMongoGRPCURL =
+    "mongodb://"s + kDefaultMongoHost + ":"s + kDefaultMongoGRPCPort;
+#endif
 
 // Initialize the featureCompatibilityVersion server parameter since the mongo shell does not have a
 // featureCompatibilityVersion document from which to initialize the parameter. The parameter is set
@@ -384,8 +389,12 @@ std::string getURIFromArgs(const std::string& arg,
                            const std::string& host,
                            const std::string& port) {
     if (host.empty() && arg.empty() && port.empty()) {
-        // Nothing provided, just play the default.
+// Nothing provided, just play the default.
+#ifdef MONGO_CONFIG_GRPC
+        return shellGlobalParams.gRPC ? kDefaultMongoGRPCURL : kDefaultMongoURL;
+#else
         return kDefaultMongoURL;
+#endif
     }
 
     if ((str::startsWith(arg, "mongodb://") || str::startsWith(arg, "mongodb+srv://")) &&
@@ -478,7 +487,12 @@ std::string getURIFromArgs(const std::string& arg,
                 } else if (port.size()) {
                     ss << ':' << uriEncode(port);
                 } else {
-                    ss << ":27017";
+#ifdef MONGO_CONFIG_GRPC
+                    ss << ":"
+                       << (shellGlobalParams.gRPC ? kDefaultMongoGRPCPort : kDefaultMongoPort);
+#else
+                    ss << ":" << kDefaultMongoPort;
+#endif
                 }
             }
             start = end + 1;
