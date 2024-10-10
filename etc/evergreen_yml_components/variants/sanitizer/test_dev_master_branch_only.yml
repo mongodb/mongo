@@ -649,7 +649,7 @@ buildvariants:
   - name: &linux-debug-aubsan-compile-grpc linux-debug-aubsan-compile-grpc
     display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Compile with GRPC"
     tags: ["experimental"]
-    cron: "0 0 * * 0" # Once a week on Sunday
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
     expansions:

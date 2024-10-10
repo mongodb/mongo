@@ -236,7 +236,7 @@ buildvariants:
   - <<: *generic_linux_compile_params
     name: &linux-x86-dynamic-grpc linux-x86-dynamic-grpc
     display_name: "~ Linux x86 Shared Library Enterprise with GRPC"
-    cron: "0 0 * * 0" # Once a week on Sunday
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     stepback: false
     expansions:
       <<: *generic_linux_compile_expansions
