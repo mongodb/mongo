@@ -40,16 +40,21 @@
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_backend_local.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/sasl_x509_server_conversation.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
@@ -75,7 +80,8 @@ BSONObj generateX509UserDocument(const StringData username) {
     return BSON("_id"
                 << "{}.{}"_format(database, username) << AuthorizationManager::USER_NAME_FIELD_NAME
                 << username << AuthorizationManager::USER_DB_FIELD_NAME << database << "roles"
-                << BSONArray() << "privileges" << BSONArray());
+                << BSONArray() << "privileges" << BSONArray() << "credentials"
+                << BSON("external" << true));
 }
 
 // Construct a simple, structured X509 name equivalent to "CN=mongodb.com"
@@ -125,19 +131,25 @@ protected:
 
         session->setSSLManager(manager);
 
-        auto uniqueAuthzManagerExternalStateMock =
-            std::make_unique<AuthzManagerExternalStateMock>();
-        authzManagerExternalState = uniqueAuthzManagerExternalStateMock.get();
-        auto newManager = std::make_unique<AuthorizationManagerImpl>(
-            serviceContext->getService(), std::move(uniqueAuthzManagerExternalStateMock));
-        authzSession = std::make_unique<AuthorizationSessionImpl>(
-            std::make_unique<AuthzSessionExternalStateMock>(client), client);
-        authzManager = newManager.get();
-        AuthorizationManager::set(serviceContext->getService(), std::move(newManager));
+        // Initialize the serviceEntryPoint so that DBDirectClient can function.
+        serviceContext->getService()->setServiceEntryPoint(
+            std::make_unique<ServiceEntryPointShardRole>());
+
+        // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
+        repl::ReplicationCoordinator::set(serviceContext,
+                                          std::make_unique<repl::ReplicationCoordinatorMock>(
+                                              serviceContext, repl::ReplSettings()));
+
         auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+        AuthorizationManager::set(
+            serviceContext->getService(),
+            globalAuthzManagerFactory->createShard(serviceContext->getService()));
+
         auth::AuthorizationBackendInterface::set(
             serviceContext->getService(),
             globalAuthzManagerFactory->createBackendInterface(serviceContext->getService()));
+        authzBackend = reinterpret_cast<auth::AuthorizationBackendMock*>(
+            auth::AuthorizationBackendInterface::get(serviceContext->getService()));
 
         saslServerSession = std::make_unique<SaslX509ServerMechanism>("$external");
         saslClientSession = std::make_unique<NativeSaslClientSession>();
@@ -174,9 +186,6 @@ protected:
 
         saslClientSession.reset();
         saslServerSession.reset();
-
-        authzSession.reset();
-        authzManagerExternalState = nullptr;
     }
 
 public:
@@ -194,9 +203,7 @@ protected:
     std::shared_ptr<SSLManagerInterface> manager;
 
     transport::TransportLayerMock transportLayer;
-    AuthzManagerExternalStateMock* authzManagerExternalState;
-    AuthorizationManager* authzManager;
-    std::unique_ptr<AuthorizationSession> authzSession;
+    auth::AuthorizationBackendMock* authzBackend;
 
     std::unique_ptr<ServerMechanismBase> saslServerSession;
     std::unique_ptr<NativeSaslClientSession> saslClientSession;
@@ -245,7 +252,7 @@ TEST_F(SASLX509Test, testBasicNoUsername) {
         "featureFlagRearchitectUserAcquisition", true);
     SSLX509Name name = buildX509Name();
     setX509PeerInfo(session, SSLPeerInfo(name));
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateX509UserDocument(name.toString()), BSONObj()));
 
     ASSERT_OK(saslClientSession->initialize());
@@ -261,7 +268,7 @@ TEST_F(SASLX509Test, testBasicEmptyUsername) {
         "featureFlagRearchitectUserAcquisition", true);
     SSLX509Name name = buildX509Name();
     setX509PeerInfo(session, SSLPeerInfo(name));
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateX509UserDocument(name.toString()), BSONObj()));
 
     ASSERT_OK(saslClientSession->initialize());
@@ -354,7 +361,7 @@ TEST_F(SASLX509Test, testEnforceUserClusterSeparationFalse) {
     peerInfo.setClusterMembership(name.toString());
     setX509PeerInfo(session, peerInfo);
 
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateX509UserDocument(kX509Subject), BSONObj()));
 
     ASSERT_OK(saslClientSession->initialize());
@@ -374,7 +381,7 @@ TEST_F(SASLX509Test, testEnforceUserClusterSeparationTrue) {
 
     saslServerSession = std::make_unique<SaslX509ServerMechanism>("$external");
 
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateX509UserDocument(kX509Subject), BSONObj()));
 
 

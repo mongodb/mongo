@@ -75,15 +75,11 @@ Service::ConstructorActionRegisterer createAuthorizationManager(
             serverGlobalParams.authState == ServerGlobalParams::AuthState::kEnabled;
 
         std::unique_ptr<AuthorizationManager> authzManager;
-        std::unique_ptr<AuthorizationClientHandle> authorizationClientHandle;
 
         if (service->role().hasExclusively(ClusterRole::RouterServer)) {
             authzManager = globalAuthzManagerFactory->createRouter(service);
-            authorizationClientHandle =
-                globalAuthzManagerFactory->createClientHandleRouter(service);
         } else {
             authzManager = globalAuthzManagerFactory->createShard(service);
-            authorizationClientHandle = globalAuthzManagerFactory->createClientHandleShard(service);
             auth::AuthorizationBackendInterface::set(
                 service, globalAuthzManagerFactory->createBackendInterface(service));
         }
@@ -97,8 +93,6 @@ Service::ConstructorActionRegisterer createAuthorizationManager(
             authzManager->setAuthEnabled(true);
         }
         AuthorizationManager::set(service, std::move(authzManager));
-
-        AuthorizationClientHandle::set(service, std::move(authorizationClientHandle));
 
         if (clusterAuthMode.allowsKeyFile()) {
             // Load up the keys if we allow key files authentication.
@@ -125,10 +119,7 @@ void AuthzVersionParameter::append(OperationContext* opCtx,
                                    BSONObjBuilder* b,
                                    StringData name,
                                    const boost::optional<TenantId>&) {
-    int authzVersion;
-    uassertStatusOK(AuthorizationManager::get(opCtx->getService())
-                        ->getAuthorizationVersion(opCtx, &authzVersion));
-    b->append(name, authzVersion);
+    b->append(name, AuthorizationManager::schemaVersion28SCRAM);
 }
 
 Status AuthzVersionParameter::setFromString(StringData newValueString,

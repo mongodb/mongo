@@ -68,9 +68,6 @@ class AuthzManagerExternalStateLocal : public AuthzManagerExternalState {
 public:
     ~AuthzManagerExternalStateLocal() override = default;
 
-    Status hasValidStoredAuthorizationVersion(OperationContext* opCtx,
-                                              BSONObj* foundVersionDoc) override;
-    Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
     StatusWith<User> getUserObject(OperationContext* opCtx,
                                    const UserRequest& userReq,
                                    const SharedUserAcquisitionStats& userAcquisitionStats) override;
@@ -91,12 +88,6 @@ public:
                                   const std::vector<RoleName>& roles,
                                   AuthenticationRestrictionsFormat,
                                   BSONObj* result) override;
-    Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                    const DatabaseName& dbname,
-                                    PrivilegeFormat showPrivileges,
-                                    AuthenticationRestrictionsFormat,
-                                    bool showBuiltinRoles,
-                                    std::vector<BSONObj>* result) override;
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;
 

@@ -38,15 +38,15 @@
 namespace mongo {
 
 /**
- * The implementation of AuthzSessionExternalState functionality for mongod.
+ * The implementation of AuthzSessionExternalState functionality for the shard cluster role.
  */
-class AuthzSessionExternalStateMongod : public AuthzSessionExternalStateServerCommon {
-    AuthzSessionExternalStateMongod(const AuthzSessionExternalStateMongod&) = delete;
-    AuthzSessionExternalStateMongod& operator=(const AuthzSessionExternalStateMongod&) = delete;
+class AuthzSessionExternalStateShard : public AuthzSessionExternalStateServerCommon {
+    AuthzSessionExternalStateShard(const AuthzSessionExternalStateShard&) = delete;
+    AuthzSessionExternalStateShard& operator=(const AuthzSessionExternalStateShard&) = delete;
 
 public:
-    AuthzSessionExternalStateMongod(Client* client);
-    ~AuthzSessionExternalStateMongod() override;
+    AuthzSessionExternalStateShard(Client* client);
+    ~AuthzSessionExternalStateShard() override;
 
     bool shouldIgnoreAuthChecks() const override;
 

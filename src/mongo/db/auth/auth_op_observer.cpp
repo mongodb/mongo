@@ -38,7 +38,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_op_observer.h"
-#include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/op_observer/op_observer_util.h"
@@ -47,6 +46,8 @@
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 namespace mongo {
 
@@ -69,7 +70,7 @@ void AuthOpObserver::onInserts(OperationContext* opCtx,
     for (auto it = first; it != last; it++) {
         audit::logInsertOperation(opCtx->getClient(), coll->ns(), it->doc);
         AuthorizationManager::get(opCtx->getService())
-            ->logOp(opCtx, "i", coll->ns(), it->doc, nullptr);
+            ->notifyDDLOperation(opCtx, "i", coll->ns(), it->doc, nullptr);
     }
 }
 
@@ -84,7 +85,8 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx,
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
     AuthorizationManager::get(opCtx->getService())
-        ->logOp(opCtx, "u", args.coll->ns(), args.updateArgs->update, &args.updateArgs->criteria);
+        ->notifyDDLOperation(
+            opCtx, "u", args.coll->ns(), args.updateArgs->update, &args.updateArgs->criteria);
 }
 
 void AuthOpObserver::onDelete(OperationContext* opCtx,
@@ -101,7 +103,7 @@ void AuthOpObserver::onDelete(OperationContext* opCtx,
     invariant(!documentId.isEmpty());
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
     AuthorizationManager::get(opCtx->getService())
-        ->logOp(opCtx, "d", coll->ns(), documentId, nullptr);
+        ->notifyDDLOperation(opCtx, "d", coll->ns(), documentId, nullptr);
 }
 
 void AuthOpObserver::onCreateCollection(OperationContext* opCtx,
@@ -117,7 +119,8 @@ void AuthOpObserver::onCreateCollection(OperationContext* opCtx,
         repl::MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex);
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
-    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 void AuthOpObserver::onCollMod(OperationContext* opCtx,
@@ -132,7 +135,8 @@ void AuthOpObserver::onCollMod(OperationContext* opCtx,
     const auto cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo);
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
-    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 void AuthOpObserver::onDropDatabase(OperationContext* opCtx,
@@ -142,7 +146,8 @@ void AuthOpObserver::onDropDatabase(OperationContext* opCtx,
     const auto cmdObj = BSON("dropDatabase" << 1);
 
     invariant(opCtx->getService()->role().has(ClusterRole::ShardServer));
-    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
@@ -155,7 +160,8 @@ repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
     const auto cmdObj = BSON("drop" << collectionName.coll());
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
-    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, nullptr);
 
     return {};
 }
@@ -169,7 +175,8 @@ void AuthOpObserver::onDropIndex(OperationContext* opCtx,
     const auto cmdObj = BSON("dropIndexes" << nss.coll() << "index" << indexName);
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
-    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, &indexInfo);
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, &indexInfo);
 }
 
 void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
@@ -191,7 +198,8 @@ void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
     const auto cmdObj = builder.done();
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
-    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
@@ -216,7 +224,7 @@ void AuthOpObserver::onImportCollection(OperationContext* opCtx,
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
     AuthorizationManager::get(opCtx->getService())
-        ->logOp(opCtx, "m", nss, catalogEntry, &storageMetadata);
+        ->notifyDDLOperation(opCtx, "m", nss, catalogEntry, &storageMetadata);
 }
 
 void AuthOpObserver::onReplicationRollback(OperationContext* opCtx,

@@ -51,9 +51,11 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
@@ -828,12 +830,11 @@ TEST(OpMsgSerializer, SetFlagWorks) {
 class OpMsgWithAuth : public mongo::ScopedGlobalServiceContextForTest, public unittest::Test {
 protected:
     void setUp() final {
-        auto authzManagerState = std::make_unique<AuthzManagerExternalStateMock>();
-        auto authzManager = std::make_unique<AuthorizationManagerImpl>(
-            getServiceContext()->getService(), std::move(authzManagerState));
-        authzManager->setAuthEnabled(true);
-        AuthorizationManager::set(getService(), std::move(authzManager));
         auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+        AuthorizationManager::set(getService(),
+                                  globalAuthzManagerFactory->createShard(getService()));
+        AuthorizationManager::get(getService())->setAuthEnabled(true);
+
         auth::AuthorizationBackendInterface::set(
             getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
 

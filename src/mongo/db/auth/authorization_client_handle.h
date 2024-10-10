@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/authorization_router.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
@@ -40,14 +41,13 @@ namespace mongo {
 class UsersInfoCommand;
 class RolesInfoCommand;
 
-struct AuthorizationVersion {
-    int version;
-};
-
 class AuthorizationClientHandle {
 public:
     AuthorizationClientHandle(const AuthorizationClientHandle&) = delete;
     AuthorizationClientHandle& operator=(const AuthorizationClientHandle&) = delete;
+
+    virtual std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
+        Client* client) = 0;
 
     StatusWith<UsersInfoReply> sendUsersInfoRequest(OperationContext* opCtx,
                                                     const DatabaseName& dbname,
@@ -57,11 +57,12 @@ public:
                                                     const DatabaseName& dbname,
                                                     RolesInfoCommand cmd);
 
-    StatusWith<AuthorizationVersion> sendGetStoredAuthorizationVersionRequest(
-        OperationContext* opCtx);
-
-    static AuthorizationClientHandle* get(Service* service);
-    static void set(Service* service, std::unique_ptr<AuthorizationClientHandle> clientHandle);
+    virtual void notifyDDLOperation(OperationContext* opCtx,
+                                    AuthorizationRouter* router,
+                                    StringData op,
+                                    const NamespaceString& nss,
+                                    const BSONObj& o,
+                                    const BSONObj* o2) = 0;
 
     virtual ~AuthorizationClientHandle() = default;
 

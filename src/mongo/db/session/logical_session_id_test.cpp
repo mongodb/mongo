@@ -48,10 +48,12 @@
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/authorization_backend_local.h"
 #include "mongo/db/auth/authorization_backend_mock.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/restriction_environment.h"
@@ -63,8 +65,10 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/service_liaison_mock.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_impl.h"
@@ -99,24 +103,26 @@ public:
     AuthorizationSession* authzSession;
 
     LogicalSessionIdTest() {
+        // Initialize the serviceEntryPoint so that DBDirectClient can function.
+        getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+
+        // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
+        repl::ReplicationCoordinator::set(getServiceContext(),
+                                          std::make_unique<repl::ReplicationCoordinatorMock>(
+                                              getServiceContext(), repl::ReplSettings()));
+
         auto session = std::make_shared<transport::MockSession>(
             HostAndPort(), SockAddr(), SockAddr(), nullptr);
-        auto localManagerState = std::make_unique<AuthzManagerExternalStateMock>();
-        auto authzManager =
-            std::make_unique<AuthorizationManagerImpl>(getService(), std::move(localManagerState));
-        authzManager->setAuthEnabled(true);
-        AuthorizationManager::set(getService(), std::move(authzManager));
 
         auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+        AuthorizationManager::set(getService(),
+                                  globalAuthzManagerFactory->createShard(getService()));
+        AuthorizationManager::get(getService())->setAuthEnabled(true);
+
         auth::AuthorizationBackendInterface::set(
             getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
         mockBackend = reinterpret_cast<auth::AuthorizationBackendMock*>(
             auth::AuthorizationBackendInterface::get(getService()));
-        {
-            auto opCtxHolder = makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            mockBackend->setAuthzVersion(opCtx, AuthorizationManager::schemaVersion26Final);
-        }
 
         Client::releaseCurrent();
         Client::initThread(getThreadName(), getServiceContext()->getService(), session);

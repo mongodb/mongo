@@ -39,7 +39,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/crypto/mechanism_scram.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_router_impl_for_test.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog_raii.h"
@@ -68,6 +72,11 @@
 namespace mongo {
 namespace {
 
+BSONObj makeUserDocument(
+    StringData id, StringData userName, StringData dbName, BSONObj credentials, BSONArray roles) {
+    return BSON("_id" << id << "user" << userName << "db" << dbName << "credentials" << credentials
+                      << "roles" << roles);
+}
 
 class AuthOpObserverTest : public ServiceContextMongoDTest {
 public:
@@ -85,26 +94,177 @@ public:
             std::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings()));
         repl::createOplog(opCtx.get());
 
+        auto localExternalState = std::make_unique<AuthzManagerExternalStateMock>();
+
+        auto authzRouter = std::make_unique<AuthorizationRouterImplForTest>(
+            getService(), std::make_unique<AuthorizationClientHandleShard>());
+        mockRouter = authzRouter.get();
+
+        auto localAuthzManager = std::make_unique<AuthorizationManagerImpl>(
+            getService(), std::move(localExternalState), std::move(authzRouter));
+        localAuthzManager->setAuthEnabled(true);
+        authzManager = localAuthzManager.get();
+        AuthorizationManager::set(getService(), std::move(localAuthzManager));
+
+        auth::AuthorizationBackendInterface::set(
+            getService(), std::make_unique<auth::AuthorizationBackendMock>());
+
         // Ensure that we are primary.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
-        // Create test collection
-        writeConflictRetry(opCtx.get(), "createColl", _nss, [&] {
+        // Create test and users collections.
+        testNss = NamespaceString::createNamespaceString_forTest("test", "coll");
+        writeConflictRetry(opCtx.get(), "createColl", testNss, [&] {
             shard_role_details::getRecoveryUnit(opCtx.get())
                 ->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
             shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
 
             WriteUnitOfWork wunit(opCtx.get());
-            AutoGetCollection collRaii(opCtx.get(), _nss, MODE_X);
+            AutoGetCollection collRaii(opCtx.get(), testNss, MODE_X);
 
             auto db = collRaii.ensureDbExists(opCtx.get());
-            invariant(db->createCollection(opCtx.get(), _nss, {}));
+            invariant(db->createCollection(opCtx.get(), testNss, {}));
             wunit.commit();
         });
+
+        usersNss = NamespaceString::makeTenantUsersCollection(boost::none);
+        writeConflictRetry(opCtx.get(), "createColl", usersNss, [&] {
+            shard_role_details::getRecoveryUnit(opCtx.get())
+                ->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+            shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+
+            WriteUnitOfWork wunit(opCtx.get());
+            AutoGetCollection collRaii(opCtx.get(), usersNss, MODE_X);
+
+            auto db = collRaii.ensureDbExists(opCtx.get());
+            invariant(db->createCollection(opCtx.get(), usersNss, {}));
+            wunit.commit();
+        });
+
+        credentials = BSON("SCRAM-SHA-1"
+                           << scram::Secrets<SHA1Block>::generateCredentials("password", 10000)
+                           << "SCRAM-SHA-256"
+                           << scram::Secrets<SHA256Block>::generateCredentials("password", 15000));
+
+        userDocument = makeUserDocument("admin.v2read"_sd,
+                                        "v2read",
+                                        "test",
+                                        credentials,
+                                        BSON_ARRAY(BSON("role"
+                                                        << "read"
+                                                        << "db"
+                                                        << "test")));
     }
 
-    NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    void doInsert(const NamespaceString& nss,
+                  const std::vector<BSONObj> insertDocs,
+                  bool shouldInvalidateCache) {
+        AuthOpObserver opObserver;
+        auto opCtx = cc().makeOperationContext();
+        mockRouter->resetCounts();
+
+        std::vector<InsertStatement> stmts;
+        std::transform(insertDocs.begin(),
+                       insertDocs.end(),
+                       std::back_inserter(stmts),
+                       [](auto doc) { return InsertStatement(doc.getOwned()); });
+
+        WriteUnitOfWork wuow(opCtx.get());
+        AutoGetCollection coll(opCtx.get(), nss, MODE_IX);
+        opObserver.onInserts(opCtx.get(),
+                             *coll,
+                             stmts.cbegin(),
+                             stmts.cend(),
+                             /*recordIds*/ {},
+                             /*fromMigrate=*/std::vector<bool>(stmts.size(), false),
+                             /*defaultFromMigrate=*/false);
+        mockRouter->assertCounts(0, 0, 0);
+        wuow.commit();
+
+        // The cache should only invalidate after the WUOW commits if shouldInvalidateCache is true.
+        if (shouldInvalidateCache) {
+            mockRouter->assertCounts(0, 1, 0);
+        } else {
+            mockRouter->assertCounts(0, 0, 0);
+        }
+    }
+
+    void doUpdate(const NamespaceString& nss,
+                  BSONObj originalDoc,
+                  BSONObj updatedDoc,
+                  bool shouldInvalidateCache) {
+        AuthOpObserver opObserver;
+        auto opCtx = cc().makeOperationContext();
+        mockRouter->resetCounts();
+
+        const auto criteria = updatedDoc["_id"].wrap();
+        const auto preImageDoc = originalDoc;
+        CollectionUpdateArgs updateArgs{preImageDoc};
+        updateArgs.criteria = criteria;
+        updateArgs.update = BSON("$set" << updatedDoc);
+        updateArgs.updatedDoc = updatedDoc;
+
+        WriteUnitOfWork wuow(opCtx.get());
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
+        OplogUpdateEntryArgs entryArgs(&updateArgs, *autoColl);
+        opObserver.onUpdate(opCtx.get(), entryArgs);
+
+        mockRouter->assertCounts(0, 0, 0);
+        wuow.commit();
+
+        if (shouldInvalidateCache) {
+            mockRouter->assertCounts(0, 1, 0);
+        } else {
+            mockRouter->assertCounts(0, 0, 0);
+        }
+    }
+
+    void doDelete(const NamespaceString& nss, BSONObj deleteDoc, bool shouldInvalidateCache) {
+        AuthOpObserver opObserver;
+        auto opCtx = cc().makeOperationContext();
+        mockRouter->resetCounts();
+
+        // Deleting a user document should trigger cache invalidation after the WUOW commits.
+        WriteUnitOfWork wuow(opCtx.get());
+        AutoGetCollection coll(opCtx.get(), nss, MODE_IX);
+        OplogDeleteEntryArgs args;
+
+        const auto& deleteDocumentKey = getDocumentKey(*coll, deleteDoc);
+        opObserver.onDelete(opCtx.get(), *coll, {}, deleteDoc, deleteDocumentKey, args);
+        mockRouter->assertCounts(0, 0, 0);
+        wuow.commit();
+
+        if (shouldInvalidateCache) {
+            mockRouter->assertCounts(0, 1, 0);
+        } else {
+            mockRouter->assertCounts(0, 0, 0);
+        }
+    }
+
+    void doDropDatabase(const DatabaseName& dbname, bool shouldInvalidateCache) {
+        AuthOpObserver opObserver;
+        auto opCtx = cc().makeOperationContext();
+        mockRouter->resetCounts();
+
+        WriteUnitOfWork wuow(opCtx.get());
+        opObserver.onDropDatabase(opCtx.get(), dbname, false /*fromMigrate*/);
+        mockRouter->assertCounts(0, 0, 0);
+        wuow.commit();
+
+        if (shouldInvalidateCache) {
+            mockRouter->assertCounts(1, 0, 0);
+        } else {
+            mockRouter->assertCounts(0, 0, 0);
+        }
+    }
+
+    NamespaceString testNss;
+    NamespaceString usersNss;
+    AuthorizationManagerImpl* authzManager;
+    AuthorizationRouterImplForTest* mockRouter;
+    BSONObj userDocument;
+    BSONObj credentials;
 
 private:
     // Creates a reasonable set of ReplSettings for most tests.  We need to be able to
@@ -117,54 +277,81 @@ private:
     }
 };
 
+TEST_F(AuthOpObserverTest, OnInsert) {
+    // Test that cache invalidation occurs for inserts to usersNss but not testNss.
+    std::vector<BSONObj> userDocs = {userDocument};
+    doInsert(usersNss, userDocs, true);
+    doInsert(testNss, userDocs, false);
+}
+
 TEST_F(AuthOpObserverTest, OnRollbackInvalidatesAuthCacheWhenAuthNamespaceRolledBack) {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
-    auto authMgr = AuthorizationManager::get(opCtx->getService());
-    auto initCacheGen = authMgr->getCacheGeneration();
+    auto initCacheGen = authzManager->getCacheGeneration();
 
     // Verify that the rollback op observer invalidates the user cache for each auth namespace by
     // checking that the cache generation changes after a call to the rollback observer method.
     OpObserver::RollbackObserverInfo rbInfo;
     rbInfo.rollbackNamespaces = {NamespaceString::kAdminRolesNamespace};
     opObserver.onReplicationRollback(opCtx.get(), rbInfo);
-    ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
+    ASSERT_NE(initCacheGen, authzManager->getCacheGeneration());
 
-    initCacheGen = authMgr->getCacheGeneration();
+    initCacheGen = authzManager->getCacheGeneration();
     rbInfo.rollbackNamespaces = {NamespaceString::kAdminUsersNamespace};
     opObserver.onReplicationRollback(opCtx.get(), rbInfo);
-    ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
+    ASSERT_NE(initCacheGen, authzManager->getCacheGeneration());
 
-    initCacheGen = authMgr->getCacheGeneration();
+    initCacheGen = authzManager->getCacheGeneration();
     rbInfo.rollbackNamespaces = {NamespaceString::kServerConfigurationNamespace};
     opObserver.onReplicationRollback(opCtx.get(), rbInfo);
-    ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
+    ASSERT_NE(initCacheGen, authzManager->getCacheGeneration());
 }
 
 TEST_F(AuthOpObserverTest, OnRollbackDoesntInvalidateAuthCacheWhenNoAuthNamespaceRolledBack) {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
-    auto authMgr = AuthorizationManager::get(opCtx->getService());
-    auto initCacheGen = authMgr->getCacheGeneration();
+    auto initCacheGen = authzManager->getCacheGeneration();
 
     // Verify that the rollback op observer doesn't invalidate the user cache.
     OpObserver::RollbackObserverInfo rbInfo;
     opObserver.onReplicationRollback(opCtx.get(), rbInfo);
-    auto newCacheGen = authMgr->getCacheGeneration();
+    auto newCacheGen = authzManager->getCacheGeneration();
     ASSERT_EQ(newCacheGen, initCacheGen);
 }
 
-TEST_F(AuthOpObserverTest, MultipleOnDelete) {
-    AuthOpObserver opObserver;
-    auto opCtx = cc().makeOperationContext();
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    WriteUnitOfWork wunit(opCtx.get());
-    AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-    OplogDeleteEntryArgs args;
-    auto doc = BSON("_id" << 1);
-    const auto& documentKey = getDocumentKey(*autoColl, doc);
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, doc, documentKey, args);
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, doc, documentKey, args);
+TEST_F(AuthOpObserverTest, OnUpdate) {
+    // Updating a user document should trigger cache invalidation after the WUOW commits.
+    BSONObj updatedUserDoc = makeUserDocument("admin.v2read"_sd,
+                                              "v2read",
+                                              "test",
+                                              credentials,
+                                              BSON_ARRAY(BSON("role"
+                                                              << "readwrite"
+                                                              << "db"
+                                                              << "test")));
+
+    doUpdate(usersNss, userDocument, updatedUserDoc, true);
+
+    // Updating a document on a test collection shouldn't trigger cache invalidation.
+    doUpdate(testNss, userDocument, updatedUserDoc, false);
+}
+
+TEST_F(AuthOpObserverTest, OnDelete) {
+    // Deleting a user document should trigger cache invalidation after the WUOW commits.
+    auto userDoc = BSON("_id"
+                        << "admin.v2read");
+    doDelete(usersNss, userDoc, true);
+
+    // Deleting a random document in the test collection should not trigger cache invalidation.
+    doDelete(testNss, userDoc, false);
+}
+
+TEST_F(AuthOpObserverTest, OnDropDatabase) {
+    // Dropping the admin database should invalidate the entire user cache.
+    doDropDatabase(DatabaseName::kAdmin, true);
+
+    // Dropping the test database should not result in any user cache invalidation.
+    doDropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "test"), false);
 }
 
 }  // namespace

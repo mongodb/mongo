@@ -50,19 +50,6 @@ public:
 
     virtual Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) = 0;
 
-    virtual Status hasAnyUserDocuments(OperationContext* opCtx,
-                                       const boost::optional<TenantId>& tenantId) = 0;
-
-    /**
-     * Returns true if there exists at least one privilege document in the system.
-     * Used by the AuthorizationSession to determine whether localhost connections should be
-     * granted special access to bootstrap the system.
-     * NOTE: If this method ever returns true, the result is cached in _privilegeDocsExist,
-     * meaning that once this method returns true it will continue to return true for the
-     * lifetime of this process, even if all users are subsequently dropped from the system.
-     */
-    virtual bool hasAnyPrivilegeDocuments(OperationContext* opCtx) = 0;
-
     // TODO SERVER-95189 - move to protected or remove.
     virtual Status getUserDescription(OperationContext* opCtx,
                                       const UserRequest& user,
@@ -73,11 +60,6 @@ public:
         OperationContext* opCtx,
         const UserRequest& userReq,
         const SharedUserAcquisitionStats& userAcquisitionStats) = 0;
-
-    /**
-     * Returns whether a schema version document exists.
-     */
-    virtual Status hasValidAuthSchemaVersionDocumentForInitialSync(OperationContext* opCtx) = 0;
 
     using ResolvedRoleData = AuthorizationManager::ResolvedRoleData;
     using ResolveRoleOption = AuthorizationManager::ResolveRoleOption;

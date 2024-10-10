@@ -27,52 +27,29 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
+#pragma once
 
-
-#include "mongo/base/shim.h"
-#include "mongo/db/auth/authz_session_external_state.h"
-#include "mongo/db/auth/authz_session_external_state_d.h"
+#include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_client_handle.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authz_session_external_state_server_common.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/transaction_resources.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-AuthzSessionExternalStateMongod::AuthzSessionExternalStateMongod(Client* client)
-    : AuthzSessionExternalStateServerCommon(client) {}
-AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
+/**
+ * The implementation of AuthzSessionExternalState functionality for the router cluster role.
+ */
+class AuthzSessionExternalStateRouter : public AuthzSessionExternalStateServerCommon {
+    AuthzSessionExternalStateRouter(const AuthzSessionExternalStateRouter&) = delete;
+    AuthzSessionExternalStateRouter& operator=(const AuthzSessionExternalStateRouter&) = delete;
 
-void AuthzSessionExternalStateMongod::startRequest(OperationContext* opCtx) {
-    // No locks should be held as this happens before any database accesses occur
-    dassert(!shard_role_details::getLocker(opCtx)->isLocked());
+public:
+    AuthzSessionExternalStateRouter(Client* client);
+    ~AuthzSessionExternalStateRouter() override;
 
-    _checkShouldAllowLocalhost(opCtx);
-}
-
-bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
-    if (AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks()) {
-        return true;
-    }
-
-    if (!haveClient()) {
-        return false;
-    }
-
-    // TODO(spencer): get "isInDirectClient" from OperationContext
-    return cc().isInDirectClient();
-}
-
-bool AuthzSessionExternalStateMongod::serverIsArbiter() const {
-    // Arbiters have access to extra privileges under localhost. See SERVER-5479.
-    return (
-        repl::ReplicationCoordinator::get(getGlobalServiceContext())->getSettings().isReplSet() &&
-        repl::ReplicationCoordinator::get(getGlobalServiceContext())->getMemberState().arbiter());
-}
+    void startRequest(OperationContext* opCtx) override;
+};
 
 }  // namespace mongo

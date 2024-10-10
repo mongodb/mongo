@@ -62,8 +62,6 @@ public:
     AuthzManagerExternalStateMock();
     ~AuthzManagerExternalStateMock() override;
 
-    void setAuthzVersion(OperationContext* opCtx, int version);
-
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
         Client* client) override;
 

@@ -52,14 +52,10 @@ public:
     virtual std::unique_ptr<AuthorizationManager> createRouter(Service* service) = 0;
     virtual std::unique_ptr<AuthorizationManager> createShard(Service* service) = 0;
 
-    // TODO: SERVER-83663 replace create function with create AuthorizationRouter.
-    virtual std::unique_ptr<AuthorizationClientHandle> createClientHandleRouter(
-        Service* service) = 0;
-    virtual std::unique_ptr<AuthorizationClientHandle> createClientHandleShard(
-        Service* service) = 0;
-
     virtual std::unique_ptr<auth::AuthorizationBackendInterface> createBackendInterface(
         Service* service) = 0;
+
+    virtual Status initialize(OperationContext* opCtx) = 0;
 };
 
 extern std::unique_ptr<AuthorizationManagerFactory> globalAuthzManagerFactory;

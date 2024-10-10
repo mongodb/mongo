@@ -44,6 +44,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_router.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/role_name.h"
@@ -74,9 +75,9 @@ namespace mongo {
 class AuthorizationManagerImpl : public AuthorizationManager {
 public:
     AuthorizationManagerImpl(Service* service,
-                             std::unique_ptr<AuthzManagerExternalState> externalState);
+                             std::unique_ptr<AuthzManagerExternalState> externalState,
+                             std::unique_ptr<AuthorizationRouter> authzRouter);
     ~AuthorizationManagerImpl() override;
-
 
     std::unique_ptr<AuthorizationSession> makeAuthorizationSession(Client* client) override;
 
@@ -88,32 +89,17 @@ public:
 
     bool isAuthEnabled() const override;
 
-    Status getAuthorizationVersion(OperationContext* opCtx, int* version) override;
-
     OID getCacheGeneration() override;
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) override;
 
-    Status getUserDescription(OperationContext* opCtx,
-                              const UserName& userName,
-                              BSONObj* result) override;
+    void notifyDDLOperation(OperationContext* opCtx,
+                            StringData op,
+                            const NamespaceString& nss,
+                            const BSONObj& o,
+                            const BSONObj* o2) override;
 
     Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) override;
-
-    StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
-                                              const std::vector<RoleName>& roleNames,
-                                              ResolveRoleOption option) override;
-
-    Status getRolesDescription(OperationContext* opCtx,
-                               const std::vector<RoleName>& roleName,
-                               PrivilegeFormat privilegeFormat,
-                               AuthenticationRestrictionsFormat,
-                               std::vector<BSONObj>* result) override;
-
-    Status getRolesAsUserFragment(OperationContext* opCtx,
-                                  const std::vector<RoleName>& roleName,
-                                  AuthenticationRestrictionsFormat,
-                                  BSONObj* result) override;
 
     StatusWith<UserHandle> acquireUser(OperationContext* opCtx,
                                        std::unique_ptr<UserRequest> userRequest) override;
@@ -141,21 +127,30 @@ public:
      */
     void invalidateUserCache() override;
 
-    std::vector<CachedUserInfo> getUserCacheInfo() const override;
+    std::vector<AuthorizationRouter::CachedUserInfo> getUserCacheInfo() const override;
 
-    void logOp(OperationContext* opCtx,
-               StringData op,
-               const NamespaceString& ns,
-               const BSONObj& o,
-               const BSONObj* o2) override;
+    StatusWith<User> lookupUserObject(
+        OperationContext* opCtx,
+        const UserRequest& userReq,
+        const SharedUserAcquisitionStats& userAcquisitionStats) override;
+
+    Status lookupUserDescription(OperationContext* opCtx,
+                                 const UserName& userName,
+                                 BSONObj* result) override;
+
+    StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
+                                              const std::vector<RoleName>& roleNames,
+                                              ResolveRoleOption option) override;
 
 private:
-    void _updateCacheGeneration();
-
     std::unique_ptr<AuthzManagerExternalState> _externalState;
+
+    std::unique_ptr<AuthorizationRouter> _authzRouter;
 
     // True if AuthSchema startup checks should be applied in this AuthorizationManager. Changes to
     // its value are not synchronized, so it should only be set once, at initalization time.
+    // Note that since AuthorizationVersion has been removed, this only controls whether system
+    // indexes are checked at startup.
     bool _startupAuthSchemaValidation{true};
 
     // True if access control enforcement is enabled in this AuthorizationManager. Changes to its
@@ -164,68 +159,6 @@ private:
 
     // A cache of whether there are any users set up for the cluster.
     AtomicWord<bool> _privilegeDocsExist{false};
-
-    // Serves as a source for the return value of getCacheGeneration(). Refer to this method for
-    // more details.
-    stdx::mutex _cacheGenerationMutex;
-    OID _cacheGeneration{OID::gen()};
-
-    /**
-     * Cache which contains at most a single entry (which has key 0), whose value is the version of
-     * the auth schema.
-     */
-    class AuthSchemaVersionCache : public ReadThroughCache<int, int> {
-    public:
-        AuthSchemaVersionCache(Service* service,
-                               ThreadPoolInterface& threadPool,
-                               AuthzManagerExternalState* externalState);
-
-    private:
-        // Even though the dist cache permits for lookup to return boost::none for non-existent
-        // values, the contract of the authorization manager is that it should throw an exception if
-        // the value can not be loaded, so if it returns, the value will always be set.
-        LookupResult _lookup(OperationContext* opCtx,
-                             int unusedKey,
-                             const ValueHandle& unusedCachedValue);
-
-        stdx::mutex _mutex;
-
-        AuthzManagerExternalState* const _externalState;
-    } _authSchemaVersionCache;
-
-    /**
-     * Cache of the users known to the authentication subsystem.
-     */
-    class UserCacheImpl : public UserCache {
-    public:
-        UserCacheImpl(Service* service,
-                      ThreadPoolInterface& threadPool,
-                      int cacheSize,
-                      AuthSchemaVersionCache* authSchemaVersionCache,
-                      AuthzManagerExternalState* externalState);
-
-    private:
-        // Even though the dist cache permits for lookup to return boost::none for non-existent
-        // values, the contract of the authorization manager is that it should throw an exception if
-        // the value can not be loaded, so if it returns, the value will always be set.
-        LookupResult _lookup(OperationContext* opCtx,
-                             const UserRequest::UserRequestCacheKey& userReqCacheKey,
-                             const UserHandle& unusedCachedUser,
-                             const UserRequest& userReq,
-                             const SharedUserAcquisitionStats& userAcquisitionStats);
-
-        stdx::mutex _mutex;
-
-        AuthSchemaVersionCache* const _authSchemaVersionCache;
-
-        AuthzManagerExternalState* const _externalState;
-    } _userCache;
-
-    // Thread pool on which to perform the blocking activities that load the user credentials from
-    // storage
-    ThreadPool _threadPool;
 };
-
-extern int authorizationManagerCacheSize;
 
 }  // namespace mongo

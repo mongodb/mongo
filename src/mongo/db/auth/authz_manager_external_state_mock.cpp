@@ -104,13 +104,6 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
 AuthzManagerExternalStateMock::AuthzManagerExternalStateMock() {}
 AuthzManagerExternalStateMock::~AuthzManagerExternalStateMock() {}
 
-void AuthzManagerExternalStateMock::setAuthzVersion(OperationContext* opCtx, int version) {
-    auto backendMock = reinterpret_cast<auth::AuthorizationBackendMock*>(
-        auth::AuthorizationBackendInterface::get(opCtx->getService()));
-    invariant(backendMock);
-    return backendMock->setAuthzVersion(opCtx, version);
-}
-
 std::unique_ptr<AuthzSessionExternalState>
 AuthzManagerExternalStateMock::makeAuthzSessionExternalState(Client* client) {
     auto ret = std::make_unique<AuthzSessionExternalStateMock>(client);

@@ -48,7 +48,7 @@
 #include "mongo/db/auth/authorization_client_handle.h"
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/authz_session_external_state.h"
-#include "mongo/db/auth/authz_session_external_state_s.h"
+#include "mongo/db/auth/authz_session_external_state_router.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
@@ -98,21 +98,7 @@ AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() = default;
 
 std::unique_ptr<AuthzSessionExternalState>
 AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(Client* client) {
-    return std::make_unique<AuthzSessionExternalStateMongos>(client);
-}
-
-Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationContext* opCtx,
-                                                                      int* outVersion) {
-    const auto& swResponse = AuthorizationClientHandle::get(opCtx->getService())
-                                 ->sendGetStoredAuthorizationVersionRequest(opCtx);
-
-    if (!swResponse.isOK()) {
-        return swResponse.getStatus();
-    }
-
-    *outVersion = swResponse.getValue().version;
-
-    return Status::OK();
+    return std::make_unique<AuthzSessionExternalStateRouter>(client);
 }
 
 StatusWith<User> AuthzManagerExternalStateMongos::getUserObject(
@@ -143,168 +129,19 @@ Status AuthzManagerExternalStateMongos::getUserDescription(
     const UserRequest& userReq,
     BSONObj* result,
     const SharedUserAcquisitionStats& userAcquisitionStats) {
-    const auto& userName = userReq.getUserName();
-
-    if (!userReq.getRoles()) {
-        UsersInfoCommand usersInfoCmd(auth::UsersInfoCommandArg(userReq.getUserName()));
-        usersInfoCmd.setShowPrivileges(true);
-        usersInfoCmd.setShowCredentials(true);
-        usersInfoCmd.setShowAuthenticationRestrictions(true);
-        usersInfoCmd.setShowCustomData(false);
-
-        const auto& usersInfoReply =
-            AuthorizationClientHandle::get(opCtx->getService())
-                ->sendUsersInfoRequest(opCtx, DatabaseName::kAdmin, std::move(usersInfoCmd));
-
-        if (!usersInfoReply.isOK()) {
-            return usersInfoReply.getStatus();
-        }
-
-        const auto& foundUsers = usersInfoReply.getValue().getUsers();
-
-        if (foundUsers.size() == 0) {
-            return Status(ErrorCodes::UserNotFound,
-                          str::stream() << "User \"" << userName << "\" not found");
-        }
-
-        if (foundUsers.size() > 1) {
-            return Status(ErrorCodes::UserDataInconsistent,
-                          str::stream()
-                              << "Found multiple users on the \"" << userName.getDB()
-                              << "\" database with name \"" << userName.getUser() << "\"");
-        }
-        *result = foundUsers[0].getOwned();
-        return Status::OK();
-    } else {
-        // Obtain privilege information from the config servers for all roles acquired from the X509
-        // certificate or jwt token.
-        const auto& rolesArr = *userReq.getRoles();
-        auth::RolesInfoCommandArg::Multiple roleNames(rolesArr.begin(), rolesArr.end());
-
-        RolesInfoCommand rolesInfoCmd{auth::RolesInfoCommandArg{roleNames}};
-        rolesInfoCmd.setShowPrivileges(
-            auth::ParsedPrivilegeFormat(PrivilegeFormat::kShowAsUserFragment));
-
-        const auto& rolesInfoResponse =
-            AuthorizationClientHandle::get(opCtx->getService())
-                ->sendRolesInfoRequest(opCtx, DatabaseName::kAdmin, std::move(rolesInfoCmd));
-
-        if (!rolesInfoResponse.isOK()) {
-            return Status(ErrorCodes::FailedToParse,
-                          "Unable to get resolved X509 roles from config server: " +
-                              rolesInfoResponse.getStatus().reason());
-        }
-        const auto& optUserFragment = rolesInfoResponse.getValue().getUserFragment();
-
-        if (!optUserFragment) {
-            return Status(ErrorCodes::FailedToParse, "Unable to get user from config server.");
-        }
-
-        const auto& cmdResult = *optUserFragment;
-
-        BSONElement userRoles = cmdResult["roles"];
-        BSONElement userInheritedRoles = cmdResult["inheritedRoles"];
-        BSONElement userInheritedPrivileges = cmdResult["inheritedPrivileges"];
-
-        if (userRoles.eoo() || userInheritedRoles.eoo() || userInheritedPrivileges.eoo() ||
-            !userRoles.isABSONObj() || !userInheritedRoles.isABSONObj() ||
-            !userInheritedPrivileges.isABSONObj()) {
-            return Status(
-                ErrorCodes::UserDataInconsistent,
-                "Received malformed response to request for X509 roles from config server");
-        }
-
-        *result =
-            BSON("_id" << userName.getUser() << "user" << userName.getUser() << "db"
-                       << userName.getDB() << "credentials" << BSON("external" << true) << "roles"
-                       << BSONArray(cmdResult["roles"].Obj()) << "inheritedRoles"
-                       << BSONArray(cmdResult["inheritedRoles"].Obj()) << "inheritedPrivileges"
-                       << BSONArray(cmdResult["inheritedPrivileges"].Obj()));
-        return Status::OK();
-    }
+    return AuthorizationManager::get(opCtx->getService())
+        ->lookupUserDescription(opCtx, userReq.getUserName(), result);
 }
 
 Status AuthzManagerExternalStateMongos::rolesExist(OperationContext* opCtx,
                                                    const std::vector<RoleName>& roleNames) try {
-    // Marshall role names into a set before querying so that we don't get a false-negative
-    // from repeated roles only providing one result at the end.
-    auth::RolesInfoCommandArg::Multiple roleNamesCopy(roleNames.begin(), roleNames.end());
-    RolesInfoCommand rolesInfoCmd{auth::RolesInfoCommandArg{roleNamesCopy}};
-
-    const auto& rolesInfoResponse =
-        AuthorizationClientHandle::get(opCtx->getService())
-            ->sendRolesInfoRequest(opCtx, DatabaseName::kAdmin, std::move(rolesInfoCmd));
-
-    if (!rolesInfoResponse.isOK()) {
-        return {rolesInfoResponse.getStatus().code(),
-                str::stream() << "Failed running rolesInfo command on mongod: "
-                              << rolesInfoResponse.getStatus().reason()};
-    }
-
-    const auto& optRoles = rolesInfoResponse.getValue().getRoles();
-    if (!optRoles) {
-        return {ErrorCodes::OperationFailed,
-                "Received invalid response from rolesInfo command on mongod"};
-    }
-
-    const auto& roles = *optRoles;
-    stdx::unordered_set<RoleName> roleNamesSet(roleNames.begin(), roleNames.end());
-
-    if (roles.size() != roleNamesSet.size()) {
-        // One or more missing roles, cross out the ones that do exist, and return error.
-        for (const auto& roleObj : roles) {
-            auto roleName = RoleName::parseFromBSONObj(roleObj);
-            roleNamesSet.erase(roleName);
-        }
-
-        return makeRoleNotFoundStatus(roleNamesSet);
-    }
-
-    return Status::OK();
-} catch (const AssertionException& ex) {
+    return AuthorizationManager::get(opCtx->getService())->rolesExist(opCtx, roleNames);
+} catch (const DBException& ex) {
     return ex.toStatus();
 }
 
 bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
-    UsersInfoCommand usersInfoCmd{auth::UsersInfoCommandArg{}};
-
-    const auto& swUsersReply =
-        AuthorizationClientHandle::get(opCtx->getService())
-            ->sendUsersInfoRequest(opCtx, DatabaseName::kAdmin, std::move(usersInfoCmd));
-
-    if (!swUsersReply.isOK()) {
-        // If we were unable to complete the query,
-        // it's best to assume that there _are_ privilege documents.  This might happen
-        // if the node contaning the users collection becomes transiently unavailable.
-        // See SERVER-12616, for example.
-        return true;
-    }
-
-    const auto& usersInfoReply = swUsersReply.getValue();
-    const auto& foundUsers = usersInfoReply.getUsers();
-
-    if (foundUsers.size() > 0) {
-        return true;
-    }
-
-    RolesInfoCommand rolesInfoCmd{auth::RolesInfoCommandArg{}};
-
-    const auto& swRolesReply =
-        AuthorizationClientHandle::get(opCtx->getService())
-            ->sendRolesInfoRequest(opCtx, DatabaseName::kAdmin, std::move(rolesInfoCmd));
-
-    if (!swRolesReply.isOK()) {
-        return true;
-    }
-
-    const auto& rolesInfoResponse = swRolesReply.getValue();
-    const auto& foundRoles = rolesInfoResponse.getRoles();
-
-    if (!foundRoles || foundRoles->size() == 0) {
-        return false;
-    }
-
-    return true;
+    return AuthorizationManager::get(opCtx->getService())->hasAnyPrivilegeDocuments(opCtx);
 }
 
 namespace {

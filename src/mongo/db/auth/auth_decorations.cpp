@@ -67,9 +67,6 @@ const auto getDisabledAuthMechanisms = Service::declareDecoration<DisabledAuthMe
 
 const auto getClusterAuthMode = ServiceContext::declareDecoration<AtomicWord<ClusterAuthMode>>();
 
-const auto getAuthorizationClientHandle =
-    Service::declareDecoration<std::unique_ptr<AuthorizationClientHandle>>();
-
 const auto getAuthorizationBackendInterface =
     Service::declareDecoration<std::unique_ptr<auth::AuthorizationBackendInterface>>();
 
@@ -109,10 +106,6 @@ AuthorizationManager* AuthorizationManager::get(Service& service) {
     return getAuthorizationManager(service).get();
 }
 
-AuthorizationClientHandle* AuthorizationClientHandle::get(Service* service) {
-    return getAuthorizationClientHandle(service).get();
-}
-
 auth::AuthorizationBackendInterface* auth::AuthorizationBackendInterface::get(Service* service) {
     return getAuthorizationBackendInterface(service).get();
 }
@@ -125,11 +118,6 @@ void auth::AuthorizationBackendInterface::set(
 void AuthorizationManager::set(Service* service,
                                std::unique_ptr<AuthorizationManager> authzManager) {
     getAuthorizationManager(service) = std::move(authzManager);
-}
-
-void AuthorizationClientHandle::set(Service* service,
-                                    std::unique_ptr<AuthorizationClientHandle> authzClientHandle) {
-    getAuthorizationClientHandle(service) = std::move(authzClientHandle);
 }
 
 AuthorizationSession* AuthorizationSession::get(Client* client) {

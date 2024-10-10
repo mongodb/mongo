@@ -88,19 +88,6 @@ public:
         Client* client) = 0;
 
     /**
-     * Retrieves the schema version of the persistent data describing users and roles.
-     * Will leave *outVersion unmodified on non-OK status return values.
-     */
-    virtual Status hasValidStoredAuthorizationVersion(OperationContext* opCtx,
-                                                      BSONObj* foundVersionDoc) = 0;
-
-    /**
-     * Retrieves the schema version of the persistent data describing users and roles.
-     * Modifies *outVersion if status is NoMatchingDocument.
-     */
-    virtual Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) = 0;
-
-    /**
      * Writes into "result" a document describing the requested user and returns Status::OK().
      * The caller is required to provide all information necessary to unique identify the request
      * for a user, including the user's name and any roles which the user must possess via
@@ -166,25 +153,6 @@ public:
                                           const std::vector<RoleName>& roles,
                                           AuthenticationRestrictionsFormat,
                                           BSONObj* result) = 0;
-
-    /**
-     * Writes into "result" documents describing the roles that are defined on the given
-     * database. If showPrivileges is kOmit or kShowPrivileges, then a vector of BSON documents are
-     * returned, where each document includes the other roles a particular role is a
-     * member of, including those role memberships held implicitly through other roles
-     * (indirect roles). If showPrivileges is kShowPrivileges, then the description documents
-     * will also include a full list of the roles' privileges. If showBuiltinRoles is true, then
-     * the result array will contain description documents for all the builtin roles for the given
-     * database, if it is false the result will just include user defined roles. In the event that
-     * some of the information in a given role description is inconsistent, the document will
-     * contain a "warnings" array, with std::string messages describing inconsistencies.
-     */
-    virtual Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                            const DatabaseName& dbname,
-                                            PrivilegeFormat showPrivileges,
-                                            AuthenticationRestrictionsFormat,
-                                            bool showBuiltinRoles,
-                                            std::vector<BSONObj>* result) = 0;
 
     /**
      * Returns true if there exists at least one privilege document in the system. If `tenantId` is

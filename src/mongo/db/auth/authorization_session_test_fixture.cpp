@@ -48,6 +48,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/assert_util.h"
 
@@ -57,10 +59,17 @@ void AuthorizationSessionTestFixture::setUp() {
     gMultitenancySupport = true;
     ServiceContextMongoDTest::setUp();
 
+    // Initialize the serviceEntryPoint so that DBDirectClient can function.
+    getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+
+    // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
+    repl::ReplicationCoordinator::set(getServiceContext(),
+                                      std::make_unique<repl::ReplicationCoordinatorMock>(
+                                          getServiceContext(), repl::ReplSettings()));
+
     _session = transportLayer.createSession();
     _client = getServiceContext()->getService()->makeClient("testClient", _session);
     _opCtx = _client->makeOperationContext();
-    managerState->setAuthzVersion(_opCtx.get(), AuthorizationManager::schemaVersion26Final);
 
     authzManager = AuthorizationManager::get(_client->getService());
     auth::AuthorizationBackendInterface::set(_client->getService(),

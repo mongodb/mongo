@@ -129,52 +129,6 @@ bool hasOne(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& 
 }
 
 }  // namespace
-
-Status AuthorizationBackendLocal::hasValidStoredAuthorizationVersion(OperationContext* opCtx,
-                                                                     BSONObj* foundVersionDoc) {
-    Status status = findOne(opCtx,
-                            NamespaceString::kServerConfigurationNamespace,
-                            AuthorizationManager::versionDocumentQuery,
-                            foundVersionDoc);
-    if (status.isOK()) {
-        BSONElement versionElement =
-            (*foundVersionDoc)[AuthorizationManager::schemaVersionFieldName];
-        if (versionElement.isNumber()) {
-            return Status::OK();
-        } else if (versionElement.eoo()) {
-            return Status(ErrorCodes::NoSuchKey,
-                          str::stream() << "No " << AuthorizationManager::schemaVersionFieldName
-                                        << " field in version document.");
-        } else {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream()
-                              << "Could not determine schema version of authorization data.  "
-                                 "Bad (non-numeric) type "
-                              << typeName(versionElement.type()) << " (" << versionElement.type()
-                              << ") for " << AuthorizationManager::schemaVersionFieldName
-                              << " field in version document");
-        }
-    } else {
-        return status;
-    }
-}
-
-Status AuthorizationBackendLocal::getStoredAuthorizationVersion(OperationContext* opCtx,
-                                                                int* outVersion) {
-    BSONObj foundVersionDoc;
-    auto status = hasValidStoredAuthorizationVersion(opCtx, &foundVersionDoc);
-    if (status.isOK()) {
-        *outVersion = foundVersionDoc.getIntField(AuthorizationManager::schemaVersionFieldName);
-        return status;
-    } else if (status == ErrorCodes::NoMatchingDocument) {
-        *outVersion = AuthorizationManager::schemaVersion28SCRAM;
-        return Status::OK();
-    }
-
-    return status;
-}
-
-
 namespace {
 NamespaceString usersNSS(const boost::optional<TenantId>& tenant) {
     if (tenant) {
@@ -315,13 +269,6 @@ ResolveRoleOption makeResolveRoleOption(PrivilegeFormat showPrivileges,
 
 }  // namespace
 
-Status AuthorizationBackendLocal::hasAnyUserDocuments(OperationContext* opCtx,
-                                                      const boost::optional<TenantId>& tenantId) {
-    BSONObj userBSONObj;
-    return findOne(
-        opCtx, NamespaceString::makeTenantUsersCollection(tenantId), BSONObj(), &userBSONObj);
-}
-
 Status AuthorizationBackendLocal::makeRoleNotFoundStatus(
     const stdx::unordered_set<RoleName>& unknownRoles) {
     dassert(unknownRoles.size());
@@ -337,33 +284,6 @@ Status AuthorizationBackendLocal::makeRoleNotFoundStatus(
         delim = ',';
     }
     return {ErrorCodes::RoleNotFound, sb.str()};
-}
-
-// If tenantId is none, we're checking whether to enable localhost auth bypass which by definition
-// will be a local user.
-bool AuthorizationBackendLocal::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
-    if (_hasAnyPrivilegeDocuments.load()) {
-        return true;
-    }
-
-    Status statusFindUsers = hasAnyUserDocuments(opCtx, boost::none);
-
-    // If we were unable to complete the query,
-    // it's best to assume that there _are_ privilege documents.
-    if (statusFindUsers != ErrorCodes::NoMatchingDocument) {
-        _hasAnyPrivilegeDocuments.store(true);
-        return true;
-    }
-
-    BSONObj userBSONObj;
-    Status statusFindRoles =
-        findOne(opCtx, NamespaceString::kAdminRolesNamespace, BSONObj(), &userBSONObj);
-    if (statusFindRoles != ErrorCodes::NoMatchingDocument) {
-        _hasAnyPrivilegeDocuments.store(true);
-        return true;
-    }
-
-    return false;
 }
 
 AuthorizationBackendLocal::RolesLocks::RolesLocks(OperationContext* opCtx,
@@ -518,35 +438,6 @@ StatusWith<ResolvedRoleData> AuthorizationBackendLocal::resolveRoles(
 } catch (const AssertionException& ex) {
     return ex.toStatus();
 }
-
-Status AuthorizationBackendLocal::hasValidAuthSchemaVersionDocumentForInitialSync(
-    OperationContext* opCtx) {
-    BSONObj foundDoc;
-    auto status = hasValidStoredAuthorizationVersion(opCtx, &foundDoc);
-
-    if (status == ErrorCodes::NoSuchKey || status == ErrorCodes::TypeMismatch) {
-        std::string msg = str::stream()
-            << "During initial sync, found malformed auth schema version document: "
-            << status.toString() << "; document: " << foundDoc;
-        return Status(ErrorCodes::AuthSchemaIncompatible, msg);
-    }
-
-    if (status.isOK()) {
-        auto version = foundDoc.getIntField(AuthorizationManager::schemaVersionFieldName);
-        if ((version != AuthorizationManager::schemaVersion26Final) &&
-            (version != AuthorizationManager::schemaVersion28SCRAM)) {
-            std::string msg = str::stream()
-                << "During initial sync, found auth schema version " << version
-                << ", but this version of MongoDB only supports schema versions "
-                << AuthorizationManager::schemaVersion26Final << " and "
-                << AuthorizationManager::schemaVersion28SCRAM;
-            return {ErrorCodes::AuthSchemaIncompatible, msg};
-        }
-    }
-
-    return status;
-}
-
 namespace {
 MONGO_FAIL_POINT_DEFINE(authLocalGetSubRoles);
 
@@ -641,12 +532,6 @@ StatusWith<User> AuthorizationBackendLocal::getUserObject(
     user.setIndirectRoles(makeRoleNameIteratorForContainer(data.roles.value()));
     user.addPrivileges(data.privileges.value());
     user.setIndirectRestrictions(data.restrictions.value());
-
-    LOGV2_DEBUG(5517200,
-                3,
-                "Acquired new user object",
-                "userName"_attr = userName,
-                "directRoles"_attr = directRoles);
 
     return std::move(user);
 } catch (const AssertionException& ex) {
@@ -968,8 +853,6 @@ std::vector<BSONObj> AuthorizationBackendLocal::performLookupWithPrivilegesAndRe
     std::vector<BSONObj> users;
 
     for (const auto& username : usernames) {
-
-
         BSONObj userDetails;
         auto status = getUserDescription(opCtx,
                                          UserRequestGeneral(username, boost::none),

@@ -268,8 +268,7 @@ void AllDatabaseCloner::postStage() {
             }
         }
     }
-    bool foundAuthSchemaDoc = false;
-    bool foundUser = false;
+
     for (const auto& dbName : _databases) {
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -296,67 +295,6 @@ void AllDatabaseCloner::postStage() {
                           "error"_attr = dbStatus.toString());
             setSyncFailedStatus(dbStatus);
             return;
-        }
-        if (!foundUser && dbName.isAdminDB()) {
-            LOGV2_DEBUG(21058, 1, "Finished the 'admin' db, now validating it");
-            // Do special checks for the admin database because of auth. collections.
-            {
-                OperationContext* opCtx = cc().getOperationContext();
-                ServiceContext::UniqueOperationContext opCtxPtr;
-                if (!opCtx) {
-                    opCtxPtr = cc().makeOperationContext();
-                    opCtx = opCtxPtr.get();
-                }
-
-                // To use the AuthorizationBackendInterface we need to be in a shard
-                // or config role.
-                auto authBackend = auth::AuthorizationBackendInterface::get(opCtx->getService());
-                if (!authBackend) {
-                    LOGV2_WARNING(8366000,
-                                  "Database clone failed, running from invalid cluster role");
-                    setSyncFailedStatus(
-                        Status(ErrorCodes::InitialSyncFailure,
-                               "Database clone failed, running from invalid cluster role"));
-                    return;
-                }
-
-                // Check if global admin has a valid auth schema version document.
-                if (!dbName.tenantId() && !foundAuthSchemaDoc) {
-                    auto status =
-                        authBackend->hasValidAuthSchemaVersionDocumentForInitialSync(opCtx);
-                    if (status == ErrorCodes::AuthSchemaIncompatible) {
-                        handleAdminDbNotValid(status);
-                        return;
-                    }
-
-                    foundAuthSchemaDoc = status.isOK();
-                }
-
-                // We haven't yet found a user document, look for one. In a multitenant environment,
-                // user documents will live in tenant-specific admin collections.
-                foundUser = auth::AuthorizationBackendInterface::get(opCtx->getService())
-                                ->hasAnyUserDocuments(opCtx, dbName.tenantId())
-                                .isOK();
-            }
-
-            // The global admin db sorts first even in a multitenant environemnt, so if we've found
-            // a user and haven't found an auth schema doc, we can fail early.
-            if (!foundAuthSchemaDoc && foundUser) {
-                std::string msg = str::stream()
-                    << "During initial sync, found documents in "
-                    << NamespaceString::kAdminUsersNamespace.toStringForErrorMsg()
-                    << " but could not find an auth schema version document in "
-                    << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg() << ".  "
-                    << "This indicates that the primary of this replica set was not "
-                       "successfully "
-                       "upgraded to schema version "
-                    << AuthorizationManager::schemaVersion26Final
-                    << ", which is the minimum supported schema version in this version of "
-                       "MongoDB";
-                auto errorStatus = Status(ErrorCodes::AuthSchemaIncompatible, msg);
-                handleAdminDbNotValid(errorStatus);
-                return;
-            }
         }
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);

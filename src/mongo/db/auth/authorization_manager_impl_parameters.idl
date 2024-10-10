@@ -29,6 +29,7 @@ global:
   cpp_namespace: mongo
   cpp_includes:
     - mongo/db/auth/authorization_manager_impl.h
+    - mongo/db/auth/authorization_router_impl.h
 
 imports:
   - mongo/db/basic_types.idl
@@ -36,9 +37,9 @@ imports:
 server_parameters:
   authorizationManagerCacheSize:
     description: >
-      Element count limit on the AuthorizationManager's user handle cache.
+      Element count limit on the AuthorizationManager's user handle cache, stored within its AuthorizationRouter.
     set_at:
       - startup
-    cpp_varname: authorizationManagerCacheSize
+    cpp_varname: authorizationRouterCacheSize
     default: 100
     redact: false

@@ -30,10 +30,6 @@
 #include "mongo/db/auth/authorization_client_handle.h"
 
 namespace mongo {
-namespace {
-const BSONObj kGetAuthSchemaVersionCmd = BSON("getParameter" << 1 << "authSchemaVersion" << 1);
-
-}  // namespace
 
 StatusWith<UsersInfoReply> AuthorizationClientHandle::sendUsersInfoRequest(
     OperationContext* opCtx, const DatabaseName& dbname, UsersInfoCommand cmd) {
@@ -57,20 +53,6 @@ StatusWith<RolesInfoReply> AuthorizationClientHandle::sendRolesInfoRequest(
 
     return RolesInfoReply::parse(IDLParserContext("AuthzClientHandle::RolesInfoRequest"),
                                  swObj.getValue());
-}
-
-StatusWith<AuthorizationVersion>
-AuthorizationClientHandle::sendGetStoredAuthorizationVersionRequest(OperationContext* opCtx) {
-    auto swObj = runAuthorizationReadCommand(opCtx, DatabaseName::kAdmin, kGetAuthSchemaVersionCmd);
-    if (!swObj.isOK()) {
-        return swObj.getStatus();
-    }
-
-    auto elem = swObj.getValue()["authSchemaVersion"_sd];
-    if (elem.eoo()) {
-        return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
-    }
-    return AuthorizationVersion{.version = elem.numberInt()};
 }
 
 }  // namespace mongo

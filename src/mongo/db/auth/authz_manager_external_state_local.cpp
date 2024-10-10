@@ -81,50 +81,6 @@ using namespace fmt::literals;
 using std::vector;
 using ResolveRoleOption = AuthzManagerExternalStateLocal::ResolveRoleOption;
 
-Status AuthzManagerExternalStateLocal::hasValidStoredAuthorizationVersion(
-    OperationContext* opCtx, BSONObj* foundVersionDoc) {
-    Status status = findOne(opCtx,
-                            NamespaceString::kServerConfigurationNamespace,
-                            AuthorizationManager::versionDocumentQuery,
-                            foundVersionDoc);
-    if (status.isOK()) {
-        BSONElement versionElement =
-            (*foundVersionDoc)[AuthorizationManager::schemaVersionFieldName];
-        if (versionElement.isNumber()) {
-            return Status::OK();
-        } else if (versionElement.eoo()) {
-            return Status(ErrorCodes::NoSuchKey,
-                          str::stream() << "No " << AuthorizationManager::schemaVersionFieldName
-                                        << " field in version document.");
-        } else {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream()
-                              << "Could not determine schema version of authorization data.  "
-                                 "Bad (non-numeric) type "
-                              << typeName(versionElement.type()) << " (" << versionElement.type()
-                              << ") for " << AuthorizationManager::schemaVersionFieldName
-                              << " field in version document");
-        }
-    } else {
-        return status;
-    }
-}
-
-Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationContext* opCtx,
-                                                                     int* outVersion) {
-    BSONObj foundVersionDoc;
-    auto status = hasValidStoredAuthorizationVersion(opCtx, &foundVersionDoc);
-    if (status.isOK()) {
-        *outVersion = foundVersionDoc.getIntField(AuthorizationManager::schemaVersionFieldName);
-        return status;
-    } else if (status == ErrorCodes::NoMatchingDocument) {
-        *outVersion = AuthorizationManager::schemaVersion28SCRAM;
-        return Status::OK();
-    }
-
-    return status;
-}
-
 namespace {
 
 NamespaceString getUsersCollection(const boost::optional<TenantId>& tenant) {
@@ -255,8 +211,7 @@ ResolveRoleOption makeResolveRoleOption(PrivilegeFormat showPrivileges,
 // If tenantId is none, we're checking whether to enable localhost auth bypass which by definition
 // will be a local user.
 bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
-    return auth::AuthorizationBackendLocal::get(opCtx->getService())
-        ->hasAnyPrivilegeDocuments(opCtx);
+    return AuthorizationManager::get(opCtx->getService())->hasAnyPrivilegeDocuments(opCtx);
 }
 
 AuthzManagerExternalStateLocal::RolesLocks::RolesLocks(OperationContext* opCtx,
@@ -410,80 +365,6 @@ Status AuthzManagerExternalStateLocal::getRolesDescription(
     return Status::OK();
 }
 
-Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
-    OperationContext* opCtx,
-    const DatabaseName& dbname,
-    PrivilegeFormat showPrivileges,
-    AuthenticationRestrictionsFormat showRestrictions,
-    bool showBuiltinRoles,
-    std::vector<BSONObj>* result) {
-    auto option = makeResolveRoleOption(showPrivileges, showRestrictions);
-
-    if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
-        return {ErrorCodes::IllegalOperation,
-                "Cannot get user fragment for all roles in a database"};
-    }
-
-    if (showBuiltinRoles) {
-        for (const auto& roleName : auth::getBuiltinRoleNamesForDB(dbname)) {
-            BSONObjBuilder roleBuilder;
-
-            roleBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName.getRole());
-            roleBuilder.append(AuthorizationManager::ROLE_DB_FIELD_NAME, roleName.getDB());
-            roleBuilder.append("isBuiltin", true);
-
-            roleBuilder.append("roles", BSONArray());
-            roleBuilder.append("inheritedRoles", BSONArray());
-
-            if (showPrivileges == PrivilegeFormat::kShowSeparate) {
-                BSONArrayBuilder privsBuilder(roleBuilder.subarrayStart("privileges"));
-                PrivilegeVector privs;
-                invariant(auth::addPrivilegesForBuiltinRole(roleName, &privs));
-                for (const auto& privilege : privs) {
-                    privsBuilder.append(privilege.toBSON());
-                }
-                privsBuilder.doneFast();
-
-                // Builtin roles have identival privs/inheritedPrivs
-                BSONArrayBuilder ipBuilder(roleBuilder.subarrayStart("inheritedPrivileges"));
-                for (const auto& privilege : privs) {
-                    ipBuilder.append(privilege.toBSON());
-                }
-                ipBuilder.doneFast();
-            }
-
-            if (showRestrictions == AuthenticationRestrictionsFormat::kShow) {
-                roleBuilder.append("authenticationRestrictions", BSONArray());
-                roleBuilder.append("inheritedAuthenticationRestrictions", BSONArray());
-            }
-
-            result->push_back(roleBuilder.obj());
-        }
-    }
-
-    return query(opCtx,
-                 getRolesCollection(dbname.tenantId()),
-                 BSON(AuthorizationManager::ROLE_DB_FIELD_NAME
-                      << dbname.serializeWithoutTenantPrefix_UNSAFE()),
-                 BSONObj(),
-                 [&](const BSONObj& roleDoc) {
-                     try {
-                         BSONObjBuilder roleBuilder;
-
-                         auto subRoles = filterAndMapRole(
-                             &roleBuilder, roleDoc, option, true, dbname.tenantId());
-                         roleBuilder.append("isBuiltin", false);
-                         auto data = uassertStatusOK(resolveRoles(opCtx, subRoles, option));
-                         data.roles->insert(subRoles.cbegin(), subRoles.cend());
-                         serializeResolvedRoles(&roleBuilder, data, roleDoc);
-                         result->push_back(roleBuilder.obj());
-                         return Status::OK();
-                     } catch (const AssertionException& ex) {
-                         return ex.toStatus();
-                     }
-                 });
-}
-
 /**
  * Below this point is the implementation of our OpObserver handler.
  *
@@ -576,16 +457,11 @@ using InvalidateFn = std::function<void(AuthorizationManager*)>;
 void invalidateUserCacheOnCommit(OperationContext* opCtx, InvalidateFn invalidate) {
     auto unit = shard_role_details::getRecoveryUnit(opCtx);
     if (unit && unit->inUnitOfWork()) {
-        LOGV2_DEBUG(9349700,
-                    5,
-                    "In WriteUnitOfWork, deferring user cache invalidation to onCommit handler");
         unit->onCommit([invalidate = std::move(invalidate)](OperationContext* opCtx,
                                                             boost::optional<Timestamp>) {
-            LOGV2_DEBUG(9349701, 3, "Invalidating user cache in onCommit handler");
             invalidate(AuthorizationManager::get(opCtx->getService()));
         });
     } else {
-        LOGV2_DEBUG(9349702, 3, "Not in WriteUnitOfWork, invalidating user cache immediately");
         invalidate(AuthorizationManager::get(opCtx->getService()));
     }
 }
@@ -602,15 +478,6 @@ void _invalidateUserCache(OperationContext* opCtx,
         auto id = (*src)["_id"].str();
         auto splitPoint = id.find('.');
         if (splitPoint == std::string::npos) {
-            LOGV2_WARNING(23749,
-                          "Invalidating user cache based on user being updated failed, will "
-                          "invalidate the entire cache instead",
-                          "error"_attr =
-                              Status(ErrorCodes::FailedToParse,
-                                     str::stream() << "_id entries for user documents must be of "
-                                                      "the form <dbname>.<username>.  Found: "
-                                                   << id));
-
             invalidateUserCacheOnCommit(opCtx, [](auto* am) { am->invalidateUserCache(); });
             return;
         }

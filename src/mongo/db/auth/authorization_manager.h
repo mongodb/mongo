@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/authorization_router.h"
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_format.h"
@@ -129,45 +130,13 @@ public:
     static const Status authenticationFailedStatus;
 
     /**
-     * Query to match the auth schema version document in the versionCollectionNamespace.
-     */
-    static const BSONObj versionDocumentQuery;
-
-    /**
-     * Name of the field in the auth schema version document containing the current schema
-     * version.
-     */
-    static constexpr StringData schemaVersionFieldName = "currentVersion"_sd;
-
-    /**
-     * Value used to represent that the schema version is not cached or invalid.
-     */
-    static const int schemaVersionInvalid = 0;
-
-    /**
-     * Auth schema version for MongoDB v2.4 and prior.
-     */
-    static const int schemaVersion24 = 1;
-
-    /**
-     * Auth schema version for MongoDB v2.6 during the upgrade process.  Same as
-     * schemaVersion26Final, except that user documents are found in admin.new.users, and user
-     * management commands are disabled.
-     */
-    static const int schemaVersion26Upgrade = 2;
-
-    /**
-     * Auth schema version for MongoDB 2.6 and 3.0 MONGODB-CR/SCRAM mixed auth mode.
-     * Users are stored in admin.system.users, roles in admin.system.roles.
-     */
-    static const int schemaVersion26Final = 3;
-
-    /**
      * Auth schema version for MongoDB 3.0 SCRAM only mode.
      * Users are stored in admin.system.users, roles in admin.system.roles.
      * MONGODB-CR credentials have been replaced with SCRAM credentials in the user documents.
+     * Note - this is the only supported auth schema version now. It is left simply so that
+     * it can be supplied in the output of {getParameter: {authSchemaVersion: 1}}.
      */
-    static const int schemaVersion28SCRAM = 5;
+    static constexpr int schemaVersion28SCRAM = 5;
 
     /**
      * Returns a new AuthorizationSession for use with this AuthorizationManager.
@@ -195,15 +164,6 @@ public:
     virtual bool isAuthEnabled() const = 0;
 
     /**
-     * Returns via the output parameter "version" the version number of the authorization
-     * system.  Returns Status::OK() if it was able to successfully fetch the current
-     * authorization version.  If it has problems fetching the most up to date version it
-     * returns a non-OK status.  When returning a non-OK status, *version will be set to
-     * schemaVersionInvalid (0).
-     */
-    virtual Status getAuthorizationVersion(OperationContext* opCtx, int* version) = 0;
-
-    /**
      * The value reported by this method must change every time some persisted authorization rule
      * gets modified. It serves as a means for consumers of authorization data to discover that
      * something changed and that they need to re-cache.
@@ -224,11 +184,16 @@ public:
     virtual bool hasAnyPrivilegeDocuments(OperationContext* opCtx) = 0;
 
     /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
+     * This method is used to indicate that an operation has occurred that may affect
+     * the user cache. Delegates method call to the underlying AuthorizationRouter.
+     * Note that this method is not expected to be called on the router Service.
+     * Doing so will result in a no-op.
      */
-    virtual Status getUserDescription(OperationContext* opCtx,
-                                      const UserName& userName,
-                                      BSONObj* result) = 0;
+    virtual void notifyDDLOperation(OperationContext* opCtx,
+                                    StringData op,
+                                    const NamespaceString& nss,
+                                    const BSONObj& o,
+                                    const BSONObj* o2) = 0;
 
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
@@ -236,47 +201,9 @@ public:
     virtual Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) = 0;
 
     /**
-     * Return type for resolveRoles().
-     * Each member will be populated ONLY IF their corresponding Option flag was specifed.
-     * Otherwise, they will be equal to boost::none.
-     */
-    struct ResolvedRoleData {
-        boost::optional<stdx::unordered_set<RoleName>> roles;
-        boost::optional<PrivilegeVector> privileges;
-        boost::optional<RestrictionDocuments> restrictions;
-    };
-
-    using ResolveRoleOption = auth::ResolveRoleOption;
-
-    /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
-     */
-    virtual StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
-                                                      const std::vector<RoleName>& roleNames,
-                                                      ResolveRoleOption option) = 0;
-
-    /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
-     */
-    virtual Status getRolesDescription(OperationContext* opCtx,
-                                       const std::vector<RoleName>& roleName,
-                                       PrivilegeFormat privilegeFormat,
-                                       AuthenticationRestrictionsFormat,
-                                       std::vector<BSONObj>* result) = 0;
-
-    /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
-     */
-    virtual Status getRolesAsUserFragment(OperationContext* opCtx,
-                                          const std::vector<RoleName>& roleName,
-                                          AuthenticationRestrictionsFormat,
-                                          BSONObj* result) = 0;
-
-
-    /**
      * Returns a Status or UserHandle for the given userRequest. If the user cache already has a
-     * user object for this user, it returns a handle from the cache, otherwise it reads the
-     * user document from the AuthzManagerExternalState - this may block for a long time.
+     * user object for this user, it returns a handle from the cache, otherwise it retrieves the
+     * user via a usersInfo command routed to the appropriate node - this may block for a long time.
      *
      * The returned user may be invalid by the time the caller gets access to it.
      */
@@ -324,22 +251,37 @@ public:
      */
     virtual Status initialize(OperationContext* opCtx) = 0;
 
-    /*
-     * Represents a user in the user cache.
+    virtual std::vector<AuthorizationRouter::CachedUserInfo> getUserCacheInfo() const = 0;
+
+    /**
+     * Return type for resolveRoles().
+     * Each member will be populated ONLY IF their corresponding Option flag was specifed.
+     * Otherwise, they will be equal to boost::none.
      */
-    struct CachedUserInfo {
-        UserName userName;  // The username of the user
-        bool active;        // Whether the user is currently in use by a thread (a thread has
-                            // called acquireUser and still owns the returned shared_ptr)
+    struct ResolvedRoleData {
+        boost::optional<stdx::unordered_set<RoleName>> roles;
+        boost::optional<PrivilegeVector> privileges;
+        boost::optional<RestrictionDocuments> restrictions;
     };
 
-    virtual std::vector<CachedUserInfo> getUserCacheInfo() const = 0;
+    using ResolveRoleOption = auth::ResolveRoleOption;
 
-    virtual void logOp(OperationContext* opCtx,
-                       StringData op,
-                       const NamespaceString& ns,
-                       const BSONObj& o,
-                       const BSONObj* o2) = 0;
+    /**
+     * The following methods all delegate to the AuthorizationBackend and bypass the user cache.
+     * They should only be used by user management commands and auth-internal code.
+     */
+    virtual StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
+                                                      const std::vector<RoleName>& roleNames,
+                                                      ResolveRoleOption option) = 0;
+
+    virtual StatusWith<User> lookupUserObject(
+        OperationContext* opCtx,
+        const UserRequest& userReq,
+        const SharedUserAcquisitionStats& userAcquisitionStats) = 0;
+
+    virtual Status lookupUserDescription(OperationContext* opCtx,
+                                         const UserName& userName,
+                                         BSONObj* result) = 0;
 };
 
 }  // namespace mongo

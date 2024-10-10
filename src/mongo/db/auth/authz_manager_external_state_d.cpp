@@ -36,7 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/auth/authz_session_external_state.h"
-#include "mongo/db/auth/authz_session_external_state_d.h"
+#include "mongo/db/auth/authz_session_external_state_shard.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -53,8 +53,9 @@ AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() = default;
 
 std::unique_ptr<AuthzSessionExternalState>
 AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(Client* client) {
-    return std::make_unique<AuthzSessionExternalStateMongod>(client);
+    return std::make_unique<AuthzSessionExternalStateShard>(client);
 }
+
 Status AuthzManagerExternalStateMongod::query(
     OperationContext* opCtx,
     const NamespaceString& collectionName,

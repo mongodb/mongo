@@ -129,6 +129,7 @@ mongo_cc_library(
     name = "auth_impl_internal",
     srcs = [
         "authorization_manager_impl.cpp",
+        "authorization_router_impl.cpp",
         "authorization_session_impl.cpp",
         "authz_manager_external_state.cpp",
         "authz_session_external_state.cpp",
@@ -137,6 +138,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "authorization_manager_impl.h",
+        "authorization_router_impl.h",
         "authorization_session_impl.h",
         "authz_manager_external_state.h",
         "authz_session_external_state.h",
@@ -259,6 +261,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "authorization_manager_impl.h",
+        "authorization_router_impl.h",
     ],
     deps = [
         ":auth",
@@ -473,6 +476,7 @@ mongo_cc_library(
         "authorization_client_handle.cpp",
         "authorization_manager.cpp",
         "authorization_manager_factory.cpp",
+        "authorization_router.cpp",
         "authorization_session.cpp",
         "//src/mongo/util/concurrency:thread_pool.h",
     ],
@@ -503,9 +507,9 @@ mongo_cc_library(
         "authorization_manager_factory_impl.cpp",
         "authz_manager_external_state_d.cpp",
         "authz_manager_external_state_s.cpp",
-        "authz_session_external_state_d.cpp",
-        "authz_session_external_state_s.cpp",
+        "authz_session_external_state_router.cpp",
         "authz_session_external_state_server_common.cpp",
+        "authz_session_external_state_shard.cpp",
         ":enable_localhost_auth_bypass_parameter_gen",
     ],
     hdrs = [
@@ -515,9 +519,9 @@ mongo_cc_library(
         "authorization_manager_factory_impl.h",
         "authz_manager_external_state_d.h",
         "authz_manager_external_state_s.h",
-        "authz_session_external_state_d.h",
-        "authz_session_external_state_s.h",
+        "authz_session_external_state_router.h",
         "authz_session_external_state_server_common.h",
+        "authz_session_external_state_shard.h",
     ],
     deps = [
         ":auth",

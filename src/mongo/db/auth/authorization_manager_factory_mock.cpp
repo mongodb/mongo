@@ -36,30 +36,27 @@
 #include "mongo/db/auth/authorization_client_handle_router.h"
 #include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 
 namespace mongo {
 
 std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryMock::createRouter(
     Service* service) {
+    auto authzRouter = std::make_unique<AuthorizationRouterImpl>(
+        service, std::make_unique<AuthorizationClientHandleRouter>());
+
     return std::make_unique<AuthorizationManagerImpl>(
-        service, std::make_unique<AuthzManagerExternalStateMock>());
+        service, std::make_unique<AuthzManagerExternalStateMock>(), std::move(authzRouter));
 }
 
 std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryMock::createShard(
     Service* service) {
+    auto authzRouter = std::make_unique<AuthorizationRouterImpl>(
+        service, std::make_unique<AuthorizationClientHandleShard>());
+
     return std::make_unique<AuthorizationManagerImpl>(
-        service, std::make_unique<AuthzManagerExternalStateMock>());
-}
-
-std::unique_ptr<AuthorizationClientHandle>
-AuthorizationManagerFactoryMock::createClientHandleRouter(Service* service) {
-    return std::make_unique<AuthorizationClientHandleRouter>();
-}
-
-std::unique_ptr<AuthorizationClientHandle> AuthorizationManagerFactoryMock::createClientHandleShard(
-    Service* service) {
-    return std::make_unique<AuthorizationClientHandleShard>();
+        service, std::make_unique<AuthzManagerExternalStateMock>(), std::move(authzRouter));
 }
 
 std::unique_ptr<auth::AuthorizationBackendInterface>

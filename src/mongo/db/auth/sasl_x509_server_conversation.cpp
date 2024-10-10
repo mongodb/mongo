@@ -230,7 +230,19 @@ StatusWith<std::tuple<bool, std::string>> SaslX509ServerMechanism::stepImpl(
 
         UserName username(ServerMechanismBase::_principalName,
                           ServerMechanismBase::getAuthenticationDatabase());
-        const bool userExists = am->getUserDescription(opCtx, username, &ignored).isOK();
+
+        // At this point, we know that the X.509 subject DN meets the criteria for cluster
+        // membership. Since gEnforceUserClusterSeparation is set, we must check whether a user with
+        // the same username as the X.509 subject DN has already been created.
+        // SaslX509Mechanism::makeUserRequest() automatically transforms X.509 UserRequests that
+        // satisfy cluster membership into UserRequestGeneral instances that represent
+        // local.__system. Passing that UserRequest into AuthorizationManager::acquireUser() will
+        // always succeed with the internal user. Therefore, we make an X.509 UserRequest via
+        // UserRequestX509::makeUserRequestX509 so that we are checking for the X.509 user rather
+        // than local.__system.
+        auto userRequest = uassertStatusOK(
+            UserRequestX509::makeUserRequestX509(username, boost::none, sslPeerInfo));
+        bool userExists = am->acquireUser(opCtx, std::move(userRequest)).isOK();
         uassert(ErrorCodes::AuthenticationFailed,
                 "The provided certificate represents both a cluster member and an "
                 "explicit user which exists in the authzn database. "

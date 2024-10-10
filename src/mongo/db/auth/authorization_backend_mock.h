@@ -76,8 +76,6 @@ public:
                   const BSONObj& document,
                   const BSONObj& writeConcern);
 
-    void setAuthzVersion(OperationContext* opCtx, int version);
-
     Status remove(OperationContext* opCtx,
                   const NamespaceString& collectionName,
                   const BSONObj& query,

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,29 +27,25 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_client_handle.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authz_session_external_state_server_common.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/auth/authorization_router.h"
 
 namespace mongo {
 
-/**
- * The implementation of AuthzSessionExternalState functionality for mongos.
- */
-class AuthzSessionExternalStateMongos : public AuthzSessionExternalStateServerCommon {
-    AuthzSessionExternalStateMongos(const AuthzSessionExternalStateMongos&) = delete;
-    AuthzSessionExternalStateMongos& operator=(const AuthzSessionExternalStateMongos&) = delete;
+std::string AuthorizationRouter::buildUnknownRolesErrorMsg(
+    const stdx::unordered_set<RoleName>& unknownRoles) {
+    dassert(unknownRoles.size());
 
-public:
-    AuthzSessionExternalStateMongos(Client* client);
-    ~AuthzSessionExternalStateMongos() override;
-
-    void startRequest(OperationContext* opCtx) override;
-};
+    char delim = ':';
+    StringBuilder sb;
+    sb << "Could not find role";
+    if (unknownRoles.size() > 1) {
+        sb << 's';
+    }
+    for (const auto& unknownRole : unknownRoles) {
+        sb << delim << ' ' << unknownRole;
+        delim = ',';
+    }
+    return sb.str();
+}
 
 }  // namespace mongo

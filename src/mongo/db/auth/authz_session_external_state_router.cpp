@@ -30,17 +30,18 @@
 #include <memory>
 #include <string>
 
+#include "mongo/db/auth/authz_session_external_state_router.h"
+
 #include "mongo/base/shim.h"
 #include "mongo/db/auth/authz_session_external_state.h"
-#include "mongo/db/auth/authz_session_external_state_s.h"
 
 namespace mongo {
 
-AuthzSessionExternalStateMongos::AuthzSessionExternalStateMongos(Client* client)
+AuthzSessionExternalStateRouter::AuthzSessionExternalStateRouter(Client* client)
     : AuthzSessionExternalStateServerCommon(client) {}
-AuthzSessionExternalStateMongos::~AuthzSessionExternalStateMongos() {}
+AuthzSessionExternalStateRouter::~AuthzSessionExternalStateRouter() {}
 
-void AuthzSessionExternalStateMongos::startRequest(OperationContext* opCtx) {
+void AuthzSessionExternalStateRouter::startRequest(OperationContext* opCtx) {
     _checkShouldAllowLocalhost(opCtx);
 }
 

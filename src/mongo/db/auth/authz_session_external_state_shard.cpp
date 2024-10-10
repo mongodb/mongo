@@ -27,30 +27,53 @@
  *    it in the license file.
  */
 
-#include "mongo/db/auth/authorization_manager.h"
-
+#include <memory>
 #include <string>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
+
+#include "mongo/db/auth/authz_session_external_state_shard.h"
+
 #include "mongo/base/shim.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/authz_session_external_state.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-SystemAuthInfo internalSecurity;
+AuthzSessionExternalStateShard::AuthzSessionExternalStateShard(Client* client)
+    : AuthzSessionExternalStateServerCommon(client) {}
+AuthzSessionExternalStateShard::~AuthzSessionExternalStateShard() {}
 
-constexpr StringData AuthorizationManager::USERID_FIELD_NAME;
-constexpr StringData AuthorizationManager::USER_NAME_FIELD_NAME;
-constexpr StringData AuthorizationManager::USER_DB_FIELD_NAME;
-constexpr StringData AuthorizationManager::ROLE_NAME_FIELD_NAME;
-constexpr StringData AuthorizationManager::ROLE_DB_FIELD_NAME;
-constexpr StringData AuthorizationManager::PASSWORD_FIELD_NAME;
-constexpr StringData AuthorizationManager::V1_USER_NAME_FIELD_NAME;
-constexpr StringData AuthorizationManager::V1_USER_SOURCE_FIELD_NAME;
+void AuthzSessionExternalStateShard::startRequest(OperationContext* opCtx) {
+    // No locks should be held as this happens before any database accesses occur
+    dassert(!shard_role_details::getLocker(opCtx)->isLocked());
 
-const Status AuthorizationManager::authenticationFailedStatus(ErrorCodes::AuthenticationFailed,
-                                                              "Authentication failed.");
+    _checkShouldAllowLocalhost(opCtx);
+}
+
+bool AuthzSessionExternalStateShard::shouldIgnoreAuthChecks() const {
+    if (AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks()) {
+        return true;
+    }
+
+    if (!haveClient()) {
+        return false;
+    }
+
+    // TODO(spencer): get "isInDirectClient" from OperationContext
+    return cc().isInDirectClient();
+}
+
+bool AuthzSessionExternalStateShard::serverIsArbiter() const {
+    // Arbiters have access to extra privileges under localhost. See SERVER-5479.
+    return (
+        repl::ReplicationCoordinator::get(getGlobalServiceContext())->getSettings().isReplSet() &&
+        repl::ReplicationCoordinator::get(getGlobalServiceContext())->getMemberState().arbiter());
+}
 
 }  // namespace mongo

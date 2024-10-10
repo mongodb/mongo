@@ -45,7 +45,7 @@
 
 namespace mongo {
 namespace {
-Document makeDocumentFromCachedUserInfo(const AuthorizationManager::CachedUserInfo& user) {
+Document makeDocumentFromCachedUserInfo(const AuthorizationRouter::CachedUserInfo& user) {
     return Document(BSON("username" << user.userName.getUser() << "db" << user.userName.getDB()
                                     << "active" << user.active));
 }

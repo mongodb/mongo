@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,48 +27,46 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <memory>
-
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/auth/authorization_manager_impl.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/client_strand.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/service_context.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/temp_dir.h"
+#include "mongo/db/auth/authorization_router_impl.h"
+#include "mongo/unittest/assert.h"
 
 namespace mongo {
-/**
- * This is a simple fixture for use with the OpMsgFuzzer.
- *
- * In essenence, this is equivalent to making a standalone mongod with a single client.
- */
-class OpMsgFuzzerFixture {
+
+// Custom AuthorizationRouterImpl which keeps track of how many times user cache invalidation
+// functions have been called.
+class AuthorizationRouterImplForTest : public AuthorizationRouterImpl {
 public:
-    OpMsgFuzzerFixture(bool skipGlobalInitializers = false);
+    using AuthorizationRouterImpl::AuthorizationRouterImpl;
 
-    ~OpMsgFuzzerFixture();
+    void invalidateUserByName(const UserName& user) override {
+        _byNameCount.fetchAndAdd(1);
+        AuthorizationRouterImpl::invalidateUserByName(user);
+    }
 
-    /**
-     * Run a single operation as if it came from the network.
-     */
-    int testOneInput(const char* Data, size_t Size);
+    void invalidateUsersByTenant(const boost::optional<TenantId>& tenant) override {
+        _byTenantCount.fetchAndAdd(1);
+        AuthorizationRouterImpl::invalidateUsersByTenant(tenant);
+    }
+
+    void invalidateUserCache() override {
+        _wholeCacheCount.fetchAndAdd(1);
+        AuthorizationRouterImpl::invalidateUserCache();
+    }
+
+    void resetCounts() {
+        _byNameCount.store(0);
+        _byTenantCount.store(0);
+        _wholeCacheCount.store(0);
+    }
+
+    void assertCounts(uint64_t whole, uint64_t name, uint64_t tenant) {
+        ASSERT_EQ(whole, _wholeCacheCount.load());
+        ASSERT_EQ(name, _byNameCount.load());
+        ASSERT_EQ(tenant, _byTenantCount.load());
+    }
 
 private:
-    void _setAuthorizationManager();
-
-    const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(3, 1));
-
-    // This member is responsible for both creating and deleting the base directory. Think of it as
-    // a smart pointer to the directory.
-    const unittest::TempDir _dir;
-
-    ServiceContext* _serviceContext;
-    ClientStrandPtr _clientStrand;
-    transport::TransportLayerMock _transportLayer;
-    std::shared_ptr<transport::Session> _session;
+    AtomicWord<uint64_t> _byNameCount = 0, _byTenantCount = 0, _wholeCacheCount = 0;
 };
+
 }  // namespace mongo

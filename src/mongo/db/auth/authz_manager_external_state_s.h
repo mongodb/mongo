@@ -65,11 +65,6 @@ public:
 
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(Client* client) final;
 
-    Status hasValidStoredAuthorizationVersion(OperationContext* opCtx,
-                                              BSONObj* foundVersionDoc) override {
-        return {ErrorCodes::NotImplemented, "AuthzMongos::hasValidStoredAuthorizationVersion"};
-    }
-    Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
     Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) final;
     StatusWith<User> getUserObject(OperationContext* opCtx,
                                    const UserRequest& userReq,
@@ -96,14 +91,6 @@ public:
                                   AuthenticationRestrictionsFormat,
                                   BSONObj* result) final {
         return {ErrorCodes::NotImplemented, "AuthzMongos::getRolesAsUserFragment"};
-    }
-    Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                    const DatabaseName& dbname,
-                                    PrivilegeFormat showPrivileges,
-                                    AuthenticationRestrictionsFormat,
-                                    bool showBuiltinRoles,
-                                    std::vector<BSONObj>* result) final {
-        return {ErrorCodes::NotImplemented, "AuthzMongos::getRoleDescriptionsForDB"};
     }
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;

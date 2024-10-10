@@ -31,19 +31,31 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_client_handle.h"
+#include "mongo/db/auth/authz_session_external_state_shard.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
 
-class AuthorizationClientHandleShard : public AuthorizationClientHandle {
+class AuthorizationClientHandleShard final : public AuthorizationClientHandle {
     AuthorizationClientHandleShard(const AuthorizationClientHandleShard&) = delete;
     AuthorizationClientHandleShard& operator=(const AuthorizationClientHandleShard&) = delete;
+
+    std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(Client* client) final {
+        return std::make_unique<AuthzSessionExternalStateShard>(client);
+    }
 
     StatusWith<BSONObj> runAuthorizationReadCommand(OperationContext* opCtx,
                                                     const DatabaseName& dbname,
                                                     const BSONObj& command) final;
+
+    void notifyDDLOperation(OperationContext* opCtx,
+                            AuthorizationRouter* authzRouter,
+                            StringData op,
+                            const NamespaceString& nss,
+                            const BSONObj& o,
+                            const BSONObj* o2) final;
 
 public:
     AuthorizationClientHandleShard() = default;

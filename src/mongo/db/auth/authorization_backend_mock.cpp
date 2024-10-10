@@ -91,16 +91,6 @@ Status AuthorizationBackendMock::insert(OperationContext* opCtx,
     return Status::OK();
 }
 
-void AuthorizationBackendMock::setAuthzVersion(OperationContext* opCtx, int version) {
-    uassertStatusOK(
-        updateOne(opCtx,
-                  NamespaceString::kServerConfigurationNamespace,
-                  AuthorizationManager::versionDocumentQuery,
-                  BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName << version)),
-                  true,
-                  BSONObj()));
-}
-
 Status AuthorizationBackendMock::remove(OperationContext* opCtx,
                                         const NamespaceString& collectionName,
                                         const BSONObj& query,

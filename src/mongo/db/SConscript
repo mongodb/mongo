@@ -416,9 +416,11 @@ env.Library(
         "service_context_test_fixture",
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "$BUILD_DIR/mongo/util/periodic_runner_factory",
         "auth/auth_impl_internal",
+        "auth/authserver",
         "catalog/catalog_impl",
         "commands/mongod",
         "index_builds_coordinator_mongod",
@@ -918,6 +920,7 @@ if wiredtiger:
         ],
         LIBDEPS=[
             "$BUILD_DIR/mongo/db/prepare_conflict_tracker",
+            "$BUILD_DIR/mongo/db/service_context_d",
             "$BUILD_DIR/mongo/transport/transport_layer_mock",
             "auth/auth",
             "auth/authmocks",
@@ -1084,6 +1087,7 @@ if wiredtiger:
             "repl/replica_set_aware_service",
             "repl/replmocks",
             "repl/storage_interface_impl",
+            "service_context_d",
             "service_context_d_test_fixture",
             "session/kill_sessions_local",
             "session/logical_session_cache_impl",

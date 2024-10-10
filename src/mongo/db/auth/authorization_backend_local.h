@@ -49,18 +49,6 @@ public:
 
     RolesInfoReply acquireRoles(OperationContext* opCtx, const RolesInfoCommand& cmd) final;
 
-    /**
-     * Returns true if there exists at least one privilege document in the system.
-     * Used by the AuthorizationSession to determine whether localhost connections should be
-     * granted special access to bootstrap the system.
-     * NOTE: If this method ever returns true, the result is cached in _privilegeDocsExist,
-     * meaning that once this method returns true it will continue to return true for the
-     * lifetime of this process, even if all users are subsequently dropped from the system.
-     */
-    bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;
-
-    Status hasValidAuthSchemaVersionDocumentForInitialSync(OperationContext* opCtx) final;
-
     StatusWith<User> getUserObject(OperationContext* opCtx,
                                    const UserRequest& userReq,
                                    const SharedUserAcquisitionStats& userAcquisitionStats) override;
@@ -111,13 +99,6 @@ protected:
                               const SharedUserAcquisitionStats& userAcquisitionStats) override;
 
     static Status makeRoleNotFoundStatus(const stdx::unordered_set<RoleName>& unknownRoles);
-
-    Status hasAnyUserDocuments(OperationContext* opCtx,
-                               const boost::optional<TenantId>& tenantId) final;
-
-    Status hasValidStoredAuthorizationVersion(OperationContext* opCtx, BSONObj* foundVersionDoc);
-
-    Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion);
 
     virtual Status findOne(OperationContext* opCtx,
                            const NamespaceString& nss,

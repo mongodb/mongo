@@ -2545,7 +2545,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", nss, o, nullptr);
+    AuthorizationManager::get(opCtx->getService())->notifyDDLOperation(opCtx, "c", nss, o, nullptr);
     return Status::OK();
 }
 

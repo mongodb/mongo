@@ -60,16 +60,21 @@
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_backend_local.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_scram_server_conversation.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/unittest/assert.h"
@@ -204,9 +209,7 @@ protected:
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
 
-    AuthzManagerExternalStateMock* authzManagerExternalState;
-    AuthorizationManager* authzManager;
-    std::unique_ptr<AuthorizationSession> authzSession;
+    auth::AuthorizationBackendMock* authzBackend;
 
     std::unique_ptr<ServerMechanismBase> saslServerSession;
     std::unique_ptr<NativeSaslClientSession> saslClientSession;
@@ -218,21 +221,25 @@ protected:
         client = serviceContext->getService()->makeClient("test");
         opCtx = serviceContext->makeOperationContext(client.get());
 
-        auto uniqueAuthzManagerExternalStateMock =
-            std::make_unique<AuthzManagerExternalStateMock>();
-        authzManagerExternalState = uniqueAuthzManagerExternalStateMock.get();
-        auto newManager = std::make_unique<AuthorizationManagerImpl>(
-            serviceContext->getService(), std::move(uniqueAuthzManagerExternalStateMock));
-        authzSession = std::make_unique<AuthorizationSessionImpl>(
-            std::make_unique<AuthzSessionExternalStateMock>(client.get()), client.get());
-        authzManager = newManager.get();
-        AuthorizationManager::set(serviceContext->getService(), std::move(newManager));
+        // Initialize the serviceEntryPoint so that DBDirectClient can function.
+        serviceContext->getService()->setServiceEntryPoint(
+            std::make_unique<ServiceEntryPointShardRole>());
+
+        // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
+        repl::ReplicationCoordinator::set(serviceContext,
+                                          std::make_unique<repl::ReplicationCoordinatorMock>(
+                                              serviceContext, repl::ReplSettings()));
 
         auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+        AuthorizationManager::set(
+            serviceContext->getService(),
+            globalAuthzManagerFactory->createShard(serviceContext->getService()));
+
         auth::AuthorizationBackendInterface::set(
             serviceContext->getService(),
             globalAuthzManagerFactory->createBackendInterface(serviceContext->getService()));
-
+        authzBackend = reinterpret_cast<auth::AuthorizationBackendMock*>(
+            auth::AuthorizationBackendInterface::get(serviceContext->getService()));
 
         saslClientSession = std::make_unique<NativeSaslClientSession>();
         saslClientSession->setParameter(NativeSaslClientSession::parameterMechanism,
@@ -252,9 +259,6 @@ protected:
 
         saslClientSession.reset();
         saslServerSession.reset();
-
-        authzSession.reset();
-        authzManagerExternalState = nullptr;
     }
 
     std::string createPasswordDigest(StringData username, StringData password) {
@@ -280,7 +284,6 @@ protected:
                 return result;
             }
             interposers.execute(result.outcome, clientOutput);
-            std::cout << result.outcome.toString() << ": " << clientOutput << std::endl;
             result.outcome.next();
 
             // Server step
@@ -293,7 +296,6 @@ protected:
             serverOutput = std::move(swServerResult.getValue());
 
             interposers.execute(result.outcome, serverOutput);
-            std::cout << result.outcome.toString() << ": " << serverOutput << std::endl;
             result.outcome.next();
         }
         ASSERT_TRUE(saslClientSession->isSuccess());
@@ -320,7 +322,7 @@ public:
 };
 
 TEST_F(SCRAMFixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -342,7 +344,7 @@ TEST_F(SCRAMFixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
 }
 
 TEST_F(SCRAMFixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -364,7 +366,7 @@ TEST_F(SCRAMFixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
 }
 
 TEST_F(SCRAMFixture, testClientStep2GivesBadProof) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -389,7 +391,7 @@ TEST_F(SCRAMFixture, testClientStep2GivesBadProof) {
 }
 
 TEST_F(SCRAMFixture, testServerStep2GivesBadVerifier) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -422,7 +424,7 @@ TEST_F(SCRAMFixture, testServerStep2GivesBadVerifier) {
 
 
 TEST_F(SCRAMFixture, testSCRAM) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -435,7 +437,7 @@ TEST_F(SCRAMFixture, testSCRAM) {
 }
 
 TEST_F(SCRAMFixture, testSCRAMWithChannelBindingSupportedByClient) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -453,7 +455,7 @@ TEST_F(SCRAMFixture, testSCRAMWithChannelBindingSupportedByClient) {
 }
 
 TEST_F(SCRAMFixture, testSCRAMWithChannelBindingRequiredByClient) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -474,7 +476,7 @@ TEST_F(SCRAMFixture, testSCRAMWithChannelBindingRequiredByClient) {
 }
 
 TEST_F(SCRAMFixture, testSCRAMWithInvalidChannelBinding) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -495,7 +497,7 @@ TEST_F(SCRAMFixture, testSCRAMWithInvalidChannelBinding) {
 }
 
 TEST_F(SCRAMFixture, testNULLInPassword) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "saj\0ack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -509,7 +511,7 @@ TEST_F(SCRAMFixture, testNULLInPassword) {
 
 
 TEST_F(SCRAMFixture, testCommasInUsernameAndPassword) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("s,a,jack", "s,a,jack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "s,a,jack");
@@ -535,7 +537,7 @@ TEST_F(SCRAMFixture, testIncorrectUser) {
 }
 
 TEST_F(SCRAMFixture, testIncorrectPassword) {
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -552,7 +554,7 @@ TEST_F(SCRAMFixture, testIncorrectPassword) {
 
 TEST_F(SCRAMFixture, testOptionalClientExtensions) {
     // Verify server ignores unknown/optional extensions sent by client.
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -576,7 +578,7 @@ TEST_F(SCRAMFixture, testOptionalClientExtensions) {
 
 TEST_F(SCRAMFixture, testOptionalServerExtensions) {
     // Verify client errors on unknown/optional extensions sent by server.
-    ASSERT_OK(authzManagerExternalState->insertUserDocument(
+    ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");

@@ -39,15 +39,20 @@
 #include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_backend_local.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -207,27 +212,23 @@ public:
           registry(opCtx->getService(), {"FOO", "BAR", "InternalAuth"}) {
 
         auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
-        auto externalStateWrapper = std::make_unique<AuthzManagerExternalStateMock>();
-        authManagerExternalState = externalStateWrapper.get();
-
         AuthorizationManager::set(getService(),
-                                  std::make_unique<AuthorizationManagerImpl>(
-                                      getService(), std::move(externalStateWrapper)));
+                                  globalAuthzManagerFactory->createShard(getService()));
+
         auth::AuthorizationBackendInterface::set(
             getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
+        authzBackend = reinterpret_cast<auth::AuthorizationBackendMock*>(
+            auth::AuthorizationBackendInterface::get(getService()));
 
-        authManager = AuthorizationManager::get(getService());
+        // Initialize the serviceEntryPoint so that DBDirectClient can function.
+        getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
 
-        ASSERT_OK(authManagerExternalState->updateOne(
-            opCtx.get(),
-            NamespaceString::kServerConfigurationNamespace,
-            AuthorizationManager::versionDocumentQuery,
-            BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName
-                                << AuthorizationManager::schemaVersion26Final)),
-            true,
-            BSONObj()));
+        // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
+        repl::ReplicationCoordinator::set(getServiceContext(),
+                                          std::make_unique<repl::ReplicationCoordinatorMock>(
+                                              getServiceContext(), repl::ReplSettings()));
 
-        ASSERT_OK(authManagerExternalState->insert(
+        ASSERT_OK(authzBackend->insert(
             opCtx.get(),
             NamespaceString::createNamespaceString_forTest("admin.system.users"),
             BSON("_id"
@@ -243,18 +244,18 @@ public:
             BSONObj()));
 
 
-        ASSERT_OK(authManagerExternalState->insert(opCtx.get(),
-                                                   NamespaceString::createNamespaceString_forTest(
-                                                       "admin.system.users"),
-                                                   BSON("_id"
-                                                        << "$external.sajack"
-                                                        << "user"
-                                                        << "sajack"
-                                                        << "db"
-                                                        << "$external"
-                                                        << "credentials" << BSON("external" << true)
-                                                        << "roles" << BSONArray()),
-                                                   BSONObj()));
+        ASSERT_OK(authzBackend->insert(opCtx.get(),
+                                       NamespaceString::createNamespaceString_forTest(
+                                           "admin.system.users"),
+                                       BSON("_id"
+                                            << "$external.sajack"
+                                            << "user"
+                                            << "sajack"
+                                            << "db"
+                                            << "$external"
+                                            << "credentials" << BSON("external" << true) << "roles"
+                                            << BSONArray()),
+                                       BSONObj()));
 
         std::unique_ptr<UserRequest> systemLocal =
             std::make_unique<UserRequestGeneral>(UserName("__system"_sd, "local"_sd), boost::none);
@@ -268,8 +269,7 @@ public:
     }
 
     ServiceContext::UniqueOperationContext opCtx;
-    AuthzManagerExternalStateMock* authManagerExternalState;
-    AuthorizationManager* authManager;
+    auth::AuthorizationBackendMock* authzBackend;
 
     SASLServerMechanismRegistry registry;
 

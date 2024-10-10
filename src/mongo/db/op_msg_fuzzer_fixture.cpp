@@ -37,7 +37,10 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
+#include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -79,15 +82,11 @@ constexpr auto kTempDirStem = "op_msg_fuzzer_fixture"_sd;
 // This must be called before creating any new threads that may access `AuthorizationManager` to
 // avoid a data-race.
 void OpMsgFuzzerFixture::_setAuthorizationManager() {
-    auto localExternalState = std::make_unique<AuthzManagerExternalStateMock>();
-    _externalState = localExternalState.get();
-
-    auto localAuthzManager = std::make_unique<AuthorizationManagerImpl>(
-        _serviceContext->getService(), std::move(localExternalState));
-    _authzManager = localAuthzManager.get();
-    _authzManager->setAuthEnabled(true);
-
-    AuthorizationManager::set(_serviceContext->getService(), std::move(localAuthzManager));
+    auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+    AuthorizationManager::set(
+        _serviceContext->getService(),
+        globalAuthzManagerFactory->createShard(_serviceContext->getService()));
+    AuthorizationManager::get(_serviceContext->getService())->setAuthEnabled(true);
 }
 
 OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)

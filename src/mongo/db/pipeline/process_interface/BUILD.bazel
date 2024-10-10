@@ -61,6 +61,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:access_checks_gen",
         "//src/mongo/db/auth:auth_types_gen",
         "//src/mongo/db/auth:authorization_manager.h",
+        "//src/mongo/db/auth:authorization_router.h",
         "//src/mongo/db/auth:builtin_roles.h",
         "//src/mongo/db/auth:ldap_cumulative_operation_stats.h",
         "//src/mongo/db/auth:ldap_operation_stats.h",

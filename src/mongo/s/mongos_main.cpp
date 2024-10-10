@@ -63,6 +63,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/audit_interface.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
@@ -914,9 +915,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Build user and roles graph",
                                                   &startupTimeElapsedBuilder);
-        Status status =
-            AuthorizationManager::get(serviceContext->getService(ClusterRole::RouterServer))
-                ->initialize(opCtx);
+        Status status = globalAuthzManagerFactory->initialize(opCtx);
         if (!status.isOK()) {
             LOGV2_ERROR(22858, "Error initializing authorization data", "error"_attr = status);
             return ExitCode::shardingError;

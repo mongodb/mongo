@@ -47,9 +47,11 @@
 #include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_backend_local.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
@@ -59,8 +61,10 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/client.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -95,12 +99,19 @@ class ValidatedTenancyScopeTestFixture : public mongo::ScopedGlobalServiceContex
                                          public unittest::Test {
 protected:
     void setUp() final {
-        auto authzManagerState = std::make_unique<AuthzManagerExternalStateMock>();
-        auto authzManager =
-            std::make_unique<AuthorizationManagerImpl>(getService(), std::move(authzManagerState));
-        authzManager->setAuthEnabled(true);
-        AuthorizationManager::set(getService(), std::move(authzManager));
+        // Initialize the serviceEntryPoint so that DBDirectClient can function.
+        getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+
+        // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
+        repl::ReplicationCoordinator::set(getServiceContext(),
+                                          std::make_unique<repl::ReplicationCoordinatorMock>(
+                                              getServiceContext(), repl::ReplSettings()));
+
         auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+        AuthorizationManager::set(getService(),
+                                  globalAuthzManagerFactory->createShard(getService()));
+        AuthorizationManager::get(getService())->setAuthEnabled(true);
+
         auth::AuthorizationBackendInterface::set(
             getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
 

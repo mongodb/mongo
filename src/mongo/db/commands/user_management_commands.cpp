@@ -196,8 +196,8 @@ Status getCurrentUserRoles(OperationContext* opCtx,
     std::unique_ptr<UserRequest> request =
         std::make_unique<UserRequestGeneral>(userName, boost::none);
 
-    auto swUser = auth::AuthorizationBackendInterface::get(opCtx->getService())
-                      ->getUserObject(opCtx, *request.get(), userAcquisitionStats);
+    auto swUser = AuthorizationManager::get(opCtx->getService())
+                      ->lookupUserObject(opCtx, *request.get(), userAcquisitionStats);
 
     if (!swUser.isOK()) {
         return swUser.getStatus();
@@ -556,27 +556,6 @@ StatusWith<std::int64_t> removePrivilegeDocuments(OperationContext* opCtx,
                           ErrorCodes::UserModificationFailed);
 }
 
-/**
- * Updates the auth schema version document to reflect the current state of the system.
- * 'foundSchemaVersion' is the authSchemaVersion to update with.
- */
-Status writeAuthSchemaVersionIfNeeded(OperationContext* opCtx,
-                                      AuthorizationManager* authzManager,
-                                      int foundSchemaVersion) {
-    Status status = updateOneAuthzDocument(
-        opCtx,
-        NamespaceString::kServerConfigurationNamespace,
-        AuthorizationManager::versionDocumentQuery,
-        BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName << foundSchemaVersion)),
-        true);  // upsert
-
-    if (status == ErrorCodes::NoMatchingDocument) {  // SERVER-11492
-        status = Status::OK();
-    }
-
-    return status;
-}
-
 class AuthzLockGuard {
     AuthzLockGuard(AuthzLockGuard&) = delete;
     AuthzLockGuard& operator=(AuthzLockGuard&) = delete;
@@ -619,67 +598,20 @@ Decorable<ServiceContext>::Decoration<stdx::mutex> AuthzLockGuard::_UMCMutexDeco
     ServiceContext::declareDecoration<stdx::mutex>();
 
 /**
- * Returns Status::OK() if the current Auth schema version is at least the auth schema version
- * for the MongoDB 3.0 SCRAM auth mode.
- * Returns an error otherwise.
+ * When executing a UMC that requires writes, this function must be called so that a lock is taken
+ * that invalidates the user cache when it is released.
  */
-StatusWith<AuthzLockGuard> requireWritableAuthSchema28SCRAM(OperationContext* opCtx) {
-    int foundSchemaVersion;
-    // We take a MODE_X lock during writes because we want to be sure that we can read any pinned
-    // user documents back out of the database after writing them during the user management
-    // commands, and to ensure only one user management command is running at a time.
+StatusWith<AuthzLockGuard> getWritableAuthzLock(OperationContext* opCtx) {
     AuthzLockGuard lk(opCtx, AuthzLockGuard::kInvalidate);
-    auto authzManager = AuthorizationManager::get(opCtx->getService());
-    Status status = authzManager->getAuthorizationVersion(opCtx, &foundSchemaVersion);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    if (foundSchemaVersion < AuthorizationManager::schemaVersion28SCRAM) {
-        return Status(ErrorCodes::AuthSchemaIncompatible,
-                      str::stream()
-                          << "User and role management commands require auth data to have "
-                          << "at least schema version "
-                          << AuthorizationManager::schemaVersion28SCRAM << " but found "
-                          << foundSchemaVersion);
-    }
-    status = writeAuthSchemaVersionIfNeeded(opCtx, authzManager, foundSchemaVersion);
-    if (!status.isOK()) {
-        return status;
-    }
-
     return std::move(lk);
 }
 
 /**
- * Returns Status::OK() if the current Auth schema version is at least the auth schema version
- * for MongoDB 2.6 during the upgrade process.
- * Returns an error otherwise.
- *
- * This method should only be called by READ-ONLY commands (usersInfo & rolesInfo)
- * because getAuthorizationVersion() will return the current max version without
- * reifying the authSchema setting in the admin database.
- *
- * If records are added thinking we're at one schema level, then the default is changed,
- * then the auth database would wind up in an inconsistent state.
+ * When executing a read-only UMC, this function must be called so that it can be synchronized
+ * without necessarily invalidating the user cache afterwards.
  */
-StatusWith<AuthzLockGuard> requireReadableAuthSchema26Upgrade(OperationContext* opCtx) {
-    int foundSchemaVersion;
+StatusWith<AuthzLockGuard> getReadOnlyAuthzLock(OperationContext* opCtx) {
     AuthzLockGuard lk(opCtx, AuthzLockGuard::kReadOnly);
-    Status status = AuthorizationManager::get(opCtx->getService())
-                        ->getAuthorizationVersion(opCtx, &foundSchemaVersion);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    if (foundSchemaVersion < AuthorizationManager::schemaVersion26Upgrade) {
-        return Status(ErrorCodes::AuthSchemaIncompatible,
-                      str::stream() << "The usersInfo and rolesInfo commands require auth data to "
-                                    << "have at least schema version "
-                                    << AuthorizationManager::schemaVersion26Upgrade << " but found "
-                                    << foundSchemaVersion);
-    }
-
     return std::move(lk);
 }
 
@@ -750,7 +682,7 @@ void trimCredentials(OperationContext* opCtx,
     auto* authzManager = AuthorizationManager::get(opCtx->getService());
 
     BSONObj userObj;
-    uassertStatusOK(authzManager->getUserDescription(opCtx, userName, &userObj));
+    uassertStatusOK(authzManager->lookupUserDescription(opCtx, userName, &userObj));
 
     const auto& credsElem = userObj["credentials"];
     uassert(ErrorCodes::UnsupportedFormat,
@@ -1198,13 +1130,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
     UUID::gen().appendToBuilder(&userObjBuilder, AuthorizationManager::USERID_FIELD_NAME);
     userName.appendToBSON(&userObjBuilder);
 
-    auto* service = opCtx->getClient()->getService();
-    auto* authzManager = AuthorizationManager::get(service);
-
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
-
-    int authzVersion;
-    uassertStatusOK(authzManager->getAuthorizationVersion(opCtx, &authzVersion));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
     buildCredentials(&credentialsBuilder, userName, cmd);
@@ -1323,7 +1249,7 @@ void CmdUMCTyped<UpdateUserCommand>::Invocation::typedRun(OperationContext* opCt
         updateDocumentBuilder.append("$unset", updateUnset);
     }
 
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     // Role existence has to be checked after acquiring the update lock
     if (auto roles = cmd.getRoles()) {
@@ -1360,7 +1286,7 @@ void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx)
     auto dbname = cmd.getDbName();
     UserName userName(cmd.getCommandParameter(), dbname);
 
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     audit::logDropUser(Client::getCurrent(), userName);
 
@@ -1387,7 +1313,7 @@ DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invo
     auto dbname = cmd.getDbName();
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     audit::logDropAllUsersFromDatabase(client, dbname);
 
@@ -1417,7 +1343,7 @@ void CmdUMCTyped<GrantRolesToUserCommand>::Invocation::typedRun(OperationContext
             !cmd.getRoles().empty());
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     stdx::unordered_set<RoleName> userRoles;
     uassertStatusOK(getCurrentUserRoles(opCtx, userName, &userRoles));
@@ -1451,7 +1377,7 @@ void CmdUMCTyped<RevokeRolesFromUserCommand>::Invocation::typedRun(OperationCont
             !cmd.getRoles().empty());
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     stdx::unordered_set<RoleName> userRoles;
     uassertStatusOK(getCurrentUserRoles(opCtx, userName, &userRoles));
@@ -1479,7 +1405,7 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
     OperationContext* opCtx) {
     const auto& cmd = request();
 
-    auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx));
+    auto lk = uassertStatusOK(getReadOnlyAuthzLock(opCtx));
     auto authzBackend = auth::AuthorizationBackendInterface::get(opCtx->getService());
     invariant(authzBackend);
 
@@ -1531,7 +1457,7 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     }
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     // Role existence has to be checked after acquiring the update lock
     uassertStatusOK(checkOkayToGrantRolesToRole(opCtx, roleName, resolvedRoleNames));
@@ -1587,7 +1513,7 @@ void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     }
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     // Role existence has to be checked after acquiring the update lock
     uassertStatusOK(AuthorizationManager::get(opCtx->getService())->rolesExist(opCtx, {roleName}));
@@ -1638,7 +1564,7 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
             !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     std::vector<std::string> unrecognizedActions;
     PrivilegeVector newPrivileges = Privilege::privilegeVectorFromParsedPrivilegeVector(
@@ -1693,7 +1619,7 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
             !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     std::vector<std::string> unrecognizedActions;
     PrivilegeVector rmPrivs = Privilege::privilegeVectorFromParsedPrivilegeVector(
@@ -1757,7 +1683,7 @@ void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext
     auto rolesToAdd = auth::resolveRoleNames(cmd.getRoles(), dbname);
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     // Check for cycles
     uassertStatusOK(checkOkayToGrantRolesToRole(opCtx, roleName, rolesToAdd));
@@ -1801,7 +1727,7 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationCont
     auto* client = opCtx->getClient();
     auto* service = opCtx->getClient()->getService();
     auto* authzManager = AuthorizationManager::get(service);
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     // Remove roles from existing set.
     auto data = uassertStatusOK(authzManager->resolveRoles(
@@ -1900,7 +1826,7 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
             !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     uassertStatusOK(AuthorizationManager::get(opCtx->getService())->rolesExist(opCtx, {roleName}));
 
@@ -1964,7 +1890,7 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
     auto* client = opCtx->getClient();
     auto* service = client->getService();
     auto* authzManager = AuthorizationManager::get(service);
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     // From here on, we always want to invalidate the user cache before returning.
     ScopeGuard invalidateGuard([opCtx, authzManager, &dbname] {
@@ -2054,7 +1980,7 @@ template <>
 RolesInfoReply CmdUMCTyped<RolesInfoCommand, UMCInfoParams>::Invocation::typedRun(
     OperationContext* opCtx) {
     const auto& cmd = request();
-    auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx));
+    auto lk = uassertStatusOK(getReadOnlyAuthzLock(opCtx));
     return auth::AuthorizationBackendInterface::get(opCtx->getService())->acquireRoles(opCtx, cmd);
 }
 
@@ -2063,7 +1989,7 @@ MONGO_REGISTER_COMMAND(CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUser
 template <>
 void CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams>::Invocation::typedRun(
     OperationContext* opCtx) {
-    auto lk = requireReadableAuthSchema26Upgrade(opCtx);
+    auto lk = getReadOnlyAuthzLock(opCtx);
     AuthorizationManager::get(opCtx->getService())
         ->invalidateUsersByTenant(request().getDbName().tenantId());
 }
@@ -2461,7 +2387,7 @@ void CmdMergeAuthzCollections::Invocation::typedRun(OperationContext* opCtx) {
 
     auto* service = opCtx->getClient()->getService();
     auto* authzManager = AuthorizationManager::get(service);
-    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx));
+    auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     // From here on, we always want to invalidate the user cache before returning.
     ScopeGuard invalidateGuard([&] { authzManager->invalidateUserCache(); });
