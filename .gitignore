@@ -277,6 +277,7 @@ bazel-*
 bazelisk
 buildifier
 .bazelrc.local
+.bazelrc.workstation
 .bazel_info_for_ninja.txt
 .ninja_last_command_line_targets.txt
 bazel/coverity/analysis/BUILD.bazel

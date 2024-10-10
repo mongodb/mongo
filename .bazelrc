@@ -195,3 +195,6 @@ try-import %workspace%/.bazelrc.evergreen_engflow_creds
 
 # Evergreen settings, ex. in evergreen this will set the key/cert options for access to the cluster
 try-import %workspace%/.bazelrc.evergreen
+
+# local default dev settings
+try-import %workspace%/.bazelrc.workstation

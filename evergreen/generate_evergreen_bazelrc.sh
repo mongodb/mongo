@@ -35,12 +35,12 @@ if bazel_rbe_supported; then
 
   uri="https://spruce.mongodb.com/task/${task_id:?}?execution=${execution:?}"
 
-  echo "build --tls_client_certificate=./engflow.cert" >> .bazelrc.evergreen
-  echo "build --tls_client_key=./engflow.key" >> .bazelrc.evergreen
-  echo "build --bes_keywords=engflow:CiCdPipelineName=${build_variant:?}" >> .bazelrc.evergreen
-  echo "build --bes_keywords=engflow:CiCdJobName=${task_name:?}" >> .bazelrc.evergreen
-  echo "build --bes_keywords=engflow:CiCdUri=${uri:?}" >> .bazelrc.evergreen
-  echo "build --bes_keywords=evg:project=${project:?}" >> .bazelrc.evergreen
-  echo "build --remote_upload_local_results=True" >> .bazelrc.evergreen
-  echo "build --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen
+  echo "common --tls_client_certificate=./engflow.cert" >> .bazelrc.evergreen
+  echo "common --tls_client_key=./engflow.key" >> .bazelrc.evergreen
+  echo "common --bes_keywords=engflow:CiCdPipelineName=${build_variant:?}" >> .bazelrc.evergreen
+  echo "common --bes_keywords=engflow:CiCdJobName=${task_name:?}" >> .bazelrc.evergreen
+  echo "common --bes_keywords=engflow:CiCdUri=${uri:?}" >> .bazelrc.evergreen
+  echo "common --bes_keywords=evg:project=${project:?}" >> .bazelrc.evergreen
+  echo "common --remote_upload_local_results=True" >> .bazelrc.evergreen
+  echo "common --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen
 fi
