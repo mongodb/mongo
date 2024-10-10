@@ -1,9 +1,9 @@
-import urllib
-import urllib.request
 import hashlib
-import zipfile
 import os
 import time
+import urllib
+import urllib.request
+import zipfile
 
 SASL_HASH = "3e22e2b16f802277123590f64dfda44f1c9c8a2b7e758180cd956d8ab0965817"
 SASL_URL = "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip"

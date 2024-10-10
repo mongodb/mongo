@@ -4,12 +4,12 @@ A hook to enable change stream in the replica set and the sharded cluster in the
 environment.
 """
 
-from time import sleep
-from bson.objectid import ObjectId
 import os.path
+from time import sleep
 
-from buildscripts.resmokelib.testing.hooks import interface
-from buildscripts.resmokelib.testing.hooks import jsfile
+from bson.objectid import ObjectId
+
+from buildscripts.resmokelib.testing.hooks import interface, jsfile
 
 
 class EnableChangeStream(interface.Hook):

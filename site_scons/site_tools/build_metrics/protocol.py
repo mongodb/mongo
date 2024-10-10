@@ -1,6 +1,7 @@
-from typing import Tuple, Any
-from typing_extensions import Protocol
 from abc import abstractmethod
+from typing import Any, Tuple
+
+from typing_extensions import Protocol
 
 
 class BuildMetricsCollector(Protocol):

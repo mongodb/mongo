@@ -3,8 +3,9 @@ Import("mongo_tidy_module")
 Import("base_toolchain_bin")
 Import("use_libunwind")
 
-import sys
 import os
+import sys
+
 import SCons
 
 # multiple compilation databases is not supported by ninja

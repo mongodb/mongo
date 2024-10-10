@@ -13,15 +13,16 @@ from typing import List
 
 from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task, TaskDependency
 from shrub.v2.command import BuiltInCommand
+
 from buildscripts.resmokelib.hang_analyzer import dumper
 
 mongo_path = pathlib.Path(__file__).parents[3]
 sys.path.append(mongo_path)
 
 # pylint: disable=wrong-import-position
+from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.util.fileops import write_file
 from buildscripts.util.read_config import read_config_file
-from buildscripts.resmokelib.utils import evergreen_conn
 
 GENERATED_TASK_PREFIX = "core_analysis"
 RANDOM_STRING_LENGTH = 5

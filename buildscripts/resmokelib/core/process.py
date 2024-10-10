@@ -17,6 +17,7 @@ from datetime import datetime
 from shlex import quote
 
 import psutil
+
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors, utils
 from buildscripts.resmokelib.core import pipe

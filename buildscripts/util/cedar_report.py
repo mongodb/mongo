@@ -1,7 +1,7 @@
 """Cedar report."""
 
 from dataclasses import dataclass
-from typing import Union, List
+from typing import List, Union
 
 
 @dataclass

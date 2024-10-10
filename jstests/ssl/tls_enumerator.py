@@ -1,7 +1,7 @@
-import ssl
-import socket
-import json
 import argparse
+import json
+import socket
+import ssl
 
 exception_ciphers = {}
 

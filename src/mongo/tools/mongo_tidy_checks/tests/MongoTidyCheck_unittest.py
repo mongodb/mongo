@@ -1,10 +1,10 @@
-import unittest
+import argparse
+import os
 import subprocess
 import sys
 import tempfile
-import os
 import textwrap
-import argparse
+import unittest
 
 
 class MongoTidyTests(unittest.TestCase):

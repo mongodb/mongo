@@ -1,14 +1,15 @@
 import argparse
 import concurrent.futures
 import datetime
+import os
 import re
 import sys
-import evergreen
-import os
 
+from dateutil import tz
+
+import evergreen
 from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.util.read_config import read_config_file
-from dateutil import tz
 
 timeouts_without_dumps = set()
 passed_with_dumps = set()

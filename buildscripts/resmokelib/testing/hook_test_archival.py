@@ -7,9 +7,7 @@ from typing import TYPE_CHECKING
 
 from opentelemetry import trace
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import config, errors, utils
 from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
 from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.testing.testcases.interface import TestCase

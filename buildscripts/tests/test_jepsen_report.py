@@ -1,13 +1,14 @@
 """Tests for jepsen report generator."""
 
-import unittest
-import textwrap
-import random
 import os
+import random
+import textwrap
+import unittest
 from unittest.mock import patch
+
 from click.testing import CliRunner
 
-from buildscripts.jepsen_report import parse, ParserOutput, main
+from buildscripts.jepsen_report import ParserOutput, main, parse
 
 _CORPUS = textwrap.dedent("""\
      "indeterminate: Command failed with error 251 (NoSuchTransaction): 'Transaction was aborted :: caused by :: from shard rs_shard2 :: caused by :: Given transaction number 53 does not match any in-progress transactions. The active transaction number is -1' on server n9:27017. The full response is {\"writeConcernError\": {\"code\": 6, \"codeName\": \"HostUnreachable\", \"errmsg\": \"operation was interrupted\", \"errInfo\": {\"writeConcern\": {\"w\": \"majority\", \"wtimeout\": 0, \"provenance\": \"clientSupplied\"}}}, \"topologyVersion\": {\"processId\": {\"$oid\": \"625f0b0ef9d6a12d9b562ff9\"}, \"counter\": 21}, \"ok\": 0.0, \"errmsg\": \"Transaction was aborted :: caused by :: from shard rs_shard2 :: caused by :: Given transaction number 53 does not match any in-progress transactions. The active transaction number is -1\", \"code\": 251, \"codeName\": \"NoSuchTransaction\", \"$clusterTime\": {\"clusterTime\": {\"$timestamp\": {\"t\": 1650395950, \"i\": 16}}, \"signature\": {\"hash\": {\"$binary\": {\"base64\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAA=\", \"subType\": \"00\"}}, \"keyId\": 0}}, \"operationTime\": {\"$timestamp\": {\"t\": 1650395950, \"i\": 5}}, \"recoveryToken\": {\"recoveryShardId\": \"rs_shard1\"}}",

@@ -1,8 +1,10 @@
 import threading
 import time
+
 import psutil
-from .util import timestamp_now
+
 from .protocol import BuildMetricsCollector
+from .util import timestamp_now
 
 
 class MemoryMonitor(BuildMetricsCollector):

@@ -20,16 +20,15 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import SCons
-
 import functools
+import os
+import random
 import subprocess
 import sys
 import time
-import random
-import os
+from typing import Callable, Dict, List
 
-from typing import Callable, List, Dict
+import SCons
 
 
 def command_spawn_func(

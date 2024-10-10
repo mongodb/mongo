@@ -5,9 +5,9 @@ from pymongo import ReadPreference
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures.external import ExternalFixture
+from buildscripts.resmokelib.testing.fixtures.replicaset import ReplicaSetFixture
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import registry
-from buildscripts.resmokelib.testing.fixtures.replicaset import ReplicaSetFixture
 
 
 class FixtureTestCase(interface.TestCase):  # pylint: disable=abstract-method

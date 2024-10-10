@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import itertools
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Callable, List
 
-from buildscripts.linter import git_base as _git
 from buildscripts import moduleconfig
+from buildscripts.linter import git_base as _git
 
 # Path to the modules in the mongodb source tree
 # Has to match the string in SConstruct

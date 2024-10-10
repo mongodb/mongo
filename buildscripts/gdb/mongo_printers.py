@@ -6,27 +6,31 @@ import struct
 import sys
 import uuid
 from pathlib import Path
+
 import gdb
 import gdb.printing
 
 ROOT_PATH = str(Path(os.path.abspath(__file__)).parent.parent.parent)
 if ROOT_PATH not in sys.path:
     sys.path.insert(0, ROOT_PATH)
-from src.third_party.immer.dist.tools.gdb_pretty_printers.printers import ListIter as ImmerListIter  # pylint: disable=wrong-import-position
+from src.third_party.immer.dist.tools.gdb_pretty_printers.printers import (
+    ListIter as ImmerListIter,  # pylint: disable=wrong-import-position
+)
 
 if not gdb:
     from buildscripts.gdb.mongo import (
         get_boost_optional,
-        lookup_type,
         get_decorable_info,
         get_object_decoration,
+        lookup_type,
     )
     from buildscripts.gdb.optimizer_printers import register_optimizer_printers
 
 try:
+    import collections
+
     import bson
     import bson.json_util
-    import collections
     from bson.codec_options import CodecOptions
 except ImportError:
     print("Warning: Could not load bson library for Python '" + str(sys.version) + "'.")

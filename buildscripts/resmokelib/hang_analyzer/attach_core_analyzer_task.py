@@ -10,12 +10,12 @@ mongo_path = pathlib.Path(__file__).parents[3]
 sys.path.append(mongo_path)
 
 # pylint: disable=wrong-import-position
-from buildscripts.util.read_config import read_config_file
-from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import (
     GENERATED_TASK_PREFIX,
     RANDOM_STRING_LENGTH,
 )
+from buildscripts.resmokelib.utils import evergreen_conn
+from buildscripts.util.read_config import read_config_file
 
 
 def matches_generated_task_pattern(

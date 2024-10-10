@@ -20,15 +20,14 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+import hashlib
 import os
 import re
 import subprocess
 import urllib
-import hashlib
-
-from pkg_resources import parse_version
 
 import SCons
+from pkg_resources import parse_version
 
 _icecream_version_min = parse_version("1.3")
 _icecream_version_gcc_remote_cpp = parse_version("1.2")

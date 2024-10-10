@@ -2,14 +2,15 @@
 """Implements an ephemeral queryable server."""
 
 import argparse
-import bson
 import logging
 import os
 import tempfile
 import urllib
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from os.path import join, getsize
+from os.path import getsize, join
 from urllib.parse import urlparse
+
+import bson
 
 
 class QueryableHandler(BaseHTTPRequestHandler):

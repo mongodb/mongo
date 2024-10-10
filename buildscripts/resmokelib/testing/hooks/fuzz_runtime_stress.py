@@ -1,9 +1,9 @@
+import math
+import multiprocessing
+import os
 import random
 import threading
 import time
-import multiprocessing
-import os
-import math
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import interface

@@ -1,33 +1,33 @@
+import atexit
 import errno
 import getpass
 import hashlib
-from io import StringIO
 import json
 import os
-import distro
 import platform
 import queue
 import shlex
 import shutil
+import socket
 import stat
 import subprocess
-import time
+import sys
 import threading
-from typing import List, Dict, Set, Tuple, Any
+import time
 import urllib.request
+from io import StringIO
+from typing import Any, Dict, List, Set, Tuple
+
+import distro
+import git
+import mongo.platform as mongo_platform
 import requests
+import SCons
 from retry import retry
 from retry.api import retry_call
-import sys
-from buildscripts.install_bazel import install_bazel
-import atexit
-import socket
-import git
-
-import SCons
 from SCons.Script import ARGUMENTS
 
-import mongo.platform as mongo_platform
+from buildscripts.install_bazel import install_bazel
 
 # Disable retries locally
 _LOCAL_MAX_RETRY_ATTEMPTS = 1

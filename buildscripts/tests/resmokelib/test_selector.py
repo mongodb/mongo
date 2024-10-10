@@ -1,15 +1,14 @@
 """Unit tests for the buildscripts.resmokelib.selector module."""
 
+import collections
 import fnmatch
 import os.path
 import re
 import sys
 import unittest
-import collections
 
 import buildscripts.resmokelib.config
-from buildscripts.resmokelib import parser, errors
-from buildscripts.resmokelib import selector
+from buildscripts.resmokelib import errors, parser, selector
 from buildscripts.resmokelib.utils import globstar
 
 FIXTURE_PREFIX = "buildscripts/tests/selftest_fixtures"

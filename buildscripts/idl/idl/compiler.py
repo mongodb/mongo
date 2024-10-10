@@ -36,11 +36,7 @@ import logging
 import os
 import platform
 
-from . import binder
-from . import errors
-from . import generator
-from . import parser
-from . import syntax
+from . import binder, errors, generator, parser, syntax
 
 
 class CompilerArgs(object):

@@ -1,7 +1,7 @@
-import os
-import sys
-import subprocess
 import io
+import os
+import subprocess
+import sys
 
 # assume we are always running from project root to find buildscripts
 sys.path.append(".")

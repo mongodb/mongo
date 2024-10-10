@@ -4,9 +4,10 @@ Test hook for verifying $queryStats collects expected metrics and can redact que
 This runs in the background as other tests are ongoing.
 """
 
-from buildscripts.resmokelib.testing.hooks.interface import Hook
-from bson import binary
 import pymongo.errors
+from bson import binary
+
+from buildscripts.resmokelib.testing.hooks.interface import Hook
 
 QUERY_STATS_NOT_ENABLED_CODES = [224, 7373500, 6579000]
 

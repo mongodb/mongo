@@ -1,6 +1,6 @@
 """A service to proxy requests to resmoke."""
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 import inject
 

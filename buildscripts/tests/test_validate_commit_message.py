@@ -1,6 +1,7 @@
 """Unit tests for the evergreen_task_timeout script."""
 
 import unittest
+
 from git import Commit, Repo
 
 from buildscripts.validate_commit_message import is_valid_commit

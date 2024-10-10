@@ -2,18 +2,17 @@
 """Unit tests for the resmokelib.testing.hooks.combine_benchmark_results module."""
 
 import datetime
-import unittest
 import logging
+import unittest
+from typing import Dict, List
 
 import mock
 
 import buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results as cbr
-from typing import List, Dict
-from buildscripts.util.cedar_report import CedarMetric
-from buildscripts.resmokelib.errors import ServerFailure
 
 # pylint: disable=protected-access
-from buildscripts.resmokelib.errors import CedarReportError
+from buildscripts.resmokelib.errors import CedarReportError, ServerFailure
+from buildscripts.util.cedar_report import CedarMetric
 
 _BM_CONTEXT = {
     "date": "2018/01/30-18:40:25",

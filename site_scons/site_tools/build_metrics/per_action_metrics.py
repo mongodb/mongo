@@ -1,13 +1,13 @@
 import functools
+import sys
 import time
-import psutil
 
 import memory_profiler
+import psutil
 import SCons
-import sys
 
-from .util import fullname, mem_adjustment
 from .protocol import BuildMetricsCollector
+from .util import fullname, mem_adjustment
 
 
 class ProfiledFunction:

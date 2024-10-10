@@ -1,6 +1,7 @@
 """The unittest.TestCase for JSON Schema tests."""
 
 from typing import Optional
+
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 

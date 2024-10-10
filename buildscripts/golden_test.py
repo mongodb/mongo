@@ -9,10 +9,10 @@ import os
 import pathlib
 import platform
 import re
-import sys
 import shutil
-
+import sys
 from subprocess import call, check_output
+
 import click
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
@@ -21,6 +21,7 @@ if __name__ == "__main__" and __package__ is None:
 
 # pylint: disable=wrong-import-position
 from buildscripts.util.fileops import read_yaml_file
+
 # pylint: enable=wrong-import-position
 
 assert sys.version_info >= (3, 7)

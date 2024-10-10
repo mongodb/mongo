@@ -4,8 +4,7 @@ import collections
 import functools
 import threading
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import config, errors
 
 
 def _check_port(func):

@@ -1,9 +1,9 @@
-import subprocess
-import sys
+import argparse
 import json
 import os
 import shutil
-import argparse
+import subprocess
+import sys
 
 parser = argparse.ArgumentParser(description="Ninja Bazel builder.")
 

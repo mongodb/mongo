@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-import sys
-import os
-import unittest
 import io
+import os
+import sys
+import unittest
 
 sys.path.append(os.path.dirname(__file__))
 
 from combine_metrics import (
-    set_lowest,
-    set_greatest,
     combine_command_line,
-    if_set_should_match,
-    recalc_list_indexes,
     extend_list,
     extend_list_no_dups,
+    if_set_should_match,
+    recalc_list_indexes,
+    set_greatest,
+    set_lowest,
 )
 
 

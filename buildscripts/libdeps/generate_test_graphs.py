@@ -23,12 +23,12 @@
 #
 """Test graphs for the graph visualizer and analyzer."""
 
-import os
-import json
 import argparse
-import networkx
+import json
+import os
 
-from libdeps.graph import LibdepsGraph, EdgeProps, NodeProps
+import networkx
+from libdeps.graph import EdgeProps, LibdepsGraph, NodeProps
 
 
 def get_args():

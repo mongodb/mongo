@@ -8,11 +8,12 @@ This comparison does not currently support nested properties is as it does only 
 """
 
 import argparse
-from enum import Enum
 import io
 import os
 import pprint
 import unittest
+from enum import Enum
+
 import yaml
 
 _COMPARE_FIELDS_SERVER_PARAMETERS = ["default", "set_at", "validator", "test_only"]

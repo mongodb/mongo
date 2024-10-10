@@ -10,11 +10,8 @@ import traceback
 
 import psutil
 
+from buildscripts.resmokelib import config, parser, reportfile, testing
 from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
-from buildscripts.resmokelib import reportfile
-from buildscripts.resmokelib import testing
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import parser
 
 _IS_WINDOWS = sys.platform == "win32"
 if _IS_WINDOWS:

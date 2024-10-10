@@ -2,7 +2,9 @@ import logging
 import os
 import subprocess
 import unittest
+
 import yaml
+
 from buildscripts.resmokelib import config, suitesconfig
 from buildscripts.resmokelib.errors import InvalidMatrixSuiteError
 from buildscripts.resmokelib.logging import loggers

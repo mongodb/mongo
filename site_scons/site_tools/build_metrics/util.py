@@ -1,6 +1,6 @@
-import time
-import sys
 import subprocess
+import sys
+import time
 
 _BUILD_METRIC_DATA = {}
 

@@ -4,17 +4,15 @@ import os.path
 import random
 import threading
 import time
-
 from enum import Enum
+
 import bson
 import bson.errors
 import pymongo.errors
 
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import core, errors
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
-from buildscripts.resmokelib.testing.fixtures import replicaset
-from buildscripts.resmokelib.testing.fixtures import shardedcluster
+from buildscripts.resmokelib.testing.fixtures import replicaset, shardedcluster
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 

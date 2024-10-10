@@ -3,22 +3,23 @@
 
 import argparse
 import datetime
+import hashlib
 import json
+import locale
+import math
+import multiprocessing
 import os
 import re
 import subprocess
 import sys
-import locale
-import hashlib
 import time
-import math
-from typing import Any, Dict, List, Optional, Tuple
-import multiprocessing
-from pathlib import Path
 from concurrent import futures
-from simple_report import put_report, try_combine_reports, make_report
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import yaml
 from clang_tidy_vscode import CHECKS_SO
+from simple_report import make_report, put_report, try_combine_reports
 
 
 def _clang_tidy_executor(

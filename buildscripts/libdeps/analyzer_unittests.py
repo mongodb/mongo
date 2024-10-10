@@ -26,15 +26,14 @@
 import json
 import unittest
 
-
 import libdeps.analyzer
+from generate_test_graphs import get_basic_mock_graph, get_double_diamond_mock_graph
 from libdeps.graph import (
+    CountTypes,
     DependsReportTypes,
     LibdepsGraph,
     LinterTypes,
-    CountTypes,
 )
-from generate_test_graphs import get_double_diamond_mock_graph, get_basic_mock_graph
 
 
 class Tests(unittest.TestCase):

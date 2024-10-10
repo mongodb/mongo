@@ -1,18 +1,18 @@
 """Unit tests for buildscripts/resmokelib/run/list_tags.py."""
 
 # pylint: disable=protected-access
-import unittest
 import logging
 import os
 import sys
+import unittest
 
 import psutil
 
-from buildscripts.resmokelib.run import TestRunner
+import buildscripts.resmokelib.config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.core import process
+from buildscripts.resmokelib.run import TestRunner
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
-import buildscripts.resmokelib.config
 
 
 class MockTestRunner(TestRunner):

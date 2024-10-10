@@ -6,9 +6,10 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Callable, Optional, NamedTuple, Dict, List
+from typing import Callable, Dict, Iterable, List, NamedTuple, Optional
 
 import click
+
 from evergreen import RetryingEvergreenApi
 
 EVG_CONFIG_FILE = "./.evergreen.yml"

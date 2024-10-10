@@ -5,8 +5,8 @@ All but the last argument are input tracefiles or .txt files which list tracefil
 The last argument is the tracefile to which the output will be written.
 """
 
-import subprocess
 import os
+import subprocess
 import sys
 from optparse import OptionParser
 

@@ -31,8 +31,6 @@ echo "Now put the dist gnupg signing keys in ~root/.gnupg"
 
 import argparse
 import errno
-import git
-from glob import glob
 import os
 import re
 import shutil
@@ -40,6 +38,9 @@ import subprocess
 import sys
 import tempfile
 import time
+from glob import glob
+
+import git
 
 # The MongoDB names for the architectures we support.
 ARCH_CHOICES = ["x86_64", "arm64", "aarch64", "s390x"]

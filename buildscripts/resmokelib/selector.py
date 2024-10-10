@@ -14,11 +14,8 @@ import sys
 from typing import Any, List, NamedTuple
 
 import buildscripts.resmokelib.testing.tags as _tags
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.utils import globstar
-from buildscripts.resmokelib.utils import jscomment
+from buildscripts.resmokelib import config, errors, utils
+from buildscripts.resmokelib.utils import globstar, jscomment
 
 ENTERPRISE_TEST_DIR = os.path.normpath("src/mongo/db/modules/enterprise/jstests")
 

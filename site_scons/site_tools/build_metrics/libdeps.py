@@ -1,20 +1,21 @@
+import json
 import os
 import sys
-import json
-from .protocol import BuildMetricsCollector
 
 import networkx
+
+from .protocol import BuildMetricsCollector
 
 # libdeps analyzer does not assume the root build directory, so we need to add its own root to the path
 dir_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(dir_path, "..", "..", "..", "buildscripts", "libdeps"))
 
 from buildscripts.libdeps.libdeps.analyzer import (
-    counter_factory,
-    LibdepsGraphAnalysis,
     GaJsonPrinter,
+    LibdepsGraphAnalysis,
+    counter_factory,
 )
-from buildscripts.libdeps.libdeps.graph import LibdepsGraph, CountTypes
+from buildscripts.libdeps.libdeps.graph import CountTypes, LibdepsGraph
 
 _ALLOWED_KEYS = set(
     [

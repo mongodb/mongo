@@ -3,7 +3,6 @@ from datetime import datetime
 
 import buildscripts.monitor_build_status.bfs_report as under_test
 
-
 evg_projects_info = under_test.EvgProjectsInfo(
     project_to_branch_map={
         "mongodb-mongo-master": "master",

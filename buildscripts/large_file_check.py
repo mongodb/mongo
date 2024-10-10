@@ -10,11 +10,9 @@ import os
 import pathlib
 import sys
 import textwrap
-
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
-
 from git import Repo
 
 mongo_dir = os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))

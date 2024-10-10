@@ -21,8 +21,9 @@
 #
 """Pseudo-builders for building test lists for Resmoke"""
 
-import SCons
 from collections import defaultdict
+
+import SCons
 
 TEST_REGISTRY = defaultdict(list)
 

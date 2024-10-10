@@ -28,9 +28,11 @@
 """Common cost estimator types and functions."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
+
 import numpy as np
-from sklearn.metrics import mean_squared_error, r2_score, explained_variance_score
+from sklearn.metrics import explained_variance_score, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from workload_execution import QueryParameters
 

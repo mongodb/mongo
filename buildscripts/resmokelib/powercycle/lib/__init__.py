@@ -1,9 +1,8 @@
 """Library functions for powercycle."""
 
+import getpass
 import logging
 import os
-
-import getpass
 import shlex
 import stat
 import subprocess
@@ -13,8 +12,8 @@ import yaml
 
 from buildscripts.resmokelib.plugin import Subcommand
 from buildscripts.resmokelib.powercycle import powercycle_constants
-from buildscripts.resmokelib.powercycle.lib.remote_operations import RemoteOperations
 from buildscripts.resmokelib.powercycle.lib.named_temp_file import NamedTempFile
+from buildscripts.resmokelib.powercycle.lib.remote_operations import RemoteOperations
 
 LOGGER = logging.getLogger(__name__)
 

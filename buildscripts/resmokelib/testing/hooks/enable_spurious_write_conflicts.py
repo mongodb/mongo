@@ -6,8 +6,7 @@ encounter unexpected failures.
 
 import os.path
 
-from buildscripts.resmokelib.testing.hooks import interface
-from buildscripts.resmokelib.testing.hooks import jsfile
+from buildscripts.resmokelib.testing.hooks import interface, jsfile
 
 
 class EnableSpuriousWriteConflicts(interface.Hook):

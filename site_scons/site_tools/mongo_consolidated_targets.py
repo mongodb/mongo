@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 
 CONSOLIDATED_TARGETS_MAP = {}
 

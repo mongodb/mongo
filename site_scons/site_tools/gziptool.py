@@ -20,9 +20,10 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import SCons
 import gzip
 import shutil
+
+import SCons
 
 
 def GZipAction(target, source, env, **kw):

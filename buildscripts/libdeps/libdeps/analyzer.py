@@ -29,17 +29,16 @@ graph generated from SCons generate-libdeps-graph target. The graph
 represents the dependency information between all binaries from the build.
 """
 
-import textwrap
-import json
-import inspect
 import functools
-from pathlib import Path
+import inspect
+import json
 import subprocess
+import textwrap
+from pathlib import Path
 
-import networkx
 import cxxfilt
-
-from libdeps.graph import CountTypes, DependsReportTypes, LinterTypes, EdgeProps, NodeProps
+import networkx
+from libdeps.graph import CountTypes, DependsReportTypes, EdgeProps, LinterTypes, NodeProps
 
 
 class UnsupportedAnalyzer(Exception):

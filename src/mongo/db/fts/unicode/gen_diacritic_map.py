@@ -3,7 +3,7 @@
 import sys
 from unicodedata import normalize, unidata_version
 
-from gen_helper import getCopyrightNotice, openNamespaces, closeNamespaces, include
+from gen_helper import closeNamespaces, getCopyrightNotice, include, openNamespaces
 
 diacritics = set()
 

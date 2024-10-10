@@ -1,8 +1,8 @@
 """Interface for customizing the behavior of a test fixture by executing a JavaScript file."""
 
 from buildscripts.resmokelib import errors, logging
-from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.fixtures.interface import MultiClusterFixture
+from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.testcases import jstest
 from buildscripts.resmokelib.utils import registry
 

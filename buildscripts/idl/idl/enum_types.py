@@ -31,15 +31,14 @@ IDL Enum type information.
 Support the code generation for enums
 """
 
-from abc import ABCMeta, abstractmethod
 import json
 import textwrap
+from abc import ABCMeta, abstractmethod
 from typing import cast
+
 import bson
 
-from . import ast
-from . import common
-from . import writer
+from . import ast, common, writer
 
 
 class EnumTypeInfoBase(object, metaclass=ABCMeta):

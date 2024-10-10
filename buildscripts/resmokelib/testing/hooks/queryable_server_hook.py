@@ -1,8 +1,8 @@
 import threading
 from http.server import HTTPServer
 
-from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing import queryable_server
+from buildscripts.resmokelib.testing.hooks import interface
 
 
 class QueryableServerHook(interface.Hook):

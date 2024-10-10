@@ -9,8 +9,8 @@ import bisect
 import os.path
 import sys
 from collections import defaultdict, namedtuple
-from optparse import OptionParser
 from functools import reduce
+from optparse import OptionParser
 from pathlib import Path
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.

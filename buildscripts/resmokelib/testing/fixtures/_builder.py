@@ -5,21 +5,18 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Type
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import logging
-from buildscripts.resmokelib.utils import registry
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
-from buildscripts.resmokelib.testing.fixtures.interface import _FIXTURES
+from buildscripts.resmokelib import config, errors, logging
 from buildscripts.resmokelib.suitesconfig import _get_suite_config
 from buildscripts.resmokelib.testing import suite as _suite
+from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
+from buildscripts.resmokelib.testing.fixtures.interface import _FIXTURES
 from buildscripts.resmokelib.testing.fixtures.replicaset import ReplicaSetFixture
 from buildscripts.resmokelib.testing.fixtures.shardedcluster import (
     ShardedClusterFixture,
     _RouterView,
 )
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
-from buildscripts.resmokelib.utils import default_if_none, pick_catalog_shard_node
+from buildscripts.resmokelib.utils import default_if_none, pick_catalog_shard_node, registry
 
 MONGO_REPO_LOCATION = "."
 FIXTURE_DIR = "buildscripts/resmokelib/testing/fixtures"

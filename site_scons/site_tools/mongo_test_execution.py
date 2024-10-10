@@ -22,11 +22,9 @@
 
 import os
 
-import SCons
-
-from SCons.Node.Alias import default_ans
-
 import auto_install_binaries
+import SCons
+from SCons.Node.Alias import default_ans
 
 _proof_scanner_cache_key = "proof_scanner_cache"
 _associated_proof = "associated_proof_key"

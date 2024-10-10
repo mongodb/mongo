@@ -28,6 +28,7 @@
 """Define ABT physical tree and parse it from query explain."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 __all__ = ["Node", "build"]

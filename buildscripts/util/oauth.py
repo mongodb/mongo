@@ -16,6 +16,7 @@ from pkce import generate_pkce_pair
 from pydantic import ValidationError
 from pydantic.main import BaseModel
 from requests_oauthlib import OAuth2Session
+
 from buildscripts.util.fileops import read_yaml_file
 
 AUTH_HANDLER_RESPONSE = """\

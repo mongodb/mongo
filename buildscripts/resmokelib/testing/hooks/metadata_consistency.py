@@ -4,7 +4,6 @@ import os.path
 import sys
 
 import buildscripts.util.testname as testname_utils
-
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import multi_sharded_cluster, shardedcluster
 from buildscripts.resmokelib.testing.hooks import jsfile

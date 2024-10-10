@@ -10,8 +10,8 @@ def _error(msg: str) -> None:
 
 
 try:
-    import yaml
     import click
+    import yaml
 except ModuleNotFoundError:
     _error(
         "ERROR: Failed to import a dependency. This is almost certainly because "

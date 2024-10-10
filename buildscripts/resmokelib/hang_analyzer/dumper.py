@@ -1,7 +1,6 @@
 """Tools to dump debug info for each OS."""
 
 import glob
-from io import StringIO
 import itertools
 import logging
 import os
@@ -10,18 +9,19 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
+from datetime import datetime
 from distutils import spawn
+from io import StringIO
 from typing import List, Tuple
 
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 
+from buildscripts.resmokelib import config as resmoke_config
 from buildscripts.resmokelib.hang_analyzer.process import call, callo, find_program
 from buildscripts.resmokelib.hang_analyzer.process_list import Pinfo
-from buildscripts.resmokelib import config as resmoke_config
 from buildscripts.resmokelib.utils.otel_utils import get_default_current_span
 from buildscripts.simple_report import Report, Result
 

@@ -8,8 +8,7 @@ import sys
 import time
 from datetime import timedelta
 from threading import Lock
-
-from typing import List, Optional, NamedTuple, Set
+from typing import List, NamedTuple, Optional, Set
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED

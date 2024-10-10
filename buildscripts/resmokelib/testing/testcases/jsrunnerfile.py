@@ -1,9 +1,9 @@
 """The unittest.TestCase for tests with a static JavaScript runner file."""
 
 import os
-
 from typing import Optional
-from buildscripts.resmokelib import config, core, utils, logging
+
+from buildscripts.resmokelib import config, core, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import registry
 

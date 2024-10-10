@@ -1,10 +1,12 @@
 """Command-line entry-point into resmoke."""
 
-from datetime import datetime
-import time
 import os
+import time
+from datetime import datetime
+
 import psutil
 from mongo_tooling_metrics.lib.top_level_metrics import ResmokeToolingMetrics
+
 from buildscripts.resmokelib import parser
 
 

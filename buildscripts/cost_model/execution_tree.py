@@ -28,8 +28,10 @@
 """Define SBE execution tree and parse it from query explain."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Optional
+
 import bson.json_util as json
 
 __all__ = ["Node", "build_execution_tree"]

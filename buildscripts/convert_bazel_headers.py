@@ -1,12 +1,12 @@
+import concurrent.futures
+import json
+import os
+import platform
+import shlex
+import shutil
 import subprocess
 import sys
-import json
-import platform
-import os
-import shlex
-import concurrent.futures
 import traceback
-import shutil
 from typing import Annotated, List
 
 import typer

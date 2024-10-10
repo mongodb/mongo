@@ -2,8 +2,9 @@ import argparse
 import json
 import os
 import sys
-import jsonschema
 from typing import List
+
+import jsonschema
 
 SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
 # directory to scan for third party libraries

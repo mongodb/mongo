@@ -2,14 +2,12 @@
 
 import os.path
 import time
-import yaml
 
 import pymongo
 import pymongo.errors
+import yaml
 
-from buildscripts.resmokelib.testing.fixtures import interface
-from buildscripts.resmokelib.testing.fixtures import external
-from buildscripts.resmokelib.testing.fixtures import _builder
+from buildscripts.resmokelib.testing.fixtures import _builder, external, interface
 
 
 class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface):

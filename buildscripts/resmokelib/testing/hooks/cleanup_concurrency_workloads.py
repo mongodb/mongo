@@ -3,8 +3,8 @@
 import copy
 
 from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.testing.retry import with_naive_retry
 from buildscripts.resmokelib.testing.hooks import interface
+from buildscripts.resmokelib.testing.retry import with_naive_retry
 
 
 class CleanupConcurrencyWorkloads(interface.Hook):

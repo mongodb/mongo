@@ -1,7 +1,8 @@
 """Script to be invoked by GDB for testing decorable pretty printing."""
 
-import gdb
 import re
+
+import gdb
 
 expected_patterns = [
     r"Decorable<MyDecorable\> with 3 elems",

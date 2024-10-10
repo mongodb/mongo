@@ -2,6 +2,7 @@
 """Download the binaries from a previous sys-perf run."""
 
 import argparse
+
 import requests
 
 BASE_URI = "https://evergreen.mongodb.com/rest/v2/"

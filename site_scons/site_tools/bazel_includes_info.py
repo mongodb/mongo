@@ -1,12 +1,12 @@
+import hashlib
+import json
 import os
 import sys
-import json
-import hashlib
+from functools import partial
 from pathlib import Path
 
-import SCons
 import libdeps_tool
-from functools import partial
+import SCons
 
 
 def exists(env):

@@ -4,7 +4,6 @@ import collections
 import os.path
 import threading
 
-
 import buildscripts.resmokelib.utils.filesystem as fs
 
 ActionFiles = collections.namedtuple("ActionFiles", ["permitted", "idle_request", "idle_ack"])

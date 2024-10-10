@@ -6,7 +6,6 @@ import os
 import textwrap
 import unittest
 from tempfile import TemporaryDirectory
-
 from typing import Iterable
 
 import buildscripts.todo_check as under_test

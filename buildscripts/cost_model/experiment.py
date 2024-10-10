@@ -94,17 +94,19 @@ sns.lineplot(x=ixscan_df['n_processed'],y=y_pred, color='red')
 """
 
 from __future__ import annotations
+
 import dataclasses
+
 import bson.json_util as json
-import seaborn as sns
+import execution_tree as sbe
 import pandas as pd
-from sklearn.metrics import r2_score
-from sklearn.linear_model import LinearRegression
+import physical_tree as abt
+import seaborn as sns
 import statsmodels.api as sm
 from database_instance import DatabaseInstance
-import execution_tree as sbe
-import physical_tree as abt
 from parameters_extractor import extract_execution_stats
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
 
 
 async def load_calibration_data(database: DatabaseInstance, collection_name: str) -> pd.DataFrame:
@@ -229,6 +231,7 @@ def calibrate(abt_node_df: pd.DataFrame, variables: list[str] = None):
 
 if __name__ == "__main__":
     import asyncio
+
     from config import DatabaseConfig
 
     async def test():

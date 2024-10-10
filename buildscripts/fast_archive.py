@@ -1,16 +1,18 @@
 import argparse
 import concurrent.futures
+import glob
 import gzip
 import json
-import shutil
-import boto3
-import requests
-from buildscripts.util.read_config import read_config_file
-import glob
 import os
+import shutil
 import sys
 import time
 from typing import Dict, List, Optional
+
+import boto3
+import requests
+
+from buildscripts.util.read_config import read_config_file
 
 
 def process_file(

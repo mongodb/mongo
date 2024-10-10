@@ -1,7 +1,8 @@
 """Script to be invoked by GDB for testing lock manager pretty printer."""
 
-import gdb
 import traceback
+
+import gdb
 
 try:
     gdb.execute("break main")

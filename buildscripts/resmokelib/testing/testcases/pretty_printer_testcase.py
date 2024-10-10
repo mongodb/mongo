@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from buildscripts.resmokelib import logging, core, utils
+from buildscripts.resmokelib import core, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
 
 

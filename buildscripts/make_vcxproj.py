@@ -13,12 +13,12 @@ To build mongodb, you must use scons. You can use this project to navigate code 
   where FILE_NAME is the of the file to generate e.g., "mongod"
 """
 
+import argparse
 import io
 import json
 import os
 import re
 import uuid
-import argparse
 import xml.etree.ElementTree as ET
 
 VCXPROJ_FOOTER = r"""

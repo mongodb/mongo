@@ -32,16 +32,15 @@ This script will automatically install the npm modules, and build and run the pr
 web service if not debug.
 """
 
-import os
-from pathlib import Path
 import argparse
+import os
 import subprocess
-import threading
 import textwrap
-
-from werkzeug.serving import is_running_from_reloader
+import threading
+from pathlib import Path
 
 from graph_visualizer_web_stack.flask.flask_backend import BackendServer
+from werkzeug.serving import is_running_from_reloader
 
 
 def get_args():

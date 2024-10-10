@@ -4,35 +4,35 @@ import concurrent.futures
 import glob
 import gzip
 import json
-from logging import Logger
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
 import tarfile
 import time
-from typing import Callable, Optional
 import urllib.request
+from logging import Logger
+from pathlib import Path
+from typing import Callable, Optional
 
-from retry import retry
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
+from retry import retry
 
 from buildscripts.resmokelib.hang_analyzer.dumper import Dumper
-from buildscripts.resmokelib.setup_multiversion.download import DownloadError
 from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
+from buildscripts.resmokelib.setup_multiversion.download import DownloadError
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
-    _DownloadOptions,
     SetupMultiversion,
+    _DownloadOptions,
 )
+from buildscripts.resmokelib.symbolizer import Symbolizer
 from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 from buildscripts.resmokelib.utils.otel_thread_pool_executor import OtelThreadPoolExecutor
 from buildscripts.resmokelib.utils.otel_utils import get_default_current_span
-from buildscripts.resmokelib.symbolizer import Symbolizer
-from evergreen.task import Task, Artifact
+from evergreen.task import Artifact, Task
 
 _DEBUG_FILE_BASE_NAMES = ["mongo", "mongod", "mongos"]
 TOOLCHAIN_ROOT = "/opt/mongodbtoolchain/v4"

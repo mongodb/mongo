@@ -1,6 +1,6 @@
-import SCons
-
 import re
+
+import SCons
 
 task_limiter_patterns = {}
 

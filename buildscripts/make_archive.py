@@ -27,12 +27,12 @@ For a detailed usage example, see src/SConscript.client or src/mongo/SConscript.
 
 import optparse
 import os
-import sys
 import shlex
 import shutil
-import zipfile
+import sys
 import tempfile
-from subprocess import Popen, PIPE, STDOUT
+import zipfile
+from subprocess import PIPE, STDOUT, Popen
 
 
 def main(argv):

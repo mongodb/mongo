@@ -21,10 +21,11 @@
 #
 """Protobuf Compiler Scons Tool."""
 
+import contextlib
 import os
 import subprocess
 import tempfile
-import contextlib
+
 import SCons
 
 

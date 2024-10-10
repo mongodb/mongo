@@ -51,32 +51,32 @@ automatically added when missing.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from collections import defaultdict
-from functools import partial
-import enum
 import copy
-import json
-import os
-import sys
+import enum
+import fileinput
 import glob
-import textwrap
 import hashlib
 import json
-import fileinput
+import os
 import subprocess
+import sys
+import textwrap
 import time
 import traceback
+from collections import defaultdict
+from functools import partial
 
 try:
     import networkx
-    from buildscripts.libdeps.libdeps.graph import EdgeProps, NodeProps, LibdepsGraph
+
+    from buildscripts.libdeps.libdeps.graph import EdgeProps, LibdepsGraph, NodeProps
 except ImportError:
     pass
 
+import SCons
 import SCons.Errors
 import SCons.Scanner
 import SCons.Util
-import SCons
 from SCons.Script import COMMAND_LINE_TARGETS
 
 

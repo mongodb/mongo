@@ -3,14 +3,15 @@
 import copy
 import os
 import os.path
-import sys
 import shutil
+import sys
 import threading
 import uuid
 from typing import Optional
+
 from bson.objectid import ObjectId
 
-from buildscripts.resmokelib import config, core, logging, utils, errors
+from buildscripts.resmokelib import config, core, errors, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import registry
 

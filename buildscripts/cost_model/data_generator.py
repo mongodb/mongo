@@ -28,16 +28,18 @@
 """Implements to populate MongoDB collections with generated data used to calibrate Cost Model."""
 
 from __future__ import annotations
-from dataclasses import dataclass
-import time
-from typing import Sequence
+
 import asyncio
+import time
+from dataclasses import dataclass
+from typing import Sequence
+
 import pymongo
-from pymongo import IndexModel
-from motor.motor_asyncio import AsyncIOMotorCollection
-from random_generator import RandomDistribution, DataType
 from config import DataGeneratorConfig, WriteMode
 from database_instance import DatabaseInstance
+from motor.motor_asyncio import AsyncIOMotorCollection
+from pymongo import IndexModel
+from random_generator import DataType, RandomDistribution
 
 __all__ = ["DataGenerator"]
 

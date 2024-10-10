@@ -28,15 +28,17 @@
 """Parse explain and extract parameters."""
 
 from __future__ import annotations
-from collections import deque, defaultdict
-from typing import Mapping, Sequence, TypeVar, Callable
+
+from collections import defaultdict, deque
+from typing import Callable, Mapping, Sequence, TypeVar
+
 import bson.json_util as json
-from workload_execution import QueryParameters
-from config import AbtCalibratorConfig
-from database_instance import DatabaseInstance
-from cost_estimator import CostModelParameters, ExecutionStats
 import execution_tree
 import physical_tree
+from config import AbtCalibratorConfig
+from cost_estimator import CostModelParameters, ExecutionStats
+from database_instance import DatabaseInstance
+from workload_execution import QueryParameters
 
 __all__ = ["extract_parameters", "extract_execution_stats"]
 

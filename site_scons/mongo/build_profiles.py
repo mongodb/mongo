@@ -3,6 +3,7 @@
 import enum
 from dataclasses import dataclass
 from typing import Any, List, Optional
+
 import mongo.generators as mongo_generators
 from site_scons.mongo import platform
 

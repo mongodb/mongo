@@ -2,10 +2,10 @@
 
 import os
 import sys
-from typing import Tuple, List, Callable
+from typing import Callable, List, Tuple
 
-from git import Repo
 import structlog
+from git import Repo
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -14,9 +14,9 @@ if __name__ == "__main__" and __package__ is None:
 # pylint: disable=wrong-import-position
 from buildscripts.linter import git
 from buildscripts.patch_builds.change_data import (
-    generate_revision_map,
     RevisionMap,
     find_changed_files_in_repos,
+    generate_revision_map,
 )
 
 # pylint: enable=wrong-import-position

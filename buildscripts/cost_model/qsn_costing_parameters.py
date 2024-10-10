@@ -27,11 +27,12 @@
 #
 """Prepare parameters for QSN cost calibration."""
 
-from typing import TypeVar, Callable, Optional
-import query_solution_tree as qsn
+from typing import Callable, Optional, TypeVar
+
 import execution_tree as sbe
-from workload_execution import QueryParameters
 import pandas as pd
+import query_solution_tree as qsn
+from workload_execution import QueryParameters
 
 Node = TypeVar("Node")
 

@@ -1,12 +1,13 @@
 import argparse
-from functools import lru_cache
+import difflib
 import glob
 import os
 import pathlib
 import subprocess
 import sys
+from functools import lru_cache
+
 import yaml
-import difflib
 
 OWNERS_FILE_NAME = "OWNERS.yml"
 

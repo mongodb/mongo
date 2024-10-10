@@ -1,6 +1,7 @@
 import logging
 import os
 import unittest
+
 from buildscripts.resmokelib import config, suitesconfig
 from buildscripts.resmokelib.logging import loggers
 

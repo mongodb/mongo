@@ -1,7 +1,7 @@
-from collections import defaultdict
 import glob
 import json
 import unittest
+from collections import defaultdict
 
 from buildscripts.idl.gen_all_feature_flag_list import get_all_feature_flags_turned_on_by_default
 from buildscripts.resmokelib.utils import jscomment

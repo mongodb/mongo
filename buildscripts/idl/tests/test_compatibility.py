@@ -29,8 +29,8 @@
 #
 """Test cases for IDL compatibility checker."""
 
-import unittest
 import sys
+import unittest
 from os import path
 
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))

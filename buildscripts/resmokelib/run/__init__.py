@@ -2,7 +2,6 @@
 
 import argparse
 import collections
-from logging import Logger
 import os
 import os.path
 import random
@@ -11,28 +10,33 @@ import subprocess
 import sys
 import textwrap
 import time
+from logging import Logger
 from typing import List, Optional
-import yaml
 
 import psutil
+import yaml
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
+from buildscripts.resmokelib import (
+    config,
+    configure_resmoke,
+    errors,
+    logging,
+    reportfile,
+    sighandler,
+    suitesconfig,
+    testing,
+    utils,
+)
 from buildscripts.resmokelib import parser as main_parser
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import configure_resmoke
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import logging
-from buildscripts.resmokelib import reportfile
-from buildscripts.resmokelib import sighandler
-from buildscripts.resmokelib import suitesconfig
-from buildscripts.resmokelib import testing
-from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
-from buildscripts.resmokelib.run import generate_multiversion_exclude_tags
-from buildscripts.resmokelib.run import runtime_recorder
-from buildscripts.resmokelib.run import list_tags
+from buildscripts.resmokelib.run import (
+    generate_multiversion_exclude_tags,
+    list_tags,
+    runtime_recorder,
+)
 from buildscripts.resmokelib.suitesconfig import get_suite_files
 from buildscripts.resmokelib.testing.docker_cluster_image_builder import build_images
 from buildscripts.resmokelib.testing.suite import Suite

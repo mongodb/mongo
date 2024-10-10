@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import argparse
 import fileinput
-import subprocess
 import os
-import sys
 import re
 import shutil
+import subprocess
+import sys
 from datetime import datetime
-
 from typing import NamedTuple, Optional
+
 from github import GithubIntegration
 
 from buildscripts.util.read_config import read_config_file

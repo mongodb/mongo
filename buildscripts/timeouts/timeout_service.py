@@ -4,6 +4,7 @@ from typing import Any, Dict, NamedTuple, Optional
 
 import inject
 import structlog
+
 from buildscripts.resmoke_proxy.resmoke_proxy import ResmokeProxyService
 from buildscripts.timeouts.timeout import TimeoutEstimate
 from buildscripts.util.teststats import HistoricTaskData, normalize_test_name

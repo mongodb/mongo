@@ -3,7 +3,7 @@
 import os
 from typing import Optional
 
-from buildscripts.resmokelib import config, core, utils, logging
+from buildscripts.resmokelib import config, core, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
 
 

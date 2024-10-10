@@ -30,16 +30,16 @@ import pymongo
 import requests
 import yaml
 
-from buildscripts.resmokelib.powercycle.lib import (
-    remote_operations,
-    execute_cmd,
-    create_temp_executable_file,
-    NamedTempFile,
-)
 from buildscripts.resmokelib.powercycle import powercycle_config, powercycle_constants
+from buildscripts.resmokelib.powercycle.lib import (
+    NamedTempFile,
+    create_temp_executable_file,
+    execute_cmd,
+    remote_operations,
+)
 
 # See https://docs.python.org/2/library/sys.html#sys.platform
-from buildscripts.resmokelib.powercycle.lib.services import WindowsService, PosixService
+from buildscripts.resmokelib.powercycle.lib.services import PosixService, WindowsService
 
 _IS_WINDOWS = sys.platform in ["win32", "cygwin"]
 _IS_LINUX = sys.platform.startswith("linux")

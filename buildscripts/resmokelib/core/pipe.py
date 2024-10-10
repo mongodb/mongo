@@ -5,8 +5,8 @@ Used to avoid deadlocks from the pipe buffer filling up and blocking the subproc
 being waited on.
 """
 
-from textwrap import wrap
 import threading
+from textwrap import wrap
 from typing import List
 
 # Logkeeper only support log lines up to 4 MB, we want to be a little under that to account for

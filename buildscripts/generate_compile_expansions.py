@@ -8,8 +8,9 @@ $ python generate_compile_expansions.py --out compile_expansions.yml
 
 import argparse
 import os
-import sys
 import shlex
+import sys
+
 import yaml
 
 VERSION_JSON = "version.json"

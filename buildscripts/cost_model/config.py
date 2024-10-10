@@ -28,10 +28,12 @@
 """Configuration of Cost Model Calibration."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Sequence
-from random_generator import RandomDistribution, DataType
+
+from random_generator import DataType, RandomDistribution
 
 
 @dataclass

@@ -24,9 +24,9 @@ Expected Format:
 
 # TODO: if https://github.com/notskm/vscode-clang-tidy/pull/77#issuecomment-1422910143 is resolved then this script can be removed
 
+import os
 import subprocess
 import sys
-import os
 
 CHECKS_SO = "build/install/lib/libmongo_tidy_checks.so"
 

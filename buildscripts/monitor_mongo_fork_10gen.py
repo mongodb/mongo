@@ -1,10 +1,11 @@
 import argparse
 import sys
 from typing import List, Optional
-from github import Github, GithubIntegration, GithubException
+
+from github import Github, GithubException, GithubIntegration
+from simple_report import make_report, put_report
 
 from buildscripts.util.read_config import read_config_file
-from simple_report import put_report, make_report
 
 
 def get_installation_access_token(

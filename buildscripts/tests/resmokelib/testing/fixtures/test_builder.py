@@ -4,7 +4,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from buildscripts.resmokelib import logging, parser, config
+from buildscripts.resmokelib import config, logging, parser
 from buildscripts.resmokelib.core import network
 from buildscripts.resmokelib.testing.fixtures import _builder as under_test
 

@@ -3,8 +3,8 @@
 import unittest
 from unittest.mock import MagicMock
 
-from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib import config
+from buildscripts.resmokelib.logging import loggers
 
 # pylint: disable=protected-access
 

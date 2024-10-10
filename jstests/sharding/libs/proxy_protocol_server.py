@@ -3,8 +3,9 @@
 Python script to interact with proxy protocol server.
 """
 
-from proxyprotocol.server.main import *
 import sys
+
+from proxyprotocol.server.main import *
 
 if __name__ == "__main__":
     print("Starting proxy protocol server...")

@@ -1,10 +1,11 @@
 import os
 import time
-from site_tools.validate_cache_dir import CacheDirValidate
-from .protocol import BuildMetricsCollector
 from typing import List, Set
 
+from site_tools.validate_cache_dir import CacheDirValidate
 from typing_extensions import TypedDict
+
+from .protocol import BuildMetricsCollector
 
 
 class CacheArtifact(TypedDict):

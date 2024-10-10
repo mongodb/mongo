@@ -1,27 +1,27 @@
 """Enable running tests simultaneously by processing them from a multi-consumer queue."""
 
+import logging
 import sys
 import threading
 import time
-import logging
 from collections import namedtuple
-from typing import List, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional, Union
+
+from opentelemetry import context, trace
+from opentelemetry.context.context import Context
+from opentelemetry.trace.status import StatusCode
 
 from buildscripts.resmokelib import config, errors
 from buildscripts.resmokelib.testing import testcases
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures.interface import Fixture, create_fixture_table
-from buildscripts.resmokelib.testing.testcases.interface import TestCase
 from buildscripts.resmokelib.testing.hook_test_archival import HookTestArchival
 from buildscripts.resmokelib.testing.hooks.interface import Hook
 from buildscripts.resmokelib.testing.queue_element import QueueElem, QueueElemRepeatTime
 from buildscripts.resmokelib.testing.report import TestReport
 from buildscripts.resmokelib.testing.testcases import fixture as _fixture
+from buildscripts.resmokelib.testing.testcases.interface import TestCase
 from buildscripts.resmokelib.utils import queue as _queue
-
-from opentelemetry import trace, context
-from opentelemetry.context.context import Context
-from opentelemetry.trace.status import StatusCode
 
 # TODO: if we ever fix the circular deps in resmoke we will be able to get rid of this
 if TYPE_CHECKING:

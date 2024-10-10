@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 from json import JSONDecoder
-from typing import Optional, Generator, Dict, List, NamedTuple
+from typing import Dict, Generator, List, NamedTuple, Optional
 
 import requests
 
@@ -19,12 +19,12 @@ import requests
 sys.path.append(str(pathlib.Path(os.path.join(os.getcwd(), __file__)).parent.parent))
 
 # pylint: disable=wrong-import-position
-from buildscripts.util.oauth import get_client_cred_oauth_credentials, Configs
+from buildscripts.build_system_options import PathOptions
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
     SetupMultiversion,
     download,
 )
-from buildscripts.build_system_options import PathOptions
+from buildscripts.util.oauth import Configs, get_client_cred_oauth_credentials
 
 BUILD_INFO_RE = re.compile(r"Build Info: ({(\n.*)*})")
 MONGOD = "mongod"

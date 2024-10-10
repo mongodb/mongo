@@ -6,7 +6,6 @@ with versions to another directory. This script supports community and
 enterprise builds.
 """
 
-from itertools import chain
 import argparse
 import logging
 import os
@@ -15,11 +14,11 @@ import re
 import subprocess
 import sys
 import time
-from typing import Optional, Dict, Any, List, NamedTuple
+from itertools import chain
+from typing import Any, Dict, List, NamedTuple, Optional
 
 import distro
 import yaml
-
 from requests.exceptions import HTTPError
 
 from buildscripts.resmokelib import multiversionsetupconstants

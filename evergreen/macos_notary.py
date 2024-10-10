@@ -1,11 +1,11 @@
 import os
 import platform
 import shutil
-import urllib.request
-import subprocess
-import zipfile
 import stat
+import subprocess
 import sys
+import urllib.request
+import zipfile
 
 if platform.system().lower() != "darwin":
     print("Not a macos system, skipping macos signing.")

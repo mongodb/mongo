@@ -27,10 +27,9 @@
 """Library functions and utility methods used across user-facing IDL scripts."""
 
 import os
+from typing import List, Set
 
-from typing import Set, List
-
-from buildscripts.idl.idl import syntax, parser
+from buildscripts.idl.idl import parser, syntax
 from buildscripts.idl.idl.compiler import CompilerImportResolver
 
 

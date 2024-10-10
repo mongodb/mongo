@@ -7,13 +7,14 @@
 """
 
 # TODO(SERVER-94780) Add buildozer dep to poetry
-import subprocess
 import json
-from typing import List, Optional, Dict, Annotated, Tuple
-import typer
-import sys
 import os
 import pprint
+import subprocess
+import sys
+from typing import Annotated, Dict, List, Optional, Tuple
+
+import typer
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:

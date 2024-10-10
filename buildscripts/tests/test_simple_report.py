@@ -1,11 +1,11 @@
 """Simple_report test."""
 
-import unittest
-import random
-import textwrap
-import sys
 import os
-from unittest.mock import patch, mock_open
+import random
+import sys
+import textwrap
+import unittest
+from unittest.mock import mock_open, patch
 
 from click.testing import CliRunner
 

@@ -10,6 +10,7 @@ A prototype hang analyzer for Evergreen integration to help investigate test tim
 Supports Linux, MacOS X, and Windows.
 """
 
+import getpass
 import logging
 import os
 import platform
@@ -18,15 +19,12 @@ import signal
 import sys
 import time
 import traceback
-import getpass
 
-import psutil
 import distro
+import psutil
 
 from buildscripts.resmokelib import config as resmoke_config
-from buildscripts.resmokelib.hang_analyzer import dumper
-from buildscripts.resmokelib.hang_analyzer import process
-from buildscripts.resmokelib.hang_analyzer import process_list
+from buildscripts.resmokelib.hang_analyzer import dumper, process, process_list
 from buildscripts.resmokelib.hang_analyzer.extractor import download_debug_symbols
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.symbolizer import Symbolizer

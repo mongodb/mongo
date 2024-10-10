@@ -1,13 +1,14 @@
-import os
-import subprocess
 import csv
 import enum
-import platform
-import puremagic
+import os
 import pathlib
+import platform
+import subprocess
 from typing import Optional
 
+import puremagic
 from typing_extensions import TypedDict
+
 from .protocol import BuildMetricsCollector
 
 

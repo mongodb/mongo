@@ -8,6 +8,7 @@ import platform
 import re
 import subprocess
 import sys
+
 from buildscripts.install_bazel import install_bazel
 
 bazel_env_settings: dict[str, str] = {}

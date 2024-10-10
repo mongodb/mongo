@@ -6,8 +6,7 @@ import os
 
 from buildscripts.resmokelib.testing.hooks import interface
 
-from . import interface
-from . import jsfile
+from . import interface, jsfile
 
 
 class HelloDelays(interface.Hook):

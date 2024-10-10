@@ -12,9 +12,11 @@ from typing import List
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-from buildscripts.linter import git  # pylint: disable=wrong-import-position
-from buildscripts.linter import parallel  # pylint: disable=wrong-import-position
-from buildscripts.linter import mongolint  # pylint: disable=wrong-import-position
+from buildscripts.linter import (
+    git,  # pylint: disable=wrong-import-position
+    mongolint,  # pylint: disable=wrong-import-position
+    parallel,  # pylint: disable=wrong-import-position
+)
 
 FILES_RE = re.compile("\\.(h|cpp)$")
 

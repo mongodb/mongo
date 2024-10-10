@@ -1,5 +1,5 @@
-from typing import List
 import subprocess
+from typing import List
 
 
 def _bd_command(cmd: str, labels: List[str]):

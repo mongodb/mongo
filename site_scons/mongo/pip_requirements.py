@@ -4,9 +4,9 @@
 # import python standard modules, because this module
 # should be used for finding such external modules or
 # missing dependencies.
-import sys
-import subprocess
 import re
+import subprocess
+import sys
 
 
 class MissingRequirements(Exception):

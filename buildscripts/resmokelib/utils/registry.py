@@ -8,6 +8,7 @@ its name.
 
 import threading
 from contextlib import contextmanager
+
 from buildscripts.resmokelib.utils import default_if_none
 
 # Specifying 'LEAVE_UNREGISTERED' as the "REGISTERED_NAME" attribute will cause the class to be

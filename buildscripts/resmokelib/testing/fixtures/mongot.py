@@ -8,9 +8,8 @@ A resmoke suite's yml definition can enable launching mongot(s) enabled via the 
 mongod via a $changeStream.
 """
 
-import time
 import shutil
-
+import time
 
 import pymongo
 import pymongo.errors

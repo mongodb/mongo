@@ -1,12 +1,11 @@
 """Unit tests for powercycle_sentinel.py."""
 
 import unittest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
+from buildscripts.powercycle_sentinel import POWERCYCLE_TASK_EXEC_TIMEOUT_SECS, watch_tasks
 from evergreen import EvergreenApi, Task
-
-from buildscripts.powercycle_sentinel import watch_tasks, POWERCYCLE_TASK_EXEC_TIMEOUT_SECS
 
 
 def make_task_mock(evg_api, task_id, start_time, finish_time):

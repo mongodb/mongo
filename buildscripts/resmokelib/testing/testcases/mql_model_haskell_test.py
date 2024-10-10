@@ -4,7 +4,7 @@ import os
 import os.path
 from typing import Optional
 
-from buildscripts.resmokelib import core, errors, utils, logging
+from buildscripts.resmokelib import core, errors, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import globstar
 

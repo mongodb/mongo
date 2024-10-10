@@ -1,6 +1,7 @@
 # -*- mode: python; -*-
 
 from functools import partial
+
 import libdeps_tool as libdeps
 
 Import("env")

@@ -1,19 +1,20 @@
 """Mongo lock module."""
 
+import os
 import re
 import sys
-import os
 from pathlib import Path
+
 import gdb
 import gdb.printing
 
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
     from buildscripts.gdb.mongo import (
+        RegisterMongoCommand,
         get_current_thread_name,
         get_thread_id,
         lookup_type,
-        RegisterMongoCommand,
     )
 
 if sys.version_info[0] < 3:

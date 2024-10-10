@@ -4,14 +4,15 @@ from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
 from json import JSONDecodeError
-from typing import NamedTuple, List, Callable, Optional
+from typing import Callable, List, NamedTuple, Optional
+
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
 from buildscripts.util.testname import (
-    split_test_hook_name,
-    is_resmoke_hook,
     get_short_name_from_test_file,
+    is_resmoke_hook,
+    split_test_hook_name,
 )
 
 TASK_LEVEL_HOOKS = {"CleanEveryN"}

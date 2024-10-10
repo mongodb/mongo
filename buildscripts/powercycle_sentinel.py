@@ -13,9 +13,9 @@ from typing import List
 
 import click
 import structlog
-from evergreen import RetryingEvergreenApi, EvergreenApi
 
 from buildscripts.util.read_config import read_config_file
+from evergreen import EvergreenApi, RetryingEvergreenApi
 
 LOGGER = structlog.getLogger(__name__)
 

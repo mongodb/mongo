@@ -6,10 +6,10 @@ import re
 from bisect import bisect_left, bisect_right
 from typing import List, NamedTuple, Optional
 
-from packaging.version import Version
-from pydantic import BaseModel, Field
 import structlog
 import yaml
+from packaging.version import Version
+from pydantic import BaseModel, Field
 
 # These values must match the include paths for artifacts.tgz in evergreen.yml.
 MONGO_VERSION_YAML = ".resmoke_mongo_version.yml"

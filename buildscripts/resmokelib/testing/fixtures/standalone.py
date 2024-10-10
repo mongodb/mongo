@@ -2,15 +2,15 @@
 
 import os
 import os.path
-import time
 import shutil
-from typing import Optional
+import time
 import uuid
-
-import yaml
+from typing import Optional
 
 import pymongo
 import pymongo.errors
+import yaml
+
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib

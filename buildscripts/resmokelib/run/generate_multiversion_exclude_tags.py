@@ -3,19 +3,19 @@
 import logging
 import os
 import re
+import subprocess
 import tempfile
 from collections import defaultdict
 from subprocess import check_output
 from typing import Optional
-from github import GithubIntegration
-import subprocess
 
 import requests
+from github import GithubIntegration
 from requests.adapters import HTTPAdapter, Retry
 
-from buildscripts.resmokelib.testing import tags as _tags
 from buildscripts.resmokelib.config import MultiversionOptions
 from buildscripts.resmokelib.core.programs import get_path_env_var
+from buildscripts.resmokelib.testing import tags as _tags
 from buildscripts.resmokelib.utils import is_windows
 from buildscripts.util.fileops import read_yaml_file
 from buildscripts.util.read_config import read_config_file

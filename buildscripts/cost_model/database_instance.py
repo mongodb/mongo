@@ -28,11 +28,13 @@
 """A wrapper with useful methods over MongoDB database."""
 
 from __future__ import annotations
-from typing import Sequence, Mapping, NewType, Any
+
 import subprocess
 from contextlib import asynccontextmanager
-from motor.motor_asyncio import AsyncIOMotorClient
+from typing import Any, Mapping, NewType, Sequence
+
 from config import DatabaseConfig, RestoreMode
+from motor.motor_asyncio import AsyncIOMotorClient
 
 __all__ = ["DatabaseInstance", "Pipeline"]
 """MongoDB Aggregate's Pipeline"""

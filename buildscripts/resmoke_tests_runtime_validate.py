@@ -13,8 +13,7 @@ import structlog
 from buildscripts.resmokelib.testing.report import TestInfo, TestReport
 from buildscripts.resmokelib.utils import get_task_name_without_suffix
 from buildscripts.util.cmdutils import enable_logging
-
-from buildscripts.util.teststats import HistoricTaskData, HistoricalTestInformation
+from buildscripts.util.teststats import HistoricalTestInformation, HistoricTaskData
 
 LOGGER = structlog.get_logger("buildscripts.resmoke_tests_runtime_validate")
 

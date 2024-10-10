@@ -28,13 +28,15 @@
 """Workload Execution. Run the queries to collect data for calibration."""
 
 from __future__ import annotations
+
 from dataclasses import asdict, dataclass
 from typing import Sequence
+
 import bson.json_util as json
 from bson.objectid import ObjectId
+from config import WorkloadExecutionConfig, WriteMode
 from data_generator import CollectionInfo
 from database_instance import DatabaseInstance, Pipeline
-from config import WorkloadExecutionConfig, WriteMode
 
 __all__ = ["execute"]
 

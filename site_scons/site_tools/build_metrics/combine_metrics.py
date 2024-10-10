@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-import json
-import sys
-import glob
 import argparse
+import glob
+import json
 import statistics
-
-from typing import Dict, List, Any
+import sys
+from typing import Any, Dict, List
 
 parser = argparse.ArgumentParser(description="Combine metrics json files into a single file.")
 parser.add_argument(

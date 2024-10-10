@@ -28,11 +28,12 @@
 # it in the license file.
 """Generate source files from a specification of error codes and categories."""
 
-from Cheetah.Template import Template
 import argparse
-import sys
-import yaml
 import os
+import sys
+
+import yaml
+from Cheetah.Template import Template
 
 help_epilog = """
 The error_codes_spec YAML document is a mapping containing two toplevel fields:

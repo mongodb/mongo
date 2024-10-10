@@ -1,12 +1,12 @@
 # run various configure checks. This script is intended to be
 # imported and run in the context of generate_config_header.py
+import json
 import os
 import platform
 import subprocess
 import tempfile
 import threading
 from typing import Dict
-import json
 
 logfile_path: str = ""
 loglock = threading.Lock()

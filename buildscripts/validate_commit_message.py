@@ -28,13 +28,14 @@
 #
 """Validate that the commit message is ok."""
 
-import re
 import pathlib
-import structlog
+import re
 import subprocess
+
+import structlog
 import typer
-from typing_extensions import Annotated
 from git import Commit, Repo
+from typing_extensions import Annotated
 
 LOGGER = structlog.get_logger(__name__)
 

@@ -1,6 +1,7 @@
 """Hook that prints Antithesis commands to be executed in the Antithesis evironment."""
 
 from time import sleep
+
 from buildscripts.resmokelib.testing.hooks import interface
 
 

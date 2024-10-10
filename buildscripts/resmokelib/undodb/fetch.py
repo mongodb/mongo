@@ -1,15 +1,15 @@
 """Subcommand for fetching UndoDB recordings from Evergreen."""
 
 import os
-from typing import List, Optional
-import tempfile
-from urllib.request import urlopen
-from shutil import copyfileobj
 import tarfile
+import tempfile
+from shutil import copyfileobj
+from typing import List, Optional
+from urllib.request import urlopen
 
 import evergreen
-from evergreen import RetryingEvergreenApi
 from buildscripts.resmokelib.plugin import Subcommand
+from evergreen import RetryingEvergreenApi
 
 
 def _is_jira_ticket(asset: str) -> bool:

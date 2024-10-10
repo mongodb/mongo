@@ -16,13 +16,13 @@ import inject
 import structlog
 import yaml
 from pydantic import BaseModel
-from evergreen import EvergreenApi, RetryingEvergreenApi
 
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, parse_evergreen_file
 from buildscripts.resmoke_proxy.resmoke_proxy import ResmokeProxyService
 from buildscripts.timeouts.timeout_service import TimeoutParams, TimeoutService
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.taskname import determine_task_base_name
+from evergreen import EvergreenApi, RetryingEvergreenApi
 
 LOGGER = structlog.get_logger(__name__)
 DEFAULT_TIMEOUT_OVERRIDES = "etc/evergreen_timeouts.yml"

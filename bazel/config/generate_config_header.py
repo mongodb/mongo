@@ -6,11 +6,11 @@
 #    --output-path mongo.h --template-path mongo.h.in \
 #    --check-path mongo_checks.py --log-path mongo.h.log
 import argparse
-import textwrap
 import inspect
-from typing import Dict
-import sys
 import os
+import sys
+import textwrap
+from typing import Dict
 
 
 def write_config_header(input_path: str, output_path: str, definitions: Dict[str, str]) -> None:

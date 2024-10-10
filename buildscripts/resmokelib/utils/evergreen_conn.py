@@ -3,15 +3,15 @@
 import os
 import pathlib
 from collections import deque
-from typing import Deque, Iterator, Optional, List, Set, Union
 from pathlib import Path
+from typing import Deque, Iterator, List, Optional, Set, Union
+
 import requests
 import structlog
 from requests import HTTPError
 
-from evergreen import RetryingEvergreenApi, Patch, Version, Task
-
 from buildscripts.resmokelib.setup_multiversion.config import SetupMultiversionConfig
+from evergreen import Patch, RetryingEvergreenApi, Task, Version
 
 EVERGREEN_HOST = "https://evergreen.mongodb.com"
 EVERGREEN_CONFIG_LOCATIONS = (

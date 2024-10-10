@@ -6,9 +6,9 @@ Python script to interface as a mock OCSP responder.
 import argparse
 import atexit
 import logging
-import time
-import sys
 import os
+import sys
+import time
 
 sys.path.append(os.path.join(os.getcwd(), "src", "third_party", "mock_ocsp_responder"))
 

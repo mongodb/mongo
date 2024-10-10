@@ -20,13 +20,14 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import json
-import SCons
 import itertools
-import shlex
-import sys
+import json
 import os
+import shlex
 import subprocess
+import sys
+
+import SCons
 
 # Implements the ability for SCons to emit a compilation database for the MongoDB project. See
 # http://clang.llvm.org/docs/JSONCompilationDatabase.html for details on what a compilation

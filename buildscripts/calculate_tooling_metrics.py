@@ -1,15 +1,14 @@
 import datetime
-import pkg_resources
-
-from pydantic import ValidationError
 
 import mongo_tooling_metrics.client as metrics_client
+import pkg_resources
+import pymongo
 from mongo_tooling_metrics.lib.top_level_metrics import (
     NinjaToolingMetrics,
     ResmokeToolingMetrics,
     SConsToolingMetrics,
 )
-import pymongo
+from pydantic import ValidationError
 
 # Check cluster connectivity
 try:

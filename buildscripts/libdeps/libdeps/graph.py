@@ -27,8 +27,8 @@ Libdeps Graph Enums.
 These are used for attributing data across the build scripts and analyzer scripts.
 """
 
-from enum import Enum, auto
 import json
+from enum import Enum, auto
 
 import networkx
 

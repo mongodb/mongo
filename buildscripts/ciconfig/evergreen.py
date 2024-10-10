@@ -17,7 +17,6 @@ from typing import Any, Dict, List, Optional, Set
 import structlog
 import yaml
 
-
 ENTERPRISE_MODULE_NAME = "enterprise"
 ASAN_SIGNATURE = "detect_leaks=1"
 

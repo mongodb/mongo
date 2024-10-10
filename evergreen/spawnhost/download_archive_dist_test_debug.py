@@ -1,8 +1,9 @@
 import collections
 import os
 import time
-import requests
 from urllib.request import urlretrieve
+
+import requests
 
 from buildscripts.resmokelib.utils import evergreen_conn
 

@@ -1,8 +1,8 @@
 """Fixture for executing JSTests against."""
 
+from buildscripts.resmokelib.testing.fixtures._builder import make_fixture
 from buildscripts.resmokelib.testing.fixtures.external import ExternalFixture as _ExternalFixture
 from buildscripts.resmokelib.testing.fixtures.interface import NoOpFixture as _NoOpFixture
-from buildscripts.resmokelib.testing.fixtures._builder import make_fixture
 from buildscripts.resmokelib.utils import autoloader as _autoloader
 
 EXTERNAL_FIXTURE_CLASS = _ExternalFixture.REGISTERED_NAME

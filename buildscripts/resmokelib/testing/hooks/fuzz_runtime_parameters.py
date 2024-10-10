@@ -2,17 +2,14 @@
 
 import copy
 import random
+import sys
 import threading
 import time
-import sys
-
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.mongo_fuzzer_configs import generate_normal_mongo_parameters
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
-from buildscripts.resmokelib.testing.fixtures import replicaset
-from buildscripts.resmokelib.testing.fixtures import shardedcluster
-from buildscripts.resmokelib.testing.fixtures import standalone
+from buildscripts.resmokelib.testing.fixtures import replicaset, shardedcluster, standalone
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 

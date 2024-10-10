@@ -6,13 +6,12 @@ import re
 import shutil
 import subprocess
 import sys
+
 import yaml
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import config, errors
 from buildscripts.resmokelib.core import redirect as redirect_lib
-from buildscripts.resmokelib.logging import buildlogger
-from buildscripts.resmokelib.logging import formatters
+from buildscripts.resmokelib.logging import buildlogger, formatters
 from buildscripts.resmokelib.logging.handlers import (
     BufferedFileHandler,
     ExceptionExtractionHandler,

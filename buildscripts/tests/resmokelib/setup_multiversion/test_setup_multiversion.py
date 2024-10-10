@@ -6,13 +6,13 @@ from argparse import Namespace
 import requests
 from mock import patch
 
-from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.resmokelib.setup_multiversion.config import SetupMultiversionConfig
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
     SetupMultiversion,
     _DownloadOptions,
     infer_platform,
 )
+from buildscripts.resmokelib.utils import evergreen_conn
 
 
 class TestInferPlatform(unittest.TestCase):

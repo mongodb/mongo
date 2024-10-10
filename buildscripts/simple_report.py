@@ -1,11 +1,12 @@
 """Given a test name, path to log file and exit code, generate/append an Evergreen report.json."""
 
 import json
-import pathlib
 import os
+import pathlib
 from typing import List
-from typing_extensions import TypedDict
+
 import click
+from typing_extensions import TypedDict
 
 
 class Result(TypedDict, total=False):

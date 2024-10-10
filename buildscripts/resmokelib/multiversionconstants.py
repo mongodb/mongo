@@ -1,21 +1,21 @@
 """FCV and Server binary version constants used for multiversion testing."""
 
+import http
 import os
 import shutil
 from subprocess import DEVNULL, STDOUT, CalledProcessError, call, check_output
-import http
+
 import requests
+import structlog
 from retry import retry
 
-import structlog
 import buildscripts.resmokelib.config as _config
-
 from buildscripts.resmokelib.multiversion.multiversion_service import (
+    MONGO_VERSION_YAML,
+    RELEASES_YAML,
     MongoReleases,
     MongoVersion,
     MultiversionService,
-    MONGO_VERSION_YAML,
-    RELEASES_YAML,
 )
 from buildscripts.resmokelib.multiversionsetupconstants import USE_EXISTING_RELEASES_FILE
 

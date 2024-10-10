@@ -4,10 +4,10 @@ import unittest
 
 from mock import patch
 from requests import HTTPError
-from evergreen import RetryingEvergreenApi
 
-from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.resmokelib.setup_multiversion.config import SetupMultiversionConfig
+from buildscripts.resmokelib.utils import evergreen_conn
+from evergreen import RetryingEvergreenApi
 
 
 class TestGetEvgApi(unittest.TestCase):

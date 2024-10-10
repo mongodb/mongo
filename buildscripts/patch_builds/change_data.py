@@ -2,7 +2,7 @@
 
 import os
 from itertools import chain
-from typing import Any, Dict, Iterable, Set, Optional, List
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 import structlog
 from git import DiffIndex, Repo

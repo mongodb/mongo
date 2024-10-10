@@ -29,20 +29,19 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from datetime import timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Union, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import requests
-
-from tenacity import wait_fixed, stop_after_delay, retry_if_result, Retrying
+from tenacity import Retrying, retry_if_result, stop_after_delay, wait_fixed
 
 sys.path.append(str(Path(os.getcwd(), __file__).parent.parent))
 
+from buildscripts.build_system_options import PathOptions  # pylint: disable=wrong-import-position
 from buildscripts.util.oauth import (
     Configs,
-    get_oauth_credentials,
     get_client_cred_oauth_credentials,
+    get_oauth_credentials,
 )  # pylint: disable=wrong-import-position
-from buildscripts.build_system_options import PathOptions  # pylint: disable=wrong-import-position
 
 SYMBOLIZER_PATH_ENV = "MONGOSYMB_SYMBOLIZER_PATH"
 # since older versions may have issues with symbolizing, we are setting the toolchain version to v4

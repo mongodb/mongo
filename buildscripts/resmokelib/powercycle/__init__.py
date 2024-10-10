@@ -14,12 +14,12 @@ from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.powercycle import powercycle, powercycle_config, powercycle_constants
 from buildscripts.resmokelib.powercycle.remote_hang_analyzer import RunHangAnalyzerOnRemoteInstance
 from buildscripts.resmokelib.powercycle.save_diagnostics import (
-    GatherRemoteEventLogs,
-    TarEC2Artifacts,
     CopyEC2Artifacts,
     CopyEC2MonitorFiles,
-    GatherRemoteMongoCoredumps,
     CopyRemoteMongoCoredumps,
+    GatherRemoteEventLogs,
+    GatherRemoteMongoCoredumps,
+    TarEC2Artifacts,
 )
 from buildscripts.resmokelib.powercycle.setup import SetUpEC2Instance
 

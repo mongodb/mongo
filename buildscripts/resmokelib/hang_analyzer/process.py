@@ -6,8 +6,8 @@ import signal
 import subprocess
 import sys
 import time
-from distutils import spawn
 from datetime import datetime
+from distutils import spawn
 
 import psutil
 
@@ -16,8 +16,8 @@ from buildscripts.resmokelib import core
 _IS_WINDOWS = sys.platform == "win32"
 
 if _IS_WINDOWS:
-    import win32event
     import win32api
+    import win32event
 
 PROCS_TIMEOUT_SECS = 60
 

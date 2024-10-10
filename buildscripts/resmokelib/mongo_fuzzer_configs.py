@@ -1,9 +1,10 @@
 """Generator functions for all parameters that we fuzz when invoked with --fuzzMongodConfigs."""
 
-import random
-import os
-import stat
 import json
+import os
+import random
+import stat
+
 from buildscripts.resmokelib import config, utils
 
 

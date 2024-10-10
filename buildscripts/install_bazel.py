@@ -2,11 +2,12 @@ import argparse
 import hashlib
 import os
 import platform
-from retry import retry
 import shutil
 import stat
 import sys
 import urllib.request
+
+from retry import retry
 
 _S3_HASH_MAPPING = {
     "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-ppc64le": "dd21c75817533ff601bf797e64f0eb2f7f6b813af26c829f0bda30e328caef46",

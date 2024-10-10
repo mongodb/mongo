@@ -27,16 +27,17 @@
 #
 """Configuration of data generation for CE accuracy testing."""
 
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Sequence
+
 import config
 from random_generator import (
-    RangeGenerator,
-    RandomDistribution,
     ArrayRandomDistribution,
     DataType,
     DistributionType,
+    RandomDistribution,
+    RangeGenerator,
 )
 
 __all__ = ["database_config", "data_generator_config"]

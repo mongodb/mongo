@@ -1,11 +1,11 @@
 """GDB commands for MongoDB."""
 
+import glob
 import json
 import os
 import re
-import sys
-import glob
 import subprocess
+import sys
 import warnings
 from pathlib import Path
 
@@ -85,8 +85,8 @@ def load_libstdcxx_printers(progspace):
         try:
             sys.path.insert(0, stdcxx_printer_toolchain_paths[progspace])
             global stdlib_printers  # pylint: disable=invalid-name,global-variable-not-assigned
-            from libstdcxx.v6 import register_libstdcxx_printers
             from libstdcxx.v6 import printers as stdlib_printers
+            from libstdcxx.v6 import register_libstdcxx_printers
 
             register_libstdcxx_printers(progspace)
             print(

@@ -1,6 +1,6 @@
+import re
 import subprocess
 import sys
-import re
 
 
 def findMongoCertsFromStore(store):

@@ -2,8 +2,9 @@
 
 import collections
 import copy
-from functools import cmp_to_key
 import textwrap
+from functools import cmp_to_key
+
 import yaml
 
 from buildscripts.resmokelib.utils import default_if_none

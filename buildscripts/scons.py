@@ -20,7 +20,7 @@ SITE_TOOLS_DIR = os.path.join(MONGODB_ROOT, "site_scons")
 sys.path = [SCONS_DIR, SITE_TOOLS_DIR] + sys.path
 
 # pylint: disable=C0413
-from mongo.pip_requirements import verify_requirements, MissingRequirements
+from mongo.pip_requirements import MissingRequirements, verify_requirements
 
 try:
     verify_requirements()

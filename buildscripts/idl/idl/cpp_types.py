@@ -27,13 +27,10 @@
 #
 """IDL C++ Code Generator."""
 
+import textwrap
 from abc import ABCMeta, abstractmethod
 
-import textwrap
-
-from . import bson
-from . import common
-from . import writer
+from . import bson, common, writer
 
 _STD_ARRAY_UINT8_16 = "std::array<std::uint8_t,16>"
 

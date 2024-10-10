@@ -28,8 +28,9 @@
 """Calibration configuration."""
 
 import random
+
 import config
-from random_generator import RangeGenerator, RandomDistribution, ArrayRandomDistribution, DataType
+from random_generator import ArrayRandomDistribution, DataType, RandomDistribution, RangeGenerator
 
 __all__ = ["main_config", "distributions"]
 

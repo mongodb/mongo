@@ -1,9 +1,9 @@
 """Filename globbing utility."""
 
+import functools
 import glob as _glob
 import os.path
 import re
-import functools
 
 _CONTAINS_GLOB_PATTERN = re.compile("[*?[]")
 

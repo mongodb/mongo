@@ -1,8 +1,8 @@
 """Unit tests for buildscripts/resmokelib/testing/hooks/fuzz_runtime_parameters.py."""
 
-import unittest
 import random
 import sys
+import unittest
 
 import mock
 

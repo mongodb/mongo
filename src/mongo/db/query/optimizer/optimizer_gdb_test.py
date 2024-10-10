@@ -1,8 +1,9 @@
 """Script to be invoked by GDB for testing optimizer pretty printers."""
 
-import gdb
-import string
 import difflib
+import string
+
+import gdb
 
 
 def output_diff(actual, expected):

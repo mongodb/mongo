@@ -2,23 +2,24 @@
 which case it is transitioned in/out of config shard mode.
 """
 
-import bson
 import os.path
-import time
-import threading
 import random
 import re
+import threading
+import time
+
+import bson
 import pymongo.errors
 
 from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
+from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
-from buildscripts.resmokelib.testing.fixtures import shardedcluster
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
-from buildscripts.resmokelib.testing.retry import retryable_codes as retryable_network_errs
 from buildscripts.resmokelib.testing.retry import (
     retryable_code_names as retryable_network_err_names,
 )
+from buildscripts.resmokelib.testing.retry import retryable_codes as retryable_network_errs
 
 # The possible number of seconds to wait before initiating a transition.
 TRANSITION_INTERVALS = [10]

@@ -8,11 +8,11 @@ from threading import Lock
 from typing import Dict, List
 
 import yaml
-from buildscripts.resmokelib.utils.external_suite import make_external
 
 import buildscripts.resmokelib.utils.filesystem as fs
+from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib import errors, utils
 from buildscripts.resmokelib.logging import loggers
-from buildscripts.resmokelib import config as _config, errors, utils
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
 from buildscripts.resmokelib.utils.dictionary import (
@@ -21,6 +21,7 @@ from buildscripts.resmokelib.utils.dictionary import (
     merge_dicts,
     set_dict_value,
 )
+from buildscripts.resmokelib.utils.external_suite import make_external
 
 SuiteName = str
 

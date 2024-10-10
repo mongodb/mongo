@@ -4,8 +4,6 @@
 # constructing a new Logger instance should use the loggers.new_logger() function instead.
 from logging import Logger  # noqa: F401
 
-from buildscripts.resmokelib.logging import buildlogger
-from buildscripts.resmokelib.logging import flush
-from buildscripts.resmokelib.logging import loggers
+from buildscripts.resmokelib.logging import buildlogger, flush, loggers
 
 __all__ = ["buildlogger", "flush", "loggers"]

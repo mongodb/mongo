@@ -1,19 +1,19 @@
+import glob
 import os
-import sys
 import shutil
 import subprocess
-import glob
+import sys
+import time
 from concurrent import futures
 from pathlib import Path
-import time
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
 # pylint: disable=wrong-import-position
-from buildscripts.linter.filediff import gather_changed_files_for_lint
 from buildscripts import simple_report
+from buildscripts.linter.filediff import gather_changed_files_for_lint
 
 # pylint: enable=wrong-import-position
 

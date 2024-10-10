@@ -1,12 +1,12 @@
-import pathlib
-import json
-import shutil
-import os
-import glob
-import subprocess
-import sys
 import argparse
 import concurrent.futures
+import glob
+import json
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
 
 parser = argparse.ArgumentParser(description="Run tests for the IWYU analysis script.")
 

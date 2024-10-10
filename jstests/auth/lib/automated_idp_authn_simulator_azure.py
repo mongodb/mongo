@@ -11,9 +11,9 @@ will simulate automatically logging in as a human would.
 import argparse
 import json
 import traceback
+from pathlib import Path
 
 import geckodriver_autoinstaller
-from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options

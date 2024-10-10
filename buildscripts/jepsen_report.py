@@ -1,16 +1,16 @@
 """Generate Evergreen reports from the Jepsen list-append workload."""
 
 import json
+import os
 import re
 import sys
-import os
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from typing_extensions import TypedDict
 import click
+from typing_extensions import TypedDict
 
-from buildscripts.simple_report import Result, Report
+from buildscripts.simple_report import Report, Result
 
 
 class ParserOutput(TypedDict):

@@ -28,16 +28,16 @@ import sys
 import time
 from timeit import default_timer as timer
 
-from jsonschema import validate
 import psutil
+from jsonschema import validate
 
-from .util import add_meta_data, get_build_metric_dict, CaptureAtexits
-from .memory import MemoryMonitor
-from .per_action_metrics import PerActionMetrics
 from .artifacts import CollectArtifacts
-from .scons import SConsStats
 from .cache_dir import CacheDirCollector, CacheDirValidateWithMetrics
 from .libdeps import LibdepsCollector
+from .memory import MemoryMonitor
+from .per_action_metrics import PerActionMetrics
+from .scons import SConsStats
+from .util import CaptureAtexits, add_meta_data, get_build_metric_dict
 
 _SEC_TO_NANOSEC_FACTOR = 1000000000.0
 _METRICS_COLLECTORS = []

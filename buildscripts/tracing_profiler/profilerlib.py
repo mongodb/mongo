@@ -1,6 +1,6 @@
+import json
 from dataclasses import dataclass
 from typing import Dict
-import json
 
 
 @dataclass

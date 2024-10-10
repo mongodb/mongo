@@ -1,6 +1,7 @@
 """Script that activates the input task on the same variant as the running task"""
 
 import typer
+
 from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.util.read_config import read_config_file
 

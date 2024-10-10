@@ -10,15 +10,15 @@ import argparse
 import binascii
 import os
 import random
+import re
+import shutil
 import subprocess
 import tempfile
 from typing import Any, Dict
-import yaml
-import OpenSSL
-import re
-import shutil
 
 import mkdigest
+import OpenSSL
+import yaml
 
 # pylint: disable=protected-access
 try:

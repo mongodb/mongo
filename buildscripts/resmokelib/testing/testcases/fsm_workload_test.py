@@ -2,12 +2,12 @@
 
 import hashlib
 import threading
-from typing import Optional
 import uuid
+from typing import Optional
 
+from buildscripts.resmokelib import logging, utils
 from buildscripts.resmokelib.testing.testcases import interface, jsrunnerfile, jstest
 from buildscripts.resmokelib.utils import registry
-from buildscripts.resmokelib import utils, logging
 
 
 class _SingleFSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):

@@ -45,11 +45,11 @@ if __package__ is None:
     import sys
 
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    from context import idl
     import testcase
+    from context import idl
 else:
-    from .context import idl
     from . import testcase
+    from .context import idl
 
 
 class TestGenerator(testcase.IDLTestcase):

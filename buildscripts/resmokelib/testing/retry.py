@@ -1,5 +1,6 @@
 import time
-from pymongo.errors import PyMongoError, ConnectionFailure, OperationFailure, ExecutionTimeout
+
+from pymongo.errors import ConnectionFailure, ExecutionTimeout, OperationFailure, PyMongoError
 
 # TODO(DRIVERS-1401): Use error labels instead of checking against an allow list of error codes.
 retryable_codes = [

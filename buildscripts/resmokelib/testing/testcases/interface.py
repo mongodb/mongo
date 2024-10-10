@@ -6,11 +6,10 @@ This is used to perform the actual test case.
 import glob
 import os
 import os.path
+import timeit
 import unittest
 import uuid
-import timeit
-
-from typing import Any, Dict, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.utils import registry

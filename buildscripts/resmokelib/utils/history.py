@@ -1,17 +1,17 @@
 """Contains classes and methods for tracking historic state."""
 
+import copy
+import traceback
+import typing
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import MutableMapping
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
-import traceback
-import typing
-import copy
+
 import yaml
 
-from buildscripts.resmokelib.utils import default_if_none, load_yaml, load_yaml_file
-from buildscripts.resmokelib.utils import registry
+from buildscripts.resmokelib.utils import default_if_none, load_yaml, load_yaml_file, registry
 
 # How large of a stack to take for each location.
 STACK_LIMIT = 3

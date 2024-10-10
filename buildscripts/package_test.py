@@ -5,14 +5,12 @@ import logging
 import os
 import platform
 import re
+import subprocess
 import sys
+import tarfile
 import time
 import traceback
 import uuid
-import requests
-import tarfile
-import subprocess
-
 from concurrent import futures
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Set, Tuple
@@ -20,11 +18,9 @@ from typing import Any, Dict, Generator, List, Optional, Set, Tuple
 import docker
 import docker.errors
 import requests
-
 from docker.client import DockerClient
 from docker.models.containers import Container
 from docker.models.images import Image
-
 from simple_report import Report, Result
 
 root = logging.getLogger()

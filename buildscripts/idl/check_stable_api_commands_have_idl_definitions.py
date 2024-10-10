@@ -44,11 +44,13 @@ sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), "../../
 
 # pylint: disable=wrong-import-position
 from idl import syntax
+
 from buildscripts.idl.lib import list_idls, parse_idl
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
+
 # pylint: enable=wrong-import-position
 
 LOGGER_NAME = "check-idl-definitions"

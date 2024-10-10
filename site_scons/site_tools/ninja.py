@@ -21,15 +21,14 @@
 #
 """Generate build.ninja files from SCons aliases."""
 
-import sys
-import os
 import importlib
 import io
-import shutil
+import os
 import shlex
+import shutil
+import sys
 import tempfile
 import textwrap
-
 from collections import OrderedDict
 from glob import glob
 from os.path import join as joinpath
@@ -37,8 +36,8 @@ from os.path import splitext
 
 import SCons
 from SCons.Action import _string_from_cmd_list, get_default_ENV
-from SCons.Util import is_List, flatten_sequence
 from SCons.Script import COMMAND_LINE_TARGETS
+from SCons.Util import flatten_sequence, is_List
 
 NINJA_STATE = None
 NINJA_SYNTAX = "NINJA_SYNTAX"

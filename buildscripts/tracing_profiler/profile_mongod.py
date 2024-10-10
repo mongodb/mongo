@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
-from threading import Event
 import json
 import signal
 import subprocess
 import sys
+from threading import Event
+
 from profilerlib import CallMetrics
 
 

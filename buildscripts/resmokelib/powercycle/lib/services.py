@@ -5,8 +5,8 @@ import os
 import sys
 import time
 
-from buildscripts.resmokelib.powercycle.lib.process_control import ProcessControl
 from buildscripts.resmokelib.powercycle.lib import execute_cmd
+from buildscripts.resmokelib.powercycle.lib.process_control import ProcessControl
 
 _IS_WINDOWS = sys.platform in ["win32", "cygwin"]
 
