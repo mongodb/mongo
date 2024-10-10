@@ -1231,6 +1231,37 @@ env.Benchmark(
     ],
 )
 
+env.Library(
+    target="service_entry_point_test_fixture",
+    source=[
+        "service_entry_point_test_fixture.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/util/clock_source_mock",
+        "read_write_concern_defaults_mock",
+        "service_context_test_fixture",
+    ],
+)
+
+env.CppUnitTest(
+    target="service_entry_point_shard_role_test",
+    source=[
+        "service_entry_point_shard_role_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/rpc/client_metadata",
+        "$BUILD_DIR/mongo/transport/message_compressor",
+        "$BUILD_DIR/mongo/transport/transport_layer_mock",
+        "auth/authserver",
+        "repl/hello_command",
+        "repl/replmocks",
+        "service_context_d",
+        "service_entry_point_test_fixture",
+        "storage/wiredtiger/storage_wiredtiger",
+        "vector_clock_mongod",
+    ],
+)
+
 env.Benchmark(
     target="service_entry_point_shard_role_bm",
     source=[

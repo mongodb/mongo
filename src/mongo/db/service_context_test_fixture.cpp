@@ -86,9 +86,10 @@ ServiceContextTest::ServiceContextTest()
     : ServiceContextTest{std::make_unique<ScopedGlobalServiceContextForTest>()} {}
 
 ServiceContextTest::ServiceContextTest(
-    std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext)
+    std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext,
+    std::shared_ptr<transport::Session> session)
     : _scopedServiceContext(std::move(scopedServiceContext)),
-      _threadClient(_scopedServiceContext->getService()) {}
+      _threadClient(_scopedServiceContext->getService(), session) {}
 
 ServiceContextTest::~ServiceContextTest() = default;
 

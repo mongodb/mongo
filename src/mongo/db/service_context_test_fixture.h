@@ -112,7 +112,8 @@ public:
 protected:
     ServiceContextTest();
     explicit ServiceContextTest(
-        std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext);
+        std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext,
+        std::shared_ptr<transport::Session> session = nullptr);
     ~ServiceContextTest() override;
 
     ScopedGlobalServiceContextForTest* scopedServiceContext() const {
