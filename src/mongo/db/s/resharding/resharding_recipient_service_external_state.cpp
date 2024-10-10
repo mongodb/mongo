@@ -156,14 +156,19 @@ ShardId RecipientStateMachineExternalStateImpl::myShardId(ServiceContext* servic
 void RecipientStateMachineExternalStateImpl::refreshCatalogCache(OperationContext* opCtx,
                                                                  const NamespaceString& nss) {
     uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getTrackedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss));
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 }
 
 CollectionRoutingInfo RecipientStateMachineExternalStateImpl::getTrackedCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss) {
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return catalogCache->getTrackedCollectionRoutingInfo(opCtx, nss);
+    const auto cri =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Expected collection " << nss.toStringForErrorMsg()
+                          << " to be tracked",
+            cri.cm.hasRoutingTable());
+    return cri;
 }
 
 MigrationDestinationManager::CollectionOptionsAndUUID

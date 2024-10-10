@@ -696,7 +696,8 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
                             1))
             .value;
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "collection " << nss.toStringForErrorMsg() << " not found",
+            str::stream() << "Collection '" << nss.toStringForErrorMsg()
+                          << "' not found in cluster catalog",
             !collDoc.empty());
 
     return CollectionType(collDoc[0]);

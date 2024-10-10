@@ -161,18 +161,6 @@ NamespaceString constructTemporaryReshardingNss(const NamespaceString& nss,
         SerializationContext::stateDefault());
 }
 
-std::set<ShardId> getRecipientShards(OperationContext* opCtx,
-                                     const NamespaceString& sourceNss,
-                                     const UUID& reshardingUUID) {
-    const auto& tempNss = constructTemporaryReshardingNss(sourceNss, reshardingUUID);
-    auto* catalogCache = Grid::get(opCtx)->catalogCache();
-    auto [cm, _] = catalogCache->getTrackedCollectionRoutingInfo(opCtx, tempNss);
-
-    std::set<ShardId> recipients;
-    cm.getAllShardIds(&recipients);
-    return recipients;
-}
-
 void checkForHolesAndOverlapsInChunks(std::vector<ReshardedChunk>& chunks,
                                       const KeyPattern& keyPattern) {
     std::sort(chunks.begin(), chunks.end(), [](const ReshardedChunk& a, const ReshardedChunk& b) {

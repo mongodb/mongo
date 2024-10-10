@@ -531,8 +531,7 @@ std::vector<BSONObj> ValidationBehaviorsReshardingBulkIndex::loadIndexes(
     if (!grid->isInitialized() || !grid->catalogCache()) {
         return std::vector<BSONObj>();
     }
-    auto catalogCache = grid->catalogCache();
-    auto cri = catalogCache->getTrackedCollectionRoutingInfo(_opCtx, nss);
+    auto cri = uassertStatusOK(grid->catalogCache()->getCollectionRoutingInfo(_opCtx, nss));
     auto [indexSpecs, _] = MigrationDestinationManager::getCollectionIndexes(
         _opCtx, nss, cri.cm.getMinKeyShardIdWithSimpleCollation(), cri, _cloneTimestamp);
     return indexSpecs;
@@ -541,8 +540,8 @@ std::vector<BSONObj> ValidationBehaviorsReshardingBulkIndex::loadIndexes(
 void ValidationBehaviorsReshardingBulkIndex::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
     invariant(_opCtx);
-    auto catalogCache = Grid::get(_opCtx)->catalogCache();
-    auto cri = catalogCache->getTrackedCollectionRoutingInfo(_opCtx, nss);
+    auto cri =
+        uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(_opCtx, nss));
     auto shard = uassertStatusOK(Grid::get(_opCtx)->shardRegistry()->getShard(
         _opCtx, cri.cm.getMinKeyShardIdWithSimpleCollation()));
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(shard->runCommand(

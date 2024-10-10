@@ -230,8 +230,8 @@ public:
     /**
      * Blocking method to retrieve refreshed collection placement information (ChunkManager).
      */
-    StatusWith<ChunkManager> getCollectionPlacementInfoWithRefresh(OperationContext* opCtx,
-                                                                   const NamespaceString& nss);
+    virtual StatusWith<ChunkManager> getCollectionPlacementInfoWithRefresh(
+        OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Blocking method to get the refreshed index information for a given collection.

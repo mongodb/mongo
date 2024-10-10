@@ -130,12 +130,14 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                                            .expectedUUID(_doc.getCollectionUUID())};
             }
 
-            const auto cmOld =
-                uassertStatusOK(
-                    Grid::get(opCtx)
-                        ->catalogCache()
-                        ->getTrackedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss()))
-                    .cm;
+            const auto cmOld = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx,
+                                                                                        nss()));
+
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Collection '" << nss().toStringForErrorMsg()
+                                  << "' not found in cluster catalog",
+                    cmOld.hasRoutingTable());
 
             StateDoc newDoc(_doc);
             newDoc.setOldShardKey(cmOld.getShardKeyPattern().getKeyPattern().toBSON());
@@ -207,12 +209,12 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 uassert(ErrorCodes::NamespaceNotFound,
                         str::stream()
                             << "MoveCollection can only be called on an unsharded collection.",
-                        !cmOld.isSharded() && cmOld.hasRoutingTable());
+                        !cmOld.isSharded());
             } else if (provenance && provenance.get() == ProvenanceEnum::kUnshardCollection) {
                 // If the collection is already unsharded, this request should be a no-op. Check
                 // that the user didn't specify a "to" shard other than the shard the collection
                 // lives on - if it is different, return an error.
-                if (!cmOld.isSharded() && cmOld.hasRoutingTable()) {
+                if (!cmOld.isSharded()) {
                     if (_doc.getShardDistribution()) {
                         std::set<ShardId> currentShards;
                         cmOld.getAllShardIds(&currentShards);

@@ -277,13 +277,6 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
 NamespaceString constructTemporaryReshardingNss(const NamespaceString& nss, const UUID& sourceUuid);
 
 /**
- * Gets the recipient shards for a resharding operation.
- */
-std::set<ShardId> getRecipientShards(OperationContext* opCtx,
-                                     const NamespaceString& reshardNss,
-                                     const UUID& reshardingUUID);
-
-/**
  * Asserts that there is not a hole or overlap in the chunks.
  */
 void checkForHolesAndOverlapsInChunks(std::vector<ReshardedChunk>& chunks,

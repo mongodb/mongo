@@ -1192,8 +1192,8 @@ ReshardingCoordinatorExternalState::ParticipantShardsAndChunks
 ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
 
-    const auto [cm, _] = uassertStatusOK(
-        RoutingInformationCache::get(opCtx)->getTrackedCollectionRoutingInfoWithPlacementRefresh(
+    const auto cm =
+        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(
             opCtx, coordinatorDoc.getSourceNss()));
 
     std::set<ShardId> donorShardIds;
@@ -2537,9 +2537,9 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
         std::set<ShardId> collectionPlacement;
         std::vector<ShardId> collectionPlacementAsVector;
 
-        const auto [cm, _] =
+        const auto cm =
             uassertStatusOK(RoutingInformationCache::get(opCtx.get())
-                                ->getTrackedCollectionRoutingInfoWithPlacementRefresh(
+                                ->getCollectionPlacementInfoWithRefresh(
                                     opCtx.get(), coordinatorDoc.getTempReshardingNss()));
 
         cm.getAllShardIds(&collectionPlacement);
@@ -2803,9 +2803,8 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
     auto opCtx = cancellableOpCtx.get();
 
     try {
-        auto [routingInfo, _] =
-            uassertStatusOK(RoutingInformationCache::get(opCtx)
-                                ->getTrackedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
+        const auto routingInfo = uassertStatusOK(
+            RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
         const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
         const auto collectionZones =

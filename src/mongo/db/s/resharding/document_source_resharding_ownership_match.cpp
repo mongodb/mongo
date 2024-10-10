@@ -143,10 +143,8 @@ DocumentSource::GetNextResult DocumentSourceReshardingOwnershipMatch::doGetNext(
         auto tempNss = _temporaryReshardingNamespace
             ? _temporaryReshardingNamespace.value()
             : resharding::constructTemporaryReshardingNss(pExpCtx->ns, *pExpCtx->uuid);
-        _tempReshardingChunkMgr =
-            uassertStatusOK(catalogCache->getTrackedCollectionRoutingInfoWithPlacementRefresh(
-                                pExpCtx->opCtx, tempNss))
-                .cm;
+        _tempReshardingChunkMgr = uassertStatusOK(
+            catalogCache->getCollectionPlacementInfoWithRefresh(pExpCtx->opCtx, tempNss));
     }
 
     auto nextInput = pSource->getNext();

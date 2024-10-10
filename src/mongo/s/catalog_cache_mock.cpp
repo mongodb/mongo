@@ -70,6 +70,18 @@ StatusWith<CollectionRoutingInfo> CatalogCacheMock::getCollectionRoutingInfo(
                                   nss.toStringForErrorMsg()));
     }
 }
+StatusWith<ChunkManager> CatalogCacheMock::getCollectionPlacementInfoWithRefresh(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    const auto it = _collectionCache.find(nss);
+    if (it != _collectionCache.end()) {
+        return it->second.cm;
+    } else {
+        return Status(
+            ErrorCodes::InternalError,
+            fmt::format("CatalogCacheMock: No mocked ChunkManager value for collection '{}'",
+                        nss.toStringForErrorMsg()));
+    }
+}
 
 void CatalogCacheMock::setDatabaseReturnValue(const DatabaseName& dbName,
                                               CachedDatabaseInfo databaseInfo) {
