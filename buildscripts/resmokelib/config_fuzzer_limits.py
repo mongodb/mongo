@@ -73,10 +73,10 @@ config_fuzzer_params = {
         "disableLogicalSessionCacheRefresh": {"choices": [True, False], "fuzz_at": ["startup"]},
         "enableAutoCompaction": {"choices": [True, False], "fuzz_at": ["startup"]},
         "ingressAdmissionControllerTicketPoolSize": {
-            "choices": [1_000, 10_000, 100_000, 1_000_000],
-            "lower_bound": 1_000,
+            "choices": [100, 1_000, 10_000, 100_000, 1_000_000],
+            "lower_bound": 100,
             "upper_bound": 1_000_000,
-            "min": 1_000,
+            "min": 100,
             "max": 1_000_000,
             "isRandomizedChoice": True,
             "period": 5,
