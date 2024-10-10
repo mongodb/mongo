@@ -747,32 +747,13 @@ def prefetch_toolchain(env):
         os.makedirs(bazel_bin_dir)
     Globals.bazel_executable = install_bazel(bazel_bin_dir)
     if platform.system() == "Linux" and not ARGUMENTS.get("CC") and not ARGUMENTS.get("CXX"):
-        exec_root = ""
-
-        try:
-            results = retry_call(
-                subprocess.run,
-                [[Globals.bazel_executable, "info"]],
-                fkwargs={"capture_output": True, "text": True},
-                tries=Globals.max_retry_attempts,
-                exceptions=(subprocess.CalledProcessError,),
-            )
-        except subprocess.CalledProcessError as ex:
-            print("ERROR: Finding bazel exec root.")
-            print(ex)
-            print("Please ask about this in #ask-devprod-build slack channel.")
-            sys.exit(1)
-
-        output_base_str = "output_base: "
-        for line in results.stdout.split("\n"):
-            if line.startswith(output_base_str):
-                exec_root = line[len(output_base_str) :].strip()
+        exec_root = f'bazel-{os.path.basename(env.Dir("#").abspath)}'
         if exec_root and not os.path.exists(f"{exec_root}/external/mongo_toolchain"):
             print("Prefetch the mongo toolchain...")
             try:
-                results = retry_call(
+                retry_call(
                     subprocess.run,
-                    [[Globals.bazel_executable, "fetch", "@mongo_toolchain"]],
+                    [[Globals.bazel_executable, "build", "@mongo_toolchain"]],
                     tries=Globals.max_retry_attempts,
                     exceptions=(subprocess.CalledProcessError,),
                 )
@@ -781,6 +762,7 @@ def prefetch_toolchain(env):
                 print(ex)
                 print("Please ask about this in #ask-devprod-build slack channel.")
                 sys.exit(1)
+
         return exec_root
 
 

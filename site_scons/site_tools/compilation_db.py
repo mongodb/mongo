@@ -160,7 +160,10 @@ def CompilationDbEntryAction(target, source, env, **kw):
 
     tool_abspaths = []
     for tool in tool_list:
-        tool_abspaths.append('"' + env.WhereIs(tool) + '"')
+        tool_abspath = env.WhereIs(tool)
+        if tool_abspath is None:
+            tool_abspath = os.path.abspath(str(tool))
+        tool_abspaths.append('"' + tool_abspath + '"')
     cmd_list = tool_abspaths + cmd_list
 
     entry = {

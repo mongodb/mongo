@@ -110,8 +110,13 @@ def generate(env):
     # Make CC and CXX absolute paths too. This ensures the correct paths to
     # compilers get passed to icecc-create-env rather than letting it
     # potentially discover something we don't expect via PATH.
-    env["CC"] = env.WhereIs("$CC")
-    env["CXX"] = env.WhereIs("$CXX")
+    cc_path = env.WhereIs("$CC")
+    cxx_path = env.WhereIs("$CXX")
+
+    if cc_path is None:
+        env["CC"] = os.path.abspath(env["CC"])
+    if cxx_path is None:
+        env["CXX"] = os.path.abspath(env["CXX"])
 
     # Set up defaults for configuration options
     env["ICECREAM_TARGET_DIR"] = env.Dir(
@@ -180,6 +185,8 @@ def generate(env):
         setupEnv["ICECC_VERSION_ID"] = "user_provided." + icecc_version_file.name
 
     else:
+        print(setupEnv.get("CC"))
+        print(setupEnv.subst("${CC}"))
         setupEnv["ICECC_COMPILER_TYPE"] = setupEnv.get(
             "ICECC_COMPILER_TYPE",
             os.path.basename(setupEnv.WhereIs("${CC}")),
