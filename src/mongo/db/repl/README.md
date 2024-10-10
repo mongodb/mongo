@@ -1678,7 +1678,6 @@ applies all oplog entries through the end of the sync source's oplog. See the
 [Startup Recovery](#startup-recovery) section for more information on truncating the oplog and
 applying oplog entries.
 
-Then, we rebuild in-memory structures such as [tenant migration access blockers](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rollback_impl.cpp#L652).
 The last thing we do before exiting the data modification section is
 [reconstruct prepared transactions](#recovering-prepared-transactions). We must also restore their
 in-memory state to what it was prior to the rollback in order to fulfill the durability guarantees

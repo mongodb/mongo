@@ -205,7 +205,7 @@ Note that this feature was backported to 4.0, 4.2, 4.4 and 5.0. Released binarie
 capability can be turned on by [setting the `storeFindAndModifyImagesInSideCollection` server
 parameter](https://github.com/mongodb/mongo/blob/2ac9fd6e613332f02636c6a7ec7f6cff4a8d05ab/src/mongo/db/repl/repl_server_parameters.idl#L506-L512).
 
-Partial cloning mechanisms such as chunk migrations, tenant migrations and resharding all support
+Partial cloning mechanisms such as chunk migrations and resharding all support
 the destination picking up the responsibility for satisfying a retryable write the source had
 originally processed (to some degree). These cloning mechanisms naturally tail the oplog to pick up
 on changes. Because the traditional retryable findAndModify algorithm places the images into the
@@ -215,7 +215,7 @@ findAndModify.
 For retry images saved in the image collection, the source will "downconvert" oplog entries with
 `needsRetryImage: true` into two oplog entries, simulating the old format. As chunk migrations use
 internal commands, [this downconverting procedure](https://github.com/mongodb/mongo/blob/0beb0cacfcaf7b24259207862e1d0d489e1c16f1/src/mongo/db/s/session_catalog_migration_source.cpp#L58-L97)
-is installed under the hood. For resharding and tenant migrations, a new aggregation stage,
+is installed under the hood. For resharding, a new aggregation stage,
 [\_internalFindAndModifyImageLookup](https://github.com/mongodb/mongo/blob/e27dfa10b994f6deff7c59a122b87771cdfa8aba/src/mongo/db/pipeline/document_source_find_and_modify_image_lookup.cpp#L61),
 was introduced to perform the identical substitution. In order for this stage to have a valid timestamp
 to assign to the forged no-op oplog entry as result of the "downconvert", we must always assign an
@@ -229,9 +229,9 @@ scenarios, along with the timestamps that are reserved and the oplog entries ass
 those timestamps:
 | Parameters | NumSlotsReserved | TS - 1 | TS | Oplog fields for entry with timestamp: TS |
 | --- | --- | --- | --- | --- |
-| Update, NeedsRetryImage=preImage | 2 | Reserved for forged no-op entry eventually used by tenant migrations/resharding|Update oplog entry|NeedsRetryImage: preImage |
-| Update, NeedsRetryImage=postImage | 2 | Reserved for forged no-op entry eventually used by tenant migrations/resharding|Update oplog entry | NeedsRetryImage: postImage |
-|Delete, NeedsRetryImage=preImage |2|Reserved for forged no-op entry eventually used by tenant migrations/resharding|Delete oplog entry|NeedsRetryImage: preImage|
+| Update, NeedsRetryImage=preImage | 2 | Reserved for forged no-op entry eventually used by resharding|Update oplog entry|NeedsRetryImage: preImage |
+| Update, NeedsRetryImage=postImage | 2 | Reserved for forged no-op entry eventually used by resharding|Update oplog entry | NeedsRetryImage: postImage |
+|Delete, NeedsRetryImage=preImage |2|Reserved for forged no-op entry eventually used by resharding|Delete oplog entry|NeedsRetryImage: preImage|
 
 #### Code references
 
