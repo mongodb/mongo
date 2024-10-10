@@ -202,6 +202,11 @@ private:
     void postStage() final;
 
     /**
+     * Stage function that runs the collStats command on the collection.
+     */
+    AfterStageBehavior collStatsStage();
+
+    /**
      * Stage function that counts the number of documents in the collection on the source in order
      * to generate progress information.
      */
@@ -271,6 +276,7 @@ private:
     // The size of the batches of documents returned in collection cloning.
     int _collectionClonerBatchSize;  // (R)
 
+    CollectionClonerStage _collStatsStage;                               // (R)
     CollectionClonerStage _countStage;                                   // (R)
     CollectionClonerStage _listIndexesStage;                             // (R)
     CollectionClonerStage _createCollectionStage;                        // (R)
