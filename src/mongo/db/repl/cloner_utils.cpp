@@ -70,10 +70,6 @@ BSONObj ClonerUtils::buildMajorityWaitRequest(Timestamp operationTime) {
 bool ClonerUtils::isDatabaseForTenant(const DatabaseName& db,
                                       const boost::optional<TenantId>& tenant,
                                       MigrationProtocolEnum protocol) {
-    if (!tenant) {
-        return protocol == MigrationProtocolEnum::kShardMerge;
-    }
-
     if (auto tenantId = db.tenantId()) {
         return tenantId == *tenant;
     }

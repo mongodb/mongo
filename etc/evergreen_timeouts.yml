@@ -155,12 +155,6 @@ overrides:
       exec_timeout: 600 # 10 hours
     - task: update_timeseries_fuzzer
       exec_timeout: 600 # 10 hours
-    - task: shard_merge_jscore_passthrough
-      exec_timeout: 240 # 4 hours
-    - task: shard_merge_causally_consistent_jscore_passthrough
-      exec_timeout: 240 # 4 hours
-    - task: shard_merge_multi_stmt_txn_jscore_passthrough
-      exec_timeout: 240 # 4 hours
     - task: read_concern_linearizable_passthrough
       exec_timeout: 270 # 4.5 hours
     - task: sharding

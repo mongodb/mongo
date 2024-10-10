@@ -1473,7 +1473,6 @@ mongo_cc_library(
     name = "tenant_migration_utils",
     srcs = [
         "tenant_migration_recipient_entry_helpers.cpp",
-        "tenant_migration_shard_merge_util.cpp",
         "tenant_migration_util.cpp",
     ],
     hdrs = [

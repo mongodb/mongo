@@ -50,7 +50,6 @@ inline constexpr StringData kMigrationIdFieldName = "migrationId"_sd;
 inline constexpr StringData kBackupIdFieldName = "backupId"_sd;
 inline constexpr StringData kDonorHostNameFieldName = "donorHostName"_sd;
 inline constexpr StringData kDonorDbPathFieldName = "dbpath"_sd;
-inline constexpr StringData kMovingFilesMarker = ".shardMergeMovingFiles"_sd;
 inline constexpr StringData kTableExtension = ".wt"_sd;
 
 // Keep the backup cursor alive by pinging twice as often as the donor's default

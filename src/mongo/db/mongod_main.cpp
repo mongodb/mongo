@@ -161,8 +161,6 @@
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery.h"
-#include "mongo/db/repl/shard_merge_recipient_op_observer.h"
-#include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
@@ -445,7 +443,6 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     if (getGlobalReplSettings().isServerless()) {
         services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
         services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
-        services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
     }
 
     if (change_stream_serverless_helpers::canInitializeServices()) {
@@ -1482,8 +1479,6 @@ void setUpObservers(ServiceContext* serviceContext) {
                 std::make_unique<repl::TenantMigrationDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-            opObserverRegistry->addObserver(
-                std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
         if (!gMultitenancySupport) {
             opObserverRegistry->addObserver(
@@ -1511,8 +1506,6 @@ void setUpObservers(ServiceContext* serviceContext) {
                 std::make_unique<repl::TenantMigrationDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-            opObserverRegistry->addObserver(
-                std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
 
         auto replCoord = repl::ReplicationCoordinator::get(serviceContext);

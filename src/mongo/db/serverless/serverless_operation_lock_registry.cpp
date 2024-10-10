@@ -162,28 +162,6 @@ void ServerlessOperationLockRegistry::recoverLocks(OperationContext* opCtx) {
 
         return true;
     });
-
-    PersistentTaskStore<ShardMergeRecipientDocument> mergeRecipientStore(
-        NamespaceString::kShardMergeRecipientsNamespace);
-    mergeRecipientStore.forEach(opCtx, {}, [&](const ShardMergeRecipientDocument& doc) {
-        // Do not acquire locks for following cases. Otherwise, we can get into potential race
-        // causing recovery procedure to fail with `ErrorCodes::ConflictingServerlessOperation`.
-        // 1) The migration was skipped.
-        if (doc.getStartGarbageCollect()) {
-            invariant(doc.getState() == ShardMergeRecipientStateEnum::kAborted ||
-                      doc.getState() == ShardMergeRecipientStateEnum::kCommitted);
-            return true;
-        }
-        // 2) State doc marked as garbage collectable.
-        if (doc.getExpireAt()) {
-            return true;
-        }
-
-        registry.acquireLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
-                             doc.getId());
-
-        return true;
-    });
 }
 
 const std::string kOperationLockFieldName = "operationLock";

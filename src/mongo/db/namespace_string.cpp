@@ -148,9 +148,6 @@ bool NamespaceString::isLegalClientSystemNS() const {
  * Process updates to 'admin.system.version' individually as well so the secondary's FCV when
  * processing each operation matches the primary's when committing that operation.
  *
- * Process updates to 'config.shardMergeRecipients' individually so they serialize after
- * inserts into 'config.donatedFiles.<migrationId>'.
- *
  * Oplog entries on 'config.shards' should be processed one at a time, otherwise the in-memory state
  * that its kept on the TopologyTimeTicker might be wrong.
  *
@@ -162,7 +159,7 @@ bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
     return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection() ||
         ns == kDonorReshardingOperationsNamespace.ns() ||
         ns == kForceOplogBatchBoundaryNamespace.ns() ||
-        ns == kTenantMigrationDonorsNamespace.ns() || ns == kShardMergeRecipientsNamespace.ns() ||
+        ns == kTenantMigrationDonorsNamespace.ns() ||
         ns == kTenantMigrationRecipientsNamespace.ns() || ns == kConfigsvrShardsNamespace.ns();
 }
 

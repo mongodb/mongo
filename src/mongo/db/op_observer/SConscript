@@ -14,7 +14,6 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/auth/authserver",
         "$BUILD_DIR/mongo/db/repl/primary_only_service",
         "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/repl/shard_merge_recipient_service",
         "$BUILD_DIR/mongo/db/repl/tenant_migration_donor_service",
         "$BUILD_DIR/mongo/db/repl/tenant_migration_recipient_service",
         "$BUILD_DIR/mongo/db/s/sharding_runtime_d",

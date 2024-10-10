@@ -96,7 +96,6 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
@@ -1641,12 +1640,6 @@ private:
                 ->lookupServiceByName(
                     repl::TenantMigrationRecipientService::kTenantMigrationRecipientServiceName));
         recipientService->abortAllMigrations(opCtx);
-
-        auto mergeRecipientService = checked_cast<repl::ShardMergeRecipientService*>(
-            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                ->lookupServiceByName(
-                    repl::ShardMergeRecipientService::kShardMergeRecipientServiceName));
-        mergeRecipientService->abortAllMigrations(opCtx);
     }
 
     /**

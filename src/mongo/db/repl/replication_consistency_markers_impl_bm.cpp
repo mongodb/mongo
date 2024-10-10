@@ -46,7 +46,6 @@
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/shard_merge_recipient_op_observer.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -170,8 +169,6 @@ void setUpObservers(ServiceContext* serviceContext, ClusterRole clusterRole, boo
                 std::make_unique<repl::TenantMigrationDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-            opObserverRegistry->addObserver(
-                std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
         if (!gMultitenancySupport) {
             opObserverRegistry->addObserver(
@@ -199,8 +196,6 @@ void setUpObservers(ServiceContext* serviceContext, ClusterRole clusterRole, boo
                 std::make_unique<repl::TenantMigrationDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-            opObserverRegistry->addObserver(
-                std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
         if (!gMultitenancySupport) {
             opObserverRegistry->addObserver(

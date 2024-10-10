@@ -196,7 +196,7 @@ public:
 
     /** Returns true if we should retry sending SyncData given the error */
     bool recordAndEvaluateRetry(Status status) override {
-        if (_protocol == MigrationProtocolEnum::kShardMerge || status.isOK()) {
+        if (status.isOK()) {
             return false;
         }
         auto underlyingError = async_rpc::unpackRPCStatusIgnoringWriteConcernAndWriteErrors(status);
@@ -270,7 +270,6 @@ void TenantMigrationDonorService::checkIfConflictsWithOtherInstances(
     BSONObj initialState,
     const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
     auto stateDoc = tenant_migration_access_blocker::parseDonorStateDocument(initialState);
-    auto isNewShardMerge = stateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge;
 
     for (auto& instance : existingInstances) {
         auto existingTypedInstance =
@@ -282,13 +281,12 @@ void TenantMigrationDonorService::checkIfConflictsWithOtherInstances(
 
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Cannot start a shard merge with existing migrations in progress",
-                !isNewShardMerge || existingIsAborted);
+                existingIsAborted);
 
         uassert(
             ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Cannot start a migration with an existing shard merge in progress",
-            existingTypedInstance->getProtocol() != MigrationProtocolEnum::kShardMerge ||
-                existingIsAborted);
+            existingIsAborted);
 
         // Any existing migration for this tenant must be aborted and garbage-collectable.
         if (stateDoc.getTenantId() &&
@@ -492,12 +490,11 @@ void TenantMigrationDonorService::Instance::checkIfOptionsConflict(const BSONObj
 
     auto tenantIdsMatch = [&] {
         switch (_protocol) {
-            case MigrationProtocolEnum::kShardMerge:
-                invariant(stateDoc.getTenantIds());
-                return *stateDoc.getTenantIds() == _tenantIds;
             case MigrationProtocolEnum::kMultitenantMigrations:
                 invariant(stateDoc.getTenantId());
                 return *stateDoc.getTenantId() == _tenantId;
+            default:
+                MONGO_UNREACHABLE;
         }
         MONGO_UNREACHABLE;
     };
@@ -921,11 +918,6 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
 
 void TenantMigrationDonorService::Instance::validateTenantIdsForProtocol() {
     switch (_protocol) {
-        case MigrationProtocolEnum::kShardMerge:
-            uassert(ErrorCodes::InvalidOptions,
-                    "The field tenantIds must be set and not empty for protocol 'shard merge'",
-                    !_tenantIds.empty());
-            break;
         case MigrationProtocolEnum::kMultitenantMigrations:
             uassert(ErrorCodes::InvalidOptions,
                     "The field tenantIds must not be set for protocol 'multitenant migration'",
@@ -1313,10 +1305,6 @@ ExecutorFuture<void>
 TenantMigrationDonorService::Instance::_waitUntilStartMigrationDonorTimestampIsCheckpointed(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& abortToken) {
-
-    if (getProtocol() != MigrationProtocolEnum::kShardMerge) {
-        return ExecutorFuture(**executor);
-    }
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();

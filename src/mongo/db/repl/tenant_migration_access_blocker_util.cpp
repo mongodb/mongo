@@ -65,7 +65,6 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
-#include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/db/service_context.h"
@@ -123,11 +122,6 @@ bool recoverTenantMigrationRecipientAccessBlockers(OperationContext* opCtx,
                                                                         doc.getId());
     auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
     switch (protocol) {
-        case MigrationProtocolEnum::kShardMerge:
-            invariant(doc.getTenantIds());
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .add(*doc.getTenantIds(), mtab);
-            break;
         case MigrationProtocolEnum::kMultitenantMigrations: {
             const auto tenantId = TenantId::parseFromString(doc.getTenantId());
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
@@ -178,16 +172,6 @@ bool recoverTenantMigrationDonorAccessBlockers(OperationContext* opCtx,
             const auto tenantId = TenantId::parseFromString(*doc.getTenantId());
             registry.add(tenantId, mtabVector.back());
         } break;
-        case MigrationProtocolEnum::kShardMerge:
-            invariant(doc.getTenantIds());
-            // Add global access blocker to avoid any tenant creation during shard merge.
-            registry.addGlobalDonorAccessBlocker(mtabVector.back());
-            for (const auto& tenantId : *doc.getTenantIds()) {
-                mtabVector.push_back(std::make_shared<TenantMigrationDonorAccessBlocker>(
-                    opCtx->getServiceContext(), doc.getId()));
-                registry.add(tenantId, mtabVector.back());
-            }
-            break;
         default:
             MONGO_UNREACHABLE;
     }
@@ -225,63 +209,6 @@ bool recoverTenantMigrationDonorAccessBlockers(OperationContext* opCtx,
         case TenantMigrationDonorStateEnum::kUninitialized:
             MONGO_UNREACHABLE;
     }
-    return true;
-}
-
-bool recoverShardMergeRecipientAccessBlockers(OperationContext* opCtx,
-                                              const ShardMergeRecipientDocument& doc) {
-    auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
-    invariant(replCoord && replCoord->getSettings().isReplSet());
-
-    // If the initial syncing node (both FCBIS and logical initial sync) syncs from a sync source
-    // that's in the middle of file copy/import phase of shard merge, it can cause the initial
-    // syncing node to have only partial donor data. And, if this node went into initial sync (i.e,
-    // resync) after it sent `recipientVoteImportedFiles` to the recipient primary, the primary
-    // can commit the migration and cause permanent data loss on this node.
-    if (replCoord->getMemberState().startup2() && !doc.getExpireAt()) {
-        assertOnUnsafeInitialSync(doc.getId());
-    }
-
-    // Do not create mtab for following cases. Otherwise, we can get into potential race
-    // causing recovery procedure to fail with `ErrorCodes::ConflictingServerlessOperation`.
-    // 1) The migration was skipped.
-    if (doc.getStartGarbageCollect()) {
-        invariant(doc.getState() == ShardMergeRecipientStateEnum::kAborted ||
-                  doc.getState() == ShardMergeRecipientStateEnum::kCommitted);
-        return true;
-    }
-    // 2) Aborted state doc marked as garbage collectable.
-    if (doc.getState() == ShardMergeRecipientStateEnum::kAborted && doc.getExpireAt()) {
-        return true;
-    }
-
-    auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(opCtx->getServiceContext(),
-                                                                        doc.getId());
-    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-        .add(doc.getTenantIds(), mtab);
-
-    switch (doc.getState()) {
-        case ShardMergeRecipientStateEnum::kStarted:
-        case ShardMergeRecipientStateEnum::kLearnedFilenames:
-            break;
-        case ShardMergeRecipientStateEnum::kConsistent:
-            repl::shard_merge_utils::assertImportDoneMarkerLocalCollExistsOnMergeConsistent(
-                opCtx, doc.getId());
-            FMT_FALLTHROUGH;
-        case ShardMergeRecipientStateEnum::kCommitted:
-            if (doc.getExpireAt()) {
-                mtab->stopBlockingTTL();
-            }
-            FMT_FALLTHROUGH;
-        case ShardMergeRecipientStateEnum::kAborted:
-            if (auto rejectTs = doc.getRejectReadsBeforeTimestamp()) {
-                mtab->startRejectingReadsBefore(*rejectTs);
-            }
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
-
     return true;
 }
 }  // namespace
@@ -607,13 +534,6 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
 
     recipientStore.forEach(opCtx, {}, [&](const TenantMigrationRecipientDocument& doc) {
         return recoverTenantMigrationRecipientAccessBlockers(opCtx, doc);
-    });
-
-    PersistentTaskStore<ShardMergeRecipientDocument> mergeRecipientStore(
-        NamespaceString::kShardMergeRecipientsNamespace);
-
-    mergeRecipientStore.forEach(opCtx, {}, [&](const ShardMergeRecipientDocument& doc) {
-        return recoverShardMergeRecipientAccessBlockers(opCtx, doc);
     });
 }
 

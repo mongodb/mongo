@@ -857,13 +857,6 @@ server_parameters:
         redact: false
 
 feature_flags:
-    featureFlagShardMerge:
-        description: When enabled, multitenant migration uses the "shard merge" protocol.
-        cpp_varname: feature_flags::gShardMerge
-        default: true
-        version: 7.1
-        shouldBeFCVGated: true
-
     featureFlagSecondaryIndexChecksInDbCheck:
         description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.
         cpp_varname: feature_flags::gSecondaryIndexChecksInDbCheck

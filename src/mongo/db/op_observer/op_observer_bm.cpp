@@ -44,7 +44,6 @@
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/shard_merge_recipient_op_observer.h"
 #include "mongo/db/repl/tenant_migration_donor_op_observer.h"
 #include "mongo/db/repl/tenant_migration_recipient_op_observer.h"
 #include "mongo/db/s/config_server_op_observer.h"
@@ -100,8 +99,6 @@ void setUpObservers(ServiceContext* serviceContext,
                 std::make_unique<repl::TenantMigrationDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-            opObserverRegistry->addObserver(
-                std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
         if (!gMultitenancySupport) {
             opObserverRegistry->addObserver(
@@ -129,8 +126,6 @@ void setUpObservers(ServiceContext* serviceContext,
                 std::make_unique<repl::TenantMigrationDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-            opObserverRegistry->addObserver(
-                std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
         if (!gMultitenancySupport) {  // && replCoord && replCoord->getSettings().isReplSet()) {
             opObserverRegistry->addObserver(

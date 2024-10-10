@@ -52,7 +52,6 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_migration_util.h"
@@ -134,8 +133,6 @@ public:
             switch (migrationProtocol) {
                 case MigrationProtocolEnum::kMultitenantMigrations:
                     return _handleMTMRecipientSyncDataCmd(opCtx, cmd);
-                case MigrationProtocolEnum::kShardMerge:
-                    return _handleShardMergeRecipientSyncDataCmd(opCtx, cmd);
                 default:
                     MONGO_UNREACHABLE;
             }
@@ -157,29 +154,6 @@ public:
                     ->lookupServiceByName(repl::TenantMigrationRecipientService::
                                               kTenantMigrationRecipientServiceName);
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
-                opCtx, recipientService, stateDoc.toBSON());
-
-            auto returnAfterReachingDonorTs = cmd.getReturnAfterReachingDonorTimestamp();
-
-            return returnAfterReachingDonorTs
-                ? Response(recipientInstance->waitUntilMigrationReachesReturnAfterReachingTimestamp(
-                      opCtx, *returnAfterReachingDonorTs))
-                : Response(recipientInstance->waitUntilMigrationReachesConsistentState(opCtx));
-        }
-
-        Response _handleShardMergeRecipientSyncDataCmd(OperationContext* opCtx,
-                                                       const Request& cmd) {
-            ShardMergeRecipientDocument stateDoc(cmd.getMigrationId(),
-                                                 cmd.getDonorConnectionString().toString(),
-                                                 *cmd.getTenantIds(),
-                                                 cmd.getStartMigrationDonorTimestamp(),
-                                                 cmd.getReadPreferenceSettings());
-
-            auto recipientService =
-                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                    ->lookupServiceByName(
-                        repl::ShardMergeRecipientService::kShardMergeRecipientServiceName);
-            auto recipientInstance = repl::ShardMergeRecipientService::Instance::getOrCreate(
                 opCtx, recipientService, stateDoc.toBSON());
 
             auto returnAfterReachingDonorTs = cmd.getReturnAfterReachingDonorTimestamp();
@@ -258,17 +232,6 @@ public:
                   "Received RecipientVoteImportedFiles request",
                   "migrationId"_attr = cmd.getMigrationId(),
                   "from"_attr = cmd.getFrom());
-            auto recipientService =
-                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                    ->lookupServiceByName(
-                        repl::ShardMergeRecipientService::kShardMergeRecipientServiceName);
-            auto [instance, _] = repl::ShardMergeRecipientService::Instance::lookup(
-                opCtx, recipientService, BSON("_id" << cmd.getMigrationId()));
-            uassert(ErrorCodes::NoSuchTenantMigration,
-                    str::stream() << "Could not find tenant migration with id "
-                                  << cmd.getMigrationId(),
-                    instance);
-            (*instance)->onMemberImportedFiles(cmd.getFrom());
         }
 
     private:
@@ -344,8 +307,6 @@ public:
             switch (migrationProtocol) {
                 case MigrationProtocolEnum::kMultitenantMigrations:
                     return _handleMTMRecipientForgetMigrationCmd(opCtx, cmd);
-                case MigrationProtocolEnum::kShardMerge:
-                    return _handleShardMergeRecipientForgetMigrationCmd(opCtx, cmd);
                 default:
                     MONGO_UNREACHABLE;
             }
@@ -377,32 +338,6 @@ public:
             // Instruct the instance run() function to mark this migration garbage collectable.
             recipientInstance->onReceiveRecipientForgetMigration(
                 opCtx, TenantMigrationRecipientStateEnum::kDone);
-            recipientInstance->getForgetMigrationDurableFuture().get(opCtx);
-        }
-
-        void _handleShardMergeRecipientForgetMigrationCmd(OperationContext* opCtx,
-                                                          const Request& cmd) {
-            ShardMergeRecipientDocument stateDoc(cmd.getMigrationId(),
-                                                 cmd.getDonorConnectionString().toString(),
-                                                 *cmd.getTenantIds(),
-                                                 kUnusedStartMigrationTimestamp,
-                                                 cmd.getReadPreferenceSettings());
-
-            // Set 'startGarbageCollect' true to not start a migration (and install access blocker
-            // or get serverless lock) unncessarily if this recipientForgetMigration command is
-            // received before a recipientSyncData command or after the state doc is garbage
-            // collected.
-            stateDoc.setStartGarbageCollect(true);
-
-            auto recipientService =
-                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                    ->lookupServiceByName(
-                        repl::ShardMergeRecipientService::kShardMergeRecipientServiceName);
-            auto recipientInstance = repl::ShardMergeRecipientService::Instance::getOrCreate(
-                opCtx, recipientService, stateDoc.toBSON(), false);
-
-            // Instruct the instance run() function to mark this migration garbage collectable.
-            recipientInstance->onReceiveRecipientForgetMigration(opCtx, *cmd.getDecision());
             recipientInstance->getForgetMigrationDurableFuture().get(opCtx);
         }
 
