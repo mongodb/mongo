@@ -86,7 +86,4 @@ Status storeMongodOptions(const moe::Environment& params);
  */
 std::string storageDBPathDescription();
 
-void setMagicRestoreMain(std::function<ExitCode(ServiceContext* svcCtx)> magicRestoreMainFn);
-std::function<ExitCode(ServiceContext* svcCtx)> getMagicRestoreMain();
-
 }  // namespace mongo

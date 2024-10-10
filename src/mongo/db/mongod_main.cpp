@@ -1180,16 +1180,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         exitCleanly(ExitCode::clean);
     }
 
-    if (storageGlobalParams.magicRestore) {
-        TimeElapsedBuilderScopedTimer scopedTimer(
-            serviceContext->getFastClockSource(), "Magic restore", &startupTimeElapsedBuilder);
-        if (getMagicRestoreMain() == nullptr) {
-            LOGV2_ERROR(7180701, "--magicRestore cannot be used with a community build");
-            exitCleanly(ExitCode::badOptions);
-        }
-        return getMagicRestoreMain()(serviceContext);
-    }
-
     globalServerLifecycleMonitor().onFinishingStartup();
 
     logStartupStats.dismiss();
