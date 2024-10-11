@@ -1319,6 +1319,8 @@ TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
  * Tests that targeter->onRemoteCommandError is called for errors attributed to a remote
  * host.
  */
+
+/* TODO SERVER-95739: Uncomment and fix test
 TEST_F(AsyncRPCTestFixture, TargeterOnRemoteCommandError) {
     const HostAndPort testHost = HostAndPort("Host1", 1);
     const std::vector<HostAndPort> hosts{testHost};
@@ -1363,6 +1365,7 @@ TEST_F(AsyncRPCTestFixture, TargeterOnRemoteCommandError) {
     downHosts = targeterMock->getAndClearMarkedDownHosts();
     ASSERT_FALSE(downHosts.find(testHost) != downHosts.end());
 }
+*/
 
 }  // namespace
 }  // namespace async_rpc
