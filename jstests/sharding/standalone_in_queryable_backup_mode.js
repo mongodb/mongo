@@ -49,6 +49,13 @@ assert.commandWorked(secondary.getDB('admin').adminCommand({
     "data": {"timestamp": recoveryTimestamp}
 }));
 
+// Generate an oplog entry corresponding to the critical section of a sharded collection drop,
+// which will be processed in the ShardServerOpObserver.
+jsTest.log("Going to insert into the sharded collection and drop it afterwards");
+st.s.getDB(kDbName)[kShardedCollName].insert({age: 10});
+st.s.getDB(kDbName)[kShardedCollName].drop();
+
+// Apply CRUD operations
 jsTest.log("Going to apply some CRUD operations over sharded and unsharded collections");
 function applyCRUDOnColl(coll) {
     coll.insert({age: 42});
