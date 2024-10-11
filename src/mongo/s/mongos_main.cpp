@@ -186,6 +186,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseWhileKillingOperationsAtShutdown);
 MONGO_FAIL_POINT_DEFINE(pauseAfterImplicitlyAbortAllTransactions)
+MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);
 
 #if defined(_WIN32)
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -992,6 +993,11 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     logStartupStats.dismiss();
     logMongosStartupTimeElapsedStatistics(
         serviceContext, beginRunMongosServer, &startupTimeElapsedBuilder, &startupInfoBuilder);
+
+    if (MONGO_unlikely(shutdownAtStartup.shouldFail())) {
+        LOGV2(9494000, "Starting clean exit via failpoint");
+        exitCleanly(ExitCode::clean);
+    }
 
     // Block until shutdown.
     MONGO_IDLE_THREAD_BLOCK;
