@@ -825,14 +825,42 @@ def write_workstation_bazelrc():
                 existing_hash = hashlib.md5(f.read().encode()).hexdigest()
 
         repo = git.Repo()
-        status = "clean" if repo.head.commit.diff(None) is None else "modified"
+
+        try:
+            status = "clean" if repo.head.commit.diff(None) is None else "modified"
+        except Exception:
+            status = "Unknown"
+
+        try:
+            hostname = socket.gethostname()
+        except Exception:
+            hostname = "Unknown"
+
+        try:
+            remote = repo.branches.master.repo.remote().url
+        except Exception:
+            try:
+                remote = repo.remotes[0].url
+            except Exception:
+                remote = "Unknown"
+
+        try:
+            branch = repo.active_branch.name
+        except Exception:
+            branch = "Unknown"
+
+        try:
+            commit = repo.commit("HEAD")
+        except Exception:
+            commit = "Unknown"
+
         bazelrc_contents = f"""\
 # Generated file, do not modify
 common --bes_keywords=developerBuild=True
-common --bes_keywords=workstation={socket.gethostname()}
-common --bes_keywords=engflow:BuildScmRemote={repo.remotes.origin.url}
-common --bes_keywords=engflow:BuildScmBranch={repo.active_branch.name}
-common --bes_keywords=engflow:BuildScmRevision={repo.commit("HEAD")}
+common --bes_keywords=workstation={hostname}
+common --bes_keywords=engflow:BuildScmRemote={remote}
+common --bes_keywords=engflow:BuildScmBranch={branch}
+common --bes_keywords=engflow:BuildScmRevision={commit}
 common --bes_keywords=engflow:BuildScmStatus={status}
     """
 
