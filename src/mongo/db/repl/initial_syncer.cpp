@@ -107,9 +107,6 @@
 namespace mongo {
 namespace repl {
 
-// Failpoint for initial sync
-MONGO_FAIL_POINT_DEFINE(failInitialSyncWithBadHost);
-
 // Failpoint which causes the initial sync function to hang after getting the oldest active
 // transaction timestamp from the sync source.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterGettingBeginFetchingTimestamp);
@@ -741,13 +738,6 @@ void InitialSyncer::_chooseSyncSourceCallback(
     auto status =
         _checkForShutdownAndConvertStatus(lock, callbackArgs, "error while choosing sync source");
     if (!status.isOK()) {
-        onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
-        return;
-    }
-
-    if (MONGO_unlikely(failInitialSyncWithBadHost.shouldFail())) {
-        status = Status(ErrorCodes::InvalidSyncSource,
-                        "initial sync failed - failInitialSyncWithBadHost failpoint is set.");
         onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
         return;
     }

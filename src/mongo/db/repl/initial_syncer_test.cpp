@@ -4296,23 +4296,6 @@ TEST_F(InitialSyncerTest,
     ASSERT_EQUALS(lastOp.getWallClockTime(), _lastApplied.getValue().wallTime);
 }
 
-TEST_F(InitialSyncerTest,
-       InitialSyncerReturnsInvalidSyncSourceWhenFailInitialSyncWithBadHostFailpointIsEnabled) {
-    auto initialSyncer = &getInitialSyncer();
-    auto opCtx = makeOpCtx();
-
-    // This fail point makes chooseSyncSourceCallback fail with an InvalidSyncSource error.
-    auto failPoint = globalFailPointRegistry().find("failInitialSyncWithBadHost");
-    failPoint->setMode(FailPoint::alwaysOn);
-    ON_BLOCK_EXIT([failPoint]() { failPoint->setMode(FailPoint::off); });
-
-    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
-
-    initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, _lastApplied);
-}
-
 TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
