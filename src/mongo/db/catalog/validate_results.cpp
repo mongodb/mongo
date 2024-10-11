@@ -45,19 +45,33 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debuggin
     }
 
     static constexpr std::size_t kMaxErrorWarningSizeBytes = 2 * 1024 * 1024;
-    auto appendRangeSizeLimited = [resultObj](StringData fieldName, const auto& values) {
+    auto appendRangeSizeLimited = [&](StringData fieldName, auto valueGetter) {
         std::size_t usedSize = 0;
         BSONArrayBuilder arr(resultObj->subarrayStart(fieldName));
-        for (auto it = values.begin(), end = values.end();
-             it != end && usedSize < kMaxErrorWarningSizeBytes;
-             ++it) {
-            arr.append(*it);
-            usedSize += it->size();
+        for (const auto& value : valueGetter(*this)) {
+            if (usedSize >= kMaxErrorWarningSizeBytes) {
+                return;
+            }
+            arr.append(value);
+            usedSize += value.size();
+        }
+        for (const auto& idxDetails : getIndexResultsMap()) {
+            if (usedSize >= kMaxErrorWarningSizeBytes) {
+                return;
+            }
+            if (valueGetter(idxDetails.second).empty()) {
+                continue;
+            }
+            std::string message = str::stream()
+                << "Found " << fieldName << " in " << idxDetails.first;
+            usedSize += message.size();
+            arr.append(std::move(message));
         }
     };
 
-    appendRangeSizeLimited("warnings"_sd, getWarnings());
-    appendRangeSizeLimited("errors"_sd, getErrors());
+    appendRangeSizeLimited("warnings"_sd,
+                           [](const auto& results) { return results.getWarnings(); });
+    appendRangeSizeLimited("errors"_sd, [](const auto& results) { return results.getErrors(); });
 
     resultObj->append("extraIndexEntries", getExtraIndexEntries());
     resultObj->append("missingIndexEntries", getMissingIndexEntries());

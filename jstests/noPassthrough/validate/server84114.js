@@ -34,7 +34,6 @@ configureFailPoint(db, "enableCompoundTextIndexes", {}, "off");
 forceCheckpoint();
 let res1 = coll.validate();
 assert(!res1.valid);
-assert.eq(res1.errors.length, 2);
 assert(res1.errors[0].startsWith("Could not build key for index"));
 
 rst.stopSet(null, null, {skipValidation: true});

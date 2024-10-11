@@ -74,17 +74,6 @@ public:
         return _continueValidation;
     }
 
-    void stealErrorsAndWarnings(ValidateResultsIf& other) {
-        _errors.insert(_errors.end(),
-                       std::make_move_iterator(other._errors.begin()),
-                       std::make_move_iterator(other._errors.end()));
-        _warnings.insert(_warnings.end(),
-                         std::make_move_iterator(other._warnings.begin()),
-                         std::make_move_iterator(other._warnings.end()));
-        other._errors.clear();
-        other._warnings.clear();
-    }
-
 protected:
     bool _continueValidation = true;
     bool _fatalError = false;

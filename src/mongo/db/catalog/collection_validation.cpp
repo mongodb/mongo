@@ -357,6 +357,7 @@ void _reportValidationResults(OperationContext* opCtx,
                               ValidateState* validateState,
                               ValidateResults* results,
                               BSONObjBuilder* output) {
+    // TODO(SERVER-95671): Move output-generation to ValidateResults::appendToResultsObj().
     BSONObjBuilder indexDetails;
 
     results->setReadTimestamp(validateState->getValidateTimestamp());
@@ -388,8 +389,6 @@ void _reportValidationResults(OperationContext* opCtx,
         }
 
         keysPerIndex.appendNumber(indexName, static_cast<long long>(vr.getKeysTraversed()));
-
-        results->stealErrorsAndWarnings(vr);
     }
 
     output->append("nIndexes", nIndexes);
