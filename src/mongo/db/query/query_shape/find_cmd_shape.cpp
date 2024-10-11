@@ -255,7 +255,7 @@ QueryShapeHash FindCmdShape::sha256Hash(OperationContext*, const SerializationCo
     StackBufBuilderBase<bufferSizeOnStack> findCommandShapeBuffer;
 
     // Write small or typically empty "find" command shape parts to the buffer.
-    findCommandShapeBuffer.appendStr(FindCommandRequest::kCommandName, false /*includeEndingNull*/);
+    findCommandShapeBuffer.appendStrBytes(FindCommandRequest::kCommandName);
 
     // Append bits corresponding to the optional command parameter values and a one bit indicator
     // whether the command specification includes a namespace or a UUID of a collection.

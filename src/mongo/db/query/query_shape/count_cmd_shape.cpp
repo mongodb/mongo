@@ -99,8 +99,7 @@ QueryShapeHash CountCmdShape::sha256Hash(OperationContext*, const SerializationC
     StackBufBuilderBase<bufferSizeOnStack> countCommandShapeBuffer;
 
     // Write small or typically empty "count" command shape parts to the buffer.
-    countCommandShapeBuffer.appendStr(CountCommandRequest::kCommandName,
-                                      false /*includeEndingNull*/);
+    countCommandShapeBuffer.appendStrBytes(CountCommandRequest::kCommandName);
 
     // 16-bit command options word. Use 0th bit as an indicator whether the command specification
     // includes a namespace or a UUID of a collection. The remaining bits are reserved for encoding

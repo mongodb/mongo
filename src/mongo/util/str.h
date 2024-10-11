@@ -57,6 +57,7 @@
 #include "mongo/platform/bits.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/str_basic.h"  // IWYU pragma: export
 
 namespace mongo {
 namespace str {
