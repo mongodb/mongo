@@ -331,8 +331,6 @@ last-continuous:
       ticket: SERVER-92530
     - test_file: jstests/sharding/transactions_stale_database_version_errors.js
       ticket: SERVER-92530
-    - test_file: jstests/replsets/initial_sync_collStats_resumes_after_network_error.js
-      ticket: SERVER-94259
   suites: null
 last-lts:
   all:
@@ -678,6 +676,4 @@ last-lts:
       ticket: SERVER-92530
     - test_file: jstests/sharding/transactions_stale_database_version_errors.js
       ticket: SERVER-92530
-    - test_file: jstests/replsets/initial_sync_collStats_resumes_after_network_error.js
-      ticket: SERVER-94259
   suites: null

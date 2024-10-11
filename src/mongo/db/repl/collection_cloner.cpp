@@ -128,7 +128,6 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
       _collectionOptions(collectionOptions),
       _sourceDbAndUuid(NamespaceString::kEmpty),
       _collectionClonerBatchSize(collectionClonerBatchSize),
-      _collStatsStage("collStats", this, &CollectionCloner::collStatsStage),
       _countStage("count", this, &CollectionCloner::countStage),
       _listIndexesStage("listIndexes", this, &CollectionCloner::listIndexesStage),
       _createCollectionStage("createCollection", this, &CollectionCloner::createCollectionStage),
@@ -169,13 +168,11 @@ BaseCloner::ClonerStages CollectionCloner::getStages() {
     if (_sourceNss.isChangeStreamPreImagesCollection() || _sourceNss.isChangeCollection()) {
         // The change stream pre-images collection and the change collection only need to be created
         // - their documents should not be copied.
-        return {&_collStatsStage,
-                &_listIndexesStage,
+        return {&_listIndexesStage,
                 &_createCollectionStage,
                 &_setupIndexBuildersForUnfinishedIndexesStage};
     }
-    return {&_collStatsStage,
-            &_countStage,
+    return {&_countStage,
             &_listIndexesStage,
             &_createCollectionStage,
             &_queryStage,
@@ -186,6 +183,26 @@ BaseCloner::ClonerStages CollectionCloner::getStages() {
 void CollectionCloner::preStage() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.start = getSharedData()->getClock()->now();
+
+    BSONObjBuilder b(BSON("collStats" << _sourceNss.coll().toString()));
+
+    BSONObj res;
+    getClient()->runCommand(_sourceNss.dbName(), b.obj(), res);
+    if (auto status = getStatusFromCommandResult(res); status.isOK()) {
+        _stats.bytesToCopy = res.getField("size").safeNumberLong();
+        if (_stats.bytesToCopy > 0) {
+            // The 'avgObjSize' parameter is only available if 'collStats' returns a 'size' field
+            // greater than zero.
+            _stats.avgObjSize = res.getField("avgObjSize").safeNumberLong();
+        }
+    } else {
+        LOGV2_DEBUG(4786302,
+                    1,
+                    "Skipping the recording of some initial sync metrics due to failure in the "
+                    "'collStats' command",
+                    logAttrs(_sourceNss),
+                    "status"_attr = status);
+    }
 }
 
 void CollectionCloner::postStage() {
@@ -226,22 +243,6 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
         getCloner()->waitForDatabaseWorkToComplete();
         throw;
     }
-}
-
-BaseCloner::AfterStageBehavior CollectionCloner::collStatsStage() {
-    BSONObjBuilder b(BSON("collStats" << _sourceNss.coll().toString()));
-
-    BSONObj res;
-    getClient()->runCommand(_sourceNss.dbName(), b.obj(), res);
-    if (auto status = getStatusFromCommandResult(res); status.isOK()) {
-        _stats.bytesToCopy = res.getField("size").safeNumberLong();
-        if (_stats.bytesToCopy > 0) {
-            // The 'avgObjSize' parameter is only available if 'collStats' returns a 'size' field
-            // greater than zero.
-            _stats.avgObjSize = res.getField("avgObjSize").safeNumberLong();
-        }
-    }
-    return kContinueNormally;
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
