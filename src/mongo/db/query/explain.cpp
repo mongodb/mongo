@@ -376,6 +376,8 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
     // Append whether or not the entry is active.
     out->append("isActive", entry.isActive);
     out->append("works", static_cast<long long>(entry.works));
+    // we can use this counter to get the highest frequency query sql in tht plancache
+    out->append("queryCount", static_cast<long long>(entry.queryCounters));
     out->append("timeOfCreation", entry.timeOfCreation);
 
     if (entry.debugInfo) {

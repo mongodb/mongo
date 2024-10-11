@@ -257,6 +257,7 @@ PlanCacheEntry::PlanCacheEntry(std::unique_ptr<const SolutionCacheData> plannerD
       planCacheKey(planCacheKey),
       isActive(isActive),
       works(works),
+      queryCounters(0),
       debugInfo(std::move(debugInfo)),
       estimatedEntrySizeBytes(_estimateObjectSizeInBytes()) {
     invariant(this->plannerData);
@@ -668,6 +669,20 @@ void PlanCache::deactivate(const CanonicalQuery& query) {
     invariant(entry);
     entry->isActive = false;
 }
+
+//increase the query counters which hit the plan
+void PlanCache::increaseCacheQueryCounters(const CanonicalQuery& query) {
+    PlanCacheKey key = computeKey(query);
+    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
+    PlanCacheEntry* entry = nullptr;
+    Status cacheStatus = _cache.get(key, &entry);
+    if (!cacheStatus.isOK()) {
+        invariant(cacheStatus == ErrorCodes::NoSuchKey);
+        return;
+    }
+    invariant(entry);
+    entry->queryCounters++;
+} 
 
 PlanCache::GetResult PlanCache::get(const CanonicalQuery& query) const {
     PlanCacheKey key = computeKey(query);
