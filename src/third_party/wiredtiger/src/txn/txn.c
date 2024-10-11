@@ -938,89 +938,6 @@ err:
 }
 
 /*
- * __txn_timestamp_usage_check --
- *     Check if a commit will violate timestamp rules.
- */
-static WT_INLINE int
-__txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *upd)
-{
-    WT_BTREE *btree;
-    WT_TXN *txn;
-    wt_timestamp_t op_ts, prev_op_durable_ts;
-    uint16_t flags;
-    char ts_string[2][WT_TS_INT_STRING_SIZE];
-    const char *name;
-    bool no_ts_ok, txn_has_ts;
-
-    btree = op->btree;
-    txn = session->txn;
-    flags = btree->dhandle->ts_flags;
-    name = btree->dhandle->name;
-    txn_has_ts = F_ISSET(txn, WT_TXN_HAS_TS_COMMIT | WT_TXN_HAS_TS_DURABLE);
-
-    /* Timestamps are ignored on logged files. */
-    if (F_ISSET(btree, WT_BTREE_LOGGED))
-        return (0);
-
-    /*
-     * Do not check for timestamp usage in recovery. We don't expect recovery to be using timestamps
-     * when applying commits, and it is possible that timestamps may be out-of-order in log replay.
-     */
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
-        return (0);
-
-    op_ts = upd->start_ts != WT_TS_NONE ? upd->start_ts : txn->commit_timestamp;
-
-    /* Check for disallowed timestamps. */
-    if (LF_ISSET(WT_DHANDLE_TS_NEVER)) {
-        if (!txn_has_ts)
-            return (0);
-
-        __wt_err(session, EINVAL,
-          "%s: " WT_TS_VERBOSE_PREFIX "timestamp %s set when disallowed by table configuration",
-          name, __wt_timestamp_to_string(op_ts, ts_string[0]));
-#ifdef HAVE_DIAGNOSTIC
-        __wt_abort(session);
-#endif
-        return (EINVAL);
-    }
-
-    prev_op_durable_ts = upd->prev_durable_ts;
-
-    /*
-     * Ordered consistency requires all updates use timestamps, once they are first used, but this
-     * test can be turned off on a per-transaction basis.
-     */
-    no_ts_ok = F_ISSET(txn, WT_TXN_TS_NOT_SET);
-    if (!txn_has_ts && prev_op_durable_ts != WT_TS_NONE && !no_ts_ok) {
-        __wt_err(session, EINVAL,
-          "%s: " WT_TS_VERBOSE_PREFIX
-          "no timestamp provided for an update to a table configured to always use timestamps "
-          "once they are first used",
-          name);
-#ifdef HAVE_DIAGNOSTIC
-        __wt_abort(session);
-#endif
-        return (EINVAL);
-    }
-
-    /* Ordered consistency requires all updates be in timestamp order. */
-    if (txn_has_ts && prev_op_durable_ts > op_ts) {
-        __wt_err(session, EINVAL,
-          "%s: " WT_TS_VERBOSE_PREFIX
-          "updating a value with a timestamp %s before the previous update %s",
-          name, __wt_timestamp_to_string(op_ts, ts_string[0]),
-          __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1]));
-#ifdef HAVE_DIAGNOSTIC
-        __wt_abort(session);
-#endif
-        return (EINVAL);
-    }
-
-    return (0);
-}
-
-/*
  * __txn_fixup_hs_update --
  *     Fix the history store update with the max stop time point if we commit the prepared update.
  */
@@ -1319,7 +1236,8 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 
     /* A prepared operation that is rolled back will not have a timestamp worth asserting on. */
     if (commit)
-        WT_RET(__txn_timestamp_usage_check(session, op, upd));
+        WT_RET(
+          __wt_txn_timestamp_usage_check(session, op, txn->commit_timestamp, upd->prev_durable_ts));
 
     for (first_committed_upd = upd; first_committed_upd != NULL &&
          (first_committed_upd->txnid == WT_TXN_ABORTED ||
@@ -1865,8 +1783,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                 if (cache->hs_fileid != 0 && op->btree->id == cache->hs_fileid)
                     break;
 
-                __wt_txn_op_set_timestamp(session, op);
-                WT_ERR(__txn_timestamp_usage_check(session, op, upd));
+                WT_ERR(__wt_txn_op_set_timestamp(session, op, true));
             } else {
                 /*
                  * If an operation has the key repeated flag set, skip resolving prepared updates as
@@ -1891,7 +1808,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
             }
             break;
         case WT_TXN_OP_REF_DELETE:
-            __wt_txn_op_set_timestamp(session, op);
+            WT_ERR(__wt_txn_op_set_timestamp(session, op, true));
             break;
         case WT_TXN_OP_TRUNCATE_COL:
         case WT_TXN_OP_TRUNCATE_ROW:

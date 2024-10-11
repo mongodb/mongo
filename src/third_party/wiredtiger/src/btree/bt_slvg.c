@@ -429,7 +429,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
     WT_DECL_RET;
     const WT_PAGE_HEADER *dsk;
     size_t addr_size;
-    uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
+    uint8_t addr[WT_ADDR_MAX_COOKIE];
     bool eof, valid;
 
     bm = S2BT(session)->bm;

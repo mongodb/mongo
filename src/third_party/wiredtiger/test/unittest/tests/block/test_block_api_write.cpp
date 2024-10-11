@@ -29,7 +29,7 @@ const std::string ACCESS_PATTERN = "random";
 const std::string DEFAULT_FILE_NAME = "test.txt";
 
 struct addr_cookie {
-    std::array<uint8_t, WT_BTREE_MAX_ADDR_COOKIE> addr;
+    std::array<uint8_t, WT_ADDR_MAX_COOKIE> addr;
     size_t size;
 };
 

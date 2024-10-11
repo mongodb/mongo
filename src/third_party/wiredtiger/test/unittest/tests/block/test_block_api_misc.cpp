@@ -61,7 +61,7 @@ test_addr_invalid(WT_SESSION_IMPL *session, WT_BM *bm, wt_off_t pack_offset, uin
 {
     // Generate an address cookie - technically, we shouldn't know about internal details of the
     // address cookie, but this allows for more rigorous testing with different inputs.
-    uint8_t p[WT_BTREE_MAX_ADDR_COOKIE], *pp;
+    uint8_t p[WT_ADDR_MAX_COOKIE], *pp;
     pp = p;
     REQUIRE(__wt_block_addr_pack(
               bm->block, &pp, WT_TIERED_OBJECTID_NONE, pack_offset, pack_size, pack_checksum) == 0);
@@ -81,7 +81,7 @@ test_addr_string(WT_SESSION_IMPL *session, WT_BM *bm, wt_off_t pack_offset, uint
 
     // Generate an address cookie - technically, we shouldn't know about internal details of the
     // address cookie, but this allows for more rigorous testing with different inputs.
-    uint8_t p[WT_BTREE_MAX_ADDR_COOKIE], *pp;
+    uint8_t p[WT_ADDR_MAX_COOKIE], *pp;
     pp = p;
     REQUIRE(__wt_block_addr_pack(
               bm->block, &pp, WT_TIERED_OBJECTID_NONE, pack_offset, pack_size, pack_checksum) == 0);
@@ -245,7 +245,7 @@ TEST_CASE("Block manager size and stat", "[block_api_misc]")
         WT_CLEAR(buf);
         std::string test_string("test123");
         create_write_buffer(&bm, session, test_string, &buf, 0);
-        uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
+        uint8_t addr[WT_ADDR_MAX_COOKIE];
         size_t addr_size;
         wt_off_t bm_size, prev_size;
         REQUIRE(bm.size(&bm, s, &prev_size) == 0);

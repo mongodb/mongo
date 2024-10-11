@@ -47,14 +47,6 @@
  */
 #define WT_BTREE_MAX_OBJECT_SIZE ((uint32_t)(UINT32_MAX - 1024))
 
-/*
- * A location in a file is a variable-length cookie, but it has a maximum size so it's easy to
- * create temporary space in which to store them. (Locations can't be much larger than this anyway,
- * they must fit onto the minimum size page because a reference to an overflow page is itself a
- * location.)
- */
-#define WT_BTREE_MAX_ADDR_COOKIE 255 /* Maximum address cookie */
-
 /* Evict pages if we see this many consecutive deleted records. */
 #define WT_BTREE_DELETE_THRESHOLD WT_THOUSAND
 
