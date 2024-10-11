@@ -2,11 +2,16 @@
  * Tests that resharding participants do not block replication while waiting for the
  * ReshardingCoordinatorService to be rebuilt.
  *
- * Incompatible because it uses a fail point to block all primary only services from being rebuilt
- * on the config server, and if the config server is the first shard, this prevents the test from
- * making progress. This tests logic that shouldn't be different on a config server, so there's no
- * need to run it with a config shard.
- * @tags: [config_shard_incompatible]
+ * @tags: [
+ *  # Incompatible because it uses a fail point to block all primary only services
+ *  # from being rebuilt on the config server, and if the config server is the first shard,
+ *  # this prevents the test from making progress.
+ *  # This tests logic that shouldn't be different on a config server,
+ *  # so there's no need to run it with a config shard.
+ *  config_shard_incompatible,
+ *  # TODO SERVER-95718: Re-enable this test on embedded router suites.
+ *  embedded_router_incompatible,
+ *  ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
