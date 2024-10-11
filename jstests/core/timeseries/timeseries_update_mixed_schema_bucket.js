@@ -5,7 +5,6 @@
  *   # $listCatalog does not include the tenant prefix in its results.
  *   command_not_supported_in_serverless,
  *   requires_timeseries,
- *   requires_fcv_80,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
