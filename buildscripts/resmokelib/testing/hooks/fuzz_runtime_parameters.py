@@ -2,6 +2,7 @@
 
 import copy
 import random
+import re
 import sys
 import threading
 import time
@@ -105,6 +106,43 @@ class FuzzRuntimeParameters(interface.Hook):
             for param, val in config_fuzzer_params["mongos"].items()
             if "runtime" in val.get("fuzz_at", [])
         }
+
+        from buildscripts.resmokelib import config
+
+        # We have some parameters that should only be fuzzed depending on the storageEngineConcurrencyAdjustmentAlgorithm.
+        # The storagEngineConcurrencyAdjustmentAlgorithm is only fuzzed at startup.
+        storageEngineConcurrencyAdjustmentAlgorithm = re.search(
+            r"storageEngineConcurrencyAdjustmentAlgorithm:\s+(\w+)", config.MONGOD_SET_PARAMETERS
+        )
+        if (
+            storageEngineConcurrencyAdjustmentAlgorithm
+            and storageEngineConcurrencyAdjustmentAlgorithm.group(1) == "throughputProbing"
+        ):
+            runtime_mongod_params = {
+                k: v for k, v in runtime_mongod_params.items() if "wiredTigerConcurrent" not in k
+            }
+        elif (
+            storageEngineConcurrencyAdjustmentAlgorithm
+            and storageEngineConcurrencyAdjustmentAlgorithm.group(1)
+            == "fixedConcurrentTransactions"
+        ):
+            runtime_mongod_params = {
+                k: v for k, v in runtime_mongod_params.items() if "throughputProbing" not in k
+            }
+        # If we can't find a storageEngineConcurrencyAdjustmentAlgorithm field, we don't want to fuzz any parameters related to the storageEngineConcurrencyAdjustmentAlgorithm.
+        elif not storageEngineConcurrencyAdjustmentAlgorithm:
+            runtime_mongod_params = {
+                k: v
+                for k, v in runtime_mongod_params.items()
+                if "wiredTigerConcurrent" and "throughputProbing" not in k
+            }
+
+        # Flow control-related parameters should only be fuzzed when enableFlowControl is set to True at startup.
+        enableFlowControl = re.search(r"enableFlowControl:\s+(\w+)", config.MONGOD_SET_PARAMETERS)
+        if not enableFlowControl or enableFlowControl.group(1) == "false":
+            runtime_mongod_params = {
+                k: v for k, v in runtime_mongod_params.items() if "flowControl" not in k
+            }
 
         validate_runtime_parameter_spec(runtime_mongod_params)
         validate_runtime_parameter_spec(runtime_mongos_params)

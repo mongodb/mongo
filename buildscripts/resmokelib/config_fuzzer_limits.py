@@ -69,7 +69,12 @@ config_fuzzer_params = {
             "max": 16,
             "fuzz_at": ["startup"],
         },
-        "collectionSamplingLogIntervalSeconds": {"min": 5, "max": 15, "fuzz_at": ["startup"]},
+        "collectionSamplingLogIntervalSeconds": {
+            "min": 5,
+            "max": 15,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "disableLogicalSessionCacheRefresh": {"choices": [True, False], "fuzz_at": ["startup"]},
         "enableAutoCompaction": {"choices": [True, False], "fuzz_at": ["startup"]},
         "ingressAdmissionControllerTicketPoolSize": {
@@ -84,9 +89,15 @@ config_fuzzer_params = {
         },
         "enableTemporarilyUnavailableExceptions": {
             "choices": [True, False],
-            "fuzz_at": ["startup"],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
         },
-        "indexBuildMinAvailableDiskSpaceMB": {"min": 250, "max": 750, "fuzz_at": ["startup"]},
+        "indexBuildMinAvailableDiskSpaceMB": {
+            "min": 250,
+            "max": 750,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "initialServiceExecutorUseDedicatedThread": {
             "choices": [True, False],
             "fuzz_at": ["startup"],
@@ -99,7 +110,12 @@ config_fuzzer_params = {
             "choices": ["nearest", "primary", "primaryPreferred", "secondaryPreferred"],
             "fuzz_at": ["startup"],
         },
-        "internalInsertMaxBatchSize": {"min": 1, "max": 750, "fuzz_at": ["startup"]},
+        "internalInsertMaxBatchSize": {
+            "min": 1,
+            "max": 750,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         # internalQueryExecYieldIterations takes a weighted random choice with a rand int generated betwen the lower_bound and upper_bound and 1.
         "internalQueryExecYieldIterations": {
             "min": 1,
@@ -110,7 +126,12 @@ config_fuzzer_params = {
         },
         "internalQueryExecYieldPeriodMS": {"min": 1, "max": 100, "fuzz_at": ["startup"]},
         "internalQueryFindCommandBatchSize": {"min": 1, "max": 500, "fuzz_at": ["startup"]},
-        "journalCommitInterval": {"min": 50, "max": 250, "fuzz_at": ["startup"]},
+        "journalCommitInterval": {
+            "min": 50,
+            "max": 250,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "lockCodeSegmentsInMemory": {"choices": [True, False], "fuzz_at": ["startup"]},
         "logicalSessionRefreshMillis": {
             "choices": [100, 1000, 10_000, 100_000],
@@ -118,7 +139,12 @@ config_fuzzer_params = {
             "max": 100_000,
             "fuzz_at": ["startup"],
         },
-        "maxNumActiveUserIndexBuilds": {"min": 1, "max": 5, "fuzz_at": ["startup"]},
+        "maxNumActiveUserIndexBuilds": {
+            "min": 1,
+            "max": 5,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         # maxNumberOfTransactionOperationsInSingleOplogEntry has two sources of randomization (rng.randint(1, 10) * rng.choice(mongod_param_choices["maxNumberOfTransactionOperationsInSingleOplogEntry"]))
         # You need to manually update maxNumberOfTransactionOperationsInSingleOplogEntry min and max in the case that you change either randomized choices.
         "maxNumberOfTransactionOperationsInSingleOplogEntry": {
@@ -127,7 +153,12 @@ config_fuzzer_params = {
             "max": 1000,
             "fuzz_at": ["startup"],
         },
-        "operationMemoryPoolBlockMaxSizeKB": {"min": 1024, "max": 2048, "fuzz_at": ["startup"]},
+        "operationMemoryPoolBlockMaxSizeKB": {
+            "min": 1024,
+            "max": 2048,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "oplogFetcherUsesExhaust": {"choices": [True, False], "fuzz_at": ["startup"]},
         # The actual maximum of `replBatchLimitOperations` is 1000 * 1000 but this range doesn't work
         # for WINDOWS DEBUG, so that maximum is multiplied by 0.2, which is still a lot more than the
@@ -174,13 +205,15 @@ config_fuzzer_params = {
             "min": 0,
             "max": 1,
             "isUniform": True,
-            "fuzz_at": ["startup"],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
         },
         "throughputProbingStepMultiple": {
             "min": 0.1,
             "max": 0.5,
             "isUniform": True,
-            "fuzz_at": ["startup"],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
         },
         "transactionTooLargeForCacheThreshold": {
             "min": 0.5,
@@ -212,27 +245,65 @@ config_fuzzer_params = {
         },
         # Flow control related parameters
         "enableFlowControl": {"choices": [True, False], "fuzz_at": ["startup"]},
-        "flowControlTicketAdderConstant": {"min": 500, "max": 1000, "fuzz_at": ["startup"]},
+        "flowControlTicketAdderConstant": {
+            "min": 500,
+            "max": 1000,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "flowControlDecayConstant": {
             "min": 0.1,
             "max": 1,
             "isUniform": True,
-            "fuzz_at": ["startup"],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
         },
-        "flowControlFudgeFactor": {"min": 0.9, "max": 1, "isUniform": True, "fuzz_at": ["startup"]},
+        "flowControlFudgeFactor": {
+            "min": 0.9,
+            "max": 1,
+            "isUniform": True,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "flowControlMaxSamples": {"min": 1, "max": 1000 * 1000, "fuzz_at": ["startup"]},
-        "flowControlMinTicketsPerSecond": {"min": 1, "max": 10 * 1000, "fuzz_at": ["startup"]},
-        "flowControlSamplePeriod": {"min": 1, "max": 1000 * 1000, "fuzz_at": ["startup"]},
-        "flowControlTargetLagSeconds": {"min": 1, "max": 1000, "fuzz_at": ["startup"]},
+        "flowControlMinTicketsPerSecond": {
+            "min": 1,
+            "max": 10 * 1000,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "flowControlSamplePeriod": {
+            "min": 1,
+            "max": 1000 * 1000,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "flowControlTargetLagSeconds": {
+            "min": 1,
+            "max": 1000,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "flowControlTicketMultiplierConstant": {
             "min": 1.01,
             "max": 1.09,
             "isUniform": True,
-            "fuzz_at": ["startup"],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
         },
         # flowControlThresholdLagPercentage is found by calling rng.random(), which means the max is NOT inclusive.
-        "flowControlThresholdLagPercentage": {"min": 0.0, "max": 1.0, "fuzz_at": ["startup"]},
-        "flowControlWarnThresholdSeconds": {"min": 5, "max": 15, "fuzz_at": ["startup"]},
+        "flowControlThresholdLagPercentage": {
+            "min": 0.0,
+            "max": 1.0,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "flowControlWarnThresholdSeconds": {
+            "min": 5,
+            "max": 15,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         # We need a higher timeout to account for test slowness
         "receiveChunkWaitForRangeDeleterTimeoutMS": {"default": 300_000, "fuzz_at": ["startup"]},
         "defaultConfigCommandTimeoutMS": {"default": 90_000, "fuzz_at": ["startup"]},
@@ -255,7 +326,8 @@ config_fuzzer_params = {
             "min": 30,
             "max": 600,
             "isRandomizedChoice": True,
-            "fuzz_at": ["startup"],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
         },
         "syncdelay": {
             "choices": [60],
