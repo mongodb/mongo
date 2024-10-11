@@ -184,8 +184,6 @@ def generate(env):
         setupEnv["ICECC_VERSION_ID"] = "user_provided." + icecc_version_file.name
 
     else:
-        print(setupEnv.get("CC"))
-        print(setupEnv.subst("${CC}"))
         setupEnv["ICECC_COMPILER_TYPE"] = setupEnv.get(
             "ICECC_COMPILER_TYPE",
             os.path.basename(setupEnv.WhereIs("${CC}")),

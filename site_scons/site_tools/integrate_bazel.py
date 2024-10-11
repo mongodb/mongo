@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Set, Tuple
 import distro
 import git
 import mongo.platform as mongo_platform
+import psutil
 import requests
 import SCons
 from retry import retry
@@ -988,6 +989,69 @@ def generate(env: SCons.Environment.Environment) -> None:
         _CI_MAX_RETRY_ATTEMPTS if os.environ.get("CI") is not None else _LOCAL_MAX_RETRY_ATTEMPTS
     )
 
+    # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
+    if normalized_arch == "ppc64le":
+        Globals.bazel_env_variables["JAVA_HOME"] = (
+            "/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
+        )
+    elif normalized_arch == "s390x":
+        Globals.bazel_env_variables["JAVA_HOME"] = (
+            "/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x"
+        )
+
+    check_remote_flags = bazel_internal_flags + shlex.split(env.get("BAZEL_FLAGS", ""))
+    if (
+        "--config=local" not in check_remote_flags
+        and "--config=public-release" not in check_remote_flags
+    ):
+        print(
+            "Running bazel with remote execution enabled. To disable bazel remote execution, please add BAZEL_FLAGS=--config=local to the end of your scons command line invocation."
+        )
+        if not validate_remote_execution_certs(env):
+            sys.exit(1)
+
+        try:
+            docker_detected = (
+                subprocess.run(["docker", "info"], capture_output=True).returncode == 0
+            )
+        except Exception:
+            docker_detected = False
+        try:
+            podman_detected = (
+                subprocess.run(["podman", "--help"], capture_output=True).returncode == 0
+            )
+        except Exception:
+            podman_detected = False
+
+        if not docker_detected:
+            print("Not using dynamic scheduling because docker not detected ('docker info').")
+        elif docker_detected and podman_detected:
+            print(
+                "Docker and podman detected, disabling dynamic scheduling due to uncertainty in docker setup."
+            )
+        else:
+            remote_execution_containers = {}
+            container_file_path = "bazel/platforms/remote_execution_containers.bzl"
+            with open(container_file_path, "r") as f:
+                code = compile(f.read(), container_file_path, "exec")
+                exec(code, {}, remote_execution_containers)
+
+            docker_image = remote_execution_containers["REMOTE_EXECUTION_CONTAINERS"][
+                f"{distro_or_os}"
+            ]["container-url"]
+
+            jobs = int(psutil.cpu_count() * 2) if os.environ.get("CI") else 400
+
+            bazel_internal_flags += [
+                "--experimental_enable_docker_sandbox",
+                f"--experimental_docker_image={docker_image}",
+                "--experimental_docker_use_customized_images",
+                "--internal_spawn_scheduler",
+                "--dynamic_local_strategy=docker",
+                "--spawn_strategy=dynamic",
+                f"--jobs={jobs}",
+            ]
+
     Globals.bazel_base_build_command = (
         [
             os.path.abspath(Globals.bazel_executable),
@@ -1002,29 +1066,9 @@ def generate(env: SCons.Environment.Environment) -> None:
     with open(os.path.join(log_dir, "bazel_command"), "w") as f:
         f.write(" ".join(Globals.bazel_base_build_command))
 
-    # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
-    if normalized_arch == "ppc64le":
-        Globals.bazel_env_variables["JAVA_HOME"] = (
-            "/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
-        )
-    elif normalized_arch == "s390x":
-        Globals.bazel_env_variables["JAVA_HOME"] = (
-            "/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x"
-        )
-
     # Store the bazel command line flags so scons can check if it should rerun the bazel targets
     # if the bazel command line changes.
     env["BAZEL_FLAGS_STR"] = bazel_internal_flags + shlex.split(env.get("BAZEL_FLAGS", ""))
-
-    if (
-        "--config=local" not in env["BAZEL_FLAGS_STR"]
-        and "--config=public-release" not in env["BAZEL_FLAGS_STR"]
-    ):
-        print(
-            "Running bazel with remote execution enabled. To disable bazel remote execution, please add BAZEL_FLAGS=--config=local to the end of your scons command line invocation."
-        )
-        if not validate_remote_execution_certs(env):
-            sys.exit(1)
 
     # We always use --compilation_mode debug for now as we always want -g, so assume -dbg location
     out_dir_platform = "$TARGET_ARCH"
