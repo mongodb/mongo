@@ -81,6 +81,8 @@ last-continuous:
       ticket: SERVER-84796
     - test_file: jstests/sharding/direct_connection_auth_transition.js
       ticket: SERVER-77073
+    - test_file: jstests/sharding/query/index_scan_in_backward_direction.js
+      ticket: SERVER-95627
     - test_file: jstests/core/query/query_settings/query_settings_index_application_aggregate.js
       ticket: SERVER-88629
     - test_file: jstests/core/index/elemmatch_index.js
@@ -394,6 +396,8 @@ last-lts:
       ticket: SERVER-84796
     - test_file: jstests/sharding/direct_connection_auth_transition.js
       ticket: SERVER-77073
+    - test_file: jstests/sharding/query/index_scan_in_backward_direction.js
+      ticket: SERVER-95627
     - test_file: jstests/core/query/query_settings/query_settings_index_application_aggregate.js
       ticket: SERVER-88629
     - test_file: jstests/core/index/elemmatch_index.js

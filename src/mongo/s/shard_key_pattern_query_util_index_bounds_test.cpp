@@ -89,9 +89,8 @@ protected:
     }
 
     void checkIndexBoundsWithKey(const char* keyStr,
-                                 const char* queryStr,
+                                 std::unique_ptr<CanonicalQuery> query,
                                  const IndexBounds& expectedBounds) {
-        auto query(canonicalize(queryStr));
         ASSERT(query.get() != nullptr);
 
         BSONObj key = fromjson(keyStr);
@@ -114,6 +113,12 @@ protected:
                               oil.intervals[i].compare(expectedOil.intervals[i]));
             }
         }
+    }
+
+    void checkIndexBoundsWithKey(const char* keyStr,
+                                 const char* queryStr,
+                                 const IndexBounds& expectedBounds) {
+        checkIndexBoundsWithKey(keyStr, canonicalize(queryStr), expectedBounds);
     }
 
     // Assume shard key is { a: 1 }
@@ -282,6 +287,76 @@ TEST_F(CMCollapseTreeTest, OrOfAnd6) {
     checkIndexBoundsWithKey("{a: 1, b: 1}",  // shard key
                             "{$or: [{a:{$in:[1]},b:{$in:[1]}}, {a:{$in:[1,5]},b:{$in:[1,5]}}]}",
                             expectedBounds);
+}
+
+TEST_F(CMCollapseTreeTest, SortInReverseDirection) {
+    IndexBounds expected;
+    expected.fields.push_back(OrderedIntervalList());
+    expected.fields.push_back(OrderedIntervalList());
+
+    expected.fields[0].intervals.push_back(Interval(BSON("" << 10 << "" << 20), true, true));
+    expected.fields[1].intervals.push_back(Interval(BSON("" << 100 << "" << 200), true, true));
+
+    // constructing query
+    BSONObj queryObj = fromjson("{a: {$gte: 10, $lte: 20}, b: {$gte: 100, $lte: 200}}");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setFilter(queryObj);
+    findCommand->setSort(BSON("a" << -1 << "b" << -1));
+    auto query = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = makeExpressionContext(operationContext(), *findCommand),
+        .parsedFind = ParsedFindCommandParams{
+            .findCommand = std::move(findCommand),
+            .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+
+    checkIndexBoundsWithKey("{a: 1, b: 1}",  // shard key
+                            std::move(query),
+                            expected);
+}
+
+TEST_F(CMCollapseTreeTest, SortMergeFromOrInReverseDirection) {
+    IndexBounds expected;
+    expected.fields.push_back(OrderedIntervalList());
+    expected.fields.push_back(OrderedIntervalList());
+    expected.fields.push_back(OrderedIntervalList());
+
+    expected.fields[0].intervals.push_back(Interval(BSON(""
+                                                         << "foo"
+                                                         << ""
+                                                         << "foo"),
+                                                    true,
+                                                    true));
+    expected.fields[1].intervals.push_back(Interval(BSON(""
+                                                         << "bar"
+                                                         << ""
+                                                         << "bar"),
+                                                    true,
+                                                    true));
+    expected.fields[1].intervals.push_back(Interval(BSON(""
+                                                         << "baz"
+                                                         << ""
+                                                         << "baz"),
+                                                    true,
+                                                    true));
+    expected.fields[2].intervals.push_back(Interval(BSON("" << 100 << "" << 200), true, true));
+
+    // constructing query
+    BSONObj queryObj =
+        fromjson("{a: \"foo\", b: {$in: [\"bar\", \"baz\"]}, c: {$gte: 100, $lte: 200}}");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setFilter(queryObj);
+    findCommand->setLimit(1);
+    findCommand->setSort(BSON("c" << -1));
+    auto query = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = makeExpressionContext(operationContext(), *findCommand),
+        .parsedFind = ParsedFindCommandParams{
+            .findCommand = std::move(findCommand),
+            .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+
+    checkIndexBoundsWithKey("{a: 1, b: 1, c: 1}",  // shard key
+                            std::move(query),
+                            expected);
 }
 
 //

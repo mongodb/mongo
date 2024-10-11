@@ -96,8 +96,15 @@ IndexBounds collapseQuerySolution(const QuerySolutionNode* node) {
                 "Invalid node type",
                 node->getType() == STAGE_IXSCAN || node->getType() == STAGE_EOF);
         // An EOF plan is produced when the predicate in the query is trivially false.
-        if (node->getType() == STAGE_IXSCAN)
-            return static_cast<const IndexScanNode*>(node)->bounds;
+        if (node->getType() == STAGE_IXSCAN) {
+            // Reverses the index bounds if the IXSCAN node scans backward. This is required because
+            // IndexBoundsBuilder::unionize() assumes intervals in ascending direction. Note
+            // that a shard key pattern is always ascending, so a backward direction in IXSCAN
+            // implies descending direction. Therefore, we can simply rely on 'isn->direction'
+            // without needing to check and forwardize each field individually.
+            const IndexScanNode* isn = static_cast<const IndexScanNode*>(node);
+            return isn->direction > 0 ? isn->bounds : isn->bounds.reverse();
+        }
         // TODO: SERVER-84547 Instead of returning empty index bounds we should propagete the EOF
         // plan to the shard targeting and avoid sending the query to any shard at all as it is most
         // likely trivallyFalse.
