@@ -47,7 +47,7 @@
 namespace mongo {
 
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(scoreFusion,
-                                           LiteParsedDocumentSourceDefault::parse,
+                                           DocumentSourceScoreFusion::LiteParsed::parse,
                                            DocumentSourceScoreFusion::createFromBson,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagSearchHybridScoring);
@@ -99,6 +99,21 @@ static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
     });
 }
 }  // namespace
+
+std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion::LiteParsed::parse(
+    const NamespaceString& nss, const BSONElement& spec) {
+    std::vector<LiteParsedPipeline> liteParsedPipelines;
+
+    auto parsedSpec = ScoreFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
+
+    // Ensure that all pipelines are valid scored selection pipelines.
+    for (const auto& input : parsedSpec.getInputs()) {
+        liteParsedPipelines.emplace_back(LiteParsedPipeline(nss, input.getPipeline()));
+    }
+
+    return std::make_unique<DocumentSourceScoreFusion::LiteParsed>(spec.fieldName(),
+                                                                   std::move(liteParsedPipelines));
+}
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {

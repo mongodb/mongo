@@ -7444,8 +7444,73 @@ export const authCommandsLib = {
           },
         ]
       },
+      {
+        testname: "aggregate_$scoreFusion",
+        command: {
+            aggregate: "foo",
+            cursor: {},
+            pipeline: [{
+              $scoreFusion: {
+                inputs: [
+                  {
+                    pipeline: [
+                      {
+                        $match: {a: 1}
+                      },
+                      {
+                        $score: {
+                          score: 5.0
+                        }
+                      },
+                    ]
+                  },
+                  {
+                    pipeline: [
+                      {
+                        $search: {
+                          // empty query
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    pipeline: [
+                      {
+                        $vectorSearch: {
+                          // empty query
+                        }
+                      }
+                    ]
+                  }
+                ],
+                inputNormalization: "none"
+              }
+          }]
+        },
+        setup: function(db) {
+          db.createCollection("foo");
+        },
+        skipSharded: false,
+        disableSearch: true,
+        skipTest: (conn) => {
+          return !TestData.setParameters.featureFlagSearchHybridScoring;
+        },
+        testcases: [
+          {
+            runOnDb: firstDbName,
+            roles: roles_read,
+            privileges: [{resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}]
+          },
+          {
+            runOnDb: secondDbName,
+            roles: roles_readAny,
+            privileges:
+                [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}]
+          },
+        ]
+      }, 
     ],
-
+    
     /************* SHARED TEST LOGIC ****************/
 
     /**

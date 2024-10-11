@@ -34,6 +34,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
 #include "mongo/db/pipeline/document_source_score_fusion_inputs_gen.h"
@@ -54,6 +55,21 @@ public:
      */
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
+                                                 const BSONElement& spec);
+
+        LiteParsed(std::string parseTimeName, std::vector<LiteParsedPipeline> pipelines)
+            : LiteParsedDocumentSourceNestedPipelines(
+                  std::move(parseTimeName), boost::none, std::move(pipelines)) {}
+
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const final {
+            return requiredPrivilegesBasic(isMongos, bypassDocumentValidation);
+        };
+    };
 
 private:
     // It is illegal to construct a DocumentSourceScoreFusion directly, use createFromBson()
