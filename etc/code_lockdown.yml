@@ -18,7 +18,7 @@ defaults:
     thresholds:
       hot_bf_count: 3
       cold_bf_count: 10
-      perf_bf_count: 3
+      perf_bf_count: 5
       include_bfs_older_than_hours: 48
     slack_tags: []
 
