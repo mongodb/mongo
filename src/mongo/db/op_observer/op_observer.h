@@ -214,15 +214,6 @@ public:
                                                         const UUID& uuid,
                                                         BSONObj indexDoc) = 0;
 
-    virtual void onCreateGlobalIndex(OperationContext* opCtx,
-                                     const NamespaceString& globalIndexNss,
-                                     const UUID& globalIndexUUID) = 0;
-
-    virtual void onDropGlobalIndex(OperationContext* opCtx,
-                                   const NamespaceString& globalIndexNss,
-                                   const UUID& globalIndexUUID,
-                                   long long numKeys) = 0;
-
     virtual void onCreateIndex(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const UUID& uuid,
@@ -284,18 +275,6 @@ public:
                            std::vector<bool> fromMigrate,
                            bool defaultFromMigrate,
                            OpStateAccumulator* opAccumulator = nullptr) = 0;
-
-    virtual void onInsertGlobalIndexKey(OperationContext* opCtx,
-                                        const NamespaceString& globalIndexNss,
-                                        const UUID& globalIndexUuid,
-                                        const BSONObj& key,
-                                        const BSONObj& docKey) = 0;
-
-    virtual void onDeleteGlobalIndexKey(OperationContext* opCtx,
-                                        const NamespaceString& globalIndexNss,
-                                        const UUID& globalIndexUuid,
-                                        const BSONObj& key,
-                                        const BSONObj& docKey) = 0;
 
     virtual void onUpdate(OperationContext* opCtx,
                           const OplogUpdateEntryArgs& args,

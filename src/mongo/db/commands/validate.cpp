@@ -344,15 +344,6 @@ public:
                                     << "is not supported on unreplicated collections");
         }
 
-        if (background && nss.isGlobalIndex()) {
-            // TODO SERVER-74209: Reading earlier than the minimum valid snapshot is temporarily not
-            // supported for global index collections as it results in extra index entries being
-            // detected. This requires further investigation.
-            uasserted(ErrorCodes::CommandNotSupported,
-                      str::stream() << "Background validation is temporarily disabled"
-                                    << " on the global indexes namespace");
-        }
-
         auto validateMode = [&] {
             if (metadata) {
                 return CollectionValidation::ValidateMode::kMetadata;

@@ -116,10 +116,6 @@ public:
     // Prefix for time-series buckets collection.
     static constexpr StringData kTimeseriesBucketsCollectionPrefix = "system.buckets."_sd;
 
-    // Prefix for global index container collections. These collections belong to the system
-    // database.
-    static constexpr StringData kGlobalIndexCollectionPrefix = "globalIndex."_sd;
-
     // Collection name that is used for { aggregate: 1, ... } style aggregations.
     static constexpr auto kCollectionlessAggregateCollection = "$cmd.aggregate"_sd;
 
@@ -236,11 +232,6 @@ public:
      * namespace is "<dbName>.$cmd.listCollections".
      */
     static NamespaceString makeListCollectionsNSS(const DatabaseName& dbName);
-
-    /**
-     * Constructs a NamespaceString for the specified global index.
-     */
-    static NamespaceString makeGlobalIndexNSS(const UUID& uuid);
 
     /**
      * Constructs the cluster parameters NamespaceString for the specified tenant. The format for
@@ -450,9 +441,6 @@ public:
     }
     bool isNormalCollection() const {
         return !isSystem() && !(isLocalDB() && coll().startsWith("replset."));
-    }
-    bool isGlobalIndex() const {
-        return coll().startsWith(kGlobalIndexCollectionPrefix);
     }
     bool isAdminDB() const {
         return db_deprecated() == DatabaseName::kAdmin.db(omitTenant);

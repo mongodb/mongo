@@ -35,11 +35,6 @@ feature_flags:
         cpp_varname: gFeatureFlagSecurityToken
         default: false
         shouldBeFCVGated: true
-    featureFlagGlobalIndexes:
-        description: "Enable support for global indexes"
-        cpp_varname: gFeatureFlagGlobalIndexes
-        default: false
-        shouldBeFCVGated: true
     featureFlagAllowAdditionalParticipants:
         description: "Enable adding additional participants to active transaction"
         cpp_varname: gFeatureFlagAllowAdditionalParticipants

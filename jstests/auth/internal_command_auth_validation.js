@@ -519,12 +519,6 @@ const internalCommandsMap = {
             collectionUUID: UUID(),
         },
     },
-    _shardsvrCreateGlobalIndex: {
-        testname: "_shardsvrCreateGlobalIndex",
-        command: {
-            _shardsvrCreateGlobalIndex: UUID(),
-        },
-    },
     _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {
         testname: "_shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern",
         command: {
@@ -536,12 +530,6 @@ const internalCommandsMap = {
         testname: "_shardsvrDropCollectionParticipant",
         command: {
             _shardsvrDropCollectionParticipant: "x.y",
-        },
-    },
-    _shardsvrDropGlobalIndex: {
-        testname: "_shardsvrDropGlobalIndex",
-        command: {
-            _shardsvrDropGlobalIndex: UUID(),
         },
     },
     _shardsvrDropIndexCatalogEntryParticipant: {
@@ -594,24 +582,6 @@ const internalCommandsMap = {
     _shardsvrGetStatsForBalancing: {
         testname: "_shardsvrGetStatsForBalancing",
         command: {_shardsvrGetStatsForBalancing: "ns", collections: [], scaleFactor: 1},
-    },
-    _shardsvrInsertGlobalIndexKey: {
-        testname: "_shardsvrInsertGlobalIndexKey",
-        command: {_shardsvrInsertGlobalIndexKey: UUID(), key: {a: 1}, docKey: {shk: 1, _id: 1}},
-    },
-    _shardsvrDeleteGlobalIndexKey: {
-        testname: "_shardsvrDeleteGlobalIndexKey",
-        command: {_shardsvrDeleteGlobalIndexKey: UUID(), key: {a: 1}, docKey: {shk: 1, _id: 1}},
-    },
-    _shardsvrWriteGlobalIndexKeys: {
-        testname: "_shardsvrWriteGlobalIndexKeys",
-        command: {
-            _shardsvrWriteGlobalIndexKeys: 1,
-            ops: [
-                {_shardsvrInsertGlobalIndexKey: UUID(), key: {a: 1}, docKey: {shk: 1, _id: 1}},
-                {_shardsvrDeleteGlobalIndexKey: UUID(), key: {a: 1}, docKey: {shk: 1, _id: 1}},
-            ]
-        },
     },
     _shardsvrJoinMigrations: {
         testname: "_shardsvrJoinMigrations",

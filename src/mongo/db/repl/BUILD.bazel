@@ -120,7 +120,6 @@ mongo_cc_library(
         "oplog_entry.cpp",
         "oplog_entry_gen",
         "oplog_entry_serialization.cpp",
-        "//src/mongo/db:global_index.h",
     ],
     hdrs = [
         "oplog_entry.h",
@@ -1569,7 +1568,6 @@ mongo_cc_library(
         "//src/mongo/db:coll_mod_command_idl",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:dbhelpers",
-        "//src/mongo/db:global_index",
         "//src/mongo/db:index_builds_coordinator_interface",
         "//src/mongo/db:index_commands_idl",
         "//src/mongo/db:multitenancy",

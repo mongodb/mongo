@@ -967,7 +967,6 @@ if wiredtiger:
     envWithAsio.CppUnitTest(
         target="index_build_test",
         source=[
-            "global_index_test.cpp",
             "index_build_entry_helpers_test.cpp",
             "index_builds_coordinator_mongod_test.cpp",
             "index_builds_coordinator_test.cpp",
@@ -976,7 +975,6 @@ if wiredtiger:
             "catalog/catalog_test_fixture",
             "catalog/collection_crud",
             "catalog/index_build_entry_idl",
-            "global_index",
             "index_build_entry_helpers",
             "index_builds_coordinator_mongod",
             "query_exec",

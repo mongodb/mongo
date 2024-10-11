@@ -312,85 +312,10 @@ bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const Namespa
     return true;
 }
 
-void logGlobalIndexDDLOperation(OperationContext* opCtx,
-                                const NamespaceString& globalIndexNss,
-                                const UUID& globalIndexUUID,
-                                const StringData commandString,
-                                boost::optional<long long> numKeys,
-                                OperationLogger* operationLogger) {
-    invariant(!opCtx->inMultiDocumentTransaction());
-
-    if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, globalIndexNss)) {
-        return;
-    }
-
-    BSONObjBuilder builder;
-    // The rollback implementation requires the collection name to list affected namespaces.
-    builder.append(commandString, globalIndexNss.coll());
-
-    MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-    oplogEntry.setObject(builder.done());
-
-    // On global index drops, persist the number of records into the 'o2' field similar to a
-    // collection drop. This allows for efficiently restoring the index keys count after rollback
-    // without forcing a collection scan.
-    invariant((numKeys && commandString == "dropGlobalIndex") ||
-              (!numKeys && commandString == "createGlobalIndex"));
-    if (numKeys) {
-        oplogEntry.setObject2(makeObject2ForDropOrRename(*numKeys));
-    }
-
-    // The 'ns' field is technically redundant as it can be derived from the uuid, however it's a
-    // required oplog entry field.
-    oplogEntry.setNss(globalIndexNss.getCommandNS());
-    oplogEntry.setUuid(globalIndexUUID);
-
-    constexpr StmtId stmtId = 0;
-    if (TransactionParticipant::get(opCtx)) {
-        // This is a retryable write: populate the lsid, txnNumber and stmtId fields.
-        // The oplog link to previous statement is empty and the stmtId is zero because this is a
-        // single-statement command replicating as a single createGlobalIndex/dropGlobalIndex oplog
-        // entry.
-        repl::OplogLink oplogLink;
-        operationLogger->appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, {stmtId});
-    }
-
-    auto writeOpTime =
-        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, operationLogger);
-
-    // Register the retryable write to in-memory transactions table.
-    SessionTxnRecord sessionTxnRecord;
-    sessionTxnRecord.setLastWriteOpTime(writeOpTime);
-    sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
-    onWriteOpCompleted(opCtx, {stmtId}, sessionTxnRecord, NamespaceString());
-}
-
 }  // namespace
 
 OpObserverImpl::OpObserverImpl(std::unique_ptr<OperationLogger> operationLogger)
     : _operationLogger(std::move(operationLogger)) {}
-
-void OpObserverImpl::onCreateGlobalIndex(OperationContext* opCtx,
-                                         const NamespaceString& globalIndexNss,
-                                         const UUID& globalIndexUUID) {
-    constexpr StringData commandString = "createGlobalIndex"_sd;
-    logGlobalIndexDDLOperation(opCtx,
-                               globalIndexNss,
-                               globalIndexUUID,
-                               commandString,
-                               boost::none /* numKeys */,
-                               _operationLogger.get());
-}
-
-void OpObserverImpl::onDropGlobalIndex(OperationContext* opCtx,
-                                       const NamespaceString& globalIndexNss,
-                                       const UUID& globalIndexUUID,
-                                       long long numKeys) {
-    constexpr StringData commandString = "dropGlobalIndex"_sd;
-    logGlobalIndexDDLOperation(
-        opCtx, globalIndexNss, globalIndexUUID, commandString, numKeys, _operationLogger.get());
-}
 
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
@@ -844,46 +769,6 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         shardingWriteRouterOpStateAccumulatorDecoration(opAccumulator) =
             std::move(shardingWriteRouter);
     }
-}
-
-void OpObserverImpl::onInsertGlobalIndexKey(OperationContext* opCtx,
-                                            const NamespaceString& globalIndexNss,
-                                            const UUID& globalIndexUuid,
-                                            const BSONObj& key,
-                                            const BSONObj& docKey) {
-    if (!opCtx->writesAreReplicated()) {
-        return;
-    }
-
-    invariant(!opCtx->isRetryableWrite());
-
-    // _shardsvrInsertGlobalIndexKey must run inside a multi-doc transaction.
-    bool isRequiredInMultiDocumentTransaction = true;
-
-    MutableOplogEntry oplogEntry = MutableOplogEntry::makeGlobalIndexCrudOperation(
-        repl::OpTypeEnum::kInsertGlobalIndexKey, globalIndexNss, globalIndexUuid, key, docKey);
-    logMutableOplogEntry(
-        opCtx, &oplogEntry, _operationLogger.get(), isRequiredInMultiDocumentTransaction);
-}
-
-void OpObserverImpl::onDeleteGlobalIndexKey(OperationContext* opCtx,
-                                            const NamespaceString& globalIndexNss,
-                                            const UUID& globalIndexUuid,
-                                            const BSONObj& key,
-                                            const BSONObj& docKey) {
-    if (!opCtx->writesAreReplicated()) {
-        return;
-    }
-
-    invariant(!opCtx->isRetryableWrite());
-
-    // _shardsvrDeleteGlobalIndexKey must run inside a multi-doc transaction.
-    bool isRequiredInMultiDocumentTransaction = true;
-
-    MutableOplogEntry oplogEntry = MutableOplogEntry::makeGlobalIndexCrudOperation(
-        repl::OpTypeEnum::kDeleteGlobalIndexKey, globalIndexNss, globalIndexUuid, key, docKey);
-    logMutableOplogEntry(
-        opCtx, &oplogEntry, _operationLogger.get(), isRequiredInMultiDocumentTransaction);
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx,

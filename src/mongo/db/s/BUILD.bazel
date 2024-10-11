@@ -60,15 +60,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "global_index_crud_commands_gen",
-    src = "global_index_crud_commands.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "migration_coordinator_document_gen",
     src = "migration_coordinator_document.idl",
     deps = [

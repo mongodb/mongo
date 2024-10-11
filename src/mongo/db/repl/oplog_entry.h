@@ -272,18 +272,6 @@ public:
                                              UUID uuid,
                                              const BSONObj& docToDelete);
 
-    // Returns a MutableOplogEntry that is intended to be equivalent to a ReplOperation.
-    // Importantly, this MutableOplogEntry is not serializable to BSON because
-    // it does not include a WallClockTime. This MutableOplogEntry is intended for
-    // construction before logOperation() which will insert a WallClockTime.
-    // Test code that needs a BSONObj can convert this using something like
-    // MutableOplogEntry::toReplOperation().
-    static MutableOplogEntry makeGlobalIndexCrudOperation(const OpTypeEnum& opType,
-                                                          const NamespaceString& indexNss,
-                                                          const UUID& indexUuid,
-                                                          const BSONObj& key,
-                                                          const BSONObj& docKey);
-
     static ReplOperation makeCreateCommand(NamespaceString nss,
                                            const mongo::CollectionOptions& options,
                                            const BSONObj& idIndex);
@@ -503,7 +491,6 @@ public:
     using MutableOplogEntry::makeCreateCommand;
     using MutableOplogEntry::makeCreateIndexesCommand;
     using MutableOplogEntry::makeDeleteOperation;
-    using MutableOplogEntry::makeGlobalIndexCrudOperation;
     using MutableOplogEntry::makeInsertOperation;
     using MutableOplogEntry::makeUpdateOperation;
 
@@ -636,12 +623,6 @@ public:
      */
     static bool isCrudOpType(OpTypeEnum opType);
     bool isCrudOpType() const;
-
-    /**
-     * Returns true if the oplog entry is for a global index CRUD operation.
-     */
-    static bool isGlobalIndexCrudOpType(OpTypeEnum opType);
-    bool isGlobalIndexCrudOpType() const;
 
     /**
      * Returns true if the oplog entry is for an Update or Delete operation.
@@ -884,7 +865,6 @@ public:
 
 
     bool isCrudOpType() const;
-    bool isGlobalIndexCrudOpType() const;
     bool isUpdateOrDelete() const;
     bool isIndexCommandType() const;
     bool shouldPrepare() const;

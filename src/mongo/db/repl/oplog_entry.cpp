@@ -44,7 +44,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/global_index.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -293,23 +292,6 @@ ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
     return op;
 }
 
-MutableOplogEntry MutableOplogEntry::makeGlobalIndexCrudOperation(const OpTypeEnum& opType,
-                                                                  const NamespaceString& indexNss,
-                                                                  const UUID& indexUuid,
-                                                                  const BSONObj& key,
-                                                                  const BSONObj& docKey) {
-    MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(opType);
-    // The 'ns' field is technically redundant as it can be derived from the uuid, however it's a
-    // required oplog entry field.
-    oplogEntry.setNss(indexNss.getCommandNS());
-    oplogEntry.setTid(indexNss.tenantId());
-    oplogEntry.setUuid(indexUuid);
-    oplogEntry.setObject(BSON(global_index::kOplogEntryIndexKeyFieldName
-                              << key << global_index::kOplogEntryDocKeyFieldName << docKey));
-    return oplogEntry;
-}
-
 StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
     const auto tid = OplogEntry::parseTid(object);
     try {
@@ -437,8 +419,6 @@ bool DurableOplogEntry::isCrudOpType(OpTypeEnum opType) {
         case OpTypeEnum::kInsert:
         case OpTypeEnum::kDelete:
         case OpTypeEnum::kUpdate:
-        case OpTypeEnum::kInsertGlobalIndexKey:
-        case OpTypeEnum::kDeleteGlobalIndexKey:
             return true;
         case OpTypeEnum::kCommand:
         case OpTypeEnum::kNoop:
@@ -451,26 +431,15 @@ bool DurableOplogEntry::isCrudOpType() const {
     return isCrudOpType(getOpType());
 }
 
-bool DurableOplogEntry::isGlobalIndexCrudOpType(OpTypeEnum opType) {
-    return opType == OpTypeEnum::kInsertGlobalIndexKey ||
-        opType == OpTypeEnum::kDeleteGlobalIndexKey;
-}
-
-bool DurableOplogEntry::isGlobalIndexCrudOpType() const {
-    return isGlobalIndexCrudOpType(getOpType());
-}
-
 bool DurableOplogEntry::isUpdateOrDelete() const {
     auto opType = getOpType();
     switch (opType) {
         case OpTypeEnum::kDelete:
         case OpTypeEnum::kUpdate:
-        case OpTypeEnum::kDeleteGlobalIndexKey:
             return true;
         case OpTypeEnum::kInsert:
         case OpTypeEnum::kCommand:
         case OpTypeEnum::kNoop:
-        case OpTypeEnum::kInsertGlobalIndexKey:
             return false;
     }
     MONGO_UNREACHABLE;
@@ -890,10 +859,6 @@ mongo::Date_t OplogEntry::getWallClockTimeForPreImage() const {
 
 bool OplogEntry::isCrudOpType() const {
     return _entry.isCrudOpType();
-}
-
-bool OplogEntry::isGlobalIndexCrudOpType() const {
-    return _entry.isGlobalIndexCrudOpType();
 }
 
 bool OplogEntry::isUpdateOrDelete() const {

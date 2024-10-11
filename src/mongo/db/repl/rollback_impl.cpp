@@ -68,7 +68,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_index.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
@@ -151,8 +150,6 @@ RollbackImpl::Listener kNoopListener;
 constexpr auto kInsertCmdName = "insert"_sd;
 constexpr auto kUpdateCmdName = "update"_sd;
 constexpr auto kDeleteCmdName = "delete"_sd;
-constexpr auto kInsertGlobalIndexKeyCmdName = "insertGlobalIndexKey"_sd;
-constexpr auto kDeleteGlobalIndexKeyCmdName = "deleteGlobalIndexKey"_sd;
 constexpr auto kNumRecordsFieldName = "numRecords"_sd;
 constexpr auto kToFieldName = "to"_sd;
 constexpr auto kDropTargetFieldName = "dropTarget"_sd;
@@ -510,8 +507,6 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
             }
             case OplogEntry::CommandType::kDbCheck:
             case OplogEntry::CommandType::kModifyCollectionShardingIndexCatalog:
-            case OplogEntry::CommandType::kCreateGlobalIndex:
-            case OplogEntry::CommandType::kDropGlobalIndex:
             case OplogEntry::CommandType::kCreate:
             case OplogEntry::CommandType::kDrop:
             case OplogEntry::CommandType::kImportCollection:
@@ -695,9 +690,7 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
           "Operations reverted by rollback",
           "insert"_attr = getCommandCount(kInsertCmdName),
           "update"_attr = getCommandCount(kUpdateCmdName),
-          "delete"_attr = getCommandCount(kDeleteCmdName),
-          "insertGlobalIndexKey"_attr = getCommandCount(kInsertGlobalIndexKeyCmdName),
-          "deleteGlobalIndexKey"_attr = getCommandCount(kDeleteGlobalIndexKeyCmdName));
+          "delete"_attr = getCommandCount(kDeleteCmdName));
 
     // Retryable writes create derived updates to the transactions table which can be coalesced into
     // one operation, so certain session operations history may be lost after restoring to the
@@ -989,21 +982,12 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
 
     // Keep track of the _ids of inserted and updated documents, as we may need to write them out to
     // a rollback file.
-    if (opType == OpTypeEnum::kInsert || opType == OpTypeEnum::kUpdate ||
-        opType == OpTypeEnum::kInsertGlobalIndexKey) {
+    if (opType == OpTypeEnum::kInsert || opType == OpTypeEnum::kUpdate) {
         const auto uuid = oplogEntry.getUuid();
         invariant(uuid,
                   str::stream() << "Oplog entry to roll back is unexpectedly missing a UUID: "
                                 << redact(oplogEntry.toBSONForLogging()));
-        const auto idElem = [&]() {
-            if (opType == OpTypeEnum::kInsertGlobalIndexKey) {
-                // As global indexes currently lack support for multi-key, a key can be uniquely
-                // identified by its document key, which maps the _id field in the global index
-                // container (collection).
-                return oplogEntry.getObject()[global_index::kOplogEntryDocKeyFieldName];
-            }
-            return oplogEntry.getIdElement();
-        }();
+        const auto idElem = oplogEntry.getIdElement();
         if (!idElem.eoo()) {
             // We call BSONElement::wrap() on each _id element to create a new BSONObj with an owned
             // buffer, as the underlying storage may be gone when we access this map to write
@@ -1014,7 +998,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
         }
     }
 
-    if (opType == OpTypeEnum::kInsert || opType == OpTypeEnum::kInsertGlobalIndexKey) {
+    if (opType == OpTypeEnum::kInsert) {
         auto idVal = oplogEntry.getObject().getStringField("_id");
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
             opNss == NamespaceString::kServerConfigurationNamespace &&
@@ -1036,12 +1020,11 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
 
         // Rolling back an insert must decrement the count by 1.
         _countDiffs[oplogEntry.getUuid().value()] -= 1;
-    } else if (opType == OpTypeEnum::kDelete || opType == OpTypeEnum::kDeleteGlobalIndexKey) {
+    } else if (opType == OpTypeEnum::kDelete) {
         // Rolling back a delete must increment the count by 1.
         _countDiffs[oplogEntry.getUuid().value()] += 1;
     } else if (opType == OpTypeEnum::kCommand) {
-        if (oplogEntry.getCommandType() == OplogEntry::CommandType::kCreate ||
-            oplogEntry.getCommandType() == OplogEntry::CommandType::kCreateGlobalIndex) {
+        if (oplogEntry.getCommandType() == OplogEntry::CommandType::kCreate) {
             // If we roll back a create, then we do not need to change the size of that uuid.
             _countDiffs.erase(oplogEntry.getUuid().value());
             _pendingDrops.erase(oplogEntry.getUuid().value());
@@ -1062,8 +1045,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
                 _pendingDrops.erase(importTargetUUID);
                 _newCounts.erase(importTargetUUID);
             }
-        } else if (oplogEntry.getCommandType() == OplogEntry::CommandType::kDrop ||
-                   oplogEntry.getCommandType() == OplogEntry::CommandType::kDropGlobalIndex) {
+        } else if (oplogEntry.getCommandType() == OplogEntry::CommandType::kDrop) {
             // The collection count at collection drop time is op-logged in the 'o2' field.
             // In the common case where the drop-pending collection is managed by the storage
             // engine, the collection metadata - including the number of records at drop time -
@@ -1142,12 +1124,6 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
     }
     if (opType == OpTypeEnum::kDelete) {
         ++_observerInfo.rollbackCommandCounts[kDeleteCmdName];
-    }
-    if (opType == OpTypeEnum::kInsertGlobalIndexKey) {
-        ++_observerInfo.rollbackCommandCounts[kInsertGlobalIndexKeyCmdName];
-    }
-    if (opType == OpTypeEnum::kDeleteGlobalIndexKey) {
-        ++_observerInfo.rollbackCommandCounts[kDeleteGlobalIndexKeyCmdName];
     }
 
     return Status::OK();

@@ -93,7 +93,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_index.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -411,8 +410,6 @@ void writeToImageCollection(OperationContext* opCtx,
     "d" delete
     "c" db cmd
     "n" no op
-    "xi" insert global index key
-    "xd" delete global index key
 */
 
 
@@ -1216,20 +1213,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                          "error"_attr = redact(ex));
              return ex.toStatus();
          }
-         return Status::OK();
-     }}},
-    {"createGlobalIndex",
-     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status {
-         const auto& globalIndexUUID = op->getUuid().get();
-         global_index::createContainer(opCtx, globalIndexUUID);
-         return Status::OK();
-     }}},
-    {"dropGlobalIndex",
-     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status {
-         const auto& globalIndexUUID = op->getUuid().get();
-         global_index::dropContainer(opCtx, globalIndexUUID);
          return Status::OK();
      }}},
 };
@@ -2178,58 +2161,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
             if (incrementOpsAppliedStats) {
                 incrementOpsAppliedStats();
             }
-            break;
-        }
-        case OpTypeEnum::kInsertGlobalIndexKey: {
-            invariant(op.getUuid());
-
-            Timestamp timestamp;
-            if (assignOperationTimestamp) {
-                timestamp = op.getTimestamp();
-            }
-
-            writeConflictRetryWithLimit(
-                opCtx, "applyOps_insertGlobalIndexKey", collection->ns(), [&] {
-                    WriteUnitOfWork wuow(opCtx);
-                    if (timestamp != Timestamp::min()) {
-                        uassertStatusOK(
-                            shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(timestamp));
-                    }
-
-                    global_index::insertKey(
-                        opCtx,
-                        collectionAcquisition,
-                        op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
-                        op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
-
-                    wuow.commit();
-                });
-            break;
-        }
-        case OpTypeEnum::kDeleteGlobalIndexKey: {
-            invariant(op.getUuid());
-
-            Timestamp timestamp;
-            if (assignOperationTimestamp) {
-                timestamp = op.getTimestamp();
-            }
-
-            writeConflictRetryWithLimit(
-                opCtx, "applyOps_deleteGlobalIndexKey", collection->ns(), [&] {
-                    WriteUnitOfWork wuow(opCtx);
-                    if (timestamp != Timestamp::min()) {
-                        uassertStatusOK(
-                            shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(timestamp));
-                    }
-
-                    global_index::deleteKey(
-                        opCtx,
-                        collectionAcquisition,
-                        op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
-                        op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
-
-                    wuow.commit();
-                });
             break;
         }
         default: {

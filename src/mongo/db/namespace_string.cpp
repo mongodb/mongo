@@ -209,11 +209,6 @@ NamespaceString NamespaceString::makeChangeCollectionNSS(
     return NamespaceString{tenantId, DatabaseName::kConfig.db(omitTenant), kChangeCollectionName};
 }
 
-NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
-    return NamespaceString(DatabaseName::kSystem,
-                           NamespaceString::kGlobalIndexCollectionPrefix + id.toString());
-}
-
 NamespaceString NamespaceString::makePreImageCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
     return NamespaceString{

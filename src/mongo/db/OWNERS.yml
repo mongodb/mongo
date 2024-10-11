@@ -1,8 +1,5 @@
 version: 1.0.0
 filters:
-  - "*global_index*":
-    approvers:
-      - 10gen/server-cluster-scalability
   - "*index_build*":
     approvers:
       - 10gen/server-storage-execution

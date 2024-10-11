@@ -2927,29 +2927,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "global_index",
-    srcs = [
-        "global_index.cpp",
-    ],
-    hdrs = [
-        "global_index.h",
-    ],
-    deps = [
-        ":dbhelpers",
-        ":index_builds_coordinator_interface",
-        ":query_exec",
-        ":server_base",
-        ":shard_role",
-        "//src/mongo/db/catalog:collection_crud",
-        "//src/mongo/db/catalog:collection_options",
-        "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/session:logical_session_id_helpers",
-        "//src/mongo/db/storage/key_string",
-        "//src/mongo/db/transaction",
-    ],
-)
-
-mongo_cc_library(
     name = "fle_crud_mongod",
     srcs = [
         "fle_crud_mongod.cpp",

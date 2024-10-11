@@ -63,7 +63,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/global_index.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
@@ -131,11 +130,6 @@ void processCrudOp(OperationContext* opCtx,
     // increasing cluster key, which guarantee preservation of the insertion order.
     if (!collProperties.isCapped || collProperties.isClustered) {
         BSONElement id = [&]() {
-            if (op->isGlobalIndexCrudOpType()) {
-                // The document key indentifies the base collection's document, and is used to
-                // serialise index key writes referring to the same document.
-                return op->getObject().getField(global_index::kOplogEntryDocKeyFieldName);
-            }
             return op->getIdElement();
         }();
         BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore,
@@ -228,9 +222,7 @@ uint32_t OplogApplierUtils::getOplogEntryHash(OperationContext* opCtx,
                                               OplogEntry* op,
                                               CachedCollectionProperties* collPropertiesCache) {
     boost::optional<size_t> idHash;
-    NamespaceString nss = op->isGlobalIndexCrudOpType()
-        ? NamespaceString::makeGlobalIndexNSS(op->getUuid().value())
-        : op->getNss();
+    NamespaceString nss = op->getNss();
 
     if (op->isCrudOpType()) {
         auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, nss);

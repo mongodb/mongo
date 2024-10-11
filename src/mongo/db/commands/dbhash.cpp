@@ -305,37 +305,14 @@ public:
             // TODO:SERVER-75848 Make this lock-free
             Lock::CollectionLock clk(opCtx, *nss, MODE_IS);
 
-            const Collection* collection = nullptr;
-            if (nss->isGlobalIndex()) {
-                // TODO SERVER-74209: Reading earlier than the minimum valid snapshot is not
-                // supported for global indexes. It appears that the primary and secondaries apply
-                // operations differently resulting in hash mismatches. This requires further
-                // investigation. In the meantime, global indexes use the behaviour prior to
-                // point-in-time lookups.
-                collection = coll;
+            const Collection* collection = catalog->establishConsistentCollection(
+                opCtx,
+                {dbName, uuid},
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp());
 
-                if (auto readTimestamp =
-                        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp()) {
-                    auto minSnapshot = coll->getMinimumValidSnapshot();
-                    uassert(ErrorCodes::SnapshotUnavailable,
-                            str::stream()
-                                << "Unable to read from a snapshot due to pending collection"
-                                   " catalog changes; please retry the operation. Snapshot"
-                                   " timestamp is "
-                                << readTimestamp->toString() << ". Collection minimum timestamp is "
-                                << minSnapshot->toString(),
-                            !minSnapshot || *readTimestamp >= *minSnapshot);
-                }
-            } else {
-                collection = catalog->establishConsistentCollection(
-                    opCtx,
-                    {dbName, uuid},
-                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp());
-
-                if (!collection) {
-                    // The collection did not exist at the read timestamp with the given UUID.
-                    continue;
-                }
+            if (!collection) {
+                // The collection did not exist at the read timestamp with the given UUID.
+                continue;
             }
 
             (void)checkAndHashCollection(collection);

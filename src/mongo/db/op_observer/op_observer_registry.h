@@ -139,23 +139,6 @@ public:
             o->onModifyCollectionShardingIndexCatalog(opCtx, nss, uuid, indexDoc);
     }
 
-    void onCreateGlobalIndex(OperationContext* opCtx,
-                             const NamespaceString& globalIndexNss,
-                             const UUID& globalIndexUUID) final {
-        ReservedTimes times{opCtx};
-        for (auto& o : _observers)
-            o->onCreateGlobalIndex(opCtx, globalIndexNss, globalIndexUUID);
-    };
-
-    void onDropGlobalIndex(OperationContext* opCtx,
-                           const NamespaceString& globalIndexNss,
-                           const UUID& globalIndexUUID,
-                           long long numKeys) final {
-        ReservedTimes times{opCtx};
-        for (auto& o : _observers)
-            o->onDropGlobalIndex(opCtx, globalIndexNss, globalIndexUUID, numKeys);
-    };
-
     void onCreateIndex(OperationContext* const opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,
@@ -249,27 +232,6 @@ public:
                          fromMigrate,
                          defaultFromMigrate,
                          &opStateAccumulator);
-    }
-
-    void onInsertGlobalIndexKey(OperationContext* opCtx,
-                                const NamespaceString& globalIndexNss,
-                                const UUID& globalIndexUuid,
-                                const BSONObj& key,
-                                const BSONObj& docKey) override {
-
-        ReservedTimes times{opCtx};
-        for (auto& o : _observers)
-            o->onInsertGlobalIndexKey(opCtx, globalIndexNss, globalIndexUuid, key, docKey);
-    }
-
-    void onDeleteGlobalIndexKey(OperationContext* opCtx,
-                                const NamespaceString& globalIndexNss,
-                                const UUID& globalIndexUuid,
-                                const BSONObj& key,
-                                const BSONObj& docKey) override {
-        ReservedTimes times{opCtx};
-        for (auto& o : _observers)
-            o->onDeleteGlobalIndexKey(opCtx, globalIndexNss, globalIndexUuid, key, docKey);
     }
 
     void onUpdate(OperationContext* const opCtx,

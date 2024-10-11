@@ -191,9 +191,6 @@ filters:
   - "*index*catalog*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "shardsvr_delete_global_index_key_command.cpp":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "README.md":
     approvers:
       - 10gen/server-catalog-and-routing

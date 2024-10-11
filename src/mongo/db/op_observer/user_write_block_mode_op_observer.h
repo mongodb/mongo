@@ -75,18 +75,6 @@ public:
                    bool defaultFromMigrate,
                    OpStateAccumulator* opAccumulator = nullptr) final;
 
-    void onInsertGlobalIndexKey(OperationContext* opCtx,
-                                const NamespaceString& globalIndexNss,
-                                const UUID& globalIndexUuid,
-                                const BSONObj& key,
-                                const BSONObj& docKey) final{};
-
-    void onDeleteGlobalIndexKey(OperationContext* opCtx,
-                                const NamespaceString& globalIndexNss,
-                                const UUID& globalIndexUuid,
-                                const BSONObj& key,
-                                const BSONObj& docKey) final {}
-
     void onUpdate(OperationContext* opCtx,
                   const OplogUpdateEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
@@ -184,9 +172,6 @@ public:
 
     // onModifyCollectionShardingIndexCatalog() is unchecked because sharded collection indexes
     // catalog are modified from internal commands.
-
-    // onCreateGlobalIndex() and onDropGlobalIndex() are unchecked because global indexes are
-    // created from internal commands.
 
     // Index builds committing (onCommitIndexBuild()) can be left unchecked since we kill any active
     // index builds before enabling write blocking. This means any index build which gets to the
