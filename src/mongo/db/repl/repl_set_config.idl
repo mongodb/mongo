@@ -152,7 +152,8 @@ structs:
                 description: "An incrementing number used to distinguish revisions of the replica
                               set configuration object from previous iterations of the
                               configuration"
-                validator: { gt: 0, lt: 2147483648 }
+                validator: { gt: 0 }
+                #upper limit is implicitly the value of int64_max
             term:
                 cpp_name: configTerm
                 type: termType

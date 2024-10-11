@@ -75,7 +75,7 @@ namespace repl {
 class ConfigVersionAndTerm {
 public:
     ConfigVersionAndTerm() : _version(0), _term(OpTime::kUninitializedTerm) {}
-    ConfigVersionAndTerm(int version, long long term) : _version(version), _term(term) {}
+    ConfigVersionAndTerm(long long version, long long term) : _version(version), _term(term) {}
 
     inline bool operator==(const ConfigVersionAndTerm& rhs) const {
         // If term of either item is uninitialized (-1), then we ignore terms entirely and only
