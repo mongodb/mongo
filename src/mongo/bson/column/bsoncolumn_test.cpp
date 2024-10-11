@@ -2014,6 +2014,65 @@ TEST_F(BSONColumnTest, DoubleRescaleFirstRescaledIsSkip) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, DoubleScaleDownWithMultipleBlocksPending) {
+    // This test writes a simple8b using a high scale factor followed by a large number of skips
+    // that do not fit in a single simple8b block in the control with a different scale factor that
+    // follows.
+    std::vector<BSONElement> elems = {createElementDouble(-153764908544737.4),
+                                      createElementDouble(-85827904635132.83)};
+    for (int i = 0; i < 150; ++i) {
+        elems.push_back(BSONElement());
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected, deltaDoubleMemory(elems.begin() + 1, elems.begin() + 2, elems.front()), 1);
+    appendSimple8bControl(expected, 0b1011, 0b0010);
+    appendSimple8bBlocks64(expected, deltaDouble(elems.begin() + 2, elems.end(), elems[1], 100), 3);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, DoubleScaleDownWithRLEPending) {
+    // This test writes a simple8b using a high scale factor followed by a large number of skips
+    // that do not fit in a single simple8b block. The builder will scale down to fit these skips as
+    // the high scale factor is not needed. The number of skips in the scaled down block is an RLE
+    // multiple resulting in a single RLE block in the scaled down block.
+    std::vector<BSONElement> elems = {
+        createElementDouble(std::numeric_limits<double>::denorm_min()),
+        BSONElement(),
+        createElementDouble(0.0)};
+    for (int i = 0; i < 148; ++i) {
+        elems.push_back(BSONElement());
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected, deltaDoubleMemory(elems.begin() + 1, elems.begin() + 31, elems.front()), 1);
+    appendSimple8bControl(expected, 0b1001, 0b0000);
+    appendSimple8bRLE(expected, 120);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, DoubleIncreaseScaleWithoutOverflow) {
     // This test needs to rescale doubles but can do so where there's no overflow in the new control
     std::vector<BSONElement> elems = {createElementDouble(314159264193.46228),

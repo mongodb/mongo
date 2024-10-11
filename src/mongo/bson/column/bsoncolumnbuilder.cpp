@@ -798,11 +798,23 @@ void BSONColumnBuilder<Allocator>::BinaryReopen::_reopen64BitTypes(
                                            sizeof(uint64_t) +
                                        /* control byte*/ 1,
                                    /* one block at a time */ sizeof(uint64_t));
-            boost::optional<uint64_t> lastValue;
             for (auto&& elem : s8b) {
-                lastValue = elem;
+                lastForS8b = elem;
             }
-            encoder.simple8bBuilder.setLastForRLE(lastValue);
+
+            // Re-calculate if we will overflow on the current control block using this lastForRLE.
+            Simple8bBuilder<uint64_t> s8bBuilder;
+            s8bBuilder.setLastForRLE(lastForS8b);
+            // We're not intrested where the overflow happens, just if it happens or not. This
+            // function will set the 'overflow' variable.
+            _appendUntilOverflow(s8bBuilder,
+                                 encoder.simple8bBuilder,
+                                 overflow,
+                                 lastForS8b,
+                                 control,
+                                 currNumBlocks - 1);
+            // Enforce the lastForRle.
+            encoder.simple8bBuilder.setLastForRLE(lastForS8b);
         }
 
         if (!resumeCurrent) {
@@ -813,18 +825,26 @@ void BSONColumnBuilder<Allocator>::BinaryReopen::_reopen64BitTypes(
                 // If the previous control block was not full, and we scaled then we need to
                 // determine if we should consider the overflow happening in this block or not. This
                 // can happen for the double type where we might not fill the control block with
-                // values due to scaling. To determine if we overflowed here we will check if at
-                // least one value can be re-scaled into the new scale factor as that represent a
-                // "soft" boundary between the control blocks. If re-scaling was not possible there
-                // is nothing from the previous control that should be kept for the following
-                // values.
+                // values due to scaling.
+                //
+                // To determine if we overflowed here due to the new value being incompatible with
+                // the previous scale factor, we will check if the first value can be re-scaled into
+                // the new scale factor. If we cannot rescale then we need to proceed as if the last
+                // control block didn't exist as it will never be possible to undo it.
+                //
+                // We could have also scaled down because the types of values have changed where the
+                // larger scale factor is no longer needed. This can be completely undone if all
+                // these values still fit in pending, then this entire control block with the new
+                // scale factor need to be reversed.
                 if (blocks != 16 && current.scaleIndex != last.scaleIndex) {
                     // Encode last using new scale factor
                     auto encoded =
                         Simple8bTypeUtil::encodeDouble(last.lastAtEndOfBlock, current.scaleIndex);
                     Simple8b<uint64_t> rescale(
                         control + 1, currNumBlocks * sizeof(uint64_t), lastForS8b);
-                    bool possible = true;
+                    // Initialize if scaling is possible on the overflow state of the current
+                    // control block.
+                    bool discardCurrent = !overflow;
                     // See if next value can be scaled using the old scale factor
                     for (auto&& elem : rescale) {
                         if (elem) {
@@ -833,16 +853,20 @@ void BSONColumnBuilder<Allocator>::BinaryReopen::_reopen64BitTypes(
                             if (!Simple8bTypeUtil::encodeDouble(
                                     Simple8bTypeUtil::decodeDouble(*encoded, current.scaleIndex),
                                     last.scaleIndex)) {
-                                possible = false;
+                                // Not possible to scale this value using the last scale factor. The
+                                // previous control block will then never be needed and we need to
+                                // make sure that we do not discard the current control block.
+                                discardCurrent = false;
                             }
                         }
                         break;
                     }
 
-                    if (possible) {
-                        // We could re-scale. Treat this as a special overflow where we append the
-                        // necessary overflow data but mark the state as no overflow. We will then
-                        // append all remaining values and the state will be setup accordingly
+                    if (discardCurrent) {
+                        // We need to discard the current control block. Treat this as a special
+                        // overflow where we append the necessary overflow data from the last
+                        // control block but the state is marked as no overflow. We will then append
+                        // all remaining values and the state will be setup accordingly
                         lastControlOffset = sizeof(uint64_t) * blocks + 1;
 
                         buffer.appendBuf(last.control, lastControlOffset);
@@ -850,7 +874,6 @@ void BSONColumnBuilder<Allocator>::BinaryReopen::_reopen64BitTypes(
                         // offset will temporarily set to a negative value to compensate for the
                         // buffer we wrote above even when there's no overflow. Later on we will add
                         // a larger value which will make it positive again.
-
                         offset -= lastControlOffset;
 
                         regular._controlByteOffset = 0;
