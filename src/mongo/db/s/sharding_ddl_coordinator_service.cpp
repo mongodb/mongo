@@ -57,6 +57,7 @@
 #include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/convert_to_capped_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator.h"
+#include "mongo/db/s/create_database_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
@@ -133,6 +134,8 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
         case DDLCoordinatorTypeEnum::kUntrackUnsplittableCollection:
             return std::make_shared<UntrackUnsplittableCollectionCoordinator>(
                 service, std::move(initialState));
+        case DDLCoordinatorTypeEnum::kCreateDatabase:
+            return std::make_shared<CreateDatabaseCoordinator>(service, std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
                       str::stream()

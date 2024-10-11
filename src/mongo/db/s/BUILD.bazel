@@ -305,6 +305,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "create_database_coordinator_document_gen",
+    src = "create_database_coordinator_document.idl",
+    deps = [
+        ":sharding_ddl_coordinator_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "drop_collection_coordinator_document_gen",
     src = "drop_collection_coordinator_document.idl",
     deps = [

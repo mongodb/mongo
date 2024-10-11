@@ -61,6 +61,7 @@ enums:
             kMigrationBlockingOperation: "migrationBlockingOperation"
             kConvertToCapped: "convertToCapped"
             kUntrackUnsplittableCollection: "untrackUnsplittableCollection"
+            kCreateDatabase: "createDatabase"
 
 types:
     ForwardableOperationMetadata:

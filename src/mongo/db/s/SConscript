@@ -346,6 +346,8 @@ env.Library(
         "convert_to_capped_coordinator_document_gen.cpp",
         "create_collection_coordinator.cpp",
         "create_collection_coordinator_document_gen.cpp",
+        "create_database_coordinator.cpp",
+        "create_database_coordinator_document_gen.cpp",
         "drop_collection_coordinator.cpp",
         "drop_collection_coordinator_document_gen.cpp",
         "drop_database_coordinator.cpp",
