@@ -27,13 +27,7 @@ function assertEqualObj(lhs, rhs, keysToIgnore) {
     }
 }
 
-const st = new ShardingTest({
-    shard: 2,
-    configOptions:
-        {setParameter:
-             {'reshardingCriticalSectionTimeoutMillis': 24 * 60 * 60 * 1000 /* 1 day */}}
-});
-
+const st = new ShardingTest({shard: 2});
 const configRSPrimary = st.configRS.getPrimary();
 
 const dbName = "testDb";

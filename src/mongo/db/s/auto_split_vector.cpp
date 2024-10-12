@@ -168,11 +168,8 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
             }
         }
 
-        // Compare the first and last document belonging to the range; if they have the same shard
-        // key value, no split point can be found.
-        bool chunkCanBeSplit = true;
+        BSONObj maxKeyInChunk;
         {
-            BSONObj maxKeyInChunk;
             auto backwardIdxScanner =
                 InternalPlanner::indexScan(opCtx,
                                            &(*collection),
@@ -188,11 +185,11 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                 // Range is empty
                 return {};
             }
-
-            chunkCanBeSplit = minKeyInOriginalChunk.woCompare(maxKeyInChunk) != 0;
         }
 
-        if (!chunkCanBeSplit) {
+        if (minKeyInOriginalChunk.woCompare(maxKeyInChunk) == 0) {
+            // Range contains only documents with a single key value.  So we cannot possibly find a
+            // split point, and there is no need to scan any further.
             LOGV2_WARNING(
                 5865001,
                 "Possible low cardinality key detected in range. Range contains only a single key.",

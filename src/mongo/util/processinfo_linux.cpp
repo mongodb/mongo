@@ -427,10 +427,7 @@ public:
     /**
      * Get some details about the CPU
      */
-    static void getCpuInfo(int& procCount,
-                           std::string& modelString,
-                           std::string& freq,
-                           std::string& features) {
+    static void getCpuInfo(int& procCount, std::string& freq, std::string& features) {
 
         procCount = 0;
 
@@ -442,7 +439,6 @@ public:
                 {"features", [&](const std::string& value) { features = value; }},
 #else
                 {"processor", [&](const std::string& value) { procCount++; }},
-                {"model name", [&](const std::string& value) { modelString = value; }},
                 {"cpu MHz", [&](const std::string& value) { freq = value; }},
                 {"flags", [&](const std::string& value) { features = value; }},
 #endif
@@ -668,11 +664,6 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 
     appendNumber("voluntary_context_switches", ru.ru_nvcsw);
     appendNumber("involuntary_context_switches", ru.ru_nivcsw);
-
-    LinuxProc p(_pid);
-
-    // Append the number of thread in use
-    appendNumber("threads", p._nlwp);
 }
 
 /**
@@ -719,13 +710,13 @@ unsigned long countNumaNodes() {
 void ProcessInfo::SystemInfo::collectSystemInfo() {
     utsname unameData;
     std::string distroName, distroVersion;
-    std::string cpuString, cpuFreq, cpuFeatures;
+    std::string cpuFreq, cpuFeatures;
     int cpuCount;
     int physicalCores;
     int cpuSockets;
 
     std::string verSig = LinuxSysHelper::readLineFromFile("/proc/version_signature");
-    LinuxSysHelper::getCpuInfo(cpuCount, cpuString, cpuFreq, cpuFeatures);
+    LinuxSysHelper::getCpuInfo(cpuCount, cpuFreq, cpuFeatures);
     LinuxSysHelper::getNumPhysicalCores(physicalCores);
     cpuSockets = LinuxSysHelper::getNumCpuSockets();
     LinuxSysHelper::getLinuxDistro(distroName, distroVersion);
@@ -769,7 +760,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
         bExtra.append("versionSignature", verSig);
 
     bExtra.append("kernelVersion", unameData.release);
-    bExtra.append("cpuString", cpuString);
     bExtra.append("cpuFrequencyMHz", cpuFreq);
     bExtra.append("cpuFeatures", cpuFeatures);
     bExtra.append("pageSize", static_cast<long long>(pageSize));

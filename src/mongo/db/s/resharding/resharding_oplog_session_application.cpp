@@ -79,7 +79,6 @@ repl::OpTime ReshardingOplogSessionApplication::_logPrePostImage(
 
 boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryApplyOperation(
     OperationContext* opCtx, const repl::OplogEntry& op) const {
-    auto sourceNss = op.getNss();
     auto lsid = *op.getSessionId();
     auto txnNumber = *op.getTxnNumber();
     bool isRetryableWrite = op.isCrudOpType();
@@ -106,8 +105,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
                                                        std::move(o2Field),
                                                        std::move(stmtIds),
                                                        std::move(preImageOpTime),
-                                                       std::move(postImageOpTime),
-                                                       std::move(sourceNss));
+                                                       std::move(postImageOpTime));
         });
 }
 

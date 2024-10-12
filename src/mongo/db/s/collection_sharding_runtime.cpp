@@ -338,11 +338,6 @@ CollectionShardingRuntime::_getCurrentMetadataIfKnown(
 std::shared_ptr<ScopedCollectionDescription::Impl>
 CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime) {
-    // If this node is not part of a sharded cluster, or the ShardingState has not been recovered
-    // yet, consider all collections as untracked.
-    if (!ShardingState::get(opCtx)->enabled())
-        return kUnshardedCollection;
-
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
     if (!optReceivedShardVersion)
         return kUnshardedCollection;

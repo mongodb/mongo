@@ -5,8 +5,8 @@
 # sourceUrl = "/path/to/source"
 # destinationUrl = "/path/to/dest"
 
-sourceUrl = "https://github.com/10gen/mongo.git"
-destinationUrl = "https://github.com/mongodb/mongo.git"
+sourceUrl = "git@github.com:10gen/mongo.git"
+destinationUrl = "git@github.com:mongodb/mongo.git"
 
 core.workflow(
     name = "default",
@@ -25,7 +25,7 @@ core.workflow(
     mode = "ITERATIVE",
     transformations = [
         # (^.*?) - matches the first line (without the newline char)
-        # \n - matches the first newline (or nothing at all if there is no newline). If there is no match then nothing happens
+        # \n - matches the first newline (or nothing at all if there is no newline). If there is no match then nopthing happens
         # ((\n|.)*) - matches everything after
         # Overall, this copies only the first line of the commit rather than the body
         metadata.scrubber("(^.*?)\n((\n|.)*)", replacement = "$1"),

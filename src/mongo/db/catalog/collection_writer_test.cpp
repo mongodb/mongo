@@ -275,6 +275,67 @@ public:
     }
 };
 
+TEST_F(CatalogReadCopyUpdateTest, ConcurrentCatalogWriteBatches) {
+    // Start threads and perform write at the same time, record catalog instance observed
+    constexpr int32_t NumThreads = 4;
+
+    unittest::Barrier barrier(NumThreads);
+    std::array<const CollectionCatalog*, NumThreads> catalogInstancesObserved;
+    std::array<NamespaceString, NumThreads> namespacesInserted;
+    AtomicWord<int32_t> threadIndex{0};
+    auto job = [&]() {
+        // Determine a unique index for this worker, we use this to be able to write our results
+        // without any synchronization.
+        auto index = threadIndex.fetchAndAdd(1);
+
+        // Prepare a Collection instance that the writer will insert.
+        NamespaceString nssToInsert("test", fmt::format("coll{}", index));
+        auto collectionToInsert = std::make_shared<CollectionMock>(nssToInsert);
+        namespacesInserted[index] = std::move(nssToInsert);
+
+        // Wait for all worker threads to reach this point before proceeding.
+        barrier.countDownAndWait();
+
+        // The first thread that enters write() will begin copying the catalog instance, other
+        // threads that enter while this copy is being made will be enqueued. When the thread
+        // copying the catalog instance finishes the copy it will execute all writes using the same
+        // writable catalog instance.
+        //
+        // To minimize the risk of this test being flaky we need to make the catalog copy slow
+        // enough so the other threads properly enter the queue state. We achieve this by having a
+        // large numbers of collections in the catalog.
+        CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& writableCatalog) {
+            catalogInstancesObserved[index] = &writableCatalog;
+
+            // Perform a write, we will later verify that all writes are observable even when
+            // workers are batched together.
+            writableCatalog.registerCollection(operationContext(), std::move(collectionToInsert));
+        });
+    };
+
+    std::array<stdx::thread, NumThreads> threads;
+    for (auto&& thread : threads) {
+        thread = stdx::thread(job);
+    }
+    for (auto&& thread : threads) {
+        thread.join();
+    }
+
+    // Verify that some batching was achieved where at least two threads observed the same catalog
+    // instance. We do this by sorting the array, removing all duplicates and last verify that we
+    // have less elements remaining than number of threads.
+    std::sort(catalogInstancesObserved.begin(), catalogInstancesObserved.end());
+    auto it = std::unique(catalogInstancesObserved.begin(), catalogInstancesObserved.end());
+    ASSERT_LT(std::distance(catalogInstancesObserved.begin(), it), NumThreads);
+
+    // Check that all Collections we inserted are in the final Catalog instance, no overwrites
+    // occured.
+    auto catalog = CollectionCatalog::get(getServiceContext());
+    for (auto&& nss : namespacesInserted) {
+        ASSERT(catalog->lookupCollectionByNamespace(operationContext(), nss));
+    }
+}
+
 TEST_F(CatalogReadCopyUpdateTest, ConcurrentCatalogWriteBatchingMayThrow) {
     // Start threads and perform write that will throw at the same time
     constexpr int32_t NumThreads = 4;

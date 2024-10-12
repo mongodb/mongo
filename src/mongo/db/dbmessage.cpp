@@ -138,6 +138,22 @@ T DbMessage::readAndAdvance() {
     return t;
 }
 
+namespace {
+template <typename Func>
+Message makeMessage(NetworkOp op, Func&& bodyBuilder) {
+    BufBuilder b;
+    b.skip(sizeof(MSGHEADER::Layout));
+
+    bodyBuilder(b);
+
+    const int size = b.len();
+    auto out = Message(b.release());
+    out.header().setOperation(op);
+    out.header().setLen(size);
+    return out;
+}
+}  // namespace
+
 Message makeInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags) {
     return makeMessage(dbInsert, [&](BufBuilder& b) {
         int reservedFlags = 0;

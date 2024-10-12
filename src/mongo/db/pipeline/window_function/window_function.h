@@ -51,19 +51,11 @@ public:
     virtual Value getValue() const = 0;
     virtual void reset() = 0;
     size_t getApproximateSize() {
+        tassert(5414200, "_memUsageBytes not set for function", _memUsageBytes != 0);
         return _memUsageBytes;
     }
 
 protected:
-    // Decrease _memUsageBytes by size, but prevent it from underflowing.
-    void decreaseMemUsageBytes(size_t size) {
-        if (size <= _memUsageBytes) {
-            _memUsageBytes -= size;
-        } else {
-            _memUsageBytes = 0;
-        }
-    }
-
     ExpressionContext* _expCtx;
     size_t _memUsageBytes = 0;
 };

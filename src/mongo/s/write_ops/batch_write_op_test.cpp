@@ -1029,7 +1029,9 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorOrdered) {
 // Tests of edge-case functionality, lifecycle is assumed to be behaving normally
 //
 
-// Multi-op (unordered) error and write concern error test.
+// Multi-op (unordered) error and write concern error test. We never report the write concern error
+// for single-doc batches, since the error means there's no write concern applied. Don't suppress
+// the error if ordered : false.
 TEST_F(BatchWriteOpTest, MultiOpErrorAndWriteConcernErrorUnordered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED(), boost::none);
@@ -1072,7 +1074,8 @@ TEST_F(BatchWriteOpTest, MultiOpErrorAndWriteConcernErrorUnordered) {
     ASSERT(clientResponse.isWriteConcernErrorSet());
 }
 
-// Single-op (ordered) error and write concern error test.
+// Single-op (ordered) error and write concern error test. Suppress the write concern error if
+// ordered and we also have an error
 TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
     NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED(), boost::none);
@@ -1118,14 +1121,14 @@ TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
     ASSERT(batchOp.isFinished());
     ASSERT(++targetedIt == targeted.end());
 
-    // Ordered reports write concern error.
+    // Ordered doesn't report write concern error
     BatchedCommandResponse clientResponse;
     batchOp.buildClientResponse(&clientResponse);
     ASSERT(clientResponse.getOk());
     ASSERT_EQUALS(clientResponse.getN(), 1);
     ASSERT(clientResponse.isErrDetailsSet());
     ASSERT_EQUALS(clientResponse.sizeErrDetails(), 1u);
-    ASSERT(clientResponse.isWriteConcernErrorSet());
+    ASSERT(!clientResponse.isWriteConcernErrorSet());
 }
 
 // Targeting failure on second op in batch op (ordered)

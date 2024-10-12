@@ -59,7 +59,7 @@ public:
         auto iter = _values.find(std::move(value));
         tassert(
             5423800, "Can't remove from an empty WindowFunctionAddToSet", iter != _values.end());
-        decreaseMemUsageBytes(iter->getApproximateSize());
+        _memUsageBytes -= iter->getApproximateSize();
         _values.erase(iter);
     }
 

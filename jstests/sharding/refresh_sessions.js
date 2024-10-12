@@ -8,15 +8,8 @@ var sessionsDb = "config";
 var refresh = {refreshLogicalSessionCacheNow: 1};
 var startSession = {startSession: 1};
 
-var cluster = new ShardingTest({
-    mongos: [{setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}}],
-    shards: 2,
-    rs: {setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}},
-    other: {
-        configOptions:
-            {setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}}
-    }
-});
+// Create a cluster with 1 shard.
+var cluster = new ShardingTest({shards: 2});
 
 // Test that we can refresh without any sessions, as a sanity check.
 {
