@@ -31,7 +31,9 @@
 
 #include <type_traits>
 
+#include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_client_handle_shard.h"
+#include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_impl.h"
@@ -93,10 +95,8 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
 
     auto const serviceContext = getServiceContext();
 
-    // Authorization manager override must occur before creating new threads like JournalFlusher
-    if (options._mockAuthzExternalState) {
-        _authzExternalState = options._mockAuthzExternalState.get();
-
+    // Set up the AuthorizationManager.
+    if (options._setAuthObjects) {
         // Setup the repl coordinator in standalone mode so that DBDirectClient can work.
         repl::ReplicationCoordinator::set(serviceContext,
                                           std::make_unique<repl::ReplicationCoordinatorMock>(
@@ -105,8 +105,8 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
         auto authzRouter = std::make_unique<AuthorizationRouterImpl>(
             getService(), std::make_unique<AuthorizationClientHandleShard>());
 
-        auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
-            getService(), std::move(options._mockAuthzExternalState), std::move(authzRouter));
+        auto uniqueAuthzManager =
+            std::make_unique<AuthorizationManagerImpl>(getService(), std::move(authzRouter));
         AuthorizationManager::set(getService(), std::move(uniqueAuthzManager));
         AuthorizationManager::get(getService())->setAuthEnabled(options._setAuthEnabled);
     }

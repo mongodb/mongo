@@ -30,7 +30,6 @@
 #include "mongo/db/s/shard_server_op_observer.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_util.h"

@@ -91,6 +91,15 @@ public:
         _findsShouldFail = enable;
     }
 
+    /**
+     * Calls the base resolveRoles, but is exposed for testing purposes.
+     */
+    StatusWith<ResolvedRoleData> resolveRoles_forTest(OperationContext* opCtx,
+                                                      const std::vector<RoleName>& roleNames,
+                                                      ResolveRoleOption option) {
+        return resolveRoles(opCtx, roleNames, option);
+    }
+
 protected:
     RolesLocks _lockRoles(OperationContext* opCtx, const boost::optional<TenantId>&) override {
         return RolesLocks();

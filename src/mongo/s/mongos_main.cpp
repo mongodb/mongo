@@ -64,8 +64,6 @@
 #include "mongo/db/audit_interface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory.h"
-#include "mongo/db/auth/authz_manager_external_state.h"
-#include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/client.h"
@@ -1021,10 +1019,6 @@ void startupConfigActions(const std::vector<std::string>& argv) {
     ntservice::configureService(
         initService, moe::startupOptionsParsed, defaultServiceStrings, disallowedOptions, argv);
 #endif
-}
-
-std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongos() {
-    return std::make_unique<AuthzManagerExternalStateMongos>();
 }
 
 ExitCode main(ServiceContext* serviceContext) {

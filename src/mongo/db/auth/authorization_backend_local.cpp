@@ -85,8 +85,8 @@
 namespace mongo::auth {
 using namespace fmt::literals;
 
-using std::vector;
-
+using ResolvedRoleData = AuthorizationBackendInterface::ResolvedRoleData;
+using ResolveRoleOption = AuthorizationBackendInterface::ResolveRoleOption;
 
 Status AuthorizationBackendLocal::findOne(OperationContext* opCtx,
                                           const NamespaceString& nss,
@@ -151,7 +151,7 @@ NamespaceString getRolesCollection(const boost::optional<TenantId>& tenant) {
 }
 
 void serializeResolvedRoles(BSONObjBuilder* user,
-                            const AuthorizationManager::ResolvedRoleData& data,
+                            const ResolvedRoleData& data,
                             boost::optional<const BSONObj&> roleDoc = boost::none) {
     BSONArrayBuilder rolesBuilder(user->subarrayStart("inheritedRoles"));
     for (const auto& roleName : data.roles.value()) {
@@ -200,8 +200,6 @@ constexpr auto kRolesFieldName = "roles"_sd;
 constexpr auto kPrivilegesFieldName = "privileges"_sd;
 constexpr auto kAuthenticationRestrictionFieldName = "authenticationRestrictions"_sd;
 
-using ResolvedRoleData = AuthorizationManager::ResolvedRoleData;
-using ResolveRoleOption = AuthorizationManager::ResolveRoleOption;
 std::vector<RoleName> filterAndMapRole(BSONObjBuilder* builder,
                                        BSONObj role,
                                        ResolveRoleOption option,
@@ -897,8 +895,8 @@ std::vector<BSONObj> AuthorizationBackendLocal::performLookupWithPrivilegesAndRe
     return users;
 }
 
-UsersInfoReply AuthorizationBackendLocal::acquireUsers(OperationContext* opCtx,
-                                                       const UsersInfoCommand& cmd) {
+UsersInfoReply AuthorizationBackendLocal::lookupUsers(OperationContext* opCtx,
+                                                      const UsersInfoCommand& cmd) {
     const auto& arg = cmd.getCommandParameter();
     const auto& dbname = cmd.getDbName();
 
@@ -918,8 +916,8 @@ UsersInfoReply AuthorizationBackendLocal::acquireUsers(OperationContext* opCtx,
     return reply;
 }
 
-RolesInfoReply AuthorizationBackendLocal::acquireRoles(OperationContext* opCtx,
-                                                       const RolesInfoCommand& cmd) {
+RolesInfoReply AuthorizationBackendLocal::lookupRoles(OperationContext* opCtx,
+                                                      const RolesInfoCommand& cmd) {
     const auto& arg = cmd.getCommandParameter();
     const auto& dbname = cmd.getDbName();
 

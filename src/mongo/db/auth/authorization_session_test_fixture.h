@@ -36,37 +36,12 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_for_test.h"
 #include "mongo/db/auth/authorization_session_impl.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
-
-class FailureCapableAuthzManagerExternalStateMock : public AuthzManagerExternalStateMock {
-public:
-    FailureCapableAuthzManagerExternalStateMock() = default;
-    ~FailureCapableAuthzManagerExternalStateMock() override = default;
-
-    void setFindsShouldFail(bool enable) {
-        _findsShouldFail = enable;
-    }
-
-    Status findOne(OperationContext* opCtx,
-                   const NamespaceString& collectionName,
-                   const BSONObj& query,
-                   BSONObj* result) override {
-        if (_findsShouldFail && collectionName == NamespaceString::kAdminUsersNamespace) {
-            return Status(ErrorCodes::UnknownError,
-                          "findOne on admin.system.users set to fail in mock.");
-        }
-        return AuthzManagerExternalStateMock::findOne(opCtx, collectionName, query, result);
-    }
-
-private:
-    bool _findsShouldFail{false};
-};
 
 class AuthorizationSessionTestFixture : public ServiceContextMongoDTest {
 public:
@@ -104,24 +79,19 @@ public:
 
 private:
     static Options createServiceContextOptions(Options options) {
-        return options.useMockClock(true).useMockAuthzManagerExternalState(
-            std::make_unique<FailureCapableAuthzManagerExternalStateMock>());
+        options = options.setAuthObjects(true);
+        return options.useMockClock(true);
     }
 
 protected:
     explicit AuthorizationSessionTestFixture(Options options = Options{})
-        : ServiceContextMongoDTest(createServiceContextOptions(std::move(options))) {
-        managerState =
-            dynamic_cast<FailureCapableAuthzManagerExternalStateMock*>(authzExternalState());
-        invariant(managerState);
-    }
+        : ServiceContextMongoDTest(createServiceContextOptions(std::move(options))) {}
 
     ClockSourceMock* clockSource() {
         return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
     }
 
 protected:
-    FailureCapableAuthzManagerExternalStateMock* managerState;
     transport::TransportLayerMock transportLayer;
     std::shared_ptr<transport::Session> _session;
     ServiceContext::UniqueClient _client;

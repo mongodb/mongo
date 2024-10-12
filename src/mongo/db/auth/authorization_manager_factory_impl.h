@@ -37,8 +37,8 @@ namespace mongo {
 
 class AuthorizationManagerFactoryImpl : public AuthorizationManagerFactory {
 public:
-    std::unique_ptr<AuthorizationManager> createRouter(Service* service) override;
-    std::unique_ptr<AuthorizationManager> createShard(Service* service) override;
+    std::unique_ptr<AuthorizationManager> createRouter(Service* service) final;
+    std::unique_ptr<AuthorizationManager> createShard(Service* service) final;
 
     std::unique_ptr<auth::AuthorizationBackendInterface> createBackendInterface(
         Service* service) override;

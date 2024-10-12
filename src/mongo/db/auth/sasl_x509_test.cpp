@@ -48,7 +48,6 @@
 #include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/sasl_x509_server_conversation.h"

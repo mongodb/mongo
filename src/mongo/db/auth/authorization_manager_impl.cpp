@@ -59,7 +59,6 @@
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
-#include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/restriction_set.h"
@@ -216,17 +215,14 @@ bool appliesToAuthzData(StringData op, const NamespaceString& nss, const BSONObj
 
 }  // namespace
 
-AuthorizationManagerImpl::AuthorizationManagerImpl(
-    Service* service,
-    std::unique_ptr<AuthzManagerExternalState> externalState,
-    std::unique_ptr<AuthorizationRouter> authzRouter)
-    : _externalState(std::move(externalState)), _authzRouter(std::move(authzRouter)) {}
+AuthorizationManagerImpl::AuthorizationManagerImpl(Service* service,
+                                                   std::unique_ptr<AuthorizationRouter> authzRouter)
+    : _authzRouter(std::move(authzRouter)) {}
 
 AuthorizationManagerImpl::~AuthorizationManagerImpl() = default;
 
 std::unique_ptr<AuthorizationSession> AuthorizationManagerImpl::makeAuthorizationSession(
     Client* client) {
-    invariant(_externalState != nullptr);
     return std::make_unique<AuthorizationSessionImpl>(
         _authzRouter->makeAuthzSessionExternalState(client), client);
 }
@@ -280,58 +276,6 @@ void AuthorizationManagerImpl::notifyDDLOperation(OperationContext* opCtx,
                                                   const BSONObj& o,
                                                   const BSONObj* o2) {
     _authzRouter->notifyDDLOperation(opCtx, op, nss, o, o2);
-}
-
-// TODO SERVER-95189 remove or update this method to improve delegation between AuthorizationRouter
-// and AuthorizationBackend.
-StatusWith<User> AuthorizationManagerImpl::lookupUserObject(
-    OperationContext* opCtx,
-    const UserRequest& userReq,
-    const SharedUserAcquisitionStats& userAcquisitionStats) try {
-    auto* backend = auth::AuthorizationBackendInterface::get(opCtx->getService());
-    uassert(ErrorCodes::OperationFailed, "Authorization backend not available", backend);
-
-    return backend->getUserObject(opCtx, userReq, userAcquisitionStats);
-} catch (const DBException& ex) {
-    return ex.toStatus();
-}
-
-// TODO SERVER-95189 remove or update this to improve delegation between AuthorizationRouter and
-// AuthorizationBackend.
-Status AuthorizationManagerImpl::lookupUserDescription(OperationContext* opCtx,
-                                                       const UserName& userName,
-                                                       BSONObj* result) try {
-    auto* backend = auth::AuthorizationBackendInterface::get(opCtx->getService());
-    uassert(ErrorCodes::OperationFailed, "Authorization backend not available", backend);
-
-    return backend->getUserDescription(opCtx,
-                                       UserRequestGeneral(userName, boost::none),
-                                       result,
-                                       CurOp::get(opCtx)->getUserAcquisitionStats());
-} catch (const DBException& ex) {
-    return ex.toStatus();
-}
-
-Status AuthorizationManagerImpl::rolesExist(OperationContext* opCtx,
-                                            const std::vector<RoleName>& roleNames) {
-    auto* backend = auth::AuthorizationBackendInterface::get(opCtx->getService());
-    if (backend) {
-        return backend->rolesExist(opCtx, roleNames);
-    }
-
-    return _authzRouter->rolesExist(opCtx, roleNames);
-}
-
-// TODO SERVER-95189 remove or update this to improve delegation between AuthorizationRouter and
-// AuthorizationBackend.
-StatusWith<AuthorizationManager::ResolvedRoleData> AuthorizationManagerImpl::resolveRoles(
-    OperationContext* opCtx, const std::vector<RoleName>& roleNames, ResolveRoleOption option) try {
-    auto* backend = auth::AuthorizationBackendInterface::get(opCtx->getService());
-    uassert(ErrorCodes::OperationFailed, "Authorization backend not available", backend);
-
-    return backend->resolveRoles(opCtx, roleNames, option);
-} catch (const DBException& ex) {
-    return ex.toStatus();
 }
 
 StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,

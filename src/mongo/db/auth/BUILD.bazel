@@ -131,7 +131,6 @@ mongo_cc_library(
         "authorization_manager_impl.cpp",
         "authorization_router_impl.cpp",
         "authorization_session_impl.cpp",
-        "authz_manager_external_state.cpp",
         "authz_session_external_state.cpp",
         ":authorization_manager_impl_parameters_gen",
         "//src/mongo/db/auth:user_request_x509.h",
@@ -140,7 +139,6 @@ mongo_cc_library(
         "authorization_manager_impl.h",
         "authorization_router_impl.h",
         "authorization_session_impl.h",
-        "authz_manager_external_state.h",
         "authz_session_external_state.h",
         "resource_pattern_search_list.h",
     ],
@@ -177,23 +175,6 @@ mongo_cc_library(
     }),
 )
 
-mongo_cc_library(
-    name = "auth_impl_internal_local",
-    srcs = [
-        "authz_manager_external_state_local.cpp",
-    ],
-    hdrs = [
-        "authorization_backend_local.h",
-        "authz_manager_external_state_local.h",
-    ],
-    deps = [
-        ":auth_impl_internal",
-        "//src/mongo/db:multitenancy",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/storage:storage_options",
-    ],
-)
-
 idl_generator(
     name = "user_cache_invalidator_job_parameters_gen",
     src = "user_cache_invalidator_job_parameters.idl",
@@ -213,7 +194,6 @@ mongo_cc_library(
     ],
     deps = [
         ":auth",
-        ":auth_impl_internal_local",
         ":authorization_manager_global",
         "//src/mongo/db:server_base",
         "//src/mongo/s:grid",
@@ -505,8 +485,6 @@ mongo_cc_library(
         "authorization_client_handle_router.cpp",
         "authorization_client_handle_shard.cpp",
         "authorization_manager_factory_impl.cpp",
-        "authz_manager_external_state_d.cpp",
-        "authz_manager_external_state_s.cpp",
         "authz_session_external_state_router.cpp",
         "authz_session_external_state_server_common.cpp",
         "authz_session_external_state_shard.cpp",
@@ -517,15 +495,12 @@ mongo_cc_library(
         "authorization_client_handle_router.h",
         "authorization_client_handle_shard.h",
         "authorization_manager_factory_impl.h",
-        "authz_manager_external_state_d.h",
-        "authz_manager_external_state_s.h",
         "authz_session_external_state_router.h",
         "authz_session_external_state_server_common.h",
         "authz_session_external_state_shard.h",
     ],
     deps = [
         ":auth",
-        ":auth_impl_internal_local",
         ":authorization_manager_global",
         ":sasl_commands",
         ":saslauth",
@@ -546,19 +521,16 @@ mongo_cc_library(
     srcs = [
         "authorization_backend_mock.cpp",
         "authorization_manager_factory_mock.cpp",
-        "authz_manager_external_state_mock.cpp",
         "authz_session_external_state_mock.cpp",
     ],
     hdrs = [
         "authorization_backend_mock.h",
         "authorization_manager_factory_mock.h",
-        "authz_manager_external_state_mock.h",
         "authz_session_external_state_mock.h",
     ],
     deps = [
         ":auth",
         ":auth_impl_internal",
-        ":auth_impl_internal_local",
         ":authserver",
         ":sasl_options",
         ":sasl_options_init",

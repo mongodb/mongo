@@ -507,7 +507,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/modules/enterprise/src/sasl/auth_delay"
         if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) and have_sasl_lib
         else "",
-        "$BUILD_DIR/mongo/db/modules/enterprise/src/sasl/authz_manager_factory_external"
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/sasl/authz_manager_factory_enterprise"
         if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) and have_sasl_lib
         else "",
         "$BUILD_DIR/mongo/db/modules/enterprise/src/sasl/mongosaslservercommon"

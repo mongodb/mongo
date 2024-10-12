@@ -809,7 +809,6 @@ mongo_cc_library(
     ],
 )
 
-# TODO SERVER-95189 - move this library back to servers below.
 mongo_cc_library(
     name = "umc_commands_idl",
     srcs = [

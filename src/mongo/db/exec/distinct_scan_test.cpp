@@ -30,6 +30,7 @@
 #include <memory>
 
 #include "mongo/client/index_spec.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/plan_stage.h"

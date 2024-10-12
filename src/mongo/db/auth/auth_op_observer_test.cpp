@@ -43,6 +43,7 @@
 #include "mongo/db/auth/authorization_backend_mock.h"
 #include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_router_impl_for_test.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/database.h"
@@ -94,14 +95,12 @@ public:
             std::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings()));
         repl::createOplog(opCtx.get());
 
-        auto localExternalState = std::make_unique<AuthzManagerExternalStateMock>();
-
         auto authzRouter = std::make_unique<AuthorizationRouterImplForTest>(
             getService(), std::make_unique<AuthorizationClientHandleShard>());
         mockRouter = authzRouter.get();
 
-        auto localAuthzManager = std::make_unique<AuthorizationManagerImpl>(
-            getService(), std::move(localExternalState), std::move(authzRouter));
+        auto localAuthzManager =
+            std::make_unique<AuthorizationManagerImpl>(getService(), std::move(authzRouter));
         localAuthzManager->setAuthEnabled(true);
         authzManager = localAuthzManager.get();
         AuthorizationManager::set(getService(), std::move(localAuthzManager));

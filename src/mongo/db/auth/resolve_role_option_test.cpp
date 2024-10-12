@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/unittest/assert.h"
 
 namespace mongo {
 namespace {
 
-using ResolveRoleOption = AuthorizationManager::ResolveRoleOption;
+using ResolveRoleOption = auth::AuthorizationBackendInterface::ResolveRoleOption;
 
 // Represents a mapping between a ResolveRoleOption bitfield and the expected assertions
 // from calling ResolveRoleOption's comparison methods.

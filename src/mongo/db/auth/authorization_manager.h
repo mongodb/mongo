@@ -62,7 +62,6 @@
 namespace mongo {
 
 class AuthorizationSession;
-class AuthzManagerExternalState;
 class Client;
 class OperationContext;
 class ServiceContext;
@@ -196,11 +195,6 @@ public:
                                     const BSONObj* o2) = 0;
 
     /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
-     */
-    virtual Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) = 0;
-
-    /**
      * Returns a Status or UserHandle for the given userRequest. If the user cache already has a
      * user object for this user, it returns a handle from the cache, otherwise it retrieves the
      * user via a usersInfo command routed to the appropriate node - this may block for a long time.
@@ -258,30 +252,5 @@ public:
      * Each member will be populated ONLY IF their corresponding Option flag was specifed.
      * Otherwise, they will be equal to boost::none.
      */
-    struct ResolvedRoleData {
-        boost::optional<stdx::unordered_set<RoleName>> roles;
-        boost::optional<PrivilegeVector> privileges;
-        boost::optional<RestrictionDocuments> restrictions;
-    };
-
-    using ResolveRoleOption = auth::ResolveRoleOption;
-
-    /**
-     * The following methods all delegate to the AuthorizationBackend and bypass the user cache.
-     * They should only be used by user management commands and auth-internal code.
-     */
-    virtual StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
-                                                      const std::vector<RoleName>& roleNames,
-                                                      ResolveRoleOption option) = 0;
-
-    virtual StatusWith<User> lookupUserObject(
-        OperationContext* opCtx,
-        const UserRequest& userReq,
-        const SharedUserAcquisitionStats& userAcquisitionStats) = 0;
-
-    virtual Status lookupUserDescription(OperationContext* opCtx,
-                                         const UserName& userName,
-                                         BSONObj* result) = 0;
 };
-
 }  // namespace mongo

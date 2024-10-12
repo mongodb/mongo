@@ -145,6 +145,49 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 namespace mongo {
+
+class auth::AuthorizationBackendInterface::CmdUMCPassthrough {
+public:
+    static Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) {
+        return auth::AuthorizationBackendInterface::get(opCtx->getService())
+            ->rolesExist(opCtx, roleNames);
+    }
+
+    static UsersInfoReply lookupUsers(OperationContext* opCtx, const UsersInfoCommand& cmd) {
+        return auth::AuthorizationBackendInterface::get(opCtx->getService())
+            ->lookupUsers(opCtx, cmd);
+    }
+
+    static StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
+                                                     const std::vector<RoleName>& roleNames,
+                                                     ResolveRoleOption option) {
+        return auth::AuthorizationBackendInterface::get(opCtx->getService())
+            ->resolveRoles(opCtx, roleNames, option);
+    }
+
+    static Status getUserDescription(OperationContext* opCtx,
+                                     const UserRequest& user,
+                                     BSONObj* result,
+                                     const SharedUserAcquisitionStats& userAcquisitionStats) {
+        return auth::AuthorizationBackendInterface::get(opCtx->getService())
+            ->getUserDescription(opCtx, user, result, userAcquisitionStats);
+    }
+
+    static StatusWith<User> getUserObject(OperationContext* opCtx,
+                                          const UserRequest& userReq,
+                                          const SharedUserAcquisitionStats& userAcquisitionStats) {
+        return auth::AuthorizationBackendInterface::get(opCtx->getService())
+            ->getUserObject(opCtx, userReq, userAcquisitionStats);
+    }
+
+    static RolesInfoReply lookupRoles(OperationContext* opCtx, const RolesInfoCommand& cmd) {
+        return auth::AuthorizationBackendInterface::get(opCtx->getService())
+            ->lookupRoles(opCtx, cmd);
+    }
+};
+
+using CmdUMCPassthrough = auth::AuthorizationBackendInterface::CmdUMCPassthrough;
+
 namespace {
 
 constexpr auto kOne = "1"_sd;
@@ -181,80 +224,6 @@ Status privilegeVectorToBSONArray(const PrivilegeVector& privileges, BSONArray* 
     PrivilegeVector uniquePrivileges;
     Privilege::addPrivilegesToPrivilegeVector(&uniquePrivileges, privileges);
     *result = containerToBSONArray(uniquePrivileges);
-    return Status::OK();
-}
-
-/**
- * Used to get all current roles of the user identified by 'userName'.
- */
-Status getCurrentUserRoles(OperationContext* opCtx,
-                           const UserName& userName,
-                           stdx::unordered_set<RoleName>* roles) {
-
-    auto userAcquisitionStats = CurOp::get(opCtx)->getUserAcquisitionStats();
-    BSONObj result;
-    std::unique_ptr<UserRequest> request =
-        std::make_unique<UserRequestGeneral>(userName, boost::none);
-
-    auto swUser = AuthorizationManager::get(opCtx->getService())
-                      ->lookupUserObject(opCtx, *request.get(), userAcquisitionStats);
-
-    if (!swUser.isOK()) {
-        return swUser.getStatus();
-    }
-
-    User user(std::move(swUser.getValue()));
-
-    RoleNameIterator rolesIt = user.getRoles();
-    while (rolesIt.more()) {
-        roles->insert(rolesIt.next());
-    }
-    return Status::OK();
-}
-
-/**
- * Checks that every role in "rolesToAdd" exists, that adding each of those roles to "role"
- * will not result in a cycle to the role graph, and that every role being added comes from the
- * same database as the role it is being added to (or that the role being added to is from the
- * "admin" database.
- */
-Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
-                                   const RoleName& role,
-                                   const std::vector<RoleName>& rolesToAdd) {
-    for (const auto& roleToAdd : rolesToAdd) {
-        if (roleToAdd == role) {
-            return {ErrorCodes::InvalidRoleModification,
-                    str::stream() << "Cannot grant role " << role << " to itself."};
-        }
-
-        if (role.getDB() != "admin" && roleToAdd.getDB() != role.getDB()) {
-            return {ErrorCodes::InvalidRoleModification,
-                    str::stream() << "Roles on the \'" << role.getDB()
-                                  << "\' database cannot be granted roles from other databases"};
-        }
-    }
-
-    auto status = AuthorizationManager::get(opCtx->getService())->rolesExist(opCtx, rolesToAdd);
-    if (!status.isOK()) {
-        return {status.code(),
-                str::stream() << "Cannot grant roles to '" << role << "': " << status.reason()};
-    }
-
-    auto swData =
-        auth::AuthorizationBackendInterface::get(opCtx->getService())
-            ->resolveRoles(opCtx, rolesToAdd, AuthorizationManager::ResolveRoleOption::kRoles());
-    if (!swData.isOK()) {
-        return {swData.getStatus().code(),
-                str::stream() << "Cannot grant roles to '" << role
-                              << "': " << swData.getStatus().reason()};
-    }
-
-    if (sequenceContains(swData.getValue().roles.get(), role)) {
-        return {ErrorCodes::InvalidRoleModification,
-                str::stream() << "Granting roles to " << role
-                              << " would introduce a cycle in the role graph"};
-    }
-
     return Status::OK();
 }
 
@@ -674,49 +643,6 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
     }
 }
 
-void trimCredentials(OperationContext* opCtx,
-                     const UserName& userName,
-                     BSONObjBuilder* queryBuilder,
-                     BSONObjBuilder* unsetBuilder,
-                     const std::vector<StringData>& mechanisms) {
-    auto* authzManager = AuthorizationManager::get(opCtx->getService());
-
-    BSONObj userObj;
-    uassertStatusOK(authzManager->lookupUserDescription(opCtx, userName, &userObj));
-
-    const auto& credsElem = userObj["credentials"];
-    uassert(ErrorCodes::UnsupportedFormat,
-            "Unable to trim credentials from a user document with no credentials",
-            credsElem.type() == Object);
-
-    const auto& creds = credsElem.Obj();
-    queryBuilder->append("credentials", creds);
-
-    bool keepSCRAMSHA1 = false, keepSCRAMSHA256 = false;
-    for (const auto& mech : mechanisms) {
-        uassert(ErrorCodes::BadValue,
-                "mechanisms field must be a subset of previously set mechanisms",
-                creds.hasField(mech));
-
-        if (mech == "SCRAM-SHA-1") {
-            keepSCRAMSHA1 = true;
-        } else if (mech == "SCRAM-SHA-256") {
-            keepSCRAMSHA256 = true;
-        }
-    }
-
-    uassert(ErrorCodes::BadValue,
-            "mechanisms field must contain at least one previously set known mechanism",
-            keepSCRAMSHA1 || keepSCRAMSHA256);
-
-    if (!keepSCRAMSHA1) {
-        unsetBuilder->append("credentials.SCRAM-SHA-1", "");
-    }
-    if (!keepSCRAMSHA256) {
-        unsetBuilder->append("credentials.SCRAM-SHA-256", "");
-    }
-}
-
 template <typename T>
 BSONArray vectorToBSON(const std::vector<T>& vec) {
     BSONArrayBuilder builder;
@@ -987,6 +913,10 @@ template <typename T>
 constexpr bool hasGetCmdParamStringData =
     stdx::is_detected_exact_v<StringData, HasGetCmdParamOp, T>;
 
+
+using ResolvedRoleData = auth::AuthorizationBackendInterface::ResolvedRoleData;
+using ResolveRoleOption = auth::AuthorizationBackendInterface::ResolveRoleOption;
+
 template <typename RequestT, typename Params = UMCStdParams>
 class CmdUMCTyped : public TypedCommand<CmdUMCTyped<RequestT, Params>> {
 public:
@@ -1052,6 +982,121 @@ public:
     }
 };
 
+/**
+ * Checks that every role in "rolesToAdd" exists, that adding each of those roles to "role"
+ * will not result in a cycle to the role graph, and that every role being added comes from the
+ * same database as the role it is being added to (or that the role being added to is from the
+ * "admin" database.
+ */
+Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
+                                   const RoleName& role,
+                                   const std::vector<RoleName>& rolesToAdd) {
+    for (const auto& roleToAdd : rolesToAdd) {
+        if (roleToAdd == role) {
+            return {ErrorCodes::InvalidRoleModification,
+                    str::stream() << "Cannot grant role " << role << " to itself."};
+        }
+
+        if (role.getDB() != "admin" && roleToAdd.getDB() != role.getDB()) {
+            return {ErrorCodes::InvalidRoleModification,
+                    str::stream() << "Roles on the \'" << role.getDB()
+                                  << "\' database cannot be granted roles from other databases"};
+        }
+    }
+
+    auto status = CmdUMCPassthrough::rolesExist(opCtx, rolesToAdd);
+    if (!status.isOK()) {
+        return {status.code(),
+                str::stream() << "Cannot grant roles to '" << role << "': " << status.reason()};
+    }
+
+    auto swData = CmdUMCPassthrough::resolveRoles(
+        opCtx, rolesToAdd, auth::AuthorizationBackendInterface::ResolveRoleOption::kRoles());
+    if (!swData.isOK()) {
+        return {swData.getStatus().code(),
+                str::stream() << "Cannot grant roles to '" << role
+                              << "': " << swData.getStatus().reason()};
+    }
+
+    if (sequenceContains(swData.getValue().roles.get(), role)) {
+        return {ErrorCodes::InvalidRoleModification,
+                str::stream() << "Granting roles to " << role
+                              << " would introduce a cycle in the role graph"};
+    }
+
+    return Status::OK();
+}
+
+/**
+ * Used to get all current roles of the user identified by 'userName'.
+ */
+Status getCurrentUserRoles(OperationContext* opCtx,
+                           const UserName& userName,
+                           stdx::unordered_set<RoleName>* roles) {
+
+    auto userAcquisitionStats = CurOp::get(opCtx)->getUserAcquisitionStats();
+    BSONObj result;
+    std::unique_ptr<UserRequest> request =
+        std::make_unique<UserRequestGeneral>(userName, boost::none);
+
+    auto swUser = CmdUMCPassthrough::getUserObject(opCtx, *request.get(), userAcquisitionStats);
+
+    if (!swUser.isOK()) {
+        return swUser.getStatus();
+    }
+
+    User user(std::move(swUser.getValue()));
+
+    RoleNameIterator rolesIt = user.getRoles();
+    while (rolesIt.more()) {
+        roles->insert(rolesIt.next());
+    }
+    return Status::OK();
+}
+
+void trimCredentials(OperationContext* opCtx,
+                     const UserName& userName,
+                     BSONObjBuilder* queryBuilder,
+                     BSONObjBuilder* unsetBuilder,
+                     const std::vector<StringData>& mechanisms) {
+    BSONObj userObj;
+    auto sharedAcquisitionStats = CurOp::get(opCtx)->getUserAcquisitionStats();
+    auto userReq = std::make_unique<UserRequestGeneral>(userName, boost::none);
+    uassertStatusOK(CmdUMCPassthrough::getUserDescription(
+        opCtx, *userReq.get(), &userObj, sharedAcquisitionStats));
+
+    const auto& credsElem = userObj["credentials"];
+    uassert(ErrorCodes::UnsupportedFormat,
+            "Unable to trim credentials from a user document with no credentials",
+            credsElem.type() == Object);
+
+    const auto& creds = credsElem.Obj();
+    queryBuilder->append("credentials", creds);
+
+    bool keepSCRAMSHA1 = false, keepSCRAMSHA256 = false;
+    for (const auto& mech : mechanisms) {
+        uassert(ErrorCodes::BadValue,
+                "mechanisms field must be a subset of previously set mechanisms",
+                creds.hasField(mech));
+
+        if (mech == "SCRAM-SHA-1") {
+            keepSCRAMSHA1 = true;
+        } else if (mech == "SCRAM-SHA-256") {
+            keepSCRAMSHA256 = true;
+        }
+    }
+
+    uassert(ErrorCodes::BadValue,
+            "mechanisms field must contain at least one previously set known mechanism",
+            keepSCRAMSHA1 || keepSCRAMSHA256);
+
+    if (!keepSCRAMSHA1) {
+        unsetBuilder->append("credentials.SCRAM-SHA-1", "");
+    }
+    if (!keepSCRAMSHA256) {
+        unsetBuilder->append("credentials.SCRAM-SHA-256", "");
+    }
+}
 
 class CmdCreateUser : public CmdUMCTyped<CreateUserCommand> {
 public:
@@ -1152,8 +1197,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
     uassertStatusOK(V2UserDocumentParser().checkValidUserDocument(userObj));
 
     // Role existence has to be checked after acquiring the update lock
-    uassertStatusOK(
-        AuthorizationManager::get(opCtx->getService())->rolesExist(opCtx, resolvedRoles));
+    uassertStatusOK(CmdUMCPassthrough::rolesExist(opCtx, resolvedRoles));
 
     // Audit this event.
     auto optCustomData = cmd.getCustomData();
@@ -1254,8 +1298,7 @@ void CmdUMCTyped<UpdateUserCommand>::Invocation::typedRun(OperationContext* opCt
     // Role existence has to be checked after acquiring the update lock
     if (auto roles = cmd.getRoles()) {
         auto resolvedRoles = auth::resolveRoleNames(roles.get(), dbname);
-        uassertStatusOK(
-            AuthorizationManager::get(opCtx->getService())->rolesExist(opCtx, resolvedRoles));
+        uassertStatusOK(CmdUMCPassthrough::rolesExist(opCtx, resolvedRoles));
     }
 
     // Audit this event.
@@ -1349,8 +1392,7 @@ void CmdUMCTyped<GrantRolesToUserCommand>::Invocation::typedRun(OperationContext
     uassertStatusOK(getCurrentUserRoles(opCtx, userName, &userRoles));
 
     auto resolvedRoleNames = auth::resolveRoleNames(cmd.getRoles(), dbname);
-    uassertStatusOK(
-        AuthorizationManager::get(opCtx->getService())->rolesExist(opCtx, resolvedRoleNames));
+    uassertStatusOK(CmdUMCPassthrough::rolesExist(opCtx, resolvedRoleNames));
     for (const auto& role : resolvedRoleNames) {
         userRoles.insert(role);
     }
@@ -1383,8 +1425,7 @@ void CmdUMCTyped<RevokeRolesFromUserCommand>::Invocation::typedRun(OperationCont
     uassertStatusOK(getCurrentUserRoles(opCtx, userName, &userRoles));
 
     auto resolvedUserRoles = auth::resolveRoleNames(cmd.getRoles(), dbname);
-    uassertStatusOK(
-        AuthorizationManager::get(opCtx->getService())->rolesExist(opCtx, resolvedUserRoles));
+    uassertStatusOK(CmdUMCPassthrough::rolesExist(opCtx, resolvedUserRoles));
     for (const auto& role : resolvedUserRoles) {
         userRoles.erase(role);
     }
@@ -1406,10 +1447,7 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
     const auto& cmd = request();
 
     auto lk = uassertStatusOK(getReadOnlyAuthzLock(opCtx));
-    auto authzBackend = auth::AuthorizationBackendInterface::get(opCtx->getService());
-    invariant(authzBackend);
-
-    return authzBackend->acquireUsers(opCtx, cmd);
+    return CmdUMCPassthrough::lookupUsers(opCtx, cmd);
 }
 
 MONGO_REGISTER_COMMAND(CmdUMCTyped<CreateRoleCommand>).forShard();
@@ -1516,7 +1554,7 @@ void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     // Role existence has to be checked after acquiring the update lock
-    uassertStatusOK(AuthorizationManager::get(opCtx->getService())->rolesExist(opCtx, {roleName}));
+    uassertStatusOK(CmdUMCPassthrough::rolesExist(opCtx, {roleName}));
 
     if (optRoles) {
         uassertStatusOK(checkOkayToGrantRolesToRole(opCtx, roleName, *optRoles));
@@ -1573,12 +1611,11 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
     uassertStatusOK(checkOkayToGrantPrivilegesToRole(roleName, newPrivileges));
 
     // Add additional privileges to existing set.
-    auto data = uassertStatusOK(
-        AuthorizationManager::get(opCtx->getService())
-            ->resolveRoles(opCtx,
-                           {roleName},
-                           AuthorizationManager::ResolveRoleOption::kPrivileges().setDirectOnly(
-                               true /* shouldEnable */)));
+    auto data = uassertStatusOK(CmdUMCPassthrough::resolveRoles(
+        opCtx,
+        {roleName},
+        auth::AuthorizationBackendInterface::ResolveRoleOption::kPrivileges().setDirectOnly(
+            true /* shouldEnable */)));
     auto privileges = std::move(data.privileges.get());
     for (const auto& priv : newPrivileges) {
         Privilege::addPrivilegeToPrivilegeVector(&privileges, priv);
@@ -1626,12 +1663,11 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
         dbname.tenantId(), cmd.getPrivileges(), &unrecognizedActions);
     uassertNoUnrecognizedActions(unrecognizedActions);
 
-    auto data = uassertStatusOK(
-        AuthorizationManager::get(opCtx->getService())
-            ->resolveRoles(opCtx,
-                           {roleName},
-                           AuthorizationManager::ResolveRoleOption::kPrivileges().setDirectOnly(
-                               true /* shouldEnable */)));
+    auto data = uassertStatusOK(CmdUMCPassthrough::resolveRoles(
+        opCtx,
+        {roleName},
+        auth::AuthorizationBackendInterface::ResolveRoleOption::kPrivileges().setDirectOnly(
+            true /* shouldEnable */)));
 
     auto privileges = std::move(data.privileges.get());
     for (const auto& rmPriv : rmPrivs) {
@@ -1689,12 +1725,11 @@ void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext
     uassertStatusOK(checkOkayToGrantRolesToRole(opCtx, roleName, rolesToAdd));
 
     // Add new roles to existing roles
-    auto data = uassertStatusOK(
-        AuthorizationManager::get(opCtx->getService())
-            ->resolveRoles(opCtx,
-                           {roleName},
-                           AuthorizationManager::ResolveRoleOption::kRoles().setDirectOnly(
-                               true /* shouldEnable */)));
+    auto data = uassertStatusOK(CmdUMCPassthrough::resolveRoles(
+        opCtx,
+        {roleName},
+        auth::AuthorizationBackendInterface::ResolveRoleOption::kRoles().setDirectOnly(
+            true /* shouldEnable */)));
     auto directRoles = std::move(data.roles.get());
     directRoles.insert(rolesToAdd.cbegin(), rolesToAdd.cend());
 
@@ -1723,23 +1758,20 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationCont
             !auth::isBuiltinRole(roleName));
 
     auto rolesToRemove = auth::resolveRoleNames(cmd.getRoles(), dbname);
-
-    auto* client = opCtx->getClient();
-    auto* service = opCtx->getClient()->getService();
-    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     // Remove roles from existing set.
-    auto data = uassertStatusOK(authzManager->resolveRoles(
+    auto data = uassertStatusOK(CmdUMCPassthrough::resolveRoles(
         opCtx,
         {roleName},
-        AuthorizationManager::ResolveRoleOption::kRoles().setDirectOnly(true /* shouldEnable */)));
+        auth::AuthorizationBackendInterface::ResolveRoleOption::kRoles().setDirectOnly(
+            true /* shouldEnable */)));
     auto roles = std::move(data.roles.get());
     for (const auto& roleToRemove : rolesToRemove) {
         roles.erase(roleToRemove);
     }
 
-    audit::logRevokeRolesFromRole(client, roleName, rolesToRemove);
+    audit::logRevokeRolesFromRole(opCtx->getClient(), roleName, rolesToRemove);
 
     auto status = updateRoleDocument(
         opCtx, roleName, BSON("$set" << BSON("roles" << containerToBSONArray(roles))));
@@ -1828,7 +1860,7 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
     auto* client = opCtx->getClient();
     auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
-    uassertStatusOK(AuthorizationManager::get(opCtx->getService())->rolesExist(opCtx, {roleName}));
+    uassertStatusOK(CmdUMCPassthrough::rolesExist(opCtx, {roleName}));
 
     // From here on, we always want to invalidate the user cache before returning.
     ScopeGuard invalidateGuard([&] {
@@ -1981,7 +2013,7 @@ RolesInfoReply CmdUMCTyped<RolesInfoCommand, UMCInfoParams>::Invocation::typedRu
     OperationContext* opCtx) {
     const auto& cmd = request();
     auto lk = uassertStatusOK(getReadOnlyAuthzLock(opCtx));
-    return auth::AuthorizationBackendInterface::get(opCtx->getService())->acquireRoles(opCtx, cmd);
+    return CmdUMCPassthrough::lookupRoles(opCtx, cmd);
 }
 
 MONGO_REGISTER_COMMAND(CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams>)

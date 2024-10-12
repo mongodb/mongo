@@ -54,7 +54,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_router_impl.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/client.h"
@@ -79,7 +78,7 @@
 namespace mongo {
 namespace {
 
-using ResolveRoleOption = AuthorizationManager::ResolveRoleOption;
+using ResolveRoleOption = auth::AuthorizationBackendInterface::ResolveRoleOption;
 
 #ifdef MONGO_CONFIG_SSL
 // Construct a simple, structured X509 name equivalent to "CN=mongodb.com"
@@ -454,7 +453,7 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
     }
 }
 
-TEST_F(AuthorizationManagerTest, testAuthzManagerExternalStateResolveRoles) {
+TEST_F(AuthorizationManagerTest, testAuthzBackendResolveRoles) {
     BSONObj innerCustomRole{BSON("_id"
                                  << "admin.innerTestRole"
                                  << "db"
@@ -494,7 +493,7 @@ TEST_F(AuthorizationManagerTest, testAuthzManagerExternalStateResolveRoles) {
     // First, resolve all roles (but no privileges or restrictions).
     ResolveRoleOption option{ResolveRoleOption::kRoles()};
     std::vector<RoleName> roleNames{RoleName{"outerTestRole", "admin"}};
-    auto swResolvedData = mockBackend->resolveRoles(opCtx.get(), roleNames, option);
+    auto swResolvedData = mockBackend->resolveRoles_forTest(opCtx.get(), roleNames, option);
     ASSERT_OK(swResolvedData.getStatus());
     auto resolvedData = swResolvedData.getValue();
     ASSERT_TRUE(resolvedData.roles.has_value());
@@ -504,7 +503,7 @@ TEST_F(AuthorizationManagerTest, testAuthzManagerExternalStateResolveRoles) {
 
     // Resolve privileges and roles, no restrictions.
     option.setPrivileges(true /* shouldEnable */);
-    swResolvedData = mockBackend->resolveRoles(opCtx.get(), roleNames, option);
+    swResolvedData = mockBackend->resolveRoles_forTest(opCtx.get(), roleNames, option);
     ASSERT_OK(swResolvedData.getStatus());
     resolvedData = swResolvedData.getValue();
     ASSERT_TRUE(resolvedData.roles.has_value());
@@ -514,7 +513,7 @@ TEST_F(AuthorizationManagerTest, testAuthzManagerExternalStateResolveRoles) {
 
     // Resolve all roles, privileges, and restrictions.
     option.setRestrictions(true /* shouldEnable */);
-    swResolvedData = mockBackend->resolveRoles(opCtx.get(), roleNames, option);
+    swResolvedData = mockBackend->resolveRoles_forTest(opCtx.get(), roleNames, option);
     ASSERT_OK(swResolvedData.getStatus());
     resolvedData = swResolvedData.getValue();
     ASSERT_TRUE(resolvedData.roles.has_value());
@@ -524,7 +523,7 @@ TEST_F(AuthorizationManagerTest, testAuthzManagerExternalStateResolveRoles) {
 
     // Resolve only direct roles, privileges, and restrictions.
     option.setDirectOnly(true /* shouldEnable */);
-    swResolvedData = mockBackend->resolveRoles(opCtx.get(), roleNames, option);
+    swResolvedData = mockBackend->resolveRoles_forTest(opCtx.get(), roleNames, option);
     ASSERT_OK(swResolvedData.getStatus());
     resolvedData = swResolvedData.getValue();
     ASSERT_TRUE(resolvedData.roles.has_value());

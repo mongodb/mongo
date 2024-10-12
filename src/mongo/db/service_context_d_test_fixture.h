@@ -34,7 +34,6 @@
 #include <utility>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/journal_listener.h"
@@ -103,12 +102,6 @@ public:
             return std::move(*this);
         }
 
-        Options useMockAuthzManagerExternalState(
-            std::unique_ptr<AuthzManagerExternalStateMock> mockAuthzExternalState) {
-            _mockAuthzExternalState = std::move(mockAuthzExternalState);
-            return std::move(*this);
-        }
-
         Options useIndexBuildsCoordinator(
             std::unique_ptr<IndexBuildsCoordinator> indexBuildsCoordinator) {
             _indexBuildsCoordinator = std::move(indexBuildsCoordinator);
@@ -125,6 +118,11 @@ public:
             return std::move(*this);
         }
 
+        Options setAuthObjects(bool setAuthObjects) {
+            _setAuthObjects = setAuthObjects;
+            return std::move(*this);
+        }
+
     private:
         friend class MongoDScopedGlobalServiceContextForTest;
 
@@ -137,10 +135,10 @@ public:
         bool _useReplSettings = false;
         bool _useMockClock = false;
         bool _setAuthEnabled = true;
+        bool _setAuthObjects = false;
         Milliseconds _autoAdvancingMockClockIncrement{0};
         std::unique_ptr<TickSource> _mockTickSource;
         std::unique_ptr<JournalListener> _journalListener;
-        std::unique_ptr<AuthzManagerExternalStateMock> _mockAuthzExternalState;
         std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoordinator;
         bool _forceDisableTableLogging = false;
         bool _createShardingState = true;
@@ -154,16 +152,9 @@ public:
         return _journalListener.get();
     }
 
-    AuthzManagerExternalStateMock* authzExternalState() {
-        return _authzExternalState;
-    }
-
 private:
     // The JournalListener must stay alive as long as the storage engine is running.
     std::unique_ptr<JournalListener> _journalListener;
-
-    // Raw pointer authorization manager external state if using a mock.
-    AuthzManagerExternalStateMock* _authzExternalState = nullptr;
 
     struct {
         std::string engine;
@@ -185,10 +176,6 @@ public:
 
     JournalListener* journalListener() const {
         return mongoDscopedServiceContext()->journalListener();
-    }
-
-    AuthzManagerExternalStateMock* authzExternalState() {
-        return mongoDscopedServiceContext()->authzExternalState();
     }
 
 private:

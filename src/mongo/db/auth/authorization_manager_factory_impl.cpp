@@ -37,8 +37,6 @@
 #include "mongo/db/auth/authorization_manager_factory_impl.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_router_impl.h"
-#include "mongo/db/auth/authz_manager_external_state_d.h"
-#include "mongo/db/auth/authz_manager_external_state_s.h"
 
 namespace mongo {
 
@@ -46,20 +44,17 @@ std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryImpl::createRou
     Service* service) {
     auto authzRouter = std::make_unique<AuthorizationRouterImpl>(
         service, std::make_unique<AuthorizationClientHandleRouter>());
-    return std::make_unique<AuthorizationManagerImpl>(
-        service, std::make_unique<AuthzManagerExternalStateMongos>(), std::move(authzRouter));
+
+    return std::make_unique<AuthorizationManagerImpl>(service, std::move(authzRouter));
 }
 
 std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryImpl::createShard(
     Service* service) {
     auto authzRouter = std::make_unique<AuthorizationRouterImpl>(
         service, std::make_unique<AuthorizationClientHandleShard>());
-    return std::make_unique<AuthorizationManagerImpl>(
-        service, std::make_unique<AuthzManagerExternalStateMongod>(), std::move(authzRouter));
+    return std::make_unique<AuthorizationManagerImpl>(service, std::move(authzRouter));
 }
 
-// TODO SERVER-95189 - move to protected or remove, may need to move this into the
-// AuthorizationManagerImpl class so externally not callable.
 std::unique_ptr<auth::AuthorizationBackendInterface>
 AuthorizationManagerFactoryImpl::createBackendInterface(Service* service) {
     invariant(service->role().has(ClusterRole::ShardServer) ||

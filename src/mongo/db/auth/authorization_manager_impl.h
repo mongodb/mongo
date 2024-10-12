@@ -74,9 +74,8 @@ namespace mongo {
  */
 class AuthorizationManagerImpl : public AuthorizationManager {
 public:
-    AuthorizationManagerImpl(Service* service,
-                             std::unique_ptr<AuthzManagerExternalState> externalState,
-                             std::unique_ptr<AuthorizationRouter> authzRouter);
+    AuthorizationManagerImpl(Service* service, std::unique_ptr<AuthorizationRouter> authzRouter);
+
     ~AuthorizationManagerImpl() override;
 
     std::unique_ptr<AuthorizationSession> makeAuthorizationSession(Client* client) override;
@@ -98,8 +97,6 @@ public:
                             const NamespaceString& nss,
                             const BSONObj& o,
                             const BSONObj* o2) override;
-
-    Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) override;
 
     StatusWith<UserHandle> acquireUser(OperationContext* opCtx,
                                        std::unique_ptr<UserRequest> userRequest) override;
@@ -129,22 +126,7 @@ public:
 
     std::vector<AuthorizationRouter::CachedUserInfo> getUserCacheInfo() const override;
 
-    StatusWith<User> lookupUserObject(
-        OperationContext* opCtx,
-        const UserRequest& userReq,
-        const SharedUserAcquisitionStats& userAcquisitionStats) override;
-
-    Status lookupUserDescription(OperationContext* opCtx,
-                                 const UserName& userName,
-                                 BSONObj* result) override;
-
-    StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
-                                              const std::vector<RoleName>& roleNames,
-                                              ResolveRoleOption option) override;
-
 private:
-    std::unique_ptr<AuthzManagerExternalState> _externalState;
-
     std::unique_ptr<AuthorizationRouter> _authzRouter;
 
     // True if AuthSchema startup checks should be applied in this AuthorizationManager. Changes to

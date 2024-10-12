@@ -103,10 +103,10 @@ Status AuthorizationSessionTestFixture::createUser(const UserName& username,
     }
     rolesBSON.doneFast();
 
-    return managerState->insert(_opCtx.get(),
-                                NamespaceString::makeTenantUsersCollection(username.tenantId()),
-                                userDoc.obj(),
-                                {});
+    return backendMock->insert(_opCtx.get(),
+                               NamespaceString::makeTenantUsersCollection(username.tenantId()),
+                               userDoc.obj(),
+                               {});
 }
 
 void AuthorizationSessionTestFixture::assertLogout(const ResourcePattern& resource,

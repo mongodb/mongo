@@ -394,7 +394,7 @@ void AuthorizationSessionTest::testInvalidateUser() {
 
     // Change the user to be read-only
     int ignored;
-    ASSERT_OK(managerState->remove(
+    ASSERT_OK(backendMock->remove(
         _opCtx.get(), NamespaceString::kAdminUsersNamespace, BSONObj(), BSONObj(), &ignored));
     ASSERT_OK(createUser(kSpencerTest, {{"read", "test"}}));
 
@@ -410,7 +410,7 @@ void AuthorizationSessionTest::testInvalidateUser() {
     ASSERT(user != nullptr);
 
     // Delete the user.
-    ASSERT_OK(managerState->remove(
+    ASSERT_OK(backendMock->remove(
         _opCtx.get(), NamespaceString::kAdminUsersNamespace, BSONObj(), BSONObj(), &ignored));
     // Make sure that invalidating the user causes the session to reload its privileges.
     AuthorizationManager::get(_opCtx->getService())->invalidateUserByName(user->getName());
@@ -444,7 +444,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Change the user to be read-only
     int ignored;
     backendMock->setFindsShouldFail(true);
-    ASSERT_OK(managerState->remove(
+    ASSERT_OK(backendMock->remove(
         _opCtx.get(), NamespaceString::kAdminUsersNamespace, BSONObj(), BSONObj(), &ignored));
     ASSERT_OK(createUser(kSpencerTest, {{"read", "test"}}));
 
@@ -470,7 +470,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
 }
 
 TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRestrictions) {
-    ASSERT_OK(managerState->insertUserDocument(
+    ASSERT_OK(backendMock->insertUserDocument(
         _opCtx.get(),
         BSON("user"
              << "spencer"
@@ -1421,33 +1421,33 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
     ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
 
     // Add a user without the restore role and ensure we can't bypass
-    ASSERT_OK(managerState->insertUserDocument(_opCtx.get(),
-                                               BSON("user"
-                                                    << "spencer"
-                                                    << "db"
-                                                    << "test"
-                                                    << "credentials" << credentials << "roles"
-                                                    << BSON_ARRAY(BSON("role"
-                                                                       << "readWrite"
-                                                                       << "db"
-                                                                       << "test"))),
-                                               BSONObj()));
+    ASSERT_OK(backendMock->insertUserDocument(_opCtx.get(),
+                                              BSON("user"
+                                                   << "spencer"
+                                                   << "db"
+                                                   << "test"
+                                                   << "credentials" << credentials << "roles"
+                                                   << BSON_ARRAY(BSON("role"
+                                                                      << "readWrite"
+                                                                      << "db"
+                                                                      << "test"))),
+                                              BSONObj()));
     ASSERT_OK(
         authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
     ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
 
     // Add a user with restore role on admin db and ensure we can bypass
-    ASSERT_OK(managerState->insertUserDocument(_opCtx.get(),
-                                               BSON("user"
-                                                    << "gmarks"
-                                                    << "db"
-                                                    << "admin"
-                                                    << "credentials" << credentials << "roles"
-                                                    << BSON_ARRAY(BSON("role"
-                                                                       << "restore"
-                                                                       << "db"
-                                                                       << "admin"))),
-                                               BSONObj()));
+    ASSERT_OK(backendMock->insertUserDocument(_opCtx.get(),
+                                              BSON("user"
+                                                   << "gmarks"
+                                                   << "db"
+                                                   << "admin"
+                                                   << "credentials" << credentials << "roles"
+                                                   << BSON_ARRAY(BSON("role"
+                                                                      << "restore"
+                                                                      << "db"
+                                                                      << "admin"))),
+                                              BSONObj()));
     authzSession->logoutDatabase(kTestDB, "End of test"_sd);
 
     ASSERT_OK(
@@ -1460,17 +1460,17 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
 
     // Add a user with the root role, which should confer restore role for cluster resource, and
     // ensure we can bypass
-    ASSERT_OK(managerState->insertUserDocument(_opCtx.get(),
-                                               BSON("user"
-                                                    << "admin"
-                                                    << "db"
-                                                    << "admin"
-                                                    << "credentials" << credentials << "roles"
-                                                    << BSON_ARRAY(BSON("role"
-                                                                       << "root"
-                                                                       << "db"
-                                                                       << "admin"))),
-                                               BSONObj()));
+    ASSERT_OK(backendMock->insertUserDocument(_opCtx.get(),
+                                              BSON("user"
+                                                   << "admin"
+                                                   << "db"
+                                                   << "admin"
+                                                   << "credentials" << credentials << "roles"
+                                                   << BSON_ARRAY(BSON("role"
+                                                                      << "root"
+                                                                      << "db"
+                                                                      << "admin"))),
+                                              BSONObj()));
     authzSession->logoutDatabase(kAdminDB, ""_sd);
 
     ASSERT_OK(

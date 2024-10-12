@@ -31,7 +31,6 @@
 
 #include "mongo/db/replica_set_endpoint_util.h"
 
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands_test_example.h"

@@ -32,7 +32,6 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/service_context.h"
