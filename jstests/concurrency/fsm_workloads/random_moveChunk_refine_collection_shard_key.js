@@ -57,17 +57,7 @@ var $config = extendWorkload($config, function($config, $super) {
     // migrated back in. The particular error code is replaced with a more generic one, so this
     // is identified by the failed migration's error message.
     $config.data.isMoveChunkErrorAcceptable = (err) => {
-        const codes = [
-            // TODO SERVER-68551: Remove lockbusy error since the balancer won't acquire anymore the
-            // DDL lock for migrations
-            ErrorCodes.LockBusy,
-            ErrorCodes.ShardKeyNotFound,
-            ErrorCodes.LockTimeout,
-            // The refienCollectionCoordinator interrupt all migrations by setting `allowMigration`
-            // to false
-            ErrorCodes.Interrupted,
-            ErrorCodes.OrphanedRangeCleanUpFailed,
-        ];
+        const codes = [ErrorCodes.LockBusy, ErrorCodes.ShardKeyNotFound, ErrorCodes.LockTimeout];
         return (err.code && codes.includes(err.code)) ||
             (err.message &&
              (err.message.includes("CommandFailed") ||

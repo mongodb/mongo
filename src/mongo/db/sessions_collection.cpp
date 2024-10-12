@@ -42,12 +42,25 @@
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/sessions_server_parameters_gen.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {
+
+// This batch size is chosen to ensure that we don't form requests larger than the 16mb limit.
+// Especially for refreshes, the updates we send include the full user name (user@db), and user
+// names can be quite large (we enforce a max 10k limit for usernames used with sessions).
+//
+// At 1000 elements, a 16mb payload gives us a budget of 16000 bytes per user, which we should
+// comfortably be able to stay under, even with 10k user names.
+constexpr size_t kMaxBatchSize = 1000;
+
+// Used to refresh or remove items from the session collection with write
+// concern majority
+const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                WriteConcernOptions::kWriteConcernTimeoutSystem};
+
 
 BSONObj lsidQuery(const LogicalSessionId& lsid) {
     return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
@@ -91,7 +104,7 @@ void runBulkGeneric(TFactory makeT, AddLineFn addLine, SendFn sendBatch, const C
     for (const auto& item : items) {
         addLine(*thing, item);
 
-        if (++i >= std::size_t(mongo::gSessionMaxBatchSize.load())) {
+        if (++i >= kMaxBatchSize) {
             sendLocalBatch();
 
             setupBatch();
@@ -179,14 +192,7 @@ SessionsCollection::FindBatchFn SessionsCollection::makeFindFnForCommand(const N
 void SessionsCollection::_doRefresh(const NamespaceString& ns,
                                     const std::vector<LogicalSessionRecord>& sessions,
                                     SendBatchFn send) {
-    // Used to refresh items from the session collection with write
-    // concern majority
-    const WriteConcernOptions kMajorityWriteConcern{
-        WriteConcernOptions::kMajority,
-        WriteConcernOptions::SyncMode::UNSET,
-        Milliseconds(mongo::gSessionWriteConcernTimeoutSystemMillis.load())};
-
-    auto init = [ns, kMajorityWriteConcern](BSONObjBuilder* batch) {
+    auto init = [ns](BSONObjBuilder* batch) {
         batch->append("update", ns.coll());
         batch->append("ordered", false);
         batch->append(WriteConcernOptions::kWriteConcernField, kMajorityWriteConcern.toBSON());
@@ -196,20 +202,14 @@ void SessionsCollection::_doRefresh(const NamespaceString& ns,
         entries->append(
             BSON("q" << lsidQuery(record) << "u" << updateQuery(record) << "upsert" << true));
     };
+
     runBulkCmd("updates", init, add, send, sessions);
 }
 
 void SessionsCollection::_doRemove(const NamespaceString& ns,
                                    const std::vector<LogicalSessionId>& sessions,
                                    SendBatchFn send) {
-    // Used to remove items from the session collection with write
-    // concern majority
-    const WriteConcernOptions kMajorityWriteConcern{
-        WriteConcernOptions::kMajority,
-        WriteConcernOptions::SyncMode::UNSET,
-        Milliseconds(mongo::gSessionWriteConcernTimeoutSystemMillis.load())};
-
-    auto init = [ns, kMajorityWriteConcern](BSONObjBuilder* batch) {
+    auto init = [ns](BSONObjBuilder* batch) {
         batch->append("delete", ns.coll());
         batch->append("ordered", false);
         batch->append(WriteConcernOptions::kWriteConcernField, kMajorityWriteConcern.toBSON());

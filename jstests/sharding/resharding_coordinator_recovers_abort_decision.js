@@ -94,11 +94,10 @@ reshardingTest.withReshardingInBackground(
             assert.commandWorked(mongos.getDB("admin").killOp(ops[0].opid));
 
             // Step down the config shard's primary.
-            let configRS = reshardingTest.getReplSetForShard(reshardingTest.configShardName);
-            let primary = configRS.getPrimary();
+            let replSet = reshardingTest.getReplSetForShard(reshardingTest.configShardName);
+            let primary = replSet.getPrimary();
             assert.commandWorked(
                 primary.getDB("admin").runCommand({replSetStepDown: 60, force: true}));
-            configRS.waitForPrimary();
 
             // After a stepdown, the _configsvrReshardCollection command will be retried by the
             // primary shard. We use the reshardCollectionJoinedExistingOperation failpoint to
@@ -117,6 +116,7 @@ reshardingTest.withReshardingInBackground(
 
             // Wait for secondaries to recover and catchup with primary before turning off the
             // failpoints as a replication roll back can disconnect the test client.
+            const configRS = reshardingTest.getReplSetForShard(reshardingTest.configShardName);
             configRS.awaitSecondaryNodes();
             configRS.awaitReplication();
             reshardCollectionJoinedFailPointsList.forEach(

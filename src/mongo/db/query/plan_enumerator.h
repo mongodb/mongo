@@ -44,8 +44,7 @@ namespace mongo {
 struct PlanEnumeratorParams {
     PlanEnumeratorParams()
         : maxSolutionsPerOr(internalQueryEnumerationMaxOrSolutions.load()),
-          maxIntersectPerAnd(internalQueryEnumerationMaxIntersectPerAnd.load()),
-          disableOrPushdown(disableMatchExpressionOptimization.shouldFail()) {}
+          maxIntersectPerAnd(internalQueryEnumerationMaxIntersectPerAnd.load()) {}
 
     // Do we provide solutions that use more indices than the minimum required to provide
     // an indexed solution?
@@ -70,11 +69,6 @@ struct PlanEnumeratorParams {
     // all-pairs approach, we could wind up creating a lot of enumeration possibilities for
     // certain inputs.
     size_t maxIntersectPerAnd;
-
-    // Whether to disable OR-pushdown optimization. OR-pushdown assumes that the expression has been
-    // simplified: for example, that single-child $or nodes are unwrapped. To avoid this, when
-    // the 'disableMatchExpressionOptimization' failpoint is set, we also disable OR-pushdown.
-    bool disableOrPushdown;
 };
 
 /**
@@ -600,9 +594,6 @@ private:
 
     // How many things do we want from each AND?
     size_t _intersectLimit;
-
-    // Whether we should disable OR-pushdown optimization.
-    const bool _disableOrPushdown;
 };
 
 }  // namespace mongo

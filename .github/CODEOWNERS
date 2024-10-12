@@ -2,10 +2,8 @@
 * @10gen/server-release
 
 # Exclude some test files and READMEs from the backport approvals
+/jstests/**/*
 /etc/backports_required_for_multiversion_tests.yml
 /etc/*.suppressions
 /README.md
 **/README.md
-
-# Exclude all the tests under "jstests" directories from backport approvals
-**/jstests/**/*

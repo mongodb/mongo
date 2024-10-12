@@ -262,8 +262,7 @@ PlanEnumerator::PlanEnumerator(const PlanEnumeratorParams& params)
       _ixisect(params.intersect),
       _enumerateOrChildrenLockstep(params.enumerateOrChildrenLockstep),
       _orLimit(params.maxSolutionsPerOr),
-      _intersectLimit(params.maxIntersectPerAnd),
-      _disableOrPushdown(params.disableOrPushdown) {}
+      _intersectLimit(params.maxIntersectPerAnd) {}
 
 PlanEnumerator::~PlanEnumerator() {
     typedef stdx::unordered_map<MemoID, NodeAssignment*> MemoMap;
@@ -530,14 +529,10 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
         // preds to 'indexedPreds'. Adding the mandatory preds directly to 'indexedPreds' would lead
         // to problems such as pulling a predicate beneath an OR into a set joined by an AND.
         getIndexedPreds(node, childContext, &indexedPreds);
-        // Pass in the indexed predicates as outside predicates when prepping the subnodes. But if
-        // match expression optimization is disabled, skip this part: we don't want to do
-        // OR-pushdown because it relies on the expression being canonicalized.
+        // Pass in the indexed predicates as outside predicates when prepping the subnodes.
         auto childContextCopy = childContext;
-        if (MONGO_likely(!_disableOrPushdown)) {
-            for (auto pred : indexedPreds) {
-                childContextCopy.outsidePreds[pred] = OutsidePredRoute{};
-            }
+        for (auto pred : indexedPreds) {
+            childContextCopy.outsidePreds[pred] = OutsidePredRoute{};
         }
         if (!prepSubNodes(node, childContextCopy, &subnodes, &mandatorySubnodes)) {
             return false;
@@ -841,13 +836,6 @@ void PlanEnumerator::assignPredicate(
     MatchExpression* pred,
     size_t position,
     OneIndexAssignment* indexAssignment) {
-    if (MONGO_unlikely(_disableOrPushdown)) {
-        // If match expression optimization is disabled, we also disable OR-pushdown,
-        // so we should never get 'outsidePreds' here.
-        tassert(7059700,
-                "Tried to do OR-pushdown despite disableMatchExpressionOptimization",
-                outsidePreds.empty());
-    }
     if (outsidePreds.find(pred) != outsidePreds.end()) {
         OrPushdownTag::Destination dest;
         dest.route = outsidePreds.at(pred).route;

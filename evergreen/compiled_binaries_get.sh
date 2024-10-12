@@ -36,10 +36,6 @@ if [ ! -z "${multiversion_architecture_44_or_later}" ]; then
   architecture="${multiversion_architecture_44_or_later}"
 fi
 
-if [ ! -z "${multiversion_platform_50_or_later}" ]; then
-  platform="${multiversion_platform_50_or_later}"
-fi
-
 version=${project#mongodb-mongo-}
 version=${version#v}
 

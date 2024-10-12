@@ -371,8 +371,6 @@ last-continuous:
     ticket: SERVER-86674
   - test_file: jstests/core/wildcard_index_validindex.js
     ticket: SERVER-93105
-  - test_file: jstests/sharding/refresh_sessions.js
-    ticket: SERVER-94635
   suites: null
 last-lts:
   all:
@@ -792,6 +790,4 @@ last-lts:
     ticket: SERVER-86674
   - test_file: jstests/core/wildcard_index_validindex.js
     ticket: SERVER-93105
-  - test_file: jstests/sharding/refresh_sessions.js
-    ticket: SERVER-94635
   suites: null

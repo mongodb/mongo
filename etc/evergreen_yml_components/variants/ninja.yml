@@ -17,7 +17,7 @@ buildvariants:
   display_name: "Ninja Build: macOS Enterprise"
   cron: "0 4 * * 0" # Run once a week to ensure no failures introduced to ninja builds
   run_on:
-  - macos-11
+  - macos-1100
   expansions:
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars

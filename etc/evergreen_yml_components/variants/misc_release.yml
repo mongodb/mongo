@@ -786,7 +786,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     multiversion_platform: rhel80
-    multiversion_platform_50_or_later: rhel8
     multiversion_edition: targeted
     has_packages: true
     packager_script: packager.py
@@ -839,7 +838,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
-    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
@@ -2217,7 +2215,7 @@ buildvariants:
   display_name: macOS
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-11
+  - macos-1100
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer --enableEnterpriseTests=off
     push_path: osx
@@ -2247,7 +2245,7 @@ buildvariants:
   display_name: macOS arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-11-arm64
+  - macos-1100-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer --enableEnterpriseTests=off
     push_path: osx
@@ -2277,7 +2275,7 @@ buildvariants:
   display_name: Enterprise macOS
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-11
+  - macos-1100
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_latch_analyzer
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
@@ -2306,7 +2304,7 @@ buildvariants:
   display_name: Enterprise macOS arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-11-arm64
+  - macos-1100-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_latch_analyzer
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug

@@ -91,19 +91,17 @@ CoordinatorCommitMonitor::CoordinatorCommitMonitor(
     std::vector<ShardId> recipientShards,
     CoordinatorCommitMonitor::TaskExecutorPtr executor,
     CancellationToken cancelToken,
-    int delayBeforeInitialQueryMillis,
     Milliseconds maxDelayBetweenQueries)
     : _ns(std::move(ns)),
       _recipientShards(std::move(recipientShards)),
       _executor(std::move(executor)),
       _cancelToken(std::move(cancelToken)),
       _threshold(Milliseconds(gRemainingReshardingOperationTimeThresholdMillis.load())),
-      _delayBeforeInitialQueryMillis(Milliseconds(delayBeforeInitialQueryMillis)),
       _maxDelayBetweenQueries(maxDelayBetweenQueries) {}
 
 
 SemiFuture<void> CoordinatorCommitMonitor::waitUntilRecipientsAreWithinCommitThreshold() const {
-    return _makeFuture(_delayBeforeInitialQueryMillis)
+    return _makeFuture()
         .onError([](Status status) {
             if (ErrorCodes::isCancellationError(status.code()) ||
                 ErrorCodes::isInterruption(status.code())) {
@@ -197,16 +195,9 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
     return {minRemainingTime, maxRemainingTime};
 }
 
-ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBetweenQueries) const {
+ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture() const {
     return ExecutorFuture<void>(_executor)
-        // Start waiting so that we have a more time to calculate a more realistic remaining time
-        // estimate.
-        .then([this, anchor = shared_from_this(), delayBetweenQueries] {
-            return _executor->sleepFor(delayBetweenQueries, _cancelToken)
-                .then([this, anchor = std::move(anchor)] {
-                    return queryRemainingOperationTimeForRecipients();
-                });
-        })
+        .then([this] { return queryRemainingOperationTimeForRecipients(); })
         .onError([this](Status status) {
             if (_cancelToken.isCanceled()) {
                 // Do not retry on cancellation errors.
@@ -242,10 +233,12 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBet
             // The following ensures that the monitor would never sleep for more than a predefined
             // maximum delay between querying recipient shards. Thus, it can handle very large,
             // and potentially inaccurate estimates of the remaining operation time.
-            auto delayBetweenQueries =
-                std::min(remainingTimes.max - _threshold, _maxDelayBetweenQueries);
-
-            return _makeFuture(delayBetweenQueries);
+            auto sleepTime = std::min(remainingTimes.max - _threshold, _maxDelayBetweenQueries);
+            return _executor->sleepFor(sleepTime, _cancelToken)
+                .then([this, anchor = std::move(anchor)] {
+                    // We are not canceled yet, so schedule new queries against recipient shards.
+                    return _makeFuture();
+                });
         });
 }
 

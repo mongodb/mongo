@@ -33,24 +33,9 @@ function verifyMetricIncrement(conn, readPref, executedOn, tagged) {
     const expectedCount = preMetrics[executedOn][readPref].external + 1;
     const count = postMetrics[executedOn][readPref].external;
 
-    // Replica set nodes run a periodic job to refresh keys for HMAC computation. Although this
-    // job is internal, it is classified as "external" because it uses a client flagged as such.
-    // The job performs two find operations on system collections using read preference 'nearest',
-    // which asynchronously increments the external 'nearest' read preference counter twice. This
-    // can race with retrieving the pre- and post-metrics, and so we must include a special case.
-    // The incorrect external classification is fixed in future versions.
-    if (readPref === "nearest") {
-        // Ensure the actual count is greater than or equal to the expected count. In the case
-        // we've hit the race condition, ensure the count is no greater than two more increments
-        // beyond the expected count.
-        assert(count >= expectedCount && count <= expectedCount + 2,
-               `Actual count ${count} is not greater than or equal to expected count ${
-                   expectedCount} for readPreference ${readPref}.`);
-    } else {
-        assert(expectedCount == count,
-               `Actual count ${count} did not equal expected count ${
-                   expectedCount} for readPreference ${readPref}.`);
-    }
+    assert(expectedCount == count,
+           `Actual count ${count} did not equal expected count ${
+               expectedCount} for readPreference ${readPref}.`);
 
     if (tagged) {
         const expectedTaggedCount = preMetrics[executedOn].tagged.external + 1;
@@ -93,22 +78,38 @@ let serverStatus = assert.commandWorked(standalone.getDB("admin").runCommand({se
 assert(!serverStatus.hasOwnProperty("readPreferenceCounters"), tojson(serverStatus));
 MongoRunner.stopMongod(standalone);
 
-// Test that replica set nodes tracks metrics around read preference.
+// Test that replica set nodes tracks metrics around read preference. The assert.soon() that
+// checks for a periodic job to complete below assumes the replica set will have two nodes, so
+// we should keep that consistent.
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 
+// On startup, the replica set nodes will run a periodic job to refresh keys for HMAC computation.
+// This job will perform two find operations on system collections, and this will increment the
+// external 'nearest' read preference counter twice. We should wait for this periodic job to
+// complete on both nodes, so the counters aren't incremented during the test.
+assert.soon(() => {
+    return getReadPreferenceMetrics(rst.getPrimary()).executedOnPrimary.nearest.external >= 2 &&
+        getReadPreferenceMetrics(rst.getSecondary()).executedOnSecondary.nearest.external >= 2;
+});
 jsTestLog("Testing against replica set");
 runTest(rst);
 
 rst.stopSet();
 
 // Test that mongos omits metrics around read preference, and shard servers include them.
+// The assert.soon() below assumes two shard server nodes, similar to the replica set case above.
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 
 serverStatus = assert.commandWorked(st.s.getDB("admin").runCommand({serverStatus: 1}));
 assert(serverStatus.process.startsWith("mongos"), tojson(serverStatus));
 assert(!serverStatus.hasOwnProperty("readPreferenceCounters"), tojson(serverStatus));
+// The newly started shard servers will also run the same periodic job mentioned above.
+assert.soon(() => {
+    return getReadPreferenceMetrics(st.rs0.getPrimary()).executedOnPrimary.nearest.external >= 2 &&
+        getReadPreferenceMetrics(st.rs0.getSecondary()).executedOnSecondary.nearest.external >= 2;
+});
 
 jsTestLog("Testing against sharded cluster");
 runTest(st.rs0);
