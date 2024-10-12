@@ -2,41 +2,51 @@
 
 ## Table of Contents
 
-- [High Level Overview](#high-level-overview)
-- [Authentication](#authentication)
-  - [SASL](#sasl)
-    - [Speculative Auth](#speculative-authentication)
-    - [SASL Supported Mechs](#sasl-supported-mechs)
-  - [X509 Authentication](#x509-authentication)
-  - [Cluster Authentication](#cluster-authentication)
-    - [X509 Intracluster Auth](#x509-intracluster-auth-and-member-certificate-rotation)
-    - [Keyfile Intracluster Auth](#keyfile-intracluster-auth)
-  - [Localhost Auth Bypass](#localhost-auth-bypass)
-- [Authorization](#authorization)
-  - [AuthName](#authname) (`UserName` and `RoleName`)
-  - [Users](#users)
-    - [User Roles](#user-roles)
-    - [User Credentials](#user-credentials)
-    - [User Authentication Restrictions](#user-authentication-restrictions)
-  - [Roles](#roles)
-    - [Role subordinate Roles](#role-subordinate-roles)
-    - [Role Privileges](#role-privileges)
-    - [Role Authentication Restrictions](#role-authentication-restrictions)
-  - [User and Role Management](#user-and-role-management)
-    - [UMC Transactions](#umc-transactions)
-  - [Privilege](#privilege)
-    - [ResourcePattern](#resourcepattern)
-    - [ActionType](#actiontype)
-  - [Command Execution](#command-execution)
-  - [Authorization Caching](#authorization-caching)
-  - [Authorization Manager External State](#authorization-manager-external-state)
-  - [Types of Authorization](#types-of-authorization)
-    - [Local Authorization](#local-authorization)
-    - [LDAP Authorization](#ldap-authorization)
-    - [X.509 Authorization](#x509-authorization)
-  - [Cursors and Operations](#cursors-and-operations)
-  - [Contracts](#contracts)
-- [External References](#external-references)
+- [Identity And Access Management](#identity-and-access-management)
+  - [Table of Contents](#table-of-contents)
+  - [High Level Overview](#high-level-overview)
+  - [Authentication](#authentication)
+    - [SASL](#sasl)
+      - [Speculative Authentication](#speculative-authentication)
+      - [SASL Supported Mechs](#sasl-supported-mechs)
+    - [Cluster Authentication](#cluster-authentication)
+      - [X509 Intracluster Auth and Member Certificate Rotation](#x509-intracluster-auth-and-member-certificate-rotation)
+      - [Keyfile Intracluster Auth](#keyfile-intracluster-auth)
+      - [Special Case: Arbiter](#special-case-arbiter)
+    - [Sharding Authentication](#sharding-authentication)
+    - [Localhost Auth Bypass](#localhost-auth-bypass)
+  - [Authorization](#authorization)
+    - [AuthName](#authname)
+      - [Serializations](#serializations)
+      - [Multitenancy](#multitenancy)
+    - [Users](#users)
+      - [User Roles](#user-roles)
+      - [User Credentials](#user-credentials)
+      - [User Authentication Restrictions](#user-authentication-restrictions)
+      - [Any versus All criteria](#any-versus-all-criteria)
+    - [Roles](#roles)
+      - [Role subordinate roles](#role-subordinate-roles)
+      - [Role Privileges](#role-privileges)
+      - [Normal resources](#normal-resources)
+      - [Role Authentication Restrictions](#role-authentication-restrictions)
+    - [Privilege](#privilege)
+      - [ResourcePattern](#resourcepattern)
+        - [Normal Namespace](#normal-namespace)
+      - [ActionType](#actiontype)
+    - [User and Role Management](#user-and-role-management)
+      - [UMC Transactions](#umc-transactions)
+      - [Multitenancy](#multitenancy-1)
+    - [Command Execution](#command-execution)
+    - [Authorization Caching](#authorization-caching)
+    - [Authorization Router](#authorization-router)
+    - [Authorization Backend](#authorization-backend)
+    - [Types of Authorization](#types-of-authorization)
+      - [Local Authorization](#local-authorization)
+      - [LDAP Authorization](#ldap-authorization)
+      - [X.509 Authorization](#x509-authorization)
+    - [Cursors and Operations](#cursors-and-operations)
+    - [Contracts](#contracts)
+  - [External References](#external-references)
 
 ## High Level Overview
 
@@ -190,6 +200,31 @@ the storage mechanism is listed as a sub-bullet below.
     If this is not approved, the server fasserts and the mechanism is not registered. On Windows,
     SChannel provides a `GSSAPI` library for the server to use. On other platforms, the Cyrus SASL
     library is used to make calls to the KDC (Kerberos key distribution center).
+- **MONGODB-X509**
+
+  - As of 8.1.0, `MONGODB-X509` is an authentication mechanism that is available under SASL. `MONGODB-X509`
+    is an authentication method that uses the x509 certificates from the SSL/TLS certificate key exchange.
+    When the peer certificate validation happens during the SSL handshake, an
+    [`SSLPeerInfo`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/util/net/ssl_types.h#L113-L143)
+    is created and attached to the transport layer SessionHandle. During `MONGODB-X509` auth, the server
+    first determines whether or not the client is a driver or a peer server. The server inspects the
+    following criteria in this order to determine whether the connecting client is a peer server node:
+
+    1. `net.tls.clusterAuthX509.attributes` is set on the server and the parsed certificate's subject name
+       contains all of the attributes and values specified in that option.
+    2. `net.tls.clusterAuthX509.extensionValue` is set on the server and the parsed certificate contains
+       the OID 1.3.6.1.4.1.34601.2.1.2 with a value matching the one specified in that option. This OID
+       is reserved for the MongoDB cluster membership extension.
+    3. Neither of the above options are set on the server and the parsed certificate's subject name contains
+       the same DC, O, and OU as the certificate the server presents to inbound connections (`tls.certificateKeyFile`).
+    4. `tlsClusterAuthX509Override.attributes` is set on the server and the parsed certificate's subject name
+       contains all of the attributes and values specified in that option.
+    5. `tlsClusterAuthX509Override.extensionValue` is set on the server and the parsed certificate contains
+       the OID 1.3.6.1.4.1.34601.2.1.2 with a value matching the one specified in that option.
+       If all of these conditions fail, then the server grabs the client's username from the `SSLPeerInfo`
+       struct and verifies that the client name matches the username provided by the command object and exists
+       in the `$external` database. In that case, the client is authenticated as that user in `$external`.
+       Otherwise, authentication fails with ErrorCodes.UserNotFound.
 
 The specific properties that each SASL mechanism provides is outlined in this table below.
 
@@ -198,31 +233,7 @@ The specific properties that each SASL mechanism provides is outlined in this ta
 | SCRAM   | X           | X             |
 | PLAIN   |             |               |
 | GSS-API | X           | X             |
-
-### <a name="x509atn"></a>X509 Authentication
-
-`MONGODB-X509` is an authentication method that uses the x509 certificates from the SSL/TLS
-certificate key exchange. When the peer certificate validation happens during the SSL handshake, an
-[`SSLPeerInfo`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/util/net/ssl_types.h#L113-L143)
-is created and attached to the transport layer SessionHandle. During `MONGODB-X509` auth, the server
-first determines whether or not the client is a driver or a peer server. The server inspects the
-following criteria in this order to determine whether the connecting client is a peer server node:
-
-1. `net.tls.clusterAuthX509.attributes` is set on the server and the parsed certificate's subject name
-   contains all of the attributes and values specified in that option.
-2. `net.tls.clusterAuthX509.extensionValue` is set on the server and the parsed certificate contains
-   the OID 1.3.6.1.4.1.34601.2.1.2 with a value matching the one specified in that option. This OID
-   is reserved for the MongoDB cluster membership extension.
-3. Neither of the above options are set on the server and the parsed certificate's subject name contains
-   the same DC, O, and OU as the certificate the server presents to inbound connections (`tls.certificateKeyFile`).
-4. `tlsClusterAuthX509Override.attributes` is set on the server and the parsed certificate's subject name
-   contains all of the attributes and values specified in that option.
-5. `tlsClusterAuthX509Override.extensionValue` is set on the server and the parsed certificate contains
-   the OID 1.3.6.1.4.1.34601.2.1.2 with a value matching the one specified in that option.
-   If all of these conditions fail, then the server grabs the client's username from the `SSLPeerInfo`
-   struct and verifies that the client name matches the username provided by the command object and exists
-   in the `$external` database. In that case, the client is authenticated as that user in `$external`.
-   Otherwise, authentication fails with ErrorCodes.UserNotFound.
+| X509    | X           | X             |
 
 ### Cluster Authentication
 
@@ -389,7 +400,7 @@ When a `TenantId` is associated with an `AuthName`, it will NOT be included in `
 which is a cache value object from the ReadThroughCache (described in [Authorization
 Caching](#authorization-caching)). There can be multiple authenticated users for a single `Client`
 object. The most important elements of a `User` document are the username and the roles set that the
-user has. While each `AuthorizationManagerExternalState` implementation may define its own
+user has. While each `AuthorizationBackend` implementation may define its own
 storage mechanism for `User` object data, they all ultimately surface this data in a format
 compatible with the `Local` implementation, stored in the `admin.system.users` collection
 with a schema as follows:
@@ -712,20 +723,25 @@ invalidates the cache for the authorization manager in the mongos. Direct writes
 `admin.system.users` and `admin.system.roles` collections will also result in invalidation via the
 `OpObserver` hook. Writing to these collections directly is strongly discouraged.
 
-### Authorization Manager External State
+### Authorization Router
 
-Implementations of the `AuthorizationManagerExternalState` interface define a way to get state
-information from external systems. For example, when the Authorization Manager needs to get
-information regarding the schema version of the Authorization System, information that is stored in
-the database that needs to be queried, the Authorization Manager will call
-[`getStoredAuthorizationVersion`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state.h#L83).
-Because mongod and mongos processes have different ways of interacting with the data stored in the
-database, there is an
-[`authz_manager_external_state_d`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state_d.h)
-and an
-[`authz_manager_external_state_s`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state_s.h)
-version of the external state implementation, with the former referencing local values in the
-storage subsystem, while the latter delegates to remove cluster config servers.
+The AuthorizationManager sits as the entry way into the Auth subsystem. All calls for User Acquisition
+should happen through the AuthorizationManager. Supporting the AuthorizationManager is the
+`AuthorizationRouter`, which provides the interface with its implementations. The `AuthorizationRouter`
+is provided a `AuthorizationClientHandle` on initialization that prepares requests for
+`UserManagementCommands`. If the `AuthorizationRouter` is on the router, it uses the `Grid` client
+to route its requests to the config server. If it is on the shard (or in rare cases, the config),
+it uses the `DBDirectClient` to route its requests internally.
+
+### Authorization Backend
+
+Implementations of the `AuthorizationBackend` exist for shards and config servers to perform
+lookups on their user collections (Local Authorization) or externally sourced data (LDAP
+Authorization). The AuthorizationBackend should be used mainly from the
+[`UserManagementCommands`](https://github.com/mongodb/mongo/blob/r8.0.0/src/mongo/db/commands/user_management_commands.cpp).
+The `AuthorizationBackend` sits as a decoration on the Service, and only exists on shards and
+config servers. It exposes a few functions as part of its API, but all functions remain protected
+so the only accessors are the few friend classes such as the `UserManagementCommands`.
 
 ### Types of Authorization
 
@@ -745,9 +761,9 @@ The user must supply roles when running the `createUser` command. Roles are stor
 LDAP authorization is an external method of getting roles. When a user authenticates using LDAP,
 there are roles stored in the User document specified by the LDAP system. The LDAP system relies on
 the
-[`AuthzManagerExternalStateLDAP`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h)
-to make external requests to the LDAP server. The `AuthzManagerExternalStateLDAP` wraps the
-`AuthzManagerExternalStateLocal` for the current process, initially attempting to route all
+[`AuthorizationBackendLDAP`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h)
+to make external requests to the LDAP server. The `AuthorizationBackendLDAP` overrides the
+`AuthorizationBackendLocal` for the current process, initially attempting to route all
 Authorization requests to LDAP and falling back on Local Authorization. LDAP queries are generated
 from
 [`UserRequest`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.cpp#L75-L113)
@@ -789,8 +805,11 @@ extension. The roles extension uses the OID described
 [here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/util/net/ssl_manager.h#L163-L165). The
 roles are DER encoded in the certificate. They are read by the SSL manager and stored in the SSL
 Peer Info struct, which is eventually used by
-[`AcquireUser`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager_impl.cpp#L454-L465)
-if X509 authorization is used. A tunable parameter in X509 Authorization is tlsCATrusts. TLSCATrusts
+[`UserRequestX509`](https://github.com/mongodb/mongo/blob/287d6628f3d910890e2501cafb5b730fa3cc25e5/src/mongo/db/auth/user_request_x509.cpp#L60-L71)
+if X509 authorization is used. These roles are always resolved before sending the UsersInfo
+request to the AuthorizationBackend; in fact, they are resolved when the `UserRequest` is created
+before calling `addAndAuthorizeUser`.
+A tunable parameter in X509 Authorization is tlsCATrusts. TLSCATrusts
 is a setParameter that allows a user to specify a mapping of CAs that are trusted to use X509
 Authorization to a set of roles that are allowed to be specified by the CA.
 
@@ -855,8 +874,8 @@ Refer to the following links for definitions of the Classes referenced in this d
 | `AuthorizationContract`          | [mongo/db/auth/authorization_contract.h](https://github.com/mongodb/mongo/blob/r4.9.0-rc0/src/mongo/db/auth/authorization_contract.h)                 | Contract generated by IDL                                                                                                                |
 | `AuthorizationManager`           | [mongo/db/auth/authorization_manager.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.h)                       | Interface to external state providers                                                                                                    |
 | `AuthorizationSession`           | [mongo/db/auth/authorization_session.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session.h)                       | Representation of currently authenticated and authorized users on the `Client` connection                                                |
-| `AuthzManagerExternalStateLocal` | [.../authz_manager_external_state_local.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state_local.h)       | `Local` implementation of user/role provider                                                                                             |
-| `AuthzManagerExternalStateLDAP`  | [.../authz_manager_external_state_ldap.h](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h) | `LDAP` implementation of users/role provider                                                                                             |
+| `AuthzManagerExternalStateLocal` | [.../authorization_baackend_local.h](https://github.com/mongodb/mongo/blob/master/src/mongo/db/auth/authorization_backend_local.h)                    | `Local` implementation of user/role provider                                                                                             |
+| `AuthzManagerExternalStateLDAP`  | [.../authorization_baackend_ldap.h](https://github.com/10gen/mongo/blob/master/src/mongo/db/modules/enterprise/src/ldap/authorization_backend_ldap.h) | `LDAP` implementation of users/role provider                                                                                             |
 | `Client`                         | [mongo/db/client.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/client.h)                                                               | An active client session, typically representing a remote driver or shell                                                                |
 | `Privilege`                      | [mongo/db/auth/privilege.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/privilege.h)                                               | A set of `ActionType`s permitted on a particular `resource'                                                                              |
 | `ResourcePattern`                | [mongo/db/auth/resource_pattern.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/resource_pattern.h)                                 | A reference to a namespace, db, collection, or cluster to apply a set of `ActionType` privileges to                                      |
