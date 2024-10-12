@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <cstring>
+
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -214,6 +216,14 @@ bool generateBuf(const char*& ptr, const char* end, const char* buf, size_t& len
     return true;
 };
 
+bool generateBufNoNuls(const char*& ptr, const char* end, const char* buf, size_t& len) {
+    if (!generateBuf(ptr, end, buf, len))
+        return false;
+
+    len = strnlen(buf, len);
+    return true;
+}
+
 /**
  * Interpret the fuzzer input as a distribution on the full range of valid
  * BSONElement that could be passed to the builder.
@@ -378,7 +388,7 @@ bool createFuzzedElement(const char*& ptr,
             return true;
         }
         case RegEx: {
-            if (!generateBuf(ptr, end, &buf[0], len))
+            if (!generateBufNoNuls(ptr, end, &buf[0], len))
                 return false;
             result = createRegex(StringData(buf, len), elementMemory);
             return true;
