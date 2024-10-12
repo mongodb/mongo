@@ -220,7 +220,7 @@ mongo_cc_library(
         "authentication_commands.h",
     ],
     deps = [
-        # TODO SERVER-72648 - remove dependencies
+        # TODO SERVER-78809 - remove dependencies
         "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:auth_options",

@@ -89,7 +89,7 @@ feature_flags:
     featureFlagRearchitectUserAcquisition:
         description: "Enable new flow for authentication and authorization"
         cpp_varname: gFeatureFlagRearchitectUserAcquisition
-        default: false
+        default: true
         shouldBeFCVGated: false
     featureFlagOIDCInternalAuthorization:
         description: "Feature flag gating OIDC authentication with internal authorization"

@@ -178,7 +178,7 @@ std::unique_ptr<UserRequest> getX509UserRequest(OperationContext* opCtx, const U
 
 constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."_sd;
 
-// TODO SERVER-72648: remove
+// TODO SERVER-78809: remove
 /**
  * Completes the authentication of "user".
  *
@@ -281,7 +281,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 }
 #endif  // MONGO_CONFIG_SSL
 
-// TODO SERVER-72648: remove
+// TODO SERVER-78809: remove
 void _authenticate(OperationContext* opCtx, AuthenticationSession* session, StringData mechanism) {
 #ifdef MONGO_CONFIG_SSL
     if (mechanism == auth::kMechanismMongoX509) {
@@ -333,7 +333,7 @@ AuthenticateReply authCommand(OperationContext* opCtx,
     auto user = cmd.getUser();
     auto mechanism = cmd.getMechanism();
 
-    // TODO SERVER-72648: remove
+    // TODO SERVER-78809: remove
     if (!gFeatureFlagRearchitectUserAcquisition.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
 
