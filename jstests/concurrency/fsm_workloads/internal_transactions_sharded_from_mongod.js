@@ -123,6 +123,20 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
     };
 
+    $config.teardown = function teardown(db, collName, cluster) {
+        $super.teardown.apply(this, arguments);
+
+        // If a shard node that is acting as a router for an internal transaction is
+        // killed/terminated/stepped down or the transaction's session is killed while running a
+        // non-retryable transaction, the transaction would be left in-progress since nothing
+        // would aborted it. Such dangling transactions can cause the CheckReplDBHash hook to hang
+        // as the fsyncLock command requires taking the global S lock and it cannot do that while
+        // there is an in-progress transaction.
+        if (TestData.runningWithShardStepdowns || this.retryOnKilledSession) {
+            this.killAllSessions(cluster);
+        }
+    };
+
     $config.states.init = function init(db, collName, connCache) {
         const retryableErrorMessages = [
             "The server is in quiesce mode and will shut down",

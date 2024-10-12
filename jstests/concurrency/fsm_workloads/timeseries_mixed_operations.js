@@ -5,31 +5,12 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   requires_timeseries,
+ *   # TODO SERVER-89708 remove this tag once the related issue is fixed
+ *   assumes_balancer_off,
  * ]
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-
-function runCmdAndRetryOnNoProgressMade(cmd) {
-    assert.soon(() => {
-        try {
-            cmd();
-            return true;
-        } catch (e) {
-            if (e instanceof BulkWriteError && e.hasWriteErrors()) {
-                for (let writeErr of e.getWriteErrors()) {
-                    if (writeErr.code == ErrorCodes.NoProgressMade) {
-                        print(`No progress made while inserting documents. Received error ${
-                            tojson(writeErr.code)}, Retrying.`);
-                        return false;
-                    }
-                }
-            } else {
-                throw e;
-            }
-        }
-    });
-}
 
 export const $config = (function() {
     const initData = {
@@ -52,56 +33,48 @@ export const $config = (function() {
 
     const states = {
         init: function init(db, collName) {
-            runCmdAndRetryOnNoProgressMade(() => {
-                const coll = this.getCollection(db, collName);
-                const res = coll.insert({
-                    [metaFieldName]: 1,
-                    [timeFieldName]: new Date(),
-                    first: true,
-                });
-                TimeseriesTest.assertInsertWorked(res);
-                assert.eq(1, res.nInserted, tojson(res));
+            const coll = this.getCollection(db, collName);
+            const res = coll.insert({
+                [metaFieldName]: 1,
+                [timeFieldName]: new Date(),
+                first: true,
             });
+            TimeseriesTest.assertInsertWorked(res);
+            assert.eq(1, res.nInserted, tojson(res));
         },
 
         insertManyOrdered: function insertManyOrdered(db, collName) {
-            runCmdAndRetryOnNoProgressMade(() => {
-                const coll = this.getCollection(db, collName);
-                const docs = [];
-                for (let i = 0; i < batchSize; i++) {
-                    docs.push({
-                        [metaFieldName]: Random.randInt(this.threadCount),
-                        [timeFieldName]: new Date(),
-                        data: Random.rand(),
-                    });
-                }
-                const res = coll.insertMany(docs, {ordered: true});
-                TimeseriesTest.assertInsertWorked(res);
-                assert.eq(res.insertedIds.length, batchSize);
-            });
+            const coll = this.getCollection(db, collName);
+            const docs = [];
+            for (let i = 0; i < batchSize; i++) {
+                docs.push({
+                    [metaFieldName]: Random.randInt(this.threadCount),
+                    [timeFieldName]: new Date(),
+                    data: Random.rand(),
+                });
+            }
+            const res = coll.insertMany(docs, {ordered: true});
+            TimeseriesTest.assertInsertWorked(res);
+            assert.eq(res.insertedIds.length, batchSize);
         },
 
         insertManyUnordered: function insertManyUnordered(db, collName) {
-            runCmdAndRetryOnNoProgressMade(() => {
-                const coll = this.getCollection(db, collName);
-                const docs = [];
-                for (let i = 0; i < batchSize; i++) {
-                    docs.push({
-                        [metaFieldName]: Random.randInt(this.threadCount),
-                        [timeFieldName]: new Date(),
-                        data: Random.rand(),
-                    });
-                }
-                const res = coll.insertMany(docs, {ordered: false});
-                TimeseriesTest.assertInsertWorked(res);
-                assert.eq(res.insertedIds.length, batchSize);
-            });
+            const coll = this.getCollection(db, collName);
+            const docs = [];
+            for (let i = 0; i < batchSize; i++) {
+                docs.push({
+                    [metaFieldName]: Random.randInt(this.threadCount),
+                    [timeFieldName]: new Date(),
+                    data: Random.rand(),
+                });
+            }
+            const res = coll.insertMany(docs, {ordered: false});
+            TimeseriesTest.assertInsertWorked(res);
+            assert.eq(res.insertedIds.length, batchSize);
         },
 
         deleteAllBuckets: function deleteAllBuckets(db, collName) {
-            runCmdAndRetryOnNoProgressMade(() => {
-                assert.commandWorked(this.getBucketCollection(db, collName).remove({}));
-            });
+            assert.commandWorked(this.getBucketCollection(db, collName).remove({}));
         },
     };
 

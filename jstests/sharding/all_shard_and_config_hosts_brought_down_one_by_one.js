@@ -41,11 +41,6 @@ jsTest.log('Config nodes up: 2 of 3, shard nodes up: 2 of 2: ' +
            'Inserts and queries must work');
 st.configRS.stop(0, undefined, undefined, {forRestart: true});
 st.restartMongos(0);
-// For a config shard, the config server is the shard. The update might timeout if the election
-// doesn't complete on time. Wait for the primary to be available.
-if (TestData.configShard) {
-    st.rs0.getPrimary();
-}
 assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
     {_id: 0}, {$inc: {count: 1}}, {upsert: true, writeConcern: {w: 2, wtimeout: 30000}}));
 count += 1;

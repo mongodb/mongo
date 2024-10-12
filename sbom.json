@@ -35,7 +35,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Server Programmability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -128,7 +128,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Networking & Observability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -159,7 +159,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Server Programmability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -190,7 +190,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Server Programmability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -221,7 +221,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Networking & Observability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -307,7 +307,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Server Programmability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -431,7 +431,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Server Programmability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -493,7 +493,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Networking & Observability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -524,7 +524,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Workload Scheduling"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -555,7 +555,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Networking & Observability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -858,7 +858,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Server Programmability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -1114,7 +1114,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Networking & Observability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -1336,7 +1336,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Workload Scheduling"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -1527,7 +1527,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Networking & Observability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",
@@ -1563,7 +1563,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Networking & Observability"
+          "value": "Service Arch"
         }
       ],
       "type": "library",

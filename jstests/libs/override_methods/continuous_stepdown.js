@@ -26,7 +26,7 @@
  */
 
 import {Thread} from "jstests/libs/parallelTester.js";
-import {reconfig, reconnect} from "jstests/replsets/rslib.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 export class ContinuousStepdown {
     /**
@@ -209,7 +209,7 @@ function makeReplSetTestWithContinuousPrimaryStepdown(stepdownOptions, verbosity
          * Overrides stopSet to terminate the failover thread.
          */
         stopSet(signal, forRestart, options) {
-            this.stopContinuousFailover({waitForPrimary: true});
+            this.stopContinuousFailover({waitForPrimary: false});
             super.stopSet(signal, forRestart, options);
         }
 
@@ -267,8 +267,7 @@ function makeReplSetTestWithContinuousPrimaryStepdown(stepdownOptions, verbosity
          * Blocking method, which tells the thread running continuousPrimaryStepdownFn to stop
          * and waits for it to terminate.
          *
-         * If waitForPrimary is true, blocks until a new primary has been elected and reestablishes
-         * all connections.
+         * If waitForPrimary is true, blocks until a new primary has been elected.
          */
         stopContinuousFailover({waitForPrimary: waitForPrimary = false} = {}) {
             if (!this._stepdownThread.hasStarted()) {
@@ -279,7 +278,6 @@ function makeReplSetTestWithContinuousPrimaryStepdown(stepdownOptions, verbosity
 
             if (waitForPrimary) {
                 this.getPrimary();
-                this.nodes.forEach(node => reconnect(node));
             }
         }
     };

@@ -13,11 +13,12 @@ function assertNumJumboChunks(configDB, ns, expectedNumJumboChunks) {
     assert.eq(findChunksUtil.countChunksForNs(configDB, ns, {jumbo: true}), expectedNumJumboChunks);
 }
 
-function setGlobalChunkSize(configDB, chunkSizeMBytes) {
+function setGlobalChunkSize(st, chunkSizeMBytes) {
     // Set global chunk size
-    assert.commandWorked(configDB.settings.update({_id: 'chunksize'},
-                                                  {$set: {value: chunkSizeMBytes}},
-                                                  {upsert: true, writeConcern: {w: 'majority'}}));
+    assert.commandWorked(
+        st.s.getDB("config").settings.update({_id: 'chunksize'},
+                                             {$set: {value: chunkSizeMBytes}},
+                                             {upsert: true, writeConcern: {w: 'majority'}}));
 }
 
 function setCollectionChunkSize(st, ns, chunkSizeMBytes) {
@@ -31,10 +32,6 @@ var st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 assert.commandWorked(
     st.s.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: 'zoneShard0'}));
-
-// Use retriable writes when writing to the config server since these are not automatically retried.
-const mongosSession = st.s.startSession({retryWrites: true});
-const configDB = mongosSession.getDatabase("config");
 
 // Try to move unsuccessfully a 3MB chunk and check it gets marked as jumbo
 {
@@ -61,7 +58,7 @@ const configDB = mongosSession.getDatabase("config");
 
     // Wait for the balancer to try to move the chunk and check it gets marked as jumbo.
     assert.soon(() => {
-        let chunk = findChunksUtil.findOneChunkByNs(configDB, 'test.foo', {min: {x: 0}});
+        let chunk = findChunksUtil.findOneChunkByNs(st.getDB('config'), 'test.foo', {min: {x: 0}});
         if (chunk == null) {
             // Balancer hasn't run and enforce the zone boundaries yet.
             return false;
@@ -81,6 +78,7 @@ const configDB = mongosSession.getDatabase("config");
 {
     const collName = "collA";
     const coll = st.s.getDB("test").getCollection(collName);
+    const configDB = st.s.getDB("config");
     const splitPoint = 0;
 
     assert.commandWorked(st.s.adminCommand({shardcollection: coll.getFullName(), key: {x: 1}}));
@@ -94,7 +92,7 @@ const configDB = mongosSession.getDatabase("config");
     bulkInsert(coll, splitPoint, 3);
 
     setCollectionChunkSize(st, coll.getFullName(), 5);
-    setGlobalChunkSize(configDB, 1);
+    setGlobalChunkSize(st, 1);
 
     // Move the 3MB chunk to shard0
     st.startBalancer();
@@ -120,6 +118,7 @@ const configDB = mongosSession.getDatabase("config");
 {
     const collName = "collB";
     const coll = st.s.getDB("test").getCollection(collName);
+    const configDB = st.s.getDB("config");
     const splitPoint = 0;
 
     assert.commandWorked(st.s.adminCommand({shardcollection: coll.getFullName(), key: {x: 1}}));
@@ -133,7 +132,7 @@ const configDB = mongosSession.getDatabase("config");
     bulkInsert(coll, splitPoint, 3);
 
     setCollectionChunkSize(st, coll.getFullName(), 1);
-    setGlobalChunkSize(configDB, 5);
+    setGlobalChunkSize(st, 5);
 
     // Try to move the 3MB chunk and mark it as jumbo
     st.startBalancer();
