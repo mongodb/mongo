@@ -25,13 +25,3 @@ env.CppUnitTest(
         "bucket_catalog",
     ],
 )
-
-env.CppUnitTest(
-    target="timeseries_sizing_test",
-    source=[
-        "timeseries_sizing_test.cpp",
-    ],
-    LIBDEPS=[
-        "bucket_catalog",
-    ],
-)
