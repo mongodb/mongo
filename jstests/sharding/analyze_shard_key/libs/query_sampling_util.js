@@ -12,6 +12,10 @@ var QuerySamplingUtil = (function() {
         return listCollectionRes.cursor.firstBatch[0].info.uuid;
     }
 
+    function generateRandomString(length = 5) {
+        return extractUUIDFromObject(UUID()).substring(0, length);
+    }
+
     function generateRandomCollation() {
         return {locale: "en_US", strength: AnalyzeShardKeyUtil.getRandInteger(1, 5)};
     }
@@ -430,6 +434,7 @@ var QuerySamplingUtil = (function() {
 
     return {
         getCollectionUuid,
+        generateRandomString,
         generateRandomCollation,
         makeCmdObjIgnoreSessionInfo,
         waitForActiveSamplingReplicaSet,

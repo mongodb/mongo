@@ -1037,6 +1037,30 @@ std::deque<std::string> getUniqueFiles(const std::vector<std::string>& files,
     return result;
 }
 
+/**
+ * Normalizes ident names with and without 'directoryPerDb' and 'wiredTigerDirectoryForIndexes'
+ * mode.
+ *
+ * The durable catalog can return idents in four forms:
+ *  - <db_name>/<collection|index>/<ident_identifier>
+ *    - directoryPerDb + wiredTigerDirectoryForIndexes
+ *  - <db_name>/<ident_name>
+ *    - directoryPerDb
+ *  - <collection|index>/<ident_identifier>
+ *    - wiredTigerDirectoryForIndexes
+ *  - <ident_name>
+ *    - default, no options enabled
+ *
+ * ident_identifier: <counter>-<random number>
+ * ident_name: <collection|index>-<ident_identifier>
+ *
+ * This function trims the leading directory names leaving only the ident's unique identifier.
+ */
+inline std::string getIdentStem(const std::string& ident) {
+    boost::filesystem::path identPath(ident);
+    return identPath.stem().string();
+}
+
 class StreamingCursorImpl : public StorageEngine::StreamingCursor {
 public:
     StreamingCursorImpl() = delete;
@@ -1295,15 +1319,15 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
         for (const DurableCatalog::EntryIdentifier& e : catalogEntries) {
             // Populate the collection ident with its namespace and UUID.
             UUID uuid = catalog->getMetaData(opCtx, e.catalogId)->options.uuid.value();
-            std::string collectionIdent = e.ident;
+            std::string collectionIdent = getIdentStem(e.ident);
             _wtBackup.identToNamespaceAndUUIDMap.emplace(collectionIdent,
                                                          std::make_pair(e.nss, uuid));
 
             // Populate the collection's index idents with the collection's namespace and UUID.
             std::vector<std::string> idxIdents = catalog->getIndexIdents(opCtx, e.catalogId);
             for (const std::string& idxIdentFull : idxIdents) {
-                _wtBackup.identToNamespaceAndUUIDMap.emplace(idxIdentFull,
-                                                             std::make_pair(e.nss, uuid));
+                std::string idxIdent = getIdentStem(idxIdentFull);
+                _wtBackup.identToNamespaceAndUUIDMap.emplace(idxIdent, std::make_pair(e.nss, uuid));
             }
         }
     }

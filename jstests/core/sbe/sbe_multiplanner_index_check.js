@@ -51,9 +51,7 @@ const awaitShell = startParallelShell(funWithArgs(function(collName) {
                                                                        ErrorCodes.QueryPlanKilled);
                                       }, collName), db.getMongo().port);
 
-// First, FailPoint::shouldFail is used as a condition to skip logging. Then, PauseWhileSet is
-// invoked, meaning the timeEntered should total 2.
-fp.wait({timesEntered: 2});
+fp.wait();
 
 coll.dropIndex({b: 1});
 

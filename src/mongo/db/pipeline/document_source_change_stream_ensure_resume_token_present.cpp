@@ -153,7 +153,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent
     }
 }
 
-Value DocumentSourceChangeStreamEnsureResumeTokenPresent::doSerialize(
+Value DocumentSourceChangeStreamEnsureResumeTokenPresent::serialize(
     const SerializationOptions& opts) const {
     BSONObjBuilder builder;
     if (opts.verbosity) {

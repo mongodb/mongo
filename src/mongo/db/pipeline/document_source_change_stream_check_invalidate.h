@@ -39,8 +39,7 @@ namespace mongo {
  * "invalidate" entry for commands that should invalidate the change stream (e.g. collection drop
  * for a single-collection change stream). It is not intended to be created by the user.
  */
-class DocumentSourceChangeStreamCheckInvalidate final
-    : public DocumentSourceInternalChangeStreamStage {
+class DocumentSourceChangeStreamCheckInvalidate final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckInvalidate"_sd;
 
@@ -65,7 +64,7 @@ public:
         return boost::none;
     }
 
-    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
@@ -82,7 +81,7 @@ private:
      */
     DocumentSourceChangeStreamCheckInvalidate(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               boost::optional<ResumeTokenData> startAfterInvalidate)
-        : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
+        : DocumentSource(kStageName, expCtx),
           _startAfterInvalidate(std::move(startAfterInvalidate)) {
         invariant(!_startAfterInvalidate ||
                   _startAfterInvalidate->fromInvalidate == ResumeTokenData::kFromInvalidate);

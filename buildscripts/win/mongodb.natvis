@@ -1,16 +1,14 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?> 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
   <!--
-  NatVis Documentation:
+  NatVis Documentation: 
   https://docs.microsoft.com/en-us/visualstudio/debugger/create-custom-views-of-native-objects?view=vs-2017
-
+  
   Boost Visualizers:
   https://marketplace.visualstudio.com/items?itemName=ArkadyShapkin.CDebuggerVisualizersforVS2017
   https://github.com/KindDragon/CPPDebuggerVisualizers
 
   To load in Visual Studio, the natvis file must be in the Visual Studio project.
-   Note: with buildscripts/setup_spawnhost_coredump, this file should be automatically placed in the user-specific Natvis directory.
-   https://learn.microsoft.com/en-us/visualstudio/debugger/create-custom-views-of-native-objects?view=vs-2022#BKMK_natvis_location
   To load in WinDBG, run ".nvload mongdb.natvis"
   -->
   <Type Name="mongo::Status">
@@ -65,16 +63,16 @@
     <Expand>
       <CustomListItems>
         <Variable Name="Code" InitialValue="(const char*)this+4"/>
-
+        
         <Item Name="code">Code+4,[*(int32_t*)(Code)-1]s8</Item>
         <Item Name="scope">*(mongo::BSONObjData*)(Code+*(int32_t*)(Code)+4)</Item>
       </CustomListItems>
     </Expand>
   </Type>
 
-  <!--
+  <!-- 
   It it not possible to use variables to calculate contents in the DisplayString nodes.
-
+  
   this+strlen((char*)&amp;name)+2: Skips over the type byte and the name with its null terminator to get to the beginning of the value
   -->
   <Type Name="mongo::BSONElementData">

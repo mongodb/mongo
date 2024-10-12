@@ -1,12 +1,10 @@
 /**
+ *
  * Tests the rewrite of NetworkInterfaceExceededTimeLimit exception coming from
  * `executor/connection_pool.cpp` into MaxTimeMSError when MaxTimeMS option is set for a given
  * sharding command.
  *
- * @tags: [
- *   requires_fcv_61,
- *   does_not_support_stepdowns,
- * ]
+ * @tags: [requires_fcv_61]
  */
 
 (function() {

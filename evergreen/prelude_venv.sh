@@ -43,5 +43,5 @@ function activate_venv {
   fi
   export PIP_CACHE_DIR=${workdir}/pip_cache
 
-  echo "python set to $(which $python) and python version: $($python --version)"
+  echo "python set to $(which $python)"
 }

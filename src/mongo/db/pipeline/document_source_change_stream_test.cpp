@@ -95,23 +95,15 @@ using DSChangeStream = DocumentSourceChangeStream;
 // Deterministic values used for testing
 const UUID testConstUuid = UUID::parse("6948DF80-14BD-4E04-8842-7668D9C001F5").getValue();
 
-class ExecutableStubMongoProcessInterface : public StubMongoProcessInterface {
-    bool isExpectedToExecuteQueries() override {
-        return true;
-    }
-};
-
 class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
 public:
     ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
     explicit ChangeStreamStageTestNoSetup(NamespaceString nsString)
-        : AggregationContextFixture(nsString) {
-        getExpCtx()->mongoProcessInterface =
-            std::make_unique<ExecutableStubMongoProcessInterface>();
-    };
+        : AggregationContextFixture(nsString) {}
 };
 
-struct MockMongoInterface final : public ExecutableStubMongoProcessInterface {
+struct MockMongoInterface final : public StubMongoProcessInterface {
+
     // Used by operations which need to obtain the oplog's UUID.
     static const UUID& oplogUuid() {
         static const UUID* oplog_uuid = new UUID(UUID::gen());
@@ -4484,7 +4476,7 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1HighWaterMark) {
     ASSERT_FALSE(next.isAdvanced());
 }
 
-TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamAddPostImageEmptyForQueryStats) {
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamAddPostImage) {
     auto spec = DocumentSourceChangeStreamSpec();
     spec.setFullDocument(FullDocumentModeEnum::kUpdateLookup);
 
@@ -4493,13 +4485,12 @@ TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamAddPostImageEmpty
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamAddPostImage":{"fullDocument":"updateLookup"}})",
         docSource->serialize().getDocument().toBson());
-
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource->serialize(opts).missing());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamAddPostImage":{"fullDocument":"updateLookup"}})",
+        redact(*docSource));
 }
 
-TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamAddPreImageEmptyForQueryStats) {
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamAddPreImage) {
     auto docSource = DocumentSourceChangeStreamAddPreImage{
         getExpCtx(), FullDocumentBeforeChangeModeEnum::kWhenAvailable};
 
@@ -4510,14 +4501,12 @@ TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamAddPreImageEmptyF
             }
         })",
         docSource.serialize().getDocument().toBson());
-
-
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource.serialize(opts).missing());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamAddPreImage":{"fullDocumentBeforeChange":"whenAvailable"}})",
+        redact(docSource));
 }
 
-TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamCheckInvalidateEmptyForQueryStats) {
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckInvalidate) {
     DocumentSourceChangeStreamSpec spec;
     spec.setResumeAfter(
         ResumeToken::parse(makeResumeToken(Timestamp(),
@@ -4537,14 +4526,24 @@ TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamCheckInvalidateEm
             }
         })",
         docSource->serialize().getDocument().toBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamCheckInvalidate":{"startAfterInvalidate":{
+                    "_data": "?string"
+                }}})",
+        redact(*docSource));
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource->serialize(opts).missing());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamCheckInvalidate":{"startAfterInvalidate":{
+                        "_data": "820000000000000000292904"
+                    }}})",
+        docSource
+            ->serialize(SerializationOptions{
+                .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
+            .getDocument()
+            .toBson());
 }
 
-TEST_F(ChangeStreamStageTestNoSetup,
-       DocumentSourceChangeStreamCheckResumabilityEmptyForQueryStats) {
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckResumability) {
     DocumentSourceChangeStreamSpec spec;
     spec.setResumeAfter(
         ResumeToken::parse(makeResumeToken(Timestamp(),
@@ -4563,27 +4562,39 @@ TEST_F(ChangeStreamStageTestNoSetup,
             }
         })",
         docSource->serialize().getDocument().toBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamCheckResumability":{
+                "resumeToken": {
+                    "_data": "?string"
+                }
+            }})",
+        redact(*docSource));
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource->serialize(opts).missing());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamCheckResumability":{
+                "resumeToken": {
+                    "_data": "820000000000000000292904"
+                }
+            }})",
+        docSource
+            ->serialize(SerializationOptions{
+                .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
+            .getDocument()
+            .toBson());
 }
 
-TEST_F(ChangeStreamStageTestNoSetup,
-       DocumentSourceChangeStreamCheckTopologyChangeEmptyForQueryStats) {
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckTopologyChange) {
     auto docSource = DocumentSourceChangeStreamCheckTopologyChange::create(getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamCheckTopologyChange":{}})",
         docSource->serialize().getDocument().toBson());
-
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource->serialize(opts).missing());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamCheckTopologyChange":{}})",
+        redact(*docSource));
 }
 
-TEST_F(ChangeStreamStageTestNoSetup,
-       DocumentSourceChangeStreamEnsureResumeTokenPresentEmptyForQueryStats) {
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamEnsureResumeTokenPresent) {
     DocumentSourceChangeStreamSpec spec;
     spec.setResumeAfter(
         ResumeToken::parse(makeResumeToken(Timestamp(),
@@ -4602,23 +4613,26 @@ TEST_F(ChangeStreamStageTestNoSetup,
             }
         })",
         docSource->serialize().getDocument().toBson());
-
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource->serialize(opts).missing());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalChangeStreamEnsureResumeTokenPresent": {
+                "resumeToken": {
+                    "_data": "?string"
+                }
+            }
+        })",
+        redact(*docSource));
 }
 
-TEST_F(ChangeStreamStageTestNoSetup,
-       DocumentSourceChangeStreamHandleTopologyChangeEmptyForQueryStats) {
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamHandleTopologyChange) {
     auto docSource = DocumentSourceChangeStreamHandleTopologyChange::create(getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamHandleTopologyChange":{}})",
         docSource->serialize().getDocument().toBson());
-
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource->serialize(opts).missing());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamHandleTopologyChange":{}})",
+        redact(*docSource));
 }
 
 TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamSplitLargeEvent) {
@@ -4660,10 +4674,9 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransform) 
             }
         })",
         docSource->serialize().getDocument().toBson());
-
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "$changeStream": {
+            "$_internalChangeStreamTransform": {
                 "resumeAfter": {
                     "_data": "?string"
                 },
@@ -4675,72 +4688,14 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransform) 
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "$changeStream": {
+            "$_internalChangeStreamTransform": {
                 "resumeAfter": {
-                    "_data": "8200000000000000002B0229296E04"
+                    "_data": "820000000000000000292904"
                 },
                 "fullDocument": "default",
                 "fullDocumentBeforeChange": "off"
             }
         })",
-        docSource
-            ->serialize(SerializationOptions{
-                .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
-            .getDocument()
-            .toBson());
-}
-
-
-TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransformMoreFields) {
-    DocumentSourceChangeStreamSpec spec;
-    spec.setStartAfter(
-        ResumeToken::parse(makeResumeToken(Timestamp(),
-                                           testConstUuid,
-                                           BSON("_id" << 1 << "x" << 2),
-                                           DocumentSourceChangeStream::kInsertOpType)));
-    spec.setFullDocument(FullDocumentModeEnum::kRequired);
-    spec.setFullDocumentBeforeChange(FullDocumentBeforeChangeModeEnum::kWhenAvailable);
-    spec.setShowExpandedEvents(true);
-
-    auto docSource = DocumentSourceChangeStreamTransform::create(getExpCtx(), spec);
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$_internalChangeStreamTransform": {
-                "startAfter": {
-                    "_data": "8200000000000000002B042C0100296E5A10046948DF8014BD4E0488427668D9C001F5463C6F7065726174696F6E54797065003C696E736572740046646F63756D656E744B657900461E5F6964002B021E78002B04000004"
-                },
-                "fullDocument": "required",
-                "fullDocumentBeforeChange": "whenAvailable",
-                "showExpandedEvents": true
-
-            }
-        })",
-        docSource->serialize().getDocument().toBson());
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-                "$changeStream": {
-                    "startAfter": {
-                        "_data": "?string"
-                    },
-                    "fullDocument": "required",
-                    "fullDocumentBeforeChange": "whenAvailable",
-                    "showExpandedEvents": true
-                }
-            })",
-        redact(*docSource));
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-                "$changeStream": {
-                    "startAfter": {
-                        "_data": "8200000000000000002B0229296E04"
-                    },
-                    "fullDocument": "required",
-                    "fullDocumentBeforeChange": "whenAvailable",
-                    "showExpandedEvents": true
-                }
-            })",
         docSource
             ->serialize(SerializationOptions{
                 .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
@@ -4792,16 +4747,21 @@ void assertRedactedMatchExpressionContainsOperatorsAndRedactedFieldPaths(BSONEle
     ASSERT(redactedFieldPaths > 0);
 }
 
-TEST_F(ChangeStreamStageTestNoSetup,
-       DocumentSourceChangeStreamUnwindTransactionEmptyForQueryStats) {
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamUnwindTransaction) {
     auto docSource = DocumentSourceChangeStreamUnwindTransaction::create(getExpCtx());
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource->serialize(opts).missing());
+    auto redacted = redact(*docSource);
+    // First, check the outermost structure.
+    BSONElement el = redacted.getField("$_internalChangeStreamUnwindTransaction"_sd);
+    ASSERT(el);
+    el = el.Obj().getField("filter");
+    ASSERT(el);
+    el = el.Obj().firstElement();
+
+    assertRedactedMatchExpressionContainsOperatorsAndRedactedFieldPaths(el);
 }
 
-TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamOplogMatchEmptyForQueryStats) {
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamOplogMatch) {
     DocumentSourceChangeStreamSpec spec;
     spec.setResumeAfter(
         ResumeToken::parse(makeResumeToken(Timestamp(),
@@ -4811,9 +4771,15 @@ TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamOplogMatchEmptyFo
 
     auto docSource = DocumentSourceChangeStreamOplogMatch::create(getExpCtx(), spec);
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource->serialize(opts).missing());
+    auto redacted = redact(*docSource);
+    // First, check the outermost structure.
+    BSONElement el = redacted.getField("$_internalChangeStreamOplogMatch"_sd);
+    ASSERT(el);
+    el = el.Obj().getField("filter");
+    ASSERT(el);
+    el = el.Obj().firstElement();
+
+    assertRedactedMatchExpressionContainsOperatorsAndRedactedFieldPaths(el);
 }
 
 }  // namespace

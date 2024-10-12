@@ -68,7 +68,7 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
     for (auto it = first; it != last; ++it) {
         auto& doc = it->doc;
         auto tenantId = coll->ns().dbName().tenantId();
-        cluster_parameters::validateParameter(doc, tenantId);
+        cluster_parameters::validateParameter(opCtx, doc, tenantId);
         opCtx->recoveryUnit()->onCommit(
             [doc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
                 cluster_parameters::updateParameter(opCtx, doc, kOplog, tenantId);
@@ -84,7 +84,7 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
     }
 
     auto tenantId = args.coll->ns().dbName().tenantId();
-    cluster_parameters::validateParameter(updatedDoc, tenantId);
+    cluster_parameters::validateParameter(opCtx, updatedDoc, tenantId);
     opCtx->recoveryUnit()->onCommit(
         [updatedDoc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
             cluster_parameters::updateParameter(opCtx, updatedDoc, kOplog, tenantId);

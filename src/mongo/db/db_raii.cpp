@@ -1130,11 +1130,6 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         // openCollection is eventually called to construct a Collection object from the durable
         // catalog.
         establishCappedSnapshotIfNeeded(opCtx, catalogBeforeSnapshot, nsOrUUID);
-        if (resolvedSecondaryNamespaces) {
-            for (const auto& secondaryNss : *resolvedSecondaryNamespaces) {
-                establishCappedSnapshotIfNeeded(opCtx, catalogBeforeSnapshot, {secondaryNss});
-            }
-        }
 
         openSnapshot(opCtx, nss.isOplog());
 

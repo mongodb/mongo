@@ -105,11 +105,10 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
 
     MINIDUMP_TYPE miniDumpType =
 #ifdef MONGO_CONFIG_DEBUG_BUILD
-        static_cast<MINIDUMP_TYPE>(MiniDumpWithFullMemory | MiniDumpIgnoreInaccessibleMemory);
+        MiniDumpWithFullMemory;
 #else
         static_cast<MINIDUMP_TYPE>(MiniDumpNormal | MiniDumpWithIndirectlyReferencedMemory |
-                                   MiniDumpWithProcessThreadData | MiniDumpWithThreadInfo |
-                                   MiniDumpWithUnloadedModules | MiniDumpWithTokenInformation);
+                                   MiniDumpWithProcessThreadData);
 #endif
     LOGV2(23132,
           "Writing minidump diagnostic file {dumpName}",

@@ -70,7 +70,7 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:
-    - rhel94-large-packagetest
+    - ubuntu2004-package
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl

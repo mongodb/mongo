@@ -786,8 +786,31 @@ Timestamp WiredTigerRecordStore::getPinnedOplog() const {
     return _kvEngine->getPinnedOplog();
 }
 
-std::shared_ptr<CollectionTruncateMarkers> WiredTigerRecordStore::getCollectionTruncateMarkers() {
-    return _oplogTruncateMarkers->shared_from_this();
+bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) {
+    // Create another reference to the oplog truncate markers while holding a lock on the collection
+    // to prevent it from being destructed.
+    std::shared_ptr<OplogTruncateMarkers> oplogTruncateMarkers = _oplogTruncateMarkers;
+
+    Locker* locker = opCtx->lockState();
+    Locker::LockSnapshot snapshot;
+
+    // Release any locks before waiting on the condition variable. It is illegal to access any
+    // methods or members of this record store after this line because it could be deleted.
+    locker->saveLockStateAndUnlock(&snapshot);
+
+    // The top-level locks were freed, so also release any potential low-level (storage engine)
+    // locks that might be held.
+    WiredTigerRecoveryUnit* recoveryUnit = (WiredTigerRecoveryUnit*)opCtx->recoveryUnit();
+    recoveryUnit->abandonSnapshot();
+    recoveryUnit->beginIdle();
+
+    // Wait for an oplog deletion request, or for this record store to have been destroyed.
+    oplogTruncateMarkers->awaitHasExcessMarkersOrDead(opCtx);
+
+    // Reacquire the locks that were released.
+    locker->restoreLockState(opCtx, snapshot);
+
+    return !oplogTruncateMarkers->isDead();
 }
 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {

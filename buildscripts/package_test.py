@@ -90,13 +90,13 @@ OS_DOCKER_LOOKUP = {
     'rhel55': None,
     'rhel57': None,
     'rhel62': None,
-    'rhel70': ('registry.access.redhat.com/ubi7/ubi', "yum",
+    'rhel70': ('centos:7', "yum",
                frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
                "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel71': ('registry.access.redhat.com/ubi7/ubi', "yum",
+    'rhel71': ('centos:7', "yum",
                frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
                "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel72': ('registry.access.redhat.com/ubi7/ubi', "yum",
+    'rhel72': ('centos:7', "yum",
                frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
                "/opt/rh/rh-python38/root/usr/bin/python3"),
     'rhel8': ('almalinux:8', "yum",
@@ -227,6 +227,12 @@ def run_test(test: Test, client: DockerClient) -> Tuple[Test, Result]:
     commands: List[str] = ["export PYTHONIOENCODING=UTF-8"]
 
     if test.os_name.startswith('rhel'):
+        if test.os_name.startswith('rhel7'):
+            # RHEL 7 needs the SCL installed for Python 3
+            commands += [
+                "yum -y install centos-release-scl",
+                "yum-config-manager --enable centos-sclo-rh",
+            ]
         # RHEL distros need EPEL for Compass dependencies
         commands += [
             "yum -y install yum-utils epel-release",
@@ -252,15 +258,9 @@ def run_test(test: Test, client: DockerClient) -> Tuple[Test, Result]:
     container: Container | None = None
     try:
         image = get_image(test, client)
-        container = client.containers.run(
-            image, command=f"bash -c \"{join_commands(commands)}\"", auto_remove=True, detach=True,
-            volumes=[
-                f'{test_external_root}:{test_docker_root}',
-                '/etc/pki/entitlement/:/run/secrets/etc-pki-entitlement',
-                '/etc/rhsm:/run/secrets/rhsm',
-                '/etc/yum.repos.d/redhat.repo:/run/secrets/redhat.repo',
-                '/etc/yum.repos.d/redhat-rhsm.repo:/run/secrets/redhat-rhsm.repo'
-            ])
+        container = client.containers.run(image, command=f"bash -c \"{join_commands(commands)}\"",
+                                          auto_remove=True, detach=True,
+                                          volumes=[f'{test_external_root}:{test_docker_root}'])
         for log in container.logs(stream=True):
             result["log_raw"] += log.decode('UTF-8')
             # This is pretty verbose, lets run this way for a while and we can delete this if it ends up being too much

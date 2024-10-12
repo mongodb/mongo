@@ -77,11 +77,25 @@ BSONObj upgradeWriteConcern(const BSONObj& origWriteConcern) {
 }
 
 /**
+ * Helper to determine whether a number of targeted writes require a new targeted batch.
+ */
+bool isNewBatchRequiredOrdered(const std::vector<std::unique_ptr<TargetedWrite>>& writes,
+                               const TargetedBatchMap& batchMap) {
+    for (auto&& write : writes) {
+        if (batchMap.find(write->endpoint.shardName) == batchMap.end()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Helper to determine whether a shard is already targeted with a different shardVersion, which
  * necessitates a new batch. This happens when a batch write includes a multi target write and
  * a single target write.
  */
-bool wasShardAlreadyTargetedWithDifferentShardVersion(
+bool isNewBatchRequiredUnordered(
     const NamespaceString& nss,
     const std::vector<std::unique_ptr<TargetedWrite>>& writes,
     const std::map<NamespaceString, std::set<ShardId>>& nsShardIdMap,
@@ -107,37 +121,6 @@ bool wasShardAlreadyTargetedWithDifferentShardVersion(
         }
     }
     return false;
-}
-
-/**
- * Helper to determine whether a number of targeted writes require a new targeted batch.
- */
-bool isNewBatchRequiredOrdered(
-    const NamespaceString& nss,
-    const std::vector<std::unique_ptr<TargetedWrite>>& writes,
-    const TargetedBatchMap& batchMap,
-    const std::map<NamespaceString, std::set<ShardId>>& nsShardIdMap,
-    const std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>>& nsEndpointMap) {
-    // If this write targets a different shard, it needs to go in a different batch.
-    for (auto&& write : writes) {
-        if (batchMap.find(write->endpoint.shardName) == batchMap.end()) {
-            return true;
-        }
-    }
-
-    // If we already targeted this shard with a different shard version, then we also need a new
-    // batch.
-    return wasShardAlreadyTargetedWithDifferentShardVersion(
-        nss, writes, nsShardIdMap, nsEndpointMap);
-}
-
-bool isNewBatchRequiredUnordered(
-    const NamespaceString& nss,
-    const std::vector<std::unique_ptr<TargetedWrite>>& writes,
-    const std::map<NamespaceString, std::set<ShardId>>& nsShardIdMap,
-    const std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>>& nsEndpointMap) {
-    return wasShardAlreadyTargetedWithDifferentShardVersion(
-        nss, writes, nsShardIdMap, nsEndpointMap);
 }
 
 /**
@@ -392,8 +375,7 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
         // these targeted writes to any other endpoints.
         if (ordered && !batchMap.empty()) {
             dassert(batchMap.size() == 1u);
-            if (isNewBatchRequiredOrdered(
-                    targeter.getNS(), writes, batchMap, nsShardIdMap, nsEndpointMap)) {
+            if (isNewBatchRequiredOrdered(writes, batchMap)) {
                 writeOp.cancelWrites(nullptr);
                 break;
             }

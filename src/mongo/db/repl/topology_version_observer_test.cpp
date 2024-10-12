@@ -42,7 +42,6 @@
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/topology_version_observer.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -121,9 +120,6 @@ protected:
     const Milliseconds sleepTime = Milliseconds(100);
 
     std::unique_ptr<TopologyVersionObserver> observer;
-
-    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kDefault,
-                                                       logv2::LogSeverity::Debug(4)};
 };
 
 
@@ -146,15 +142,11 @@ TEST_F(TopologyVersionObserverTest, UpdateCache) {
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen, opCtx.get());
 
-    auto sleepCounter = 0;
     // Wait for the observer to update its cache
     while (observer->getCached()->getTopologyVersion()->getCounter() ==
            cachedResponse->getTopologyVersion()->getCounter()) {
         sleepFor(sleepTime);
-        // Make sure the test doesn't wait here for longer than 15 seconds.
-        ASSERT_LTE(sleepCounter++, 150);
     }
-    LOGV2(9326401, "Observer topology incremented after successful election");
 
     auto newResponse = observer->getCached();
     ASSERT(newResponse && newResponse->getTopologyVersion());

@@ -64,33 +64,27 @@ void CollectionTruncateMarkers::kill() {
 }
 
 
-bool CollectionTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* opCtx) {
+void CollectionTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* opCtx) {
     // Wait until kill() is called or there are too many collection markers.
     stdx::unique_lock<Latch> lock(_collectionMarkersReclaimMutex);
-    MONGO_IDLE_THREAD_BLOCK;
-    auto isWaitConditionSatisfied = opCtx->waitForConditionOrInterruptFor(
-        _reclaimCv, lock, Seconds(gCollectionTruncationCheckPeriodSeconds), [this, opCtx] {
-            if (_isDead) {
-                return true;
-            }
-
-            if (auto marker = peekOldestMarkerIfNeeded(opCtx)) {
-                invariant(marker->lastRecord.isValid());
+    while (!_isDead) {
+        {
+            MONGO_IDLE_THREAD_BLOCK;
+            stdx::lock_guard<Latch> lk(_markersMutex);
+            if (_hasExcessMarkers(opCtx)) {
+                const auto& oldestMarker = _markers.front();
+                invariant(oldestMarker.lastRecord.isValid());
 
                 LOGV2_DEBUG(7393215,
                             2,
                             "Collection has excess markers",
-                            "lastRecord"_attr = marker->lastRecord,
-                            "wallTime"_attr = marker->wallTime);
-                return true;
+                            "lastRecord"_attr = oldestMarker.lastRecord,
+                            "wallTime"_attr = oldestMarker.wallTime);
+                return;
             }
-
-            return false;
-        });
-
-    // Return true only when we have detected excess markers, not because the record store
-    // is being destroyed (_isDead) or we timed out waiting on the condition variable.
-    return !(_isDead || !isWaitConditionSatisfied);
+        }
+        _reclaimCv.wait_for(lock, stdx::chrono::seconds{gCollectionTruncationCheckPeriodSeconds});
+    }
 }
 
 boost::optional<CollectionTruncateMarkers::Marker>

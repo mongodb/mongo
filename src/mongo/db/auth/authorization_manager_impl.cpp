@@ -262,7 +262,6 @@ AuthorizationManagerImpl::AuthorizationManagerImpl(
 AuthorizationManagerImpl::~AuthorizationManagerImpl() = default;
 
 std::unique_ptr<AuthorizationSession> AuthorizationManagerImpl::makeAuthorizationSession() {
-    invariant(_externalState != nullptr);
     return std::make_unique<AuthorizationSessionImpl>(
         _externalState->makeAuthzSessionExternalState(this),
         AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});

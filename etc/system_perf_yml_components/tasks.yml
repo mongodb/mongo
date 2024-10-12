@@ -1,0 +1,252 @@
+functions:
+  f_dsi_run_workload: &dsi_run_func
+    - command: timeout.update
+      params:
+        exec_timeout_secs: ${exec_timeout_secs_override}
+        timeout_secs: ${timeout_secs_override}
+    - command: git.get_project
+      params:
+        directory: src/mongo
+        clone_depth: 1000
+        revisions:
+          dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          linkbench: ${linkbench_rev}
+          linkbench2: ${linkbench2_rev}
+          tsbs: ${tsbs_rev}
+          workloads: ${workloads_rev}
+          YCSB: ${YCSB_rev}
+          flamegraph: ${flamegraph_rev}
+          PrivateWorkloads: ${PrivateWorkloads_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+        redacted: true
+    - command: shell.exec
+      params:
+        script: ./src/dsi/run-dsi run_workload
+    - command: shell.exec
+      type: system
+      params:
+        script: ./src/dsi/run-dsi determine_failure -m SYSTEM
+    - command: shell.exec
+      type: setup
+      params:
+        script: ./src/dsi/run-dsi determine_failure -m SETUP
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi determine_failure -m TEST
+
+  f_run_dsi_workload: *dsi_run_func # Do not use this function. It is deprecated.
+
+  ## DSI_SELFTEST ##
+  dsi_selftest_setup_tests:
+    - command: git.get_project
+      params:
+        directory: src/dsi
+  dsi_selftest_check_python_formatting:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/check-format-python.sh
+  dsi_selftest_lint_python_scripts:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/lint-python.sh
+  dsi_selftest_lint_yml:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/lint-yml.sh
+  dsi_selftest_pytest:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/pytest.sh
+  dsi_selftest_mypy:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/mypy.sh
+  dsi_selftest_shellcheck:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/lint-shell.sh
+  dsi_selftest_e2e:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi e2e_test
+
+tasks:
+  ###
+  # Same in every DSI project
+  - name: renew_ssl_cert
+    commands:
+      - command: git.get_project
+        params:
+          directory: src/mongo
+          revisions:
+            dsi: ${dsi_rev}
+      # Run the script to generate ssl cert files
+      - command: shell.exec
+        params:
+          script: AWS_ACCESS_KEY_ID=${terraform_key} AWS_SECRET_ACCESS_KEY=${terraform_secret} ./src/dsi/run-dsi generate_ssl_cert
+      # Upload files for further DSI usage
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: member.pem
+          # path to the remote file is intended to be static
+          remote_file: dsi/ssl/member.pem
+          bucket: mciuploads
+          # the visibility has to be public for consumption by DSI
+          permissions: public-read
+          content_type: text/plain
+          display_name: member.pem
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: root.crt
+          # path to the remote file is intended to be static
+          remote_file: dsi/ssl/root.crt
+          bucket: mciuploads
+          # the visibility has to be public for consumption by DSI
+          permissions: public-read
+          content_type: text/plain
+          display_name: root.crt
+
+  - name: ycsb.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb.2023-09"
+
+  - name: ycsb_60GB.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-60GB.2023-09"
+
+  - name: ycsb_60GB.long.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-60GB.long.2023-09"
+
+  - name: ycsb_secondary_reads.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-secondary-reads.2023-09"
+
+  - name: ycsb_w1.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-w1.2023-09"
+
+  - name: ycsb_stepdowns.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb_stepdowns.2023-09"
+
+  - name: ycsb_rolling_restarts.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb_rolling_restarts.2023-09"
+
+  - name: ycsb_non_retryable_writes_stepdowns.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb_non_retryable_writes_stepdowns.2023-09"
+
+  - name: ycsb_non_retryable_writes_rolling_restarts.2023-09
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb_non_retryable_writes_rolling_restarts.2023-09"
+
+  - name: locust_bulk_insert
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "locust_bulk_insert"
+
+  - name: tsbs_query_fixed_bucketing
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_fixed_bucketing"
+
+  - name: tsbs-expression-query
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_genny"
+          test_control_params: |
+            {task_name: tsbs_expression_query,
+             config_filename: ./src/genny/dist/etc/genny/workloads/query/TimeseriesTsbsExpressionQuery.yml}
+
+  - name: startup
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "startup"
+
+  - name: dbcheck
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_dsi_run_workload
+        timeout_secs: 43200 # 12 hours
+        vars:
+          test_control: "dbcheck"
+          additional_tfvars: "tags: {expire-on-delta: 12}" # increase host expiration to 12 hours.
+
+  - name: genny_resharding_withIndexes
+    exec_timeout_secs: 172800 # 2 days
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/sharding/ReshardCollectionWithIndexes.yml
+
+  - name: tie-breaking-heuristics
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: tie-breaking,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+
+  - name: stream_workloads
+    commands:
+    - func: f_dsi_run_workload
+      vars:
+        test_control: streams.2023-10

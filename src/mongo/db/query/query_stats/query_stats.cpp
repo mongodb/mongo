@@ -153,7 +153,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         // number of cores. The size needs to be cast to a double since we want to round up the
         // number of partitions, and therefore need to avoid int division.
         size_t numPartitions = std::ceil(double(size) / (16 * 1024 * 1024));
-        auto numLogicalCores = ProcessInfo::getNumLogicalCores();
+        auto numLogicalCores = ProcessInfo::getNumCores();
         if (numPartitions < numLogicalCores) {
             numPartitions = numLogicalCores;
         }

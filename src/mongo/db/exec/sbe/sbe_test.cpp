@@ -232,26 +232,6 @@ TEST(SBEValues, HashCompound) {
         value::releaseValue(tag1, val1);
         value::releaseValue(tag2, val2);
     }
-
-    {
-        auto [tag1, val1] = value::makeNewArraySet();
-        auto set1 = value::getArraySetView(val1);
-        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
-        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
-        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
-
-        auto [tag2, val2] = value::makeNewArraySet();
-        auto set2 = value::getArraySetView(val2);
-        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
-        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
-        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
-
-
-        ASSERT_EQUALS(value::hashValue(tag1, val1), value::hashValue(tag2, val2));
-
-        value::releaseValue(tag1, val1);
-        value::releaseValue(tag2, val2);
-    }
 }
 
 TEST(SBEVM, Add) {

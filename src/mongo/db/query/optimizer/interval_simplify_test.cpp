@@ -869,7 +869,7 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
 
 // Number of bits held in the bitset. This include MinKey and MaxKey, so it must be at least two.
 static constexpr int bitsetSize = 11;
-static const size_t numThreads = ProcessInfo::getNumLogicalCores();
+static const size_t numThreads = ProcessInfo::getNumCores();
 
 TEST_F(IntervalIntersection, IntervalPermutations) {
     // Number of permutations is bitsetSize^4 * 2^4 * 2

@@ -95,7 +95,7 @@ size_t getRequestedMemSizeInBytes(const MemorySize& memSize) {
     size_t planCacheSize = convertToSizeInBytes(memSize);
     uassert(5968001,
             "Cache size must be at least 1KB * number of cores",
-            planCacheSize >= 1024 * ProcessInfo::getNumLogicalCores());
+            planCacheSize >= 1024 * ProcessInfo::getNumCores());
     return planCacheSize;
 }
 

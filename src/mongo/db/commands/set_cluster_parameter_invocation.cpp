@@ -156,11 +156,6 @@ StatusWith<bool> ClusterParameterDBClientService::updateParameterOnDisk(
         return Status(ErrorCodes::FailedToParse, errmsg);
     }
 
-    auto responseStatus = response.toStatus();
-    if (!responseStatus.isOK()) {
-        return responseStatus;
-    }
-
     return response.getNModified() > 0 || response.getN() > 0;
 }
 

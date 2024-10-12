@@ -36,7 +36,7 @@ namespace mongo {
  * A custom subclass of DocumentSourceMatch which is used to generate a $match stage to be applied
  * on the oplog. The stage requires itself to be the first stage in the pipeline.
  */
-class DocumentSourceChangeStreamOplogMatch final : public DocumentSourceInternalChangeStreamMatch {
+class DocumentSourceChangeStreamOplogMatch final : public DocumentSourceMatch {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamOplogMatch"_sd;
 
@@ -45,7 +45,7 @@ public:
 
     DocumentSourceChangeStreamOplogMatch(const DocumentSourceChangeStreamOplogMatch& other,
                                          const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
-        : DocumentSourceInternalChangeStreamMatch(other, newExpCtx) {
+        : DocumentSourceMatch(other, newExpCtx) {
         _clusterTime = other._clusterTime;
         _optimizedEndOfPipeline = other._optimizedEndOfPipeline;
     }
@@ -74,7 +74,7 @@ public:
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
-    Value doSerialize(const SerializationOptions& opts) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
 protected:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
@@ -88,8 +88,7 @@ private:
      */
     DocumentSourceChangeStreamOplogMatch(BSONObj filter,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceInternalChangeStreamMatch(std::move(filter), expCtx),
-          _optimizedEndOfPipeline(true) {
+        : DocumentSourceMatch(std::move(filter), expCtx), _optimizedEndOfPipeline(true) {
         expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     }
 

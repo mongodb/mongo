@@ -132,7 +132,7 @@ public:
     virtual ReactorHandle getReactor(WhichReactor which) = 0;
 
     virtual BatonHandle makeBaton(OperationContext* opCtx) const {
-        return {};
+        return opCtx->getServiceContext()->makeBaton(opCtx);
     }
 
     std::shared_ptr<const WireSpec::Specification> getWireSpec() const {

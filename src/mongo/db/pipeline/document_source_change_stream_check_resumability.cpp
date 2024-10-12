@@ -133,8 +133,7 @@ DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
 
 DocumentSourceChangeStreamCheckResumability::DocumentSourceChangeStreamCheckResumability(
     const intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token)
-    : DocumentSourceInternalChangeStreamStage(getSourceName(), expCtx),
-      _tokenFromClient(std::move(token)) {}
+    : DocumentSource(getSourceName(), expCtx), _tokenFromClient(std::move(token)) {}
 
 intrusive_ptr<DocumentSourceChangeStreamCheckResumability>
 DocumentSourceChangeStreamCheckResumability::create(const intrusive_ptr<ExpressionContext>& expCtx,
@@ -212,7 +211,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGet
     MONGO_UNREACHABLE;
 }
 
-Value DocumentSourceChangeStreamCheckResumability::doSerialize(
+Value DocumentSourceChangeStreamCheckResumability::serialize(
     const SerializationOptions& opts) const {
     BSONObjBuilder builder;
     if (opts.verbosity) {
@@ -224,7 +223,7 @@ Value DocumentSourceChangeStreamCheckResumability::doSerialize(
         builder.append(
             kStageName,
             DocumentSourceChangeStreamCheckResumabilitySpec(ResumeToken(_tokenFromClient))
-                .toBSON());
+                .toBSON(opts));
     }
     return Value(builder.obj());
 }

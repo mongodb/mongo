@@ -85,12 +85,11 @@ ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
                                      TicketHolder* writeTicketHolder,
                                      Milliseconds interval)
     : TicketHolderMonitor(svcCtx, readTicketHolder, writeTicketHolder, interval),
-      _stableConcurrency(
-          gInitialConcurrency
-              ? gInitialConcurrency
-              : std::clamp(static_cast<int32_t>(ProcessInfo::getNumLogicalCores() * 2),
-                           gMinConcurrency * 2,
-                           gMaxConcurrency.load() * 2)),
+      _stableConcurrency(gInitialConcurrency
+                             ? gInitialConcurrency
+                             : std::clamp(static_cast<int32_t>(ProcessInfo::getNumCores() * 2),
+                                          gMinConcurrency * 2,
+                                          gMaxConcurrency.load() * 2)),
       _timer(svcCtx->getTickSource()) {
     _resetConcurrency();
 }

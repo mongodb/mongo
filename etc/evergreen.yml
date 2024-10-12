@@ -285,7 +285,7 @@ variables:
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:
-    - rhel94-large-packagetest
+    - ubuntu2004-package
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -794,7 +794,7 @@ buildvariants:
   display_name: "* macOS DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
-  - macos-11
+  - macos-1100
   expansions: &macos-debug-expansions
     compile_variant: *macos-debug-suggested
     test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
@@ -830,7 +830,7 @@ buildvariants:
   display_name: "Enterprise macOS Via Rosetta 2"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-11-arm64
+  - macos-1100-arm64
   expansions:
     compile_variant: *enterprise-macos-rosetta-2
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
@@ -861,7 +861,7 @@ buildvariants:
   display_name: "Enterprise macOS DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-11
+  - macos-1100
   expansions:
     compile_variant: *enterprise-macos
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
@@ -892,7 +892,7 @@ buildvariants:
 - name: &enterprise-macos-arm64 enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"
   run_on:
-  - macos-11-arm64
+  - macos-1100-arm64
   expansions:
     compile_variant: *enterprise-macos-arm64
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
@@ -1623,7 +1623,7 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   stepback: false
   run_on:
-  - macos-11
+  - macos-1100
   expansions:
     num_scons_link_jobs_available: 0.1
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app

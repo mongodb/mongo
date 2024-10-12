@@ -39,11 +39,6 @@
 
 namespace mongo {
 
-namespace details {
-std::string extractIdentFromPath(const boost::filesystem::path& dbpath,
-                                 const boost::filesystem::path& identAbsolutePath);
-}
-
 /**
  * Represents the file blocks returned by the storage engine during both full and incremental
  * backups. In the case of a full backup, each block is an entire file with offset=0 and
@@ -62,7 +57,7 @@ public:
         stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>;
 
     explicit BackupBlock(OperationContext* opCtx,
-                         std::string fileAbsolutePath,
+                         std::string filePath,
                          const IdentToNamespaceAndUUIDMap& identToNamespaceAndUUIDMap,
                          boost::optional<Timestamp> checkpointTimestamp,
                          std::uint64_t offset = 0,
@@ -72,7 +67,7 @@ public:
     ~BackupBlock() = default;
 
     std::string filePath() const {
-        return _fileAbsolutePath;
+        return _filePath;
     }
 
     std::string ns() const {
@@ -115,12 +110,12 @@ private:
                      boost::optional<Timestamp> checkpointTimestamp);
     void _setNamespaceString(const NamespaceString& nss);
 
-    const std::string _fileAbsolutePath;
+    const std::string _filePath;
     const std::uint64_t _offset;
     const std::uint64_t _length;
     const std::uint64_t _fileSize;
 
-    std::string _ident;
+    std::string _filenameStem;
     NamespaceString _nss;
     boost::optional<UUID> _uuid;
 };

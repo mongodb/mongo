@@ -666,11 +666,6 @@ boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
 #endif
     }
 
-    auto ec = lastSystemError();
-    LOGV2(8366600,
-          "sched_getaffinity failed to collect cpu_set info",
-          "error"_attr = errorMessage(ec));
-
     return boost::none;
 }
 

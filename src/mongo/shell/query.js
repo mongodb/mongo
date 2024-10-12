@@ -150,7 +150,6 @@ DBQuery.prototype._exec = function() {
             let readPreference = {};
             if (findCmd["$readPreference"]) {
                 readPreference = findCmd["$readPreference"];
-                delete findCmd["$readPreference"];
             }
 
             findCmd["$db"] = this._db.getName();

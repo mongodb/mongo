@@ -106,7 +106,7 @@ DocumentSourceChangeStreamUnwindTransaction::createFromBson(
 
 DocumentSourceChangeStreamUnwindTransaction::DocumentSourceChangeStreamUnwindTransaction(
     const BSONObj& filter, const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceInternalChangeStreamStage(kStageName, expCtx) {
+    : DocumentSource(kStageName, expCtx) {
     rebuild(filter);
 }
 
@@ -128,7 +128,7 @@ StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
                             ChangeStreamRequirement::kChangeStreamStage);
 }
 
-Value DocumentSourceChangeStreamUnwindTransaction::doSerialize(
+Value DocumentSourceChangeStreamUnwindTransaction::serialize(
     const SerializationOptions& opts) const {
     tassert(7481400, "expression has not been initialized", _expression);
 
@@ -141,10 +141,14 @@ Value DocumentSourceChangeStreamUnwindTransaction::doSerialize(
         return Value(DOC(DocumentSourceChangeStream::kStageName << builder.obj()));
     }
 
-    // 'SerializationOptions' are not required here, since serialization for explain and query
-    // stats occur before this function call.
-    return Value(Document{
-        {kStageName, Value{DocumentSourceChangeStreamUnwindTransactionSpec{_filter}.toBSON()}}});
+    Value spec;
+    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged || opts.transformIdentifiers) {
+        spec = Value(DOC(DocumentSourceChangeStreamUnwindTransactionSpec::kFilterFieldName
+                         << _expression->serialize(opts)));
+    } else {
+        spec = Value(DocumentSourceChangeStreamUnwindTransactionSpec(_filter).toBSON());
+    }
+    return Value(Document{{kStageName, spec}});
 }
 
 DepsTracker::State DocumentSourceChangeStreamUnwindTransaction::getDependencies(

@@ -169,8 +169,7 @@ void validateTTLOptions(OperationContext* opCtx,
     }
 
     const auto clusteredAndCapped = [&](LockMode mode) {
-        AutoGetCollection collection(
-            opCtx, ns, mode, AutoGetCollection::Options{}.expectedUUID(cmd.getCollectionUUID()));
+        AutoGetCollection collection(opCtx, ns, mode);
         if (collection) {
             const auto c = collection.getCollection().get();
             if (c->getClusteredInfo() && c->isCapped()) {
@@ -191,8 +190,7 @@ void validateTTLOptions(OperationContext* opCtx,
 void checkEncryptedFieldIndexRestrictions(OperationContext* opCtx,
                                           const NamespaceString& ns,
                                           const CreateIndexesCommand& cmd) {
-    AutoGetCollection collection(
-        opCtx, ns, MODE_IS, AutoGetCollection::Options{}.expectedUUID(cmd.getCollectionUUID()));
+    AutoGetCollection collection(opCtx, ns, MODE_IS);
     if (!collection) {
         return;
     }

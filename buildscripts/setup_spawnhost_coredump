@@ -26,35 +26,25 @@ if [[ "${machine}" = "Cygwin" ]]; then
 
         echo "----------------------"
         echo -e "\n=> Setting _NT_SOURCE_PATH environment variable for debuggers to pick up source files."
-        SRC_DIR_HASH=$(find /cygdrive/z/data/mci -name 'source-*' | head -n 1 | xargs -I% basename %)
-        SRC_DIR="Z:\data\mci\\${SRC_DIR_HASH}\src"
+        SRC_DIR_HASH=$(readlink -f /cygdrive/z/data/mci/source-*)
+        SRC_DIR="${SRC_DIR_HASH}/src"
         echo "Source Path: [${SRC_DIR}]"
         set -x;
         setx _NT_SOURCE_PATH "${SRC_DIR}"
         { set +x; } 2>/dev/null
 
         echo -e "\n=> Setting _NT_SYMBOL_PATH environment variable for debuggers to pick up the symbols."
-        DBG_SYMBOLS_HASH=$(find /cygdrive/z/data/mci -name 'artifacts-*dist_test_debug' | head -n 1 | xargs -I% basename %)
-        DBG_SYMBOLS_WINPATH="\"Z:\data\mci\\${DBG_SYMBOLS_HASH}\extracted_symbols\dist-test\bin;srv*;\""
         DBG_ARCHIVE_PARENT=$(readlink -f /cygdrive/z/data/mci/artifacts-*dist_test_debug)
         DBG_ARCHIVE=$(readlink -f ${DBG_ARCHIVE_PARENT}/debugsymbols-*.zip)
         DBG_ARCHIVE_TARGET_PARENT="${DBG_ARCHIVE_PARENT}/extracted_symbols"
         DBG_ARCHIVE_TARGET="${DBG_ARCHIVE_TARGET_PARENT}/dist-test/bin"
         echo "Symbols Dir: [${DBG_ARCHIVE_TARGET}]"
 
-        echo -e "\n=> Copying .natvis file to Visual Studio's expected directories (System for 2017/2019 and User)."
-        set -x;
-        cp "/cygdrive/z/data/mci/${SRC_DIR_HASH}/buildscripts/win/mongodb.natvis" /cygdrive/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2017/Professional/Common7/Packages/Debugger/Visualizers
-        cp "/cygdrive/z/data/mci/${SRC_DIR_HASH}/buildscripts/win/mongodb.natvis" /cygdrive/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2019/Professional/Common7/Packages/Debugger/Visualizers
-        mkdir "${USERPROFILE}/Documents/Visual Studio 2022/Visualizers"
-        cp "/cygdrive/z/data/mci/${SRC_DIR_HASH}/buildscripts/win/mongodb.natvis" "${USERPROFILE}/Documents/Visual Studio 2022/Visualizers"
-        { set +x; } 2>/dev/null
-
         echo -e "\n=> Extracting Symbol files."
         set -x;
         mkdir -p ${DBG_ARCHIVE_TARGET_PARENT}
         unzip -n ${DBG_ARCHIVE} -d ${DBG_ARCHIVE_TARGET_PARENT}
-        setx _NT_SYMBOL_PATH "${DBG_SYMBOLS_WINPATH}"
+        setx _NT_SYMBOL_PATH "${DBG_ARCHIVE_TARGET};srv*;"
         { set +x; } 2>/dev/null
 
         echo -e "\n=> Extracting Core Dumps to Desktop."
@@ -103,7 +93,6 @@ if [[ "${machine}" = "Cygwin" ]]; then
         if [[ -z $(ls ${COREDUMP_ARCHIVE_TARGET}/dump* 2>/dev/null) ]]; then
             echo "No core dumps found."
         fi
-
         { set +x; } 2>/dev/null
         echo "Copied to Desktop."
     } &> ${out_dir}

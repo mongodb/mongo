@@ -348,10 +348,6 @@ public:
                 auto ws = std::make_unique<WorkingSet>();
                 auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
                 auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-                tassert(9089302,
-                        "point in time catalog lookup for a collection list is not supported",
-                        RecoveryUnit::ReadSource::kNoTimestamp ==
-                            opCtx->recoveryUnit()->getTimestampReadSource());
 
                 if (DatabaseHolder::get(opCtx)->dbExists(opCtx, dbName)) {
                     if (auto collNames = _getExactNameMatches(matcher.get())) {

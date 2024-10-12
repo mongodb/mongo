@@ -51,11 +51,6 @@
 
 
 namespace mongo {
-
-// Failpoint which causes to hang after wuow commits, before publishing the catalog updates on a
-// given namespace.
-MONGO_FAIL_POINT_DEFINE(hangBeforePublishingCatalogUpdates);
-
 namespace {
 // Sentinel id for marking a catalogId mapping range as unknown. Must use an invalid RecordId.
 static RecordId kUnknownRangeMarkerId = RecordId::minLong();
@@ -305,21 +300,6 @@ public:
         // Create catalog write jobs for all updates registered in this WriteUnitOfWork
         auto entries = _uncommittedCatalogUpdates.releaseEntries();
         for (auto&& entry : entries) {
-            hangBeforePublishingCatalogUpdates.executeIf(
-                [&](const BSONObj& data) {
-                    LOGV2(
-                        9089303, "hangBeforePublishingCatalogUpdates enabled", logAttrs(entry.nss));
-                    hangBeforePublishingCatalogUpdates.pauseWhileSet();
-                },
-                [&](const BSONObj& data) {
-                    const auto tenantField = data.getField("tenant");
-                    const auto tenantId = tenantField.ok()
-                        ? boost::optional<TenantId>(TenantId::parseFromBSON(tenantField))
-                        : boost::none;
-                    const auto fpNss =
-                        NamespaceStringUtil::deserialize(tenantId, data["collectionNS"].str());
-                    return fpNss.isEmpty() || entry.nss == fpNss;
-                });
             switch (entry.action) {
                 case UncommittedCatalogUpdates::Entry::Action::kWritableCollection: {
                     writeJobs.push_back([collection = std::move(entry.collection),
@@ -2056,46 +2036,6 @@ std::set<TenantId> CollectionCatalog::getAllTenants() const {
         [](const DatabaseName& dbName) {
             return std::make_pair(DatabaseName(dbName.tenantId(), "\xff"), maxUuid);
         });
-    return ret;
-}
-
-std::vector<DatabaseName> CollectionCatalog::getAllConsistentDbNames(
-    OperationContext* opCtx) const {
-    return getAllConsistentDbNamesForTenant(opCtx, boost::none);
-}
-
-std::vector<DatabaseName> CollectionCatalog::getAllConsistentDbNamesForTenant(
-    OperationContext* opCtx, boost::optional<TenantId> tenantId) const {
-    // The caller must have an active storage snapshot
-    tassert(9089300,
-            "cannot get database list consistent to a snapshot without an active snapshot",
-            opCtx->recoveryUnit()->isActive());
-
-    // First get the dbnames that are not pending commit
-    std::vector<DatabaseName> ret = getAllDbNamesForTenant(tenantId);
-    stdx::unordered_set<DatabaseName> visitedDBs(ret.begin(), ret.end());
-    auto insertSortedIfUnique = [&ret, &visitedDBs](DatabaseName dbname) {
-        auto [_, isNewDB] = visitedDBs.emplace(dbname);
-        if (isNewDB) {
-            ret.insert(std::lower_bound(ret.begin(), ret.end(), dbname), dbname);
-        }
-    };
-
-    // Now iterate over uncommitted list and validate against the storage snapshot.
-    // Only consider databases we have not seen so far.
-    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-    tassert(9089301,
-            "point in time catalog lookup for a database list is not supported",
-            RecoveryUnit::ReadSource::kNoTimestamp ==
-                opCtx->recoveryUnit()->getTimestampReadSource());
-    for (auto const& [ns, coll] : _pendingCommitNamespaces) {
-        if (!visitedDBs.contains(ns.dbName())) {
-            if (establishConsistentCollection(opCtx, ns, readTimestamp)) {
-                insertSortedIfUnique(ns.dbName());
-            }
-        }
-    }
-
     return ret;
 }
 

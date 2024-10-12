@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -44,7 +43,9 @@ constexpr auto kIdField = "_id"_sd;
 constexpr auto kCPTField = "clusterParameterTime"_sd;
 constexpr auto kOplog = "oplog"_sd;
 
-void validateParameter(BSONObj doc, const boost::optional<TenantId>& tenantId) {
+void validateParameter(OperationContext* opCtx,
+                       BSONObj doc,
+                       const boost::optional<TenantId>& tenantId) {
     auto nameElem = doc[kIdField];
     uassert(ErrorCodes::OperationFailed,
             "Validate with invalid parameter name",
@@ -96,12 +97,6 @@ void updateParameter(OperationContext* opCtx,
 
     uassertStatusOK(sp->validate(doc, tenantId));
 
-    // Callback handlers of the ServerParameters take operation context and are allowed to acquire
-    // Shared and ExclusiveLock (ResourceMutex). These mutex acquisitions are not allowed to throw
-    // and not allowed to do any blocking work either. Placing this ULG here covers the first
-    // condition.
-    UninterruptibleLockGuard ulg(opCtx->lockState());  // NOLINT (ResourceMutex acquisition)
-
     BSONObjBuilder oldValueBob;
     sp->append(opCtx, &oldValueBob, name.toString(), tenantId);
     audit::logUpdateCachedClusterParameter(opCtx->getClient(), oldValueBob.obj(), doc, tenantId);
@@ -116,12 +111,6 @@ void clearParameter(OperationContext* opCtx,
         // Nothing to clear.
         return;
     }
-
-    // Callback handlers of the ServerParameters take operation context and are allowed to acquire
-    // Shared and ExclusiveLock (ResourceMutex). These mutex acquisitions are not allowed to throw
-    // and not allowed to do any blocking work either. Placing this ULG here covers the first
-    // condition.
-    UninterruptibleLockGuard ulg(opCtx->lockState());  // NOLINT (ResourceMutex acquisition)
 
     BSONObjBuilder oldValueBob;
     sp->append(opCtx, &oldValueBob, sp->name(), tenantId);

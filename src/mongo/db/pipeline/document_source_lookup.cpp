@@ -1093,8 +1093,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         }
         if (opts.transformIdentifiers ||
             opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-            return Pipeline::parse(*_userPipeline, _fromExpCtx, lookupPipeValidator)
-                ->serializeToBson(opts);
+            return Pipeline::parse(*_userPipeline, _fromExpCtx)->serializeToBson(opts);
         }
         if (opts.serializeForQueryAnalysis) {
             // If we are in query analysis, encrypted fields will have been marked in the

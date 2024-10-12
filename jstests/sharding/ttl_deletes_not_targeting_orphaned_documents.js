@@ -21,12 +21,14 @@ const testDB = st.s.getDB('test');
 const coll = testDB[jsTest.name()];
 const collName = coll.getFullName();
 
-// Shard a collection on _id:1 so that the initial chunk will reside on the primary shard (shard0)
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: collName, key: {_id: 1}}));
 
-// Insert documents that are going to be deleted by the TTL index created later on
+// Initialize TTL index: delete documents with field `a: <current date>` after 20 seconds
+assert.commandWorked(coll.createIndex({a: 1}, {expireAfterSeconds: 20}));
+
+// Insert documents that are going to be deleted in 20 seconds
 const currTime = new Date();
 var bulk = coll.initializeUnorderedBulkOp();
 const nDocs = 100;
@@ -35,20 +37,16 @@ for (let i = 0; i < nDocs; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-// Move all documents to the other shard (shard1) but keep a chunk on shard0 to create the TTL index
-assert.commandWorked(st.s.adminCommand({split: collName, middle: {_id: -1}}));
+// Move all documents on other shards
 assert.commandWorked(
     st.s.adminCommand({moveChunk: collName, find: {_id: 0}, to: st.shard1.shardName}));
 
-// Initialize TTL index: delete documents with field `a: <current date>` older than 1 second
-assert.commandWorked(coll.createIndex({a: 1}, {expireAfterSeconds: 1}));
-
-// Verify that TTL index worked properly on owned documents on shard1
+// Verify that TTL index worked properly on owned documents
 assert.soon(function() {
     return coll.countDocuments({}) == 0;
 }, "Failed to move all documents", 60000 /* 60 seconds */, 5000 /* 5 seconds */);
 
-// Verify that TTL index did not delete orphaned documents on shard0
+// Verify that TTL index did not delete orphaned documents
 assert.eq(nDocs, st.rs0.getPrimary().getCollection(collName).countDocuments({}));
 
 st.stop();
