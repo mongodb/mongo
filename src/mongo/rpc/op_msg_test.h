@@ -90,7 +90,7 @@ protected:
 
     template <typename... Rest>
     void append(StringData arg, Rest&&... rest) {
-        buffer.appendCStr(arg);
+        buffer.appendStr(arg, /* null terminate*/ true);
         append(rest...);
     }
 

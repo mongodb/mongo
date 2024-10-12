@@ -35,7 +35,6 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 SaslClientSession::SaslClientSessionFactoryFn SaslClientSession::create;
@@ -55,7 +54,7 @@ void SaslClientSession::setParameter(Parameter id, StringData value) {
     // Note that we append a terminal NUL to buffer.data, so it may be treated as a C-style
     // string.  This is required for parameterServiceName, parameterServiceHostname,
     // parameterMechanism and parameterUser.
-    str::copyAsCString(buffer.data.get(), value);
+    value.copyTo(buffer.data.get(), true);
 }
 
 bool SaslClientSession::hasParameter(Parameter id) {

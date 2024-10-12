@@ -396,7 +396,7 @@ void OpMsg::shareOwnershipWith(const ConstSharedBuffer& buffer) {
 void OpMsgBuilder::setSecurityToken(StringData token) {
     invariant(_state == kEmpty);
     _buf.appendStruct(Section::kSecurityToken);
-    _buf.appendCStr(token);
+    _buf.appendStr(token, true /* includeEndingNull */);
 }
 
 auto OpMsgBuilder::beginDocSequence(StringData name) -> DocSequenceBuilder {
@@ -407,7 +407,7 @@ auto OpMsgBuilder::beginDocSequence(StringData name) -> DocSequenceBuilder {
     _buf.appendStruct(Section::kDocSequence);
     int sizeOffset = _buf.len();
     _buf.skip(sizeof(int32_t));  // section size.
-    _buf.appendCStr(name);
+    _buf.appendStr(name, true);
     return DocSequenceBuilder(this, &_buf, sizeOffset);
 }
 

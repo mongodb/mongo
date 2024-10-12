@@ -98,8 +98,8 @@ public:
      * Used where string length is not known in advance.
      * 'c' must be null or point to a null-terminated string.
      */
-    constexpr StringData(const char* c)
-        : StringData{c ? std::string_view{c} : std::string_view{}} {}
+    StringData(const char* c)
+        : StringData{std::string_view{c, (c && c[0] != '\0') ? std::strlen(c) : 0}} {}
 
     StringData(const std::string& s) : StringData{std::string_view{s}} {}
 
@@ -350,6 +350,13 @@ public:
             std::equal(begin(), end(), other.begin(), other.end(), [](char a, char b) {
                    return ctype::toLower(a) == ctype::toLower(b);
                });
+    }
+
+    void copyTo(char* dest, bool includeEndingNull) const {
+        if (!empty())
+            copy(dest, size());
+        if (includeEndingNull)
+            dest[size()] = 0;
     }
 
 private:

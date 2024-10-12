@@ -548,7 +548,7 @@ bool encodeSearchForSbeCache(const boost::intrusive_ptr<ExpressionContext>& expC
     // Encoding for $search/$searchMeta with its stage name, we also includes storedSource flag
     // for $search as well. We don't need to encode other info from the stage, such as search
     // query, limit, sortSpec, because they are all parameterized into slots.
-    bufBuilder->appendStrBytes(ds->getSourceName());
+    bufBuilder->appendStr(ds->getSourceName(), false /* includeEndingNull */);
     if (auto searchStage = dynamic_cast<DocumentSourceSearch*>(ds)) {
         bufBuilder->appendChar(searchStage->isStoredSource() ? '1' : '0');
         // The remoteCursorId is the offset of the cursor in opCtx, we expect it to be same across

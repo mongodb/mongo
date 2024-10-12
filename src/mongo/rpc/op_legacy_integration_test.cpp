@@ -79,7 +79,7 @@ Message makeUnsupportedOpUpdateMessage(StringData ns, BSONObj query, BSONObj upd
     return makeMessage(dbUpdate, [&](BufBuilder& b) {
         const int reservedFlags = 0;
         b.appendNum(reservedFlags);
-        b.appendCStr(ns);
+        b.appendStr(ns);
         b.appendNum(flags);
 
         query.appendSelfToBufBuilder(b);
@@ -91,7 +91,7 @@ Message makeUnsupportedOpRemoveMessage(StringData ns, BSONObj query, int flags) 
     return makeMessage(dbDelete, [&](BufBuilder& b) {
         const int reservedFlags = 0;
         b.appendNum(reservedFlags);
-        b.appendCStr(ns);
+        b.appendStr(ns);
         b.appendNum(flags);
 
         query.appendSelfToBufBuilder(b);
@@ -114,7 +114,7 @@ Message makeUnsupportedOpQueryMessage(StringData ns,
                                       int queryOptions) {
     return makeMessage(dbQuery, [&](BufBuilder& b) {
         b.appendNum(queryOptions);
-        b.appendCStr(ns);
+        b.appendStr(ns);
         b.appendNum(nToSkip);
         b.appendNum(nToReturn);
         query.appendSelfToBufBuilder(b);
@@ -129,7 +129,7 @@ Message makeUnsupportedOpGetMoreMessage(StringData ns,
                                         int flags) {
     return makeMessage(dbGetMore, [&](BufBuilder& b) {
         b.appendNum(flags);
-        b.appendCStr(ns);
+        b.appendStr(ns);
         b.appendNum(nToReturn);
         b.appendNum(cursorId);
     });
@@ -239,7 +239,7 @@ TEST(OpLegacy, InvalidNs) {
 
     auto msg = makeMessage(dbQuery, [&](BufBuilder& b) {
         b.appendNum(0);
-        b.appendStrBytes("nonullbyte");
+        b.appendStr("nonullbyte", false);
     });
     // Since our request is not able to be parsed, we don't receive a response from the server.
     ASSERT_THROWS(conn->call(msg), DBException);

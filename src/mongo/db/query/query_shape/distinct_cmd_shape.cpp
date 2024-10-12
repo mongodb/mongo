@@ -91,7 +91,8 @@ QueryShapeHash DistinctCmdShape::sha256Hash(OperationContext*, const Serializati
     StackBufBuilderBase<bufferSizeOnStack> distinctCommandShapeBuffer;
 
     // Write small or typically empty "distinct" command shape parts to the buffer.
-    distinctCommandShapeBuffer.appendStrBytes(DistinctCommandRequest::kCommandName);
+    distinctCommandShapeBuffer.appendStr(DistinctCommandRequest::kCommandName,
+                                         false /*includeEndingNull*/);
 
     // 16-bit command options word. Use 0th bit as an indicator whether the command specification
     // includes a namespace or a UUID of a collection. The remaining bits are reserved for encoding
@@ -104,7 +105,7 @@ QueryShapeHash DistinctCmdShape::sha256Hash(OperationContext*, const Serializati
     // Append a null byte to separate the namespace string 'nssOrUUID' from the "key" parameter
     // value.
     distinctCommandShapeBuffer.appendChar(0);
-    distinctCommandShapeBuffer.appendCStr(components.key);
+    distinctCommandShapeBuffer.appendStr(components.key);
     distinctCommandShapeBuffer.appendBuf(collation.objdata(), collation.objsize());
     return SHA256Block::computeHash({
         ConstDataRange{distinctCommandShapeBuffer.buf(),

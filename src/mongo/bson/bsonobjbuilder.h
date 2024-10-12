@@ -178,7 +178,7 @@ public:
         // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
         MONGO_verify(!e.eoo());
         _b.appendNum((char)e.type());
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendBuf((void*)e.value(), e.valuesize());
         return static_cast<Derived&>(*this);
     }
@@ -186,7 +186,7 @@ public:
     /** add a subobject as a member */
     Derived& append(StringData fieldName, BSONObj subObj) {
         _b.appendNum((char)Object);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendBuf((void*)subObj.objdata(), subObj.objsize());
         return static_cast<Derived&>(*this);
     }
@@ -201,7 +201,7 @@ public:
         MONGO_verify(size > 4 && size < 100000000);
 
         _b.appendNum((char)Object);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendBuf((void*)objdata, size);
         return static_cast<Derived&>(*this);
     }
@@ -219,7 +219,7 @@ public:
      */
     B& subobjStart(StringData fieldName) {
         _b.appendNum((char)Object);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         return _b;
     }
 
@@ -228,7 +228,7 @@ public:
     */
     Derived& appendArray(StringData fieldName, const BSONObj& subObj) {
         _b.appendNum((char)Array);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendBuf((void*)subObj.objdata(), subObj.objsize());
 
         return static_cast<Derived&>(*this);
@@ -241,14 +241,14 @@ public:
         the subarray's body */
     B& subarrayStart(StringData fieldName) {
         _b.appendNum((char)Array);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         return _b;
     }
 
     /** Append a boolean element */
     Derived& appendBool(StringData fieldName, int val) {
         _b.appendNum((char)Bool);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendNum((char)(val ? 1 : 0));
         return static_cast<Derived&>(*this);
     }
@@ -258,7 +258,7 @@ public:
     Derived& append(StringData fieldName, const T& n) {
         constexpr BSONType type = BSONObjAppendFormat<T>::value;
         _b.appendNum(static_cast<char>(type));
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         if constexpr (type == Bool) {
             _b.appendNum(static_cast<char>(n));
         } else if constexpr (type == NumberInt) {
@@ -309,7 +309,7 @@ public:
     */
     Derived& appendOID(StringData fieldName, OID* oid = nullptr, bool generateIfBlank = false) {
         _b.appendNum((char)jstOID);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         if (oid)
             _b.appendBuf(oid->view().view(), OID::kOIDSize);
         else {
@@ -330,7 +330,7 @@ public:
     */
     Derived& append(StringData fieldName, OID oid) {
         _b.appendNum((char)jstOID);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendBuf(oid.view().view(), OID::kOIDSize);
         return static_cast<Derived&>(*this);
     }
@@ -349,7 +349,7 @@ public:
     */
     Derived& appendTimeT(StringData fieldName, time_t dt) {
         _b.appendNum((char)Date);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendNum(static_cast<unsigned long long>(dt) * 1000);
         return static_cast<Derived&>(*this);
     }
@@ -368,9 +368,9 @@ public:
     */
     Derived& appendRegex(StringData fieldName, StringData regex, StringData options = "") {
         _b.appendNum((char)RegEx);
-        _b.appendCStr(fieldName);
-        _b.appendCStr(regex);
-        _b.appendCStr(options);
+        _b.appendStr(fieldName);
+        _b.appendStr(regex);
+        _b.appendStr(options);
 
         return static_cast<Derived&>(*this);
     }
@@ -381,9 +381,9 @@ public:
 
     Derived& appendCode(StringData fieldName, StringData code) {
         _b.appendNum((char)Code);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendNum((int)code.size() + 1);
-        _b.appendStrBytesAndNul(code);
+        _b.appendStr(code);
         return static_cast<Derived&>(*this);
     }
 
@@ -395,7 +395,7 @@ public:
         @param sz size includes terminating null character */
     Derived& append(StringData fieldName, const char* str, int sz) {
         _b.appendNum((char)String);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendNum((int)sz);
         _b.appendBuf(str, sz);
 
@@ -408,17 +408,17 @@ public:
     /** Append a string element */
     Derived& append(StringData fieldName, StringData str) {
         _b.appendNum((char)String);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendNum((int)str.size() + 1);
-        _b.appendStrBytesAndNul(str);
+        _b.appendStr(str, true);
         return static_cast<Derived&>(*this);
     }
 
     Derived& appendSymbol(StringData fieldName, StringData symbol) {
         _b.appendNum((char)Symbol);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendNum((int)symbol.size() + 1);
-        _b.appendStrBytesAndNul(symbol);
+        _b.appendStr(symbol);
         return static_cast<Derived&>(*this);
     }
 
@@ -429,7 +429,7 @@ public:
     /** Append a Null element to the object */
     Derived& appendNull(StringData fieldName) {
         _b.appendNum((char)jstNULL);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
 
         return static_cast<Derived&>(*this);
     }
@@ -437,13 +437,13 @@ public:
     // Append an element that is less than all other keys.
     Derived& appendMinKey(StringData fieldName) {
         _b.appendNum((char)MinKey);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         return static_cast<Derived&>(*this);
     }
     // Append an element that is greater than all other keys.
     Derived& appendMaxKey(StringData fieldName) {
         _b.appendNum((char)MaxKey);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         return static_cast<Derived&>(*this);
     }
 
@@ -464,9 +464,9 @@ public:
     */
     Derived& appendDBRef(StringData fieldName, StringData ns, const OID& oid) {
         _b.appendNum((char)DBRef);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendNum((int)ns.size() + 1);
-        _b.appendStrBytesAndNul(ns);
+        _b.appendStr(ns);
         _b.appendBuf(oid.view().view(), OID::kOIDSize);
 
         return static_cast<Derived&>(*this);
@@ -485,7 +485,7 @@ public:
     */
     Derived& appendBinData(StringData fieldName, int len, BinDataType type, const void* data) {
         _b.appendNum((char)BinData);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendNum(len);
         _b.appendNum((char)type);
         _b.appendBuf(data, len);
@@ -505,7 +505,7 @@ public:
     */
     Derived& appendBinDataArrayDeprecated(const char* fieldName, const void* data, int len) {
         _b.appendNum((char)BinData);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendNum(len + 4);
         _b.appendNum((char)0x2);
         _b.appendNum(len);
@@ -519,10 +519,10 @@ public:
     */
     Derived& appendCodeWScope(StringData fieldName, StringData code, const BSONObj& scope) {
         _b.appendNum((char)CodeWScope);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         _b.appendNum((int)(4 + 4 + code.size() + 1 + scope.objsize()));
         _b.appendNum((int)code.size() + 1);
-        _b.appendStrBytesAndNul(code);
+        _b.appendStr(code);
         _b.appendBuf((void*)scope.objdata(), scope.objsize());
 
         return static_cast<Derived&>(*this);
@@ -534,7 +534,7 @@ public:
 
     Derived& appendUndefined(StringData fieldName) {
         _b.appendNum((char)Undefined);
-        _b.appendCStr(fieldName);
+        _b.appendStr(fieldName);
         return static_cast<Derived&>(*this);
     }
 

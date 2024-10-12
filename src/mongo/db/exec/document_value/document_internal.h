@@ -295,8 +295,8 @@ public:
         return _sd.size();
     }
 
-    inline size_t copy(char* dest, size_t len) const {
-        return _sd.copy(dest, len);
+    inline void copyTo(char* dest, bool includeEndingNull) const {
+        return _sd.copyTo(dest, includeEndingNull);
     }
 
     constexpr const char* rawData() const noexcept {

@@ -322,7 +322,7 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
         case TypeTags::StringSmall: {
             // Small strings cannot contain null bytes, so it is safe to serialize them as plain
             // C-strings with a null terminator.
-            buf.appendCStr(getStringView(tag, val));
+            buf.appendStr(getStringView(tag, val), true /* includeEndingNull */);
             break;
         }
         case TypeTags::StringBig:
@@ -330,7 +330,7 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
         case TypeTags::bsonSymbol: {
             auto sv = getStringOrSymbolView(tag, val);
             buf.appendNum(static_cast<uint32_t>(sv.size()));
-            buf.appendStrBytes(sv);
+            buf.appendStr(sv, false /* includeEndingNull */);
             break;
         }
         case TypeTags::Array: {
@@ -354,7 +354,7 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
             auto obj = getObjectView(val);
             buf.appendNum(obj->size());
             for (size_t idx = 0; idx < obj->size(); ++idx) {
-                buf.appendCStr(obj->field(idx));
+                buf.appendStr(obj->field(idx), true /* includeEndingNull */);
                 auto [tag, val] = obj->getAt(idx);
                 serializeValue(buf, tag, val);
             }
@@ -406,27 +406,27 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
         }
         case TypeTags::bsonRegex: {
             auto regex = getBsonRegexView(val);
-            buf.appendCStr(regex.pattern);
-            buf.appendCStr(regex.flags);
+            buf.appendStr(regex.pattern, true /* includeEndingNull */);
+            buf.appendStr(regex.flags, true /* includeEndingNull */);
             break;
         }
         case TypeTags::bsonJavascript: {
             auto javascriptCode = getBsonJavascriptView(val);
             buf.appendNum(static_cast<uint32_t>(javascriptCode.size()));
-            buf.appendStrBytes(javascriptCode);
+            buf.appendStr(javascriptCode, false /* includeEndingNull */);
             break;
         }
         case TypeTags::bsonDBPointer: {
             auto dbptr = getBsonDBPointerView(val);
             buf.appendNum(static_cast<uint32_t>(dbptr.ns.size()));
-            buf.appendStrBytes(dbptr.ns);
+            buf.appendStr(dbptr.ns, false /* includeEndingNull */);
             buf.appendBuf(dbptr.id, sizeof(ObjectIdType));
             break;
         }
         case TypeTags::bsonCodeWScope: {
             auto cws = getBsonCodeWScopeView(val);
             buf.appendNum(static_cast<uint32_t>(cws.code.size()));
-            buf.appendStrBytes(cws.code);
+            buf.appendStr(cws.code, false /* includeEndingNull */);
             auto scopeLen = ConstDataView(cws.scope).read<LittleEndian<uint32_t>>();
             buf.appendBuf(cws.scope, scopeLen);
             break;

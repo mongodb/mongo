@@ -182,7 +182,7 @@ Derived& BSONObjBuilderBase<Derived, B>::appendMaxForType(StringData fieldName, 
 template <class Derived, class B>
 Derived& BSONObjBuilderBase<Derived, B>::appendDate(StringData fieldName, Date_t dt) {
     _b.appendNum((char)Date);
-    _b.appendCStr(fieldName);
+    _b.appendStr(fieldName);
     _b.appendNum(dt.toMillisSinceEpoch());
     return static_cast<Derived&>(*this);
 }

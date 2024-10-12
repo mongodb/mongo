@@ -270,7 +270,7 @@ void CyrusSaslClientSession::setParameter(Parameter id, StringData value) {
         _secret.reset(new char[sizeof(sasl_secret_t) + value.size() + 1]);
         sasl_secret_t* secret = static_cast<sasl_secret_t*>(static_cast<void*>(_secret.get()));
         secret->len = value.size();
-        value.copy(static_cast<char*>(static_cast<void*>(&secret->data[0])), value.size());
+        value.copyTo(static_cast<char*>(static_cast<void*>(&secret->data[0])), false);
     }
     SaslClientSession::setParameter(id, value);
 }

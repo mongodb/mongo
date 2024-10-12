@@ -156,7 +156,7 @@ void doAppendElementToCell(const BSONElement& element, Buffer* cellBuffer) {
                 break;  // Store large strings as BSON.
 
             cellBuffer->appendUChar(Bytes::kStringSizeMin + sd.size());
-            cellBuffer->appendStrBytes(sd);
+            cellBuffer->appendStr(sd, /*nul*/ false);
             return;
         }
         case NumberInt:

@@ -105,7 +105,7 @@ TEST(DBMessage1, GoodInsert) {
     string ns("test");
 
     b.appendNum(static_cast<int>(1));
-    b.appendCStr(ns);
+    b.appendStr(ns);
     b.appendNum(static_cast<int>(3));
     b.appendNum(static_cast<int>(39));
 
@@ -124,7 +124,7 @@ TEST(DBMessage1, GoodInsert2) {
     string ns("test");
 
     b.appendNum(static_cast<int>(1));
-    b.appendCStr(ns);
+    b.appendStr(ns);
     b.appendNum(static_cast<int>(3));
     b.appendNum(static_cast<int>(39));
 

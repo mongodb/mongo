@@ -1182,7 +1182,7 @@ public:
 
     void preVisit(const MatchExpression* expr) {
         // Encode the type of the node as well as the path (if there is a non-empty path).
-        _builder->appendCStr(encodeMatchType(expr->matchType()));
+        _builder->appendStr(encodeMatchType(expr->matchType()));
         encodeUserString(expr->path(), _builder);
 
         // The node encodes itself, and then its children.
@@ -1344,7 +1344,7 @@ std::string encodeSBE(const CanonicalQuery& cq, const bool requiresSbeCompatibil
     encodeKeyForAutoParameterizedMatchSBE(
         cq.getExpCtx(), cq.getPrimaryMatchExpression(), &bufBuilder, !sort.isEmpty());
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
-    bufBuilder.appendStrBytes(strBuilderEncoded);
+    bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
     bufBuilder.appendChar(kEncodeSectionDelimiter);
     if (!hint.isEmpty()) {
         bufBuilder.appendBuf(hint.objdata(), hint.objsize());
@@ -1368,7 +1368,7 @@ std::string encodeSBE(const CanonicalQuery& cq, const bool requiresSbeCompatibil
 
     encodePipeline(cq.getExpCtx(), cq.cqPipeline(), &bufBuilder);
     if (const auto& bitset = cq.searchMetadata(); bitset.any()) {
-        bufBuilder.appendStrBytes(bitset.to_string());
+        bufBuilder.appendStr(bitset.to_string(), false /* includeEndingNull */);
     }
 
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
@@ -1401,7 +1401,7 @@ CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const Pipeline& pi
         if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(documentSource)) {
             StringBuilder keyBuilder;
             encodeKeyForMatch(matchStage->getMatchExpression(), &keyBuilder);
-            bufBuilder.appendCStr(keyBuilder.stringData());
+            bufBuilder.appendStr(keyBuilder.stringData());
         } else if (!search_helpers::encodeSearchForSbeCache(
                        pipeline.getContext(), documentSource, &bufBuilder)) {
             encodeKeyForPipelineStage(documentSource, serializedArray, &bufBuilder);

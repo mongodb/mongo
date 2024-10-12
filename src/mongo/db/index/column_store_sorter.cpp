@@ -70,7 +70,7 @@ bool ColumnStoreSorter::Key::operator<(const Key& other) const {
 }
 
 void ColumnStoreSorter::Key::serializeForSorter(BufBuilder& buf) const {
-    buf.appendCStr(path);
+    buf.appendStr(path);
     buf.appendNum(rowId);
 }
 

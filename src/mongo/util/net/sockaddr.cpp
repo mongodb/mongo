@@ -142,7 +142,7 @@ void SockAddr::initUnixDomainSocket(StringData path, int port) {
     uassert(
         13079, "path to unix socket too long", path.size() < sizeof(as<sockaddr_un>().sun_path));
     as<sockaddr_un>().sun_family = AF_UNIX;
-    str::copyAsCString(as<sockaddr_un>().sun_path, path);
+    path.copyTo(as<sockaddr_un>().sun_path, /* includeEndingNull =*/true);
     addressSize = sizeof(sockaddr_un);
     _isValid = true;
 }
