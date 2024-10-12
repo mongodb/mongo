@@ -803,7 +803,7 @@ public:
         {
             BSONObjBuilder b;
             b.bb().appendNum(static_cast<char>(bsonTimestamp));
-            b.bb().appendStr("a");
+            b.bb().appendCStr("a");
             b.bb().appendNum(std::numeric_limits<unsigned long long>::max());
 
             in = b.obj();

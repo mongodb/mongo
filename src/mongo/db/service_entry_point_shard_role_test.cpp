@@ -150,7 +150,7 @@ TEST_F(ServiceEntryPointShardRoleTest, ParseCommandFailsDbQueryUnsupportedComman
     const BSONObj obj = BSON(commandName << 1);
     auto dummyLegacyDbQueryBuilder = [&](BufBuilder& b) {
         b.appendNum(0);
-        b.appendStr("test.$cmd");
+        b.appendCStr("test.$cmd");
         b.appendNum(0);
         // n to return, required to be 1 or -1.
         b.appendNum(1);

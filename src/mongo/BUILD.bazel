@@ -348,6 +348,7 @@ mongo_cc_library(
         "//src/mongo/util:stacktrace_windows.h",
         "//src/mongo/util:static_immortal.h",
         "//src/mongo/util:str.h",
+        "//src/mongo/util:str_basic.h",
         "//src/mongo/util:str_escape.h",
         "//src/mongo/util:string_map.h",
         "//src/mongo/util:synchronized_value.h",

@@ -149,7 +149,7 @@ public:
         // No endian conversions needed, since we store in-memory representation
         // in little endian format, regardless of target endian.
         builder.appendNum(static_cast<char>(bsonTimestamp));
-        builder.appendStr(fieldName);
+        builder.appendCStr(fieldName);
         builder.appendNum(asULL());
     }
     BSONObj toBSON() const;
