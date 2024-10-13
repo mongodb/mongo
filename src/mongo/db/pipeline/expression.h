@@ -4557,7 +4557,8 @@ public:
                        boost::intrusive_ptr<Expression> field,
                        boost::intrusive_ptr<Expression> input,
                        boost::intrusive_ptr<Expression> value)
-        : Expression(expCtx, {std::move(field), std::move(input), std::move(value)}) {
+        : Expression(expCtx, {std::move(field), std::move(input), std::move(value)}),
+          _fieldName(getValidFieldName(_children[_kField])) {
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
 
@@ -4578,6 +4579,15 @@ public:
     static constexpr auto kExpressionName = "$setField"_sd;
 
 private:
+    /**
+     * Ensures 'fieldExpr' is a constant string representing a valid field name and returns it as a
+     * string. If 'fieldExpr' is not valid, this function will throw a 'uassert()'.
+     */
+    std::string getValidFieldName(boost::intrusive_ptr<Expression> fieldExpr);
+
+    // This is pre-validated by the constructor.
+    const std::string _fieldName;
+
     static constexpr size_t _kField = 0;
     static constexpr size_t _kInput = 1;
     static constexpr size_t _kValue = 2;
