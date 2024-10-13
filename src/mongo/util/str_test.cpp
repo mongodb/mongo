@@ -329,4 +329,48 @@ TEST(StringUtilsTest, GetCodePointLength) {
     }
 }
 
+TEST(StringUtilsTest, UassertNoEmbeddedNulBytes) {
+    // These shouldn't throw.
+    uassertNoEmbeddedNulBytes({nullptr, 0});
+    uassertNoEmbeddedNulBytes(""_sd);
+    uassertNoEmbeddedNulBytes("hello"_sd);
+    uassertNoEmbeddedNulBytes("hello\0"_sd.substr(0, 5));
+
+    // These should throw.
+    ASSERT_THROWS_CODE(uassertNoEmbeddedNulBytes("\0"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(uassertNoEmbeddedNulBytes("\0hello"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(uassertNoEmbeddedNulBytes("hello\0"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(uassertNoEmbeddedNulBytes("hello\0world"_sd), DBException, 9527900);
+}
+
+TEST(StringUtilsTest, CopyAsCString) {
+    char dest[100];  // big enough for anything we would reasonably add here.
+
+    // Print address not contents on failures.
+    auto ptr = [](const char* p) {
+        return static_cast<const void*>(p);
+    };
+    auto testValid = [&](StringData noNul, int line) {
+        // Make sure we write a nul byte. Without this, the test could pass if dest happened to have
+        // uninitialized zero bytes.
+        std::fill_n(dest, sizeof(dest), 0xff);
+
+        ASSERT_EQ(ptr(copyAsCString(dest, noNul)), ptr(dest + noNul.size() + 1)) << "line:" << line;
+        ASSERT_EQ(dest[noNul.size()], '\0') << "line:" << line;
+        ASSERT_EQ(StringData(dest, noNul.size()), noNul) << "line:" << line;
+    };
+
+    // These shouldn't throw.
+    testValid({nullptr, 0}, __LINE__);
+    testValid(""_sd, __LINE__);
+    testValid("hello"_sd, __LINE__);
+    testValid("hello world"_sd.substr(0, 5), __LINE__);
+
+    // These should throw.
+    ASSERT_THROWS_CODE(copyAsCString(dest, "\0"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(copyAsCString(dest, "\0hello"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(copyAsCString(dest, "hello\0"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(copyAsCString(dest, "hello\0world"_sd), DBException, 9527900);
+}
+
 }  // namespace mongo::str

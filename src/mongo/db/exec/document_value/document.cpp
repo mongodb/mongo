@@ -267,7 +267,8 @@ Value& DocumentStorage::appendField(T field, ValueElement::Kind kind) {
     append(nextCollision);
     append(nameSize);
     append(kind);
-    field.copyTo(dest, true);
+    dest += field.copy(dest, field.size());
+    *dest++ = '\0';  // Like std::string, there is both an explicit size and final NUL byte.
 // Padding for alignment handled above
 #undef append
 
@@ -863,7 +864,7 @@ void Document::serializeForSorter(BufBuilder& buf) const {
     buf.appendNum(static_cast<int>(numElems));
 
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
-        buf.appendStr(it->nameSD(), /*NUL byte*/ true);
+        buf.appendCStr(it->nameSD());
         it->val.serializeForSorter(buf);
     }
 

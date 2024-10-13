@@ -1208,7 +1208,7 @@ public:
 
     void preVisit(const MatchExpression* expr) {
         // Encode the type of the node as well as the path (if there is a non-empty path).
-        _builder->appendStr(encodeMatchType(expr->matchType()));
+        _builder->appendCStr(encodeMatchType(expr->matchType()));
         encodeUserString(expr->path(), _builder);
 
         // The node encodes itself, and then its children.
@@ -1382,7 +1382,7 @@ std::string encodeSBE(const CanonicalQuery& cq, const Optimizer optimizer) {
                                           encodeParameterTypes,
                                           !sort.isEmpty());
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
-    bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
+    bufBuilder.appendStrBytes(strBuilderEncoded);
     bufBuilder.appendChar(kEncodeSectionDelimiter);
     if (!hint.isEmpty()) {
         bufBuilder.appendBuf(hint.objdata(), hint.objsize());
@@ -1406,7 +1406,7 @@ std::string encodeSBE(const CanonicalQuery& cq, const Optimizer optimizer) {
 
     encodePipeline(cq.getExpCtx(), cq.cqPipeline(), &bufBuilder, optimizer);
     if (const auto& bitset = cq.searchMetadata(); bitset.any()) {
-        bufBuilder.appendStr(bitset.to_string(), false /* includeEndingNull */);
+        bufBuilder.appendStrBytes(bitset.to_string());
     }
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
@@ -1438,7 +1438,7 @@ CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const Pipeline& pi
         if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(documentSource)) {
             StringBuilder keyBuilder;
             encodeKeyForMatch(matchStage->getMatchExpression(), &keyBuilder);
-            bufBuilder.appendStr(keyBuilder.stringData());
+            bufBuilder.appendCStr(keyBuilder.stringData());
         } else if (!search_helpers::encodeSearchForSbeCache(
                        pipeline.getContext(), documentSource, &bufBuilder)) {
             encodeKeyForPipelineStage(documentSource, serializedArray, &bufBuilder);

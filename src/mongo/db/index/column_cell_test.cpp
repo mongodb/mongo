@@ -66,7 +66,7 @@ TEST(ColumnCell, AppendElementToCellTest) {
         // Write a strange message.
         const char* message = "Help, I'm trapped in a columnar index.";
         expectedBuffer.appendChar(ColumnStore::Bytes::kStringSizeMin + strlen(message));
-        expectedBuffer.appendStr(message, false /* includeEndingNull */);
+        expectedBuffer.appendStrBytes(message);
 
         Decimal128 decimalNum("123.456");
         expectedBuffer.appendChar(ColumnStore::Bytes::kDecimal128);
