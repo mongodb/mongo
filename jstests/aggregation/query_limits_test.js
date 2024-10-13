@@ -209,13 +209,25 @@ function testNestedAndOr() {
     }
 }
 
+function testLargeSetFunction() {
+    jsTestLog("Testing large $setIntersection");
+
+    const fieldExprs = [];
+    for (let j = 1; j <= 13000; j++) {
+        fieldExprs.push("$a" + j);
+    }
+    const pipeline = [{$project: {a: {$setIntersection: fieldExprs}}}, {$group: {_id: "$a"}}];
+    runAgg(pipeline);
+}
+
 const tests = [
     testLargeIn,
     testLargeProject,
     testLargeAndOrPredicates,
     testDeeplyNestedPath,
     testNestedAndOr,
-    testPipelineLimits
+    testPipelineLimits,
+    testLargeSetFunction
 ];
 
 for (const test of tests) {
