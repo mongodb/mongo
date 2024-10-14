@@ -103,6 +103,39 @@ TEST(ProcessInfo, TestSysInfo) {
         }
     }
     ASSERT_GREATER_THAN(count, 0);
+
+    // Check the cpu cgroup v2 information.
+    auto getFirstLine = [&](std::string const& filename) {
+        std::ifstream file(filename);
+        std::string firstLine;
+        if (file.is_open() && std::getline(file, firstLine)) {
+            return firstLine;
+        }
+        return std::string();
+    };
+    using namespace fmt::literals;
+    auto filename = "/proc/{}/cgroup"_format(ProcessId::getCurrent().asUInt32());
+    auto cgroupInfo = getFirstLine(filename);
+    const std::string v2Prefix = "0::";
+    if (!cgroupInfo.empty() && cgroupInfo.rfind(v2Prefix, 0) == 0) {
+        // cgroup v2
+        std::string path = "/sys/fs/cgroup{}"_format(cgroupInfo.substr(v2Prefix.length()));
+        std::vector<std::pair<std::string, std::string>> fileNameAndKeys = {
+            {"cpu.max", "cpuMax"},
+            {"cpu.max.burst", "cpuMaxBurst"},
+            {"cpu.uclamp.min", "cpuUclampMin"},
+            {"cpu.uclamp.max", "cpuUclampMax"},
+            {"cpu.weight", "cpuWeight"}};
+        for (const auto& item : fileNameAndKeys) {
+            ASSERT_KEY(item.second);
+            auto str = getFirstLine("{}/{}"_format(path, item.first));
+            if (!str.empty()) {
+                ASSERT_EQ(obj.getStringField(item.second), str);
+            } else {
+                ASSERT_EQ(obj.getStringField(item.second), "default");
+            }
+        }
+    }
 #endif
 }
 

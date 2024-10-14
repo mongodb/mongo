@@ -485,8 +485,6 @@ public:
     }
 };
 
-}  // namespace
-
 class LinuxSysHelper {
 public:
     /**
@@ -785,8 +783,135 @@ public:
         }
         return systemMemBytes;
     }
+
+    /**
+     * Get Cgroup path of the process.
+     * return string path of cgrouop. If no cgroup v2, return an empty string.
+     */
+    static std::string getCgroupV2Path(const ProcessId& pid) {
+        const auto line =
+            LinuxSysHelper::parseLineFromFile("/proc/{}/cgroup"_format(pid.asUInt32()).c_str());
+        if (line.empty()) {
+            return {};
+        }
+        // The entry for cgroup v2 is always in the format “0::$PATH”.
+        const StringData prefixV2 = "0::"_sd;
+        const size_t prefixLength = prefixV2.length();
+
+        // Check if the input starts with the prefix
+        if (StringData{line}.startsWith(prefixV2)) {
+            // cgroup v2.
+            return "/sys/fs/cgroup{}"_format(line.substr(prefixLength));
+        } else {
+            // cgroup v1.
+            return {};
+        }
+    }
+
+    static void getCpuCgroupV2Info(const ProcessId& pid,
+                                   std::string& cpuMax,
+                                   std::string& cpuMaxBurst,
+                                   std::string& cpuUclampMin,
+                                   std::string& cpuUclampMax,
+                                   std::string& cpuWeight) {
+        auto path = getCgroupV2Path(pid);
+        if (path.empty()) {
+            return;
+        }
+        auto parseLineOrDefault = [](const std::string& fileName) {
+            auto lineStr = parseLineFromFile(fileName.c_str());
+            return lineStr.empty() ? "default" : lineStr;
+        };
+        cpuMax = parseLineOrDefault("{}/cpu.max"_format(path));
+        cpuMaxBurst = parseLineOrDefault("{}/cpu.max.burst"_format(path));
+        cpuUclampMin = parseLineOrDefault("{}/cpu.uclamp.min"_format(path));
+        cpuUclampMax = parseLineOrDefault("{}/cpu.uclamp.max"_format(path));
+        cpuWeight = parseLineOrDefault("{}/cpu.weight"_format(path));
+    }
 };
 
+void appendIfExists(BSONObjBuilder* bob, StringData key, StringData value) {
+    if (!value.empty()) {
+        bob->append(key, value);
+    }
+}
+
+void collectPressureStallInfo(BSONObjBuilder& builder) {
+
+    auto parsePressureFile = [](StringData key, StringData filename, BSONObjBuilder& bob) {
+        BSONObjBuilder psiParseBuilder;
+        auto status = procparser::parseProcPressureFile(key, filename, &psiParseBuilder);
+        if (status.isOK()) {
+            bob.appendElements(psiParseBuilder.obj());
+        }
+        return status.isOK();
+    };
+
+    BSONObjBuilder psiBuilder;
+    bool parseStatus = false;
+
+    parseStatus |= parsePressureFile("memory", "/proc/pressure/memory"_sd, psiBuilder);
+    parseStatus |= parsePressureFile("cpu", "/proc/pressure/cpu"_sd, psiBuilder);
+    parseStatus |= parsePressureFile("io", "/proc/pressure/io"_sd, psiBuilder);
+
+    if (parseStatus) {
+        builder.append("pressure"_sd, psiBuilder.obj());
+    }
+}
+
+/**
+ * If the process is running with (cc)NUMA enabled, return the number of NUMA nodes. Else, return 0.
+ */
+unsigned long countNumaNodes() {
+    bool hasMultipleNodes = false;
+    bool hasNumaMaps = false;
+
+    try {
+        hasMultipleNodes = boost::filesystem::exists("/sys/devices/system/node/node1");
+        hasNumaMaps = boost::filesystem::exists("/proc/self/numa_maps");
+
+        if (hasMultipleNodes && hasNumaMaps) {
+            // proc is populated with numa entries
+
+            // read the second column of first line to determine numa state
+            // ('default' = enabled, 'interleave' = disabled).  Logic from version.cpp's warnings.
+            std::string line =
+                LinuxSysHelper::parseLineFromFile("/proc/self/numa_maps").append(" \0");
+            size_t pos = line.find(' ');
+            if (pos != std::string::npos &&
+                line.substr(pos + 1, 10).find("interleave") == std::string::npos) {
+                // interleave not found, count NUMA nodes by finding the highest numbered node file
+                unsigned long i = 2;
+                while (boost::filesystem::exists(
+                    std::string(str::stream() << "/sys/devices/system/node/node" << i++)))
+                    ;
+                return i - 1;
+            }
+        }
+    } catch (boost::filesystem::filesystem_error& e) {
+        LOGV2(23340,
+              "WARNING: Cannot detect if NUMA interleaving is enabled. Failed to probe",
+              "path"_attr = e.path1().string(),
+              "reason"_attr = e.code().message());
+    }
+    return 0;
+}
+
+/**
+ * Append CPU Cgroup v2 info of the current process.
+ */
+void appendCpuCgrouopV2Info(BSONObjBuilder& bob) {
+    std::string cpuMax, cpuMaxBurst, cpuUclampMin, cpuUclampMax, cpuWeight;
+    LinuxSysHelper::getCpuCgroupV2Info(
+        ProcessId::getCurrent(), cpuMax, cpuMaxBurst, cpuUclampMin, cpuUclampMax, cpuWeight);
+    appendIfExists(&bob, "cpuMax"_sd, cpuMax);
+    appendIfExists(&bob, "cpuMaxBurst"_sd, cpuMaxBurst);
+    appendIfExists(&bob, "cpuUclampMin"_sd, cpuUclampMin);
+    appendIfExists(&bob, "cpuUclampMax"_sd, cpuUclampMax);
+    appendIfExists(&bob, "cpuWeight"_sd, cpuWeight);
+}
+
+}  // namespace
 
 ProcessInfo::ProcessInfo(ProcessId pid) : _pid(pid) {}
 
@@ -891,29 +1016,6 @@ bool ProcessInfo::checkGlibcRseqTunable() {
     return false;
 }
 
-void collectPressureStallInfo(BSONObjBuilder& builder) {
-
-    auto parsePressureFile = [](StringData key, StringData filename, BSONObjBuilder& bob) {
-        BSONObjBuilder psiParseBuilder;
-        auto status = procparser::parseProcPressureFile(key, filename, &psiParseBuilder);
-        if (status.isOK()) {
-            bob.appendElements(psiParseBuilder.obj());
-        }
-        return status.isOK();
-    };
-
-    BSONObjBuilder psiBuilder;
-    bool parseStatus = false;
-
-    parseStatus |= parsePressureFile("memory", "/proc/pressure/memory"_sd, psiBuilder);
-    parseStatus |= parsePressureFile("cpu", "/proc/pressure/cpu"_sd, psiBuilder);
-    parseStatus |= parsePressureFile("io", "/proc/pressure/io"_sd, psiBuilder);
-
-    if (parseStatus) {
-        builder.append("pressure"_sd, psiBuilder.obj());
-    }
-}
-
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
@@ -957,49 +1059,6 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
     collectPressureStallInfo(info);
 }
 
-/**
- * If the process is running with (cc)NUMA enabled, return the number of NUMA nodes. Else, return 0.
- */
-unsigned long countNumaNodes() {
-    bool hasMultipleNodes = false;
-    bool hasNumaMaps = false;
-
-    try {
-        hasMultipleNodes = boost::filesystem::exists("/sys/devices/system/node/node1");
-        hasNumaMaps = boost::filesystem::exists("/proc/self/numa_maps");
-
-        if (hasMultipleNodes && hasNumaMaps) {
-            // proc is populated with numa entries
-
-            // read the second column of first line to determine numa state
-            // ('default' = enabled, 'interleave' = disabled).  Logic from version.cpp's warnings.
-            std::string line =
-                LinuxSysHelper::parseLineFromFile("/proc/self/numa_maps").append(" \0");
-            size_t pos = line.find(' ');
-            if (pos != std::string::npos &&
-                line.substr(pos + 1, 10).find("interleave") == std::string::npos) {
-                // interleave not found, count NUMA nodes by finding the highest numbered node file
-                unsigned long i = 2;
-                while (boost::filesystem::exists(
-                    std::string(str::stream() << "/sys/devices/system/node/node" << i++)))
-                    ;
-                return i - 1;
-            }
-        }
-    } catch (boost::filesystem::filesystem_error& e) {
-        LOGV2(23340,
-              "WARNING: Cannot detect if NUMA interleaving is enabled. Failed to probe",
-              "path"_attr = e.path1().string(),
-              "reason"_attr = e.code().message());
-    }
-    return 0;
-}
-
-void appendIfExists(BSONObjBuilder* bob, std::string key, std::string value) {
-    if (!value.empty()) {
-        bob->append(key, value);
-    }
-}
 /**
  * Save a BSON obj representing the host system's details
  */
@@ -1079,6 +1138,9 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     appendIfExists(&bExtra, "cpuVariant", cpuVariant);
     appendIfExists(&bExtra, "cpuPart", cpuPart);
     appendIfExists(&bExtra, "cpuRevision", cpuRevision);
+
+    // Append CPU Cgroup v2 information, if they exist.
+    appendCpuCgrouopV2Info(bExtra);
 
     if (auto res = ProcessInfo::readTransparentHugePagesParameter("enabled"); res.isOK()) {
         appendIfExists(&bExtra, "thp_enabled", res.getValue());
