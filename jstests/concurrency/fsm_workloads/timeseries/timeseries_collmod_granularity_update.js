@@ -6,6 +6,7 @@
  *   requires_sharding,
  *   requires_fcv_60,
  *   does_not_support_transactions,
+ *   requires_timeseries,
  * ]
  */
 

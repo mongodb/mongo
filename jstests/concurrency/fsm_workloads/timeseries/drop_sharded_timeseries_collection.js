@@ -6,6 +6,7 @@
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_fcv_51,
+ *   requires_timeseries,
  * ]
  */
 const dbPrefix = 'fsm_db_for_sharded_timeseries_collection_';
