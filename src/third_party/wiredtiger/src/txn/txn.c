@@ -2596,6 +2596,9 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
     conn = S2C(session);
     use_timestamp = false;
 
+    __wt_verbose_info(session, WT_VERB_RECOVERY_PROGRESS, "%s",
+      "perform final checkpoint and shutting down the global transaction state");
+
     /*
      * Perform a system-wide checkpoint so that all tables are consistent with each other. All
      * transactions are resolved but ignore timestamps to make sure all data gets to disk. Do this
@@ -2619,7 +2622,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
             const char *rts_cfg[] = {
               WT_CONFIG_BASE(session, WT_CONNECTION_rollback_to_stable), NULL, NULL};
             __wt_timer_start(session, &timer);
-            __wt_verbose(session, WT_VERB_RTS,
+            __wt_verbose_info(session, WT_VERB_RTS,
               "[SHUTDOWN_INIT] performing shutdown rollback to stable, stable_timestamp=%s",
               __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string));
             WT_TRET(conn->rts->rollback_to_stable(session, rts_cfg, true));
@@ -2632,7 +2635,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
                   "performing shutdown rollback to stable failed with code %s",
                   __wt_strerror(session, ret, NULL, 0));
             else
-                __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+                __wt_verbose_info(session, WT_VERB_RECOVERY_PROGRESS,
                   "shutdown rollback to stable has successfully finished and ran for %" PRIu64
                   " milliseconds",
                   conn->shutdown_timeline.rts_ms);
@@ -2657,7 +2660,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
 
             /* Time since the shutdown checkpoint has started. */
             __wt_timer_evaluate_ms(session, &timer, &conn->shutdown_timeline.checkpoint_ms);
-            __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+            __wt_verbose_info(session, WT_VERB_RECOVERY_PROGRESS,
               "shutdown checkpoint has successfully finished and ran for %" PRIu64 " milliseconds",
               conn->shutdown_timeline.checkpoint_ms);
         }
