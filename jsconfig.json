@@ -4,8 +4,9 @@
         "disableSizeLimit": true,
         "target": "ES2020"
     },
-    "exclude": [
-        "node_modules",
-        "src/third_party"
+    "include": [
+        "jstests/**/*.js",
+        "src/mongo/shell/*.js",
+        "src/third_party/fast_check/**/*"
     ]
 }
