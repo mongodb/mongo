@@ -32,25 +32,8 @@ selector:
 
     # These workloads frequently time out waiting for the distributed lock to drop a sharded
     # collection.
-    - jstests/concurrency/fsm_workloads/query/kill_aggregation.js
-    - jstests/concurrency/fsm_workloads/query/kill_rooted_or.js
 
     # Uses getmores.
-    - jstests/concurrency/fsm_workloads/query/agg/agg_base.js
-    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_ordered_bulk.js
-    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_text.js
-    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_unordered_bulk.js
-    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_upsert.js
-    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_where.js
-    - jstests/concurrency/fsm_workloads/list_indexes.js
-    - jstests/concurrency/fsm_workloads/query/update/update_where.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_fetch.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_rooted_or.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_sort.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_sort_merge.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_text.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_with_drop.js
 
     # Uses non retryable writes.
     - jstests/concurrency/fsm_workloads/query/remove/remove_and_bulk_insert.js
@@ -78,8 +61,6 @@ selector:
     # serverStatus does not include transaction metrics on mongos.
 
     # Use non-retryable commands not allowed by the network retry helper.
-    - jstests/concurrency/fsm_workloads/txns/snapshot_read/snapshot_read_kill_op_only.js
-    - jstests/concurrency/fsm_workloads/txns/snapshot_read/snapshot_read_kill_operations.js
 
     # Induces non-blindly-retriable errors (see SERVER-45767).
     - jstests/concurrency/fsm_workloads/ddl/create_database.js
@@ -121,6 +102,9 @@ selector:
     # The tests start their own ReplSetTest
     - requires_replication
     - does_not_support_causal_consistency
+    # Because this suite kills / restarts the initial syncing node, if a kill occurs between a read and
+    # subsequent getMore on the initial syncing node tests can fail.
+    - requires_getmore
 
 executor:
   archive:

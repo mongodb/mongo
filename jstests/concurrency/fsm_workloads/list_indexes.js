@@ -10,6 +10,9 @@
  * @tags: [
  *   requires_getmore,
  *   incompatible_with_concurrency_simultaneous,
+ *   # We run the 'listIndexes' command, which cannot be run within a transaction, and perform
+ *   # subsequent getMores. Therefore the getMore will run outside a transaction.
+ *   uses_getmore_outside_of_transaction,
  * ]
  */
 export const $config = (function() {

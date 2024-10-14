@@ -29,32 +29,8 @@ selector:
 
     # These workloads frequently time out waiting for the distributed lock to drop a sharded
     # collection.
-    - jstests/concurrency/fsm_workloads/query/kill_aggregation.js
-    - jstests/concurrency/fsm_workloads/query/kill_rooted_or.js
 
     # Uses getmores.
-    - jstests/concurrency/fsm_workloads/query/agg/agg_base.js
-    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js
-    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_partial_filter.js
-    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_wildcard.js
-    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_ordered_bulk.js
-    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_text.js
-    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_unordered_bulk.js
-    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_upsert.js
-    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_where.js
-    - jstests/concurrency/fsm_workloads/list_indexes.js
-    - jstests/concurrency/fsm_workloads/query/query_stats/query_stats_concurrent.js
-    - jstests/concurrency/fsm_workloads/query/remove/remove_multiple_documents.js
-    - jstests/concurrency/fsm_workloads/query/remove/remove_where.js
-    - jstests/concurrency/fsm_workloads/server_status/server_status_with_time_out_cursors.js
-    - jstests/concurrency/fsm_workloads/query/update/update_where.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_fetch.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_rooted_or.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_sort.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_sort_merge.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_text.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_with_drop.js
 
     # Uses non retryable writes.
     - jstests/concurrency/fsm_workloads/query/remove/remove_and_bulk_insert.js
@@ -85,8 +61,6 @@ selector:
     # router tries to commit, it may not know the full participant list.
 
     # Use non-retryable commands not allowed by the network retry helper.
-    - jstests/concurrency/fsm_workloads/txns/snapshot_read/snapshot_read_kill_op_only.js
-    - jstests/concurrency/fsm_workloads/txns/snapshot_read/snapshot_read_kill_operations.js
 
     # The test may spuriously fail when run against sharded clusters, due to limitations of the
     # infrastructure. See SERVER-77039 for full details.
@@ -103,6 +77,8 @@ selector:
     - requires_profiling
     - does_not_support_stepdowns
     - assumes_unsharded_collection
+    # TODO (SERVER-89682): Remove this
+    - requires_getmore
 
 executor:
   archive:

@@ -12,6 +12,10 @@
  *  uses_curop_agg_stage,
  *  # TODO Undenylist (SERVER-38852).
  *  assumes_against_mongod_not_mongos,
+ *  requires_getmore,
+ *  # The 'killOp' state uses the killOp cmd, which is incompatible with txns, and a getMore in
+ *  # same state. As a result the getMore will be run outside of a txn.
+ *  uses_getmore_outside_of_transaction,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

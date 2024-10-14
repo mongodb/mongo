@@ -17,7 +17,6 @@
  * @tags: [
  *   # PM-1632 was delivered in 7.1, resolving the issue about assumes_unsharded_collection.
  *   requires_fcv_81,
- *   requires_getmore,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

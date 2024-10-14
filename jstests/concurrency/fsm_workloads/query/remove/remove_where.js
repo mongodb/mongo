@@ -12,6 +12,7 @@
  *  assumes_balancer_off,
  *  # Uses $where operator
  *  requires_scripting,
+ *  requires_getmore,
  * ]
  */
 

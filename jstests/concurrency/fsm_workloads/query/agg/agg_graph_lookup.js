@@ -6,7 +6,6 @@
  * TODO SERVER-90385 Enable this test in embedded router suites
  * @tags: [
  *   temp_disabled_embedded_router_uncategorized,
- *   requires_getmore
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
@@ -41,7 +40,7 @@ export const $config = (function() {
                                   }
                               },
                               {$limit: limitAmount}
-                          ]);
+                          ], {cursor: {batchSize: limitAmount + 1}});
 
                     arr = cursor.toArray();
                 } catch (e) {

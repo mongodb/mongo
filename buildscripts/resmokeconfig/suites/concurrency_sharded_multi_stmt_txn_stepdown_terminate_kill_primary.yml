@@ -88,9 +88,6 @@ selector:
     # Uses getMore. If a kill node happens between the time of creation of cursor (usually by calling
     # find or aggregate) and calling getMore(), server will throw CursortNotFound exception.
     # We currently do not retry the transaction on this exception.
-    - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_chunk_migrations.js
-    - jstests/concurrency/fsm_workloads/list_indexes.js
 
     # Uses non-retryable commands in the same state function as a command not supported in a
     # transaction.
@@ -129,6 +126,16 @@ selector:
     - assumes_unsharded_collection
     # Time-series collections do not support write transactions
     - requires_timeseries
+    # We do NOT exclude all tests tagged with 'requires_getmore', but we do exclude tests tagged with
+    # the more specific 'uses_getmore_outside_of_transaction'. Tests that use a getMore are generally
+    # incompatible with suites that kill / terminate nodes. However in this suite because all operations
+    # are wrapped within a txn, if a getMore fails due to the node being killed the entire txn will be
+    # retried, including the getMore, on a new node.
+    # A very small number of tests run a getMore in the same state function as an operation that is
+    # incompatible with txns (such as dropDatabase). When this happens, the entire state function is run
+    # outside a txn. Therefore, because the getMore will also be run outside a txn, it once again becomes
+    # incompatible with killing / terminating nodes and the test must be excluded.
+    - uses_getmore_outside_of_transaction
 
   # Note that "requires_non_retryable_writes" does not need to be denylisted because some writes
   # that are not individually retryable can be retried if they are part of a transaction.

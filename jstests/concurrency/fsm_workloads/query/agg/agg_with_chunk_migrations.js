@@ -12,6 +12,7 @@
  *  requires_sharding,
  *  assumes_balancer_off,
  *  requires_non_retryable_writes,
+ *  requires_getmore,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
