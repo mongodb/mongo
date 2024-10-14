@@ -1165,16 +1165,11 @@ boost::optional<UUID> createCollectionAndIndexes(
     const ShardsvrCreateCollectionRequest& request,
     const NamespaceString& originalNss,
     const NamespaceString& translatedNss,
-    const boost::optional<mongo::TranslatedRequestParams>& translatedRequestParams,
+    const TranslatedRequestParams& translatedRequestParams,
     const ShardId& dataShard,
     bool isUpdatedCoordinatorDoc) {
     LOGV2_DEBUG(
         5277903, 2, "Create collection createCollectionAndIndexes", logAttrs(translatedNss));
-
-    // TODO (SERVER-87284): We can remove this tassert once translatedRequestParams stops being
-    // optional.
-    tassert(
-        8679502, "Expecting translated request params to not be empty.", translatedRequestParams);
 
     // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
     boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
@@ -1186,8 +1181,8 @@ boost::optional<UUID> createCollectionAndIndexes(
     }
 
     auto translatedRequest = request;
-    translatedRequest.setCollation(translatedRequestParams->getCollation());
-    translatedRequest.setTimeseries(translatedRequestParams->getTimeseries());
+    translatedRequest.setCollation(translatedRequestParams.getCollation());
+    translatedRequest.setTimeseries(translatedRequestParams.getTimeseries());
 
     // The creation is on the original nss in order to support timeseries creation using the
     // directly the bucket nss. In that case, we do not want to create the view. This feature is
@@ -1212,11 +1207,11 @@ boost::optional<UUID> createCollectionAndIndexes(
             opCtx,
             translatedNss,
             shardKeyPattern,
-            translatedRequestParams->getCollation(),
+            translatedRequestParams.getCollation(),
             request.getUnique().value_or(false),
             request.getEnforceUniquenessCheck().value_or(true),
             shardkeyutil::ValidationBehaviorsShardCollection(opCtx, dataShard),
-            translatedRequestParams->getTimeseries(),
+            translatedRequestParams.getTimeseries(),
             isUpdatedCoordinatorDoc);
     } else {
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
@@ -1231,7 +1226,7 @@ boost::optional<UUID> createCollectionAndIndexes(
                         opCtx,
                         translatedNss,
                         shardKeyPattern,
-                        translatedRequestParams->getCollation(),
+                        translatedRequestParams.getCollation(),
                         request.getUnique().value_or(false) &&
                             request.getEnforceUniquenessCheck().value_or(true),
                         shardkeyutil::ValidationBehaviorsShardCollection(opCtx, dataShard)));
@@ -1298,7 +1293,7 @@ void commit(OperationContext* opCtx,
             const boost::optional<UUID>& collectionUUID,
             const NamespaceString& nss,
             const std::set<ShardId>& shardsHoldingData,
-            const boost::optional<mongo::TranslatedRequestParams>& translatedRequestParams,
+            const TranslatedRequestParams& translatedRequestParams,
             std::function<OperationSessionInfo(OperationContext*)> newSessionBuilder) {
     LOGV2_DEBUG(5277906, 2, "Create collection commit", logAttrs(nss));
 
@@ -1320,20 +1315,20 @@ void commit(OperationContext* opCtx,
                                initialChunks->collPlacementVersion().getTimestamp(),
                                Date_t::now(),
                                *collectionUUID,
-                               translatedRequestParams->getKeyPattern());
+                               translatedRequestParams.getKeyPattern());
     if (isUnsplittable(request))
         coll.setUnsplittable(isUnsplittable(request));
 
     const auto& placementVersion = initialChunks->chunks.back().getVersion();
 
-    if (translatedRequestParams->getTimeseries()) {
+    if (translatedRequestParams.getTimeseries()) {
         TypeCollectionTimeseriesFields timeseriesFields;
-        auto tsOptions = *translatedRequestParams->getTimeseries();
+        auto tsOptions = *translatedRequestParams.getTimeseries();
         timeseriesFields.setTimeseriesOptions(std::move(tsOptions));
         coll.setTimeseriesFields(std::move(timeseriesFields));
     }
 
-    if (auto collationBSON = translatedRequestParams->getCollation(); !collationBSON.isEmpty()) {
+    if (auto collationBSON = translatedRequestParams.getCollation(); !collationBSON.isEmpty()) {
         coll.setDefaultCollation(collationBSON);
     }
 
@@ -1679,13 +1674,12 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                     _request.getUnsplittable(),
                     _request.getDataShard());
 
-
                 _collectionUUID = createCollectionAndIndexes(opCtx,
                                                              shardKeyPattern,
                                                              _request,
                                                              originalNss(),
                                                              nss(),
-                                                             _doc.getTranslatedRequestParams(),
+                                                             *_doc.getTranslatedRequestParams(),
                                                              ShardingState::get(opCtx)->shardId(),
                                                              false /* isUpdatedCoordinatorDoc */);
 
@@ -1739,7 +1733,7 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                            _collectionUUID,
                            nss(),
                            involvedShards,
-                           _doc.getTranslatedRequestParams(),
+                           *_doc.getTranslatedRequestParams(),
                            [this](OperationContext* opCtx) { return getNewSession(opCtx); });
 
                     generateCommitEventForChangeStreams(opCtx,
@@ -2279,6 +2273,10 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
 
 void CreateCollectionCoordinator::_createCollectionOnCoordinator(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
+    tassert(8728400,
+            "Expecting translated request params to not be empty.",
+            _doc.getTranslatedRequestParams());
+
     auto opCtxHolder = cc().makeOperationContext();
     auto* opCtx = opCtxHolder.get();
     getForwardableOpMetadata().setOn(opCtx);
@@ -2294,7 +2292,7 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator(
                                            _request,
                                            originalNss(),
                                            nss(),
-                                           _doc.getTranslatedRequestParams(),
+                                           *_doc.getTranslatedRequestParams(),
                                            *_doc.getOriginalDataShard(),
                                            true /* isUpdatedCoordinatorDoc */);
     }
@@ -2455,6 +2453,10 @@ void CreateCollectionCoordinator::_createCollectionOnParticipants(
 
 void CreateCollectionCoordinator::_commitOnShardingCatalog(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    tassert(8728401,
+            "Expecting translated request params to not be empty.",
+            _doc.getTranslatedRequestParams());
+
     auto opCtxHolder = cc().makeOperationContext();
     auto* opCtx = opCtxHolder.get();
     getForwardableOpMetadata().setOn(opCtx);
@@ -2534,7 +2536,7 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
            _uuid,
            nss(),
            involvedShards,
-           _doc.getTranslatedRequestParams(),
+           *_doc.getTranslatedRequestParams(),
            [this](OperationContext* opCtx) { return getNewSession(opCtx); });
 
     // Checkpoint configTime in order to preserve causality of operations in
