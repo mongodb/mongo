@@ -162,6 +162,7 @@ public:
         Microseconds timeTaken;
         MarkersCreationMethod methodUsed;
     };
+
     struct RecordIdAndWallTime {
         RecordId id;
         Date_t wall;
@@ -353,17 +354,59 @@ protected:
 };
 
 /**
- * An extension of CollectionTruncateMarkers that provides support for creating "partial markers".
+ * An extension of 'CollectionTruncateMarkers' that supports transforming the 'partial marker', when
+ * it spans expired data, into a full marker without the 'minBytesPerMarker' size requirement.
  *
- * Partial markers are normal markers that can be requested by the user calling
- * CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecessary. The
- * implementation will then consider whether the current data awaiting a marker should be deleted
- * according to some internal logic. This is useful in time-based expiration systems as there could
- * be low activity collections containing data that should be expired but won't because there is no
- * marker.
+ * This is useful in time-based expiration systems as there could be low activity collections
+ * containing expired data that can't be removed until covered by a full marker.
  */
 class CollectionTruncateMarkersWithPartialExpiration : public CollectionTruncateMarkers {
 public:
+    /**
+     * Partial marker expiration depends on tracking the highest seen RecordId and wall time
+     * across the lifetime of the 'CollectionTruncateMarkersWithPartialExpiration' class.
+     *
+     * 'CollectionTruncateMarkersWithPartialExpiration' should always maintain the highest tracked
+     * RecordId and wall time are:
+     *  . Greater than or equal to the 'lastRecord' and 'wall' of the most recent marker
+     *  generated, if any.
+     *  .Initialized provided records have been tracked at any point in time.
+     *              * Records are tracked either by full markers, or a non-zero
+     *                'leftoverRecordsCount' or 'leftoveRecordsBytes'.
+     *  . Strictly increasing over time.
+     *
+     * Thus, to support partial marker expiration, the 'InitialSetOfMarkers' is
+     * extended to account for the highest RecordId and wall time.
+     */
+    struct InitialSetOfMarkers {
+        std::deque<Marker> markers;
+        int64_t leftoverRecordsCount;
+        int64_t leftoverRecordsBytes;
+        RecordId highestRecordId;
+        Date_t highestWallTime;
+        Microseconds timeTaken;
+        MarkersCreationMethod methodUsed;
+    };
+
+    // TODO SERVER-95714: Utilize constructor and InitialSetOfMarkers with highestRecordId and
+    // highestWallTime for PreImagesTruncateMarkersPerNsUUID.
+    CollectionTruncateMarkersWithPartialExpiration(std::deque<Marker> markers,
+                                                   int64_t leftoverRecordsCount,
+                                                   int64_t leftoverRecordsBytes,
+                                                   RecordId highestRecordId,
+                                                   Date_t highestWallTime,
+                                                   int64_t minBytesPerMarker)
+        : CollectionTruncateMarkers(
+              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker),
+          _highestRecordId(std::move(highestRecordId)),
+          _highestWallTime(highestWallTime) {}
+
+    /**
+     * Deprecated: Upon construction, records may be accounted for by the 'markers' or non-zero
+     * 'leftoverRecordsCounts'/'leftoverRecordsBytes' despite uninitialized '_highestRecordId' and
+     * '_highestWallTime'. Until the highest record metrics are updated, partial marker expiration
+     * isn't possible.
+     */
     CollectionTruncateMarkersWithPartialExpiration(std::deque<Marker> markers,
                                                    int64_t leftoverRecordsCount,
                                                    int64_t leftoverRecordsBytes,
@@ -381,16 +424,16 @@ public:
                                                 Date_t wallTime,
                                                 int64_t countInserted) final;
 
-    std::pair<const RecordId&, const Date_t&> getPartialMarker_forTest() const {
-        return {_lastHighestRecordId, _lastHighestWallTime};
+    std::pair<const RecordId&, const Date_t&> getHighestRecordMetrics_forTest() const {
+        return {_highestRecordId, _highestWallTime};
     }
 
 private:
     // Highest marker seen during the lifetime of the class. Modifications must happen
-    // while holding '_lastHighestRecordMutex'.
-    mutable stdx::mutex _lastHighestRecordMutex;
-    RecordId _lastHighestRecordId;
-    Date_t _lastHighestWallTime;
+    // while holding '_highestRecordMutex'.
+    mutable stdx::mutex _highestRecordMutex;
+    RecordId _highestRecordId;
+    Date_t _highestWallTime;
 
     // Used to decide if the current partially built marker has expired.
     virtual bool _hasPartialMarkerExpired(OperationContext* opCtx,
@@ -407,8 +450,8 @@ protected:
     auto checkPartialMarkerWith(F&& fn) const {
         static_assert(std::is_invocable_v<F, const RecordId&, const Date_t&>,
                       "fn must be a callable of type T(const RecordId&, const Date_t&)");
-        stdx::unique_lock lk(_lastHighestRecordMutex);
-        return fn(_lastHighestRecordId, _lastHighestWallTime);
+        stdx::unique_lock lk(_highestRecordMutex);
+        return fn(_highestRecordId, _highestWallTime);
     }
 
     void updateCurrentMarker(int64_t bytesAdded,

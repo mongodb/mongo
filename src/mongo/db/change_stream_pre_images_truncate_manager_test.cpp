@@ -239,7 +239,7 @@ protected:
             }
 
             const auto& [partialMarkerHighestRid, partialMarkerHighestWallTime] =
-                truncateMarkersForNsUUID->getPartialMarker_forTest();
+                truncateMarkersForNsUUID->getHighestRecordMetrics_forTest();
             ASSERT_GTE(partialMarkerHighestRid, highestSeenRecordId);
             ASSERT_GTE(partialMarkerHighestWallTime, highestSeenWallTime);
         }

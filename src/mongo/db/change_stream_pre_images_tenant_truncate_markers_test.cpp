@@ -202,7 +202,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesRepeatSamples) {
     }
 }
 
-// TODO SERVER-95301: Re-enable the following tests to enforce correct partial marker creation.
+// TODO SERVER-95290: Re-enable the following tests to enforce correct partial marker creation.
 // TEST_F(PreImageMarkerInitializationTest, PopulateMapWithEmptyCollection) {
 //    auto opCtx = operationContext();
 //    createPreImagesCollection(opCtx, kTenantId);
@@ -275,7 +275,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesRepeatSamples) {
 //            // The partial marker should always track up the the highest seen RecordId and wall
 //            // time.
 //            const auto [highestRecord, highestWallTime] =
-//                perNsUUIDMarkers->getPartialMarker_forTest();
+//                perNsUUIDMarkers->getHighestRecordMetrics_forTest();
 //            const auto [expectedHighestRecord, expectedHighestWall] =
 //                extractRecordIdAndWallTime(expectedPreImage);
 //            ASSERT_EQ(expectedHighestRecord, highestRecord);

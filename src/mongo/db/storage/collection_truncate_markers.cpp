@@ -509,9 +509,9 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
         return;
     }
 
-    stdx::unique_lock<stdx::mutex> highestRecordLock(_lastHighestRecordMutex, stdx::try_to_lock);
+    stdx::unique_lock<stdx::mutex> highestRecordLock(_highestRecordMutex, stdx::try_to_lock);
     if (!highestRecordLock) {
-        logFailedLockAcquisition("_lastHighestRecordMutex");
+        logFailedLockAcquisition("_highestRecordMutex");
         return;
     }
 
@@ -520,8 +520,8 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
         return;
     }
 
-    if (_hasPartialMarkerExpired(opCtx, _lastHighestRecordId, _lastHighestWallTime)) {
-        auto& marker = createNewMarker(_lastHighestRecordId, _lastHighestWallTime);
+    if (_hasPartialMarkerExpired(opCtx, _highestRecordId, _highestWallTime)) {
+        auto& marker = createNewMarker(_highestRecordId, _highestWallTime);
 
         LOGV2_DEBUG(7393201,
                     2,
@@ -535,12 +535,12 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
 
 void CollectionTruncateMarkersWithPartialExpiration::_updateHighestSeenRecordIdAndWallTime(
     const RecordId& rId, Date_t wallTime) {
-    stdx::unique_lock lk(_lastHighestRecordMutex);
-    if (_lastHighestRecordId < rId) {
-        _lastHighestRecordId = rId;
+    stdx::unique_lock lk(_highestRecordMutex);
+    if (_highestRecordId < rId) {
+        _highestRecordId = rId;
     }
-    if (_lastHighestWallTime < wallTime) {
-        _lastHighestWallTime = wallTime;
+    if (_highestWallTime < wallTime) {
+        _highestWallTime = wallTime;
     }
 }
 
