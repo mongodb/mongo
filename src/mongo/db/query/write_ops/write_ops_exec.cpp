@@ -1110,6 +1110,81 @@ void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp) {
     }
 }
 
+namespace {
+StatusWith<int> getIndexCountForCollectionBatchTuning(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const boost::optional<UUID>& collectionUUID) {
+    // If we're already in a write unit of work, the collection acquisition may hold on to the lock
+    // (because of two-phase locking) and cause a lock conflict.  Also, this is used to adjust batch
+    // size which is not meaningful when already in a WUOW at this point.  We return 1 which is
+    // treated as meaning no tuning is needed.
+    if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork())
+        return 1;
+
+    try {
+        // Acquire collection with an unsharded collection acquisition concern, because we don't
+        // care if the sharding data is stale; this is used for tuning only so it can be
+        // best-effort.
+        auto collection = mongo::acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(nss,
+                                         collectionUUID,
+                                         AcquisitionPrerequisites::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        if (collection.exists()) {
+            return collection.getCollectionPtr()->getTotalIndexCount();
+        }
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+    return Status{ErrorCodes::NamespaceNotFound,
+                  str::stream() << "Collection '" << nss.toStringForErrorMsg()
+                                << "' does not exist when checking number of indexes."};
+}
+
+// Tune batch size by number of indexes.  If we fail to acquire the collection here we ignore it
+// and let any error occur when we acquire the collection for write.
+size_t getTunedMaxBatchSize(OperationContext* opCtx,
+                            const write_ops::InsertCommandRequest& wholeOp) {
+    const size_t origMaxBatchSize = internalInsertMaxBatchSize.load();
+    size_t maxBatchSize = origMaxBatchSize;
+    size_t lowestMaxBatchSize = std::max<size_t>(1, origMaxBatchSize / 10);
+
+    // Avoid obtaining the index count if the tuning wouldn't do anything anyway.
+    if (wholeOp.getDocuments().size() <= lowestMaxBatchSize)
+        return maxBatchSize;
+
+    StatusWith<int> swIndexCount = getIndexCountForCollectionBatchTuning(
+        opCtx, wholeOp.getNamespace(), wholeOp.getCollectionUUID());
+    if (swIndexCount.isOK()) {
+        int indexCount = swIndexCount.getValue();
+        if (indexCount > 1) {
+            // Assume the max batch size paramter is tuned for a collection with single index, and
+            // should be reduced for collections with more indexes.  But do not increase batch size
+            // for 0-index clustered collections.  We also enforce a minimum of one-tenth of the
+            // single-index batch size.
+            maxBatchSize = std::max((origMaxBatchSize * 2) / (indexCount + 1), lowestMaxBatchSize);
+            LOGV2_DEBUG(9204400,
+                        2,
+                        "Tuning max batch size according to number of indexes",
+                        "internalInsertMaxBatchSize"_attr = origMaxBatchSize,
+                        "nss"_attr = wholeOp.getNamespace(),
+                        "indexCount"_attr = indexCount,
+                        "maxBatchSize"_attr = maxBatchSize);
+        }
+    } else {
+        LOGV2(9204401,
+              "Error occurred while attempting to get number of indexes to tune max batch size for "
+              "insert",
+              "error"_attr = swIndexCount.getStatus(),
+              "maxBatchSize"_attr = maxBatchSize);
+    }
+    return maxBatchSize;
+}
+}  // namespace
+
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& wholeOp,
                            OperationSource source) {
@@ -1173,8 +1248,9 @@ WriteResult performInserts(OperationContext* opCtx,
     size_t nextOpIndex = 0;
     size_t bytesInBatch = 0;
     std::vector<InsertStatement> batch;
-    const size_t maxBatchSize = internalInsertMaxBatchSize.load();
+    const size_t maxBatchSize = getTunedMaxBatchSize(opCtx, wholeOp);
     const size_t maxBatchBytes = write_ops::insertVectorMaxBytes;
+
     batch.reserve(std::min(wholeOp.getDocuments().size(), maxBatchSize));
 
     // If 'wholeOp.getBypassEmptyTsReplacement()' is true or if 'source' is 'kFromMigrate', set
