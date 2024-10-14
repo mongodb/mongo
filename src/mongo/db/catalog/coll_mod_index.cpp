@@ -104,8 +104,8 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         return;
     }
 
-    // If the current `expireAfterSeconds` is invalid, it can never be equal to
-    // 'indexExpireAfterSeconds'.
+    // If the current `expireAfterSeconds` is invalid (cannot safely fit into a 32 bit integer), it
+    // can never be equal to 'indexExpireAfterSeconds'.
     if (auto status = index_key_validate::validateExpireAfterSeconds(
             oldExpireSecsElement,
             index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
@@ -133,8 +133,21 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
 
     // This collection is already TTL. Compare the requested value against the existing setting
     // before updating the catalog.
+    //
+    // The catalog should be updated if:
+    //  (1) The old expireAfterSeconds (cast as 'safeNumberLong') is numerically different than
+    //  the new expireAfterSeconds.
+    //  (2) The old expireAfterSeconds isn't stored as a type int or long. The old
+    //  expireAfterSeconds could be a floating point number, which, when casted to a
+    //  'safeNumberLong', could misleadingly look equivalent to the new expireAfterSeconds.
+    //
+    // TODO SERVER-91498 - Simplify equivalence logic.
     *oldExpireSecs = oldExpireSecsElement.safeNumberLong();
-    if (**oldExpireSecs != indexExpireAfterSeconds) {
+    bool equivalentAsTypeLong = **oldExpireSecs == indexExpireAfterSeconds;
+    bool shouldUpdateCatalog = !equivalentAsTypeLong ||
+        (oldExpireSecsElement.type() != BSONType::NumberInt &&
+         oldExpireSecsElement.type() != BSONType::NumberLong);
+    if (shouldUpdateCatalog) {
         // Change the value of "expireAfterSeconds" on disk.
         writableColl->updateTTLSetting(opCtx, idx->indexName(), indexExpireAfterSeconds);
     }
