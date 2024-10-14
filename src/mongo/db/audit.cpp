@@ -42,9 +42,6 @@ std::function<void(OperationContext*)> initializeManager;
 std::function<void(OpObserverRegistry*)> opObserverRegistrar;
 std::function<void(ServiceContext*)> initializeSynchronizeJob;
 std::function<void()> shutdownSynchronizeJob;
-std::function<void(OperationContext*, boost::optional<Timestamp>)> migrateOldToNew;
-std::function<void(OperationContext*)> removeOldConfig;
-std::function<void(OperationContext*)> updateAuditConfigOnDowngrade;
 
 #if !MONGO_ENTERPRISE_AUDIT
 ImpersonatedClientAttrs::ImpersonatedClientAttrs(Client* client) {}

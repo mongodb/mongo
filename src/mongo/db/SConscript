@@ -471,7 +471,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_configuration"
         if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", [])
         else "",
-        "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_mongod_proxy"
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_mongod"
         if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", [])
         else "",
         "$BUILD_DIR/mongo/db/modules/enterprise/src/encryptdb/encryption_key_manager_aux"

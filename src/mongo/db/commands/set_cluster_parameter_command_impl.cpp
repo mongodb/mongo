@@ -96,14 +96,6 @@ void setClusterParameterImplShard(OperationContext* opCtx,
     // setClusterParameter is serialized against setFeatureCompatibilityVersion.
     FixedFCVRegion fcvRegion(opCtx);
 
-    if (!feature_flags::gFeatureFlagAuditConfigClusterParameter.isEnabled(
-            fcvRegion->acquireFCVSnapshot())) {
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << SetClusterParameter::kCommandName
-                              << " cannot be run on standalones",
-                repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
-    }
-
     hangInSetClusterParameterFailPointCheck(request);
 
     std::unique_ptr<ServerParameterService> parameterService =

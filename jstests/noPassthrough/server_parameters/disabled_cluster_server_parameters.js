@@ -23,13 +23,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.enableTestCommands = false;
 // If feature flag enabling standalone cluster parameters is enabled, test on standalone.
 const mongo = MongoRunner.runMongod({});
-if (FeatureFlagUtil.isEnabled(mongo.getDB('admin'), 'AuditConfigClusterParameter')) {
-    setupNode(mongo);
-    // Assert that turning off enableTestCommands prevents test-only cluster server parameters
-    // from being directly set/retrieved and filters them from the output of
-    // getClusterParameter: '*'.
-    testDisabledClusterParameters(mongo);
-}
+setupNode(mongo);
+// Assert that turning off enableTestCommands prevents test-only cluster server parameters
+// from being directly set/retrieved and filters them from the output of
+// getClusterParameter: '*'.
+testDisabledClusterParameters(mongo);
 MongoRunner.stopMongod(mongo);
 
 const rst = new ReplSetTest({

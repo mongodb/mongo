@@ -77,7 +77,6 @@ const allCommands = {
     _flushReshardingStateChange: {skip: isAnInternalCommand},
     _flushRoutingTableCacheUpdates: {skip: isAnInternalCommand},
     _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: isAnInternalCommand},
-    _getAuditConfigGeneration: {skip: isAnInternalCommand},
     _getNextSessionMods: {skip: isAnInternalCommand},
     _getUserCacheGeneration: {skip: isAnInternalCommand},
     _hashBSONElement: {skip: isAnInternalCommand},

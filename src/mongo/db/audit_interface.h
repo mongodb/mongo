@@ -402,9 +402,7 @@ public:
                               const std::vector<Status>& errors,
                               const std::string& suffix) const = 0;
 
-    virtual void logConfigEvent(Client* client,
-                                const AuditConfigDocument& config,
-                                AuditConfigFormat formatIfPrevConfigNotSet) const = 0;
+    virtual void logConfigEvent(Client* client, const AuditConfigDocument& config) const = 0;
 
 
     /**
@@ -651,9 +649,7 @@ public:
                       const std::vector<Status>& errors,
                       const std::string& suffix) const override{};
 
-    void logConfigEvent(Client* client,
-                        const AuditConfigDocument& config,
-                        AuditConfigFormat formatIfPrevConfigNotSet) const override{};
+    void logConfigEvent(Client* client, const AuditConfigDocument& config) const override{};
 };
 
 }  // namespace audit

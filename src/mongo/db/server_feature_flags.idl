@@ -51,12 +51,6 @@ feature_flags:
         cpp_varname: gFeatureFlagRecordIdsReplicated
         default: false
         shouldBeFCVGated: true
-    featureFlagAuditConfigClusterParameter:
-        description: "Enable use of new auditConfig cluster server parameter"
-        cpp_varname: feature_flags::gFeatureFlagAuditConfigClusterParameter
-        default: true
-        version: 7.1
-        shouldBeFCVGated: true
     featureFlagStreams:
         description: "Enable support for streams"
         cpp_varname: gFeatureFlagStreams
