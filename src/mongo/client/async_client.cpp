@@ -279,6 +279,14 @@ Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
         .then([this, requestObj, hook, timer = Timer{}](Message response) {
             auto cmdReply = rpc::makeReply(&response);
             _parseHelloResponse(requestObj, cmdReply);
+
+            LOGV2_DEBUG(9484003,
+                        3,
+                        "Initialized wire version",
+                        "peer"_attr = _peer,
+                        "sessionId"_attr = _session->id(),
+                        "response"_attr = redact(cmdReply->getCommandReply()));
+
             if (hook) {
                 executor::RemoteCommandResponse cmdResp(
                     _peer, cmdReply->getCommandReply(), timer.elapsed());
@@ -320,6 +328,13 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
             uassert(50787,
                     "ResponseId did not match sent message ID.",
                     msgId ? response.header().getResponseToMsgId() == msgId : true);
+            LOGV2_DEBUG(9484011,
+                        4,
+                        "Got response",
+                        "peer"_attr = _peer,
+                        "sessionId"_attr = _session->id(),
+                        "msgId"_attr = response.header().getId(),
+                        "responseTo"_attr = response.header().getResponseToMsgId());
             if (response.operation() == dbCompressed) {
                 return _compressorManager.decompressMessage(response);
             } else {
@@ -333,11 +348,19 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
                                                    bool fireAndForget,
                                                    std::shared_ptr<Timer> fromConnAcquiredTimer,
                                                    const CancellationToken& token) {
+    auto msgId = nextMessageId();
+    LOGV2_DEBUG(9484002,
+                4,
+                "Sending command to peer",
+                "peer"_attr = _peer,
+                "sessionId"_attr = _session->id(),
+                "msgId"_attr = msgId,
+                "request"_attr = redact(request.body),
+                "fireAndForget"_attr = fireAndForget);
     auto requestMsg = request.serialize();
     if (fireAndForget) {
         OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
     }
-    auto msgId = nextMessageId();
     auto future = _call(std::move(requestMsg), msgId, baton, token);
 
     auto logMetrics = [this, fromConnAcquiredTimerInner = std::move(fromConnAcquiredTimer)] {
@@ -432,9 +455,16 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::awaitExhaustCommand(
 
 Future<executor::RemoteCommandResponse> AsyncDBClient::runExhaustCommand(
     OpMsgRequest request, const BatonHandle& baton, const CancellationToken& token) {
+    auto msgId = nextMessageId();
+    LOGV2_DEBUG(9484004,
+                4,
+                "Sending exhaust command to peer",
+                "peer"_attr = _peer,
+                "sessionId"_attr = _session->id(),
+                "msgId"_attr = msgId,
+                "request"_attr = redact(request.body));
     auto requestMsg = request.serialize();
     OpMsg::setFlag(&requestMsg, OpMsg::kExhaustSupported);
-    auto msgId = nextMessageId();
 
     return _call(std::move(requestMsg), msgId, baton, token)
         .then([msgId, baton, this, token]() mutable {
@@ -451,6 +481,11 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::beginExhaustCommandReques
 }
 
 void AsyncDBClient::cancel(const BatonHandle& baton) {
+    LOGV2_DEBUG(9484005,
+                3,
+                "Canceling async operations",
+                "peer"_attr = _peer,
+                "sessionId"_attr = _session->id());
     _session->cancelAsyncOperations(baton);
 }
 

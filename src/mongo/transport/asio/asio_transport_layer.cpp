@@ -585,8 +585,12 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
         uassert(ErrorCodes::InvalidSSLConfiguration,
                 "Specified transient SSL params but connection SSL mode is not set",
                 sslMode == kEnableSSL);
-        LOGV2_DEBUG(
-            5270701, 2, "Connecting to peer using transient SSL connection", "peer"_attr = peer);
+        LOGV2_DEBUG(5270701,
+                    2,
+                    "Synchronously connecting to peer using transient SSL connection",
+                    "peer"_attr = peer);
+    } else {
+        LOGV2_DEBUG(9484006, 3, "Synchronously connecting to peer", "peer"_attr = peer);
     }
 
     WrappedResolver resolver(*_egressReactor);
@@ -606,6 +610,12 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
     if (!sws.isOK()) {
         return sws.getStatus();
     }
+
+    LOGV2_DEBUG(9484008,
+                3,
+                "Sync connection established with peer",
+                "peer"_attr = peer,
+                "sessionId"_attr = sws.getValue()->id());
 
     auto session = std::move(sws.getValue());
     session->ensureSync();
@@ -662,6 +672,12 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
         }
 
         if (finishLine->arriveStrongly()) {
+            LOGV2_DEBUG(9484009,
+                        3,
+                        "Sync TLS handshake completed with peer",
+                        "peer"_attr = peer,
+                        "sessionId"_attr = session->id(),
+                        "duration"_attr = timeAfter - timeBefore);
             timer->cancel();
         } else if (!sslStatus.isOK()) {
             // We only take this path if the handshake times out. Overwrite the socket exception
@@ -766,8 +782,12 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
         uassert(ErrorCodes::InvalidSSLConfiguration,
                 "Specified transient SSL context but connection SSL mode is not set",
                 sslMode == kEnableSSL);
-        LOGV2_DEBUG(
-            5270601, 2, "Connecting to peer using transient SSL connection", "peer"_attr = peer);
+        LOGV2_DEBUG(5270601,
+                    2,
+                    "Asynchronously connecting to peer using transient SSL connection",
+                    "peer"_attr = peer);
+    } else {
+        LOGV2_DEBUG(9484007, 3, "Asynchronously connecting to peer", "peer"_attr = peer);
     }
 
     struct AsyncConnectState {
@@ -898,6 +918,12 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
             }();
             connector->session->ensureAsync();
 
+            LOGV2_DEBUG(9484010,
+                        3,
+                        "Async connection established with peer",
+                        "peer"_attr = connector->peer,
+                        "sessionId"_attr = connector->session->id());
+
 #ifndef MONGO_CONFIG_SSL
             if (sslMode == kEnableSSL) {
                 uasserted(ErrorCodes::InvalidSSLConfiguration, "SSL requested but not supported");
@@ -916,10 +942,16 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                 return connector->session
                     ->handshakeSSLForEgress(connector->peer, connector->reactor)
                     .then([connector, timeBefore, connectionMetrics] {
+                        const auto duration = Date_t::now() - timeBefore;
+                        LOGV2_DEBUG(9484012,
+                                    3,
+                                    "Async TLS handshake completed with peer",
+                                    "peer"_attr = connector->peer,
+                                    "sessionId"_attr = connector->session->id(),
+                                    "duration"_attr = duration);
                         connectionMetrics->onTLSHandshakeFinished();
 
-                        Date_t timeAfter = Date_t::now();
-                        if (timeAfter - timeBefore > kSlowOperationThreshold) {
+                        if (duration > kSlowOperationThreshold) {
                             networkCounter.incrementNumSlowSSLOperations();
                         }
                         return Status::OK();
@@ -1165,6 +1197,7 @@ void AsioTransportLayer::_runListener() noexcept {
     });
 
     if (_isShutdown || _listener.state == Listener::State::kShuttingDown) {
+        LOGV2_DEBUG(9484000, 3, "Unable to start listening: transport layer in shutdown");
         return;
     }
 
@@ -1328,6 +1361,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
         asioTransportLayerHangDuringAcceptCallback.pauseWhileSet();
 
         if (auto lk = stdx::lock_guard(_mutex); _isShutdown) {
+            LOGV2_DEBUG(9484001, 3, "Unable to accept connection: transport layer in shutdown");
             return;
         }
 
