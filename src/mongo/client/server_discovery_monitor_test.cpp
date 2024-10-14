@@ -71,7 +71,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 
-namespace mongo {
+namespace mongo::sdam {
 namespace {
 
 using executor::NetworkInterfaceMock;
@@ -563,4 +563,4 @@ TEST_F(ServerDiscoveryMonitorTestFixture, ServerHelloMonitorRequestImmediateChec
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::sdam

@@ -42,7 +42,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 
-namespace mongo {
+namespace mongo::sdam {
 class SingleServerDiscoveryMonitorExpeditedFixture : public unittest::Test {
 public:
     struct TestCase {
@@ -110,4 +110,4 @@ TEST_F(SingleServerDiscoveryMonitorExpeditedFixture, PreviousRequestConcurrent) 
     verifyTestCase(TestCase{kZeroMs, kLongRefreshPeriod, kExpeditedRefreshPeriod});
     verifyTestCase(TestCase{kZeroMs, kExpeditedRefreshPeriod, boost::none});
 }
-}  // namespace mongo
+}  // namespace mongo::sdam

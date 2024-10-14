@@ -67,7 +67,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 
-namespace mongo {
+namespace mongo::sdam {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(overrideMaxAwaitTimeMS);
@@ -585,4 +585,4 @@ void ServerDiscoveryMonitor::_disableExpeditedChecking(WithLock) {
         addressAndMonitor.second->disableExpeditedChecking();
     }
 }
-}  // namespace mongo
+}  // namespace mongo::sdam

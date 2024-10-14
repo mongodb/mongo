@@ -257,12 +257,12 @@ void StreamableReplicaSetMonitor::init() {
     _eventsPublisher->registerListener(_pingMonitor);
 
     _serverDiscoveryMonitor =
-        std::make_unique<ServerDiscoveryMonitor>(_uri,
-                                                 _sdamConfig,
-                                                 _eventsPublisher,
-                                                 _topologyManager->getTopologyDescription(),
-                                                 _stats,
-                                                 _executor);
+        std::make_unique<sdam::ServerDiscoveryMonitor>(_uri,
+                                                       _sdamConfig,
+                                                       _eventsPublisher,
+                                                       _topologyManager->getTopologyDescription(),
+                                                       _stats,
+                                                       _executor);
     _eventsPublisher->registerListener(_serverDiscoveryMonitor);
 
     _eventsPublisher->registerListener(_queryProcessor);

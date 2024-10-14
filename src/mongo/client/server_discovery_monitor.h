@@ -53,8 +53,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo {
-using namespace sdam;
+namespace mongo::sdam {
 
 class SingleServerDiscoveryMonitor
     : public std::enable_shared_from_this<SingleServerDiscoveryMonitor> {
@@ -185,4 +184,4 @@ private:
     MongoURI _setUri;
 };
 using ServerDiscoveryMonitorPtr = std::shared_ptr<ServerDiscoveryMonitor>;
-}  // namespace mongo
+}  // namespace mongo::sdam

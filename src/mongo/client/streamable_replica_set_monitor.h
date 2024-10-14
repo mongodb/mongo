@@ -259,7 +259,7 @@ private:
         const std::vector<sdam::ServerDescriptionPtr>& serverDescriptions);
 
     boost::optional<std::vector<HostAndPort>> _getHosts(
-        const TopologyDescriptionPtr& topology,
+        const sdam::TopologyDescriptionPtr& topology,
         const ReadPreferenceSetting& criteria,
         const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>());
     boost::optional<std::vector<HostAndPort>> _getHosts(
@@ -303,10 +303,10 @@ private:
 
     void _failOutstandingWithStatus(WithLock, Status status);
 
-    void _setConfirmedNotifierState(WithLock, const ServerDescriptionPtr& primaryDescription);
+    void _setConfirmedNotifierState(WithLock, const sdam::ServerDescriptionPtr& primaryDescription);
 
     // Try to satisfy the outstanding queries for this instance with the given topology information.
-    void _processOutstanding(const TopologyDescriptionPtr& topologyDescription);
+    void _processOutstanding(const sdam::TopologyDescriptionPtr& topologyDescription);
 
     // Take action on error for the given host.
     void _doErrorActions(
@@ -324,7 +324,7 @@ private:
     sdam::ServerSelectorPtr _serverSelector;
     sdam::TopologyEventsPublisherPtr _eventsPublisher;
     std::unique_ptr<StreamableReplicaSetMonitorErrorHandler> _errorHandler;
-    ServerDiscoveryMonitorPtr _serverDiscoveryMonitor;
+    sdam::ServerDiscoveryMonitorPtr _serverDiscoveryMonitor;
     std::shared_ptr<ServerPingMonitor> _pingMonitor;
 
     // This object will be registered as a TopologyListener if there are

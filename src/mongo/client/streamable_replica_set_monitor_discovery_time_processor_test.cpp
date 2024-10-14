@@ -47,7 +47,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo {
+namespace mongo::sdam {
 
 class PrimaryServerDiscoveryTime : public SdamTestFixture {
 public:
@@ -109,4 +109,4 @@ TEST_F(PrimaryServerDiscoveryTime, ShouldFilterByLastWriteTime2) {
                 beforeElapsedDuration);  // afterElapsedDuration was just reset
 }
 
-}  // namespace mongo
+}  // namespace mongo::sdam
