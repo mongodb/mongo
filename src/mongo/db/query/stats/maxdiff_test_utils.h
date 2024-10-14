@@ -53,12 +53,6 @@ size_t getActualCard(OperationContext* opCtx,
                      const std::string& query);
 
 /**
-    Given a value and a comparison operator, generate a match expression reflecting
-    x cmpOp val.
-*/
-std::string makeMatchExpr(const SBEValue& val, ce::EstimationType cmpOp);
-
-/**
     Given a vector of values, create a histogram reflection the distribution of the vector
     with the supplied number of buckets.
 */

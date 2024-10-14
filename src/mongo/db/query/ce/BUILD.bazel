@@ -8,18 +8,3 @@ exports_files(
         "*.cpp",
     ]),
 )
-
-mongo_cc_library(
-    name = "ce_utils",
-    srcs = [
-        "bound_utils.cpp",
-    ],
-    hdrs = [
-        "bound_utils.h",
-    ],
-    deps = [
-        "//src/mongo/db/pipeline:abt_utils",
-        "//src/mongo/db/query/optimizer:optimizer_rewrites",
-        "//src/mongo/db/query/stats:stats_histograms",
-    ],
-)

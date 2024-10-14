@@ -146,13 +146,6 @@ size_t getActualCard(OperationContext* opCtx,
     return runPipeline(opCtx, query, convertToBSON(input)).size();
 }
 
-std::string makeMatchExpr(const SBEValue& val, ce::EstimationType cmpOp) {
-    std::stringstream matchExpr;
-    std::string cmpOpName = ce::estimationTypeName.at(cmpOp);
-    matchExpr << "[{$match: {a: {$" << cmpOpName << ": " << val.get() << "}}}]";
-    return matchExpr.str();
-}
-
 ScalarHistogram makeHistogram(std::vector<SBEValue>& randData, size_t nBuckets) {
     sortValueVector(randData);
     const DataDistribution& dataDistrib = getDataDistribution(randData);

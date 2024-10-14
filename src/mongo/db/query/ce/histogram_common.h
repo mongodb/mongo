@@ -53,13 +53,6 @@ struct EstimationResult {
 
 enum class EstimationType { kEqual, kLess, kLessOrEqual, kGreater, kGreaterOrEqual };
 
-const stdx::unordered_map<EstimationType, std::string> estimationTypeName = {
-    {EstimationType::kEqual, "eq"},
-    {EstimationType::kLess, "lt"},
-    {EstimationType::kLessOrEqual, "lte"},
-    {EstimationType::kGreater, "gt"},
-    {EstimationType::kGreaterOrEqual, "gte"}};
-
 /**
  * Checks if an interval is in descending direction.
  */
