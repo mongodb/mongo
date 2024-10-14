@@ -23,13 +23,16 @@ for (var j = 0; j < 10; ++j) {
 }
 
 // Confirm number of entries in the store and that none have been evicted.
-let res = getQueryStats(conn);
+let res = getQueryStats(conn, {collName: coll.getName()});
 assert.eq(res.length, 10, res);
 {
     const metrics = testDB.serverStatus().metrics.queryStats;
     assert.eq(metrics.numEvicted, 0, metrics);
     assert.gt(metrics.queryStatsStoreSizeEstimateBytes, 0, metrics);
-    assert.eq(metrics.numEntries, 11, metrics);
+    // This test directly caused 11 queries to be inserted (10 queries above + $queryStats), but
+    // there may be background queries that also got collected, so we'll make this assertion
+    // lenient.
+    assert.gte(metrics.numEntries, 11, metrics);
 }
 
 // Command to clear the cache.
@@ -39,7 +42,7 @@ assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryStatsCac
 // cleared.
 {
     const metrics = testDB.serverStatus().metrics.queryStats;
-    assert.eq(metrics.numEvicted, 11, metrics);
+    assert.gte(metrics.numEvicted, 11, metrics);
     assert.eq(metrics.queryStatsStoreSizeEstimateBytes, 0, metrics);
     assert.eq(metrics.numEntries, 0, metrics);
 }
