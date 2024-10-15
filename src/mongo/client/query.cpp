@@ -174,7 +174,7 @@ void assembleQueryRequest(const string& ns,
     BufBuilder b;
     int opts = queryOptions;
     b.appendNum(opts);
-    b.appendStr(ns);
+    b.appendCStr(ns);
     b.appendNum(nToSkip);
     b.appendNum(nToReturn);
     query.appendSelfToBufBuilder(b);

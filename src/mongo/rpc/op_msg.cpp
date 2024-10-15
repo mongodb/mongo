@@ -276,7 +276,7 @@ auto OpMsgBuilder::beginDocSequence(StringData name) -> DocSequenceBuilder {
     _buf.appendStruct(Section::kDocSequence);
     int sizeOffset = _buf.len();
     _buf.skip(sizeof(int32_t));  // section size.
-    _buf.appendStr(name, true);
+    _buf.appendCStr(name);
     return DocSequenceBuilder(this, &_buf, sizeOffset);
 }
 

@@ -100,7 +100,7 @@ Message legacyRequestFromOpMsgRequest(const OpMsgRequest& request) {
     const auto downconvertedBody = downconvertRequestBody(request, &queryOptions);
 
     builder.appendNum(queryOptions);
-    builder.appendStr(cmdNS);
+    builder.appendCStr(cmdNS);
     builder.appendNum(0);  // nToSkip
     builder.appendNum(1);  // nToReturn
 

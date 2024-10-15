@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,35 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/util/intrusive_counter.h"
+/**
+ * This header would be part of str.h, but is separated to break an include cycle with
+ * bson/util/builder.h
+ */
 
-#include "mongo/util/str.h"
+#include <cstring>
 
-namespace mongo {
-using boost::intrusive_ptr;
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
 
-intrusive_ptr<const RCString> RCString::create(StringData s) {
-    uassert(16493,
-            str::stream() << "Tried to create string longer than "
-                          << (BSONObjMaxUserSize / 1024 / 1024) << "MB",
-            s.size() < static_cast<size_t>(BSONObjMaxUserSize));
-
-    const size_t sizeWithNUL = s.size() + 1;
-    const size_t bytesNeeded = sizeof(RCString) + sizeWithNUL;
-
-#pragma warning(push)
-#pragma warning(disable : 4291)
-    intrusive_ptr<RCString> ptr = new (bytesNeeded) RCString();  // uses custom operator new
-#pragma warning(pop)
-
-    ptr->_size = s.size();
-    char* stringStart = reinterpret_cast<char*>(ptr.get()) + sizeof(RCString);
-    s.copy(stringStart, s.size());
-    stringStart[s.size()] = '\0';
-
-    return ptr;
+namespace mongo::str {
+/**
+ * Throws if sd contains any bytes equal to '\0' within its range.
+ *
+ * Note: When a StringData is constructed from a C string or std::string, the final '\0' byte is NOT
+ * considered in range and so will not cause this to throw.
+ */
+inline void uassertNoEmbeddedNulBytes(StringData sd) {
+    uassert(9527900, "illegal embedded NUL byte", sd.find('\0') == std::string::npos);
 }
 
-}  // namespace mongo
+/**
+ * Copies the contents of sd to dest and appends a NUL byte.
+ *
+ * Throws if sd already contains a NUL byte.
+ * Returns a pointer to the next byte to write to (equivalently, the byte after the appended NUL).
+ */
+inline char* copyAsCString(char* dest, StringData sd) {
+    uassertNoEmbeddedNulBytes(sd);
+    dest += sd.copy(dest, sd.size());
+    *dest++ = '\0';
+    return dest;
+}
+}  // namespace mongo::str

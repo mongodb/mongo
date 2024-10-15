@@ -103,7 +103,7 @@ Message makeLegacyExhaustMessage(Message* m, const DbResponse& dbresponse) {
     b.appendNum(header.getResponseToMsgId());  // in response to
     b.appendNum(static_cast<int>(dbGetMore));  // opCode is OP_GET_MORE
     b.appendNum(static_cast<int>(0));          // Must be ZERO (reserved)
-    b.appendStr(StringData(ns));               // Namespace
+    b.appendCStr(StringData(ns));              // Namespace
     b.appendNum(static_cast<int>(0));          // ntoreturn
     b.appendNum(cursorid);                     // cursor id from the OP_REPLY
 

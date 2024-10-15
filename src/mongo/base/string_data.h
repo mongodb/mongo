@@ -129,7 +129,7 @@ public:
      */
     bool equalCaseInsensitive(StringData other) const;
 
-    void copyTo(char* dest, bool includeEndingNull) const;
+    size_t copy(char* dest, size_t count, size_t pos = 0) const;
 
     constexpr StringData substr(size_t pos, size_t n = std::numeric_limits<size_t>::max()) const;
 
@@ -245,11 +245,13 @@ inline bool StringData::equalCaseInsensitive(StringData other) const {
            });
 }
 
-inline void StringData::copyTo(char* dest, bool includeEndingNull) const {
-    if (_data)
-        memcpy(dest, _data, size());
-    if (includeEndingNull)
-        dest[size()] = 0;
+inline size_t StringData::copy(char* dest, size_t count, size_t pos) const {
+    if (MONGO_unlikely(pos > size()))
+        throw std::out_of_range("pos > size()");
+
+    const auto rcount = std::min(count, size() - pos);
+    std::char_traits<char>::copy(dest, rawData() + pos, rcount);
+    return rcount;
 }
 
 inline size_t StringData::find(char c, size_t fromPos) const {

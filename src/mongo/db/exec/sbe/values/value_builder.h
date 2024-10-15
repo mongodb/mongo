@@ -110,21 +110,21 @@ public:
         } else {
             appendValueBufferOffset(TypeTags::StringBig);
             _valueBufferBuilder->appendNum(static_cast<int32_t>(in.size() + 1));
-            _valueBufferBuilder->appendStr(in, true /* includeEndingNull */);
+            _valueBufferBuilder->appendStrBytesAndNul(in);
         }
     }
 
     void append(const BSONSymbol& in) {
         appendValueBufferOffset(TypeTags::bsonSymbol);
         _valueBufferBuilder->appendNum(static_cast<int32_t>(in.symbol.size() + 1));
-        _valueBufferBuilder->appendStr(in.symbol, true /* includeEndingNull */);
+        _valueBufferBuilder->appendStrBytesAndNul(in.symbol);
     }
 
     void append(const BSONCode& in) {
         appendValueBufferOffset(TypeTags::bsonJavascript);
         // Add one to account null byte at the end.
         _valueBufferBuilder->appendNum(static_cast<uint32_t>(in.code.size() + 1));
-        _valueBufferBuilder->appendStr(in.code, true /* includeEndingNull */);
+        _valueBufferBuilder->appendStrBytesAndNul(in.code);
     }
 
     void append(const BSONCodeWScope& in) {
@@ -132,7 +132,7 @@ public:
         _valueBufferBuilder->appendNum(
             static_cast<uint32_t>(4 + in.code.size() + 1 + in.scope.objsize()));
         _valueBufferBuilder->appendNum(static_cast<int32_t>(in.code.size() + 1));
-        _valueBufferBuilder->appendStr(in.code, true /* includeEndingNull */);
+        _valueBufferBuilder->appendStrBytesAndNul(in.code);
         _valueBufferBuilder->appendBuf(in.scope.objdata(), in.scope.objsize());
     }
 
@@ -145,14 +145,14 @@ public:
 
     void append(const BSONRegEx& in) {
         appendValueBufferOffset(TypeTags::bsonRegex);
-        _valueBufferBuilder->appendStr(in.pattern, true /* includeEndingNull */);
-        _valueBufferBuilder->appendStr(in.flags, true /* includeEndingNull */);
+        _valueBufferBuilder->appendCStr(in.pattern);
+        _valueBufferBuilder->appendCStr(in.flags);
     }
 
     void append(const BSONDBRef& in) {
         appendValueBufferOffset(TypeTags::bsonDBPointer);
         _valueBufferBuilder->appendNum(static_cast<int32_t>(in.ns.size() + 1));
-        _valueBufferBuilder->appendStr(in.ns, true /* includeEndingNull */);
+        _valueBufferBuilder->appendStrBytesAndNul(in.ns);
         _valueBufferBuilder->appendBuf(in.oid.view().view(), OID::kOIDSize);
     }
 

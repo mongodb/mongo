@@ -46,6 +46,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/bits.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/str_basic.h"  // IWYU pragma: export
 
 namespace mongo::str {
 
