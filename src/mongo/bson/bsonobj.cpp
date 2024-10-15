@@ -687,7 +687,7 @@ BSONElement BSONObj::getField(StringData name) const {
         // Use the name comparison while computing the name length: this avoids having to look at
         // the same name bytes twice.
         for (auto c : name)
-            if (*++ptr != c)
+            if (*++ptr != c || c == '\0')
                 goto next;  // *ptr is the first non-matching byte, possibly the 0 terminator
 
         // If the field name is found and complete, return the element.
