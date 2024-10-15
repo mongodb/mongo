@@ -147,3 +147,35 @@ for (const [operator, errorCodes] of operators) {
         assertErrorCode(coll, [{$project: {output: {[operator]: ["$arr1", "$arr2"]}}}], errorCodes);
     }
 }
+
+// Tests for null and missing values.
+const nullMissingDocs = [
+    {_id: 0, arr1: null, arr2: [1, 2, 3]},
+    {_id: 1, arr1: [1, 2, 3], arr2: null},
+    {_id: 2, arr1: null, arr2: null},
+    {_id: 3, arr2: [1, 2, 3]},
+    {_id: 4, arr1: [1, 2, 3]},
+];
+
+const nullResultOperators = ["$setUnion", "$setIntersection", "$setDifference"];
+const errorCodeOperators = [["$setEquals", 17044], ["$setIsSubset", [17042, 17046]]];
+
+for (const operator of nullResultOperators) {
+    for (const doc of nullMissingDocs) {
+        assert(coll.drop());
+        assert.commandWorked(coll.insertOne(doc));
+        const result =
+            coll.aggregate([{$project: {output: {[operator]: ["$arr1", "$arr2"]}}}]).toArray();
+        assert.eq(result[0].output,
+                  null,
+                  `Expected null result for operator ${operator} with document ${tojson(doc)}`);
+    }
+}
+
+for (const [operator, errorCodes] of errorCodeOperators) {
+    for (const doc of nullMissingDocs) {
+        assert(coll.drop());
+        assert.commandWorked(coll.insertOne(doc));
+        assertErrorCode(coll, [{$project: {output: {[operator]: ["$arr1", "$arr2"]}}}], errorCodes);
+    }
+}

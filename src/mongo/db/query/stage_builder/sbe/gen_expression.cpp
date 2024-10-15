@@ -4203,8 +4203,10 @@ private:
         checkNulls.reserve(arity);
         checkNotArrays.reserve(arity);
 
-        auto [operatorName, setFunctionName] =
+        auto operatorNameSetFunctionNamePair =
             getSetOperatorAndFunctionNames(setOp, collatorSlot.has_value());
+        auto operatorName = operatorNameSetFunctionNamePair.first;
+        auto setFunctionName = operatorNameSetFunctionNamePair.second;
         if (collatorSlot) {
             variables.push_back(makeABTVariable(*collatorSlot));
         }
@@ -4226,15 +4228,28 @@ private:
             makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNulls));
         auto checkNotArrayAnyArgument =
             makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNotArrays));
-        auto setExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},
-            ABTCaseValuePair{std::move(checkNotArrayAnyArgument),
-                             makeABTFail(ErrorCodes::Error{7158100},
-                                         str::stream() << "All operands of $" << operatorName
-                                                       << " must be arrays.")},
-            optimizer::make<optimizer::FunctionCall>(setFunctionName.toString(),
-                                                     std::move(variables)));
-
+        optimizer::ABT setExpr = [&]() -> optimizer::ABT {
+            // To match classic engine semantics, $setEquals and $setIsSubset should throw an error
+            // for any non-array arguments including null and missing values.
+            if (setOp == SetOperation::Equals || setOp == SetOperation::IsSubset) {
+                return makeIf(makeFillEmptyTrue(std::move(checkNotArrayAnyArgument)),
+                              makeABTFail(ErrorCodes::Error{7158100},
+                                          str::stream() << "All operands of $" << operatorName
+                                                        << " must be arrays."),
+                              optimizer::make<optimizer::FunctionCall>(setFunctionName.toString(),
+                                                                       std::move(variables)));
+            } else {
+                return buildABTMultiBranchConditional(
+                    ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},
+                    ABTCaseValuePair{std::move(checkNotArrayAnyArgument),
+                                     makeABTFail(ErrorCodes::Error{7158101},
+                                                 str::stream()
+                                                     << "All operands of $" << operatorName
+                                                     << " must be arrays.")},
+                    optimizer::make<optimizer::FunctionCall>(setFunctionName.toString(),
+                                                             std::move(variables)));
+            }
+        }();
         for (size_t i = 0; i < arity; ++i) {
             setExpr = optimizer::make<optimizer::Let>(
                 std::move(argNames[i]), std::move(args[i]), std::move(setExpr));
