@@ -37,7 +37,6 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"

@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
-#include "mongo/db/query/plan_explainer_sbe.h"
 
 namespace mongo::sbe {
 /**

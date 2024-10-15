@@ -411,22 +411,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "abt_utils",
-    srcs = [
-        "//src/mongo/db/pipeline/abt:utils.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/exec:docval_to_sbeval.h",
-        "//src/mongo/db/pipeline/abt:utils.h",
-    ],
-    deps = [
-        ":field_path",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/exec/document_value",
-        "//src/mongo/db/query/optimizer:optimizer_base",
-    ],
-)
-
-mongo_cc_library(
     name = "pipeline",
     srcs = [
         "//src/mongo/db/query/query_shape:agg_cmd_shape.cpp",
@@ -649,7 +633,6 @@ mongo_cc_library(
         "//src/mongo/s:transaction_router_resource_yielder.h",
     ],
     deps = [
-        ":abt_utils",
         ":accumulator",
         ":change_stream_error_extra_info",
         ":change_stream_helpers",
