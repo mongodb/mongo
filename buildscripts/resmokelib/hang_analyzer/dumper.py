@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 from datetime import datetime
@@ -651,6 +652,7 @@ class GDBDumper(Dumper):
             handler.setFormatter(logging.Formatter(fmt="%(message)s"))
             logger.addHandler(handler)
             with TRACER.start_as_current_span("core_analyzer.analyze_core") as analyze_core_span:
+                start_time = time.time()
                 analyze_core_span.set_status(StatusCode.OK)
                 try:
                     exit_code, status = self.analyze_core(
@@ -677,6 +679,7 @@ class GDBDumper(Dumper):
                     analyze_core_span.set_status(
                         StatusCode.ERROR, description="Failed to analyze core dump."
                     )
+            end_time = time.time()
             output = log_stream.getvalue()
             result = Result(
                 Result(
@@ -685,6 +688,9 @@ class GDBDumper(Dumper):
                         "exit_code": exit_code,
                         "test_file": basename,
                         "log_raw": output,
+                        "start": start_time,
+                        "end": end_time,
+                        "elapsed": end_time - start_time,
                     }
                 )
             )
@@ -744,6 +750,21 @@ class GDBDumper(Dumper):
             f"set index-cache directory {tmp_dir}",
             f"set index-cache enabled {gdb_index_cache}",
             f"file {binary_path}",
+        ]
+
+        # We run gdb once to populate the gdb index cache because gdb can sometimes
+        # behave weirdly and take a long time when pulling from the index cache
+        # in the same invocation it creates the index cache.
+        gdb_index_cmds = self._prefix() + cmds + self._postfix()
+        args = [dbg, "--nx"] + list(
+            itertools.chain.from_iterable([["-ex", b] for b in gdb_index_cmds])
+        )
+        exit_code = call(args, logger, check=False)
+
+        if exit_code != 0:
+            raise Exception("Bad exit code %d from %s" % (exit_code, " ".join(args)))
+
+        cmds += [
             f"core-file {core_file_path}",
             "python import gdbmongo",
             "python gdbmongo.register_printers()",
