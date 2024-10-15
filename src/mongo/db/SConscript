@@ -809,6 +809,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/rpc/rpc",
+        "$BUILD_DIR/mongo/s/startup_initialization",
         "$BUILD_DIR/mongo/transport/session_manager",
         "$BUILD_DIR/mongo/unittest/unittest",
         "$BUILD_DIR/mongo/util/periodic_runner_factory",
