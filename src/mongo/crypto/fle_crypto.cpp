@@ -1593,35 +1593,6 @@ void convertServerPayload(ConstDataRange cdr,
     it.it++;
 }
 
-
-BSONObj toBSON(BSONType type, ConstDataRange cdr) {
-    auto valueString = "value"_sd;
-
-    // The size here is to construct a new BSON document and validate the
-    // total size of the object. The first four bytes is for the size of an
-    // int32_t, then a space for the type of the first element, then the space
-    // for the value string and the the 0x00 terminated field name, then the
-    // size of the actual data, then the last byte for the end document character,
-    // also 0x00.
-    size_t docLength = sizeof(int32_t) + 1 + valueString.size() + 1 + cdr.length() + 1;
-    BufBuilder builder;
-    builder.reserveBytes(docLength);
-
-    uassert(ErrorCodes::BadValue,
-            "invalid decryption value",
-            docLength < static_cast<size_t>(std::numeric_limits<int32_t>::max()));
-
-    builder.appendNum(static_cast<uint32_t>(docLength));
-    builder.appendChar(static_cast<uint8_t>(type));
-    builder.appendCStr(valueString);
-    builder.appendBuf(cdr.data(), cdr.length());
-    builder.appendChar('\0');
-
-    ConstDataRangeCursor cdc = ConstDataRangeCursor(ConstDataRange(builder.buf(), builder.len()));
-    BSONObj elemWrapped = cdc.readAndAdvance<Validated<BSONObj>>();
-    return elemWrapped.getOwned();
-}
-
 void collectIndexedFields(std::vector<EDCIndexedFields>* pFields,
                           ConstDataRange cdr,
                           StringData fieldPath) {
