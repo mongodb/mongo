@@ -172,6 +172,7 @@ class _EvaluatePathsResult(NamedTuple):
 
     evaluated: List[str]
     unrecognized: List[str]
+    paths_missing_from_roots: List[str]
 
 
 class _TestList(object):
@@ -198,6 +199,7 @@ class _TestList(object):
     def _evaluate_paths(self, paths: List[str]) -> _EvaluatePathsResult:
         evaluated = []
         unrecognized = []
+        paths_missing_from_roots = []
 
         for path in paths:
             if self._test_file_explorer.is_glob_pattern(path):
@@ -211,13 +213,22 @@ class _TestList(object):
                 ):
                     unrecognized.append(path)
 
+                # Ensure selector patterns match at lease one result
+                if hasattr(self, "_roots") and not any(
+                    expanded_path in self._roots for expanded_path in expanded_paths
+                ):
+                    paths_missing_from_roots.append(path)
+
             elif self._test_file_explorer.isfile(path):
-                evaluated.append(os.path.normpath(path))
+                normalized_path = os.path.normpath(path)
+                evaluated.append(normalized_path)
+                if hasattr(self, "_roots") and normalized_path not in self._roots:
+                    paths_missing_from_roots.append(path)
 
             elif path.startswith(self._test_file_explorer.get_jstests_dir()):
                 unrecognized.append(path)
 
-        return _EvaluatePathsResult(evaluated, unrecognized)
+        return _EvaluatePathsResult(evaluated, unrecognized, paths_missing_from_roots)
 
     def _expand_roots(self, tests: List[str]) -> List[str]:
         paths = self._evaluate_paths(tests)
@@ -246,16 +257,11 @@ class _TestList(object):
                 )
             )
 
-        paths_missing_from_roots = [
-            path
-            for path in paths.evaluated
-            if path.startswith(self._test_file_explorer.get_jstests_dir())
-            and path not in self._roots
-        ]
-        if len(paths_missing_from_roots) > 0:
+        if len(paths.paths_missing_from_roots) > 0:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_TEST_FILES_FROM_ROOTS_MESSAGE.format(
-                    config_section="include_files", not_matching_paths=paths_missing_from_roots
+                    config_section="include_files",
+                    not_matching_paths=paths.paths_missing_from_roots,
                 )
             )
 
