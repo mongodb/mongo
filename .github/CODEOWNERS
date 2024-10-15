@@ -109,6 +109,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/**/*reshard* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/**/*unshard*collection* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/aggregation/OWNERS.yml
+/jstests/aggregation/**/* @10gen/query @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/client_encrypt/OWNERS.yml
 /jstests/client_encrypt/**/* @10gen/query-integration-fle @svc-auto-approve-bot
 
