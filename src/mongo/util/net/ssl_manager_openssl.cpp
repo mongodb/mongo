@@ -3095,7 +3095,7 @@ bool SSLManagerOpenSSL::_setupCRL(SSL_CTX* context, const std::string& crlFile) 
     X509_STORE* store = SSL_CTX_get_cert_store(context);
     fassert(16583, store);
 
-    X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK);
+    X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     X509_LOOKUP* lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
     fassert(16584, lookup);
 
@@ -3108,14 +3108,7 @@ bool SSLManagerOpenSSL::_setupCRL(SSL_CTX* context, const std::string& crlFile) 
         return false;
     }
 
-    if (status == 1) {
-        LOGV2(4652601, "ssl imported 1 revoked certificate from the revocation list.");
-    } else {
-        LOGV2(4652602,
-              "SSL imported revoked certificates from the revocation list",
-              "numberCerts"_attr = status);
-    }
-
+    LOGV2(4652602, "SSL imported certificate revocation list(s)", "numberCRLs"_attr = status);
     return true;
 }
 

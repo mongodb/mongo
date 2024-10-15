@@ -1757,8 +1757,6 @@ TEST(SSLManager, noCRLFoundTests) {
 // - Apple: CRL unsupported; test disabled
 // - Windows: multiple CRLs (root CRL + intermediate CRL) is not allowed
 // TODO: SERVER-95583 investigate why windows behaves like this.
-// - OpenSSL: passes; only leaf cert is checked against CRL
-// TODO: SERVER-95445 should fix this openssl issue.
 TEST(SSLManager, revocationWithCRLsIntermediateTests) {
     // intermediate-ca-B.pem + intermediate-ca-B-leaf.pem bundle
     const std::string intermediateBLeafWithIssuerCertKeyFile = combinePEMFiles(
@@ -1790,7 +1788,8 @@ TEST(SSLManager, revocationWithCRLsIntermediateTests) {
     SSLTestFixture tf(serverParams, clientParams);
     tf.doHandshake();
     auto result = tf.runIngressEgressValidation();
-    checkValidationResults(result, true, true);
+    checkValidationResults(result, true, false);
+    ASSERT_NE(result.egress.getStatus().reason().find("revoked"), std::string::npos);
 #endif
 }
 
