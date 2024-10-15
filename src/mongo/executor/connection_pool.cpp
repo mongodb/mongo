@@ -774,21 +774,21 @@ SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::_get(const HostAndP
     auto connFuture = pool->getConnection(lk, timeout, lease, token);
     pool->updateState(lk);
 
-    // Unlock here so that we won't deadlock if connFuture is ready when we tap into it to record
-    // the wait time.
+    if (lease) {
+        return std::move(connFuture).semi();
+    }
+
+    std::shared_ptr<SpecificPool> poolAnchor = pool;
     lk.unlock();
 
     // Only count connections being checked-out for ordinary use, not lease, towards cumulative wait
     // time.
-    if (!lease) {
-        connFuture =
-            std::move(connFuture).tap([this, connRequestedAt, pool = pool](const auto& conn) {
-                stdx::lock_guard lk(_mutex);
-                pool->recordConnectionWaitTime(lk, connRequestedAt);
-            });
-    }
-
-    return std::move(connFuture).semi();
+    return std::move(connFuture)
+        .tap([this, connRequestedAt, pool = std::move(poolAnchor)](const auto& conn) {
+            stdx::lock_guard lk(_mutex);
+            pool->recordConnectionWaitTime(lk, connRequestedAt);
+        })
+        .semi();
 }
 
 void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
