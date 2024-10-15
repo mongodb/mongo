@@ -51,7 +51,7 @@ Message makeUnsupportedOpUpdateMessage(StringData ns, BSONObj query, BSONObj upd
     return makeMessage(dbUpdate, [&](BufBuilder& b) {
         const int reservedFlags = 0;
         b.appendNum(reservedFlags);
-        b.appendStr(ns);
+        b.appendCStr(ns);
         b.appendNum(flags);
 
         query.appendSelfToBufBuilder(b);
@@ -63,7 +63,7 @@ Message makeUnsupportedOpRemoveMessage(StringData ns, BSONObj query, int flags) 
     return makeMessage(dbDelete, [&](BufBuilder& b) {
         const int reservedFlags = 0;
         b.appendNum(reservedFlags);
-        b.appendStr(ns);
+        b.appendCStr(ns);
         b.appendNum(flags);
 
         query.appendSelfToBufBuilder(b);
@@ -86,7 +86,7 @@ Message makeUnsupportedOpQueryMessage(StringData ns,
                                       int queryOptions) {
     return makeMessage(dbQuery, [&](BufBuilder& b) {
         b.appendNum(queryOptions);
-        b.appendStr(ns);
+        b.appendCStr(ns);
         b.appendNum(nToSkip);
         b.appendNum(nToReturn);
         query.appendSelfToBufBuilder(b);
@@ -101,7 +101,7 @@ Message makeUnsupportedOpGetMoreMessage(StringData ns,
                                         int flags) {
     return makeMessage(dbGetMore, [&](BufBuilder& b) {
         b.appendNum(flags);
-        b.appendStr(ns);
+        b.appendCStr(ns);
         b.appendNum(nToReturn);
         b.appendNum(cursorId);
     });

@@ -182,13 +182,13 @@ public:
     void run() {
         {
             BufBuilder b(0);
-            b.appendStr("foo");
+            b.appendCStr("foo");
             ASSERT_EQUALS(4, b.len());
             ASSERT(strcmp("foo", b.buf()) == 0);
         }
         {
             mongo::StackBufBuilder b;
-            b.appendStr("foo");
+            b.appendCStr("foo");
             ASSERT_EQUALS(4, b.len());
             ASSERT(strcmp("foo", b.buf()) == 0);
         }
@@ -203,7 +203,7 @@ public:
         try {
             for (; written <= mongo::BufferMaxSize + 1; ++written)
                 // (re)alloc past the buffer limit
-                b.appendStr("a");
+                b.appendCStr("a");
         } catch (const AssertionException&) {
         }
         // assert half of max buffer size was allocated before exception is thrown

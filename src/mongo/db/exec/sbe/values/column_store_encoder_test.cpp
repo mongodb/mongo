@@ -51,7 +51,7 @@ TEST(SBEColumnStoreEncoder, EncodeTest) {
     // Write a strange message.
     const char* message = "Help, I'm trapped in a columnar index.";
     columnStoreCell.appendChar(ColumnStore::Bytes::kStringSizeMin + strlen(message));
-    columnStoreCell.appendStr(message, false /* includeEndingNull */);
+    columnStoreCell.appendStrBytes(message);
 
     Decimal128 decimalNum{"123.456"};
     columnStoreCell.appendChar(ColumnStore::Bytes::kDecimal128);

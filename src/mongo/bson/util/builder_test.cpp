@@ -38,10 +38,41 @@ TEST(Builder, String1) {
     ASSERT_EQUALS(small, "eliot");
 
     BufBuilder bb;
-    bb.appendStr(small);
+    bb.appendCStr(small);
+
+    ASSERT_EQUALS(bb.len(), small.size() + 1);
+    ASSERT_EQUALS(bb.buf()[small.size()], 0);
 
     ASSERT_EQUALS(0, strcmp(bb.buf(), "eliot"));
     ASSERT_EQUALS(0, strcmp("eliot", bb.buf()));
+}
+
+TEST(Builder, StringNulByteHandling) {
+    auto hasNulByte = "hello\0world"_sd;
+
+    {
+        // appendCStr() throws without changing bb;
+        BufBuilder bb;
+        ASSERT_THROWS_CODE(bb.appendCStr(hasNulByte), DBException, 9527900);
+        ASSERT_EQ(bb.len(), 0);
+    }
+
+    {
+        // appendStrBytes appends embedded NUL without terminator.
+        BufBuilder bb;
+        bb.appendStrBytes(hasNulByte);
+        ASSERT_EQ(StringData(bb.buf(), bb.len()), hasNulByte);
+    }
+
+    {
+        // appendStrBytesAndNul appends embedded NUL and NUL terminator.
+        BufBuilder bb;
+        bb.appendStrBytesAndNul(hasNulByte);
+        // Since hasNulByte points to a string literal, we know that
+        // *(hasNulByte.data() + hasNulByte.size()) is valid and == '\0'
+        ASSERT_EQ(StringData(bb.buf(), bb.len()),
+                  StringData(hasNulByte.rawData(), hasNulByte.size() + 1));
+    }
 }
 
 TEST(Builder, StringBuilderAddress) {

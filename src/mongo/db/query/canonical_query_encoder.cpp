@@ -1087,7 +1087,7 @@ public:
 
     void preVisit(const MatchExpression* expr) {
         // Encode the type of the node as well as the path (if there is a non-empty path).
-        _builder->appendStr(encodeMatchType(expr->matchType()));
+        _builder->appendCStr(encodeMatchType(expr->matchType()));
         encodeUserString(expr->path(), _builder);
 
         // The node encodes itself, and then its children.
@@ -1151,7 +1151,7 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     BufBuilder bufBuilder(bufSize);
     encodeKeyForAutoParameterizedMatchSBE(cq.getOpCtx(), cq.root(), &bufBuilder, !sort.isEmpty());
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
-    bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
+    bufBuilder.appendStrBytes(strBuilderEncoded);
     bufBuilder.appendChar(kEncodeSectionDelimiter);
     if (!hint.isEmpty()) {
         bufBuilder.appendBuf(hint.objdata(), hint.objsize());

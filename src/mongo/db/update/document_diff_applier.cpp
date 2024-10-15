@@ -446,7 +446,7 @@ int32_t computeDamageOnArray(const BSONObj& preImageRoot,
             nextMod = reader->next();
         } else {
             // This field is not mentioned in the diff so we pad the post image with null.
-            auto idxAsStr = std::to_string(idx);
+            const auto idxAsStr = std::to_string(idx);
             // The end of 'arrayPreImage' with the offset from the updates made already.
             auto targetOffset = targetOffsetInPostImage(
                 arrayPreImage.end()->rawdata(), preImageRoot.objdata(), offsetRoot, diffSize);
@@ -455,7 +455,7 @@ int32_t computeDamageOnArray(const BSONObj& preImageRoot,
             appendDamage(damages, bufBuilder->len(), sourceSize, targetOffset, 0);
             diffSize += sourceSize;
             appendTypeByte(bufBuilder, BSONType::jstNULL);
-            bufBuilder->appendStr(idxAsStr);
+            bufBuilder->appendCStr(idxAsStr);
         }
     }
 

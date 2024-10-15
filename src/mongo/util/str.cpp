@@ -35,6 +35,11 @@
 #include "mongo/util/str.h"
 
 namespace mongo::str {
+namespace str_details {
+void uassertNoEmbeddedNulBytesFailed() {
+    uasserted(9527900, "illegal embedded NUL byte");
+}
+}  // namespace str_details
 
 void splitStringDelim(const std::string& str, std::vector<std::string>* res, char delim) {
     if (str.empty())
