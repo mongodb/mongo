@@ -8228,46 +8228,11 @@ intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const exp
     uassert(4161103, str::stream() << name << " requires 'value' to be specified", valueExpr);
     uassert(4161109, str::stream() << name << " requires 'input' to be specified", inputExpr);
 
-    // The 'field' argument to '$setField' must evaluate to a constant string, for example,
-    // {$const: "$a.b"}. In case the user has forgotten to wrap the value into a '$const' or
-    // '$literal' expression, we will raise an error with a more meaningful description.
-    if (auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(fieldExpr.get()); fieldPathExpr) {
-        auto fp = fieldPathExpr->getFieldPath().fullPathWithPrefix();
-        uasserted(4161108,
-                  str::stream() << "'" << fp
-                                << "' is a field path reference which is not allowed "
-                                   "in this context. Did you mean {$literal: '"
-                                << fp << "'}?");
-    }
-
-    auto constFieldExpr = dynamic_cast<ExpressionConstant*>(fieldExpr.get());
-    uassert(4161106,
-            str::stream() << name
-                          << " requires 'field' to evaluate to a constant, "
-                             "but got a non-constant argument",
-            constFieldExpr);
-    uassert(4161107,
-            str::stream() << name
-                          << " requires 'field' to evaluate to type String, "
-                             "but got "
-                          << typeName(constFieldExpr->getValue().getType()),
-            constFieldExpr->getValue().getType() == BSONType::String);
-
-
-    return make_intrusive<ExpressionSetField>(expCtx, fieldExpr, inputExpr, valueExpr);
+    return make_intrusive<ExpressionSetField>(
+        expCtx, std::move(fieldExpr), std::move(inputExpr), std::move(valueExpr));
 }
 
 Value ExpressionSetField::evaluate(const Document& root, Variables* variables) const {
-    auto field = _field->evaluate(root, variables);
-
-    // The parser guarantees that the '_field' expression evaluates to a constant string.
-    tassert(4161104,
-            str::stream() << kExpressionName
-                          << " requires 'field' to evaluate to type String, "
-                             "but got "
-                          << typeName(field.getType()),
-            field.getType() == BSONType::String);
-
     auto input = _input->evaluate(root, variables);
     if (input.nullish()) {
         return Value(BSONNULL);
@@ -8281,7 +8246,7 @@ Value ExpressionSetField::evaluate(const Document& root, Variables* variables) c
 
     // Build output document and modify 'field'.
     MutableDocument outputDoc(input.getDocument());
-    outputDoc.setField(field.getString(), value);
+    outputDoc.setField(_fieldName, value);
     return outputDoc.freezeToValue();
 }
 
@@ -8312,6 +8277,42 @@ Value ExpressionSetField::serialize(const SerializationOptions& options) const {
                            Document{{"field"_sd, std::move(maybeRedactedPath)},
                                     {"input"_sd, _input->serialize(options)},
                                     {"value"_sd, _value->serialize(options)}}}});
+}
+
+std::string ExpressionSetField::getValidFieldName(boost::intrusive_ptr<Expression> fieldExpr) {
+    tassert(9534701,
+            str::stream() << kExpressionName << " requires 'field' to be specified",
+            fieldExpr);
+
+    // The 'field' argument to '$setField' must evaluate to a constant string, for example,
+    // {$const: "$a.b"}. In case the user has forgotten to wrap the value into a '$const' or
+    // '$literal' expression, we will raise an error with a more meaningful description.
+    if (auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(fieldExpr.get()); fieldPathExpr) {
+        auto fp = fieldPathExpr->getFieldPath().fullPathWithPrefix();
+        uasserted(4161108,
+                  str::stream() << "'" << fp
+                                << "' is a field path reference which is not allowed "
+                                   "in this context. Did you mean {$literal: '"
+                                << fp << "'}?");
+    }
+
+    auto constFieldExpr = dynamic_cast<ExpressionConstant*>(fieldExpr.get());
+    uassert(4161106,
+            str::stream() << kExpressionName
+                          << " requires 'field' to evaluate to a constant, "
+                             "but got a non-constant argument",
+            constFieldExpr);
+    uassert(4161107,
+            str::stream() << kExpressionName
+                          << " requires 'field' to evaluate to type String, "
+                             "but got "
+                          << typeName(constFieldExpr->getValue().getType()),
+            constFieldExpr->getValue().getType() == BSONType::String);
+    uassert(9534700,
+            str::stream() << kExpressionName << ": 'field' cannot contain an embedded null byte",
+            constFieldExpr->getValue().getStringData().find('\0') == std::string::npos);
+
+    return constFieldExpr->getValue().getString();
 }
 
 /* ------------------------- ExpressionTsSecond ----------------------------- */
