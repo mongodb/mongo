@@ -111,6 +111,8 @@ last-continuous:
       ticket: SERVER-88447
     - test_file: jstests/core/timeseries/timeseries_computed_field.js
       ticket: SERVER-88072
+    - test_file: jstests/auth/commands_builtin_roles_replset.js
+      ticket: SERVER-92411
     - test_file: jstests/auth/curop_auth_info.js
       ticket: SERVER-89664
     - test_file: jstests/auth/killop_own_ops.js
@@ -426,6 +428,8 @@ last-lts:
       ticket: SERVER-88447
     - test_file: jstests/core/timeseries/timeseries_computed_field.js
       ticket: SERVER-88072
+    - test_file: jstests/auth/commands_builtin_roles_replset.js
+      ticket: SERVER-92411
     - test_file: jstests/auth/curop_auth_info.js
       ticket: SERVER-89664
     - test_file: jstests/auth/killop_own_ops.js

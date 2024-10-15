@@ -57,7 +57,7 @@
 namespace mongo {
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReshardingOwnershipMatch,
-                                  LiteParsedDocumentSourceDefault::parse,
+                                  LiteParsedDocumentSourceInternal::parse,
                                   DocumentSourceReshardingOwnershipMatch::createFromBson,
                                   true);
 

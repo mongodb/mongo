@@ -319,6 +319,32 @@ public:
     }
 };
 
+class LiteParsedDocumentSourceInternal final : public LiteParsedDocumentSource {
+public:
+    /**
+     * Creates the default LiteParsedDocumentSource for internal document sources. This requires
+     * the privilege on 'internal' action. This should still be used with caution. Make sure your
+     * stage doesn't need to communicate any special behavior before registering a DocumentSource
+     * using this parser.
+     */
+    static std::unique_ptr<LiteParsedDocumentSourceInternal> parse(const NamespaceString& nss,
+                                                                   const BSONElement& spec) {
+        return std::make_unique<LiteParsedDocumentSourceInternal>(spec.fieldName());
+    }
+
+    LiteParsedDocumentSourceInternal(std::string parseTimeName)
+        : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+        return stdx::unordered_set<NamespaceString>();
+    }
+
+    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
+        return {Privilege(ResourcePattern::forClusterResource(boost::none),
+                          ActionSet{ActionType::internal})};
+    }
+};
+
 /**
  * Helper class for DocumentSources which reference a foreign collection.
  */
