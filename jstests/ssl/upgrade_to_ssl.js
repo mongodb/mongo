@@ -20,7 +20,7 @@ var opts = {
 };
 var rst = new ReplSetTest({name: 'tlsSet', nodes: 3, nodeOptions: opts});
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 var rstConn1 = rst.getPrimary();
 rstConn1.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"});

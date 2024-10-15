@@ -13,7 +13,7 @@ replSet.startSet();
 
 // Increase the election timeout to 24 hours so that elections are not called due to election
 // timeouts, since we need them to be called for the kSingleNodePromptElection election reason.
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 let primary = replSet.getPrimary();
 const initialPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));

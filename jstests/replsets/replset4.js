@@ -5,7 +5,7 @@ let doTest = function(signal) {
     var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 
     replTest.startSet();
-    replTest.initiate();
+    replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
     var primary = replTest.getPrimary();
 

@@ -22,7 +22,7 @@ var rst = new ReplSetTest({
 });
 rst.startSet();
 // Initiate the set with a high election timeout so that there aren't any unplanned elections.
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const lastVoteNS = 'local.replset.election';
 

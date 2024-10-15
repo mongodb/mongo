@@ -13,7 +13,7 @@ const bucketNs = dbName + '.' + bucketCollName;
 
 const rst = new ReplSetTest({name: 'rs', nodes: 2});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 // Create collection on the primary node
 const primary = rst.getPrimary();

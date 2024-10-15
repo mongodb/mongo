@@ -94,7 +94,12 @@ const st = new ShardingTest({
         // Make the periodic job for writing sampled queries have a period of 1 second to speed up
         // the test.
         setParameter: {queryAnalysisWriterIntervalSecs: 1}
-    }
+    },
+    // By default, our test infrastructure sets the election timeout to a very high value (24
+    // hours). For this test, we need a shorter election timeout because it relies on nodes running
+    // an election when they do not detect an active primary. Therefore, we are setting the
+    // electionTimeoutMillis to its default value.
+    initiateWithDefaultElectionTimeout: true
 });
 
 // Force samples to get persisted even though query sampling is not enabled.

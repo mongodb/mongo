@@ -37,7 +37,7 @@ function runTest(validateMode, writeConcern) {
         }
     });
     rst.startSet();
-    rst.initiateWithHighElectionTimeout();
+    rst.initiate();
     const primary = rst.getPrimary();
     const secondary = rst.getSecondary();
     const primaryHealthLog = primary.getDB("local").system.healthlog;

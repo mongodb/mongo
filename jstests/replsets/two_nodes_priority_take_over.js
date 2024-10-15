@@ -12,7 +12,7 @@ rst.startSet();
 var conf = rst.getReplSetConfig();
 conf.members[0].priority = 2;
 conf.members[1].priority = 1;
-rst.initiate(conf);
+rst.initiate(conf, null, {initiateWithDefaultElectionTimeout: true});
 rst.awaitSecondaryNodes();
 
 // Increase the verbosity for everything except storage on all nodes.

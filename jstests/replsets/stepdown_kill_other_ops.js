@@ -6,7 +6,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const replSet = new ReplSetTest({name: TestData.name, nodes: 2});
 const nodes = replSet.nodeList();
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 const primary = replSet.getPrimary();
 assert.eq(primary.host, nodes[0], "primary assumed to be node 0");

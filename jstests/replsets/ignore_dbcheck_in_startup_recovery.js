@@ -29,7 +29,7 @@ const replSet = new ReplSetTest({
     nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}}
 });
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 let primary = replSet.getPrimary();
 const primaryDb = primary.getDB(dbName);

@@ -49,7 +49,7 @@ function verifySlowLogsIndicateMirroredReads(rst, cmd) {
         nodes: 2,
     });
     rst.startSet();
-    rst.initiateWithHighElectionTimeout();
+    rst.initiate();
 
     // Put in a datum
     {

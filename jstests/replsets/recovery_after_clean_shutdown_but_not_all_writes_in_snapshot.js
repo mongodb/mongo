@@ -12,7 +12,7 @@ const rst = new ReplSetTest({
     nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}}
 });
 const nodes = rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const dbName = "recovery_clean_shutdown";
 let primaryDB = rst.getPrimary().getDB(dbName);

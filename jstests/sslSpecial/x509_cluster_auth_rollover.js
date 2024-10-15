@@ -20,9 +20,11 @@ const rst = new ReplSetTest({
     }
 });
 rst.startSet();
-
-rst.initiateWithAnyNodeAsPrimary(
-    Object.extend(rst.getReplSetConfig(), {writeConcernMajorityJournalDefault: true}));
+rst.initiate(Object.extend(rst.getReplSetConfig(), {
+    writeConcernMajorityJournalDefault: true,
+}),
+             null,
+             {initiateWithDefaultElectionTimeout: true, allNodesAuthorizedToRunRSGetStatus: false});
 
 // Create a user to login as when auth is enabled later
 rst.getPrimary().getDB('admin').createUser({user: 'root', pwd: 'root', roles: ['root']}, {w: 3});

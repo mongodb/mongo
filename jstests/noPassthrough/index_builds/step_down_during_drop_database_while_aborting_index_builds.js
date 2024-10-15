@@ -14,7 +14,7 @@ const collName = "coll";
 
 const replSet = new ReplSetTest({nodes: 2});
 replSet.startSet();
-replSet.initiate();
+replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const primary = replSet.getPrimary();
 

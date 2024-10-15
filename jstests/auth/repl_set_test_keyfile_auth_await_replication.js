@@ -11,7 +11,7 @@ const rst = new ReplSetTest({
     keyFile: "jstests/libs/key1",
 });
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 jsTestLog("Running 'awaitReplication()' while not authenticated in the test");
 rst.awaitReplication();

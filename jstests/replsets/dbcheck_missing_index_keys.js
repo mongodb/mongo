@@ -26,7 +26,7 @@ const collName = "dbCheckMissingIndexKeysCheck-collection";
 
 const replSet = new ReplSetTest({name: jsTestName(), nodes: 2});
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 const primary = replSet.getPrimary();
 const primaryDb = primary.getDB(dbName);

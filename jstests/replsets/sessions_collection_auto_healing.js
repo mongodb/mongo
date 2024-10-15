@@ -15,7 +15,7 @@ var replTest = new ReplSetTest({
 });
 var nodes = replTest.startSet();
 
-replTest.initiate();
+replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 var primary = replTest.getPrimary();
 var primaryAdmin = primary.getDB("admin");
 

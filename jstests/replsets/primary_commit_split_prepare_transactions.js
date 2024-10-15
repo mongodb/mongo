@@ -44,9 +44,9 @@ const replTest = new ReplSetTest({
 });
 replTest.startSet();
 
-// initiateWithHighElectionTimeout makes replTest.waitForPrimary() below very slow
+// initiate makes replTest.waitForPrimary() below very slow
 // and adding a replTest.stepUp(primary) does not help.
-replTest.initiate();
+replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const primary = replTest.getPrimary();
 const secondary = replTest.getSecondary();

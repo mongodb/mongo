@@ -81,7 +81,7 @@ function runTest(downgradeVersion) {
 
     jsTestLog("Running test with 'downgradeVersion': " + downgradeVersion);
     rst.startSet();
-    rst.initiate();
+    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
     rst.getPrimary().getDB(dbName).createCollection(watchedCollName);
     rst.getPrimary().getDB(dbName).createCollection(unwatchedCollName);

@@ -18,7 +18,7 @@ var replSet = new ReplSetTest({
     ]
 });
 replSet.startSet();
-replSet.initiate();
+replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 replSet.waitForState(0, ReplSetTest.State.PRIMARY);
 // Wait until all nodes get the "no-op" of "new primary" after initial sync.

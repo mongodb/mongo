@@ -26,7 +26,7 @@ let rst = new ReplSetTest({
     ]
 });
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 let primary = rst.getPrimary();
 let coll = primary.getDB(dbName).getCollection(collName);

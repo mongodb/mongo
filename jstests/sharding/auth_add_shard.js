@@ -40,7 +40,7 @@ assert.eq(1, st.config.shards.count(), "initial server count wrong");
 // start a mongod with NO keyfile
 var rst = new ReplSetTest({nodes: 1});
 rst.startSet({shardsvr: ""});
-rst.initiateWithAnyNodeAsPrimary();
+rst.initiate();
 
 // --------------- Test 1 --------------------
 // Add shard to the existing cluster (should fail because it was added without a keyfile)
@@ -53,7 +53,7 @@ rst.stopSet();
 // start mongod again, this time with keyfile
 rst = new ReplSetTest({nodes: 1});
 rst.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
-rst.initiateWithAnyNodeAsPrimary();
+rst.initiate();
 
 // try adding the new shard
 var addShardRes = admin.runCommand({addShard: rst.getURL()});

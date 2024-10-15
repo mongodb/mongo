@@ -30,7 +30,7 @@ var rst = new ReplSetTest({
     useBridge: true
 });
 var nodes = rst.startSet({setParameter: {allowMultipleArbiters: true}});
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.

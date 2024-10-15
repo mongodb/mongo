@@ -85,7 +85,15 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
 
 {
     jsTest.log("Test when the old primary steps up");
-    const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
+    const st = new ShardingTest({
+        shards: 1,
+        rs: {nodes: 1},
+        // By default, our test infrastructure sets the election timeout to a very high value (24
+        // hours). For this test, we need a shorter election timeout because it relies on nodes
+        // running an election when they do not detect an active primary. Therefore, we are setting
+        // the electionTimeoutMillis to its default value.
+        initiateWithDefaultElectionTimeout: true
+    });
     const stepDownShard0PrimaryFunc = () => {
         const oldPrimary = st.rs0.getPrimary();
         assert.commandWorked(
@@ -122,7 +130,15 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
 
 {
     jsTest.log("Test when an old secondary steps up");
-    const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
+    const st = new ShardingTest({
+        shards: 1,
+        rs: {nodes: 2},
+        // By default, our test infrastructure sets the election timeout to a very high value (24
+        // hours). For this test, we need a shorter election timeout because it relies on nodes
+        // running an election when they do not detect an active primary. Therefore, we are setting
+        // the electionTimeoutMillis to its default value.
+        initiateWithDefaultElectionTimeout: true
+    });
     const stepDownShard0PrimaryFunc = () => {
         assert.commandWorked(st.rs0.getSecondary().adminCommand({replSetFreeze: 0}));
         assert.commandWorked(st.rs0.getPrimary().adminCommand(

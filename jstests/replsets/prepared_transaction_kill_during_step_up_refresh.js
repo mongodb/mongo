@@ -11,7 +11,7 @@ import {reconnect} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({nodes: 2, name: jsTestName()});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const dbName = "primaryDB";
 const collName = "testcoll";

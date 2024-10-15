@@ -24,7 +24,9 @@ replSet.initiate({
     ],
     // No primary catch-up so we focus on the drain mode.
     "settings": {"catchUpTimeoutMillis": 0},
-});
+},
+                 null,
+                 {initiateWithDefaultElectionTimeout: true});
 
 var primary = replSet.getPrimary();
 var secondary = replSet.getSecondary();

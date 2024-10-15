@@ -166,7 +166,7 @@ MongoRunner.stopMongod(mongod);
 
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 runTest(rst.getPrimary().getDB("admin"),
         true /* supportsTransactions */,

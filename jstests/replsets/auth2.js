@@ -42,7 +42,9 @@ replSetTest.initiate({
         {"_id": 1, "host": hostnames[1], priority: 0},
         {"_id": 2, "host": hostnames[2], priority: 0}
     ]
-});
+},
+                     null,
+                     {initiateWithDefaultElectionTimeout: true});
 
 var primary = replSetTest.getPrimary();
 

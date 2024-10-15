@@ -15,7 +15,7 @@ const rst = new ReplSetTest({
     ]
 });
 const nodes = rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const primary = rst.getPrimary();
 const dbName = 'test';

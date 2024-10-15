@@ -27,11 +27,11 @@ const NUM_NODES = 3;
 const rst = new ReplSetTest(
     {name: 'tlsSet', nodes: NUM_NODES, waitForKeys: false, keyFile: KEYFILE, nodeOptions: opts});
 rst.startSet();
-
-// ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.
-// TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
-rst.initiateWithAnyNodeAsPrimary(Object.extend(
-    rst.getReplSetConfig(), {writeConcernMajorityJournalDefault: wcMajorityJournalDefault}));
+rst.initiate(Object.extend(rst.getReplSetConfig(), {
+    writeConcernMajorityJournalDefault: wcMajorityJournalDefault,
+}),
+             null,
+             {allNodesAuthorizedToRunRSGetStatus: false});
 
 // Make administrative user other than local.__system
 rst.getPrimary().getDB("admin").createUser({user: "root", pwd: "pwd", roles: ["root"]},

@@ -11,7 +11,7 @@ const rst = new ReplSetTest(
     {name: name, nodes: 3, useBridge: true, settings: {catchUpTimeoutMillis: 4 * 60 * 1000}});
 
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 rst.awaitSecondaryNodes();
 
 // The default WC is majority and this test can't satisfy majority writes.

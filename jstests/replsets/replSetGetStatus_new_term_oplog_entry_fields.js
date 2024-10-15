@@ -10,7 +10,7 @@ const name = jsTestName();
 const rst = new ReplSetTest({name: name, nodes: 3});
 
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 rst.awaitReplication();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.

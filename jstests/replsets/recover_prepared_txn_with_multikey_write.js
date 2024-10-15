@@ -27,7 +27,7 @@ const rst = new ReplSetTest({
 });
 
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 let primary = rst.getPrimary();
 

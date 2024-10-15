@@ -19,7 +19,9 @@ export var testPrepareFailoverDueToReconfig = function(name, reconfigOnPrimary) 
             {/* primary   */ "_id": 0, "host": nodes[0]},
             {/* secondary */ "_id": 1, "host": nodes[1], "priority": 0}
         ]
-    });
+    },
+                 null,
+                 {initiateWithDefaultElectionTimeout: true});
 
     const primary = rst.getPrimary();
     const secondary = rst.getSecondary();

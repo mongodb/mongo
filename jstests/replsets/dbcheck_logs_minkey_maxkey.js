@@ -34,7 +34,7 @@ const replSet = new ReplSetTest({
     }
 });
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 const primary = replSet.getPrimary();
 const primaryDB = primary.getDB(dbName);

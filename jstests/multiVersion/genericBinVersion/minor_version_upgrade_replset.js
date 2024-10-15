@@ -15,7 +15,7 @@ var nodes = {
 var rst = new ReplSetTest({nodes: nodes});
 
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Wait for a primary node...
 var primary = rst.getPrimary();

@@ -17,7 +17,7 @@ const replTest = new ReplSetTest({
     settings: {chainingAllowed: false}
 });
 replTest.startSet();
-replTest.initiateWithHighElectionTimeout();
+replTest.initiate();
 
 const dbName = testName;
 const primary = replTest.getPrimary();

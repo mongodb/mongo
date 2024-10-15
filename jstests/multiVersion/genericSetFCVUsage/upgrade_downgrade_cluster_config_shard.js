@@ -33,7 +33,12 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
             rsOptions: {binVersion: oldVersion},
             rs: true,
         },
-        configShard: true
+        configShard: true,
+        // By default, our test infrastructure sets the election timeout to a very high value (24
+        // hours). For this test, we need a shorter election timeout because it relies on nodes
+        // running an election when they do not detect an active primary. Therefore, we are setting
+        // the electionTimeoutMillis to its default value.
+        initiateWithDefaultElectionTimeout: true
     });
     st.configRS.awaitReplication();
 

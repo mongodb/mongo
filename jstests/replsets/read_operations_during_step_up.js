@@ -12,7 +12,7 @@ const collName = "coll";
 
 const rst = new ReplSetTest({name: testName, nodes: 2});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);

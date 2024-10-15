@@ -37,7 +37,7 @@ let nodeOption = {binVersion: 'last-lts'};
 // with another primary eligible node available.
 let replSet = new ReplSetTest({nodes: [nodeOption, nodeOption]});
 replSet.startSet();
-replSet.initiate();
+replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 replSet.upgradeSet({binVersion: 'latest', setParameter: {featureFlagAllMongodsAreSharded: true}});
 

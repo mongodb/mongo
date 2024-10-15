@@ -31,7 +31,7 @@ const replSet = new ReplSetTest({
 });
 
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 const dbName = "test";
 const collName = "drop_indexes_prevents_dropping_ready_indexes_after_aborting";

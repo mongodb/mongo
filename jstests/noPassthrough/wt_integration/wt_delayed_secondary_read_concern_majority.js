@@ -41,7 +41,7 @@ if (storageEngine !== "wiredTiger") {
 
     // We cannot wait for a stable recovery timestamp, oplog replication, or config replication due
     // to the secondary delay.
-    rst.initiateWithAnyNodeAsPrimary(conf, "replSetInitiate", {
+    rst.initiate(conf, "replSetInitiate", {
         doNotWaitForStableRecoveryTimestamp: true,
         doNotWaitForReplication: true,
         doNotWaitForNewlyAddedRemovals: true

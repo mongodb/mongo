@@ -11,7 +11,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
-replTest.initiate();
+replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 const nDocs = 100;
 const dbName = jsTestName();
 let primary = replTest.getPrimary();

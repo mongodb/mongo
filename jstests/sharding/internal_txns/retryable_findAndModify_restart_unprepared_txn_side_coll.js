@@ -8,7 +8,8 @@ import {
     RetryableInternalTransactionTest
 } from "jstests/sharding/internal_txns/libs/retryable_internal_transaction_test.js";
 
-const transactionTest = new RetryableInternalTransactionTest();
+const transactionTest = new RetryableInternalTransactionTest(
+    {} /*collectionOptions*/, true /*initiateWithDefaultElectionTimeout*/);
 transactionTest.runTestsForAllUnpreparedRetryableInternalTransactionTypes(
     transactionTest.runFindAndModifyTestsEnableImageCollection, transactionTest.TestMode.kRestart);
 transactionTest.stop();

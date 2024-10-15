@@ -21,7 +21,7 @@ const collName = "testcoll";
 
 const rst = new ReplSetTest({name: testName, nodes: 1, settings: {chainingAllowed: false}});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);

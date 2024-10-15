@@ -6,7 +6,7 @@ import {isConfigCommitted, occasionally, reconnect} from "jstests/replsets/rslib
 
 const rs = new ReplSetTest({name: 'testSet', nodes: 3, nodeOptions: {verbose: 2}});
 rs.startSet();
-rs.initiate();
+rs.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 var primary = rs.getPrimary();
 

@@ -15,7 +15,7 @@ const nodeOption = {
 // with another primary-eligible node available.
 const replSet = new ReplSetTest({nodes: [nodeOption, nodeOption]});
 replSet.startSet();
-replSet.initiate();
+replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Upgrade the set and enable the feature flag. The feature flag will be enabled as of
 // the latest FCV. However, the repl set will still have FCV last-lts.

@@ -46,7 +46,9 @@ let nodes = rst.startSet({setParameter: {logComponentVerbosity: logLevel}});
 let node = nodes[0];
 let secondary = nodes[1];
 rst.initiate(
-    {_id: name, members: [{_id: 0, host: node.host}, {_id: 2, host: secondary.host, priority: 0}]});
+    {_id: name, members: [{_id: 0, host: node.host}, {_id: 2, host: secondary.host, priority: 0}]},
+    null,
+    {initiateWithDefaultElectionTimeout: true});
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(rst.getPrimary().adminCommand(

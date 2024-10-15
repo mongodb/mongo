@@ -1000,6 +1000,11 @@ export class ShardingTest {
      * @property {boolean} [useHostname] if true, use hostname of machine, otherwise use localhost
      * @property {number} [numReplicas]
      * @property {boolean} [configShard] Add the config server as a shard if true.
+     * @property {boolean} [initiateWithDefaultElectionTimeout] Set the electionTimeoutMillis to its
+     * default value when initiating all replica sets for both config and non-config shards. If not
+     * set, 'ReplSetTest.initiate' defaults to a very high election timeout value (24 hours).
+     * @property {boolean} [allNodesAuthorizedToRunRSGetStatus] Informs `ReplSetTest.initiate`
+     * whether all nodes in the replica set are authorized to run `replSetGetStatus`.
      * @property {boolean} [useAutoBootstrapProcedure] Use the auto-bootstrapping procedure on every
      * shard and config server if set to true.
      * @property {boolean} [alwaysUseTestNameForShardName] Always use the testname as the name of
@@ -1495,10 +1500,26 @@ export class ShardingTest {
                     rstConfig.writeConcernMajorityJournalDefault = true;
                 }
 
+                let rstInitiateArgs = {
+                    allNodesAuthorizedToRunRSGetStatus: true,
+                    initiateWithDefaultElectionTimeout: false
+                };
+
+                if (otherParams.hasOwnProperty("allNodesAuthorizedToRunRSGetStatus") &&
+                    otherParams.allNodesAuthorizedToRunRSGetStatus == false) {
+                    rstInitiateArgs.allNodesAuthorizedToRunRSGetStatus = false;
+                }
+
+                if (otherParams.hasOwnProperty("initiateWithDefaultElectionTimeout") &&
+                    otherParams.initiateWithDefaultElectionTimeout == true) {
+                    rstInitiateArgs.initiateWithDefaultElectionTimeout = true;
+                }
+
                 const makeNodeHost = (node) => {
                     const [_, port] = node.name.split(":");
                     return `127.0.0.1:${port}`;
                 };
+
                 return {
                     rst,
                     // Arguments for creating instances of each replica set within parallel threads.
@@ -1515,11 +1536,14 @@ export class ShardingTest {
                     },
                     // Replica set configuration for initiating the replica set.
                     rstConfig,
+
+                    // Args to be sent to rst.initiate
+                    rstInitiateArgs
                 };
             });
 
-            const initiateReplicaSet = (rst, rstConfig) => {
-                rst.initiateWithAnyNodeAsPrimary(rstConfig);
+            const initiateReplicaSet = (rst, rstConfig, rstInitiateArgs) => {
+                rst.initiate(rstConfig, null, rstInitiateArgs);
 
                 // Do replication.
                 rst.awaitNodesAgreeOnPrimary();
@@ -1557,13 +1581,13 @@ export class ShardingTest {
             if (isParallelSupported) {
                 const threads = [];
                 try {
-                    for (let {rstArgs, rstConfig} of replicaSetsToInitiate) {
-                        const thread =
-                            new Thread(async (rstArgs, rstConfig, initiateReplicaSet) => {
+                    for (let {rstArgs, rstConfig, rstInitiateArgs} of replicaSetsToInitiate) {
+                        const thread = new Thread(
+                            async (rstArgs, rstConfig, rstInitiateArgs, initiateReplicaSet) => {
                                 const {ReplSetTest} = await import("jstests/libs/replsettest.js");
                                 try {
                                     const rst = new ReplSetTest({rstArgs});
-                                    initiateReplicaSet(rst, rstConfig);
+                                    initiateReplicaSet(rst, rstConfig, rstInitiateArgs);
                                     return {ok: 1};
                                 } catch (e) {
                                     return {
@@ -1574,7 +1598,11 @@ export class ShardingTest {
                                         stack: e.stack,
                                     };
                                 }
-                            }, rstArgs, rstConfig, initiateReplicaSet);
+                            },
+                            rstArgs,
+                            rstConfig,
+                            rstInitiateArgs,
+                            initiateReplicaSet);
                         thread.start();
                         threads.push(thread);
                     }
@@ -1591,8 +1619,8 @@ export class ShardingTest {
                     });
                 }
             } else {
-                for (let {rst, rstConfig} of replicaSetsToInitiate) {
-                    initiateReplicaSet(rst, rstConfig);
+                for (let {rst, rstConfig, rstInitiateArgs} of replicaSetsToInitiate) {
+                    initiateReplicaSet(rst, rstConfig, rstInitiateArgs);
                 }
             }
 

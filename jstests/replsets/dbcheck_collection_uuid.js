@@ -15,7 +15,7 @@ const replSet = new ReplSetTest({
     nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}},
 });
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 const dbName = "dbCheckCollectionUUID";
 const collName = "dbCheckCollectionUUID-collection";

@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 var name = "bg_index_rename";
 var rst = new ReplSetTest({name: name, nodes: 3});
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Create and populate a collection.
 var primary = rst.getPrimary();

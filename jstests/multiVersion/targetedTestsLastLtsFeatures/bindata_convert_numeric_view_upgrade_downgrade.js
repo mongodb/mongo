@@ -23,7 +23,7 @@ const rst = new ReplSetTest({
     ],
 });
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const getAdminDB = () => rst.getPrimary().getDB("admin");
 const getDB = () => rst.getPrimary().getDB(jsTestName());
