@@ -252,6 +252,11 @@ public:
     bool hasReadyRequests();
 
     /**
+     * Returns the current number of requests that have not started processing.
+     */
+    size_t getNumReadyRequests();
+
+    /**
      * Returns true if the given iterator points to the end of the network operation list.
      */
     bool isNetworkOperationIteratorAtEnd(const NetworkInterfaceMock::NetworkOperationIterator& itr);
@@ -410,9 +415,9 @@ private:
     void _waitForWork_inlock(stdx::unique_lock<stdx::mutex>& lk);
 
     /**
-     * Returns true if there are ready requests for the network thread to service.
+     * Returns the current number of ready requests.
      */
-    bool _hasReadyRequests_inlock(stdx::unique_lock<stdx::mutex>& lk);
+    size_t _getNumReadyRequests_inlock(stdx::unique_lock<stdx::mutex>& lk);
 
     /**
      * Returns true if the network thread could run right now.

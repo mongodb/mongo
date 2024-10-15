@@ -348,15 +348,19 @@ void NetworkInterfaceMock::exitNetwork() {
 }
 
 bool NetworkInterfaceMock::hasReadyRequests() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    invariant(_currentlyRunning == kNetworkThread);
-    return _hasReadyRequests_inlock(lk);
+    return getNumReadyRequests() > 0;
 }
 
-bool NetworkInterfaceMock::_hasReadyRequests_inlock(stdx::unique_lock<stdx::mutex>& lk) {
-    auto noi = std::find_if(
-        _operations.begin(), _operations.end(), [](auto& op) { return op.hasReadyRequest(); });
-    return noi != _operations.end();
+size_t NetworkInterfaceMock::getNumReadyRequests() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    invariant(_currentlyRunning == kNetworkThread);
+    return _getNumReadyRequests_inlock(lk);
+}
+
+size_t NetworkInterfaceMock::_getNumReadyRequests_inlock(stdx::unique_lock<stdx::mutex>& lk) {
+    return std::accumulate(_operations.begin(), _operations.end(), 0, [](auto sum, auto& op) {
+        return op.hasReadyRequest() ? sum + 1 : sum;
+    });
 }
 
 bool NetworkInterfaceMock::isNetworkOperationIteratorAtEnd(
@@ -488,7 +492,7 @@ Date_t NetworkInterfaceMock::runUntil(Date_t until) {
     invariant(until > _now_inlock(lk));
     while (until > _now_inlock(lk)) {
         _runReadyNetworkOperations_inlock(lk);
-        if (_hasReadyRequests_inlock(lk)) {
+        if (_getNumReadyRequests_inlock(lk) > 0) {
             break;
         }
         Date_t newNow = _executorNextWakeupDate;

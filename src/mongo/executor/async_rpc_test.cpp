@@ -99,6 +99,33 @@ const HostAndPort kTestStandaloneHost = {HostAndPort("FakeStandalone1Host", 1234
 
 namespace async_rpc {
 namespace {
+
+template <typename CommandType>
+auto sendCommandAndWaitUntilRequestIsReady(std::shared_ptr<AsyncRPCOptions<CommandType>> options,
+                                           OperationContext* opCtx,
+                                           std::unique_ptr<Targeter> targeter,
+                                           NetworkInterfaceMock* net) {
+    auto getNumReady = [net] {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        return net->getNumReadyRequests();
+    };
+    const auto numBefore = getNumReady();
+    auto future = sendCommand(options, opCtx, std::move(targeter));
+    for (auto i = 0; i < 5000; ++i) {  // Wait for at most 5 seconds
+        sleepFor(Milliseconds(1));
+        if (getNumReady() == numBefore + 1) {
+            return future;
+        }
+    }
+    iasserted(ErrorCodes::ExceededTimeLimit, "Timed out while waiting for NetworkInterfaceMock!");
+}
+
+void shutdownExecutor(TaskExecutor* executor, NetworkInterfaceMock* net) {
+    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+    executor->shutdown();
+    net->runReadyNetworkOperations();
+}
+
 /*
  * Mock a successful network response to hello command.
  */
@@ -598,8 +625,9 @@ TEST_F(AsyncRPCTestFixture, ExecutorShutdown) {
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
         getExecutorPtr(), _cancellationToken, helloCmd);
-    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
-    getExecutorPtr()->shutdown();
+    auto resultFuture = sendCommandAndWaitUntilRequestIsReady(
+        options, opCtxHolder.get(), std::move(targeter), getNetworkInterfaceMock());
+    shutdownExecutor(getExecutorPtr().get(), getNetworkInterfaceMock());
     auto error = resultFuture.getNoThrow().getStatus();
     // The error returned by our API should always be RemoteCommandExecutionError
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
@@ -1319,8 +1347,6 @@ TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
  * Tests that targeter->onRemoteCommandError is called for errors attributed to a remote
  * host.
  */
-
-/* TODO SERVER-95739: Uncomment and fix test
 TEST_F(AsyncRPCTestFixture, TargeterOnRemoteCommandError) {
     const HostAndPort testHost = HostAndPort("Host1", 1);
     const std::vector<HostAndPort> hosts{testHost};
@@ -1340,7 +1366,8 @@ TEST_F(AsyncRPCTestFixture, TargeterOnRemoteCommandError) {
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
         getExecutorPtr(), CancellationToken::uncancelable(), findCmd);
-    auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+    auto future = sendCommandAndWaitUntilRequestIsReady(
+        options, opCtxHolder.get(), std::move(targeter), getNetworkInterfaceMock());
 
     onCommand([&](const auto& request) {
         return createErrorResponse(Status(ErrorCodes::ShutdownInProgress, "test"));
@@ -1357,15 +1384,15 @@ TEST_F(AsyncRPCTestFixture, TargeterOnRemoteCommandError) {
     targeter = std::make_unique<AsyncRemoteCommandTargeterAdapter>(readPref, t);
     options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
         getExecutorPtr(), CancellationToken::uncancelable(), findCmd);
-    future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
-    getExecutorPtr()->shutdown();
+    future = sendCommandAndWaitUntilRequestIsReady(
+        options, opCtxHolder.get(), std::move(targeter), getNetworkInterfaceMock());
+    shutdownExecutor(getExecutorPtr().get(), getNetworkInterfaceMock());
     future.wait();
 
     // onRemoteCommandError not called, error not from remote host.
     downHosts = targeterMock->getAndClearMarkedDownHosts();
     ASSERT_FALSE(downHosts.find(testHost) != downHosts.end());
 }
-*/
 
 }  // namespace
 }  // namespace async_rpc

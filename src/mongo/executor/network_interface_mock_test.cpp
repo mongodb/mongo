@@ -170,7 +170,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
 
     {
         net().enterNetwork();
-        ASSERT(net().hasReadyRequests());
+        ASSERT_EQ(net().getNumReadyRequests(), 1);
         auto req = net().getNextReadyRequest();
         ASSERT_BSONOBJ_EQ(req->getRequest().cmdObj, expectedRequest.cmdObj);
         net().scheduleResponse(req, net().now(), expectedResponse);
@@ -187,7 +187,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
 
     {
         net().enterNetwork();
-        ASSERT(net().hasReadyRequests());
+        ASSERT_EQ(net().getNumReadyRequests(), 1);
         auto actualCommand = net().getNextReadyRequest();
         ASSERT_BSONOBJ_EQ(actualCommand->getRequest().cmdObj, actualCommandExpected.cmdObj);
         net().scheduleResponse(actualCommand, net().now(), actualResponseExpected);
@@ -521,6 +521,43 @@ TEST_F(NetworkInterfaceMockTest, CancelCommandAfterResponse) {
 
     ASSERT_EQ(before, after);
     ASSERT_OK(deferred.get().status);
+}
+
+TEST_F(NetworkInterfaceMockTest, TestNumReadyRequests) {
+    startNetwork();
+
+    TaskExecutor::CallbackHandle cb1{}, cb2{};
+    RemoteCommandRequest request1{kUnimportantRequest}, request2{kUnimportantRequest};
+
+    net().enterNetwork();
+    ASSERT_EQ(net().getNumReadyRequests(), 0);
+
+    auto deferred1 = net().startCommand(cb1, request1);
+    ASSERT_EQ(net().getNumReadyRequests(), 1);
+    auto deferred2 = net().startCommand(cb2, request2);
+    ASSERT_EQ(net().getNumReadyRequests(), 2);
+
+    TaskExecutor::CallbackHandle exhaustCb{};
+    RemoteCommandRequest exhaustRequest{kUnimportantRequest};
+    auto reader = net().startExhaustCommand(exhaustCb, exhaustRequest).get();
+    ASSERT_EQ(net().getNumReadyRequests(), 2);
+
+    auto deferredExhaust1 = reader->next();
+    auto deferredExhaust2 = reader->next();
+
+    ASSERT_EQ(net().getNumReadyRequests(), 4);
+
+
+    RemoteCommandResponse resp = RemoteCommandResponse::make_forTest(BSON("foo"
+                                                                          << "bar"),
+                                                                     Milliseconds(30));
+    auto req = net().getNextReadyRequest();
+    net().scheduleResponse(req, net().now(), resp);
+    net().runReadyNetworkOperations();
+
+    ASSERT_EQ(net().getNumReadyRequests(), 3);
+
+    net().exitNetwork();
 }
 
 TEST_F(NetworkInterfaceMockTest, InShutdown) {
