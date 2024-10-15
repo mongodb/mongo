@@ -1074,7 +1074,7 @@ BSONObj toBSON(BSONType type, ConstDataRange cdr) {
 
     builder.appendNum(static_cast<uint32_t>(docLength));
     builder.appendChar(static_cast<uint8_t>(type));
-    builder.appendStr(valueString, true);
+    builder.appendCStr(valueString);
     builder.appendBuf(cdr.data(), cdr.length());
     builder.appendChar('\0');
 

@@ -301,7 +301,7 @@ BSONObj EncryptedDBClientBase::validateBSONElement(ConstDataRange out, uint8_t b
 
         builder.appendNum(static_cast<uint32_t>(docLength));
         builder.appendChar(static_cast<uint8_t>(bsonType));
-        builder.appendStr(valueString, true);
+        builder.appendCStr(valueString);
         builder.appendBuf(out.data(), out.length());
         builder.appendChar('\0');
 
@@ -471,7 +471,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
         }
 
         plaintextBuilder.appendNum(static_cast<uint32_t>(valueStr.size() + 1));
-        plaintextBuilder.appendStr(valueStr, true);
+        plaintextBuilder.appendStrBytesAndNul(valueStr);
         bsonType = BSONType::String;
 
     } else if (args.get(1).isNumber()) {

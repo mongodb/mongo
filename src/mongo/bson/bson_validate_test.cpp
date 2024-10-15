@@ -51,9 +51,9 @@ using std::unique_ptr;
 void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
     // like a BSONObj string, but without a NUL terminator.
     bb->appendChar(String);
-    bb->appendStr(fieldName, /*withNUL*/ true);
+    bb->appendCStr(fieldName);
     bb->appendNum(4);
-    bb->appendStr("asdf", /*withNUL*/ false);
+    bb->appendStrBytes("asdf");  // Missing required final NUL.
 }
 
 TEST(BSONValidate, Basic) {
@@ -368,7 +368,7 @@ TEST(BSONValidateFast, StringHasSomething) {
     BufBuilder bb;
     BSONObjBuilder ob(bb);
     bb.appendChar(String);
-    bb.appendStr("x", /*withNUL*/ true);
+    bb.appendCStr("x");
     bb.appendNum(0);
     const BSONObj x = ob.done();
     ASSERT_EQUALS(5        // overhead

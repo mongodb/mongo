@@ -117,7 +117,7 @@ void ValueStorage::putString(StringData s) {
     if (sizeNoNUL <= sizeof(shortStrStorage)) {
         shortStr = true;
         shortStrSize = s.size();
-        s.copyTo(shortStrStorage, false);  // no NUL
+        s.copy(shortStrStorage, s.size());
 
         // All memory is zeroed before this is called, so we know that
         // the nulTerminator field will definitely contain a NUL byte.
@@ -148,8 +148,9 @@ void ValueStorage::putRegEx(const BSONRegEx& re) {
 
     // Need to copy since putString doesn't support scatter-gather.
     std::unique_ptr<char[]> buf(new char[totalLen]);
-    re.pattern.copyTo(buf.get(), true);
-    re.flags.copyTo(buf.get() + patternLen + 1, false);  // no NUL
+    auto dest = buf.get();
+    dest = str::copyAsCString(dest, re.pattern);
+    re.flags.copy(dest, re.flags.size());  // NUL added automatically by putString()
     putString(StringData(buf.get(), totalLen));
 }
 
@@ -1310,7 +1311,7 @@ void Value::serializeForSorter(BufBuilder& buf) const {
         case Code: {
             StringData str = getRawData();
             buf.appendNum(int(str.size()));
-            buf.appendStr(str, /*NUL byte*/ false);
+            buf.appendStrBytes(str);
             break;
         }
 
@@ -1318,13 +1319,13 @@ void Value::serializeForSorter(BufBuilder& buf) const {
             StringData str = getRawData();
             buf.appendChar(_storage.binDataType());
             buf.appendNum(int(str.size()));
-            buf.appendStr(str, /*NUL byte*/ false);
+            buf.appendStrBytes(str);
             break;
         }
 
         case RegEx:
-            buf.appendStr(getRegex(), /*NUL byte*/ true);
-            buf.appendStr(getRegexFlags(), /*NUL byte*/ true);
+            buf.appendCStr(getRegex());
+            buf.appendCStr(getRegexFlags());
             break;
 
         case Object:
@@ -1333,13 +1334,13 @@ void Value::serializeForSorter(BufBuilder& buf) const {
 
         case DBRef:
             buf.appendStruct(_storage.getDBRef()->oid);
-            buf.appendStr(_storage.getDBRef()->ns, /*NUL byte*/ true);
+            buf.appendCStr(_storage.getDBRef()->ns);
             break;
 
         case CodeWScope: {
             intrusive_ptr<const RCCodeWScope> cws = _storage.getCodeWScope();
             buf.appendNum(int(cws->code.size()));
-            buf.appendStr(cws->code, /*NUL byte*/ false);
+            buf.appendStrBytes(cws->code);
             cws->scope.serializeForSorter(buf);
             break;
         }

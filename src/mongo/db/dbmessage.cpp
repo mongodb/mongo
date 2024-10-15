@@ -148,7 +148,7 @@ Message makeUnsupportedOpInsertMessage(StringData ns,
             reservedFlags |= InsertOption_ContinueOnError;
 
         b.appendNum(reservedFlags);
-        b.appendStr(ns);
+        b.appendCStr(ns);
 
         for (size_t i = 0; i < count; i++) {
             objs[i].appendSelfToBufBuilder(b);

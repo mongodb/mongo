@@ -80,7 +80,7 @@ protected:
 
     template <typename... Rest>
     void append(StringData arg, Rest&&... rest) {
-        buffer.appendStr(arg, /* null terminate*/ true);
+        buffer.appendCStr(arg);
         append(rest...);
     }
 

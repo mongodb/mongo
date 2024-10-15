@@ -57,6 +57,7 @@
 #include "mongo/util/itoa.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/shared_buffer_fragment.h"
+#include "mongo/util/str_basic.h"
 
 namespace mongo {
 
@@ -402,9 +403,36 @@ public:
         appendBuf(&s, sizeof(T));
     }
 
-    void appendStr(StringData str, bool includeEndingNull = true) {
-        const size_t len = str.size() + (includeEndingNull ? 1 : 0);
-        str.copyTo(grow(len), includeEndingNull);
+    /**
+     * Appends the raw bytes of str with no NUL terminator.
+     */
+    void appendStrBytes(StringData str) {
+        str.copy(grow(str.size()), str.size());
+    }
+
+    /**
+     * Appends the raw bytes of str followed by a final NUL byte.
+     *
+     * WARNING: only use this method for formats with explicit string lengths where the NUL byte is
+     * not used to find the end. This method does not check for embedded NUL bytes, so they can
+     * trick a parser into thinking the string has ended. Use appendCStr() instead for that use
+     * case.
+     */
+    void appendStrBytesAndNul(StringData str) {
+        auto dest = grow(str.size() + 1);
+        dest += str.copy(dest, str.size());
+        *dest = '\0';
+    }
+
+    /**
+     * Appends the raw bytes of str followed by a final NUL byte, throwing if str already has an
+     * embedded NUL byte.
+     *
+     * This method is intended to pair with BufReader::readCStr() on the parse side.
+     */
+    void appendCStr(StringData str) {
+        str::uassertNoEmbeddedNulBytes(str);
+        appendStrBytesAndNul(str);
     }
 
     /** Returns the length of data in the current buffer */
@@ -751,7 +779,7 @@ public:
     }
 
     void append(StringData str) {
-        str.copyTo(_buf.grow(str.size()), false);
+        _buf.appendStrBytes(str);
     }
 
     void reset(int maxSize = 0) {
