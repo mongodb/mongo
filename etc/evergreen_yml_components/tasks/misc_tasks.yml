@@ -427,26 +427,6 @@ tasks:
           args:
             - "./src/evergreen/todos_check.sh"
 
-  - name: daily_task_scanner
-    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
-    commands:
-      - func: "f_expansions_write"
-      - command: manifest.load
-      - func: "git get project and add git tag"
-      - func: "f_expansions_write"
-      - func: "kill processes"
-      - func: "cleanup environment"
-      - func: "set up venv"
-      - func: "upload pip requirements"
-      - func: "configure evergreen api credentials"
-      - command: subprocess.exec
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/run_python_script.sh"
-            - "buildscripts/daily_task_scan.py"
-            - "-f=task_errors.txt"
-
   - name: determine_patch_tests
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
