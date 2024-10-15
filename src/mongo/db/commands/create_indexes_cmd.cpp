@@ -135,9 +135,6 @@ MONGO_FAIL_POINT_DEFINE(skipTTLIndexValidationOnCreateIndex);
 constexpr auto kCommandName = "createIndexes"_sd;
 constexpr auto kAllIndexesAlreadyExist = "all indexes already exist"_sd;
 constexpr auto kIndexAlreadyExists = "index already exists"_sd;
-constexpr auto kCsiPreviewWarning =
-    "This command requests creation of a columnstore index. Columnstore indexes "
-    "are a preview feature and are not recommended for production use"_sd;
 
 /**
  * Appends 'message' to the 'note' component of the response.
@@ -254,21 +251,6 @@ void checkEncryptedFieldIndexRestrictions(OperationContext* opCtx,
                     str::stream() << "Index not allowed on, or a prefix of, the encrypted field "
                                   << match->encryptedField.dottedField(),
                     !match);
-        }
-    }
-}
-
-/**
- * Checks whether the command attempts to create a columnstore index, and if so, adds a "note" to
- * the response indicating that columnstore indexes are a preview feature.
- */
-void addNoteForColumnstoreIndexPreview(const CreateIndexesCommand& cmd,
-                                       CreateIndexesReply* outReply) {
-    for (const auto& indexSpec : cmd.getIndexes()) {
-        const auto keyPattern = indexSpec[IndexDescriptor::kKeyPatternFieldName].Obj();
-        if (IndexNames::findPluginName(keyPattern) == IndexNames::COLUMN) {
-            appendMessageToNoteField(outReply, kCsiPreviewWarning);
-            return;
         }
     }
 }
@@ -534,7 +516,6 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                 LockMode::MODE_IX);
 
             checkEncryptedFieldIndexRestrictions(opCtx, collection.getCollectionPtr().get(), cmd);
-            addNoteForColumnstoreIndexPreview(cmd, &reply);
 
             uassert(ErrorCodes::NotWritablePrimary,
                     str::stream() << "Not primary while creating indexes in "

@@ -49,6 +49,7 @@ const string IndexNames::TEXT = "text";
 const string IndexNames::HASHED = "hashed";
 const string IndexNames::BTREE = "";
 const string IndexNames::WILDCARD = "wildcard";
+// We no longer support column store indexes. We use this value to reject creating them.
 const string IndexNames::COLUMN = "columnstore";
 const string IndexNames::ENCRYPTED_RANGE = "queryable_encrypted_range";
 // We no longer support geo haystack indexes. We use this value to reject creating them.

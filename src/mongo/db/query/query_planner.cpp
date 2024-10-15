@@ -258,14 +258,6 @@ std::pair<DepsTracker /* filter */, DepsTracker /* other */> computeDeps(
     return {std::move(filterDeps), std::move(outputDeps)};
 }
 
-bool checkProjectionCoversQuery(OrderedPathSet& fields, const ColumnIndexEntry& columnStoreIndex) {
-    const auto projectedFields = projection_executor_utils::applyProjectionToFields(
-        columnStoreIndex.indexPathProjection->exec(), fields);
-    // If the number of fields is equal to the number of fields preserved, then the projection
-    // covers the query.
-    return projectedFields.size() == fields.size();
-}
-
 bool isSolutionBoundedCollscan(const QuerySolution* querySoln) {
     auto [node, count] = querySoln->getFirstNodeByType(StageType::STAGE_COLLSCAN);
     if (node) {

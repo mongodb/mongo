@@ -15,12 +15,6 @@ filters:
   - "*key_generator*":
     approvers:
       - 10gen/query-execution
-  - "*column_cell*":
-    approvers:
-      - 10gen/query-execution
-  - "*column_store*":
-    approvers:
-      - 10gen/query-execution
   - "expression_keys*":
     approvers:
       - 10gen/query-execution

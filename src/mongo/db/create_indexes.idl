@@ -165,14 +165,6 @@ structs:
                 type: object_owned
                 optional: true
                 stability: stable
-            columnstoreProjection:
-                type: object_owned
-                optional: true
-                stability: unstable
-            columnstoreCompressor:
-                type: string
-                optional: true
-                stability: unstable
             coarsestIndexedLevel:
                 type: safeInt
                 optional: true

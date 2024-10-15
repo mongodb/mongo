@@ -22,8 +22,6 @@ selector:
     - requires_auth
     # Sharding commands are not tenant aware.
     - requires_sharding
-    # Columnstore indexes are under development and cannot be used without enabling the feature flag
-    - featureFlagColumnstoreIndexes
   exclude_files:
     # The "exhaust" function does not use runCommand (required by the simulate_mongoq.js override).
     - jstests/core/**/query/exhaust.js

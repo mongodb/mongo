@@ -52,7 +52,6 @@
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index/wildcard_key_generator.h"
@@ -74,14 +73,11 @@ namespace mongo {
 namespace {
 
 /**
- * Returns wildcardProjection or columnstoreProjection projection
+ * Returns wildcardProjection projection
  */
 BSONObj createPathProjection(const BSONObj& infoObj) {
     if (const auto wildcardProjection = infoObj[IndexDescriptor::kWildcardProjectionFieldName]) {
         return wildcardProjection.Obj().getOwned();
-    } else if (const auto columnStoreProjection =
-                   infoObj[IndexDescriptor::kColumnStoreProjectionFieldName]) {
-        return columnStoreProjection.Obj().getOwned();
     } else {
         return BSONObj();
     }
@@ -97,21 +93,19 @@ std::map<StringData, BSONElement> populateOptionsMapForEqualityCheck(const BSONO
 
     // These index options are not considered for equality.
     static const StringDataSet kIndexOptionsNotConsideredForEqualityCheck{
-        IndexDescriptor::kKeyPatternFieldName,             // checked specially
-        IndexDescriptor::kNamespaceFieldName,              // removed in 4.4
-        IndexDescriptor::kIndexNameFieldName,              // checked separately
-        IndexDescriptor::kIndexVersionFieldName,           // not considered for equivalence
-        IndexDescriptor::kTextVersionFieldName,            // same as index version
-        IndexDescriptor::k2dsphereVersionFieldName,        // same as index version
-        IndexDescriptor::kBackgroundFieldName,             // this is a creation time option only
-        IndexDescriptor::kDropDuplicatesFieldName,         // this is now ignored
-        IndexDescriptor::kCollationFieldName,              // checked specially
-        IndexDescriptor::kPartialFilterExprFieldName,      // checked specially
-        IndexDescriptor::kUniqueFieldName,                 // checked specially
-        IndexDescriptor::kSparseFieldName,                 // checked specially
-        IndexDescriptor::kWildcardProjectionFieldName,     // checked specially
-        IndexDescriptor::kColumnStoreProjectionFieldName,  // checked specially
-        IndexDescriptor::kColumnStoreCompressorFieldName,  // not considered for equivalence
+        IndexDescriptor::kKeyPatternFieldName,          // checked specially
+        IndexDescriptor::kNamespaceFieldName,           // removed in 4.4
+        IndexDescriptor::kIndexNameFieldName,           // checked separately
+        IndexDescriptor::kIndexVersionFieldName,        // not considered for equivalence
+        IndexDescriptor::kTextVersionFieldName,         // same as index version
+        IndexDescriptor::k2dsphereVersionFieldName,     // same as index version
+        IndexDescriptor::kBackgroundFieldName,          // this is a creation time option only
+        IndexDescriptor::kDropDuplicatesFieldName,      // this is now ignored
+        IndexDescriptor::kCollationFieldName,           // checked specially
+        IndexDescriptor::kPartialFilterExprFieldName,   // checked specially
+        IndexDescriptor::kUniqueFieldName,              // checked specially
+        IndexDescriptor::kSparseFieldName,              // checked specially
+        IndexDescriptor::kWildcardProjectionFieldName,  // checked specially
     };
 
     BSONObjIterator it(spec);
@@ -146,7 +140,6 @@ constexpr StringData IndexDescriptor::kLanguageOverrideFieldName;
 constexpr StringData IndexDescriptor::kNamespaceFieldName;
 constexpr StringData IndexDescriptor::kPartialFilterExprFieldName;
 constexpr StringData IndexDescriptor::kWildcardProjectionFieldName;
-constexpr StringData IndexDescriptor::kColumnStoreProjectionFieldName;
 constexpr StringData IndexDescriptor::kSparseFieldName;
 constexpr StringData IndexDescriptor::kStorageEngineFieldName;
 constexpr StringData IndexDescriptor::kTextVersionFieldName;
@@ -154,7 +147,6 @@ constexpr StringData IndexDescriptor::kUniqueFieldName;
 constexpr StringData IndexDescriptor::kHiddenFieldName;
 constexpr StringData IndexDescriptor::kWeightsFieldName;
 constexpr StringData IndexDescriptor::kPrepareUniqueFieldName;
-constexpr StringData IndexDescriptor::kColumnStoreCompressorFieldName;
 
 /**
  * Constructs an IndexDescriptor object. Arguments:
@@ -199,30 +191,16 @@ IndexDescriptor::SharedState::SharedState(const std::string& accessMethodName, B
         _prepareUnique = prepareUniqueElement.trueValue();
     }
 
-    if (BSONElement compressor = _infoObj[kColumnStoreCompressorFieldName]) {
-        invariant(compressor.type() == BSONType::String);
-        _compressor = compressor.valueStringData().toString();
-    } else {
-        _compressor = boost::none;
-    }
 
-    // If there is a wildcardProjection or columnstoreProjection, compute and store the normalized
+    _compressor = boost::none;
+
+    // If there is a wildcardProjection, compute and store the normalized
     // version in '_normalizedProjection'.
     BSONElement wildcardProjection = infoObj[IndexDescriptor::kWildcardProjectionFieldName];
-    BSONElement columnStoreProjection = infoObj[IndexDescriptor::kColumnStoreProjectionFieldName];
-    tassert(6744600,
-            "Can't enable both wildcardProjection and columnstoreProjection",
-            !(wildcardProjection && columnStoreProjection));
     if (wildcardProjection) {
         IndexPathProjection indexPathProjection =
             static_cast<IndexPathProjection>(WildcardKeyGenerator::createProjectionExecutor(
                 BSON("$**" << 1), wildcardProjection.Obj()));
-        _normalizedProjection =
-            indexPathProjection.exec()->serializeTransformation(boost::none).toBson();
-    } else if (columnStoreProjection) {
-        IndexPathProjection indexPathProjection = static_cast<IndexPathProjection>(
-            column_keygen::ColumnKeyGenerator::createProjectionExecutor(
-                BSON("$**" << IndexNames::COLUMN), columnStoreProjection.Obj()));
         _normalizedProjection =
             indexPathProjection.exec()->serializeTransformation(boost::none).toBson();
     }
@@ -253,7 +231,7 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
         return Comparison::kDifferent;
     }
 
-    // If the candidate has a wildcardProjection or columnstoreProjection, we must compare the
+    // If the candidate has a wildcardProjection, we must compare the
     // normalized versions, not the versions from the catalog which are kept as the user gave them
     // and thus may be semantically identical to but syntactically different from the normalized
     // form. There are no other types of index projections. Thus, if there is no projection, both

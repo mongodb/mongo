@@ -48,7 +48,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/backup_block.h"
-#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
@@ -110,22 +109,6 @@ public:
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc) override;
-
-    Status createColumnStore(OperationContext* opCtx,
-                             const NamespaceString& ns,
-                             const CollectionOptions& collOptions,
-                             StringData ident,
-                             const IndexDescriptor* desc) override {
-        return Status(ErrorCodes::NotImplemented, "createColumnStore()");
-    }
-
-    std::unique_ptr<ColumnStore> getColumnStore(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const CollectionOptions& collOptions,
-                                                StringData ident,
-                                                const IndexDescriptor*) override {
-        uasserted(ErrorCodes::NotImplemented, "getColumnStore()");
-    }
 
     Status dropIdent(RecoveryUnit* ru,
                      StringData ident,

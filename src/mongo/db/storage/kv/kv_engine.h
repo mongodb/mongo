@@ -38,7 +38,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/import_options.h"
-#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -111,11 +110,6 @@ public:
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc) = 0;
-    virtual std::unique_ptr<ColumnStore> getColumnStore(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        const CollectionOptions& collOptions,
-                                                        StringData ident,
-                                                        const IndexDescriptor*) = 0;
 
     /**
      * The create and drop methods on KVEngine are not transactional. Transactional semantics
@@ -203,11 +197,6 @@ public:
                                              const CollectionOptions& collOptions,
                                              StringData ident,
                                              const IndexDescriptor* desc) = 0;
-    virtual Status createColumnStore(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     const CollectionOptions& collOptions,
-                                     StringData ident,
-                                     const IndexDescriptor* desc) = 0;
 
     /**
      * Similar to createSortedDataInterface but this imports from an existing table with the

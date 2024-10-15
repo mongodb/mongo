@@ -51,7 +51,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
@@ -154,15 +153,10 @@ void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
                                                  const IndexAccessMethod* accessMethod,
                                                  UpdateIndexData* outData) {
     const IndexDescriptor* descriptor = entry->descriptor();
-    if (bool isWildcard = (descriptor->getAccessMethodName() == IndexNames::WILDCARD);
-        isWildcard || descriptor->getAccessMethodName() == IndexNames::COLUMN) {
+    if (descriptor->getAccessMethodName() == IndexNames::WILDCARD) {
         // Obtain the projection used by the $** index's key generator.
-        const auto* pathProj = isWildcard
-            ? static_cast<const IndexPathProjection*>(
-                  static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection())
-            : static_cast<const IndexPathProjection*>(
-                  static_cast<const ColumnStoreAccessMethod*>(accessMethod)
-                      ->getColumnstoreProjection());
+        const auto* pathProj = static_cast<const IndexPathProjection*>(
+            static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection());
         // If the projection is an exclusion, then we must check the new document's keys on all
         // updates, since we do not exhaustively know the set of paths to be indexed.
         if (pathProj->exec()->getType() ==
@@ -178,14 +172,12 @@ void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
             }
 
             // Handle regular index fields of Compound Wildcard Index.
-            if (isWildcard) {
-                BSONObj key = descriptor->keyPattern();
-                BSONObjIterator j(key);
-                while (j.more()) {
-                    StringData fieldName(j.next().fieldName());
-                    if (!fieldName.endsWith("$**"_sd)) {
-                        outData->addPath(FieldRef{fieldName});
-                    }
+            BSONObj key = descriptor->keyPattern();
+            BSONObjIterator j(key);
+            while (j.more()) {
+                StringData fieldName(j.next().fieldName());
+                if (!fieldName.endsWith("$**"_sd)) {
+                    outData->addPath(FieldRef{fieldName});
                 }
             }
         }

@@ -41,36 +41,11 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "column_store_index",
-    srcs = [
-        "column_cell.cpp",
-        "column_store_sorter.cpp",
-    ],
-    hdrs = [
-        "column_cell.h",
-        "column_key_generator.h",
-        "column_store_sorter.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/sorter:sorter_base",
-        "//src/mongo/db/sorter:sorter_stats",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:encryption_hooks",
-        "//src/mongo/db/storage:execution_context",
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/third_party/snappy",
-    ],
-)
-
-mongo_cc_library(
     name = "index_access_method",
     srcs = [
         "2d_access_method.cpp",
         "btree_access_method.cpp",
         "btree_key_generator.cpp",
-        "column_key_generator.cpp",
-        "columns_access_method.cpp",
         "duplicate_key_tracker.cpp",
         "expression_keys_private.cpp",
         "fts_access_method.cpp",
@@ -94,8 +69,6 @@ mongo_cc_library(
         "btree_access_method.h",
         "btree_key_generator.h",
         "bulk_builder_common.h",
-        "column_key_generator.h",
-        "columns_access_method.h",
         "duplicate_key_tracker.h",
         "expression_keys_private.h",
         "fts_access_method.h",
@@ -114,7 +87,6 @@ mongo_cc_library(
         "wildcard_validation.h",
     ],
     deps = [
-        ":column_store_index",
         ":expression_params",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:multi_key_path_tracker",  # TODO(SERVER-93876): Remove.

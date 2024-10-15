@@ -57,7 +57,6 @@
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_impl.h"
-#include "mongo/db/catalog/column_index_consistency.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/throttle_cursor.h"
@@ -1044,18 +1043,10 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     }
 }
 
-bool isColumnStoreIndex(const IndexCatalogEntry* index) {
-    return index->descriptor()->getAccessMethodName() == IndexNames::COLUMN;
-}
-
 void ValidateAdaptor::validateIndexKeyCount(OperationContext* opCtx,
                                             const IndexCatalogEntry* index,
                                             IndexValidateResults& results) {
-    if (isColumnStoreIndex(index)) {
-        _columnIndexConsistency.validateIndexKeyCount(opCtx, index, &_numRecords, results);
-    } else {
-        _keyBasedIndexConsistency.validateIndexKeyCount(opCtx, index, &_numRecords, results);
-    }
+    _keyBasedIndexConsistency.validateIndexKeyCount(opCtx, index, &_numRecords, results);
 }
 
 void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
@@ -1067,22 +1058,13 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     if (!_progress.get(WithLock::withoutLock())->isActive()) {
         const char* curopMessage = "Validate: scanning index entries";
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        _progress.set(
-            lk,
-            CurOp::get(opCtx)->setProgress(lk,
-                                           curopMessage,
-                                           isColumnStoreIndex(index)
-                                               ? _columnIndexConsistency.getTotalIndexKeys()
-                                               : _keyBasedIndexConsistency.getTotalIndexKeys()),
-            opCtx);
+        _progress.set(lk,
+                      CurOp::get(opCtx)->setProgress(
+                          lk, curopMessage, _keyBasedIndexConsistency.getTotalIndexKeys()),
+                      opCtx);
     }
 
-    int64_t numKeys = 0;
-    if (isColumnStoreIndex(index)) {
-        numKeys += _columnIndexConsistency.traverseIndex(opCtx, index, _progress, results);
-    } else {
-        numKeys += _keyBasedIndexConsistency.traverseIndex(opCtx, index, _progress, results);
-    }
+    int64_t numKeys = _keyBasedIndexConsistency.traverseIndex(opCtx, index, _progress, results);
 
     if (numTraversedKeys) {
         *numTraversedKeys = numKeys;
@@ -1095,39 +1077,26 @@ void ValidateAdaptor::traverseRecord(OperationContext* opCtx,
                                      const RecordId& recordId,
                                      const BSONObj& record,
                                      ValidateResults* results) {
-    if (isColumnStoreIndex(index)) {
-        _columnIndexConsistency.traverseRecord(opCtx, coll, index, recordId, record, results);
-    } else {
-        _keyBasedIndexConsistency.traverseRecord(opCtx, coll, index, recordId, record, results);
-    }
+    _keyBasedIndexConsistency.traverseRecord(opCtx, coll, index, recordId, record, results);
 }
 
 void ValidateAdaptor::setSecondPhase() {
-    _columnIndexConsistency.setSecondPhase();
     _keyBasedIndexConsistency.setSecondPhase();
 }
 
 bool ValidateAdaptor::limitMemoryUsageForSecondPhase(ValidateResults* result) {
-    bool retVal = true;
-    retVal &= _columnIndexConsistency.limitMemoryUsageForSecondPhase(result);
-    retVal &= _keyBasedIndexConsistency.limitMemoryUsageForSecondPhase(result);
-    return retVal;
+    return _keyBasedIndexConsistency.limitMemoryUsageForSecondPhase(result);
 }
 
 bool ValidateAdaptor::haveEntryMismatch() const {
-    bool retVal = false;
-    retVal |= _columnIndexConsistency.haveEntryMismatch();
-    retVal |= _keyBasedIndexConsistency.haveEntryMismatch();
-    return retVal;
+    return _keyBasedIndexConsistency.haveEntryMismatch();
 }
 
 void ValidateAdaptor::repairIndexEntries(OperationContext* opCtx, ValidateResults* results) {
-    _columnIndexConsistency.repairIndexEntries(opCtx, results);
     _keyBasedIndexConsistency.repairIndexEntries(opCtx, results);
 }
 
 void ValidateAdaptor::addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results) {
-    _columnIndexConsistency.addIndexEntryErrors(opCtx, results);
     _keyBasedIndexConsistency.addIndexEntryErrors(opCtx, results);
 }
 

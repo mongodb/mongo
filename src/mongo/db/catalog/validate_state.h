@@ -52,7 +52,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_resources.h"
@@ -153,10 +152,6 @@ public:
         return _seekRecordStoreCursor;
     }
 
-    const StringMap<std::unique_ptr<ColumnStore::Cursor>>& getColumnStoreCursors() const {
-        return _columnStoreIndexCursors;
-    }
-
     RecordId getFirstRecordId() const {
         return _firstRecordId;
     }
@@ -215,7 +210,6 @@ private:
     StringMap<std::unique_ptr<SortedDataInterfaceThrottleCursor>> _indexCursors;
     std::unique_ptr<SeekableRecordThrottleCursor> _traverseRecordStoreCursor;
     std::unique_ptr<SeekableRecordThrottleCursor> _seekRecordStoreCursor;
-    StringMap<std::unique_ptr<ColumnStore::Cursor>> _columnStoreIndexCursors;
 
     RecordId _firstRecordId;
 

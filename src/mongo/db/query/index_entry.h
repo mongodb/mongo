@@ -85,7 +85,7 @@ struct CoreIndexInfo {
           indexPathProjection(indexPathProj) {
         // If a projection executor exists, we always expect a $** index
         if (indexPathProjection != nullptr)
-            invariant(type == IndexType::INDEX_WILDCARD || type == IndexType::INDEX_COLUMN);
+            invariant(type == IndexType::INDEX_WILDCARD);
     }
 
     virtual ~CoreIndexInfo() = default;
@@ -156,8 +156,7 @@ struct CoreIndexInfo {
     const CollatorInterface* collator = nullptr;
 
     // For $** indexes, a pointer to the projection executor owned by the index access method. Null
-    // unless this IndexEntry represents a wildcard or column storeindex, in which case this is
-    // always non-null.
+    // unless this IndexEntry represents a wildcard index, in which case this is always non-null.
     const IndexPathProjection* indexPathProjection = nullptr;
 };
 
@@ -278,39 +277,6 @@ struct IndexEntry : CoreIndexInfo {
     // Position of the replaced wildcard index field in the keyPattern, applied to Wildcard Indexes
     // only.
     size_t wildcardFieldPos;
-};
-
-/**
- * Represents a columnar index.
- */
-struct ColumnIndexEntry : CoreIndexInfo {
-    ColumnIndexEntry(const BSONObj& keyPattern,
-                     IndexType type,
-                     IndexDescriptor::IndexVersion version,
-                     bool sparse,
-                     bool unique,
-                     Identifier ident,
-                     const MatchExpression* filterExpression,
-                     const CollatorInterface* ci,
-                     const IndexPathProjection* columnstoreProjection)
-        : CoreIndexInfo(keyPattern,
-                        type,
-                        sparse,
-                        std::move(ident),
-                        filterExpression,
-                        ci,
-                        columnstoreProjection),
-          version(version),
-          unique(unique) {}
-
-    ColumnIndexEntry(const ColumnIndexEntry&) = default;
-    ColumnIndexEntry(ColumnIndexEntry&&) = default;
-    ColumnIndexEntry& operator=(const ColumnIndexEntry&) = default;
-    ColumnIndexEntry& operator=(ColumnIndexEntry&&) = default;
-    ~ColumnIndexEntry() override = default;
-
-    IndexDescriptor::IndexVersion version;
-    bool unique;
 };
 
 std::ostream& operator<<(std::ostream& stream, const IndexEntry::Identifier& ident);

@@ -43,7 +43,6 @@
 #include "mongo/db/catalog/validate_gen.h"
 #include "mongo/db/catalog/validate_state.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
@@ -131,18 +130,12 @@ void ValidateState::yieldCursors(OperationContext* opCtx) {
     for (const auto& indexCursor : _indexCursors) {
         indexCursor.second->save();
     }
-    for (const auto& indexCursor : _columnStoreIndexCursors) {
-        indexCursor.second->save();
-    }
 
     _traverseRecordStoreCursor->save();
     _seekRecordStoreCursor->save();
 
     // Restore all the cursors.
     for (const auto& indexCursor : _indexCursors) {
-        indexCursor.second->restore();
-    }
-    for (const auto& indexCursor : _columnStoreIndexCursors) {
         indexCursor.second->restore();
     }
 
@@ -255,19 +248,10 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     while (it->more()) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* desc = entry->descriptor();
-
-        if (entry->descriptor()->getAccessMethodName() == IndexNames::COLUMN) {
-            const auto iam = entry->accessMethod();
-            auto indexCursor =
-                static_cast<ColumnStoreAccessMethod*>(iam)->storage()->newCursor(opCtx);
-            _columnStoreIndexCursors.emplace(desc->indexName(), std::move(indexCursor));
-        } else {
-            const auto iam = entry->accessMethod()->asSortedData();
-            auto indexCursor =
-                std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle);
-            _indexCursors.emplace(desc->indexName(), std::move(indexCursor));
-        }
-
+        const auto iam = entry->accessMethod()->asSortedData();
+        auto indexCursor =
+            std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle);
+        _indexCursors.emplace(desc->indexName(), std::move(indexCursor));
         _indexIdents.push_back(desc->getEntry()->getIdent());
     }
 

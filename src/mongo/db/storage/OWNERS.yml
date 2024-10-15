@@ -7,9 +7,6 @@ filters:
   - "named_pipe*":
     approvers:
       - 10gen/query-integration-staff-leads
-  - "column_store*":
-    approvers:
-      - 10gen/query-integration-staff-leads
   - "durable_catalog*":
     approvers:
       - 10gen/server-catalog-and-routing

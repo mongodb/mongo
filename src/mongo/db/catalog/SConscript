@@ -44,7 +44,6 @@ env.Library(
     target="catalog_impl",
     source=[
         "collection_impl.cpp",
-        "column_index_consistency.cpp",
         "database_holder_impl.cpp",
         "database_impl.cpp",
         "index_catalog_entry_impl.cpp",
@@ -57,7 +56,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/collection_index_usage_tracker",
         "$BUILD_DIR/mongo/db/commands/server_status_core",
         "$BUILD_DIR/mongo/db/dbcommands_idl",
-        "$BUILD_DIR/mongo/db/index/column_store_index",
         "$BUILD_DIR/mongo/db/index/index_access_method",
         "$BUILD_DIR/mongo/db/multitenancy",
         "$BUILD_DIR/mongo/db/op_observer/op_observer",

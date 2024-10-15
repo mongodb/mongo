@@ -1,6 +1,6 @@
 /**
  * Ensure the indexes excluded from API version 1 cannot be used for query planning with
- * "APIStrict: true". Currently, "geoHaystack", "text", "columnstore", and sparse indexes are
+ * "APIStrict: true". Currently, "geoHaystack", "text", and sparse indexes are
  * excluded from API version 1. Note "geoHaystack" index has been deprecated after 4.9.
  *
  * @tags: [

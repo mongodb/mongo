@@ -49,7 +49,6 @@ static const std::string k2d = "2d";
 static const std::string k2dSphere = "2dsphere";
 static const std::string k2dSphereBucket = "2dsphere_bucket";
 static const std::string kCollation = "collation";
-static const std::string kColumn = "columnstore";
 static const std::string kCompound = "compound";
 static const std::string kHashed = "hashed";
 static const std::string kId = "id";
@@ -174,7 +173,6 @@ void AggregatedIndexUsageTracker::forEachFeature(OnFeatureFn&& onFeature) const 
     onFeature(k2dSphere, _indexTypeStats[INDEX_2DSPHERE]);
     onFeature(k2dSphereBucket, _indexTypeStats[INDEX_2DSPHERE_BUCKET]);
     onFeature(kCollation, _featureStats[static_cast<size_t>(FeatureStatType::kCollation)]);
-    onFeature(kColumn, _indexTypeStats[INDEX_COLUMN]);
     onFeature(kCompound, _featureStats[static_cast<size_t>(FeatureStatType::kCompound)]);
     onFeature(kHashed, _indexTypeStats[INDEX_HASHED]);
     onFeature(kId, _featureStats[static_cast<size_t>(FeatureStatType::kId)]);

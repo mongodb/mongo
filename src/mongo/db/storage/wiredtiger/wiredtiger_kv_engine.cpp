@@ -90,7 +90,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_column_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
@@ -1731,41 +1730,6 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
                                                      keyFormat,
                                                      desc,
                                                      WiredTigerUtil::useTableLogging(nss));
-}
-
-Status WiredTigerKVEngine::createColumnStore(OperationContext* opCtx,
-                                             const NamespaceString& ns,
-                                             const CollectionOptions& collOptions,
-                                             StringData ident,
-                                             const IndexDescriptor* desc) {
-    _ensureIdentPath(ident);
-    invariant(desc->getIndexType() == IndexType::INDEX_COLUMN);
-
-    StatusWith<std::string> result = WiredTigerColumnStore::generateCreateString(
-        _canonicalName, ns, *desc, WiredTigerUtil::useTableLogging(ns));
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-
-    std::string config = std::move(result.getValue());
-
-    LOGV2_DEBUG(6738400,
-                2,
-                "WiredTigerKVEngine::createColumnStore",
-                "collection_uuid"_attr = collOptions.uuid,
-                "ident"_attr = ident,
-                "config"_attr = config);
-    return WiredTigerColumnStore::create(opCtx, _uri(ident), config);
-}
-
-std::unique_ptr<ColumnStore> WiredTigerKVEngine::getColumnStore(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const CollectionOptions& collOptions,
-    StringData ident,
-    const IndexDescriptor* descriptor) {
-    return std::make_unique<WiredTigerColumnStore>(
-        opCtx, _uri(ident), ident, descriptor, WiredTigerUtil::useTableLogging(nss));
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(OperationContext* opCtx,

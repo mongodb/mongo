@@ -98,7 +98,6 @@ public:
     static constexpr StringData kNamespaceFieldName = "ns"_sd;  // Removed in 4.4
     static constexpr StringData kPartialFilterExprFieldName = "partialFilterExpression"_sd;
     static constexpr StringData kWildcardProjectionFieldName = "wildcardProjection"_sd;
-    static constexpr StringData kColumnStoreProjectionFieldName = "columnstoreProjection"_sd;
     static constexpr StringData kSparseFieldName = "sparse"_sd;
     static constexpr StringData kStorageEngineFieldName = "storageEngine"_sd;
     static constexpr StringData kTextVersionFieldName = "textIndexVersion"_sd;
@@ -107,7 +106,6 @@ public:
     static constexpr StringData kOriginalSpecFieldName = "originalSpec"_sd;
     static constexpr StringData kPrepareUniqueFieldName = "prepareUnique"_sd;
     static constexpr StringData kClusteredFieldName = "clustered"_sd;
-    static constexpr StringData kColumnStoreCompressorFieldName = "columnstoreCompressor"_sd;
 
     /**
      * infoObj is a copy of the index-describing BSONObj contained in the catalog.
@@ -139,13 +137,11 @@ public:
 
     /**
      * Return the path projection spec, if one exists. This is only applicable for wildcard ('$**')
-     * and columnstore indexes. It is kept as originally specified by the createIndex() call, not
-     * normalized.
+     * indexes. It is kept as originally specified by the createIndex() call, not normalized.
      *
      * It contains only the projection object that was contained in one of the fields listed below
      * from the original createIndex() parameters object, but it does NOT preserve the field name:
      *   - "wildcardProjection"    (IndexDescriptor::kWildcardProjectionFieldName)
-     *   - "columnstoreProjection" (IndexDescriptor::kColumnStoreProjectionFieldName)
      *
      * This is set by the IndexDescriptor constructor and never changes after that.
      *
@@ -158,7 +154,7 @@ public:
 
     /**
      * Returns the normalized path projection spec, if one exists. This is only applicable for
-     * wildcard ('$**') and columnstore indexes. It is the normalized version of the path projection
+     * wildcard ('$**') indexes. It is the normalized version of the path projection
      * and is used to determine whether a new index candidate from createIndex() duplicates an
      * existing index.
      *
@@ -166,7 +162,6 @@ public:
      * in one of the fields listed below from the original createIndex() parameters object, but it
      * does NOT preserve the field name:
      *   - "wildcardProjection"    (IndexDescriptor::kWildcardProjectionFieldName)
-     *   - "columnstoreProjection" (IndexDescriptor::kColumnStoreProjectionFieldName)
      *
      * This is set by the IndexDescriptor constructor and never changes after that.
      *
@@ -361,9 +356,8 @@ private:
 
         int64_t _numFields;  // How many fields are indexed?
         BSONObj _keyPattern;
-        BSONObj _projection;  // for wildcardProjection / columnstoreProjection; never changes
-        BSONObj
-            _normalizedProjection;  // for wildcardProjection / columnstoreProjection; never changes
+        BSONObj _projection;            // for wildcardProjection; never changes
+        BSONObj _normalizedProjection;  // for wildcardProjection; never changes
         std::string _indexName;
         bool _isIdIndex;
         bool _isHashedIdIndex;

@@ -43,7 +43,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
@@ -87,22 +86,6 @@ public:
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc) override {
-        return nullptr;
-    }
-
-    Status createColumnStore(OperationContext* opCtx,
-                             const NamespaceString& ns,
-                             const CollectionOptions& collOptions,
-                             StringData ident,
-                             const IndexDescriptor* desc) override {
-        MONGO_UNREACHABLE;
-    }
-
-    std::unique_ptr<ColumnStore> getColumnStore(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const CollectionOptions& collOptions,
-                                                StringData ident,
-                                                const IndexDescriptor*) override {
         return nullptr;
     }
 

@@ -622,9 +622,7 @@ Status DurableCatalog::createIndex(OperationContext* opCtx,
     std::string ident = getIndexIdent(opCtx, catalogId, spec->indexName());
 
     auto kvEngine = _engine->getEngine();
-    Status status = spec->getIndexType() == INDEX_COLUMN
-        ? kvEngine->createColumnStore(opCtx, nss, collOptions, ident, spec)
-        : kvEngine->createSortedDataInterface(opCtx, nss, collOptions, ident, spec);
+    Status status = kvEngine->createSortedDataInterface(opCtx, nss, collOptions, ident, spec);
     if (status.isOK()) {
         shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [this, ident, recoveryUnit = shard_role_details::getRecoveryUnit(opCtx)](

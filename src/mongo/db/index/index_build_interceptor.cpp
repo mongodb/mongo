@@ -555,47 +555,6 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     return _finishSideWrite(opCtx, indexCatalogEntry, std::move(toInsert));
 }
 
-Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
-                                        const IndexCatalogEntry* indexCatalogEntry,
-                                        const std::vector<column_keygen::CellPatch>& keys,
-                                        int64_t* const numKeysWrittenOut,
-                                        int64_t* const numKeysDeletedOut) {
-    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-
-    int64_t numKeysWritten = 0;
-    int64_t numKeysDeleted = 0;
-
-    std::vector<BSONObj> toInsert;
-    toInsert.reserve(keys.size());
-    for (const auto& patch : keys) {
-
-        BSONObjBuilder builder;
-        patch.recordId.serializeToken("rid", &builder);
-        builder.append("op", [&] {
-            switch (patch.diffAction) {
-                case column_keygen::ColumnKeyGenerator::kInsert:
-                    numKeysWritten++;
-                    return "i";
-                case column_keygen::ColumnKeyGenerator::kDelete:
-                    numKeysDeleted++;
-                    return "d";
-                case column_keygen::ColumnKeyGenerator::kUpdate:
-                    numKeysWritten++;
-                    return "u";
-            }
-            MONGO_UNREACHABLE;
-        }());
-        builder.append("path", patch.path);
-        builder.append("cell", patch.contents);
-
-        toInsert.push_back(builder.obj());
-    }
-
-    *numKeysWrittenOut = numKeysWritten;
-    *numKeysDeletedOut = numKeysDeleted;
-
-    return _finishSideWrite(opCtx, indexCatalogEntry, std::move(toInsert));
-}
 
 Status IndexBuildInterceptor::retrySkippedRecords(OperationContext* opCtx,
                                                   const CollectionPtr& collection,

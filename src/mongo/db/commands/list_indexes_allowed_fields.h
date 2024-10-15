@@ -68,7 +68,5 @@ inline static std::map<StringData, std::set<IndexType>> kAllowedListIndexesField
     {ListIndexesReplyItem::kVFieldName, {}},
     {ListIndexesReplyItem::kWeightsFieldName, {IndexType::INDEX_TEXT}},
     {ListIndexesReplyItem::kWildcardProjectionFieldName, {IndexType::INDEX_WILDCARD}},
-    {ListIndexesReplyItem::kColumnstoreProjectionFieldName, {IndexType::INDEX_COLUMN}},
-    {ListIndexesReplyItem::kColumnstoreCompressorFieldName, {IndexType::INDEX_COLUMN}},
 };
 }  // namespace mongo

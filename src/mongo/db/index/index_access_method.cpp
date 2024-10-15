@@ -66,7 +66,6 @@
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/bulk_builder_common.h"
-#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/index_access_method.h"
@@ -133,9 +132,6 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
     auto makeSDI = [&] {
         return engine->getSortedDataInterface(opCtx, nss, collectionOptions, ident, desc);
     };
-    auto makeCS = [&] {
-        return engine->getColumnStore(opCtx, nss, collectionOptions, ident, desc);
-    };
     const std::string& type = desc->getAccessMethodName();
 
     if ("" == type)
@@ -152,8 +148,6 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
         return std::make_unique<TwoDAccessMethod>(entry, makeSDI());
     else if (IndexNames::WILDCARD == type)
         return std::make_unique<WildcardAccessMethod>(entry, makeSDI());
-    else if (IndexNames::COLUMN == type)
-        return std::make_unique<ColumnStoreAccessMethod>(entry, makeCS());
     LOGV2(20688, "Can't find index for keyPattern", "keyPattern"_attr = desc->keyPattern());
     fassertFailed(31021);
 }

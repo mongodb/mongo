@@ -205,10 +205,6 @@ std::vector<TestCase>
                                 << "en")
                         << "v" << 2),
              {"normal", "single", "collation"}},
-            {BSON("key" << BSON("$**"
-                                << "columnstore")
-                        << "v" << 2),
-             {"columnstore", "single"}},
             {BSON("key" << BSON("foo" << 1 << "bar" << 1) << "v" << 2), {"normal", "compound"}},
             {BSON("key" << BSON("foo"
                                 << "hashed")

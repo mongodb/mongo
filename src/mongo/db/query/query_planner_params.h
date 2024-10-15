@@ -74,9 +74,6 @@ struct CollectionInfo {
     // Indexes available for planning.
     std::vector<IndexEntry> indexes{};
 
-    // Columnar indexes available for planning.
-    std::vector<ColumnIndexEntry> columnIndexes{};
-
     bool exists{true};
 
     // Basic collection stats for a given collection.

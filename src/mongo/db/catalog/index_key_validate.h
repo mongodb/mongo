@@ -88,7 +88,6 @@ static std::map<StringData, std::set<IndexType>> allowedFieldNames = {
     {IndexDescriptor::kNamespaceFieldName, {}},
     {IndexDescriptor::kPartialFilterExprFieldName, {}},
     {IndexDescriptor::kWildcardProjectionFieldName, {IndexType::INDEX_WILDCARD}},
-    {IndexDescriptor::kColumnStoreProjectionFieldName, {IndexType::INDEX_COLUMN}},
     {IndexDescriptor::kSparseFieldName, {}},
     {IndexDescriptor::kStorageEngineFieldName, {}},
     {IndexDescriptor::kTextVersionFieldName, {IndexType::INDEX_TEXT}},
@@ -96,7 +95,6 @@ static std::map<StringData, std::set<IndexType>> allowedFieldNames = {
     {IndexDescriptor::kWeightsFieldName, {IndexType::INDEX_TEXT}},
     {IndexDescriptor::kOriginalSpecFieldName, {}},
     {IndexDescriptor::kPrepareUniqueFieldName, {}},
-    {IndexDescriptor::kColumnStoreCompressorFieldName, {IndexType::INDEX_COLUMN}},
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     {"_id", {}},
     // TODO SERVER-76108: Field names are not validated to match index type. This was used for the

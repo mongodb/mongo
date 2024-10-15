@@ -45,7 +45,6 @@ indexTestEnv.CppUnitTest(
         "$BUILD_DIR/mongo/db/shard_role",
         "$BUILD_DIR/mongo/db/sorter/sorter_stats",
         "$BUILD_DIR/mongo/db/storage/storage_options",
-        "column_store_index",
         "expression_params",
         "index_access_method",
     ],

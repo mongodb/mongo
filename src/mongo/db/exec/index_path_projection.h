@@ -56,6 +56,5 @@ private:
 };
 
 using WildcardProjection = IndexPathProjection;
-using ColumnStoreProjection = IndexPathProjection;
 
 }  // namespace mongo

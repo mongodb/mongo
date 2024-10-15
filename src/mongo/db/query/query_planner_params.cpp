@@ -30,7 +30,6 @@
 #include "query_planner_params.h"
 
 #include "mongo/db/exec/projection_executor_utils.h"
-#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/multikey_metadata_access_stats.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/distinct_access.h"
@@ -139,35 +138,6 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             wildcardProjection};
 }
 
-/**
- * Converts the catalog metadata for an index into an ColumnIndexEntry, which is a format that is
- * meant to be consumed by the query planner. This function can perform index reads and should not
- * be called unless access to the storage engine is permitted.
- */
-ColumnIndexEntry columnIndexEntryFromIndexCatalogEntry(OperationContext* opCtx,
-                                                       const CollectionPtr& collection,
-                                                       const IndexCatalogEntry& ice) {
-
-    auto desc = ice.descriptor();
-    invariant(desc);
-
-    auto accessMethod = ice.accessMethod();
-    invariant(accessMethod);
-
-    auto cam = static_cast<const ColumnStoreAccessMethod*>(accessMethod);
-    const auto columnstoreProjection = cam->getColumnstoreProjection();
-
-    return {desc->keyPattern(),
-            desc->getIndexType(),
-            desc->version(),
-            desc->isSparse(),
-            desc->unique(),
-            ColumnIndexEntry::Identifier{desc->indexName()},
-            ice.getFilterExpression(),
-            ice.getCollator(),
-            columnstoreProjection};
-}
-
 void fillOutIndexEntries(OperationContext* opCtx,
                          const CanonicalQuery& canonicalQuery,
                          const CollectionPtr& collection,
@@ -185,7 +155,7 @@ void fillOutIndexEntries(OperationContext* opCtx,
         auto indexType = ice->descriptor()->getIndexType();
         if (apiStrict &&
             (indexType == IndexType::INDEX_HAYSTACK || indexType == IndexType::INDEX_TEXT ||
-             indexType == IndexType::INDEX_COLUMN || ice->descriptor()->isSparse())) {
+             ice->descriptor()->isSparse())) {
             continue;
         }
 
@@ -521,13 +491,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
                                  mainColl,
                                  &mainCollectionInfo.stats,
                                  // Only include the full size stats when there's a CSI.
-                                 !mainCollectionInfo.columnIndexes.empty());
-
-    if (!mainCollectionInfo.columnIndexes.empty()) {
-        // Only fill this out when a CSI is present.
-        const auto kMB = 1024 * 1024;
-        availableMemoryBytes = static_cast<long long>(ProcessInfo::getMemSizeMB()) * kMB;
-    }
+                                 false /* includeSizeStats */);
 }
 
 void QueryPlannerParams::setTargetSbeStageBuilder(OperationContext* opCtx,

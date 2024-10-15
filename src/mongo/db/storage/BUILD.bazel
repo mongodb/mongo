@@ -304,7 +304,6 @@ mongo_cc_library(
         "//src/mongo/db/exec:index_path_projection.h",
         "//src/mongo/db/exec:projection_executor.h",
         "//src/mongo/db/exec:projection_executor_builder.h",
-        "//src/mongo/db/index:column_key_generator.h",
         "//src/mongo/db/matcher/schema:encrypt_schema_gen",
         "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_gen",
         "//src/mongo/db/pipeline:document_source_change_stream_gen",

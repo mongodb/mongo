@@ -45,8 +45,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/index/column_key_generator.h"
-#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/duplicate_key_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -126,20 +124,6 @@ public:
                      Op op,
                      int64_t* numKeysOut);
 
-    /**
-     * Client writes that are concurrent with a column store index build will have their index
-     * updates written to a temporary table. After the index table scan is complete, these updates
-     * will be applied to the underlying index table.
-     *
-     * On success, 'numKeysWrittenOut' will contain the number of keys that will be inserted or
-     * updated by applying the side write and 'numKeysDeletedOut' will contain the number of keys
-     * that will be removed.
-     */
-    Status sideWrite(OperationContext* opCtx,
-                     const IndexCatalogEntry* indexCatalogEntry,
-                     const std::vector<column_keygen::CellPatch>& keys,
-                     int64_t* numKeysWrittenOut,
-                     int64_t* numKeysDeletedOut);
 
     /**
      * Given a duplicate key, record the key for later verification by a call to

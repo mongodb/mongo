@@ -15,10 +15,10 @@
 //   # Tenant migrations passthrough suites automatically retry operations on TenantMigrationAborted
 //   # errors.
 //   tenant_migration_incompatible,
-//   # Some passthroughs which implicitly create indexes (e.g. the column store index passthrough)
-//   # will override the 'getIndexes()' helper to hide the implicitly created index. This override
-//   # messes with the latency stats tracking and counts the operation as an aggregate instead of a
-//   # command. It's an implementation detail that leaks and invalidates the test.
+//   # Some passthroughs which implicitly create indexes will override the 'getIndexes()' helper to
+//   # hide the implicitly created index. This override messes with the latency stats tracking and
+//   # counts the operation as an aggregate instead of a command. It's an implementation detail that
+//   # leaks and invalidates the test.
 //   assumes_no_implicit_index_creation,
 //   uses_compact,
 //   # Does not support multiplanning, because it stashes documents beyond batch size.

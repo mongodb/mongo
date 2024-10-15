@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/column_index_consistency.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/validate_results.h"
@@ -60,9 +59,7 @@ class ValidateAdaptor {
 public:
     ValidateAdaptor(OperationContext* opCtx, CollectionValidation::ValidateState* validateState)
 
-        : _keyBasedIndexConsistency(opCtx, validateState),
-          _columnIndexConsistency(opCtx, validateState),
-          _validateState(validateState) {}
+        : _keyBasedIndexConsistency(opCtx, validateState), _validateState(validateState) {}
 
     /**
      * Validates the record data and traverses through its key set to keep track of the
@@ -149,7 +146,6 @@ private:
                                                       ValidateResults* results);
 
     KeyStringIndexConsistency _keyBasedIndexConsistency;
-    ColumnIndexConsistency _columnIndexConsistency;
     CollectionValidation::ValidateState* _validateState;
 
     // Saves the record count from the record store traversal to be used later to validate the index

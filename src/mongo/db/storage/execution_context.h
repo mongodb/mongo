@@ -31,7 +31,6 @@
 
 #include <vector>
 
-#include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -64,15 +63,11 @@ public:
     AutoClearPtr<MultikeyPaths> multikeyPaths() {
         return makeAutoClearPtr(&_multikeyPaths);
     }
-    AutoClearPtr<std::vector<column_keygen::CellPatch>> columnChanges() {
-        return makeAutoClearPtr(&_columnChanges);
-    }
 
 private:
     KeyStringSet _keys;
     KeyStringSet _multikeyMetadataKeys;
     MultikeyPaths _multikeyPaths;
-    std::vector<column_keygen::CellPatch> _columnChanges;
 };
 
 }  // namespace mongo

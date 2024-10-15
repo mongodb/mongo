@@ -104,14 +104,6 @@ struct ProjectionPolicies {
                                   kEmptyProjectionPolicyDefault};
     }
 
-    static ProjectionPolicies columnStoreIndexSpecProjectionPolicies() {
-        return ProjectionPolicies{kDefaultIdPolicyDefault,
-                                  ArrayRecursionPolicy::kDoNotRecurseNestedArrays,
-                                  ComputedFieldsPolicy::kBanComputedFields,
-                                  FindOnlyFeaturesPolicy::kBanFindOnlyFeatures,
-                                  EmptyProjectionPolicy::kAllowEmptyProjection};
-    }
-
     ProjectionPolicies(
         DefaultIdPolicy idPolicy = kDefaultIdPolicyDefault,
         ArrayRecursionPolicy arrayRecursionPolicy = kArrayRecursionPolicyDefault,

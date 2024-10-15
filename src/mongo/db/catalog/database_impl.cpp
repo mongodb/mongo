@@ -123,16 +123,6 @@ MONGO_FAIL_POINT_DEFINE(overrideRecordIdsReplicatedDefault);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 MONGO_FAIL_POINT_DEFINE(openCreateCollectionWindowFp);
 
-// When active, a column index will be created for all new collections. This is used for the column
-// index JS test passthrough suite. Other passthroughs work by overriding javascript methods on the
-// client side, but this approach often requires the drop() function to create the collection. This
-// behavior is confusing, and requires a large number of tests to be re-written to accommodate this
-// passthrough behavior. In case you're wondering, this failpoint approach would not work as well
-// for the sharded collections task, since mongos and the config servers are generally unaware of
-// when a collection is created. There isn't a great server-side hook we can use to auto-shard a
-// collection, and it is more complex technically to drive this process from one shard in the
-// cluster. For column store indexes, we just need to change local state on each mongod.
-MONGO_FAIL_POINT_DEFINE(createColumnIndexOnAllCollections);
 
 Status validateDBNameForWindows(StringData dbname) {
     const std::vector<std::string> windowsReservedNames = {
@@ -159,13 +149,6 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
                   "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
     }
 }
-
-static const BSONObj kColumnStoreSpec = BSON("name"
-                                             << "$**_columnstore"
-                                             << "key"
-                                             << BSON("$**"
-                                                     << "columnstore")
-                                             << "v" << 2);
 }  // namespace
 
 Status DatabaseImpl::validateDBName(const DatabaseName& dbName) {
@@ -707,19 +690,6 @@ Collection* DatabaseImpl::createVirtualCollection(OperationContext* opCtx,
                              vopts);
 }
 
-/**
- * Some system collections (namely, 'config.transactions' and
- * 'local.replset.oplogTruncateAfterPoint') are special internal collections that are written to
- * without updating indexes, so there's no value in creating an index on them.
- *
- * @return true if any modification on the collection data leads to updating the indexes defined on
- * it.
- */
-bool doesCollectionModificationsUpdateIndexes(const NamespaceString& nss) {
-    return nss != NamespaceString::kSessionTransactionsTableNamespace &&
-        nss != NamespaceString::kDefaultOplogTruncateAfterPointNamespace;
-}
-
 Collection* DatabaseImpl::_createCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -860,7 +830,6 @@ Collection* DatabaseImpl::_createCollection(
 
     BSONObj fullIdIndexSpec;
 
-    bool createColumnIndex = false;
     if (createIdIndex && collection->requiresIdIndex()) {
         if (optionsWithUUID.autoIndexId == CollectionOptions::YES ||
             optionsWithUUID.autoIndexId == CollectionOptions::DEFAULT) {
@@ -870,8 +839,6 @@ Collection* DatabaseImpl::_createCollection(
                 collection,
                 !idIndex.isEmpty() ? idIndex
                                    : ic->getDefaultIdIndexSpec(CollectionPtr(collection))));
-            createColumnIndex = createColumnIndexOnAllCollections.shouldFail() &&
-                doesCollectionModificationsUpdateIndexes(nss);
         } else {
             // autoIndexId: false is only allowed on unreplicated collections.
             uassert(50001,
@@ -879,15 +846,6 @@ Collection* DatabaseImpl::_createCollection(
                                   << nss.toStringForErrorMsg() << " because it can be replicated",
                     !nss.isReplicated());
         }
-    }
-
-    if (MONGO_unlikely(createColumnIndex)) {
-        invariant(ServerParameterSet::getNodeParameterSet()
-                          ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                          ->_data.get() != QueryFrameworkControlEnum::kForceClassicEngine,
-                  "Column Store Indexes failpoint in use without enabling SBE engine");
-        uassertStatusOK(collection->getIndexCatalog()->createIndexOnEmptyCollection(
-            opCtx, collection, kColumnStoreSpec));
     }
 
     hangBeforeLoggingCreateCollection.pauseWhileSet();

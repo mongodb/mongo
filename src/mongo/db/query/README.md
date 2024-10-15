@@ -22,7 +22,6 @@ satisfy it, and to actually compute the results. It is primarily exposed through
 ## Features
 
 - Change Streams
-- Column Store Indexes
 - Field-level encryption
 - Geo
 - [Query shape][query shape]

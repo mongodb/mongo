@@ -89,7 +89,7 @@ public:
 };
 
 /**
- * Contain utilities to work with wildcard fields used for Wildcard indexes and Columnstore.
+ * Contain utilities to work with wildcard fields used for Wildcard indexes.
  */
 struct WildcardNames {
     static constexpr StringData WILDCARD_FIELD_NAME = "$**"_sd;
