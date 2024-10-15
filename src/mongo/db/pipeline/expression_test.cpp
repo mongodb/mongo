@@ -3975,6 +3975,19 @@ TEST(ExpressionSetFieldTest, SetFieldSerializesCorrectly) {
         BSON("ignoredField" << expression->serialize()));
 }
 
+TEST(ExpressionSetFieldTest, SetFieldRejectsNullCharInFieldArgument) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    auto fieldExpr = make_intrusive<ExpressionConstant>(&expCtx, Value("ab\0c"_sd));
+    auto inputExpr = make_intrusive<ExpressionConstant>(&expCtx, Value(BSON("a" << 1)));
+    auto valueExpr = make_intrusive<ExpressionConstant>(&expCtx, Value(true));
+    ASSERT_THROWS_CODE(
+        make_intrusive<ExpressionSetField>(
+            &expCtx, std::move(fieldExpr), std::move(inputExpr), std::move(valueExpr)),
+        AssertionException,
+        9534700);
+}
+
 TEST(ExpressionIfNullTest, OptimizedExpressionIfNullShouldRemoveNullConstant) {
     auto expCtx = ExpressionContextForTest{};
     auto vps = expCtx.variablesParseState;
