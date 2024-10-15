@@ -87,9 +87,18 @@ const mongotStages =
  * @param {Object} explain The explain object that the stage should contain.
  * @param {Boolean} isE2E True if this function is being called for an e2e test. Since an e2e test
  *     uses an actual mongot, we don't know the value of the explain object and cannot check it.
+ * @param {NumberLong} numFiltered optional, The number of documents filtered out by the idLookup
+ *     stage.
  */
-export function validateMongotStageExplainExecutionStats(
-    {stage, stageType, verbosity, nReturned = null, explain = null, isE2E = false}) {
+export function validateMongotStageExplainExecutionStats({
+    stage,
+    stageType,
+    verbosity,
+    nReturned = null,
+    explain = null,
+    isE2E = false,
+    numFiltered = null
+}) {
     assert(mongotStages.includes(stageType),
            "stageType must be a mongot stage found in mongotStages.");
     assert(stage[stageType],
@@ -119,6 +128,10 @@ export function validateMongotStageExplainExecutionStats(
         if (!isE2E) {
             assert(explain, "Explain is null but needs to be provided for initial mongot stage.");
             assert.eq(explain, explainStage["explain"]);
+            if (numFiltered) {
+                assert(explainStage.hasOwnProperty("numDocsFilteredByIdLookup"), explainStage);
+                assert.eq(explainStage["numDocsFilteredByIdLookup"], numFiltered);
+            }
         }
     }
 }

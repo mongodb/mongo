@@ -191,7 +191,7 @@ function runExplainTest(verbosity) {
                     {_id: 3, $searchScore: 100},
                     {_id: 2, $searchScore: 10},
                     {_id: 4, $searchScore: 1},
-                    {_id: 1, $searchScore: 0.99},
+                    {_id: 21, $searchScore: 0.99},
                 ],
                 metaBatch: [{val: 1}]
             });
@@ -221,7 +221,8 @@ function runExplainTest(verbosity) {
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,
                 verbosity,
-                nReturnedList: [NumberLong(4), NumberLong(3)]
+                nReturnedList: [NumberLong(3), NumberLong(3)],
+                numFilteredList: [NumberLong(1), NumberLong(0)],
             });
             verifyShardsPartExplainOutput(
                 {result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
@@ -239,7 +240,7 @@ function runExplainTest(verbosity) {
                         {_id: 3, $searchScore: 100},
                         {_id: 2, $searchScore: 10},
                     ],
-                    [{_id: 4, $searchScore: 1}, {_id: 1, $searchScore: 0.99}],
+                    [{_id: 4, $searchScore: 1}, {_id: 21, $searchScore: 0.99}],
                 ],
                 metaBatchList: [[{val: 1}]]
             });
@@ -269,7 +270,8 @@ function runExplainTest(verbosity) {
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,
                 verbosity,
-                nReturnedList: [NumberLong(4), NumberLong(3)]
+                nReturnedList: [NumberLong(3), NumberLong(3)],
+                numFilteredList: [NumberLong(1), NumberLong(0)],
             });
             verifyShardsPartExplainOutput(
                 {result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
@@ -291,7 +293,7 @@ function runExplainTest(verbosity) {
                 batchList: [
                     [
                         {_id: 3, $searchScore: 100},
-                        {_id: 2, $searchScore: 10},
+                        {_id: 21, $searchScore: 10},
                     ],
                     [{_id: 4, $searchScore: 1}, {_id: 1, $searchScore: 0.99}],
                 ],
@@ -327,7 +329,8 @@ function runExplainTest(verbosity) {
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,
                 verbosity,
-                nReturnedList: [NumberLong(4), NumberLong(3)]
+                nReturnedList: [NumberLong(3), NumberLong(3)],
+                numFilteredList: [NumberLong(1), NumberLong(0)],
             });
             verifyShardsPartExplainOutput(
                 {result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});

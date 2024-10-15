@@ -113,6 +113,10 @@ public:
             return _docsReturnedByIdLookup;
         }
 
+        long long getDocsSeenByIdLookup() const {
+            return _docsSeenByIdLookup;
+        }
+
         void incrementDocsSeenByIdLookup() {
             _docsSeenByIdLookup++;
         }

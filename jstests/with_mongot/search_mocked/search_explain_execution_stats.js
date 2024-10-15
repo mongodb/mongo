@@ -118,6 +118,7 @@ function runExplainTest(verbosity) {
             stageType: "$_internalSearchIdLookup",
             verbosity,
             nReturned: NumberLong(3),
+            numFiltered: NumberLong(1),
         });
     }
     {
@@ -144,6 +145,7 @@ function runExplainTest(verbosity) {
             stageType: "$_internalSearchIdLookup",
             verbosity,
             nReturned: NumberLong(4),
+            numFiltered: NumberLong(1),
         });
     }
 }

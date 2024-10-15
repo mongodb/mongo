@@ -366,7 +366,7 @@ export function setUpMongotReturnExplainAndMultiCursorGetMore({
  * @param {Object} explainContents The explain object that the stage should contain.
  */
 export function getMongotStagesAndValidateExplainExecutionStats(
-    {result, stageType, verbosity, nReturned, explainObject = null}) {
+    {result, stageType, verbosity, nReturned, explainObject = null, numFiltered = null}) {
     const searchStage = getAggPlanStage(result, stageType);
     assert.neq(searchStage, null, result);
     validateMongotStageExplainExecutionStats({
@@ -375,6 +375,7 @@ export function getMongotStagesAndValidateExplainExecutionStats(
         nReturned: nReturned,
         explain: explainObject,
         verbosity: verbosity,
+        numFiltered: numFiltered,
     });
 }
 
@@ -394,9 +395,18 @@ export function getMongotStagesAndValidateExplainExecutionStats(
  *     match expectedNumStages.
  * @param {Object} expectedExplainContents Optional - The explain object that the stage should
  *     contain.
+ * @param {Array{NumberLong}} numFilteredList Optional - Index i is the number of documents filtered
+ *     by idLookup for shard i.
  */
-export function getShardedMongotStagesAndValidateExplainExecutionStats(
-    {result, stageType, expectedNumStages, verbosity, nReturnedList, expectedExplainContents}) {
+export function getShardedMongotStagesAndValidateExplainExecutionStats({
+    result,
+    stageType,
+    expectedNumStages,
+    verbosity,
+    nReturnedList,
+    expectedExplainContents,
+    numFilteredList = null
+}) {
     assert.eq(nReturnedList.length, expectedNumStages);
     assert(result.hasOwnProperty("shards"),
            tojson(result) + "has no shards property, but it should.");
@@ -428,6 +438,7 @@ export function getShardedMongotStagesAndValidateExplainExecutionStats(
             nReturned: nReturnedList[index],
             explain: expectedExplainContents,
             verbosity: verbosity,
+            numFiltered: numFilteredList ? numFilteredList[index] : null,
         });
         counter++;
     }

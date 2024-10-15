@@ -110,6 +110,9 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
         const PlanSummaryStats& stats = _stats.planSummaryStats;
         outputSpec["totalDocsExamined"] = Value(static_cast<long long>(stats.totalDocsExamined));
         outputSpec["totalKeysExamined"] = Value(static_cast<long long>(stats.totalKeysExamined));
+        outputSpec["numDocsFilteredByIdLookup"] = opts.serializeLiteral(
+            Value((long long)(_searchIdLookupMetrics->getDocsSeenByIdLookup() -
+                              _searchIdLookupMetrics->getDocsReturnedByIdLookup())));
     }
 
     return Value(DOC(getSourceName() << outputSpec.freezeToValue()));

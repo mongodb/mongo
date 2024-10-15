@@ -252,7 +252,7 @@ function runExplainTest(verbosity) {
                 nextBatch: [
                     {_id: 3, $vectorSearchScore: 100},
                     {_id: 2, $vectorSearchScore: 10},
-                    {_id: 4, $vectorSearchScore: 1},
+                    {_id: 60, $vectorSearchScore: 1},
                     {_id: 1, $vectorSearchScore: 0.2},
                 ],
             });
@@ -263,7 +263,7 @@ function runExplainTest(verbosity) {
                 nextBatch: [
                     {_id: 11, $vectorSearchScore: 100},
                     {_id: 12, $vectorSearchScore: 10},
-                    {_id: 13, $vectorSearchScore: 1},
+                    {_id: 200, $vectorSearchScore: 1},
                 ],
             });
             const result = coll.explain(verbosity).aggregate(pipeline);
@@ -280,7 +280,8 @@ function runExplainTest(verbosity) {
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,
                 verbosity,
-                nReturnedList: [NumberLong(4), NumberLong(3)]
+                nReturnedList: [NumberLong(3), NumberLong(2)],
+                numFilteredList: [NumberLong(1), NumberLong(1)],
             });
         }
         {
@@ -289,8 +290,8 @@ function runExplainTest(verbosity) {
                 mongotMock: s0Mongot,
                 coll: coll,
                 batchList: [
-                    [{_id: 3, $vectorSearchScore: 100}, {_id: 2, $vectorSearchScore: 1}],
-                    [{_id: 4, $vectorSearchScore: 0.99}, {_id: 1, $vectorSearchScore: 0.98}],
+                    [{_id: 60, $vectorSearchScore: 100}, {_id: 2, $vectorSearchScore: 1}],
+                    [{_id: 40, $vectorSearchScore: 0.99}, {_id: 1, $vectorSearchScore: 0.98}],
                 ]
             });
             setUpMongotReturnExplainAndCursorGetMore({
@@ -299,7 +300,7 @@ function runExplainTest(verbosity) {
                 coll: coll,
                 batchList: [
                     [{_id: 11, $vectorSearchScore: 100}, {_id: 12, $vectorSearchScore: 1}],
-                    [{_id: 13, $vectorSearchScore: 0.99}],
+                    [{_id: 21, $vectorSearchScore: 0.99}],
                 ]
             });
             const result = coll.explain(verbosity).aggregate(pipeline, {cursor: {batchSize: 2}});
@@ -316,7 +317,8 @@ function runExplainTest(verbosity) {
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,
                 verbosity,
-                nReturnedList: [NumberLong(4), NumberLong(3)]
+                nReturnedList: [NumberLong(2), NumberLong(2)],
+                numFilteredList: [NumberLong(2), NumberLong(1)],
             });
         }
     }
