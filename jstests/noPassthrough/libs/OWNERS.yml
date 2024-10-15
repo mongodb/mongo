@@ -3,3 +3,6 @@ filters:
   - "*server_parameter*":
     approvers:
       - 10gen/server-programmability
+  - "*index_build*":
+    approvers:
+      - 10gen/server-storage-execution
