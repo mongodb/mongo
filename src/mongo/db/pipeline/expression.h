@@ -3608,7 +3608,8 @@ public:
         : Expression(expCtx, {std::move(field), std::move(input), std::move(value)}),
           _field(_children[0]),
           _input(_children[1]),
-          _value(_children[2]) {
+          _value(_children[2]),
+          _fieldName(getValidFieldName(_children[0])) {
         expCtx->sbeCompatible = false;
     }
 
@@ -3628,9 +3629,18 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final override;
 
 private:
+    /**
+     * Ensures 'fieldExpr' is a constant string representing a valid field name and returns it as a
+     * string. If 'fieldExpr' is not valid, this function will throw a 'uassert()'.
+     */
+    std::string getValidFieldName(boost::intrusive_ptr<Expression> fieldExpr);
+
     boost::intrusive_ptr<Expression>& _field;
     boost::intrusive_ptr<Expression>& _input;
     boost::intrusive_ptr<Expression>& _value;
+
+    // This is pre-validated by the constructor.
+    const std::string _fieldName;
 };
 
 /**
