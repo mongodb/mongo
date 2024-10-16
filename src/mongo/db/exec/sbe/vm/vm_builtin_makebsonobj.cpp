@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,38 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/hasher.h"
+#include "mongo/db/exec/sbe/vm/vm_makeobj.h"
 
-namespace mongo {
-namespace sbe {
-namespace vm {
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinHash(ArityType arity) {
-    auto hashVal = value::hashInit();
-    for (ArityType idx = 0; idx < arity; ++idx) {
-        auto [owned, tag, val] = getFromStack(idx);
-        hashVal = value::hashCombine(hashVal, value::hashValue(tag, val));
-    }
+namespace mongo::sbe::vm {
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(
+    ArityType arity, const CodeFragment* code) {
+    tassert(6897002,
+            str::stream() << "Unsupported number of args passed to makeBsonObj(): " << arity,
+            arity >= 2);
 
-    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<decltype(hashVal)>(hashVal)};
+    const int argsStackOff = 2;
+    const uint32_t numArgs = arity - 2;
+    const auto impl = MakeObjImpl{*this, argsStackOff, numArgs, code};
+
+    return impl.makeObj<BsonObjWriter, BsonArrWriter>();
 }
-
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinShardHash(ArityType arity) {
-    invariant(arity == 1);
-
-    auto [ownedShardKey, shardKeyTag, shardKeyValue] = getFromStack(0);
-
-    // Compute the shard key hash value by round-tripping it through BSONObj as it is currently the
-    // only way to do it if we do not want to duplicate the hash computation code.
-    // TODO SERVER-55622
-    BSONObjBuilder input;
-    bson::appendValueToBsonObj<BSONObjBuilder>(input, ""_sd, shardKeyTag, shardKeyValue);
-    auto hashVal =
-        BSONElementHasher::hash64(input.obj().firstElement(), BSONElementHasher::DEFAULT_HASH_SEED);
-    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<decltype(hashVal)>(hashVal)};
-}
-
-}  // namespace vm
-}  // namespace sbe
-}  // namespace mongo
+}  // namespace mongo::sbe::vm

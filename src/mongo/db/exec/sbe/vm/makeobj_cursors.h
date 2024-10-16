@@ -50,6 +50,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/makeobj_writers.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::sbe::vm {
@@ -57,7 +58,7 @@ namespace mongo::sbe::vm {
 // MakeObj input cursor for BSON objects.
 class BsonObjCursor {
 public:
-    BsonObjCursor(const char* be) : _be(be) {
+    MONGO_COMPILER_ALWAYS_INLINE BsonObjCursor(const char* be) : _be(be) {
         _last = _be + ConstDataView(_be).read<LittleEndian<uint32_t>>() - 1;
         _be += 4;
         if (_be != _last) {
@@ -108,7 +109,8 @@ private:
 // MakeObj input cursor for SBE objects.
 class ObjectCursor {
 public:
-    ObjectCursor(value::Object* objRoot) : _objRoot(objRoot), _idx(0), _endIdx(_objRoot->size()) {
+    MONGO_COMPILER_ALWAYS_INLINE ObjectCursor(value::Object* objRoot)
+        : _objRoot(objRoot), _idx(0), _endIdx(_objRoot->size()) {
         if (_idx != _endIdx) {
             // Initialize '_name'.
             _name = StringData(_objRoot->field(_idx));

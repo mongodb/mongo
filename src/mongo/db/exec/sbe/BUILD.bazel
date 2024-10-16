@@ -54,6 +54,8 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/vm:vm_builtin_datetime.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_builtin_hash.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_builtin_keystring.cpp",
+        "//src/mongo/db/exec/sbe/vm:vm_builtin_makebsonobj.cpp",
+        "//src/mongo/db/exec/sbe/vm:vm_builtin_makeobj.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_builtin_object.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_builtin_predicate.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_builtin_regex.cpp",
@@ -62,7 +64,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/vm:vm_builtin_string.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_datetime.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_instruction.cpp",
-        "//src/mongo/db/exec/sbe/vm:vm_makeobj.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_printer.cpp",
     ],
     hdrs = [

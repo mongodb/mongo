@@ -50,15 +50,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/column_op.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
-#include "mongo/db/exec/sbe/vm/makeobj_cursors.h"
-#include "mongo/db/exec/sbe/vm/makeobj_writers.h"
 #include "mongo/db/exec/sbe/vm/vm_builtin.h"
 #include "mongo/db/exec/sbe/vm/vm_instruction.h"
 #include "mongo/db/exec/sbe/vm/vm_memory.h"
@@ -197,22 +194,6 @@ int32_t updateAndCheckMemUsage(value::Array* state,
                                size_t idx = static_cast<size_t>(AggMultiElems::kMemUsage));
 
 class CodeFragment;
-
-struct ProduceObjContext {
-    int argsStackOffset = 0;
-    const CodeFragment* code;
-};
-
-/**
- * This struct is used by traverseAndProduceObj() to hold args that stay the same across
- * each level of recursion. Also, by making use of this struct, on most common platforms we
- * will be able to pass all of traverseAndProduceObj()'s args via CPU registers (rather
- * than passing them via the native stack).
- */
-struct ProduceObjContextAndSpec {
-    ProduceObjContext produceObjCtx;
-    const MakeObjSpec* spec;
-};
 
 /**
  * This enum defines indices into an 'Array' that returns the partial sum result when 'needsMerge'
@@ -377,8 +358,8 @@ class ByteCode {
     static_assert(std::is_trivially_copyable_v<FastTuple<bool, value::TypeTags, value::Value>>);
 
 public:
+    class MakeObjImplBase;
     struct InvokeLambdaFunctor;
-    struct GetFromStackFunctor;
     class TopBottomArgs;
     class TopBottomArgsDirect;
     class TopBottomArgsFromStack;
@@ -742,106 +723,6 @@ private:
                                                              int64_t binSize,
                                                              TimeZone timezone,
                                                              DayOfWeek startOfWeek);
-    /**
-     * produceObject() takes a MakeObjSpec ('spec'), a root value ('rootTag' and 'rootVal'),
-     * and 0 or more "computed" values as inputs, it builds an output BSON object based on the
-     * instructions provided by 'spec' and based on the contents of 'root' and the computed input
-     * values, and then it returns the output object. (Note the computed input values are not
-     * directly passed in as C++ parameters -- instead the computed input values are passed via
-     * the VM's stack.)
-     */
-    template <typename ObjWriterT>
-    MONGO_COMPILER_ALWAYS_INLINE void produceObject(const ProduceObjContext& ctx,
-                                                    const MakeObjSpec* spec,
-                                                    ObjWriterT& bob,
-                                                    value::TypeTags rootTag,
-                                                    value::Value rootVal) {
-
-        // Invoke produceObject<ObjWriterT, CursorT>() with the appropriate cursor type. For
-        // SBE objects, we use ObjectCursor. For all other types, we use BsonObjCursor.
-        if (rootTag == value::TypeTags::Object) {
-            auto obj = value::getObjectView(rootVal);
-
-            produceObject(ctx, spec, bob, ObjectCursor(obj));
-        } else {
-            const char* obj = rootTag == value::TypeTags::bsonObject
-                ? value::bitcastTo<const char*>(rootVal)
-                : BSONObj::kEmptyObject.objdata();
-
-            produceObject(ctx, spec, bob, BsonObjCursor(obj));
-        }
-    }
-
-    template <typename ObjWriterT, typename CursorT>
-    void produceObject(const ProduceObjContext& ctx,
-                       const MakeObjSpec* spec,
-                       ObjWriterT& bob,
-                       CursorT cursor);
-
-    template <typename ArrWriterT>
-    void traverseAndProduceObj(const ProduceObjContextAndSpec& ctx,
-                               value::TypeTags tag,
-                               value::Value val,
-                               int64_t maxDepth,
-                               ArrWriterT& bab);
-
-    template <typename ObjWriterT>
-    void traverseAndProduceObj(const ProduceObjContextAndSpec& ctx,
-                               value::TypeTags tag,
-                               value::Value val,
-                               StringData fieldName,
-                               ObjWriterT& bob);
-
-    template <typename ObjWriterT>
-    MONGO_COMPILER_ALWAYS_INLINE void performSetArgAction(const ProduceObjContext& ctx,
-                                                          const MakeObjSpec::FieldAction& action,
-                                                          StringData fieldName,
-                                                          ObjWriterT& bob) {
-        size_t argIdx = action.getSetArgIdx();
-        auto [_, tag, val] = getFromStack(ctx.argsStackOffset + argIdx);
-        bob.appendValue(fieldName, tag, val);
-    }
-
-    template <typename ObjWriterT>
-    MONGO_COMPILER_ALWAYS_INLINE void performAddArgAction(const ProduceObjContext& ctx,
-                                                          const MakeObjSpec::FieldAction& action,
-                                                          StringData fieldName,
-                                                          ObjWriterT& bob) {
-        size_t argIdx = action.getAddArgIdx();
-        auto [_, tag, val] = getFromStack(ctx.argsStackOffset + argIdx);
-        bob.appendValue(fieldName, tag, val);
-    }
-
-    template <typename ObjWriterT>
-    MONGO_COMPILER_ALWAYS_INLINE void performLambdaArgAction(const ProduceObjContext& ctx,
-                                                             const MakeObjSpec::FieldAction& action,
-                                                             value::TypeTags tag,
-                                                             value::Value val,
-                                                             StringData fieldName,
-                                                             ObjWriterT& bob) {
-        const auto& lambdaArg = action.getLambdaArg();
-        size_t argIdx = lambdaArg.argIdx;
-        auto [_, lamTag, lamVal] = getFromStack(ctx.argsStackOffset + argIdx);
-        tassert(7103506, "Expected arg to be LocalLambda", lamTag == value::TypeTags::LocalLambda);
-
-        pushStack(false, tag, val);
-        runLambdaInternal(ctx.code, value::bitcastTo<int64_t>(lamVal));
-
-        auto [__, outputTag, outputVal] = getFromStack(0);
-        bob.appendValue(fieldName, outputTag, outputVal);
-        popAndReleaseStack();
-    }
-
-    template <typename ObjWriterT>
-    MONGO_COMPILER_ALWAYS_INLINE void performMakeObjAction(const ProduceObjContext& ctx,
-                                                           const MakeObjSpec::FieldAction& action,
-                                                           value::TypeTags tag,
-                                                           value::Value val,
-                                                           StringData fieldName,
-                                                           ObjWriterT& bob) {
-        const MakeObjSpec* spec = action.getMakeObjSpec();
-        traverseAndProduceObj({ctx, spec}, tag, val, fieldName, bob);
-    }
 
     template <bool IsBlockBuiltin = false>
     bool validateDateTruncParameters(TimeUnit* unit,
@@ -1522,6 +1403,53 @@ private:
     uint8_t* _argStack{nullptr};
 };
 
+class ByteCode::MakeObjImplBase {
+public:
+    MONGO_COMPILER_ALWAYS_INLINE MakeObjImplBase(ByteCode& bc,
+                                                 int argsStackOffset,
+                                                 uint32_t numArgs,
+                                                 const CodeFragment* code)
+        : bc(bc), argsStackOffset(argsStackOffset), numArgs(numArgs), code(code) {}
+
+protected:
+    MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> getSpec() const {
+        return bc.getFromStack(0);
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> getInputObject()
+        const {
+        return bc.getFromStack(1);
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> extractInputObject()
+        const {
+        return bc.moveFromStack(1);
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> getArg(
+        size_t argIdx) const {
+        return bc.getFromStack(argsStackOffset + argIdx);
+    }
+
+    // Invokes the specified lambda, passing in a view of the specified input value.
+    MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> invokeLambda(
+        int64_t lamPos, value::TypeTags inputTag, value::Value inputVal) const {
+        // Invoke the lambda.
+        bc.pushStack(false, inputTag, inputVal);
+        bc.runLambdaInternal(code, lamPos);
+        // Move the result off the stack and return it.
+        auto outputTuple = bc.getFromStack(0);
+        bc.popStack();
+        return outputTuple;
+    }
+
+private:
+    ByteCode& bc;
+    const int argsStackOffset;
+    const uint32_t numArgs;
+    const CodeFragment* const code;
+};
+
 struct ByteCode::InvokeLambdaFunctor {
     InvokeLambdaFunctor(ByteCode& bytecode, const CodeFragment* code, int64_t lamPos)
         : bytecode(bytecode), code(code), lamPos(lamPos) {}
@@ -1540,18 +1468,6 @@ struct ByteCode::InvokeLambdaFunctor {
     ByteCode& bytecode;
     const CodeFragment* const code;
     const int64_t lamPos;
-};
-
-struct ByteCode::GetFromStackFunctor {
-    GetFromStackFunctor(ByteCode& bytecode, int stackStartOffset)
-        : bytecode(&bytecode), stackStartOffset(stackStartOffset) {}
-
-    FastTuple<bool, value::TypeTags, value::Value> operator()(size_t idx) const {
-        return bytecode->getFromStack(stackStartOffset + idx);
-    }
-
-    ByteCode* bytecode;
-    const int stackStartOffset;
 };
 
 class ByteCode::TopBottomArgs {
@@ -1657,50 +1573,6 @@ protected:
 };
 
 std::pair<value::TypeTags, value::Value> initializeDoubleDoubleSumState();
-
-// Instantiations of the templated produceObject() and traverseAndProduceObj() methods.
-extern template void ByteCode::produceObject<BsonObjWriter, BsonObjCursor>(
-    const ProduceObjContext& ctx,
-    const MakeObjSpec* spec,
-    BsonObjWriter& bob,
-    BsonObjCursor cursor);
-
-extern template void ByteCode::produceObject<BsonObjWriter, ObjectCursor>(
-    const ProduceObjContext& ctx, const MakeObjSpec* spec, BsonObjWriter& bob, ObjectCursor cursor);
-
-extern template void ByteCode::traverseAndProduceObj<BsonArrWriter>(
-    const ProduceObjContextAndSpec& ctx,
-    value::TypeTags tag,
-    value::Value val,
-    int64_t maxDepth,
-    BsonArrWriter& bab);
-
-extern template void ByteCode::traverseAndProduceObj<BsonObjWriter>(
-    const ProduceObjContextAndSpec& ctx,
-    value::TypeTags tag,
-    value::Value val,
-    StringData fieldName,
-    BsonObjWriter& bob);
-
-extern template void ByteCode::produceObject<ObjectWriter, BsonObjCursor>(
-    const ProduceObjContext& ctx, const MakeObjSpec* spec, ObjectWriter& bob, BsonObjCursor cursor);
-
-extern template void ByteCode::produceObject<ObjectWriter, ObjectCursor>(
-    const ProduceObjContext& ctx, const MakeObjSpec* spec, ObjectWriter& bob, ObjectCursor cursor);
-
-extern template void ByteCode::traverseAndProduceObj<ArrayWriter>(
-    const ProduceObjContextAndSpec& ctx,
-    value::TypeTags tag,
-    value::Value val,
-    int64_t maxDepth,
-    ArrayWriter& bab);
-
-extern template void ByteCode::traverseAndProduceObj<ObjectWriter>(
-    const ProduceObjContextAndSpec& ctx,
-    value::TypeTags tag,
-    value::Value val,
-    StringData fieldName,
-    ObjectWriter& bob);
 }  // namespace vm
 }  // namespace sbe
 }  // namespace mongo

@@ -2266,6 +2266,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/vm:vm_builtin.h",
         "//src/mongo/db/exec/sbe/vm:vm_datetime.h",
         "//src/mongo/db/exec/sbe/vm:vm_instruction.h",
+        "//src/mongo/db/exec/sbe/vm:vm_makeobj.h",
         "//src/mongo/db/exec/sbe/vm:vm_memory.h",
         "//src/mongo/db/query/search:internal_search_mongot_remote_spec_gen",
         "//src/mongo/executor:task_executor_cursor_parameters_gen",

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/js_function.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/fts/fts_matcher.h"
 

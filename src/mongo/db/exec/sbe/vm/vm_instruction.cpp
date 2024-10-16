@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 

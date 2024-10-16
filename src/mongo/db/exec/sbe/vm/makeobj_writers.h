@@ -35,38 +35,96 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo::sbe::vm {
+#if defined(_MSC_VER)
+#define MONGO_COMPILER_ALWAYS_INLINE_WITH_INLINE_SPEC MONGO_COMPILER_ALWAYS_INLINE
+#else
+#define MONGO_COMPILER_ALWAYS_INLINE_WITH_INLINE_SPEC MONGO_COMPILER_ALWAYS_INLINE inline
+#endif
 
-class BsonArrWriter;
+namespace mongo::sbe::vm {
+class BsonObjWriter;
+
+/**
+ * MakeObj writer for outputting BSON arrays.
+ */
+class BsonArrWriter {
+public:
+    MONGO_COMPILER_ALWAYS_INLINE BsonArrWriter() {}
+
+    MONGO_COMPILER_ALWAYS_INLINE explicit BsonArrWriter(UniqueBSONArrayBuilder bab)
+        : _bab(std::move(bab)) {}
+
+    MONGO_COMPILER_ALWAYS_INLINE void appendValue(value::TypeTags tag, value::Value val) {
+        bson::appendValueToBsonArr(_bab, tag, val);
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE_WITH_INLINE_SPEC BsonObjWriter startObj();
+
+    MONGO_COMPILER_ALWAYS_INLINE_WITH_INLINE_SPEC void finishObj(BsonObjWriter nestedWriter);
+
+    MONGO_COMPILER_ALWAYS_INLINE BsonArrWriter startArr() {
+        return BsonArrWriter(UniqueBSONArrayBuilder(_bab.subarrayStart()));
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE void finishArr(BsonArrWriter) {
+        // Do nothing. The BsonArrWriter class's destructor will perform any necessary finishing
+        // steps.
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> done() {
+        _bab.doneFast();
+        char* data = _bab.bb().release().release();
+        return {value::TypeTags::bsonArray, value::bitcastFrom<char*>(data)};
+    }
+
+private:
+    friend class BsonObjWriter;
+
+    UniqueBSONArrayBuilder _bab;
+};
 
 /**
  * MakeObj writer for outputting BSON objects.
  */
 class BsonObjWriter {
 public:
-    BsonObjWriter() = default;
+    MONGO_COMPILER_ALWAYS_INLINE BsonObjWriter() {}
 
-    explicit BsonObjWriter(UniqueBSONObjBuilder bob) : _bob(std::move(bob)) {}
+    MONGO_COMPILER_ALWAYS_INLINE explicit BsonObjWriter(UniqueBSONObjBuilder bob)
+        : _bob(std::move(bob)) {}
 
-    void appendValue(StringData fieldName, value::TypeTags tag, value::Value val) {
+    MONGO_COMPILER_ALWAYS_INLINE void appendValue(StringData fieldName,
+                                                  value::TypeTags tag,
+                                                  value::Value val) {
         bson::appendValueToBsonObj(_bob, fieldName, tag, val);
     }
 
-    void appendBsonElement(const BSONElement& bsonElement) {
+    MONGO_COMPILER_ALWAYS_INLINE void appendBsonElement(const BSONElement& bsonElement) {
         _bob.append(bsonElement);
     }
 
-    inline BsonObjWriter startObj(StringData fieldName);
+    MONGO_COMPILER_ALWAYS_INLINE BsonObjWriter startObj(StringData fieldName) {
+        return BsonObjWriter(UniqueBSONObjBuilder(_bob.subobjStart(fieldName)));
+    }
 
-    inline void finishObj(StringData fieldName, BsonObjWriter nestedWriter);
+    MONGO_COMPILER_ALWAYS_INLINE void finishObj(StringData, BsonObjWriter) {
+        // Do nothing. The BsonObjWriter class's destructor will perform any necessary finishing
+        // steps.
+    }
 
-    inline BsonArrWriter startArr(StringData fieldName);
+    MONGO_COMPILER_ALWAYS_INLINE BsonArrWriter startArr(StringData fieldName) {
+        return BsonArrWriter(UniqueBSONArrayBuilder(_bob.subarrayStart(fieldName)));
+    }
 
-    inline void finishArr(StringData fieldName, BsonArrWriter nestedWriter);
+    MONGO_COMPILER_ALWAYS_INLINE void finishArr(StringData, BsonArrWriter) {
+        // Do nothing. The BsonArrWriter class's destructor will perform any necessary finishing
+        // steps.
+    }
 
-    std::pair<value::TypeTags, value::Value> done() {
+    MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> done() {
         _bob.doneFast();
         char* data = _bob.bb().release().release();
         return {value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
@@ -78,55 +136,6 @@ private:
     UniqueBSONObjBuilder _bob;
 };
 
-/**
- * MakeObj writer for outputting BSON arrays.
- */
-class BsonArrWriter {
-public:
-    BsonArrWriter() = default;
-
-    void appendValue(value::TypeTags tag, value::Value val) {
-        bson::appendValueToBsonArr(_bab, tag, val);
-    }
-
-    inline BsonObjWriter startObj();
-
-    inline void finishObj(BsonObjWriter nestedWriter);
-
-    inline BsonArrWriter startArr();
-
-    inline void finishArr(BsonArrWriter nestedWriter);
-
-    std::pair<value::TypeTags, value::Value> done() {
-        _bab.doneFast();
-        char* data = _bab.bb().release().release();
-        return {value::TypeTags::bsonArray, value::bitcastFrom<char*>(data)};
-    }
-
-private:
-    friend class BsonObjWriter;
-
-    explicit BsonArrWriter(UniqueBSONArrayBuilder bab) : _bab(std::move(bab)) {}
-
-    UniqueBSONArrayBuilder _bab;
-};
-
-inline BsonObjWriter BsonObjWriter::startObj(StringData fieldName) {
-    return BsonObjWriter(UniqueBSONObjBuilder(_bob.subobjStart(fieldName)));
-}
-
-inline void BsonObjWriter::finishObj(StringData, BsonObjWriter) {
-    // Do nothing. The BsonObjWriter class's destructor will perform any necessary finishing steps.
-}
-
-inline BsonArrWriter BsonObjWriter::startArr(StringData fieldName) {
-    return BsonArrWriter(UniqueBSONArrayBuilder(_bob.subarrayStart(fieldName)));
-}
-
-inline void BsonObjWriter::finishArr(StringData, BsonArrWriter) {
-    // Do nothing. The BsonArrWriter class's destructor will perform any necessary finishing steps.
-}
-
 inline BsonObjWriter BsonArrWriter::startObj() {
     return BsonObjWriter(UniqueBSONObjBuilder(_bab.subobjStart()));
 }
@@ -135,73 +144,37 @@ inline void BsonArrWriter::finishObj(BsonObjWriter) {
     // Do nothing. The BsonObjWriter class's destructor will perform any necessary finishing steps.
 }
 
-inline BsonArrWriter BsonArrWriter::startArr() {
-    return BsonArrWriter(UniqueBSONArrayBuilder(_bab.subarrayStart()));
-}
-
-inline void BsonArrWriter::finishArr(BsonArrWriter) {
-    // Do nothing. The BsonArrWriter class's destructor will perform any necessary finishing steps.
-}
-
-class ArrayWriter;
-
-/**
- * MakeObj writer for outputting SBE objects.
- */
-class ObjectWriter {
-public:
-    ObjectWriter() {
-        auto [tag, val] = value::makeNewObject();
-        _obj = std::unique_ptr<value::Object>{value::bitcastTo<value::Object*>(val)};
-    }
-
-    void appendValue(StringData fieldName, value::TypeTags tag, value::Value val) {
-        auto [copyTag, copyVal] = value::copyValue(tag, val);
-        _obj->push_back(fieldName, copyTag, copyVal);
-    }
-
-    inline ObjectWriter startObj(StringData fieldName);
-
-    inline void finishObj(StringData fieldName, ObjectWriter nestedWriter);
-
-    inline ArrayWriter startArr(StringData fieldName);
-
-    inline void finishArr(StringData fieldName, ArrayWriter nestedWriter);
-
-    std::pair<value::TypeTags, value::Value> done() {
-        return {value::TypeTags::Object, value::bitcastFrom<value::Object*>(_obj.release())};
-    }
-
-private:
-    friend class ArrayWriter;
-
-    std::unique_ptr<value::Object> _obj;
-};
+class ObjectWriter;
 
 /**
  * MakeObj writer for outputting SBE arrays.
  */
 class ArrayWriter {
 public:
-    ArrayWriter() {
+    MONGO_COMPILER_ALWAYS_INLINE ArrayWriter() {
         auto [tag, val] = value::makeNewArray();
         _arr = std::unique_ptr<value::Array>{value::bitcastTo<value::Array*>(val)};
     }
 
-    void appendValue(value::TypeTags tag, value::Value val) {
+    MONGO_COMPILER_ALWAYS_INLINE void appendValue(value::TypeTags tag, value::Value val) {
         auto [copyTag, copyVal] = value::copyValue(tag, val);
         _arr->push_back(copyTag, copyVal);
     }
 
-    inline ObjectWriter startObj();
+    MONGO_COMPILER_ALWAYS_INLINE_WITH_INLINE_SPEC ObjectWriter startObj();
 
-    inline void finishObj(ObjectWriter nestedWriter);
+    MONGO_COMPILER_ALWAYS_INLINE_WITH_INLINE_SPEC void finishObj(ObjectWriter nestedWriter);
 
-    inline ArrayWriter startArr();
+    MONGO_COMPILER_ALWAYS_INLINE ArrayWriter startArr() {
+        return ArrayWriter();
+    }
 
-    inline void finishArr(ArrayWriter nestedWriter);
+    MONGO_COMPILER_ALWAYS_INLINE void finishArr(ArrayWriter nestedWriter) {
+        _arr->push_back(value::TypeTags::Array,
+                        value::bitcastFrom<value::Array*>(nestedWriter._arr.release()));
+    }
 
-    std::pair<value::TypeTags, value::Value> done() {
+    MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> done() {
         return {value::TypeTags::Array, value::bitcastFrom<value::Array*>(_arr.release())};
     }
 
@@ -211,25 +184,52 @@ private:
     std::unique_ptr<value::Array> _arr;
 };
 
-inline ObjectWriter ObjectWriter::startObj(StringData) {
-    return ObjectWriter();
-}
+/**
+ * MakeObj writer for outputting SBE objects.
+ */
+class ObjectWriter {
+public:
+    MONGO_COMPILER_ALWAYS_INLINE ObjectWriter() {
+        auto [tag, val] = value::makeNewObject();
+        _obj = std::unique_ptr<value::Object>{value::bitcastTo<value::Object*>(val)};
+    }
 
-inline void ObjectWriter::finishObj(StringData fieldName, ObjectWriter nestedWriter) {
-    _obj->push_back(fieldName,
-                    value::TypeTags::Object,
-                    value::bitcastFrom<value::Object*>(nestedWriter._obj.release()));
-}
+    MONGO_COMPILER_ALWAYS_INLINE void appendValue(StringData fieldName,
+                                                  value::TypeTags tag,
+                                                  value::Value val) {
+        auto [copyTag, copyVal] = value::copyValue(tag, val);
+        _obj->push_back(fieldName, copyTag, copyVal);
+    }
 
-inline ArrayWriter ObjectWriter::startArr(StringData) {
-    return ArrayWriter();
-}
+    MONGO_COMPILER_ALWAYS_INLINE ObjectWriter startObj(StringData) {
+        return ObjectWriter();
+    }
 
-inline void ObjectWriter::finishArr(StringData fieldName, ArrayWriter nestedWriter) {
-    _obj->push_back(fieldName,
-                    value::TypeTags::Array,
-                    value::bitcastFrom<value::Array*>(nestedWriter._arr.release()));
-}
+    MONGO_COMPILER_ALWAYS_INLINE void finishObj(StringData fieldName, ObjectWriter nestedWriter) {
+        _obj->push_back(fieldName,
+                        value::TypeTags::Object,
+                        value::bitcastFrom<value::Object*>(nestedWriter._obj.release()));
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE ArrayWriter startArr(StringData) {
+        return ArrayWriter();
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE void finishArr(StringData fieldName, ArrayWriter nestedWriter) {
+        _obj->push_back(fieldName,
+                        value::TypeTags::Array,
+                        value::bitcastFrom<value::Array*>(nestedWriter._arr.release()));
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> done() {
+        return {value::TypeTags::Object, value::bitcastFrom<value::Object*>(_obj.release())};
+    }
+
+private:
+    friend class ArrayWriter;
+
+    std::unique_ptr<value::Object> _obj;
+};
 
 inline ObjectWriter ArrayWriter::startObj() {
     return ObjectWriter();
@@ -239,14 +239,4 @@ inline void ArrayWriter::finishObj(ObjectWriter nestedWriter) {
     _arr->push_back(value::TypeTags::Object,
                     value::bitcastFrom<value::Object*>(nestedWriter._obj.release()));
 }
-
-inline ArrayWriter ArrayWriter::startArr() {
-    return ArrayWriter();
-}
-
-inline void ArrayWriter::finishArr(ArrayWriter nestedWriter) {
-    _arr->push_back(value::TypeTags::Array,
-                    value::bitcastFrom<value::Array*>(nestedWriter._arr.release()));
-}
-
 }  // namespace mongo::sbe::vm
