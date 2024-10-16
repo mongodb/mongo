@@ -355,7 +355,7 @@ void OplogWriterImpl::_writeOplogBatchForRange(OperationContext* opCtx,
 
     // The 'nsOrUUID' is used only to log the debug message when retrying inserts on the
     // oplog and change collections. The 'writeConflictRetry' helper assumes operations
-    // are done on a single a single namespace. But the provided insert function can do
+    // are done on a single namespace. But the provided insert function can do
     // inserts on the oplog and/or multiple change collections, ie. multiple namespaces.
     // As such 'writeConflictRetry' will not log the correct namespace when retrying.
     NamespaceStringOrUUID nsOrUUID = writeOplogColl
