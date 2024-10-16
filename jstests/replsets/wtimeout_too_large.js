@@ -6,7 +6,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({name: jsTestName(), nodes: 2});
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const dbName = "testdb";
 const collName = "testcoll";

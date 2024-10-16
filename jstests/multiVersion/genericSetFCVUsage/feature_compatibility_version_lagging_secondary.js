@@ -14,7 +14,7 @@ function runTest(downgradeVersion) {
         settings: {chainingAllowed: false}
     });
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
 
     let primary = rst.getPrimary();
     let latestSecondary = rst.getSecondary();

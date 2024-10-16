@@ -10,7 +10,7 @@ const replTest = new ReplSetTest({nodes: 2, useBridge: true});
 const nodes = replTest.startSet();
 // Initiating with a high election timeout prevents unnecessary elections and also prevents
 // the primary from stepping down if it cannot communicate with the secondary.
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 const primary = replTest.getPrimary();
 const secondary = replTest.getSecondary();
 

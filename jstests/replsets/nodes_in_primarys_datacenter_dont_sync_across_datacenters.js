@@ -39,7 +39,7 @@ const rst = new ReplSetTest({
 });
 
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const testNode = rst.getSecondaries()[0];

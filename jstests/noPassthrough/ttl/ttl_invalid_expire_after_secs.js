@@ -21,7 +21,7 @@ function test(expireAfterSecondsVal) {
         settings: {chainingAllowed: false},
     });
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
 
     let primary = rst.getPrimary();
     const db = primary.getDB('test');

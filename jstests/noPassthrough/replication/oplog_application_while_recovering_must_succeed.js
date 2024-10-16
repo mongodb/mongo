@@ -24,7 +24,7 @@ function runTest(op, result) {
     jsTestLog(`Testing "${op}" oplog application during recovery that finishes with "${result}".`);
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
     let conn = rst.getPrimary();
 
     // Construct a valid oplog entry.

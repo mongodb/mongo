@@ -17,7 +17,7 @@ const rst = new ReplSetTest({
 });
 
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 rst.awaitNodesAgreeOnPrimary();
 
 const primary = rst.getPrimary();

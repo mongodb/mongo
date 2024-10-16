@@ -9,7 +9,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // Create set with one node.
 const rst = new ReplSetTest({name: jsTestName(), nodes: 1, useBridge: true});
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");

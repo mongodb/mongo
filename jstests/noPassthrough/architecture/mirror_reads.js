@@ -320,7 +320,7 @@ function verifyMirrorReads(rst, db, cmd) {
         }
     });
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
 
     jsTestLog(`Attempting invalid mirrorReads parameters`);
     assert.commandFailed(setParameter({rst: rst, value: 0.5}));
@@ -496,7 +496,7 @@ function verifyMirroringDistribution(rst) {
             }
         });
         rst.startSet();
-        rst.initiate();
+        rst.initiateWithHighElectionTimeout();
 
         jsTestLog(`Verifying mirroring distribution for ${secondaries} secondaries`);
         verifyMirroringDistribution(rst);

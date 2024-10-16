@@ -14,7 +14,7 @@ const nodes = replTest.startSet();
 
 // Increase the election timeout to 24 hours so that we do not accidentally trigger an election
 // while the secondary is restarting.
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 
 const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();

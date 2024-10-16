@@ -86,7 +86,7 @@ const rst = new ReplSetTest({
     nodes: 3,
 });
 const nodes = rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 rst.awaitNodesAgreeOnPrimary();
 
 const dbName = "test";

@@ -12,7 +12,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // Start one of the nodes with priority: 0 to avoid elections.
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 let primary = rst.getPrimary();
 

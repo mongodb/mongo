@@ -18,7 +18,7 @@ var replSet = new ReplSetTest({
     ]
 });
 replSet.startSet();
-replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+replSet.initiate();
 
 replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 var primary = replSet.getPrimary();

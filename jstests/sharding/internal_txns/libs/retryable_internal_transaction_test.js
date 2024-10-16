@@ -41,8 +41,7 @@ export function getOplogEntriesForTxnWithRetries(rs, lsid, txnNumber) {
     return oplogEntries;
 }
 
-export function RetryableInternalTransactionTest(collectionOptions = {},
-                                                 initiateWithDefaultElectionTimeout = false) {
+export function RetryableInternalTransactionTest(collectionOptions = {}) {
     // This test requires running prepareTransaction and commitTransaction directly against the
     // shard.
     TestData.replicaSetEndpointIncompatible = true;
@@ -63,8 +62,7 @@ export function RetryableInternalTransactionTest(collectionOptions = {},
                 maxNumberOfTransactionOperationsInSingleOplogEntry:
                     maxNumberOfTransactionOperationsInSingleOplogEntry
             }
-        },
-        initiateWithDefaultElectionTimeout: initiateWithDefaultElectionTimeout
+        }
     });
 
     const kTestMode = {kNonRecovery: 1, kRestart: 2, kFailover: 3, kRollback: 4};

@@ -27,7 +27,7 @@ const replTest = new ReplSetTest({
     }
 });
 replTest.startSet();
-replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+replTest.initiate();
 
 // Asserts that documents in the pre-images collection on the primary node are the same as on a
 // secondary node.

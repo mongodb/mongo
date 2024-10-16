@@ -11,7 +11,7 @@ import {assertVoteCount, isMemberNewlyAdded} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({name: jsTestName(), nodes: 1});
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 

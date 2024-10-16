@@ -29,7 +29,7 @@ config.members[2].priority = 0;
 config.settings = {
     chainingAllowed: false
 };
-rst.initiate(config);
+rst.initiateWithHighElectionTimeout(config);
 
 let rollbackTest = new RollbackTest("history_rollback_test", rst);
 let rollbackNode = rollbackTest.getPrimary();

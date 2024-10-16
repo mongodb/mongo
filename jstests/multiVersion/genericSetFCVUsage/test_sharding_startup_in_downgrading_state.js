@@ -16,16 +16,7 @@ function runSharding() {
     let configPrimary;
     let configPrimaryAdminDB;
 
-    const st = new ShardingTest({
-        shards: {rs0: {nodes: 2}, rs1: {nodes: 2}},
-        config: 1,
-        mongos: 1,
-        // By default, our test infrastructure sets the election timeout to a very high value (24
-        // hours). For this test, we need a shorter election timeout because it relies on nodes
-        // running an election when they do not detect an active primary. Therefore, we are setting
-        // the electionTimeoutMillis to its default value.
-        initiateWithDefaultElectionTimeout: true
-    });
+    const st = new ShardingTest({shards: {rs0: {nodes: 2}, rs1: {nodes: 2}}, config: 1, mongos: 1});
 
     mongosAdminDB = st.s.getDB("admin");
     configPrimary = st.configRS.getPrimary();

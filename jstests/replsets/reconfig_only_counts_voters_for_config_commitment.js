@@ -18,7 +18,7 @@ var replTest = new ReplSetTest({
     useBridge: true
 });
 var nodes = replTest.startSet();
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 var primary = replTest.getPrimary();
 var secondary = replTest.getSecondary();
 

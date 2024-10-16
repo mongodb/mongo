@@ -10,7 +10,7 @@ function stepDownPrimary(replTest) {
 
 const replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
-replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+replTest.initiate();
 
 ////////////////////////////////////////////////////////////////////////
 // Test insert command

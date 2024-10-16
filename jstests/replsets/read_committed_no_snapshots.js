@@ -28,10 +28,8 @@ var replTest = new ReplSetTest({
 replTest.startSet();
 
 // Cannot wait for a stable recovery timestamp due to the no-snapshot secondary.
-replTest.initiate(
-    null,
-    "replSetInitiate",
-    {doNotWaitForStableRecoveryTimestamp: true, initiateWithDefaultElectionTimeout: true});
+replTest.initiateWithAnyNodeAsPrimary(
+    null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
 // Get connections and collection.
 var primary = replTest.getPrimary();

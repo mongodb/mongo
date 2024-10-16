@@ -38,7 +38,7 @@ insertInvalidUTF8(testColl, uri, mongod, numDocs);
 const replSet = new ReplSetTest({name: jsTestName(), nodes: 2});
 replSet.start(0, {dbpath: dbpath, noCleanData: true});
 replSet.start(1);
-replSet.initiate();
+replSet.initiateWithHighElectionTimeout();
 
 const primary = replSet.getPrimary();
 const secondary = replSet.getSecondary();

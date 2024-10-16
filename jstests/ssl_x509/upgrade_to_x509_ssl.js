@@ -36,7 +36,7 @@ var rst = new ReplSetTest({
 });
 rst.startSet();
 
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 // Connect to master and do some basic operations
 var rstConn1 = rst.getPrimary();

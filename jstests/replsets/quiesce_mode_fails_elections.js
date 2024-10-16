@@ -12,7 +12,7 @@ const rst = new ReplSetTest({
 });
 
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const dbName = "test";
 const primary = rst.getPrimary();

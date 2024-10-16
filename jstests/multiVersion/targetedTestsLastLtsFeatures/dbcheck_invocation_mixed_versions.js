@@ -80,7 +80,7 @@ const latestLastLTSReplSet = new ReplSetTest({
 });
 
 latestLastLTSReplSet.startSet();
-latestLastLTSReplSet.initiate();
+latestLastLTSReplSet.initiateWithHighElectionTimeout();
 latestLastLTSReplSet.awaitSecondaryNodes();
 
 testDbCheckInvocationParameters(latestLastLTSReplSet);
@@ -97,7 +97,7 @@ const lastLTSLatestReplSet = new ReplSetTest({
 });
 
 lastLTSLatestReplSet.startSet();
-lastLTSLatestReplSet.initiate();
+lastLTSLatestReplSet.initiateWithHighElectionTimeout();
 lastLTSLatestReplSet.awaitSecondaryNodes();
 
 testDbCheckInvocationParameters(lastLTSLatestReplSet);

@@ -18,7 +18,7 @@ const cmdList = [
 TestData.enableTestCommands = false;
 let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
-rst.initiate(null, "replSetInitiate", {doNotWaitForNewlyAddedRemovals: true});
+rst.initiateWithAnyNodeAsPrimary(null, "replSetInitiate", {doNotWaitForNewlyAddedRemovals: true});
 
 let primary = rst.getPrimary();
 for (let cmd of cmdList) {
@@ -31,7 +31,7 @@ rst.stopSet();
 TestData.enableTestCommands = true;
 rst = new ReplSetTest({nodes: 1});
 rst.startSet();
-rst.initiate(null, "replSetInitiate", {doNotWaitForNewlyAddedRemovals: true});
+rst.initiateWithAnyNodeAsPrimary(null, "replSetInitiate", {doNotWaitForNewlyAddedRemovals: true});
 
 primary = rst.getPrimary();
 for (let cmd of cmdList) {

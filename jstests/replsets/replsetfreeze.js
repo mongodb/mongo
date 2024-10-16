@@ -51,7 +51,7 @@ var config = {
         {"_id": 2, "host": nodes[2], "arbiterOnly": true}
     ]
 };
-var r = replTest.initiate(config, null, {initiateWithDefaultElectionTimeout: true});
+var r = replTest.initiate(config);
 
 replTest.awaitNodesAgreeOnPrimary();
 

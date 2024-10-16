@@ -31,7 +31,7 @@ const replSet = new ReplSetTest({
 });
 
 replSet.startSet();
-replSet.initiate();
+replSet.initiateWithHighElectionTimeout();
 
 const dbName = "test";
 const collName = jsTestName();

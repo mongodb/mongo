@@ -25,7 +25,7 @@ import {
         nodes: [{}, {rsConfig: {arbiterOnly: true}}],
     });
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
 
     const primary = rst.getPrimary();
     assertVoteCount(primary, {
@@ -72,7 +72,7 @@ import {
         nodes: [{}, {rsConfig: {votes: 0, priority: 0}}, {rsConfig: {arbiterOnly: true}}],
     });
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
 
     const primary = rst.getPrimary();
     assertVoteCount(primary, {
@@ -116,7 +116,7 @@ import {
         nodes: [{}, {rsConfig: {arbiterOnly: true}}],
     });
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
 
     const primary = rst.getPrimary();
     assertVoteCount(primary, {

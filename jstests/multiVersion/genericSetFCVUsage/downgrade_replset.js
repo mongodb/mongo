@@ -18,7 +18,7 @@ function runDowngradeTest(downgradeVersion) {
     const downgradeFCV = binVersionToFCV(downgradeVersion);
     let rst = new ReplSetTest({name: name, nodes: nodes, waitForKeys: true});
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
 
     let primary = rst.getPrimary();
     let coll = "test.foo";

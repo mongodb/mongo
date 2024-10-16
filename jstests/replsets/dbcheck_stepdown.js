@@ -20,7 +20,7 @@ const rst = new ReplSetTest({
     nodeOptions: {setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
 });
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 logEveryBatch(rst);
 const dbName = "dbCheck_stepdown";

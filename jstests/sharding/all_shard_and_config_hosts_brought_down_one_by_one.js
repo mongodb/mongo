@@ -24,12 +24,7 @@ var st = new ShardingTest({
     shards: {
         rs0: {nodes: 2},
     },
-    config: 3,
-    // By default, our test infrastructure sets the election timeout to a very high value
-    // (24 hours). For this test, we need a shorter election timeout because it relies on
-    // nodes running an election when they do not detect an active primary. Therefore, we
-    // are setting the electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    config: 3
 });
 // TODO (SERVER-83433): Add back the test coverage for running db hash and validation check on
 // replica set that is fsync locked and has replica set endpoint enabled.

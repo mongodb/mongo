@@ -9,7 +9,7 @@ const testName = "initial_sync_fails_after_source_resyncs";
 const rst = new ReplSetTest(
     {name: testName, nodes: [{}, {rsConfig: {priority: 0, votes: 0}}], useBridge: true});
 const nodes = rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");

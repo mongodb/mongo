@@ -40,7 +40,6 @@ export var ReshardingTest = class {
         wiredTigerConcurrentWriteTransactions: wiredTigerConcurrentWriteTransactions = undefined,
         reshardingOplogBatchTaskCount: reshardingOplogBatchTaskCount = undefined,
         ttlMonitorSleepSecs: ttlMonitorSleepSecs = undefined,
-        initiateWithDefaultElectionTimeout: initiateWithDefaultElectionTimeout = false
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -74,7 +73,6 @@ export var ReshardingTest = class {
         this._wiredTigerConcurrentWriteTransactions = wiredTigerConcurrentWriteTransactions;
         this._reshardingOplogBatchTaskCount = reshardingOplogBatchTaskCount;
         this._ttlMonitorSleepSecs = ttlMonitorSleepSecs;
-        this._initiateWithDefaultElectionTimeout = initiateWithDefaultElectionTimeout;
         /** @private */
         this._opType = "reshardCollection";
 
@@ -137,7 +135,6 @@ export var ReshardingTest = class {
             // getting rolled back.
             rsOptions.settings = {catchUpTimeoutMillis: 0};
             configReplSetTestOptions.settings = {catchUpTimeoutMillis: 0};
-            this._initiateWithDefaultElectionTimeout = true;
 
             rsOptions.setParameter.enableElectionHandoff = 0;
             configOptions.setParameter.enableElectionHandoff = 0;
@@ -221,7 +218,6 @@ export var ReshardingTest = class {
             configReplSetTestOptions,
             manualAddShard: true,
             configShard: this._configShard,
-            initiateWithDefaultElectionTimeout: this._initiateWithDefaultElectionTimeout
         });
 
         for (let i = 0; i < this._numShards; ++i) {

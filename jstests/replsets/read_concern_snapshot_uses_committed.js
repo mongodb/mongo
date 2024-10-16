@@ -18,7 +18,7 @@ import {
 
 const replSet = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 replSet.startSet();
-replSet.initiate();
+replSet.initiateWithHighElectionTimeout();
 
 const dbName = "test";
 const collName = "coll";

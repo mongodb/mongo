@@ -95,7 +95,7 @@ const rst = new ReplSetTest({
     nodes: 2,
 });
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 checkClusterParameterInitialSync(rst);
 checkClusterParameterRestart(rst);

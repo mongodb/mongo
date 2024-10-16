@@ -22,7 +22,7 @@ var replTest = new ReplSetTest({
     nodeOptions: {verbose: 1}
 });
 var nodes = replTest.startSet();
-replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+replTest.initiate();
 replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY);
 var primary = replTest.getPrimary();
 

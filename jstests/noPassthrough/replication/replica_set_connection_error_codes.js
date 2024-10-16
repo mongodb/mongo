@@ -24,7 +24,7 @@ const rst = new ReplSetTest({
     }
 });
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 const directConn = rst.getPrimary();
 const rsConn = new Mongo(rst.getURL());

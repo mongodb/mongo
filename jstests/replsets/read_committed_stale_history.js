@@ -25,7 +25,7 @@ var rst = new ReplSetTest({
 
 rst.startSet();
 var nodes = rst.nodes;
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 /**
  * Waits for the given node to be in state primary *and* have finished drain mode and thus

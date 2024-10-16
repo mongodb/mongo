@@ -193,7 +193,7 @@ const replSetConfig = {
 
 const replTest = new ReplSetTest(replSetConfig);
 replTest.startSet();
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 const replDb = replTest.getPrimary().getDB(jsTestName());
 runTest(replDb, [replTest], false);
 runTest(replDb, [replTest], true);

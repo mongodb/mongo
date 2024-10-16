@@ -65,27 +65,18 @@ function runTest(host, rst, waitForPrimary) {
 // Test querying a replica set primary directly.
 var rst = new ReplSetTest({nodes: 1});
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 runTest(rst.getPrimary().host, rst, false);
 rst.stopSet();
 
 rst = new ReplSetTest({nodes: 2});
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 runTest(rst.getURL(), rst, true);
 rst.stopSet();
 
 // Test querying a replica set primary through mongos.
-var st = new ShardingTest({
-    shards: 1,
-    rs: {nodes: 2},
-    config: 2,
-    // By default, our test infrastructure sets the election timeout to a very high value (24
-    // hours). For this test, we need a shorter election timeout because it relies on nodes running
-    // an election when they do not detect an active primary. Therefore, we are setting the
-    // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
-});
+var st = new ShardingTest({shards: 1, rs: {nodes: 2}, config: 2});
 rst = st.rs0;
 runTest(st.s0.host, rst, true);
 st.stop();

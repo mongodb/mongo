@@ -60,7 +60,7 @@ const rst = new ReplSetTest(rstOpts);
 // in the inMemory variant this replica set doesn't get started with the "inMemory" storage engine
 // and fail since the config server cannot use the "inMemory" storage engine.
 rst.startSet(TestData.configShard ? {storageEngine: "wiredTiger"} : {});
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 const primary = rst.getPrimary();
 
 // Create a user for running commands later on in the test. Make the user not have the

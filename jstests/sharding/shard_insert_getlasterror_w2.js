@@ -29,18 +29,8 @@ for (var i = 0; i < 40; i++) {
 }
 
 // Spin up a sharded cluster, but do not add the shards
-var shardingTestConfig = {
-    name: baseName,
-    mongos: 1,
-    shards: 1,
-    rs: {nodes: replNodes},
-    other: {manualAddShard: true},
-    // By default, our test infrastructure sets the election timeout to a very high value (24
-    // hours). For this test, we need a shorter election timeout because it relies on nodes running
-    // an election when they do not detect an active primary. Therefore, we are setting the
-    // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
-};
+var shardingTestConfig =
+    {name: baseName, mongos: 1, shards: 1, rs: {nodes: replNodes}, other: {manualAddShard: true}};
 var shardingTest = new ShardingTest(shardingTestConfig);
 
 // Get connection to the individual shard

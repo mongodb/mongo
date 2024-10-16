@@ -116,7 +116,7 @@ var rt = new ReplSetTest({
 });
 rt.startSet();
 // Initiate the replica set with high election timeout to avoid accidental elections.
-rt.initiate();
+rt.initiateWithHighElectionTimeout();
 
 rt.awaitSecondaryNodes();
 

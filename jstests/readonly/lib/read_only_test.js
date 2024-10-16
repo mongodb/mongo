@@ -27,17 +27,8 @@ ShardedFixture = function() {
 };
 
 ShardedFixture.prototype.runLoadPhase = function runLoadPhase(test) {
-    this.st = new ShardingTest({
-        mongos: 1,
-        config: this.nConfigs,
-        shards: this.nShards,
-        rs: {nodes: 1},
-        // By default, our test infrastructure sets the election timeout to a very high value (24
-        // hours). For this test, we need a shorter election timeout because it relies on nodes
-        // running an election when they do not detect an active primary. Therefore, we are setting
-        // the electionTimeoutMillis to its default value.
-        initiateWithDefaultElectionTimeout: true
-    });
+    this.st =
+        new ShardingTest({mongos: 1, config: this.nConfigs, shards: this.nShards, rs: {nodes: 1}});
 
     // This information will be needed later on to set up the shards on read only mode.
     this.dbPaths = [];

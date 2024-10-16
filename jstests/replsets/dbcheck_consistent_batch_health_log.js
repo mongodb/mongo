@@ -20,7 +20,7 @@ const replSet = new ReplSetTest({
     nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: dbCheckHealthLogEveryNBatches}},
 });
 replSet.startSet();
-replSet.initiate();
+replSet.initiateWithHighElectionTimeout();
 
 const dbName = "dbCheckConsistentHealthLog";
 const collName = "collName";

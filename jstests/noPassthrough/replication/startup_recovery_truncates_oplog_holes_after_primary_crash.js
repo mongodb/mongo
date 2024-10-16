@@ -19,7 +19,7 @@ const rst = new ReplSetTest({name: jsTest.name(), nodes: 2});
 rst.startSet();
 // Make sure there are no election timeouts. This should prevent primary stepdown. Normally we would
 // set the secondary node votes to 0, but that would affect the feature that is being tested.
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const dbName = "testDB";

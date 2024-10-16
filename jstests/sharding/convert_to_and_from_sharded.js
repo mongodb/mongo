@@ -299,7 +299,7 @@ const st = new ShardingTest({
 const replShard = new ReplSetTest({nodes: NUM_NODES, nodeOptions: nodeOptions});
 
 replShard.startSet({verbose: 1});
-replShard.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+replShard.initiate();
 let priConn = replShard.getPrimary();
 
 // Insert the initial documents for the background CRUD threads.

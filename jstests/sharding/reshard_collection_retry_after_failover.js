@@ -29,8 +29,7 @@ const getTempUUID = (tempNs) => {
     return getUUIDFromConfigCollections(mongos, tempCollection.getFullName());
 };
 
-const reshardingTest = new ReshardingTest(
-    {numDonors: 1, minimumOperationDurationMS: 0, initiateWithDefaultElectionTimeout: true});
+const reshardingTest = new ReshardingTest({numDonors: 1, minimumOperationDurationMS: 0});
 reshardingTest.setup();
 const donorShardNames = reshardingTest.donorShardNames;
 const recipientShardNames = reshardingTest.recipientShardNames;

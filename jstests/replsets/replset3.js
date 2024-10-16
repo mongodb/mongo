@@ -13,7 +13,7 @@ var doTest = function(signal) {
 
     // Call initiate() to send the replSetInitiate command
     // This will wait for initiation
-    replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    replTest.initiate();
 
     // Get primary node
     var primary = replTest.getPrimary();

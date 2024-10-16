@@ -19,7 +19,7 @@ const rst = new ReplSetTest({
     nodeOptions: {setParameter: {ttlMonitorSleepSecs: 1}},
 });
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 let primary = rst.getPrimary();
 let secondary = rst.getSecondary();

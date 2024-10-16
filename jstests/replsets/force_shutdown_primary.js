@@ -16,7 +16,7 @@ import {stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
 
 const replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 
 const primary = replTest.getPrimary();
 const testDB = primary.getDB("test");

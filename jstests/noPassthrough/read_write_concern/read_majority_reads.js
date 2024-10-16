@@ -178,7 +178,8 @@ var replTest = new ReplSetTest({
 });
 replTest.startSet();
 // Cannot wait for a stable recovery timestamp with 'testingSnapshotBehaviorInIsolation' set.
-replTest.initiate(null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
+replTest.initiateWithAnyNodeAsPrimary(
+    null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
 var mongod = replTest.getPrimary();
 

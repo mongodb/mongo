@@ -9,7 +9,7 @@ const collName = "testcoll";
 
 const rst = new ReplSetTest({name: jsTestName(), nodes: 7});
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);

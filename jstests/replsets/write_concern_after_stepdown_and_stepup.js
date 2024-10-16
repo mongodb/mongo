@@ -22,7 +22,7 @@ var rst = new ReplSetTest({
     useBridge: true
 });
 var nodes = rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 function waitForPrimary(node) {
     assert.soon(function() {

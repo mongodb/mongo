@@ -24,12 +24,7 @@ let overrideMaxAwaitTimeMS = {'mode': 'alwaysOn', 'data': {maxAwaitTimeMS: 5 * 6
 let st = new ShardingTest({
     mongos:
         {s0: {setParameter: {"failpoint.overrideMaxAwaitTimeMS": tojson(overrideMaxAwaitTimeMS)}}},
-    shards: {rs0: {nodes: [{}, {}, {rsConfig: {priority: 0}}]}},
-    // By default, our test infrastructure sets the election timeout to a very high value (24
-    // hours). For this test, we need a shorter election timeout because it relies on nodes running
-    // an election when they do not detect an active primary. Therefore, we are setting the
-    // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    shards: {rs0: {nodes: [{}, {}, {rsConfig: {priority: 0}}]}}
 });
 
 let timeoutMS = 20000;

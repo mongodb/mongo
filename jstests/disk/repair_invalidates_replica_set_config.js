@@ -23,7 +23,7 @@ const collName = "test";
 
 let replSet = new ReplSetTest({nodes: 2});
 replSet.startSet();
-replSet.initiate();
+replSet.initiateWithHighElectionTimeout();
 replSet.awaitReplication();
 
 const originalSecondary = replSet.getSecondary();

@@ -27,12 +27,7 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
 
                 rsOptions: {binVersion: oldVersion},
                 rs: true,
-            },
-            // By default, our test infrastructure sets the election timeout to a very high value
-            // (24 hours). For this test, we need a shorter election timeout because it relies on
-            // nodes running an election when they do not detect an active primary. Therefore, we
-            // are setting the electionTimeoutMillis to its default value.
-            initiateWithDefaultElectionTimeout: true
+            }
         });
 
         const oldVersionIs73 = MongoRunner.areBinVersionsTheSame("7.3", oldVersion);

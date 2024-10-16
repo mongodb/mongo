@@ -16,7 +16,7 @@ var rt = new ReplSetTest({name: "ttl_repl", nodes: 2});
 
 // setup set
 var nodes = rt.startSet();
-rt.initiate();
+rt.initiateWithHighElectionTimeout();
 var primary = rt.getPrimary();
 rt.awaitSecondaryNodes();
 var secondary1 = rt.getSecondary();

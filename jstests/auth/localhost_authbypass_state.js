@@ -94,7 +94,7 @@ const replset = new ReplSetTest({
     useHostName: false,
 });
 replset.startSet();
-replset.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+replset.initiate();
 replset.awaitSecondaryNodes();
 runTest('ReplSet', {primary: replset.getPrimary(), replset: replset, wc: replsetWC}, function() {
     const kAppliedOpTimeTimeoutMS = 10 * 1000;

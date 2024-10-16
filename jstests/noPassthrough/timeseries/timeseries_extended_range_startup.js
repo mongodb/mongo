@@ -16,7 +16,7 @@ const getExtendedRangeCount = (db) => {
 
 const rst = new ReplSetTest({name: jsTestName(), nodes: 2});
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const secondary = rst.getSecondary();

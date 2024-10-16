@@ -14,7 +14,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 function runTest(downgradeFCV) {
     const rst = new ReplSetTest({name: jsTestName(), nodes: 2});
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
 
     let primary = rst.getPrimary();
 

@@ -10,7 +10,7 @@ function runTest(downgradeVersion) {
     });
 
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
 
     let testDB = rst.getPrimary().getDB(jsTestName());
     let coll = testDB.change_stream_upgrade;

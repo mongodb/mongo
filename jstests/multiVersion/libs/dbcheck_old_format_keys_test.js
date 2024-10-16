@@ -49,9 +49,9 @@ export class DbCheckOldFormatKeysTest {
             const rst = new ReplSetTest({name, nodes});
             rst.startSet();
             if (initiateWithHighElectionTimeout) {
-                rst.initiate();
+                rst.initiateWithHighElectionTimeout();
             } else {
-                rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+                rst.initiate();
             }
             return rst;
         }

@@ -35,7 +35,7 @@ const rst = new ReplSetTest({
 
 const nodes = rst.startSet();
 let restoreNode = nodes[1];
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 logEveryBatch(rst);
 
 const primary = rst.getPrimary();

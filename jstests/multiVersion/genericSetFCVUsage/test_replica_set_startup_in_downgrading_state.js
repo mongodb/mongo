@@ -14,7 +14,7 @@ function runReplicaSet() {
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: "latest"}});
 
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
 
     const primaryAdminDB = rst.getPrimary().getDB("admin");
     const primary = rst.getPrimary();

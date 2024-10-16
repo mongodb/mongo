@@ -17,7 +17,7 @@ const rst = new ReplSetTest({
 
 // Turn on the collecting of query stats metrics.
 rst.startSet({setParameter: {internalQueryStatsRateLimit: -1}});
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 let conn = rst.getPrimary();
 const collName = jsTestName();

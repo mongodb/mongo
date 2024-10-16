@@ -23,7 +23,7 @@ const collName = "dbCheckClusteredCollectionsColl";
 
 const replSet = new ReplSetTest({name: jsTestName(), nodes: 2});
 replSet.startSet();
-replSet.initiate();
+replSet.initiateWithHighElectionTimeout();
 
 const primary = replSet.getPrimary();
 const primaryDb = primary.getDB(dbName);

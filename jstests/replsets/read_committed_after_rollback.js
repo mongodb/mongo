@@ -41,7 +41,7 @@ var config = {
     ]
 };
 
-replTest.initiate(config, null, {initiateWithDefaultElectionTimeout: true});
+replTest.initiate(config);
 
 // Get connections.
 var oldPrimary = replTest.getPrimary();

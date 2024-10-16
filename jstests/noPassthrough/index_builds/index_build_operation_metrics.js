@@ -24,7 +24,7 @@ var rst = new ReplSetTest({
     }
 });
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 const dbName = 'test';
 const collName = 'test';

@@ -67,7 +67,7 @@ function runDataConsistencyChecks(testCase) {
         }
     });
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithNodeZeroAsPrimary();
 
     // Insert a document so the "dbhash" and "validate" commands have some actual work to do.
     assert.commandWorked(rst.nodes[0].getDB("test").mycoll.insert({}));

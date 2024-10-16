@@ -24,9 +24,7 @@ replTest.initiate({
     _id: name,
     members:
         [{_id: 0, host: nodes[0]}, {_id: 1, host: nodes[1]}, {_id: 2, host: nodes[2], priority: 0}]
-},
-                  null,
-                  {initiateWithDefaultElectionTimeout: true});
+});
 
 // The test starts with node 0 as the primary.
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);

@@ -49,7 +49,7 @@ let config = replSet.getReplSetConfig();
 config.settings = {
     chainingAllowed: false,
 };
-replSet.initiate(config);
+replSet.initiateWithHighElectionTimeout(config);
 replSet.awaitReplication();
 assert.eq(replSet.getPrimary(), nodes[0]);
 

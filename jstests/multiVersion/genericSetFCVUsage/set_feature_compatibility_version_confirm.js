@@ -55,7 +55,7 @@ function runReplicaSetTest(downgradeVersion) {
     // Spin up a replica set with latest FCV.
     const rst = new ReplSetTest({nodes: 3, nodeOptions: {binVersion: latest}});
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
 
     const primary = rst.getPrimary();
     const adminDB = primary.getDB("admin");

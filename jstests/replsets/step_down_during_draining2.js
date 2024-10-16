@@ -23,7 +23,7 @@ conf.members[2].priority = 0;
 conf.settings = conf.settings || {};
 conf.settings.chainingAllowed = false;
 conf.settings.catchUpTimeoutMillis = 0;
-replSet.initiate(conf, null, {initiateWithDefaultElectionTimeout: true});
+replSet.initiate(conf);
 
 var primary = replSet.getPrimary();
 var secondary = replSet.getSecondary();

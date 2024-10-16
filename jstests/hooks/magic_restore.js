@@ -265,7 +265,7 @@ function performMagicRestore(sourceNode, dbPath, nodeType, name, options) {
     let rst = new ReplSetTest({nodes: 1});
 
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
 
     let expectedConfig =
         assert.commandWorked(rst.getPrimary().adminCommand({replSetGetConfig: 1})).config;

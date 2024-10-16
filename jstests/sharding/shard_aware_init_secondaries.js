@@ -12,7 +12,7 @@ var st = new ShardingTest({shards: 1});
 var replTest = new ReplSetTest({nodes: 2});
 replTest.startSet({shardsvr: ''});
 var nodeList = replTest.nodeList();
-replTest.initiate({
+replTest.initiateWithHighElectionTimeout({
     _id: replTest.name,
     members: [{_id: 0, host: nodeList[0], priority: 1}, {_id: 1, host: nodeList[1], priority: 0}]
 });

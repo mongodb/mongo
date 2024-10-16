@@ -21,7 +21,7 @@ const collName = "test";
 
 const replSet = new ReplSetTest({nodes: 2});
 replSet.startSet();
-replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+replSet.initiate();
 
 const primary = replSet.getPrimary();
 const primaryDB = primary.getDB(dbName);

@@ -21,7 +21,7 @@ const replTest = new ReplSetTest({
 });
 
 replTest.startSet();
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 
 // We have to add and pause the initial sync node here, because we cannot re-initiate the set while
 // the failpoints are held.

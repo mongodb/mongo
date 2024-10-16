@@ -8,15 +8,7 @@
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const st = new ShardingTest({
-    shards: 2,
-    rs: {nodes: 3},
-    // By default, our test infrastructure sets the election timeout to a very high value (24
-    // hours). For this test, we need a shorter election timeout because it relies on nodes running
-    // an election when they do not detect an active primary. Therefore, we are setting the
-    // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
-});
+const st = new ShardingTest({shards: 2, rs: {nodes: 3}});
 
 const dbName = "test";
 const collName1 = "my_coll_1";

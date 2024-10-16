@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const testName = "initial_sync_survives_restart";
 const rst = new ReplSetTest({name: testName, nodes: 1});
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");

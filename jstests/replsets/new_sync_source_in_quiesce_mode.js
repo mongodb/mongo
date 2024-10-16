@@ -23,7 +23,7 @@ assert.commandWorked(syncSource.adminCommand({
     mode: "alwaysOn",
     data: {hostAndPort: rst.nodes[0].host}
 }));
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.

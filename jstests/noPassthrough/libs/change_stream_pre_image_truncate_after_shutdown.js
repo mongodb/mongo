@@ -69,7 +69,7 @@ export class PreImageTruncateAfterShutdownTest {
         this._rst.startSet();
 
         // Allow test cases to have complete control over which node is primary.
-        this._rst.initiate();
+        this._rst.initiateWithHighElectionTimeout();
     }
 
     teardown() {

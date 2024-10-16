@@ -12,7 +12,7 @@ const replSet = new ReplSetTest({
     nodeOptions: {setParameter: {writePeriodicNoops: true}}
 });
 replSet.startSet();
-replSet.initiate();
+replSet.initiateWithHighElectionTimeout();
 
 const primary = replSet.getPrimary();
 const secondaries = replSet.getSecondaries();

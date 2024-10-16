@@ -29,7 +29,7 @@ var config = replTest.getReplSetConfig();
 config.members[0].priority = 2;
 config.members[2].priority = 0;
 
-replTest.initiate(config, null, {initiateWithDefaultElectionTimeout: true});
+replTest.initiate(config);
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 
 var primary = replTest.getPrimary().getDB("test");

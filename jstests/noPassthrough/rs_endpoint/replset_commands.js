@@ -47,7 +47,7 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     const shard1Name = "shard1-" + extractUUIDFromObject(UUID());
     const shard1Rst = new ReplSetTest({name: shard1Name, nodes: 2});
     shard1Rst.startSet({shardsvr: ""});
-    shard1Rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    shard1Rst.initiate();
     const shard1Primary = shard1Rst.getPrimary();
 
     // Run the addShard command against shard0's primary mongod instead to verify that
@@ -108,7 +108,7 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
         useAutoBootstrapProcedure: true,
     });
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
     const primary = rst.getPrimary();
     const tearDownFunc = () => rst.stopSet();
 
@@ -123,11 +123,6 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
         rs: {nodes: 2},
         configShard: true,
         embeddedRouter: true,
-        // By default, our test infrastructure sets the election timeout to a very high value (24
-        // hours). For this test, we need a shorter election timeout because it relies on nodes
-        // running an election when they do not detect an active primary. Therefore, we are setting
-        // the electionTimeoutMillis to its default value.
-        initiateWithDefaultElectionTimeout: true
     });
     const tearDownFunc = () => st.stop();
 
@@ -143,7 +138,7 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
             {setParameter: {featureFlagAllMongodsAreSharded: true, multitenancySupport: true}},
     });
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
     const primary = rst.getPrimary();
     const tearDownFunc = () => rst.stopSet();
 

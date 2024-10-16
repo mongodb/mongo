@@ -18,7 +18,7 @@ export class RollbackIndexBuildsTest {
         let config = replTest.getReplSetConfig();
         config.members[2].priority = 0;
         config.settings = {chainingAllowed: false};
-        replTest.initiate(config);
+        replTest.initiateWithHighElectionTimeout(config);
         this.rollbackTest = new RollbackTest(jsTestName(), replTest);
         this.expectedErrors = expectedErrors;
     }

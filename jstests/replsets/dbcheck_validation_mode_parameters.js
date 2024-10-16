@@ -17,7 +17,7 @@ const replSet = new ReplSetTest({
     nodes: 2,
 });
 replSet.startSet();
-replSet.initiate();
+replSet.initiateWithHighElectionTimeout();
 
 const primary = replSet.getPrimary();
 const db = primary.getDB(dbName);

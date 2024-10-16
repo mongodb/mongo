@@ -28,7 +28,7 @@ const rst = new ReplSetTest({
     settings: {chainingAllowed: false, catchupTimeoutMillis: 0 /* disable primary catchup */},
 });
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);

@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 let primary = rst.getPrimary();
 

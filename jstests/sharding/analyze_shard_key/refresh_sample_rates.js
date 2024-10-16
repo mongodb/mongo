@@ -299,12 +299,7 @@ function runTest(createConnFn, rst, samplerNames) {
         rs: {nodes: 1, setParameter: setParameterOpts},
         other: {
             configOptions: {setParameter: setParameterOpts},
-        },
-        // By default, our test infrastructure sets the election timeout to a very high value (24
-        // hours). For this test, we need a shorter election timeout because it relies on nodes
-        // running an election when they do not detect an active primary. Therefore, we are setting
-        // the electionTimeoutMillis to its default value.
-        initiateWithDefaultElectionTimeout: true
+        }
     });
     st.configRS.isConfigSvr = true;
     const samplerNames = [st.s0.host, st.s1.host, st.s2.host];
@@ -342,7 +337,7 @@ function runTest(createConnFn, rst, samplerNames) {
 if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 3, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
     const samplerNames = rst.nodes.map(node => node.host);
 
     jsTest.log("Test that the _refreshQueryAnalyzerConfiguration command is not supported on " +

@@ -16,7 +16,7 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     var rst = new ReplSetTest({nodes: nodes});
 
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
 
     // Wait for a primary node...
     var primary = rst.getPrimary();

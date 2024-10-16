@@ -18,7 +18,7 @@ TestData.skipCheckDBHashes = true;
 
 const rst = new ReplSetTest({name: jsTestName(), nodes: 2});
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const dbName = "dbCheckRangeMissingKeys";
 const collName = "testColl";

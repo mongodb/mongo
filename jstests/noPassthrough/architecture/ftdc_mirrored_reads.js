@@ -22,7 +22,7 @@ rst.startSet({
         logComponentVerbosity: tojson({command: 1})
     }
 });
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 const primary = rst.getPrimary();
 const secondaries = rst.getSecondaries();
 

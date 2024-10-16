@@ -39,7 +39,7 @@ function runTest(docs, query, results, path, bounds) {
     const rst = new ReplSetTest({nodes: nodes});
 
     rst.startSet();
-    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+    rst.initiate();
 
     let db = rst.getPrimary().getDB("test");
 

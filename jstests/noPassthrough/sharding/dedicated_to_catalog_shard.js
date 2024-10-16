@@ -7,7 +7,6 @@
  * ]
  */
 
-import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "foo";
@@ -21,15 +20,7 @@ function flushRoutingAndDBCacheUpdates(conn) {
     assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: "notRealDB"}));
 }
 
-const st = new ShardingTest({
-    shards: 0,
-    config: 3,
-    // By default, our test infrastructure sets the election timeout to a very high value (24
-    // hours). For this test, we need a shorter election timeout because it relies on nodes running
-    // an election when they do not detect an active primary. Therefore, we are setting the
-    // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
-});
+const st = new ShardingTest({shards: 0, config: 3});
 
 const configCS = st.configRS.getURL();
 

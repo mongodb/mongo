@@ -9,14 +9,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 jsTest.log("Testing write concern (2)");
 
-let st = new ShardingTest({
-    rs: {nodes: 3},
-    // By default, our test infrastructure sets the election timeout to a very high value (24
-    // hours). For this test, we need a shorter election timeout because it relies on nodes running
-    // an election when they do not detect an active primary. Therefore, we are setting the
-    // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
-});
+let st = new ShardingTest({rs: {nodes: 3}});
 let db = st.getDB("test");
 
 var replTest = st.rs0;

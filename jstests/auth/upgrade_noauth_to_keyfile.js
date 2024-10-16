@@ -30,7 +30,7 @@ var keyFileOptions = {
 
 var rst = new ReplSetTest({name: 'noauthSet', nodes: 3, nodeOptions: noAuthOptions});
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 var rstConn1 = rst.getPrimary();
 

@@ -22,7 +22,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 
 const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();

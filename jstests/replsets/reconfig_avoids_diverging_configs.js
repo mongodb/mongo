@@ -20,7 +20,7 @@ import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 let rst = new ReplSetTest({nodes: 4, useBridge: true});
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const node0 = rst.getPrimary();
 const [node1, node2, node3] = rst.getSecondaries();

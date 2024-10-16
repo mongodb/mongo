@@ -67,17 +67,7 @@ function test(st, description, testBody) {
 }
 
 (() => {
-    const st = new ShardingTest({
-        shards: {
-            rs0: {nodes: 3},
-            rs1: {nodes: 3},
-            // By default, our test infrastructure sets the election timeout to a very high value
-            // (24 hours). For this test, we need a shorter election timeout because it relies on
-            // nodes running an election when they do not detect an active primary. Therefore, we
-            // are setting the electionTimeoutMillis to its default value.
-            initiateWithDefaultElectionTimeout: true
-        }
-    });
+    const st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
     test(st,
          "Refining the shard key does not prevent removal of orphaned documents on a donor" +
              " shard after a successful migration",

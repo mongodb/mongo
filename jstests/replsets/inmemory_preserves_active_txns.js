@@ -36,7 +36,8 @@ function doTest(commitOrAbort) {
     });
 
     replSet.startSet(PrepareHelpers.replSetStartSetOptions);
-    replSet.initiate(null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
+    replSet.initiateWithAnyNodeAsPrimary(
+        null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
     const primary = replSet.getPrimary();
     const secondary = replSet.getSecondary();

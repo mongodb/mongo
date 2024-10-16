@@ -13,7 +13,7 @@ const rst = new ReplSetTest({
     nodes: [{}, {}, {arbiter: true}],
 });
 const nodes = rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 const primary = rst.getPrimary();
 const testDB = primary.getDB('test');

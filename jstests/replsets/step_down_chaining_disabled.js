@@ -14,7 +14,7 @@ const replSet = new ReplSetTest({
     nodeOptions: {setParameter: {writePeriodicNoops: false, periodicNoopIntervalSecs: 1}}
 });
 replSet.startSet();
-replSet.initiate();
+replSet.initiateWithHighElectionTimeout();
 
 const oldPrimary = replSet.getPrimary();
 const [newPrimary, secondary] = replSet.getSecondaries();

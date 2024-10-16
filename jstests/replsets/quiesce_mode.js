@@ -13,7 +13,7 @@ const replTest = new ReplSetTest({
     nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"}
 });
 replTest.startSet();
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 
 const dbName = "test";
 const collName = "coll";

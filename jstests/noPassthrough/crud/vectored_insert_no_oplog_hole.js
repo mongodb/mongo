@@ -14,7 +14,7 @@ const dbName = testName;
 const replTest = new ReplSetTest(
     {name: testName, nodes: [{}, {rsConfig: {priority: 0}}], settings: {chainingAllowed: false}});
 replTest.startSet();
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 
 const primary = replTest.getPrimary();
 const primaryDB = primary.getDB(dbName);

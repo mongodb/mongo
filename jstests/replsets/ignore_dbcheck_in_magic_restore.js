@@ -35,7 +35,7 @@ TestData.skipCollectionAndIndexValidation = true;
 
 const sourceCluster = new ReplSetTest({nodes: 1});
 sourceCluster.startSet();
-sourceCluster.initiate();
+sourceCluster.initiateWithHighElectionTimeout();
 logEveryBatch(sourceCluster);
 
 const sourcePrimary = sourceCluster.getPrimary();

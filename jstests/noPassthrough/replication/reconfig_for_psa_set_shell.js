@@ -14,7 +14,7 @@ const rst = new ReplSetTest({
     nodes: [{}, {rsConfig: {votes: 0, priority: 0}}, {rsConfig: {arbiterOnly: true}}],
 });
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 assert.eq(primary, rst.nodes[0], "the primary should be the node at index 0");

@@ -15,7 +15,7 @@ const options = {
 };
 const replSet = new ReplSetTest({nodes: 3, nodeOptions: options});
 replSet.startSet();
-replSet.initiate();
+replSet.initiateWithHighElectionTimeout();
 let primaryAdmin = replSet.getPrimary().getDB("admin");
 assert.eq(assert
               .commandWorked(

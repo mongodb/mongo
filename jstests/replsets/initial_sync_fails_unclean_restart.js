@@ -14,7 +14,7 @@ const collName = "coll";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
-rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
+rst.initiate();
 
 let syncSourceNode = rst.getPrimary();
 const syncSourceColl = syncSourceNode.getDB(dbName)[collName];
