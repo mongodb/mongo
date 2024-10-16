@@ -79,9 +79,7 @@ public:
           _svcCtx(svcCtx),
           _reactor(std::move(reactor)) {}
 
-    using Handle = std::shared_ptr<AsyncDBClient>;
-
-    static Future<Handle> connect(
+    static Future<std::shared_ptr<AsyncDBClient>> connect(
         const HostAndPort& peer,
         transport::ConnectSSLMode sslMode,
         ServiceContext* context,

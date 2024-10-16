@@ -421,7 +421,8 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
                            connMetricsAnchor,
                            _transientSSLContext)
         .thenRunOn(_reactor)
-        .onError([](StatusWith<AsyncDBClient::Handle> swc) -> StatusWith<AsyncDBClient::Handle> {
+        .onError([](StatusWith<std::shared_ptr<AsyncDBClient>> swc)
+                     -> StatusWith<std::shared_ptr<AsyncDBClient>> {
             if (const Status& status = swc.getStatus();
                 status.code() == ErrorCodes::ConnectionError) {
                 return status;
@@ -430,7 +431,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
             }
         })
         .then([this, helloHook, instanceName = std::move(instanceName)](
-                  AsyncDBClient::Handle client) {
+                  std::shared_ptr<AsyncDBClient> client) {
             {
                 stdx::lock_guard lk(_clientMutex);
                 _client = std::move(client);

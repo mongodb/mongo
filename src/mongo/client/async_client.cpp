@@ -94,7 +94,7 @@ auto& totalTimeForEgressConnectionAcquiredToWireMicros =
     *MetricBuilder<Counter64>{"network.totalTimeForEgressConnectionAcquiredToWireMicros"};
 }  // namespace
 
-Future<AsyncDBClient::Handle> AsyncDBClient::connect(
+Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
     const HostAndPort& peer,
     transport::ConnectSSLMode sslMode,
     ServiceContext* const context,
