@@ -399,15 +399,6 @@ public:
     /**
      * Get several fields at once. This is faster than separate getField() calls as the size of
      * elements iterated can then be calculated only once each.
-     * @param n number of fieldNames, and number of elements in the fields array
-     * @param fields if a field is found its element is stored in its corresponding position in
-     *          this array. if not found the array element is unchanged.
-     */
-    void getFields(unsigned n, const char** fieldNames, BSONElement* fields) const;
-
-    /**
-     * Get several fields at once. This is faster than separate getField() calls as the size of
-     * elements iterated can then be calculated only once each.
      */
     template <size_t N>
     void getFields(const std::array<StringData, N>& fieldNames,
@@ -423,10 +414,9 @@ public:
     }
 
     BSONElement operator[](int field) const {
-        StringBuilder ss;
-        ss << field;
-        std::string s = ss.str();
-        return getField(s.c_str());
+        if (field < 0)
+            return BSONElement();
+        return getField(ItoA(field));
     }
 
     /**
@@ -642,7 +632,7 @@ public:
 
     BSONType firstElementType() const {
         const char* p = objdata() + 4;
-        return (BSONType)*p;
+        return BSONType(*p);
     }
 
     /**

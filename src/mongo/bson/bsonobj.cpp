@@ -501,7 +501,7 @@ BSONElement BSONObj::getFieldUsingIndexNames(StringData fieldName, const BSONObj
         BSONElement f = i.next();
         if (f.eoo())
             return BSONElement();
-        if (f.fieldName() == fieldName)
+        if (f.fieldNameStringData() == fieldName)
             break;
         ++j;
     }
@@ -587,7 +587,7 @@ BSONObj BSONObj::stripFieldNames(const BSONObj& obj) {
 
 bool BSONObj::hasFieldNames() const {
     for (auto e : *this) {
-        if (e.fieldName()[0])
+        if (!e.fieldNameStringData().empty())
             return true;
     }
     return false;
@@ -654,20 +654,6 @@ Status BSONObj::storageValidEmbedded() const {
         first = false;
     }
     return Status::OK();
-}
-
-void BSONObj::getFields(unsigned n, const char** fieldNames, BSONElement* fields) const {
-    BSONObjIterator i(*this);
-    while (i.more()) {
-        BSONElement e = i.next();
-        const char* p = e.fieldName();
-        for (unsigned i = 0; i < n; i++) {
-            if (strcmp(p, fieldNames[i]) == 0) {
-                fields[i] = e;
-                break;
-            }
-        }
-    }
 }
 
 BSONElement BSONObj::getField(StringData name) const {
@@ -768,7 +754,7 @@ BSONObj BSONObj::removeField(StringData name) const {
     BSONObjIterator i(*this);
     while (i.more()) {
         BSONElement e = i.next();
-        const char* fname = e.fieldName();
+        auto fname = e.fieldNameStringData();
         if (name != fname)
             b.append(e);
     }

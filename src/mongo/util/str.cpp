@@ -126,9 +126,9 @@ int LexNumCmp::cmp(StringData sd1, StringData sd2, bool lexOnly) {
                 } else if (len2 > len1) {
                     return -1;
                 }
-                // if the lengths are equal, just strcmp
+                // if the lengths of digits are equal, just memcmp
                 else {
-                    result = strncmp(sd1.rawData() + s1, sd2.rawData() + s2, len1);
+                    result = memcmp(sd1.rawData() + s1, sd2.rawData() + s2, len1);
                     if (result)
                         return (result > 0) ? 1 : -1;
                 }

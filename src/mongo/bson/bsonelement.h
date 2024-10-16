@@ -925,13 +925,6 @@ public:
     static const long long kLargestSafeLongLongAsDouble;
     static const long long kSmallestSafeLongLongAsDouble;
 
-    /**
-     * Compute the size of the encoding of a regex, minKey or MaxKey. Throws if the elemt is not a
-     * any of these. This function is suitable as a fallback after other known BSON types are
-     * handles, as it will try and dump extra diagnostic information in case of memory corruption.
-     */
-    static int computeRegexSize(const char* data, int fieldNameSize);
-
 private:
     // This needs to be 2 elements because we check the strlen of data + 1 and GCC sees that as
     // accessing beyond the end of a constant string, even though we always check whether the
@@ -982,6 +975,15 @@ private:
         (1u << mongo::String) | (1u << mongo::Object) | (1u << mongo::Array) |
         (1u << mongo::BinData) | (1u << mongo::DBRef) | (1u << mongo::Code) |
         (1u << mongo::Symbol) | (1u << mongo::CodeWScope);
+
+    /**
+     * This is an out-of-line helper only for use as the slow path of valuesize()!
+     *
+     * Computes the size of the encoding of a Regex, MinKey or MaxKey. Throws if the element is
+     * not any of these. This function is suitable as a fallback after other known BSON types are
+     * handled, as it will try to dump extra diagnostic information in case of memory corruption.
+     */
+    static int computeRegexSize(const char* data, int fieldNameSize);
 
     /**
      * This is to enable structured bindings for BSONElement, it should not be used explicitly.
