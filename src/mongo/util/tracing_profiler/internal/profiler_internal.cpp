@@ -48,7 +48,7 @@ ProfilerTags* ProfilerTags::get() {
 #endif
 }
 
-ProfilerTag ProfilerTags::getOrInsertTag(const char* name) {
+ProfilerTag ProfilerTags::getOrInsertTag(StringData name) {
     auto it = _tagIdByName.find(name);
     if (it != _tagIdByName.end()) {
         return _tags[it->second];

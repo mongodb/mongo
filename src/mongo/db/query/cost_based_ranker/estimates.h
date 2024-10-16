@@ -96,7 +96,7 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(EstimationSource, ESTIMATION_SOURCE_NAMES);
 template <FixedString nameArg, EstimationUnit unitArg, typename numType, typename paramType>
 struct StrongDoubleTag {
     // the name of the property quantified by this type
-    static constexpr const char* kName = nameArg;
+    static constexpr StringData kName = nameArg;
     // the units used to measure this quantity
     static constexpr EstimationUnit kUnit = unitArg;
     // the minimum value of this data type, inclusive
@@ -219,7 +219,7 @@ public:
 
     // The name of this strong type. It is possible to extract it via typeid, but it is
     // unnecessarily complex. This approach is simpler and more flexible.
-    static constexpr const char* name() {
+    static constexpr StringData name() {
         return TypeTag::kName;
     }
 
@@ -385,12 +385,11 @@ public:
 
 protected:
     std::string sourceName() const {
-        StringData sourceName = toStringData(_source);
-        return sourceName.toString();
+        return std::string{toStringData(_source)};
     }
 
     std::string estimateName() const {
-        return EstimateType::name();
+        return std::string{EstimateType::name()};
     }
 
     EstimateType _estimate;

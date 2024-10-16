@@ -43,6 +43,7 @@
 #include "mongo/util/aligned.h"
 #include "mongo/util/fixed_string.h"
 #include "mongo/util/overloaded_visitor.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/tracing_profiler/internal/cycleclock.h"
 
 namespace mongo::tracing_profiler::internal {
@@ -76,7 +77,7 @@ struct TagIdHash {
  */
 struct ProfilerTag {
     TagId id;
-    const char* name;
+    StringData name;
 };
 
 /**
@@ -86,7 +87,7 @@ class ProfilerTags {
 public:
     static ProfilerTags* get();
 
-    ProfilerTag getOrInsertTag(const char* name);
+    ProfilerTag getOrInsertTag(StringData name);
 
     MONGO_COMPILER_ALWAYS_INLINE const std::vector<ProfilerTag>& tags() const {
         return _tags;
@@ -94,7 +95,7 @@ public:
 
 private:
     std::vector<ProfilerTag> _tags;
-    absl::flat_hash_map<std::string_view, TagId> _tagIdByName;
+    StringDataMap<TagId> _tagIdByName;
 };
 
 /**
