@@ -8,7 +8,7 @@ var conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 
 var testDB = conn.getDB("test");
-assert.commandWorked(testDB.runCommand({create: "index_version_autoupgrade"}));
+assert.commandWorked(testDB.runCommand({create: jsTestName()}));
 var allIndexes = testDB.index_version_autoupgrade.getIndexes();
 var spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "Index with key pattern {_id: 1} not found: " + tojson(allIndexes));

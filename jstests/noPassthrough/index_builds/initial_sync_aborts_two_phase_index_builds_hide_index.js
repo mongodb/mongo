@@ -9,7 +9,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
-const dbName = jsTest.name();
+const dbName = jsTestName();
 const collName = "test";
 
 const rst = new ReplSetTest({

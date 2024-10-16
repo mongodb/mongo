@@ -16,7 +16,7 @@
  */
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
-const coll = db.timeseries_partial_index_opt;
+const coll = db[jsTestName()];
 
 coll.drop();
 assert.commandWorked(

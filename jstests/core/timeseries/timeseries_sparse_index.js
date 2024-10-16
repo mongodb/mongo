@@ -15,7 +15,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const collName = "timeseries_sparse_index";
+    const collName = jsTestName();
 
     const timeFieldName = "tm";
     const metaFieldName = "mm";

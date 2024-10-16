@@ -66,7 +66,7 @@ function runTests(conn, db, coll, testCases) {
             let thread = new Thread(function(connStr, i, runAndAssertAggregation, pred, ids) {
                 let conn = new Mongo(connStr);
                 let db = conn.getDB('test');
-                let coll = db.timeseries_multithread;
+                let coll = db[jsTestName()];
 
                 // Run each aggregation 500 times to ensure concurrent execution
                 for (let times = 0; times < 500; ++times) {
@@ -95,7 +95,7 @@ TimeseriesTest.run((insert) => {
     const kDbName = "test";
     const db = conn.getDB(kDbName);
 
-    let coll = db.timeseries_multithread;
+    let coll = db[jsTestName()];
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'time';

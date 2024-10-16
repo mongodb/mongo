@@ -23,7 +23,7 @@ import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
 
-    let coll = db.timeseries_match;
+    let coll = db[jsTestName()];
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'time';

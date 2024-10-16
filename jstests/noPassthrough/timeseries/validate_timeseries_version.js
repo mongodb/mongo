@@ -12,8 +12,8 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 let testCount = 0;
-const collNamePrefix = "validate_timeseries_version";
-const bucketNamePrefix = "system.buckets.validate_timeseries_version";
+const collNamePrefix = jsTestName();
+const bucketNamePrefix = "system.buckets." + jsTestName();
 let collName = collNamePrefix + testCount;
 let bucketName = bucketNamePrefix + testCount;
 let coll = null;

@@ -20,7 +20,7 @@
 
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
-const coll = db.bucket_unpack_with_match_fixed_buckets;
+const coll = db[jsTestName()];
 const metaField = "mt";
 const timeField = "time";
 

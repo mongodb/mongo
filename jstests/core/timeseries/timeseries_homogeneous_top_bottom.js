@@ -8,8 +8,8 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    let coll = db.homogeneous_top_bottom_ts;
-    let collNotTs = db.homogeneous_top_bottom_not_ts;
+    let coll = db[jsTestName() + '_ts'];
+    let collNotTs = db[jsTestName() + '_not_ts'];
 
     coll.drop();
     collNotTs.drop();

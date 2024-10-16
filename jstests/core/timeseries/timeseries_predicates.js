@@ -13,9 +13,9 @@
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
-const coll = assertDropAndRecreateCollection(db, "timeseries_predicates_normal");
+const coll = assertDropAndRecreateCollection(db, jsTestName() + '_normal');
 const tsColl = assertDropAndRecreateCollection(
-    db, "timeseries_predicates_timeseries", {timeseries: {timeField: 'time', metaField: 'mt'}});
+    db, jsTestName() + '_timeseries', {timeseries: {timeField: 'time', metaField: 'mt'}});
 const bucketsColl = db.getCollection('system.buckets.' + tsColl.getName());
 
 // Tests that we produce the same results for a given 'predicate', with and without timeseries, and

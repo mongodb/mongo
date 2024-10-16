@@ -8,7 +8,7 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 const conn = MongoRunner.runMongod({});
 
 const dbName = "test";
-const collName = "index_build_capped_position_lost";
+const collName = jsTestName();
 
 const db = conn.getDB(dbName);
 assert.commandWorked(

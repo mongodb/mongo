@@ -11,10 +11,12 @@
  * ]
  */
 
-const coll = db.timeseries_groupby_reorder;
+const coll = db[jsTestName()];
 coll.drop();
 
-import {runGroupRewriteTest} from 'jstests/core/timeseries/timeseries_groupby_reorder_helpers.js';
+import {
+    runGroupRewriteTest
+} from 'jstests/core/timeseries/libs/timeseries_groupby_reorder_helpers.js';
 
 // Test with measurement group key -- a rewrite in this situation would be wrong.
 (function testNonMetaGroupKey() {

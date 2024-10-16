@@ -189,7 +189,7 @@ function opWorkingTime(node) {
 // no extra operations of the corresponding type have occurred on the mongod.
 function runLatencyComparisonTest(getOpTimes, st, testDB, testColl) {
     const kObjId = 99999;
-    const shard = st.shard0.getDB("test");
+    const shard = st.shard0.getDB(jsTestName());
 
     // Write test
     let opTimesMongoSOld = getOpTimes(testDB);
@@ -233,7 +233,7 @@ const workingTimeName = "opWorkingTimeHistogramTest";
 
 // Run tests against mongod.
 const mongod = MongoRunner.runMongod();
-let testDB = mongod.getDB("test");
+let testDB = mongod.getDB(jsTestName());
 let testColl = testDB[latencyName + "coll"];
 testColl.drop();
 runTests(getLatencyHistogramStats, testDB, testColl, false);
@@ -246,7 +246,7 @@ MongoRunner.stopMongod(mongod);
 
 // Run tests against mongos.
 const st = new ShardingTest({config: 1, shards: 1});
-testDB = st.s.getDB("test");
+testDB = st.s.getDB(jsTestName());
 testColl = testDB[latencyName + "coll"];
 testColl.drop();
 runLatencyComparisonTest(opLatencies, st, testDB, testColl);

@@ -6,7 +6,7 @@
  *   requires_timeseries,
  * ]
  */
-const coll = db.timeseries_expire_collmod;
+const coll = db[jsTestName()];
 coll.drop();
 
 const timeFieldName = 'time';

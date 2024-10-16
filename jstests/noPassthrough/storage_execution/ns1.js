@@ -1,6 +1,6 @@
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
-let mydb = conn.getDB("test_ns1");
+let mydb = conn.getDB(jsTestName());
 
 const check = function(n, isNew) {
     var coll = mydb["x" + n];

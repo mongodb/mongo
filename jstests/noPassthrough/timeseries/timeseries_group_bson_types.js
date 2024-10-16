@@ -27,8 +27,8 @@ if (assert.commandWorked(scalarDb.adminCommand({getParameter: 1, internalQueryFr
     quit();
 }
 
-const scalarColl = scalarDb.timeseries_group_bson_types;
-const bpColl = bpDb.timeseries_group_bson_types;
+const scalarColl = scalarDb[jsTestName()];
+const bpColl = bpDb[jsTestName()];
 
 const timeFieldName = 'time';
 const metaFieldName = 'meta';

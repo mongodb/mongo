@@ -15,7 +15,7 @@ const dbName = jsTestName();
 const db = conn.getDB(dbName);
 
 TimeseriesTest.run((insert) => {
-    const collNamePrefix = 'timeseries_bucket_limit_size_';
+    const collNamePrefix = jsTestName() + '_';
 
     const timeFieldName = 'time';
 

@@ -29,10 +29,10 @@ import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/query/analy
 (function() {
 "use strict";
 
-const coll = db.bucket_unpack_group_reorder_fixed_buckets;
+const coll = db[jsTestName()];
 // For sanity check of the results, we'll use as oracle a collection that contains the same data but
 // isn't time-series.
-const collNonTs = db.bucket_unpack_group_reorder_fixed_buckets_non_ts;
+const collNonTs = db[jsTestName() + '_non_ts'];
 
 const timeField = "time";
 const measurementField = "b";

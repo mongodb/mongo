@@ -17,7 +17,7 @@ rst.initiate();
 const db = rst.getPrimary().getDB(jsTestName());
 assert.commandWorked(db.dropDatabase());
 
-const collNamePrefix = db.validate_timeseries_bucket_reopening_;
+const collNamePrefix = db[jsTestName() + '_'];
 const timeFieldName = 'time';
 const metaFieldName1 = 'meta';
 const metaFieldName2 = 'tag';

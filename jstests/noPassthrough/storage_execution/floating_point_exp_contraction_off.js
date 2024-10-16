@@ -8,7 +8,7 @@
 
 const conn = MongoRunner.runMongod();
 
-const coll = conn.getDB('test').getCollection('c');
+const coll = conn.getDB(jsTestName()).getCollection('c');
 
 assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 assert.commandWorked(coll.insertOne({

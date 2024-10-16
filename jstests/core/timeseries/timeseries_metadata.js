@@ -16,7 +16,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const collNamePrefix = 'timeseries_metadata_';
+    const collNamePrefix = jsTestName() + '_';
 
     const timeFieldName = 'time';
     const metaFieldName = 'meta';

@@ -12,7 +12,7 @@
  */
 
 (function testSeconds() {
-    let coll = db.bucket_timestamp_rounding_granularitySeconds;
+    let coll = db[jsTestName() + '_granularitySeconds'];
     coll.drop();
 
     assert.commandWorked(db.createCollection(

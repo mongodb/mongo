@@ -12,10 +12,10 @@
  */
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
-const ts = db.timeseries_streaming_group;
+const ts = db[jsTestName()];
 ts.drop();
 
-const coll = db.timeseires_streaming_group_regular_collection;
+const coll = db[jsTestName() + '_regular_collection'];
 coll.drop();
 
 assert.commandWorked(
@@ -62,7 +62,7 @@ assert.commandWorked(coll.insert(documents));
 
 // Incorrect use of $_internalStreamingGroup should return error
 assert.commandFailedWithCode(db.runCommand({
-    aggregate: "timeseires_streaming_group_regular_collection",
+    aggregate: jsTestName() + '_regular_collection',
     pipeline: [{
         $_internalStreamingGroup: {
             _id: {symbol: "$symbol", time: "$time"},
@@ -74,13 +74,13 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              7026705);
 assert.commandFailedWithCode(db.runCommand({
-    aggregate: "timeseires_streaming_group_regular_collection",
+    aggregate: jsTestName() + '_regular_collection',
     pipeline: [{$_internalStreamingGroup: {_id: null, count: {$sum: 1}}}],
     cursor: {},
 }),
                              7026702);
 assert.commandFailedWithCode(db.runCommand({
-    aggregate: "timeseires_streaming_group_regular_collection",
+    aggregate: jsTestName() + '_regular_collection',
     pipeline:
         [{$_internalStreamingGroup: {_id: null, count: {$sum: 1}, $monotonicIdFields: ["_id"]}}],
     cursor: {},

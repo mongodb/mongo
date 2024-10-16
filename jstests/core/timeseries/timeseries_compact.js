@@ -16,7 +16,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run(() => {
-    const coll = db.timeseries_compact;
+    const coll = db[jsTestName()];
     coll.drop();
 
     const timeFieldName = "time";

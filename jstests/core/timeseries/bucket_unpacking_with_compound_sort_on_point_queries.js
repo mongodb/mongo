@@ -26,11 +26,10 @@ import {
     setupColl
 } from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
-const metaCollSubFieldsName = "bucket_unpacking_with_compound_sort_with_meta_sub_on_point_queries";
-const metaCollSubFields = db[metaCollSubFieldsName];
+const metaCollSubFields = db[jsTestName()];
 const subFields = ["a", "b"];
 
-setupColl(metaCollSubFields, metaCollSubFieldsName, true, subFields);
+setupColl(metaCollSubFields, jsTestName(), true, subFields);
 
 // Test mixed cases involving both a point predicate and compound sort.
 // In all of these cases we have an index on {m.a, m.b, t}, and possibly some more trailing fields.

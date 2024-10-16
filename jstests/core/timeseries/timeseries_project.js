@@ -11,7 +11,7 @@
  *   directly_against_shardsvrs_incompatible,
  * ]
  */
-const coll = db.timeseries_project;
+const coll = db[jsTestName()];
 let pipeline = [];
 
 function checkResult({expectedResult, pipeline}) {

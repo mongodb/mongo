@@ -26,7 +26,7 @@ import {
     setupColl
 } from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
-const metaCollName = "bucket_unpacking_with_sort_with_meta_on_single_field_point_queries";
+const metaCollName = jsTestName();
 const metaColl = db[metaCollName];
 
 setupColl(metaColl, metaCollName, true);

@@ -11,7 +11,7 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);
 
-const dbName = "drop_indexes_aborts_in_progress_index_builds_complex_name";
+const dbName = jsTestName();
 const collName = "test";
 
 TestData.dbName = dbName;

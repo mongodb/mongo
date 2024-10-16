@@ -22,7 +22,7 @@ import {
     setupColl
 } from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
-const geoCollName = 'bucket_unpacking_with_sort_with_geo';
+const geoCollName = jsTestName();
 const geoColl = db[geoCollName];
 
 geoColl.drop();

@@ -25,11 +25,11 @@ import {
     setupColl
 } from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
-const collName = "bucket_unpacking_with_sort_negative";
+const collName = jsTestName();
 const coll = db[collName];
-const metaCollName = "bucket_unpacking_with_sort_with_meta_negative";
+const metaCollName = jsTestName() + '_meta';
 const metaColl = db[metaCollName];
-const metaCollSubFieldsName = "bucket_unpacking_with_sort_with_meta_sub_negative";
+const metaCollSubFieldsName = jsTestName() + '_meta_sub';
 const metaCollSubFields = db[metaCollSubFieldsName];
 const subFields = ["a", "b"];
 

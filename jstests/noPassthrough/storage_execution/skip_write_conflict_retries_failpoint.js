@@ -17,7 +17,7 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const testDB = primary.getDB("test");
-const testColl = testDB.getCollection("skip_write_conflict_retries_failpoint");
+const testColl = testDB.getCollection(jsTestName());
 
 const session = primary.startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(testDB.getName());

@@ -8,10 +8,10 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-const collPrefix = "validate_timeseries_minmax";
-const bucketPrefix = "system.buckets.validate_timeseries_minmax";
-let collName = "validate_timeseries_minmax";
-let bucketName = "system.buckets.validate_timeseries_minmax";
+const collPrefix = jsTestName();
+const bucketPrefix = "system.buckets." + jsTestName();
+let collName = jsTestName();
+let bucketName = "system.buckets." + jsTestName();
 let testCount = 0;
 
 const conn = MongoRunner.runMongod();

@@ -3,7 +3,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({name: 'capped_insert_order', nodes: 2});
+var replTest = new ReplSetTest({name: jsTestName(), nodes: 2});
 replTest.startSet();
 replTest.initiate();
 

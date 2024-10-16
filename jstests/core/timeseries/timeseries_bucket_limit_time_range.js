@@ -15,7 +15,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const collNamePrefix = 'timeseries_bucket_limit_time_range_';
+    const collNamePrefix = jsTestName() + '_';
 
     const timeFieldName = 'time';
 

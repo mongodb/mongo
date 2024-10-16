@@ -1,6 +1,6 @@
 // Tests that MongoD fails to start with the correct error message if mongod.lock exists in the
 // dbpath.
-var baseName = "jstests_lock_file_fail_to_open";
+var baseName = jsTestName();
 
 var dbPath = MongoRunner.dataPath + baseName + "/";
 

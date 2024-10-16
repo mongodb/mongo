@@ -26,8 +26,7 @@ import {
     setupColl
 } from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
-const metaCollSubFieldsName =
-    "bucket_unpacking_with_sort_with_meta_sub_on_multiple_fields_point_queries";
+const metaCollSubFieldsName = jsTestName();
 const metaCollSubFields = db[metaCollSubFieldsName];
 const subFields = ["a", "b"];
 

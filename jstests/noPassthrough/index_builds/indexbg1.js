@@ -6,7 +6,7 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
 var db = conn.getDB("test");
-var baseName = "jstests_indexbg1";
+var baseName = jsTestName();
 
 var parallel = function() {
     return db[baseName + "_parallelStatus"];
@@ -46,7 +46,7 @@ while (1) {  // if indexing finishes before we can run checks, try indexing w/ m
     var t = db[baseName];
     t.drop();
 
-    var bulk = db.jstests_indexbg1.initializeUnorderedBulkOp();
+    var bulk = db[jsTestName()].initializeUnorderedBulkOp();
     for (var i = 0; i < size; ++i) {
         bulk.insert({i: i});
     }

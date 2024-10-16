@@ -9,7 +9,7 @@
  *   requires_timeseries,
  * ]
  */
-const dbPrefix = 'fsm_db_for_sharded_timeseries_collection_';
+const dbPrefix = jsTestName();
 const dbCount = 2;
 const collPrefix = 'sharded_timeseries_collection_';
 const collCount = 2;
