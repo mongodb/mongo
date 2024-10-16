@@ -5,6 +5,9 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
+import {
+    withTxnAndAutoRetry
+} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     disableStaleVersionAndSnapshotRetriesWithinTransactions,
@@ -15,6 +18,8 @@ import {
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
+
+Random.setRandomSeed();
 
 const st = new ShardingTest({
     shards: 2,
@@ -58,22 +63,20 @@ function runTest(st, readConcern) {
     assert.commandWorked(
         otherRouter.adminCommand({moveChunk: ns, find: docToInsert, to: st.shard0.shardName}));
 
-    session.startTransaction({readConcern: readConcern});
-
-    // The transaction should always see the document written earlier through its session,
-    // regardless of the move.
-    //
-    // Note: until transactions can read from secondaries and/or disabling speculative snapshot
-    // is allowed, read concerns that do not require global snapshots (i.e. local and majority)
-    // will always read the inserted document here because the local snapshot established on
-    // this shard will include all currently applied operations, which must include all earlier
-    // acknowledged writes.
-    assert.docEq(docToInsert,
-                 sessionDB[collName].findOne(docToInsert),
-                 "sharded transaction with read concern " + tojson(readConcern) +
-                     " did not see expected document");
-
-    assert.commandWorked(session.commitTransaction_forTesting());
+    withTxnAndAutoRetry(session, () => {
+        // The transaction should always see the document written earlier through its session,
+        // regardless of the move.
+        //
+        // Note: until transactions can read from secondaries and/or disabling speculative snapshot
+        // is allowed, read concerns that do not require global snapshots (i.e. local and majority)
+        // will always read the inserted document here because the local snapshot established on
+        // this shard will include all currently applied operations, which must include all earlier
+        // acknowledged writes.
+        assert.docEq(docToInsert,
+                     sessionDB[collName].findOne(docToInsert),
+                     "sharded transaction with read concern " + tojson(readConcern) +
+                         " did not see expected document");
+    }, {readConcern: readConcern});
 
     // Clean up for the next iteration.
     assert.commandWorked(
