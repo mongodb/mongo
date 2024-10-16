@@ -135,7 +135,7 @@ def _impl(ctx):
 
     thin_archive_feature = feature(
         name = "thin_archive",
-        enabled = True,
+        enabled = False,
         flag_sets = [
             flag_set(
                 actions = [ACTION_NAMES.cpp_link_static_library],
