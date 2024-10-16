@@ -34,14 +34,23 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 
-void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debugging) const {
+void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
+                                        bool debugging,
+                                        const SerializationContext& sc) const {
     resultObj->appendBool("valid", isValid());
     resultObj->appendBool("repaired", getRepaired());
     if (getReadTimestamp()) {
         resultObj->append("readTimestamp", getReadTimestamp().value());
+    }
+    if (_nss.has_value()) {
+        resultObj->append("ns", NamespaceStringUtil::serialize(_nss.value(), sc));
+    }
+    if (_uuid.has_value()) {
+        _uuid->appendToBuilder(resultObj, "uuid");
     }
 
     static constexpr std::size_t kMaxErrorWarningSizeBytes = 2 * 1024 * 1024;
@@ -75,6 +84,15 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debuggin
 
     resultObj->append("extraIndexEntries", getExtraIndexEntries());
     resultObj->append("missingIndexEntries", getMissingIndexEntries());
+    if (_numInvalidDocuments.has_value()) {
+        resultObj->appendNumber("nInvalidDocuments", _numInvalidDocuments.value());
+    }
+    if (_numNonCompliantDocuments.has_value()) {
+        resultObj->appendNumber("nNonCompliantDocuments", _numNonCompliantDocuments.value());
+    }
+    if (_numRecords.has_value()) {
+        resultObj->appendNumber("nrecords", _numRecords.value());
+    }
 
     // Need to convert RecordId to a printable type.
     BSONArrayBuilder builder;
@@ -84,6 +102,28 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debuggin
         builder.append(objBuilder.done().firstElement());
     }
     resultObj->append("corruptRecords", builder.arr());
+
+    // Report detailed index validation results for validated indexes.
+    BSONObjBuilder keysPerIndex;
+    BSONObjBuilder indexDetails;
+    int nIndexes = getIndexResultsMap().size();
+    for (auto& [indexName, ivr] : getIndexResultsMap()) {
+        BSONObjBuilder bob(indexDetails.subobjStart(indexName));
+        bob.appendBool("valid", ivr.isValid());
+
+        if (!ivr.getWarnings().empty()) {
+            bob.append("warnings", ivr.getWarnings());
+        }
+
+        if (!ivr.getErrors().empty()) {
+            bob.append("errors", ivr.getErrors());
+        }
+
+        keysPerIndex.appendNumber(indexName, static_cast<long long>(ivr.getKeysTraversed()));
+    }
+    resultObj->append("nIndexes", nIndexes);
+    resultObj->append("keysPerIndex", keysPerIndex.done());
+    resultObj->append("indexDetails", indexDetails.done());
 
     if (getRepaired() || debugging) {
         resultObj->appendNumber("numRemovedCorruptRecords", getNumRemovedCorruptRecords());

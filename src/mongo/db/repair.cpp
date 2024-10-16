@@ -280,11 +280,6 @@ Status repairCollection(OperationContext* opCtx,
     }
 
     ValidateResults validateResults;
-    BSONObjBuilder output;
-    // Serialize valdiate result for logging in which tenant prefix is expected.
-    const SerializationContext serializationCtx(SerializationContext::Source::Command,
-                                                SerializationContext::CallerType::Reply,
-                                                SerializationContext::Prefix::IncludePrefix);
 
     // Close the open transaction to allow enabling pre-fetching in validation.
     if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
@@ -300,21 +295,19 @@ Status repairCollection(OperationContext* opCtx,
             CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
             CollectionValidation::RepairMode::kFixErrors,
             /*logDiagnostics=*/false),
-        &validateResults,
-        &output,
-        serializationCtx);
+        &validateResults);
     if (!status.isOK()) {
         return status;
     }
 
-    BSONObjBuilder detailedResults;
+    // Serialize valdiate result for logging in which tenant prefix is expected.
+    const SerializationContext serializationCtx(SerializationContext::Source::Command,
+                                                SerializationContext::CallerType::Reply,
+                                                SerializationContext::Prefix::IncludePrefix);
     const bool debug = false;
-    validateResults.appendToResultObj(&detailedResults, debug);
-
-    LOGV2(21028,
-          "Collection validation",
-          "results"_attr = output.done(),
-          "detailedResults"_attr = detailedResults.done());
+    BSONObjBuilder detailedResults;
+    validateResults.appendToResultObj(&detailedResults, debug, serializationCtx);
+    LOGV2(21028, "Collection validation", "results"_attr = detailedResults.done());
 
     if (validateResults.getRepaired()) {
         if (validateResults.isValid()) {

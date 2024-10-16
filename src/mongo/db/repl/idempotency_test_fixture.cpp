@@ -405,7 +405,6 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
 
     {
         ValidateResults validateResults;
-        BSONObjBuilder bob;
 
         ASSERT_OK(
             CollectionValidation::validate(_opCtx.get(),
@@ -414,8 +413,7 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
                                                /*logDiagnostics=*/false},
-                                           &validateResults,
-                                           &bob));
+                                           &validateResults));
         ASSERT_TRUE(validateResults.isValid());
     }
 

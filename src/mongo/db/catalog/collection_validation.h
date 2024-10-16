@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 
@@ -188,9 +187,7 @@ private:
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidationOptions options,
-                ValidateResults* results,
-                BSONObjBuilder* output,
-                const SerializationContext& sc = SerializationContext::stateCommandReply());
+                ValidateResults* results);
 
 /**
  * Checks whether a failpoint has been hit in the above validate() code..

@@ -814,15 +814,13 @@ void offlineValidate(OperationContext* opCtx) {
             opCtx->checkForInterrupt();
 
             ValidateResults validateResults;
-            BSONObjBuilder results;
             Status status = CollectionValidation::validate(
                 opCtx,
                 nss,
                 {CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount,
                  CollectionValidation::RepairMode::kNone,
                  /*logDiagnostics=*/false},
-                &validateResults,
-                &results);
+                &validateResults);
 
             if (!status.isOK()) {
                 uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
@@ -833,6 +831,7 @@ void offlineValidate(OperationContext* opCtx) {
                 return;
             } else {
                 allResultsValid &= validateResults.isValid();
+                BSONObjBuilder results;
                 validateResults.appendToResultObj(&results, /*debug=*/false);
                 LOGV2(9437301, "Offline validation result", "results"_attr = results.done());
             }

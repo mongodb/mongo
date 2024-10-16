@@ -78,7 +78,6 @@ public:
      */
     void traverseRecordStore(OperationContext* opCtx,
                              ValidateResults* results,
-                             BSONObjBuilder* output,
                              ValidationVersion validationVersion);
 
     /**

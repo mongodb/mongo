@@ -443,18 +443,16 @@ public:
         }
 
         ValidateResults validateResults;
-        Status status = CollectionValidation::validate(
-            opCtx,
-            nss,
-            std::move(options),
-            &validateResults,
-            &result,
-            SerializationContext::stateCommandReply(reqSerializationCtx));
+        Status status =
+            CollectionValidation::validate(opCtx, nss, std::move(options), &validateResults);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
 
-        validateResults.appendToResultObj(&result, /*debugging=*/false);
+        validateResults.appendToResultObj(
+            &result,
+            /*debugging=*/false,
+            SerializationContext::stateCommandReply(reqSerializationCtx));
 
         if (!validateResults.isValid()) {
             result.append("advice",

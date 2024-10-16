@@ -89,7 +89,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
@@ -211,10 +210,8 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
     // the keys that were inconsistent during the first phase of validation.
     {
         ValidateResults tempValidateResults;
-        BSONObjBuilder tempBuilder;
-
         indexValidator->traverseRecordStore(
-            opCtx, &tempValidateResults, &tempBuilder, validateState->validationVersion());
+            opCtx, &tempValidateResults, validateState->validationVersion());
     }
 
     LOGV2_OPTIONS(
@@ -269,13 +266,22 @@ void _validateIndexKeyCount(OperationContext* opCtx,
     }
 }
 
-void _printIndexSpec(OperationContext* opCtx,
-                     const ValidateState* validateState,
-                     StringData indexName) {
-    const IndexDescriptor* descriptor =
-        validateState->getCollection()->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    auto indexSpec = descriptor->infoObj();
-    LOGV2_ERROR(7463100, "Index failed validation", "spec"_attr = indexSpec);
+void _logInvalidIndices(OperationContext* opCtx,
+                        ValidateState* validateState,
+                        ValidateResults* results) {
+    if (validateState->isFullIndexValidation()) {
+        invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+            validateState->nss(), MODE_X));
+    }
+    for (auto& [indexName, ivr] : results->getIndexResultsMap()) {
+        if (!ivr.isValid()) {
+            const IndexDescriptor* descriptor =
+                validateState->getCollection()->getIndexCatalog()->findIndexByName(opCtx,
+                                                                                   indexName);
+            auto indexSpec = descriptor->infoObj();
+            LOGV2_ERROR(7463100, "Index failed validation", "spec"_attr = indexSpec);
+        }
+    }
 }
 
 /**
@@ -353,54 +359,10 @@ void _logOplogEntriesForInvalidResults(OperationContext* opCtx, ValidateResults*
     }
 }
 
-void _reportValidationResults(OperationContext* opCtx,
-                              ValidateState* validateState,
-                              ValidateResults* results,
-                              BSONObjBuilder* output) {
-    // TODO(SERVER-95671): Move output-generation to ValidateResults::appendToResultsObj().
-    BSONObjBuilder indexDetails;
-
-    results->setReadTimestamp(validateState->getValidateTimestamp());
-
-    if (validateState->isFullIndexValidation()) {
-        invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
-            validateState->nss(), MODE_X));
-    }
-
-    BSONObjBuilder keysPerIndex;
-
-    // Report detailed index validation results gathered when using {full: true} for validated
-    // indexes.
-    int nIndexes = results->getIndexResultsMap().size();
-    for (auto& [indexName, vr] : results->getIndexResultsMap()) {
-        if (!vr.isValid()) {
-            _printIndexSpec(opCtx, validateState, indexName);
-        }
-
-        BSONObjBuilder bob(indexDetails.subobjStart(indexName));
-        bob.appendBool("valid", vr.isValid());
-
-        if (!vr.getWarnings().empty()) {
-            bob.append("warnings", vr.getWarnings());
-        }
-
-        if (!vr.getErrors().empty()) {
-            bob.append("errors", vr.getErrors());
-        }
-
-        keysPerIndex.appendNumber(indexName, static_cast<long long>(vr.getKeysTraversed()));
-    }
-
-    output->append("nIndexes", nIndexes);
-    output->append("keysPerIndex", keysPerIndex.done());
-    output->append("indexDetails", indexDetails.done());
-}
-
 void _reportInvalidResults(OperationContext* opCtx,
                            ValidateState* validateState,
-                           ValidateResults* results,
-                           BSONObjBuilder* output) {
-    _reportValidationResults(opCtx, validateState, results, output);
+                           ValidateResults* results) {
+    _logInvalidIndices(opCtx, validateState, results);
     _logOplogEntriesForInvalidResults(opCtx, results);
     LOGV2_OPTIONS(20302,
                   {LogComponent::kIndex},
@@ -549,9 +511,7 @@ ValidationOptions::ValidationOptions(ValidateMode validateMode,
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidationOptions options,
-                ValidateResults* results,
-                BSONObjBuilder* output,
-                const SerializationContext& sc) {
+                ValidateResults* results) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair ||
               storageGlobalParams.validate);
 
@@ -612,9 +572,9 @@ Status validate(OperationContext* opCtx,
     uassertStatusOK(replCoord->checkCanServeReadsFor(
         opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-    output->append("ns", NamespaceStringUtil::serialize(validateState.nss(), sc));
-
-    validateState.uuid().appendToBuilder(output, "uuid");
+    results->setNamespaceString(validateState.nss());
+    results->setUUID(validateState.uuid());
+    results->setReadTimestamp(validateState.getValidateTimestamp());
 
     try {
         invariant(!validateState.isFullIndexValidation() ||
@@ -632,7 +592,7 @@ Status validate(OperationContext* opCtx,
             opCtx, validateState.isFullIndexValidation(), &validateState, results);
 
         if (!results->isValid()) {
-            _reportInvalidResults(opCtx, &validateState, results, output);
+            _reportInvalidResults(opCtx, &validateState, results);
             return Status::OK();
         }
 
@@ -669,8 +629,7 @@ Status validate(OperationContext* opCtx,
         // the collection. For clustered collections, the validator also verifies that the
         // record key (RecordId) matches the cluster key field in the record value (document's
         // cluster key).
-        indexValidator.traverseRecordStore(
-            opCtx, results, output, validateState.validationVersion());
+        indexValidator.traverseRecordStore(opCtx, results, validateState.validationVersion());
 
         // Pause collection validation while a lock is held and between collection and index data
         // validation.
@@ -693,7 +652,7 @@ Status validate(OperationContext* opCtx,
         // Continue validation checks are done in case previously reported errors need additional
         // metadata to be added by later calls
         if (!results->isValid() && !results->continueValidation()) {
-            _reportInvalidResults(opCtx, &validateState, results, output);
+            _reportInvalidResults(opCtx, &validateState, results);
             return Status::OK();
         }
 
@@ -710,7 +669,7 @@ Status validate(OperationContext* opCtx,
         }
 
         if (!results->isValid() && !results->continueValidation()) {
-            _reportInvalidResults(opCtx, &validateState, results, output);
+            _reportInvalidResults(opCtx, &validateState, results);
             return Status::OK();
         }
 
@@ -720,13 +679,9 @@ Status validate(OperationContext* opCtx,
 
         // We don't want to check continueValidation as there are no more validation checks to do
         if (!results->isValid()) {
-            _reportInvalidResults(opCtx, &validateState, results, output);
+            _reportInvalidResults(opCtx, &validateState, results);
             return Status::OK();
         }
-
-        // At this point, validation is complete and successful.
-        // Report the validation results for the user to see.
-        _reportValidationResults(opCtx, &validateState, results, output);
 
         LOGV2_OPTIONS(20306,
                       {LogComponent::kIndex},

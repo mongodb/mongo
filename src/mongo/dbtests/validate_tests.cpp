@@ -242,26 +242,19 @@ protected:
         }();
         auto repairMode = CollectionValidation::RepairMode::kNone;
         ValidateResults results;
-        BSONObjBuilder output;
 
         forceCheckpoint(_background);
-        ASSERT_OK(
-            CollectionValidation::validate(&_opCtx,
-                                           _nss,
-                                           ValidationOptions{mode, repairMode, kLogDiagnostics},
-                                           &results,
-                                           &output));
+        ASSERT_OK(CollectionValidation::validate(
+            &_opCtx, _nss, ValidationOptions{mode, repairMode, kLogDiagnostics}, &results));
 
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.isValid(), totalErrors(results) == 0);
 
         if (_full) {
-            BSONObj outputObj = output.done();
-            bool allIndexesValid = true;
-            for (auto elem : outputObj["indexDetails"].Obj()) {
-                BSONObj indexDetail(elem.value());
-                allIndexesValid = indexDetail["valid"].boolean() ? allIndexesValid : false;
-            }
+            bool allIndexesValid = std::all_of(
+                results.getIndexResultsMap().begin(),
+                results.getIndexResultsMap().end(),
+                [](const auto& name_results_pair) { return name_results_pair.second.isValid(); });
             ASSERT_EQ(results.isValid(), allIndexesValid);
         }
 
@@ -1333,7 +1326,6 @@ public:
 
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -1341,8 +1333,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1444,7 +1435,6 @@ public:
 
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -1452,8 +1442,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1526,7 +1515,6 @@ public:
 
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -1534,8 +1522,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1634,7 +1621,6 @@ public:
         // Confirm missing and extra index entries are detected.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -1642,8 +1628,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1663,7 +1648,6 @@ public:
         // entries are inserted.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -1674,8 +1658,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1702,7 +1685,6 @@ public:
         // repair.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -1713,8 +1695,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1821,7 +1802,6 @@ public:
         // Confirm validate detects missing index entries.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -1829,8 +1809,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1852,7 +1831,6 @@ public:
         // Run validate with repair, expect missing index entries are inserted.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -1863,8 +1841,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1887,7 +1864,6 @@ public:
         // errors were suppressed by repair.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -1895,8 +1871,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1974,7 +1949,6 @@ public:
         // Confirm validation detects extra index entries error.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -1982,8 +1956,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2005,7 +1978,6 @@ public:
         // Run validate with repair, expect extra index entries are removed.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -2016,8 +1988,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2039,7 +2010,6 @@ public:
         // Confirm extra index entries are removed such that results are valid.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -2047,8 +2017,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2191,7 +2160,6 @@ public:
         // Confirm validation detects missing index entry.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -2199,8 +2167,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2221,7 +2188,6 @@ public:
         // from record store and results are valid.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -2232,8 +2198,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2277,7 +2242,6 @@ public:
         // valid.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -2285,8 +2249,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2447,7 +2410,6 @@ public:
         // Confirm validation detects missing index entries.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -2455,8 +2417,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2480,7 +2441,6 @@ public:
         // numKeys can be correctly updated.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -2491,8 +2451,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2539,7 +2498,6 @@ public:
         // Confirm extra index entries are removed such that results are valid.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -2547,8 +2505,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2805,7 +2762,6 @@ public:
         // Confirm validation detects missing index entries.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -2813,8 +2769,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2835,7 +2790,6 @@ public:
         // record store and missing index entry is inserted into index. Results should be valid.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -2846,8 +2800,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -2894,7 +2847,6 @@ public:
         // Confirm extra index entries are removed such that results are valid.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -2902,8 +2854,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3023,15 +2974,13 @@ public:
         // Confirm missing multikey document found on non-multikey index error detected by validate.
         {
             ValidateResults results;
-            BSONObjBuilder output;
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
                 _nss,
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3053,7 +3002,6 @@ public:
         // Run validate in repair mode.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -3064,8 +3012,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3088,7 +3035,6 @@ public:
         // is true.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -3099,8 +3045,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3481,7 +3426,6 @@ public:
                                     : CollectionValidation::ValidateMode::kForeground;
 
             ValidateResults results;
-            BSONObjBuilder output;
 
             // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
@@ -3498,8 +3442,7 @@ public:
                 &_opCtx,
                 _nss,
                 ValidationOptions{mode, CollectionValidation::RepairMode::kNone, kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3558,7 +3501,6 @@ public:
         // validate.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -3566,8 +3508,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3589,7 +3530,6 @@ public:
         // Run validate with repair, expect corrupted records are removed.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -3600,8 +3540,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3627,7 +3566,6 @@ public:
         // results are valid.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -3638,8 +3576,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3661,7 +3598,6 @@ public:
         // Confirm repair mode does not silently suppress validation errors.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -3669,8 +3605,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3832,15 +3767,13 @@ public:
         // Confirm multikey document found on non-multikey index error detected by validate.
         {
             ValidateResults results;
-            BSONObjBuilder output;
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
                 _nss,
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3860,7 +3793,6 @@ public:
         // Run validate in repair mode.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -3871,8 +3803,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -3893,7 +3824,6 @@ public:
         // to be rebuilt.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -3904,8 +3834,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -4053,7 +3982,6 @@ public:
         // Confirm multikey paths' insufficient coverage of multikey document detected by validate.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -4061,8 +3989,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -4082,7 +4009,6 @@ public:
         // Run validate in repair mode.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -4093,8 +4019,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -4114,7 +4039,6 @@ public:
         // Confirm repair mode does not silently suppress validation errors.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -4122,8 +4046,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -4222,7 +4145,6 @@ public:
         // Confirm multikeyPaths are added by validate.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -4233,8 +4155,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kAdjustMultikey,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -4258,7 +4179,6 @@ public:
         // Confirm validate does not make changes when run a second time.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
@@ -4269,8 +4189,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForeground,
                                   CollectionValidation::RepairMode::kAdjustMultikey,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -4320,7 +4239,6 @@ public:
                                     : CollectionValidation::ValidateMode::kForeground;
 
             ValidateResults results;
-            BSONObjBuilder output;
 
             // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
@@ -4337,8 +4255,7 @@ public:
                 &_opCtx,
                 _nss,
                 ValidationOptions{mode, CollectionValidation::RepairMode::kNone, kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -4426,7 +4343,6 @@ public:
                                     : CollectionValidation::ValidateMode::kForeground;
 
             ValidateResults results;
-            BSONObjBuilder output;
 
             // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
@@ -4443,8 +4359,7 @@ public:
                 &_opCtx,
                 _nss,
                 ValidationOptions{mode, CollectionValidation::RepairMode::kNone, kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -4722,7 +4637,6 @@ public:
                                     : CollectionValidation::ValidateMode::kForeground;
 
             ValidateResults results;
-            BSONObjBuilder output;
 
             // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
@@ -4739,8 +4653,7 @@ public:
                 &_opCtx,
                 _nss,
                 ValidationOptions{mode, CollectionValidation::RepairMode::kNone, kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -4763,7 +4676,6 @@ public:
                                     : CollectionValidation::ValidateMode::kForeground;
 
             ValidateResults results;
-            BSONObjBuilder output;
 
             // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
@@ -4784,8 +4696,7 @@ public:
                 _nss,
                 ValidationOptions{
                     mode, CollectionValidation::RepairMode::kFixErrors, kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -4894,7 +4805,6 @@ public:
         // Verify that validate() detects the two corrupt records.
         {
             ValidateResults results;
-            BSONObjBuilder output;
 
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,
@@ -4902,8 +4812,7 @@ public:
                 ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
                                   CollectionValidation::RepairMode::kNone,
                                   kLogDiagnostics},
-                &results,
-                &output));
+                &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);

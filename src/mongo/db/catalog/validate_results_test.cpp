@@ -46,7 +46,7 @@ std::vector<BSONElement> getElements(const BSONObj& obj) {
 }
 
 // Helper to ensure that there is an element present in a container. In gmock this would be
-// something like: EXPECT_THAT(container, Contains(BSONString(element)))
+// something like: EXPECT_THAT(container, Contains(BSONString(Eq(element))))
 bool contains(const auto& container, const auto& element) {
     return std::any_of(container.begin(), container.end(), [&element](const BSONElement& elem) {
         return elem.str() == element;
@@ -55,26 +55,27 @@ bool contains(const auto& container, const auto& element) {
 
 }  // namespace
 
-// See SERVER-89857, issues found for a specific index should not be duplicated en-masse into the
-// top-level fields, but we do need to put *something* in the top-level field to inform the user to
-// check indexDetails.
 TEST(ValidateResultsTest, ErrorWarningFieldsPropagatedCorrectly) {
     ValidateResults vr;
     vr.addError("top-level error");
     vr.addWarning("top-level warning");
-    vr.getIndexValidateResult("index").addError("index-specific-error");
-    vr.getIndexValidateResult("index").addWarning("index-specific-warning");
+    vr.getIndexValidateResult("index").addError("index-specific error");
+    vr.getIndexValidateResult("index").addWarning("index-specific warning");
 
     BSONObjBuilder bob;
     vr.appendToResultObj(&bob, /*debugging=*/false);
     auto obj = bob.done();
 
     std::vector<BSONElement> errs = getElements(obj.getObjectField("errors"));
-    ASSERT_TRUE(contains(errs, "top-level error"));
     std::vector<BSONElement> warns = getElements(obj.getObjectField("warnings"));
+    std::vector<BSONElement> index_errs = getElements(
+        obj.getObjectField("indexDetails").getObjectField("index").getObjectField("errors"));
+    std::vector<BSONElement> index_warns = getElements(
+        obj.getObjectField("indexDetails").getObjectField("index").getObjectField("warnings"));
+    ASSERT_TRUE(contains(errs, "top-level error"));
     ASSERT_TRUE(contains(warns, "top-level warning"));
-
-    // TODO(SERVER-95671): add expectations for index-specific errors/warnings here.
+    ASSERT_TRUE(contains(index_errs, "index-specific error"));
+    ASSERT_TRUE(contains(index_warns, "index-specific warning"));
 }
 
 // See SERVER-89857, issues found for a specific index should not be duplicated en-masse into the
@@ -95,8 +96,13 @@ TEST(ValidateResultsTest, IndexIssuesGenerateSyntheticCollectionIssue) {
 
     std::vector<BSONElement> errs = getElements(obj.getObjectField("errors"));
     std::vector<BSONElement> warns = getElements(obj.getObjectField("warnings"));
-    ASSERT_EQ(errs.size(), 2);
-    ASSERT_EQ(warns.size(), 1);
+    ASSERT_EQ(errs.size(), 2);   // One foo and *one* for bar.
+    ASSERT_EQ(warns.size(), 1);  // One for foo only.
+
+    // Don't double-report index issues in the top-level fields.
+    ASSERT_FALSE(contains(errs, "foo error"));
+    ASSERT_FALSE(contains(errs, "bar error 1"));
+    ASSERT_FALSE(contains(warns, "foo warning"));
 }
 
 

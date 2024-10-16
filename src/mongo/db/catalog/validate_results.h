@@ -42,7 +42,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -130,6 +133,14 @@ public:
         return &_warnings;
     }
 
+    void setNamespaceString(NamespaceString nss) {
+        _nss = std::move(nss);
+    }
+
+    void setUUID(UUID uuid) {
+        _uuid = std::move(uuid);
+    }
+
     const std::vector<BSONObj>& getExtraIndexEntries() const {
         return _extraIndexEntries;
     }
@@ -163,6 +174,18 @@ public:
     }
     void setReadTimestamp(boost::optional<Timestamp> readTimestampOpt) {
         _readTimestamp = std::move(readTimestampOpt);
+    }
+
+    void setNumInvalidDocuments(long long numInvalidDocuments) {
+        _numInvalidDocuments = numInvalidDocuments;
+    }
+
+    void setNumNonCompliantDocuments(long long numNonCompliantDocuments) {
+        _numNonCompliantDocuments = numNonCompliantDocuments;
+    }
+
+    void setNumRecords(long long numRecords) {
+        _numRecords = numRecords;
     }
 
     const std::set<Timestamp>& getRecordTimestamps() const {
@@ -224,15 +247,27 @@ public:
 
     // Takes a bool that indicates the context of the caller and a BSONObjBuilder to append with
     // validate results.
-    void appendToResultObj(BSONObjBuilder* resultObj, bool debugging) const;
+    void appendToResultObj(
+        BSONObjBuilder* resultObj,
+        bool debugging,
+        const SerializationContext& sc = SerializationContext::stateCommandReply()) const;
 
 private:
+    boost::optional<UUID> _uuid;
+    boost::optional<NamespaceString> _nss;
+
     std::vector<BSONObj> _extraIndexEntries;
     std::vector<BSONObj> _missingIndexEntries;
     std::vector<RecordId> _corruptRecords;
 
     bool _repaired = false;
     boost::optional<Timestamp> _readTimestamp = boost::none;
+
+    // Collection stats.
+    // If validate doesn't progress far enough to determine these, they will remain nullopt.
+    boost::optional<long long> _numInvalidDocuments;
+    boost::optional<long long> _numNonCompliantDocuments;
+    boost::optional<long long> _numRecords;
 
     // Timestamps (startTs, startDurable, stopTs, stopDurableTs) related to records
     // with validation errors. See WiredTigerRecordStore::printRecordMetadata().

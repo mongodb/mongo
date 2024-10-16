@@ -790,7 +790,6 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           ValidateResults* results,
-                                          BSONObjBuilder* output,
                                           ValidationVersion validationVersion) {
     _numRecords = 0;  // need to reset it because this function can be called more than once.
     long long dataSizeTotal = 0;
@@ -800,9 +799,9 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     long long numCorruptRecordsSizeBytes = 0;
 
     ON_BLOCK_EXIT([&]() {
-        output->appendNumber("nInvalidDocuments", nInvalid);
-        output->appendNumber("nNonCompliantDocuments", nNonCompliantDocuments);
-        output->appendNumber("nrecords", _numRecords);
+        results->setNumInvalidDocuments(nInvalid);
+        results->setNumNonCompliantDocuments(nNonCompliantDocuments);
+        results->setNumRecords(_numRecords);
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());
             _progress.get(lk)->finished();
