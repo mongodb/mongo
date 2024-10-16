@@ -1,7 +1,7 @@
 /**
  * Sharding tests for using "explain" with the $searchMeta aggregation stage.
  *
- * @tags: [featureFlagSearchExplainExecutionStats]
+ * @tags: [requires_fcv_81]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";

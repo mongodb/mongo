@@ -1,7 +1,7 @@
 /**
  * Tests explain for $search with a subpipeline ($unionWith and $lookup).
  * @tags: [
- * featureFlagSearchExplainExecutionStats,
+ * requires_fcv_81,
  * ]
  */
 

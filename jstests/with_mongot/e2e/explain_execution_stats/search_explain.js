@@ -1,7 +1,7 @@
 /**
  * Tests explain for $search.
  * @tags: [
- * featureFlagSearchExplainExecutionStats,
+ * requires_fcv_81,
  * ]
  */
 import {

@@ -1,7 +1,7 @@
 /**
  * Test the use of "explain" with the "$searchMeta" aggregation stage. This tests all verbosities
  * and tests when mongot returns explain only as well as explain with cursor response.
- * @tags: [featureFlagSearchExplainExecutionStats]
+ * @tags: [requires_fcv_81]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";

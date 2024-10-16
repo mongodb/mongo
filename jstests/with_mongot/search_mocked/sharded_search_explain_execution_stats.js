@@ -2,7 +2,7 @@
  * Sharding tests for using "explain" with the $search aggregation stage and checks that usage of
  * $$SEARCH_META works as expected. This test checks execution stats are as expected.
  *
- * @tags:[featureFlagSearchExplainExecutionStats]
+ * @tags:[requires_fcv_81]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";

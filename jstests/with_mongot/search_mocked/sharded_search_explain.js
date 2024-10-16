@@ -4,7 +4,6 @@
  * also tests  "executionStats" and "allPlansExecution" without the feature flag for explain
  * execution stats enabled.
  *
- * @tags:[featureFlagSearchExplainExecutionStats_incompatible]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -204,7 +203,11 @@ function runExplainTest(verbosity) {
 }
 
 runExplainTest("queryPlanner");
-runExplainTest("executionStats");
-runExplainTest("allPlansExecution");
+// The following tests only work if 'featureFlagSearchExplainExecutionStats' is disabled.
+// TODO SERVER-85637 remove when the feature flag is removed.
+if (!FeatureFlagUtil.isEnabled(testDB.getMongo(), 'SearchExplainExecutionStats')) {
+    runExplainTest("executionStats");
+    runExplainTest("allPlansExecution");
+}
 
 stWithMock.stop();

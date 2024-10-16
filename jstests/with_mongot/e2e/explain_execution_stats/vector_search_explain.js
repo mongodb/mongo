@@ -1,7 +1,7 @@
 /**
  * Test the use of "explain" with the "$vectorSearch" aggregation stage.
  * @tags: [
- * featureFlagSearchExplainExecutionStats,
+ * requires_fcv_81,
  * ]
  */
 import {

@@ -157,7 +157,7 @@ feature_flags:
     featureFlagSearchExplainExecutionStats:
       description: "Feature flag to enable executing search queries for explain."
       cpp_varname: gFeatureFlagSearchExplainExecutionStats
-      default: false
+      default: true
       shouldBeFCVGated: false
 
     featureFlagShardFilteringDistinctScan:

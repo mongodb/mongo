@@ -1,7 +1,7 @@
 /**
  * Test the use of "explain" with the "$search" aggregation stage. This tests  "executionStats" and
  * "allPlansExecution" verbosities and checks that they function as expected.
- * @tags: [featureFlagSearchExplainExecutionStats]
+ * @tags: [requires_fcv_81]
  *
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

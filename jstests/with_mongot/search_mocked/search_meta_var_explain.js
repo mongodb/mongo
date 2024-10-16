@@ -2,7 +2,7 @@
  * Test the use of "explain" with usage of $$SEARCH_META after a $search aggregation stage. This
  * tests all verbosities and tests when mongot returns explain only as well as explain with cursor
  * response.
- * @tags: [featureFlagSearchExplainExecutionStats]
+ * @tags: [requires_fcv_81]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";

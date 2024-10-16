@@ -1,7 +1,7 @@
 /**
  * Tests explain for $searchMeta.
  * @tags: [
- * featureFlagSearchExplainExecutionStats,
+ * requires_fcv_81,
  * ]
  */
 import {verifyE2ESearchMetaExplainOutput} from "jstests/with_mongot/e2e/lib/explain_utils.js";

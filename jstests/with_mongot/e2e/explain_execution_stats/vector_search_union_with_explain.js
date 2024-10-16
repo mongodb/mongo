@@ -1,7 +1,7 @@
 /**
  * Tests explain for $vectorSearch in a $unionWith subpipeline.
  * @tags: [
- * featureFlagSearchExplainExecutionStats,
+ * requires_fcv_81,
  * ]
  */
 
