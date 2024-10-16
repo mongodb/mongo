@@ -83,7 +83,10 @@ The reason they should be pushed as separate commits is in the case of needing t
 
 - `etc/system_perf.yml` will be used as YAML configuration for a new `sys-perf-X.Y` evergreen project
 
-  - Remove `etc/evergreen_yml_components/variants/perf/perf.yml` from "include" section
+  - Ensure that [DSI](https://github.com/10gen/dsi/blob/master/evergreen/system_perf/README.md#branching) and [Genny](https://github.com/mongodb/genny/blob/master/evergreen/system_perf/README.md#branching-the-mongo-repository) have been updated with new branches
+  - Remove `evergreen/system_perf/master/master_variants.yml` from "include" section
+  - Update `evergreen/system_perf/master/variants.yml` to `evergreen/system_perf/X.Y/variants.yml` in the "include" section
+  - Update `evergreen/system_perf/master/genny_tasks.yml` to `evergreen/system_perf/X.Y/genny_tasks.yml` in the "include" section
 
 ### Other files
 
