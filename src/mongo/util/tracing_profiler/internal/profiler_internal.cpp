@@ -192,7 +192,9 @@ ProfilerMetrics::ComputedMetricsBuilder::ComputedMetricsBuilder(
 
 std::vector<ProfilerMetrics::ComputedMetrics> ProfilerMetrics::ComputedMetricsBuilder::build() {
     _computedMetrics.resize(_callMetrics.nodeMetrics().size());
-    visit(0);
+    if (!_callMetrics.callTree().nodes().empty()) {
+        visit(0);
+    }
     return std::move(_computedMetrics);
 }
 
