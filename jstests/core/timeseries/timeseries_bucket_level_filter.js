@@ -15,7 +15,7 @@ import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStage, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_bucket_level_filter;
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));

@@ -11,7 +11,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const collName = jsTestName();
+    const collName = "timeseries_metric_index_compound";
 
     const timeFieldName = "tm";
     const metaFieldName = "mm";

@@ -3,14 +3,14 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-let replTest = new ReplSetTest({name: jsTestName(), nodes: 2});
+let replTest = new ReplSetTest({name: "capped_deletes", nodes: 2});
 replTest.startSet();
 replTest.initiate();
 
 let primary = replTest.getPrimary();
 
 let dbName = "test";
-let collName = jsTestName();
+let collName = "capped_deletes";
 
 let db = primary.getDB(dbName);
 

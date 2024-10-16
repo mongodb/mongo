@@ -122,7 +122,7 @@ rst.initiate();
 
 const conn = rst.getPrimary();
 const db = conn.getDB("test");
-const collName = jsTestName();
+const collName = "test_list_indexes_index_build_info";
 const coll = db.getCollection(collName);
 coll.drop();
 db.createCollection(collName);

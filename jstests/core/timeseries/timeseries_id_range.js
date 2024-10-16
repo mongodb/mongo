@@ -42,7 +42,7 @@ TimeseriesTest.run((insert) => {
         ISODate("2021-04-10T00:00:00.002Z"),
     ];
 
-    const coll = db[jsTestName()];
+    const coll = db.timeseries_id_range;
     const timeFieldName = "time";
 
     function init() {

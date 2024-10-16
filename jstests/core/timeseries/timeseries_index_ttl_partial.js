@@ -11,7 +11,7 @@
  * ]
  */
 
-const collName = jsTestName();
+const collName = "timeseries_index_ttl_partial";
 const indexName = "partialTTLIndex";
 const coll = db.getCollection(collName);
 const bucketsColl = db.getCollection("system.buckets." + collName);

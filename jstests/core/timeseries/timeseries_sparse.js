@@ -13,7 +13,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const collNamePrefix = jsTestName() + '_';
+    const collNamePrefix = 'timeseries_sparse_';
 
     const timeFieldName = 'time';
     let collCount = 0;

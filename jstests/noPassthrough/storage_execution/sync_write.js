@@ -5,7 +5,7 @@
  * @tags: [requires_persistence]
  */
 //  The following test verifies that writeConcern: {j: true} ensures that data is durable.
-var dbpath = MongoRunner.dataPath + jsTestName();
+var dbpath = MongoRunner.dataPath + 'sync_write';
 resetDbpath(dbpath);
 
 var mongodArgs = {dbpath: dbpath, noCleanData: true};

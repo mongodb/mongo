@@ -6,7 +6,7 @@
  * ]
  */
 
-let t = db[jsTestName()];
+let t = db.scan_capped_id;
 t.drop();
 
 let x = t.runCommand("create", {capped: true, size: 10000});

@@ -22,7 +22,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
-const dbName = jsTestName();
+const dbName = jsTest.name();
 const collName = "commitQuorumWithInitialSync";
 
 const rst = new ReplSetTest({

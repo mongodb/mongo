@@ -18,7 +18,7 @@ rst.initiate();
 
 const dbName = "test";
 const db = rst.getPrimary().getDB(dbName);
-const coll = db[jsTestName()];
+const coll = db.timeseries_resumable_index_build;
 coll.drop();
 
 const timeFieldName = "time";

@@ -20,7 +20,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
 
-    let coll = db[jsTestName()];
+    let coll = db.timeseries_computed_field;
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'time';

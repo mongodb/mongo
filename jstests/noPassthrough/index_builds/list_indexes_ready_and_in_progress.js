@@ -13,7 +13,7 @@ const conn = rst.getPrimary();
 const testDB = conn.getDB("test");
 assert.commandWorked(testDB.dropDatabase());
 
-let coll = testDB[jsTestName()];
+let coll = testDB.list_indexes_ready_and_in_progress;
 coll.drop();
 assert.commandWorked(testDB.createCollection(coll.getName()));
 IndexBuildTest.assertIndexes(coll, 1, ["_id_"]);

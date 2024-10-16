@@ -18,7 +18,7 @@ TimeseriesTest.run((insert) => {
 
     const metadata = ['8', '16', '64', '128'];
 
-    const coll = db[jsTestName()];
+    const coll = db.timeseries_index_collation;
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     coll.drop();  // implicitly drops bucketsColl.

@@ -11,7 +11,7 @@
  */
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_match_pushdown;
 const timeField = 'time';
 const metaField = 'meta';
 const measureField = 'a';

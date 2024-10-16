@@ -11,7 +11,7 @@
 
 const timeField = "t";
 const metaField = "meta1";
-const coll = db[jsTestName()];
+const coll = db.timeseries_project_pushdown;
 
 function runTest({docs, pipeline, expectedResults}) {
     coll.drop();

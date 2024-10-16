@@ -41,7 +41,7 @@ function incTs(ts) {
 }
 
 let replTest = new ReplSetTest({
-    name: jsTestName(),
+    name: "prepare_recordid_initialization",
     nodes: 1,
     nodeOptions: {
         setParameter: {

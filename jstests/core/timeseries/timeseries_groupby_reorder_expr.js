@@ -11,12 +11,10 @@
  * ]
  */
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_groupby_reorder_expr;
 coll.drop();
 
-import {
-    runGroupRewriteTest
-} from 'jstests/core/timeseries/libs/timeseries_groupby_reorder_helpers.js';
+import {runGroupRewriteTest} from 'jstests/core/timeseries/timeseries_groupby_reorder_helpers.js';
 
 // The rewrite applies here because only the metafield is accessed in the group key, and only min or
 // max is used in the accumulators.

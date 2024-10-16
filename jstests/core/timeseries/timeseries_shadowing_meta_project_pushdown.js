@@ -9,7 +9,7 @@
 
 const timeField = "t";
 const metaField = "meta1";
-const coll = db[jsTestName()];
+const coll = db.timeseries_shadowing_meta_project_pushdown;
 const date1 = new Date();
 
 function runTest({docs, pipeline, expectedResults}) {

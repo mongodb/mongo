@@ -17,7 +17,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 export const $config = (function() {
     const initData = {
         getCollectionName: function(collName) {
-            return jsTestName() + '_' + collName;
+            return "insert_ttl_timeseries_" + collName;
         },
 
         getCollection: function(db, collName) {

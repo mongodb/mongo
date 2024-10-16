@@ -13,7 +13,7 @@
  *     assumes_unsharded_collection,
  * ]
  */
-const coll = db[jsTestName()];
+const coll = db.capped_large_docs;
 coll.drop();
 
 const maxSize = 25 * 1024 * 1024;  // 25MB.

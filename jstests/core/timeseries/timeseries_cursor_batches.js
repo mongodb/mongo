@@ -7,8 +7,8 @@
  */
 
 db.timeseries_cursor_batches.drop();
-assert.commandWorked(
-    db.createCollection(jsTestName(), {"timeseries": {"timeField": "time", "metaField": "tag"}}));
+assert.commandWorked(db.createCollection(
+    'timeseries_cursor_batches', {"timeseries": {"timeField": "time", "metaField": "tag"}}));
 
 // All of these documents will go in the same bucket.
 assert.commandWorked(db.timeseries_cursor_batches.insertMany([

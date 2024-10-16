@@ -20,7 +20,7 @@
 
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_internal_bucket_geo_within;
 coll.drop();
 
 assert.commandWorked(

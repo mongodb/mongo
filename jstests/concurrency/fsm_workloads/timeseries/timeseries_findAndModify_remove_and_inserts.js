@@ -18,7 +18,7 @@ import {
 } from 'jstests/concurrency/fsm_workloads/query/timeseries/timeseries_deletes_and_inserts.js';
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.logColl = jsTestName() + '_log';
+    $config.data.logColl = "findAndModify_remove_and_inserts_log";
     $config.states.findAndRemove = function findAndRemove(db, collName) {
         // Delete a reading from each bucket. Include readings that will be inserted to have
         // coverage on overlapping inserts and deletes.

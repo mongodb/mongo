@@ -14,7 +14,7 @@ const getExtendedRangeCount = (db) => {
         .catalogStats.timeseriesExtendedRange;
 };
 
-const rst = new ReplSetTest({name: jsTestName(), nodes: 2});
+const rst = new ReplSetTest({name: jsTest.name(), nodes: 2});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 

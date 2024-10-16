@@ -7,7 +7,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const testName = jsTestName();
+const testName = "clustered_collection_at_startup";
 const dbpath = MongoRunner.dataPath + testName;
 const coll = "clusteredCollection";
 

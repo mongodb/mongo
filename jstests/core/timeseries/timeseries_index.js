@@ -18,7 +18,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 TimeseriesTest.run((insert) => {
-    const collNamePrefix = jsTestName() + '_';
+    const collNamePrefix = 'timeseries_index_';
     let collCountPostfix = 0;
 
     const timeFieldName = 'tm';

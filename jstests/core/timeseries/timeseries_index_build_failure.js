@@ -13,7 +13,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const coll = db[jsTestName()];
+    const coll = db.timeseries_index_skipped_record_tracker;
     coll.drop();
 
     const timeFieldName = "time";

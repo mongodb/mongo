@@ -14,7 +14,7 @@ const testDB = conn.getDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
 TimeseriesTest.run((insert) => {
-    const coll = testDB[jsTestName()];
+    const coll = testDB.timeseries_expire;
     const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
     coll.drop();

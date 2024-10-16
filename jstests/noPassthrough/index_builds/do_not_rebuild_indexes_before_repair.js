@@ -11,7 +11,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const dbName = jsTestName();
+const dbName = "indexRebuild";
 const collName = "coll";
 
 const rst = new ReplSetTest({

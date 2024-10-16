@@ -16,7 +16,7 @@ rst.startSet();
 rst.initiateWithHighElectionTimeout();
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB('test');
-const coll = primaryDb[jsTestName()];
+const coll = primaryDb.timeseries_create_drop;
 const viewName = coll.getName();
 const viewNs = coll.getFullName();
 

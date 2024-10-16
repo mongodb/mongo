@@ -17,7 +17,7 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const timeFieldName = "timestamp";
 
-const coll = db[jsTestName()];
+const coll = db.partialFilterExpression_with_internalBucketGeoWithin;
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 coll.drop();
 

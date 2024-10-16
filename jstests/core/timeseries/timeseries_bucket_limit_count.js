@@ -13,7 +13,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const collNamePrefix = jsTestName() + '_';
+    const collNamePrefix = 'timeseries_bucket_limit_count_';
 
     // Assumes each bucket has a limit of 1000 measurements.
     const bucketMaxCount = 1000;

@@ -27,7 +27,7 @@ TimeseriesTest.run((insert) => {
 
     const doc = {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: {tag1: 'a', tag2: 'b'}};
 
-    const coll = db[jsTestName()];
+    const coll = db.timeseries_index_stats;
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();  // implicitly drops bucketsColl.
 

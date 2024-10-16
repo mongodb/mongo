@@ -8,7 +8,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
-var dbname = jsTestName();
+var dbname = 'dropbgindex';
 var collection = 'jstests_feh';
 var size = 100;
 

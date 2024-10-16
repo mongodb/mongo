@@ -17,7 +17,7 @@ const testDB = conn.getDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
 TimeseriesTest.run((insert) => {
-    const coll = testDB[jsTestName()];
+    const coll = testDB.timeseries_expires_with_partial_index;
     const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'tm';

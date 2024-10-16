@@ -34,8 +34,8 @@ import {
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
 
-    let coll = db[jsTestName() + '_ts'];
-    let collNotTs = db[jsTestName() + '_not_ts'];
+    let coll = db.timeseries_group_ts;
+    let collNotTs = db.timeseries_group_not_ts;
 
     const timeFieldName = 'time';
     const metaFieldName = 'meta';

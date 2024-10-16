@@ -13,7 +13,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 Random.setRandomSeed();
 
 const dbName = 'testDB';
-const collName = jsTestName();
+const collName = 'timeseries_sort';
 const timeField = 't';
 const metaField = 'm';
 

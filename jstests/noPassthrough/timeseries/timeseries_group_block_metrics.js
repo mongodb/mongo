@@ -21,7 +21,7 @@ if (db.adminCommand('buildInfo').debug ||
     quit();
 }
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_group_block_metrics;
 coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), {

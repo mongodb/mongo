@@ -23,9 +23,9 @@
 
 import {getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
 
-const collName = jsTestName();
+const collName = "timeseries_bucket_unpacking_with_limit";
 const coll = db[collName];
-const metaCollName = jsTestName() + '_meta';
+const metaCollName = "timeseries_bucket_unpacking_with_limit_meta";
 const metaColl = db[metaCollName];
 
 // Helper function to set up collections.

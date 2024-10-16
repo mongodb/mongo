@@ -23,7 +23,7 @@ import {
     getRejectedPlans
 } from "jstests/libs/query/analyze_plan.js";
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_index_partial;
 const timeField = 'time';
 const metaField = 'm';
 let extraBucketIndexes = [];

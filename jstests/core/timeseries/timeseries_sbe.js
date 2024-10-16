@@ -36,7 +36,7 @@ const sbeUnpackPushdownEnabled =
 // const sbeUnpackPushdownEnabled = checkSbeRestrictedOrFullyEnabled(db) &&
 //     FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_sbe;
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));

@@ -10,7 +10,7 @@
 const conn = MongoRunner.runMongod();
 
 const testDB = conn.getDB('test');
-const coll = testDB[jsTestName()];
+const coll = testDB.timeseries_latency_stats;
 const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
 coll.drop();

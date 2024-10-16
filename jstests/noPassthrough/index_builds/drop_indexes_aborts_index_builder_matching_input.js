@@ -8,7 +8,7 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);
 
-const dbName = jsTestName();
+const dbName = "drop_indexes_aborts_in_progress_index_builds_wildcard";
 const collName = "test";
 
 TestData.dbName = dbName;

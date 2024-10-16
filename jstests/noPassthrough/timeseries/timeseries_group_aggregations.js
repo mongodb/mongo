@@ -33,8 +33,8 @@ if (isSlowBuild(classicDb) || isSlowBuild(bpDb)) {
     quit();
 }
 
-const classicColl = classicDb[jsTestName()];
-const bpColl = bpDb[jsTestName()];
+const classicColl = classicDb.timeseries_group_aggregations;
+const bpColl = bpDb.timeseries_group_aggregations;
 
 classicColl.drop();
 bpColl.drop();

@@ -44,7 +44,7 @@ assert.commandWorked(rst.getPrimary().adminCommand(
     {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 function getColl(conn) {
-    return conn.getDB(jsTestName())["coll"];
+    return conn.getDB("timestampingIndexBuild")["coll"];
 }
 
 let coll = getColl(rst.getPrimary());

@@ -23,7 +23,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
 
-    let coll = db[jsTestName()];
+    let coll = db.timeseries_ixscan_clusteredidxscan_union;
     coll.drop();
 
     // Create a timeseries collection with some documents.

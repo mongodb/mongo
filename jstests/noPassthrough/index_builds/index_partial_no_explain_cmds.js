@@ -5,7 +5,7 @@ import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 var runner = MongoRunner.runMongod({setParameter: "notablescan=1"});
 const db = runner.getDB("test");
-var coll = db[jsTestName()];
+var coll = db.index_partial_no_explain_cmds;
 var ret;
 
 coll.drop();

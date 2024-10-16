@@ -1,5 +1,5 @@
 if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger") {
-    var baseDir = jsTestName();
+    var baseDir = "jstests_split_c_and_i";
 
     var dbpath = MongoRunner.dataPath + baseDir + "/";
 

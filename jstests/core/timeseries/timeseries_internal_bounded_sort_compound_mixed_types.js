@@ -14,7 +14,7 @@
  */
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_internal_bounded_sort_compound_mixed_types;
 const buckets = db['system.buckets.' + coll.getName()];
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {

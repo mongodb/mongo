@@ -16,7 +16,7 @@ rst.startSet();
 rst.initiate();
 
 const dbName = "test";
-const collName = jsTestName();
+const collName = "index_build_prepareUnique";
 
 const primary = rst.getPrimary();
 const db = primary.getDB(dbName);

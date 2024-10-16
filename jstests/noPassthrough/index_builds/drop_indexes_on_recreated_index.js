@@ -6,7 +6,7 @@ import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = "test";
-const collName = jsTestName();
+const collName = "dropIndexesOnRecreatedIndex";
 
 const conn = MongoRunner.runMongod({});
 assert(conn);

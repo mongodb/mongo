@@ -15,7 +15,7 @@ import {getExecutionStages, getPlanStage} from "jstests/libs/query/analyze_plan.
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const dateTime = ISODate("2021-07-12T16:00:00Z");
-const collNamePrefix = jsTestName() + "_";
+const collNamePrefix = "timeseries_explain_delete_";
 let testCaseId = 0;
 
 const testDB = db.getSiblingDB(jsTestName());

@@ -19,7 +19,7 @@ replSet.initiate();
 
 const primary = replSet.getPrimary();
 const testDB = primary.getDB('test');
-const coll = testDB[jsTestName()];
+const coll = testDB.index_build_wildcard;
 
 const docs = 50;
 const bigArr = new Array(100000).fill('x'.repeat(10));

@@ -23,7 +23,7 @@ if (!sbeEnabled) {
     quit();
 }
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_bucket_level_filter;
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));

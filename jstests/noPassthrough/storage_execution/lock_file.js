@@ -13,7 +13,7 @@ function getMongodLockFileSize(dir) {
     assert(false, 'mongod.lock not found in data directory ' + dir);
 }
 
-var baseName = jsTestName();
+var baseName = "jstests_lock_file";
 var dbpath = MongoRunner.dataPath + baseName + '/';
 
 // Test framework will append --storageEngine command line option.

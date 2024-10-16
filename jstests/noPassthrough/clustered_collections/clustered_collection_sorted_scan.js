@@ -10,7 +10,7 @@ const testConnection =
     MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
 const testDb = testConnection.getDB('local');
 const collectionSize = 10;
-const clusteredCollName = jsTestName() + '_coll';
+const clusteredCollName = "clustered_index_sorted_scan_coll";
 const clusterField = "_id";
 
 let nonClusteredCollName = clusteredCollName + "_nc";

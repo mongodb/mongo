@@ -13,7 +13,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const replSetTest = new ReplSetTest({
-    name: jsTestName(),
+    name: "index_builds_ignore_prepare_conflicts",
     nodes: [
         {},
         {rsConfig: {priority: 0}},
@@ -42,7 +42,7 @@ let setUp = function(coll) {
 let runTest = function(conn) {
     const testDB = conn.getDB('test');
 
-    const collName = jsTestName();
+    const collName = 'index_builds_ignore_prepare_conflicts';
     const coll = primaryDB.getCollection(collName);
     setUp(coll);
 

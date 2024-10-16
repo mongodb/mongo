@@ -15,7 +15,7 @@ rst.startSet();
 rst.initiate();
 
 const dbName = "test";
-const collName = jsTestName();
+const collName = "create_indexes_waits_for_already_in_progress";
 const primary = rst.getPrimary();
 const testDB = primary.getDB(dbName);
 const testColl = testDB.getCollection(collName);

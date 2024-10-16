@@ -16,7 +16,7 @@ const db = rst.getPrimary().getDB(jsTestName());
 
 assert.commandWorked(db.dropDatabase());
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_idle_buckets;
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 const timeFieldName = 'time';

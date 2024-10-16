@@ -9,7 +9,7 @@
  */
 const timeFieldName = 'time';
 
-const coll = db[jsTestName()];
+const coll = db.timeseries_list_collections_filter_name;
 coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));

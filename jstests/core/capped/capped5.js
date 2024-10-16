@@ -6,7 +6,7 @@
  * ]
  */
 
-let tn = jsTestName();
+let tn = "capped5";
 
 let t = db[tn];
 t.drop();

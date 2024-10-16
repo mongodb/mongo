@@ -8,7 +8,7 @@
  * ]
  */
 
-const collName = jsTestName();
+const collName = "timeseries_field_parsed_as_bson";
 const coll = db.getCollection(collName);
 
 coll.drop();

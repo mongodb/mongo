@@ -6,7 +6,7 @@
  */
 // The following test verifies that writeConcern: {j: true} ensures that the view catalog is
 // durable.
-let dbpath = MongoRunner.dataPath + '_' + jsTestName();
+let dbpath = MongoRunner.dataPath + '_durable_view_catalog';
 resetDbpath(dbpath);
 
 let mongodArgs = {dbpath: dbpath, noCleanData: true};
@@ -67,7 +67,7 @@ assert.neq(
 
 // Now that the database's view catalog has been marked as invalid, all view operations in that
 // database should fail.
-viewsDB = conn.getDB('test');
+viewsDB = conn.getDB("test");
 assert.commandFailedWithCode(viewsDB.runCommand({find: "view2"}), ErrorCodes.InvalidViewDefinition);
 assert.commandFailedWithCode(viewsDB.runCommand({create: "view4", viewOn: "collection"}),
                              ErrorCodes.InvalidViewDefinition);
