@@ -42,7 +42,17 @@ assert.soon(() => {
     // keep inserting documents until the oplog truncates
     assert.commandWorked(testColl.insert({_id: id, longString: longString}));
     id++;
-    return timestampCmp(localDb.oplog.rs.findOne().ts, oplogEntry.ts) == 1;
+    let doc;
+    try {
+        doc = localDb.oplog.rs.findOne();
+    } catch (e) {
+        if (e.code == ErrorCodes.CappedPositionLost) {
+            // Oplog truncation occurred concurrently with the find command above.
+            return false;
+        }
+        throw e;
+    }
+    return timestampCmp(doc.ts, oplogEntry.ts) == 1;
 }, "Timeout waiting for oplog to roll over on primary");
 
 assert.commandFailedWithCode(localDb.runCommand({
