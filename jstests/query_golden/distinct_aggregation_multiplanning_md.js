@@ -45,9 +45,6 @@ outputAggregationPlanAndResults(
     coll, [{$sort: {a: 1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
 outputAggregationPlanAndResults(
     coll, [{$sort: {a: -1, b: 1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
-// DISTINCT_SCAN on 'a_1' + FETCH is picked but scanning 'a_1_b_1' would avoid fetching. Currently
-// 'a_1_b_1' is not even considered for this query.
-// TODO SERVER-95152: Ensure we pick a fully covered plan here.
 outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", accum: {$first: "$b"}}}]);
 // Ensure the planner correctly reverses the DISTINCT_SCAN direction for $first and $top.
 outputAggregationPlanAndResults(
@@ -91,6 +88,18 @@ outputAggregationPlanAndResults(
     coll,
     [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
     {hint: {$natural: 1}});
+
+section(
+    "DISTINCT_SCAN candidates choose index that covers projection, or smallest index if impossible");
+subSection("No projection, pick smallest index");
+outputAggregationPlanAndResults(coll, [{$group: {_id: "$a"}}]);
+subSection("Pick index that covers projection");
+outputAggregationPlanAndResults(
+    coll, [{$group: {_id: "$a", accumB: {$first: "$b"}, accumC: {$first: "$c"}}}]);
+subSection("No index covers projection, pick smallest index");
+outputAggregationPlanAndResults(coll, [
+    {$group: {_id: "$a", accumB: {$first: "$b"}, accumC: {$first: "$c"}, accumD: {$first: "$d"}}}
+]);
 
 // TODO SERVER-92469: See if we have to do something to break the tie.
 subSection("Multiplanning tie between DISTINCT_SCAN and IXSCAN");

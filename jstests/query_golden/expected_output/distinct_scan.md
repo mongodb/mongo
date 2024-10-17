@@ -217,7 +217,7 @@
 {  "_id" : 1,  "firstField" : 1 }
 {  "_id" : 2,  "firstField" : 3 }
 {  "_id" : 3,  "firstField" : 7 }
-{  "_id" : 4,  "firstField" : 3 }
+{  "_id" : 4,  "firstField" : 2 }
 {  "_id" : 7,  "firstField" : 1 }
 ```
 ### Summarized explain
@@ -229,16 +229,24 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "FETCH"
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
 					},
 					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
 								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
 							]
 						},
-						"indexName" : "a_1",
+						"indexName" : "a_1_b_1",
 						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
@@ -246,10 +254,210 @@
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
-							"a" : 1
+							"a" : 1,
+							"b" : 1
 						},
 						"multiKeyPaths" : {
-							"a" : [ ]
+							"a" : [ ],
+							"b" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"firstField" : "$b"
+				}
+			}
+		}
+	]
+}
+```
+
+### $sort influences index selection
+### Pipeline
+```json
+[
+	{
+		"$sort" : {
+			"a" : 1
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a",
+			"firstField" : {
+				"$first" : "$b"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 1,  "firstField" : 1 }
+{  "_id" : 2,  "firstField" : 3 }
+{  "_id" : 3,  "firstField" : 7 }
+{  "_id" : 4,  "firstField" : 2 }
+{  "_id" : 7,  "firstField" : 1 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [
+					[
+						{
+							"stage" : "FETCH"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					]
+				],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1_b_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1,
+							"b" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ],
+							"b" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"firstField" : "$b"
+				}
+			}
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$sort" : {
+			"a" : 1,
+			"b" : 1
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a",
+			"firstField" : {
+				"$first" : "$b"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 1,  "firstField" : 1 }
+{  "_id" : 2,  "firstField" : 3 }
+{  "_id" : 3,  "firstField" : 7 }
+{  "_id" : 4,  "firstField" : 2 }
+{  "_id" : 7,  "firstField" : 1 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1_b_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1,
+							"b" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ],
+							"b" : [ ]
 						},
 						"stage" : "DISTINCT_SCAN"
 					}

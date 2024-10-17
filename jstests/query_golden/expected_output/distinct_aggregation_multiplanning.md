@@ -1210,16 +1210,24 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "FETCH"
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
 					},
 					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
 								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
 							]
 						},
-						"indexName" : "a_1",
+						"indexName" : "a_1_b_1",
 						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
@@ -1227,10 +1235,12 @@
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
-							"a" : 1
+							"a" : 1,
+							"b" : 1
 						},
 						"multiKeyPaths" : {
-							"a" : [ ]
+							"a" : [ ],
+							"b" : [ ]
 						},
 						"stage" : "DISTINCT_SCAN"
 					}
@@ -2310,6 +2320,230 @@
 }
 ```
 
+## 3. DISTINCT_SCAN candidates choose index that covers projection, or smallest index if impossible
+### No projection, pick smallest index
+### Pipeline
+```json
+[ { "$group" : { "_id" : "$a" } } ]
+```
+### Results
+```json
+{  "_id" : 4 }
+{  "_id" : 5 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a"
+				}
+			}
+		}
+	]
+}
+```
+
+### Pick index that covers projection
+### Pipeline
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accumB" : {
+				"$first" : "$b"
+			},
+			"accumC" : {
+				"$first" : "$c"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 4,  "accumB" : 2,  "accumC" : 3 }
+{  "_id" : 5,  "accumB" : 4,  "accumC" : 7 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1,
+							"c" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
+							],
+							"c" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1_b_1_c_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1,
+							"b" : 1,
+							"c" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ],
+							"b" : [ ],
+							"c" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"accumB" : "$b",
+					"accumC" : "$c"
+				}
+			}
+		}
+	]
+}
+```
+
+### No index covers projection, pick smallest index
+### Pipeline
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accumB" : {
+				"$first" : "$b"
+			},
+			"accumC" : {
+				"$first" : "$c"
+			},
+			"accumD" : {
+				"$first" : "$d"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 4,  "accumB" : 2,  "accumC" : 3,  "accumD" : 4 }
+{  "_id" : 5,  "accumB" : 4,  "accumC" : 7,  "accumD" : 5 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "FETCH"
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"accumB" : "$b",
+					"accumC" : "$c",
+					"accumD" : "$d"
+				}
+			}
+		}
+	]
+}
+```
+
 ### Multiplanning tie between DISTINCT_SCAN and IXSCAN
 ### Pipeline
 ```json
@@ -2444,7 +2678,7 @@
 }
 ```
 
-## 3. No DISTINCT_SCAN candidates considered due to conflicting sort specs
+## 4. No DISTINCT_SCAN candidates considered due to conflicting sort specs
 ### Pipeline
 ```json
 [
@@ -2813,7 +3047,7 @@
 }
 ```
 
-## 4. No DISTINCT_SCAN candidates considered due to multikey index
+## 5. No DISTINCT_SCAN candidates considered due to multikey index
 ### Pipeline
 ```json
 [

@@ -134,42 +134,66 @@ bool isAFullIndexScanPreferable(const IndexEntry& index,
     return false;
 }
 
+bool indexCoversProjection(const IndexEntry& index, const OrderedPathSet& projFields) {
+    if (projFields.empty()) {
+        return false;
+    }
+    size_t coveredFieldsCount = 0;
+    for (const auto& field : index.keyPattern) {
+        if (projFields.find(field.fieldNameStringData()) != projFields.end()) {
+            coveredFieldsCount++;
+        }
+    }
+    return coveredFieldsCount == projFields.size();
+}
+
 /**
- * Returns true if indices contains an index that can be used with DistinctNode (the "fast distinct
- * hack" node, which can be used only if there is an empty query predicate).  Sets indexOut to the
- * array index of PlannerParams::indices.  Look for the index for the fewest fields.  Criteria for
- * suitable index is that the index should be of type BTREE or HASHED and the index cannot be a
- * partial index.
+ * Returns true if indices contains an index that can be used with DistinctNode (the "fast
+ * distinct hack" node, which can be used only if there is an empty query predicate). Sets
+ * indexOut to the array index of PlannerParams::indices. Criteria for suitable index is that
+ * the index should be of type BTREE or HASHED and the index cannot be a partial index.
  *
- * Multikey indices are not suitable for DistinctNode when the projection is on an array element.
- * Arrays are flattened in a multikey index which makes it impossible for the distinct scan stage
- * (plan stage generated from DistinctNode) to select the requested element by array index.
+ * If there is a projection and at least one index that covers all its fields, the smallest such
+ * index is selected. Otherwise, select the index with the fewest total fields.
  *
- * Multikey indices cannot be used for the fast distinct hack if the field is dotted.  Currently the
- * solution generated for the distinct hack includes a projection stage and the projection stage
- * cannot be covered with a dotted field.
+ * Multikey indices are not suitable for DistinctNode when the projection is on an array
+ * element. Arrays are flattened in a multikey index which makes it impossible for the distinct
+ * scan stage (plan stage generated from DistinctNode) to select the requested element by array
+ * index.
+ *
+ * Multikey indices cannot be used for the fast distinct hack if the field is dotted. Currently
+ * the solution generated for the distinct hack includes a projection stage and the projection
+ * stage cannot be covered with a dotted field.
  */
 bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
-                          const std::string& field,
+                          const std::string& key,
+                          const OrderedPathSet& projectionFields,
                           const CollatorInterface* collator,
                           size_t* indexOut) {
-    invariant(indexOut);
-    int minFields = std::numeric_limits<int>::max();
+    tassert(951520, "indexOut must be initialized", indexOut);
+    size_t minIndexFields = Ordering::kMaxCompoundIndexKeys + 1;
+    bool someIndexCoversProj = false;
     for (size_t i = 0; i < indices.size(); ++i) {
-        if (isAFullIndexScanPreferable(indices[i], field, collator)) {
+        if (isAFullIndexScanPreferable(indices[i], key, collator)) {
             continue;
         }
-
-        int nFields = indices[i].keyPattern.nFields();
-        // Pick the index with the lowest number of fields.
-        if (nFields < minFields) {
-            minFields = nFields;
+        const size_t nFields = indices[i].keyPattern.nFields();
+        bool currIndexCoversProj = indexCoversProjection(indices[i], projectionFields);
+        if (currIndexCoversProj && (!someIndexCoversProj || nFields < minIndexFields)) {
+            // Pick this index if it's the first covering index or it has fewer fields than the
+            // current smallest covering index.
+            minIndexFields = nFields;
+            *indexOut = i;
+            someIndexCoversProj = true;
+        } else if (!currIndexCoversProj && !someIndexCoversProj && nFields < minIndexFields) {
+            // No covering index found yet, so pick this one if it's smaller than the current
+            // smallest.
+            minIndexFields = nFields;
             *indexOut = i;
         }
     }
-    return minFields != std::numeric_limits<int>::max();
+    return minIndexFields <= Ordering::kMaxCompoundIndexKeys;
 }
-
 }  // namespace
 
 std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
@@ -180,6 +204,9 @@ std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
     auto collator = canonicalQuery.getCollator();
     if (getDistinctNodeIndex(plannerParams.mainCollectionInfo.indexes,
                              canonicalDistinct.getKey(),
+                             canonicalQuery.getProj()
+                                 ? canonicalQuery.getProj()->getRequiredFields()
+                                 : OrderedPathSet{},
                              collator,
                              &distinctNodeIndex)) {
         // TODO SERVER-94880: Construct an index scan and let
