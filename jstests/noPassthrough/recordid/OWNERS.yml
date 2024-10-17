@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "prepare_recordid_initialization.js":
+    approvers:
+      - 10gen/server-storage-execution

@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "check_for_oplog_cap_maintainer_thread.js":
+    approvers:
+      - 10gen/server-storage-execution
+  - "*":
+    approvers:
+      - 10gen/server-replication

@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "skip_write_conflict_retries_failpoint.js":
+    approvers:
+      - 10gen/server-storage-execution

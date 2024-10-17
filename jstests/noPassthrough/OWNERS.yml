@@ -18,6 +18,3 @@ filters:
   - "*utf8_paths*":
     approvers:
       - 10gen/server-programmability
-  - "*coll_stats*":
-    approvers:
-      - 10gen/server-storage-execution
