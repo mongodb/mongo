@@ -715,7 +715,7 @@ public:
                     makeABTFail(ErrorCodes::Error{7315402},
                                 "only one date allowed in an $add expression")},
                 optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::Add, std::move(varLeft), std::move(varRight)));
+                    optimizer::Operations::Add, varLeft, varRight));
             return optimizer::make<optimizer::Let>(
                 std::move(nameLeft),
                 std::move(left),
