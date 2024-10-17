@@ -335,6 +335,8 @@ last-continuous:
       ticket: SERVER-92530
     - test_file: jstests/replsets/initial_sync_collStats_resumes_after_network_error.js
       ticket: SERVER-94259
+    - test_file: jstests/core/timeseries/drop_timeseries.js
+      ticket: SERVER-94829
   suites: null
 last-lts:
   all:
@@ -684,4 +686,6 @@ last-lts:
       ticket: SERVER-92530
     - test_file: jstests/replsets/initial_sync_collStats_resumes_after_network_error.js
       ticket: SERVER-94259
+    - test_file: jstests/core/timeseries/drop_timeseries.js
+      ticket: SERVER-94829
   suites: null

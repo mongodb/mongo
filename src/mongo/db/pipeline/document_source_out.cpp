@@ -120,7 +120,7 @@ DocumentSourceOut::~DocumentSourceOut() {
                 if (_timeseries) {
                     auto collType = pExpCtx->mongoProcessInterface->getCollectionType(
                         cleanupOpCtx.get(), getOutputNs());
-                    if (collType == query_shape::CollectionType::kNonExistent) {
+                    if (collType != query_shape::CollectionType::kTimeseries) {
                         dropCollectionCmd(getOutputNs().makeTimeseriesBucketsNamespace());
                     }
                 }
