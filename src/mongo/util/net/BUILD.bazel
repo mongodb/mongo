@@ -257,6 +257,7 @@ mongo_cc_library(
         "//src/mongo/base:data_builder.h",
     ],
     hdrs = [
+        "cidr.h",
         "http_client.h",
         "http_client_mock.h",
     ],

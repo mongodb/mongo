@@ -338,6 +338,11 @@ public:
         return std::make_unique<WinHttpClient>();
     }
 
+    std::unique_ptr<HttpClient> createWithFirewall(
+        [[maybe_unused]] const std::vector<CIDR>& cidrDenyList) final {
+        MONGO_UNIMPLEMENTED;
+    }
+
     BSONObj getServerStatus() final {
         return BSON("type"
                     << "winhttp");

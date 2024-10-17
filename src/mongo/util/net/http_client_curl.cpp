@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <arpa/inet.h>
 #include <cstddef>
 #include <curl/curl.h>
 #include <curl/easy.h>
@@ -659,6 +658,9 @@ class CurlHttpClient final : public HttpClient {
 public:
     CurlHttpClient(HttpConnectionPool pool) : _pool(pool) {}
 
+    CurlHttpClient(const std::vector<CIDR>& cidrDenyList)
+        : _pool(HttpConnectionPool::kUse), _cidrDenyList(cidrDenyList) {}
+
     void allowInsecureHTTP(bool allow) final {
         _allowInsecure = allow;
     }
@@ -700,6 +702,51 @@ public:
     }
 
 private:
+    static curl_socket_t staticBlockCidrDenyList(void* clientp,
+                                                 curlsocktype purpose,
+                                                 struct curl_sockaddr* address) {
+        CurlHttpClient* client = static_cast<CurlHttpClient*>(clientp);
+        return client->blockCidrDenyList(address);
+    }
+
+    curl_socket_t blockCidrDenyList(struct curl_sockaddr* address) {
+        std::vector<char> ipAddress(address->addrlen);
+
+        switch (address->addr.sa_family) {
+            case AF_INET: {
+                struct sockaddr_in* ipv4 = reinterpret_cast<struct sockaddr_in*>(&address->addr);
+                auto result =
+                    inet_ntop(AF_INET, &(ipv4->sin_addr), ipAddress.data(), address->addrlen);
+                if (!result) {
+                    return CURL_SOCKET_BAD;
+                }
+                break;
+            }
+            case AF_INET6: {
+                struct sockaddr_in6* ipv6 = reinterpret_cast<struct sockaddr_in6*>(&address->addr);
+                auto result =
+                    inet_ntop(AF_INET6, &(ipv6->sin6_addr), ipAddress.data(), address->addrlen);
+                if (!result) {
+                    return CURL_SOCKET_BAD;
+                }
+                break;
+            }
+            default:
+                return CURL_SOCKET_BAD;
+        }
+
+        auto destinationAsCIDR = CIDR::parse(ipAddress.data());
+        if (!destinationAsCIDR.isOK()) {
+            return CURL_SOCKET_BAD;
+        }
+        for (const CIDR& cidr : _cidrDenyList) {
+            if (cidr.contains(destinationAsCIDR.getValue())) {
+                return CURL_SOCKET_BAD;
+            }
+        }
+        return socket(address->family, address->socktype, address->protocol);
+    }
+
     void updateHandleForBufferData(CURL* handle, BufReader* bufReader) const {
         curl_easy_setopt(handle, CURLOPT_READFUNCTION, ReadMemoryCallback);
         curl_easy_setopt(handle, CURLOPT_READDATA, bufReader);
@@ -710,6 +757,12 @@ private:
 
     HttpReply request(CURL* handle, HttpMethod method, StringData url, ConstDataRange cdr) const {
         uassert(ErrorCodes::InternalError, "Curl initialization failed", handle);
+
+        if (!_cidrDenyList.empty()) {
+            curl_easy_setopt(
+                handle, CURLOPT_OPENSOCKETFUNCTION, &CurlHttpClient::staticBlockCidrDenyList);
+            curl_easy_setopt(handle, CURLOPT_OPENSOCKETDATA, this);
+        }
 
         curl_easy_setopt(handle, CURLOPT_TIMEOUT, longSeconds(_timeout));
 
@@ -792,6 +845,8 @@ private:
     HttpConnectionPool _pool;
 
     bool _allowInsecure{false};
+
+    std::vector<CIDR> _cidrDenyList;
 };
 
 class HttpClientProviderImpl : public HttpClientProvider {
@@ -808,6 +863,11 @@ public:
     std::unique_ptr<HttpClient> createWithoutConnectionPool() final {
         invariant(curlLibraryManager.isInitialized());
         return std::make_unique<CurlHttpClient>(HttpConnectionPool::kDoNotUse);
+    }
+
+    std::unique_ptr<HttpClient> createWithFirewall(const std::vector<CIDR>& cidrDenyList) final {
+        invariant(curlLibraryManager.isInitialized());
+        return std::make_unique<CurlHttpClient>(cidrDenyList);
     }
 
     BSONObj getServerStatus() final {

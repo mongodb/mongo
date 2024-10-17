@@ -79,6 +79,11 @@ std::unique_ptr<HttpClient> HttpClient::createWithoutConnectionPool() {
     return _factory->createWithoutConnectionPool();
 }
 
+std::unique_ptr<HttpClient> HttpClient::createWithFirewall(const std::vector<CIDR>& cidrDenyList) {
+    invariant(_factory != nullptr);
+    return _factory->createWithFirewall(cidrDenyList);
+}
+
 BSONObj HttpClient::getServerStatus() {
     invariant(_factory != nullptr);
     return _factory->getServerStatus();
