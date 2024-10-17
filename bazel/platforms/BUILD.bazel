@@ -116,6 +116,7 @@ platform(
     constraint_values = [
         "@platforms//cpu:ppc64le",
         "@platforms//os:linux",
+        ":use_mongo_toolchain",
     ],
 )
 
@@ -124,5 +125,6 @@ platform(
     constraint_values = [
         "@platforms//cpu:s390x",
         "@platforms//os:linux",
+        ":use_mongo_toolchain",
     ],
 )

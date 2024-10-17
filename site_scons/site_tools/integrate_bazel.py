@@ -741,6 +741,8 @@ def add_libdeps_time(env, delate_time):
 
 
 def prefetch_toolchain(env):
+    setup_bazel_env_vars()
+    setup_max_retry_attempts()
     bazel_bin_dir = (
         env.GetOption("evergreen-tmp-dir")
         if env.GetOption("evergreen-tmp-dir")
@@ -753,10 +755,25 @@ def prefetch_toolchain(env):
         exec_root = f'bazel-{os.path.basename(env.Dir("#").abspath)}'
         if exec_root and not os.path.exists(f"{exec_root}/external/mongo_toolchain"):
             print("Prefetch the mongo toolchain...")
+
+            local_flags = []
+            if is_local_execution(env):
+                local_flags = ["--config=local"]
+            else:
+                print(
+                    "Running bazel with remote execution enabled. To disable bazel remote execution, please add BAZEL_FLAGS=--config=local to the end of your scons command line invocation."
+                )
+                if not validate_remote_execution_certs(env):
+                    sys.exit(1)
+
             try:
                 retry_call(
                     subprocess.run,
-                    [[Globals.bazel_executable, "build", "@mongo_toolchain"]],
+                    [[Globals.bazel_executable, "build", "@mongo_toolchain"] + local_flags],
+                    fkwargs={
+                        "env": {**os.environ.copy(), **Globals.bazel_env_variables},
+                        "check": True,
+                    },
                     tries=Globals.max_retry_attempts,
                     exceptions=(subprocess.CalledProcessError,),
                 )
@@ -869,6 +886,37 @@ common --bes_keywords=engflow:BuildScmStatus={status}
             print(f"Generating new {workstation_file} file...")
             with open(workstation_file, "w") as f:
                 f.write(bazelrc_contents)
+
+
+def setup_bazel_env_vars() -> None:
+    # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
+    if platform.machine().lower() == "ppc64le":
+        Globals.bazel_env_variables["JAVA_HOME"] = (
+            "/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
+        )
+    elif platform.machine().lower() == "s390x":
+        Globals.bazel_env_variables["JAVA_HOME"] = (
+            "/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x"
+        )
+
+
+def setup_max_retry_attempts() -> None:
+    Globals.max_retry_attempts = (
+        _CI_MAX_RETRY_ATTEMPTS if os.environ.get("CI") is not None else _LOCAL_MAX_RETRY_ATTEMPTS
+    )
+
+
+def is_local_execution(env: SCons.Environment.Environment) -> bool:
+    normalized_arch = (
+        platform.machine().lower().replace("aarch64", "arm64").replace("x86_64", "amd64")
+    )
+    user_flags = shlex.split(env.get("BAZEL_FLAGS", ""))
+    return (
+        os.environ.get("USE_NATIVE_TOOLCHAIN")
+        or normalized_arch not in ["arm64", "amd64"]
+        or "--config=local" in user_flags
+        or "--config=public-release" in user_flags
+    )
 
 
 def generate(env: SCons.Environment.Environment) -> None:
@@ -1002,39 +1050,23 @@ def generate(env: SCons.Environment.Environment) -> None:
         print("Custom toolchain detected, using --config=local for bazel build.")
         bazel_internal_flags.append("--config=local")
 
+    public_release = False
     # Disable remote execution for public release builds.
     if env.GetOption("release") == "on" and (
         env.GetOption("cache-dir") is None
         or env.GetOption("cache-dir") == "$BUILD_ROOT/scons/cache"
     ):
         bazel_internal_flags.append("--config=public-release")
+        public_release = True
 
     evergreen_tmp_dir = env.GetOption("evergreen-tmp-dir")
     if normalized_os == "macos" and evergreen_tmp_dir:
         bazel_internal_flags.append(f"--sandbox_writable_path={evergreen_tmp_dir}")
 
-    Globals.max_retry_attempts = (
-        _CI_MAX_RETRY_ATTEMPTS if os.environ.get("CI") is not None else _LOCAL_MAX_RETRY_ATTEMPTS
-    )
+    setup_bazel_env_vars()
+    setup_max_retry_attempts()
 
-    # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
-    if normalized_arch == "ppc64le":
-        Globals.bazel_env_variables["JAVA_HOME"] = (
-            "/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
-        )
-    elif normalized_arch == "s390x":
-        Globals.bazel_env_variables["JAVA_HOME"] = (
-            "/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x"
-        )
-
-    check_remote_flags = bazel_internal_flags + shlex.split(env.get("BAZEL_FLAGS", ""))
-    if (
-        "--config=local" not in check_remote_flags
-        and "--config=public-release" not in check_remote_flags
-    ):
-        print(
-            "Running bazel with remote execution enabled. To disable bazel remote execution, please add BAZEL_FLAGS=--config=local to the end of your scons command line invocation."
-        )
+    if not is_local_execution(env) and not public_release:
         if not validate_remote_execution_certs(env):
             sys.exit(1)
 

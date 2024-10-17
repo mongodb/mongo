@@ -1,4 +1,5 @@
 load("//bazel/platforms:remote_execution_containers.bzl", "REMOTE_EXECUTION_CONTAINERS")
+load("//bazel/toolchains:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 load("//bazel:utils.bzl", "get_host_distro_major_version")
 
 _OS_MAP = {
@@ -49,6 +50,7 @@ def _setup_local_config_platform(ctx):
     # EngFlow's "default" pool is ARM64
     remote_execution_pool = "x86_64" if arch == "amd64" else "default"
     result = None
+    toolchain_key = "{distro}_{arch}".format(distro = distro, arch = arch)
     if ctx.os.environ.get("USE_NATIVE_TOOLCHAIN"):
         exec_props = ""
         result = {"USE_NATIVE_TOOLCHAIN": "1"}
@@ -66,6 +68,10 @@ def _setup_local_config_platform(ctx):
     },
 """ % (container_url, remote_execution_pool)
         result = {"DISTRO": distro}
+    elif distro != None and distro in TOOLCHAIN_MAP:
+        constraints_str += ',\n        "@//bazel/platforms:use_mongo_toolchain"'
+        result = {"DISTRO": distro}
+        exec_props = ""
     else:
         result = {"USE_NATIVE_TOOLCHAIN": "1"}
         exec_props = ""
