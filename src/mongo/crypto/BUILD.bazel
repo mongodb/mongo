@@ -76,12 +76,14 @@ mongo_cc_library(
         "fle_stats_gen",
         "fle_tags.cpp",
         "fle_tokens_gen",
+        "mongocryptstatus.cpp",
     ],
     hdrs = [
         "encryption_fields_util.h",
         "fle_crypto.h",
         "fle_stats.h",
         "fle_tags.h",
+        "mongocryptstatus.h",
     ],
     deps = [
         # TODO(SERVER-93876): Remove many of these.

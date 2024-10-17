@@ -96,6 +96,7 @@ extern "C" {
 #include "mongo/crypto/fle_fields_util.h"
 #include "mongo/crypto/fle_numeric.h"
 #include "mongo/crypto/fle_tokens_gen.h"
+#include "mongo/crypto/mongocryptstatus.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -225,88 +226,6 @@ using UniqueMongoCrypt =
 using UniqueMongoCryptCtx =
     libmongocrypt_support_detail::libmongocrypt_unique_ptr<mongocrypt_ctx_t,
                                                            mongocrypt_ctx_destroy>;
-
-/**
- * C++ friendly wrapper around libmongocrypt's public mongocrypt_status_t* and its associated
- * functions.
- */
-class MongoCryptStatus {
-public:
-    ~MongoCryptStatus() {
-        mongocrypt_status_destroy(_status);
-    }
-
-    MongoCryptStatus(MongoCryptStatus&) = delete;
-    MongoCryptStatus(MongoCryptStatus&&) = delete;
-
-    static MongoCryptStatus create() {
-        return MongoCryptStatus(mongocrypt_status_new());
-    }
-
-    /**
-     * Get the error category for the status.
-     */
-    mongocrypt_status_type_t getType() {
-        return mongocrypt_status_type(_status);
-    }
-
-    /**
-     * Get a libmongocrypt specific error code
-     */
-    uint32_t getCode() {
-        return mongocrypt_status_code(_status);
-    }
-
-    /**
-     * Returns true if there are no errors
-     */
-    bool isOk() {
-        return mongocrypt_status_ok(_status);
-    }
-
-    operator mongocrypt_status_t*() {
-        return _status;
-    }
-
-    /**
-     * Convert a mongocrypt_status_t to a mongo::Status.
-     */
-    Status toStatus() {
-        if (getType() == MONGOCRYPT_STATUS_OK) {
-            return Status::OK();
-        }
-
-        uint32_t len;
-        StringData errorPrefix;
-        switch (getType()) {
-            case MONGOCRYPT_STATUS_ERROR_CLIENT: {
-                errorPrefix = "Client Error: "_sd;
-                break;
-            }
-            case MONGOCRYPT_STATUS_ERROR_KMS: {
-                errorPrefix = "Kms Error: "_sd;
-                break;
-            }
-            case MONGOCRYPT_STATUS_ERROR_CRYPT_SHARED: {
-                errorPrefix = "Crypt Shared  Error: "_sd;
-                break;
-            }
-            default: {
-                errorPrefix = "Unexpected Error: "_sd;
-                break;
-            }
-        }
-
-        return Status(ErrorCodes::LibmongocryptError,
-                      str::stream() << errorPrefix << mongocrypt_status_message(_status, &len));
-    }
-
-private:
-    explicit MongoCryptStatus(mongocrypt_status_t* status) : _status(status) {}
-
-private:
-    mongocrypt_status_t* _status;
-};
 
 /**
  * C++ friendly wrapper around libmongocrypt's public mongocrypt_binary_t* and its associated
@@ -1744,7 +1663,7 @@ BSONObj runStateMachineForDecryption(mongocrypt_ctx_t* ctx, FLEKeyVault* keyVaul
     bool done = false;
     BSONObj result;
 
-    MongoCryptStatus status = MongoCryptStatus::create();
+    MongoCryptStatus status;
 
     while (!done) {
         state = mongocrypt_ctx_state(ctx);
