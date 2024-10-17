@@ -1405,6 +1405,12 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
         if (cloneDetails) {
             setBuilder.append(ReshardingRecipientDocument::kCloneTimestampFieldName,
                               cloneDetails->cloneTimestamp);
+            setBuilder.append(ReshardingRecipientDocument::kMetricsFieldName + "." +
+                                  ReshardingRecipientMetrics::kApproxBytesToCopyFieldName,
+                              cloneDetails->approxBytesToCopy);
+            setBuilder.append(ReshardingRecipientDocument::kMetricsFieldName + "." +
+                                  ReshardingRecipientMetrics::kApproxDocumentsToCopyFieldName,
+                              cloneDetails->approxDocumentsToCopy);
 
             BSONArrayBuilder donorShardsArrayBuilder;
             for (const auto& donor : cloneDetails->donorShards) {
