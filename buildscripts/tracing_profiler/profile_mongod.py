@@ -22,6 +22,10 @@ def get_profiler_stats(args):
         command.extend(["--username", args.username])
     if args.password:
         command.extend(["--password", args.password])
+    if args.host:
+        command.extend(["--host", args.host])
+    if args.port:
+        command.extend(["--port", args.port])
     if args.tls:
         command.append("--tls")
     if args.tlsAllowInvalidCertificates:
@@ -67,6 +71,16 @@ def main():
         "--password",
         dest="password",
         help="Password for authentication",
+    )
+    parser.add_argument(
+        "--host",
+        dest="host",
+        help="Server to connect to",
+    )
+    parser.add_argument(
+        "--port",
+        dest="port",
+        help="Port to connect to",
     )
     parser.add_argument(
         "--tls", dest="tls", action="store_true", help="Use TLS for all connections"
