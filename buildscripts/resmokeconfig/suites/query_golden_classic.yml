@@ -5,8 +5,6 @@ selector:
     - jstests/query_golden/**/*.js
   exclude_files:
     - jstests/query_golden/libs/**/*.js
-  exclude_with_any_tags:
-    - requires_cqf
 executor:
   archive:
     hooks:
