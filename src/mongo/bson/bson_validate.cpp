@@ -35,6 +35,7 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/util/bsoncolumn_util.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -79,6 +80,10 @@ static constexpr ValidationStyle kTypeInfoTable alignas(32)[32] = {
 MONGO_STATIC_ASSERT(sizeof(kTypeInfoTable) == 32);
 
 constexpr ErrorCodes::Error InvalidBSON = ErrorCodes::InvalidBSON;
+constexpr ErrorCodes::Error NonConformantBSON = ErrorCodes::NonConformantBSON;
+
+template <bool precise>
+Status _doValidateColumn(const char* originalBuffer, uint64_t maxLength);
 
 template <bool precise>
 class ValidateBuffer {
@@ -90,10 +95,7 @@ public:
 
     Status validate() noexcept {
         try {
-            _currFrame = _frames.begin();
-            _currElem = nullptr;
-            auto maxFrames = BSONDepth::getMaxAllowableDepth() + 1;  // A flat BSON has one frame.
-            uassert(InvalidBSON, "Cannot enforce max nesting depth", _frames.size() <= maxFrames);
+            setupValidation();
             uassert(InvalidBSON, "BSON data has to be at least 5 bytes", _maxLength >= 5);
 
             // Read the length as signed integer, to ensure we limit it to < 2GB.
@@ -111,8 +113,51 @@ public:
         return Status::OK();
     }
 
+    /* Assumes the root level is a single literal element (which may contain nested objects).
+     * Only validates up to the termination of that first literal, more data is permitted to
+     * remain in the buffer after that and is not validated. Throws exception on invalid data.
+     * Confirm field names for literals in BSONColumn have empty field names.
+     */
+    int validateAndMeasureElem() {
+        setupValidation();
+        uassert(InvalidBSON,
+                "BSON literal is not followed by fieldname",
+                _maxLength > 1);  // must at least have a 0-terminator after control
+        // Confirm fieldName is just a null terminator
+        uassert(NonConformantBSON,
+                "BSON literal content does not have an empty fieldname",
+                _maxLength > 1 && _data[1] == 0);
+
+        // Handle one element without using iterative loop, and without expecting
+        // multiple instances or an EOO.  Only resume with the iterative loop if
+        // we have nested objects
+        _currElem = _data;
+        const char* ptr = _validateElem<false>(Cursor{_data + 2, _data + _maxLength}, *_data);
+
+        if (_firstFrameUpdated) {
+            // We know that type was kObject/kArray/kCodeWScope
+            // Size is fieldname, type, and a stored int
+            int64_t size =
+                static_cast<int64_t>(ConstDataView(_data + 2).read<LittleEndian<int32_t>>()) + 2;
+            uassert(InvalidBSON,
+                    "BSON literal content exceeds buffer size",
+                    (size_t)size <= _maxLength);
+            _validateIterative(Cursor{ptr, _data + size});
+            return size;
+        } else {
+            return ptr - _data;
+        }
+    }
+
 private:
     struct Empty {};
+
+    void inline setupValidation() {
+        _currFrame = _frames.begin();
+        _currElem = nullptr;
+        auto maxFrames = BSONDepth::getMaxAllowableDepth() + 1;  // A flat BSON has one frame.
+        uassert(InvalidBSON, "Cannot enforce max nesting depth", _frames.size() <= maxFrames);
+    }
 
     /**
      * Extra information for each nesting level in the precise validation mode.
@@ -129,6 +174,8 @@ private:
         typename std::conditional<precise, std::vector<Frame>, std::array<Frame, 32>>::type;
 
     struct Cursor {
+        /* Also requires remaining buf after the skip (both BSONColumn and BSONObj guarantee this
+           by having at minimum a trailing EOO) */
         void skip(size_t len) {
             uassert(InvalidBSON, "BSON size is larger than buffer size", (ptr += len) < end);
         }
@@ -163,7 +210,10 @@ private:
         uassert(ErrorCodes::Overflow,
                 "BSONObj exceeds maximum nested object depth",
                 ++_currFrame != _frames.end());
+        return _updateFrame(cursor);
+    }
 
+    const char* _updateFrame(Cursor cursor) {
         auto obj = cursor.ptr;
         auto len = cursor.template read<int32_t>();
         uassert(ErrorCodes::InvalidBSON, "Nested BSON object has to be at least 5 bytes", len >= 5);
@@ -186,10 +236,19 @@ private:
 
     static const char* _validateSpecial(Cursor cursor, uint8_t type) {
         switch (type) {
-            case BSONType::BinData:
-                cursor.skip(cursor.template read<uint32_t>());  // Like String, but...
-                cursor.skip(1);  // ...add extra skip for the subtype byte to avoid overflow.
+            case BSONType::BinData: {
+                auto count = cursor.template read<uint32_t>();
+                auto subtype = cursor.template read<uint8_t>();
+                const char* columnStart = cursor.ptr;
+                cursor.skip(count);
+                if (subtype == BinDataType::Column) {
+                    /* do not pass down cursor; we want to reset the nesting depth */
+                    uassert(NonConformantBSON,
+                            "Invalid BSON column",
+                            _doValidateColumn<precise>(columnStart, count).isOK());
+                }
                 break;
+            }
             case BSONType::Bool:
                 if (auto value = cursor.template read<uint8_t>())  // If not 0, must be 1.
                     uassert(InvalidBSON, "BSON bool is neither false nor true", value == 1);
@@ -213,10 +272,15 @@ private:
         return cursor.ptr;
     }
 
+    template <bool nestedFrame>
     const char* _pushCodeWithScope(Cursor cursor) {
-        cursor.ptr = _pushFrame(cursor);  // Push a dummy frame to check the CodeWScope size.
-        cursor.skipString();              // Now skip the BSON UTF8 string containing the code.
-        _currElem = cursor.ptr - 1;       // Use the terminating NUL as adummy scope element.
+        // Push a dummy frame to check the CodeWScope size.
+        if constexpr (nestedFrame)
+            cursor.ptr = _pushFrame(cursor);
+        else
+            cursor.ptr = _updateFrame(cursor);
+        cursor.skipString();         // Now skip the BSON UTF8 string containing the code.
+        _currElem = cursor.ptr - 1;  // Use the terminating NUL as a dummy scope element.
         return _pushFrame(cursor);
     }
 
@@ -230,21 +294,30 @@ private:
         }
     }
 
+    template <bool nestedFrame>
     const char* _validateElem(Cursor cursor, uint8_t type) {
         if (MONGO_unlikely(type > JSTypeMax))
             return _validateSpecial(cursor, type);
 
         auto style = kTypeInfoTable[type];
-        if (MONGO_likely(style <= kSkip16))
+        if (MONGO_likely(style <= kSkip16)) {
             cursor.skip(style * 4);
-        else if (MONGO_likely(style == kString))
+        } else if (MONGO_likely(style == kString)) {
             cursor.skipString();
-        else if (MONGO_likely(style == kObjectOrArray))
-            cursor.ptr = _pushFrame(cursor);
-        else if (MONGO_unlikely(precise && type == CodeWScope))
-            cursor.ptr = _pushCodeWithScope(cursor);
-        else
+        } else if (MONGO_likely(style == kObjectOrArray)) {
+            if constexpr (nestedFrame) {
+                cursor.ptr = _pushFrame(cursor);
+            } else {
+                cursor.ptr = _updateFrame(cursor);
+                _firstFrameUpdated = true;
+            }
+        } else if (MONGO_unlikely(precise && type == CodeWScope)) {
+            cursor.ptr = _pushCodeWithScope<nestedFrame>(cursor);
+            if constexpr (!nestedFrame)
+                _firstFrameUpdated = true;
+        } else {
             cursor.ptr = _validateSpecial(cursor, type);
+        }
 
         return cursor.ptr;
     }
@@ -258,14 +331,14 @@ private:
                 uint8_t type = *cursor.ptr;
                 _currElem = cursor.ptr;
                 cursor.ptr += len + 1;
-                cursor.ptr = _validateElem(cursor, type);
+                cursor.ptr = _validateElem<true>(cursor, type);
 
                 if constexpr (precise) {
                     // See if the _id field was just validated. If so, set the global scope element.
                     if (_currFrame == _frames.begin() && StringData(_currElem + 1) == "_id"_sd)
                         _currFrame->elem = BSONElement(_currElem);  // This is fully validated now.
                 }
-                dassert(cursor.ptr <= cursor.end);
+                dassert(cursor.ptr < cursor.end);
             }
 
             // Got the EOO byte: skip it and compare its location with the expected frame end.
@@ -300,7 +373,93 @@ private:
     const char* _currElem = nullptr;  // Element to validate: only the name is known to be good.
     typename Frames::iterator _currFrame;  // Frame currently being validated.
     Frames _frames;  // Has end pointers to check and the containing element for precise mode.
+    bool _firstFrameUpdated = false;  // Has the first frame received nested while measuring an elem
 };
+
+template <bool precise>
+class ColumnValidator {
+public:
+    static Status doValidateBSONColumn(const char* originalBuffer, int maxLength) noexcept {
+        // run control pointer through to end of buffer
+        // run over literal data as directed by lengths from control
+        // check formatting of Simple8B blocks
+        // scan reference objects of interleaved mode starts
+        // confirm EOO terminations of interleaved modes
+        // content of interleaved objects does not need to be checked differently from
+        //      standard Simple8B block and literal decodings
+        // confirm we end at end of buffer
+        const char* ptr = originalBuffer;
+        const char* end = originalBuffer + maxLength;
+        bool interleavedMode = false;
+
+        try {
+            // Check this beforehand to ensure we cannot overflow the buffer with any strlen
+            uassert(NonConformantBSON,
+                    "BSON column is missing EOO termination",
+                    ptr < end && *(end - 1) == EOO);
+
+            while (ptr < end) {
+                uint8_t control = *ptr;
+                if (control == EOO) {
+                    ptr++;
+                    if (interleavedMode) {
+                        interleavedMode = false;
+                    } else {
+                        // should be the last control of the sequence
+                        uassert(NonConformantBSON,
+                                "BSONColumn EOO does not fully consume buffer",
+                                ptr == end);
+                        return Status::OK();
+                    }
+                } else if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
+                    ptr += ValidateBuffer<precise>(ptr, end - ptr).validateAndMeasureElem();
+                } else if (bsoncolumn::isInterleavedStartControlByte(control)) {
+                    // interleaved objects begin with a reference object, and then a series
+                    // of diff blocks for followup objects, ending with an EOO. Nesting interleaved
+                    // mode is not allowed.
+                    uassert(NonConformantBSON, "Nested interleaved mode", !interleavedMode);
+                    ptr++;
+                    uassert(NonConformantBSON,
+                            "Invalid reference object for interleaved mode",
+                            validateBSON(ptr, end - ptr).isOK());
+                    // we now know due to validateBSON that it is safe to interpret *ptr
+                    BSONObj reference(ptr);
+                    ptr += reference.objsize();
+                    interleavedMode = true;
+                } else {
+                    // Simple8b block sequence, just check for memory overflow of block count
+                    uint8_t numBlocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
+                    int size = sizeof(uint64_t) * numBlocks;
+                    uassert(NonConformantBSON,
+                            "BSONColumn blocks exceed buffer size",
+                            ptr + size + 1 <= end);
+                    ptr += 1 + size;
+                }
+            }
+        } catch (const ExceptionForCat<ErrorCategory::ValidationError>& e) {
+            return Status(e.code(), str::stream() << e.what());
+        }
+
+        // We should not get here for a valid object, the final EOO should have returned OK
+        return Status(NonConformantBSON, "Missing terminating EOO");
+    }
+};
+
+template <bool precise>
+Status _doValidateColumn(const char* originalBuffer, uint64_t maxLength) {
+    if constexpr (precise) {
+        // First try validating using the fast but less precise version. That version will return
+        // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases
+        // and actual failures will rerun the precise version that gives a detailed error context.
+        if (MONGO_likely(
+                ColumnValidator<false>::doValidateBSONColumn(originalBuffer, maxLength).isOK()))
+            return Status::OK();
+
+        return ColumnValidator<true>::doValidateBSONColumn(originalBuffer, maxLength);
+    } else {
+        return ColumnValidator<false>::doValidateBSONColumn(originalBuffer, maxLength);
+    }
+}
 }  // namespace
 
 Status validateBSON(const char* originalBuffer, uint64_t maxLength) noexcept {
@@ -312,4 +471,9 @@ Status validateBSON(const char* originalBuffer, uint64_t maxLength) noexcept {
 
     return ValidateBuffer<true>(originalBuffer, maxLength).validate();
 }
+
+Status validateBSONColumn(const char* originalBuffer, int maxLength) noexcept {
+    return _doValidateColumn<true>(originalBuffer, maxLength);
+}
+
 }  // namespace mongo

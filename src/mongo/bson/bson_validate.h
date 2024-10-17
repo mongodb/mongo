@@ -50,4 +50,7 @@ namespace mongo {
  * Length is only limited by the buffer's maxLength and the inherent 2GB - 1 format limitation.
  */
 Status validateBSON(const char* buf, uint64_t maxLength) noexcept;
+
+Status validateBSONColumn(const char* buf, int maxLength) noexcept;
+
 }  // namespace mongo

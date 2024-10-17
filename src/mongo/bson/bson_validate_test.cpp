@@ -34,6 +34,9 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/util/bsoncolumn_util.h"
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
@@ -431,4 +434,272 @@ TEST(BSONValidateFast, MaxNestingDepth) {
     Status status = validateBSON(tooDeepNesting.objdata(), tooDeepNesting.objsize());
     ASSERT_EQ(status.code(), ErrorCodes::Overflow);
 }
+
+TEST(BSONValidateFast, ErrorTooShort) {
+    BSONObj x;
+    x = BSON("foo" << 17 << "bar"
+                   << "eliot");
+    ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
+    ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize() - 1));
+    // Check if previous byte looks like EOO
+    char badCopy[16384];
+    memcpy(badCopy, x.objdata(), x.objsize() - 1);
+    badCopy[x.objsize() - 2] = 0;
+    ASSERT_NOT_OK(validateBSON(badCopy, x.objsize() - 1));
+}
+
+class BSONValidateColumn : public unittest::Test {
+public:
+    BSONElement objToElement(BSONObj val) {
+        BSONObjBuilder ob;
+        ob.append("0"_sd, val);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
+private:
+    std::forward_list<BSONObj> _elementMemory;
+};
+
+TEST_F(BSONValidateColumn, BSONColumnInBSON) {
+    BSONColumnBuilder cb("");
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    cb.append(BSON("a" << 1).getField("a"));
+    cb.append(BSON("a" << 2).getField("a"));
+    cb.append(BSON("a" << 1).getField("a"));
+    BSONBinData columnData = cb.finalize();
+    BSONObj obj = BSON("a" << columnData);
+    Status status = validateBSON(obj.objdata(), obj.objsize());
+    ASSERT_OK(status);
+
+    // Change one important byte.
+    ((char*)columnData.data)[0] = '0';
+    obj = BSON("a" << columnData);
+    status = validateBSON(obj.objdata(), obj.objsize());
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(BSONValidateColumn, BSONColumnMissingEOO) {
+    BSONColumnBuilder cb("");
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+
+    // Remove final EOO
+    ASSERT_EQ(validateBSONColumn((char*)columnData.data, columnData.length - 1).code(),
+              ErrorCodes::InvalidBSON);
+    // Remove final EOO and 0 previous byte (check no overflow)
+    ((char*)columnData.data)[columnData.length - 2] = 0;
+    ASSERT_EQ(validateBSONColumn((char*)columnData.data, columnData.length - 1).code(),
+              ErrorCodes::InvalidBSON);
+}
+
+TEST(BSONValidateColumn, BSONColumnFieldnameNotEmpty) {
+    BSONColumnBuilder cb("");
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+
+    char buf[1024];
+    buf[0] = ((const char*)columnData.data)[0];
+    buf[1] = 'f';
+    buf[2] = 'o';
+    buf[3] = 'o';
+    memcpy(buf + 4, ((const char*)columnData.data) + 1, columnData.length - 1);
+
+    ASSERT_EQ(validateBSONColumn(buf, columnData.length + 3).code(), ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(BSONValidateColumn, BSONColumnNoOverflowMissingAllEOOInColumn) {
+    BSONColumnBuilder cb("");
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    BSONBinData columnData = cb.finalize();
+    for (int i = 0; i < columnData.length; ++i)
+        if (((char*)columnData.data)[i] == 0)
+            ((char*)columnData.data)[i] = 1;
+    BSONObj obj = BSON("a" << columnData);
+    ASSERT_EQ(validateBSON(obj.objdata(), obj.objsize()).code(), ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(BSONValidateColumn, BSONColumnTrailingGarbage) {
+    BSONColumnBuilder cb("");
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+    char badData[4096];
+    memcpy(badData, columnData.data, columnData.length);
+    badData[columnData.length] = 1;
+
+    ASSERT_EQ(validateBSONColumn(badData, columnData.length + 1).code(),
+              ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(BSONValidateColumn, BSONColumnNoOverflowBadContent) {
+    BSONColumnBuilder cb("");
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+
+    // Remove all string null terminators, expect failure but not overflow
+    for (int i = 0; i < columnData.length; ++i)
+        if (((char*)columnData.data)[i] == 0)
+            ((char*)columnData.data)[i] = 1;
+    ASSERT_EQ(validateBSONColumn((char*)columnData.data, columnData.length).code(),
+              ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(BSONValidateColumn, BSONColumnNoOverflowMissingFieldname) {
+    BSONColumnBuilder cb("");
+    cb.append(objToElement(BSON("a"
+                                << "deadbeef")));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+
+    ASSERT_EQ(validateBSONColumn((char*)columnData.data, 6 /* start of "a" */).code(),
+              ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(BSONValidateColumn, BSONColumnNoOverflowBadFieldname) {
+    BSONColumnBuilder cb("");
+    cb.append(objToElement(BSON("a"
+                                << "deadbeef")));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+
+    for (int i = 6 /* start of "a" string */; i < columnData.length; ++i)
+        if (((char*)columnData.data)[i] == 0)
+            ((char*)columnData.data)[i] = 1;
+    ASSERT_EQ(validateBSONColumn((char*)columnData.data, columnData.length).code(),
+              ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(BSONValidateColumn, BSONColumnNoOverflowBadLiteral) {
+    BSONColumnBuilder cb("");
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+
+    // Remove all string null terminators after string start, expect failure but not overflow
+    for (int i = 6 /* start of "deadbeef" string */; i < columnData.length; ++i)
+        if (((char*)columnData.data)[i] == 0)
+            ((char*)columnData.data)[i] = 1;
+    ASSERT_EQ(validateBSONColumn((char*)columnData.data, columnData.length).code(),
+              ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(BSONValidateColumn, BSONColumnInterleavedObjectPasses) {
+    BSONColumnBuilder cb("");
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    BSONObj subObj1 = BSON("b"
+                           << "inside");
+    cb.append(objToElement(subObj1));
+    BSONObj subObj2 = BSON("b"
+                           << "outside");
+    cb.append(objToElement(subObj2));
+    BSONObj subObj3 = BSON("b"
+                           << "gone");
+    cb.append(objToElement(subObj3));
+    cb.append(BSON("c"
+                   << "foobar")
+                  .getField("c"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+}
+
+TEST_F(BSONValidateColumn, BSONColumnInterleavedNestedObjectPasses) {
+    BSONColumnBuilder cb("");
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    BSONObj subObj1 = BSON("d"
+                           << "inside");
+    BSONObj subObj2 = BSON("c" << subObj1);
+    BSONObj subObj3 = BSON("b" << subObj2);
+    cb.append(objToElement(subObj3));
+    cb.append(BSON("c"
+                   << "foobar")
+                  .getField("c"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+}
+
+TEST_F(BSONValidateColumn, BSONColumnInterleavedEmptyObjectPasses) {
+    BSONColumnBuilder cb("");
+    BSONObj subObj1;
+    cb.append(objToElement(subObj1));
+    cb.append(BSON("c"
+                   << "foobar")
+                  .getField("c"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+}
+
+TEST(BSONValidateColumn, BSONColumnInterleavedNestedInterleaved) {
+    BufBuilder buffer;
+    BSONObj ref = BSON("c" << 1);
+
+    buffer.appendChar(bsoncolumn::kInterleavedStartControlByteLegacy);
+    buffer.appendBuf(ref.objdata(), ref.objsize());
+    buffer.appendChar(bsoncolumn::kInterleavedStartControlByteLegacy);
+    buffer.appendBuf(ref.objdata(), ref.objsize());
+    buffer.appendChar(0);
+    buffer.appendChar(0);
+
+    ASSERT_EQ(validateBSONColumn(buffer.buf(), buffer.len()), ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(BSONValidateColumn, BSONColumnNoOverflowBlocksShort) {
+    BSONColumnBuilder cb("");
+    for (int i = 0; i < 100; ++i)
+        cb.append(BSON("a" << i).getField("a"));
+
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+    /* Remove EOO and one block */
+    ASSERT_EQ(validateBSONColumn((char*)columnData.data, columnData.length - 1 - 8).code(),
+              ErrorCodes::NonConformantBSON);
+}
+
+TEST_F(BSONValidateColumn, BSONColumnBadExtendedSelector) {
+    BSONColumnBuilder cb("");
+    for (int i = 0; i < 100; ++i)
+        cb.append(BSON("a" << i).getField("a"));
+
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+    /* Change extended selector on a 7 selector to 14 */
+    uint64_t block = ConstDataView((char*)columnData.data + 31) /* first 7 selector */
+                         .read<LittleEndian<uint64_t>>();
+    ASSERT_EQ(7, block & 15);  // Check that we found a 7 selector
+    block = (14 << 4)          /* 14 extended selector */
+        + 7                    /* original selector */
+        + ((block >> 8) << 8); /* original blocks */
+    memcpy((char*)columnData.data + 31, &block, sizeof(block));
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+}
+
+TEST(BSONValidateColumn, BSONColumnWithCodeWScope) {
+    BSONObj obj = BSON("a" << BSONCodeWScope("code", BSON("c" << 1)));
+    BSONColumnBuilder cb("");
+    cb.append(obj.getField("a"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+}
+
 }  // namespace

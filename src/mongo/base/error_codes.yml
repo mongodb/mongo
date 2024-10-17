@@ -447,6 +447,7 @@ error_codes:
 
     - {code: 360, name: ShardVersionRefreshCanceled, categories: [InternalOnly]}
     - {code: 370, name: CannotDropShardKeyIndex}
+    - {code: 378, name: NonConformantBSON, categories: [ValidationError]}
     - {code: 379, name: DatabaseMetadataRefreshCanceled, categories: [InternalOnly]}
 
     - {code: 388, name: TransactionTooLargeForCache}
