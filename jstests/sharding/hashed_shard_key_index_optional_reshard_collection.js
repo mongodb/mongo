@@ -67,8 +67,8 @@ function runTest(hashedShardKeyIndexOptionalUponShardingCollection) {
 
         jsTest.log("Testing reshardCollection with hashed shard key");
         const shardKey1 = {c: "hashed"};
-        const res1 =
-            st.s.adminCommand({reshardCollection: ns, key: shardKey1, implicitlyCreateIndex});
+        const res1 = st.s.adminCommand(
+            {reshardCollection: ns, key: shardKey1, implicitlyCreateIndex, numInitialChunks: 1});
         if (implicitlyCreateIndex || hashedShardKeyIndexOptionalUponShardingCollection) {
             assert.commandWorked(res1);
             expectedShardKey = shardKey1;
@@ -85,8 +85,8 @@ function runTest(hashedShardKeyIndexOptionalUponShardingCollection) {
 
         jsTest.log("Testing reshardCollection with range shard key");
         const shardKey2 = {d: 1};
-        const res2 =
-            st.s.adminCommand({reshardCollection: ns, key: shardKey2, implicitlyCreateIndex});
+        const res2 = st.s.adminCommand(
+            {reshardCollection: ns, key: shardKey2, implicitlyCreateIndex, numInitialChunks: 1});
         if (implicitlyCreateIndex) {
             assert.commandWorked(res2);
             expectedShardKey = shardKey2;

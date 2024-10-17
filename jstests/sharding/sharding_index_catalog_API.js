@@ -566,7 +566,8 @@ jsTestLog("Give enough cardinality for two chunks to resharding.");
 assert.commandWorked(st.s.getCollection(nss6).insert({x: 0}));
 assert.commandWorked(st.s.getCollection(nss6).insert({x: 1}));
 
-assert.commandWorked(st.s.adminCommand({reshardCollection: nss6, key: {x: 1}}));
+assert.commandWorked(
+    st.s.adminCommand({reshardCollection: nss6, key: {x: 1}, numInitialChunks: 1}));
 const collection6AfterResharding =
     st.s.getCollection(configsvrCollectionCatalog).findOne({_id: nss6});
 

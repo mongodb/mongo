@@ -124,6 +124,7 @@ const testShardDistribution = (mongos) => {
         {
             reshardCollection: ns,
             key: {newKey: 1},
+            numInitialChunks: 1,
             shardDistribution: [
                 {shard: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: 0}},
                 {shard: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
@@ -162,6 +163,7 @@ const testForceRedistribution = (mongos) => {
             reshardCollection: ns,
             key: {oldKey: 1},
             forceRedistribution: true,
+            numInitialChunks: 1,
             shardDistribution:
                 [{shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: MaxKey}}]
         },
@@ -172,6 +174,7 @@ const testForceRedistribution = (mongos) => {
             reshardCollection: ns,
             key: {oldKey: 1},
             forceRedistribution: true,
+            numInitialChunks: 1,
             shardDistribution: [{shard: st.shard0.shardName}]
         },
         1,
@@ -203,6 +206,7 @@ const testForceRedistribution = (mongos) => {
             reshardCollection: ns,
             key: {oldKey: 1},
             forceRedistribution: true,
+            numInitialChunks: 1,
             shardDistribution: [
                 {shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
                 {shard: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 1}},
@@ -227,6 +231,7 @@ const testForceRedistribution = (mongos) => {
             reshardCollection: ns,
             key: {oldKey: 1},
             forceRedistribution: true,
+            numInitialChunks: 1,
             zones: [],
             shardDistribution: [
                 {shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},

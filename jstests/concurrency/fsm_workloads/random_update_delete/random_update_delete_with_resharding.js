@@ -44,6 +44,7 @@ export const $config = extendWorkload($partialConfig, function($config, $super) 
         const result = assert.commandWorked(db.adminCommand({
             reshardCollection: namespace,
             key: this.getShardKey(collName),
+            numInitialChunks: 1,
             forceRedistribution: true
         }));
         jsTestLog(`Reshard collection result for ${namespace}: ${tojson(result)}`);

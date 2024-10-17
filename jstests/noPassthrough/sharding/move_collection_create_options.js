@@ -564,7 +564,8 @@ function runTest(configShard) {
             assert.commandFailedWithCode(shardRes, testCase.expectedShardCollectionError);
         } else {
             assert.commandWorked(shardRes);
-            const reshardRes = st.s.adminCommand({reshardCollection: ns, key: shardKey1});
+            const reshardRes =
+                st.s.adminCommand({reshardCollection: ns, key: shardKey1, numInitialChunks: 1});
             assert.commandWorked(reshardRes);
         }
         testCase.validateCollection(

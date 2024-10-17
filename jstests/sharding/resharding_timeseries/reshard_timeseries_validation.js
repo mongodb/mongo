@@ -62,7 +62,11 @@ function reshardAndVerifyShardKeyAndIndexes(
     jsTestLog("Resharding to new key:");
     printjson(newKey);
 
-    assert.commandWorked(mongos.adminCommand({reshardCollection: ns, key: newKey}));
+    assert.commandWorked(mongos.adminCommand({
+        reshardCollection: ns,
+        key: newKey,
+        numInitialChunks: 1,
+    }));
 
     const viewIndexes =
         assert.commandWorked(sDB.getCollection(kCollName).runCommand({listIndexes: kCollName}));

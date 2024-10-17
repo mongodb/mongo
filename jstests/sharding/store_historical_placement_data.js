@@ -387,6 +387,7 @@ function testReshardCollection() {
     assert.commandWorked(db.adminCommand({
         reshardCollection: nss,
         key: {newShardKey: 1},
+        numInitialChunks: 1,
         zones: [zone1Descriptor, zone2Descriptor]
     }));
 

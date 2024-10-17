@@ -40,7 +40,8 @@ function testValidation(key, {isValidIndexKey, isValidShardKey}) {
     }
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {_id: 1}}));
-    const reshardCollectionRes = st.s.adminCommand({reshardCollection: ns2, key});
+    const reshardCollectionRes =
+        st.s.adminCommand({reshardCollection: ns2, key, numInitialChunks: 1});
     if (isValidShardKey) {
         assert.commandWorked(reshardCollectionRes);
     } else {
