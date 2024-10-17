@@ -790,12 +790,10 @@ BSONObj _fnvHashToHexString(const BSONObj& args, void*) {
 }
 
 // Comparison function for sorting BSON elements in an array.
-bool cmpBSONElements(const BSONElement& lhs, const BSONElement& rhs) {
+bool cmpBSONObjs(const BSONObj& lhs, const BSONObj& rhs) {
     // Use the woCompare method with no bits set, so field names are ignored. This is helpful for
     // comparing elements in an array without considering their initial ordering/id.
-    BSONObj lhsObj = lhs.wrap();
-    BSONObj rhsObj = rhs.wrap();
-    return lhsObj.woCompare(rhsObj, BSONObj(), false, nullptr) < 0;
+    return lhs.woCompare(rhs, BSONObj(), false, nullptr) < 0;
 }
 
 void sortBSONObjectInternallyHelper(const BSONObj& input,
@@ -812,18 +810,17 @@ void sortBSONElementInternally(const BSONElement& el,
         if (isSet(opts, NormalizationOpts::kSortArrays)) {
             // Sort each individual BSONElement in the array internally.
             std::vector<BSONObj> sortedObjs;
+            sortedObjs.reserve(arr.size());
+
             for (const auto& child : arr) {
                 BSONObjBuilder tmp;
                 sortBSONElementInternally(child, tmp, opts);
-                sortedObjs.push_back(tmp.obj());
+                sortedObjs.emplace_back(tmp.obj());
             }
 
             // Sort the top-level elements in the array among each other. The elements have already
             // been sorted individually.
-            std::sort(
-                sortedObjs.begin(), sortedObjs.end(), [&](const BSONObj& lhs, const BSONObj& rhs) {
-                    return cmpBSONElements(lhs.firstElement(), rhs.firstElement());
-                });
+            std::sort(sortedObjs.begin(), sortedObjs.end(), cmpBSONObjs);
 
             // Append the elements back to the top-level BSONObjBuilder.
             BSONArrayBuilder sub(bob.subarrayStart(el.fieldNameStringData()));
