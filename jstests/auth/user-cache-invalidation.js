@@ -223,7 +223,7 @@ function runTest(writeNode, readNode, awaitReplication) {
     rst.awaitSecondaryNodes();
 
     // Freeze secondaries to avoid surprise stepdowns.
-    rst.getSecondaries().forEach(rst.freeze);
+    rst.getSecondaries().forEach(node => rst.freeze(node));
     rst.awaitReplication();
 
     // Now identify the permanent primary and secondary we'll use.
