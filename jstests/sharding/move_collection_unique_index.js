@@ -23,8 +23,9 @@ assert.commandWorked(st.s.getCollection(nss).createIndex({oldKey: 1, a: 1, b: 1}
 assert.commandWorked(st.s.adminCommand({moveCollection: nss, toShard: st.shard1.shardName}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {oldKey: 1}}));
-assert.commandFailedWithCode(st.s.adminCommand({reshardCollection: nss, key: {newKey: 1}}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    st.s.adminCommand({reshardCollection: nss, key: {newKey: 1}, numInitialChunks: 1}),
+    ErrorCodes.InvalidOptions);
 
 assert.commandWorked(st.s.adminCommand({unshardCollection: nss, toShard: st.shard0.shardName}));
 

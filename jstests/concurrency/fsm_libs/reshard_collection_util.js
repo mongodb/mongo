@@ -27,6 +27,7 @@ export function executeReshardCollection($config, db, collName, connCache, sameK
         let reshardCollectionCmdObj = {
             reshardCollection: ns,
             key: newShardKey,
+            numInitialChunks: 1
         };
         if (sameKeyResharding) {
             reshardCollectionCmdObj.forceRedistribution = true;

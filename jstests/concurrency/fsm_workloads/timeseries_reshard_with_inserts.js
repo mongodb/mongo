@@ -45,7 +45,7 @@ export const $config = (function() {
             tojson(newShardKey)}`);
 
         let ns = db + "." + collName;
-        let reshardCollectionCmd = {reshardCollection: ns, key: newShardKey};
+        let reshardCollectionCmd = {reshardCollection: ns, key: newShardKey, numInitialChunks: 1};
         if (TestData.runningWithShardStepdowns) {
             assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmd),
                                                  [ErrorCodes.SnapshotUnavailable]);

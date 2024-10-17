@@ -37,7 +37,11 @@ export const $config = (function() {
         const coll = db.getCollection(collName);
         print(`Started Resharding Collection ${coll.getFullName()}. New Shard Key ${
             tojson(newShardKey)}, Same key resharding ${forceRedistribution}`);
-        let reshardCollectionCmd = {reshardCollection: coll.getFullName(), key: newShardKey};
+        let reshardCollectionCmd = {
+            reshardCollection: coll.getFullName(),
+            key: newShardKey,
+            numInitialChunks: 1
+        };
         if (forceRedistribution) {
             reshardCollectionCmd.forceRedistribution = forceRedistribution;
         }

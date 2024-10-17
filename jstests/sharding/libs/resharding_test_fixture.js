@@ -490,7 +490,7 @@ export var ReshardingTest = class {
                             command = {
                                 reshardCollection: ns,
                                 key: newShardKeyPattern,
-                                _presetReshardedChunks: newChunks,
+                                _presetReshardedChunks: newChunks
                             };
                             break;
                         case 'moveCollection':

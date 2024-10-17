@@ -41,8 +41,12 @@ const uuid = function() {
 resetColl(coll);
 
 // The command succeeds when provided with the correct collection UUID.
-assert.commandWorked(mongos.adminCommand(
-    {reshardCollection: coll.getFullName(), key: newKeyDoc, collectionUUID: uuid()}));
+assert.commandWorked(mongos.adminCommand({
+    reshardCollection: coll.getFullName(),
+    key: newKeyDoc,
+    collectionUUID: uuid(),
+    numInitialChunks: 1
+}));
 
 // The command fails when provided with a UUID with no corresponding collection.
 resetColl(coll);
@@ -51,6 +55,7 @@ let res = assert.commandFailedWithCode(mongos.adminCommand({
     reshardCollection: coll.getFullName(),
     key: newKeyDoc,
     collectionUUID: nonexistentUUID,
+    numInitialChunks: 1,
 }),
                                        ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.db, db.getName());
@@ -65,6 +70,7 @@ res = assert.commandFailedWithCode(mongos.adminCommand({
     reshardCollection: coll2.getFullName(),
     key: newKeyDoc,
     collectionUUID: uuid(),
+    numInitialChunks: 1,
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.db, db.getName());
@@ -81,6 +87,7 @@ res = assert.commandFailedWithCode(mongos.adminCommand({
     reshardCollection: coll3.getFullName(),
     key: newKeyDoc,
     collectionUUID: uuid(),
+    numInitialChunks: 1,
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.db, otherDB.getName());
@@ -95,6 +102,7 @@ res = assert.commandFailedWithCode(mongos.adminCommand({
     reshardCollection: coll2.getFullName(),
     key: newKeyDoc,
     collectionUUID: uuid(),
+    numInitialChunks: 1,
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.db, db.getName());
@@ -110,6 +118,7 @@ res = assert.commandFailedWithCode(mongos.adminCommand({
     reshardCollection: view.getFullName(),
     key: newKeyDoc,
     collectionUUID: uuid(),
+    numInitialChunks: 1,
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.db, db.getName());

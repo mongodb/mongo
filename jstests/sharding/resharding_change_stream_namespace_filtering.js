@@ -46,8 +46,8 @@ for (let i = 0; i < 100; ++i) {
 }
 
 // Reshard the 'coll_reshard' collection on {b: 1}.
-assert.commandWorked(
-    mongosDB.adminCommand({reshardCollection: mongosReshardColl.getFullName(), key: {b: 1}}));
+assert.commandWorked(mongosDB.adminCommand(
+    {reshardCollection: mongosReshardColl.getFullName(), key: {b: 1}, numInitialChunks: 1}));
 
 // Confirm that the change stream we opened on 'coll_other' only sees the sentinel 'insert' but does
 // not see the earlier 'reshardBegin' or 'reshardDoneCatchUp' events on the 'coll_reshard'

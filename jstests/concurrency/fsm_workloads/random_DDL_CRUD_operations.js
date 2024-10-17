@@ -192,8 +192,8 @@ export const $config = (function() {
             try {
                 jsTestLog('resharding state tid:' + tid + ' currentTid:' + this.tid +
                           ' collection:' + fullNs + ' newKey ' + newKey);
-                assert.commandWorked(
-                    db.adminCommand({reshardCollection: fullNs, key: {[`${newKey}`]: 1}}));
+                assert.commandWorked(db.adminCommand(
+                    {reshardCollection: fullNs, key: {[`${newKey}`]: 1}, numInitialChunks: 1}));
             } catch (e) {
                 const exceptionCode = e.code;
                 if (exceptionCode == ErrorCodes.ConflictingOperationInProgress ||

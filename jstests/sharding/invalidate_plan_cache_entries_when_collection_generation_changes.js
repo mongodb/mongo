@@ -122,8 +122,8 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 
     // Ensure that after resharding there are no plan cache entries associated with the 'collA'.
     // However, plan cache entries for 'collB' must remain unchanged.
-    assert.commandWorked(
-        mongos.adminCommand({reshardCollection: collA.getFullName(), key: {b: 1}}));
+    assert.commandWorked(mongos.adminCommand(
+        {reshardCollection: collA.getFullName(), key: {b: 1}, numInitialChunks: 1}));
     assertPlanCacheSizeForColl(collA.getFullName(), 0);
     assertPlanCacheSizeForColl(collB.getFullName(), 1);
 })();

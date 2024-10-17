@@ -164,7 +164,7 @@ const standardTestCases = [
         generateOpLogEntry: function(coll) {
             assert.commandWorked(coll.insert({sk: 2, a: 1}));
             assert.commandWorked(coll.getDB().adminCommand(
-                {reshardCollection: coll.getFullName(), key: {sk: 1, a: 1}}));
+                {reshardCollection: coll.getFullName(), key: {sk: 1, a: 1}, numInitialChunks: 1}));
         }
     }
 ];

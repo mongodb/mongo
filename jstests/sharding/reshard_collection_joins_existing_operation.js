@@ -24,6 +24,7 @@ const makeConfigsvrReshardCollectionThread = (configsvrConnString, ns) => {
         assert.commandWorked(configsvr.adminCommand({
             _configsvrReshardCollection: ns,
             key: {newKey: 1},
+            numInitialChunks: 1,
             writeConcern: {w: "majority"},
             provenance: "reshardCollection"
         }));
