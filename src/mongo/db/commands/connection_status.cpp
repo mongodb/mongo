@@ -82,7 +82,6 @@ public:
 
             Reply reply;
             reply.setAuthInfo(std::move(info));
-            reply.setUuid(opCtx->getClient()->getUUID());
             return reply;
         }
 
