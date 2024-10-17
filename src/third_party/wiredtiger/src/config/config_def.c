@@ -116,6 +116,7 @@ static const uint8_t confchk_WT_CONNECTION_open_session_jump[WT_CONFIG_JUMP_TABL
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3,
   3, 3, 3, 3, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6};
 const char __WT_CONFIG_CHOICE_all_durable[] = "all_durable";
+const char __WT_CONFIG_CHOICE_backup_checkpoint[] = "backup_checkpoint";
 const char __WT_CONFIG_CHOICE_last_checkpoint[] = "last_checkpoint";
 const char __WT_CONFIG_CHOICE_oldest[] = "oldest";
 const char __WT_CONFIG_CHOICE_oldest_reader[] = "oldest_reader";
@@ -126,15 +127,17 @@ const char __WT_CONFIG_CHOICE_stable[] = "stable";
 const char __WT_CONFIG_CHOICE_stable_timestamp[] = "stable_timestamp";
 
 static const char *confchk_get_choices[] = {__WT_CONFIG_CHOICE_all_durable,
-  __WT_CONFIG_CHOICE_last_checkpoint, __WT_CONFIG_CHOICE_oldest, __WT_CONFIG_CHOICE_oldest_reader,
-  __WT_CONFIG_CHOICE_oldest_timestamp, __WT_CONFIG_CHOICE_pinned, __WT_CONFIG_CHOICE_recovery,
-  __WT_CONFIG_CHOICE_stable, __WT_CONFIG_CHOICE_stable_timestamp, NULL};
+  __WT_CONFIG_CHOICE_backup_checkpoint, __WT_CONFIG_CHOICE_last_checkpoint,
+  __WT_CONFIG_CHOICE_oldest, __WT_CONFIG_CHOICE_oldest_reader, __WT_CONFIG_CHOICE_oldest_timestamp,
+  __WT_CONFIG_CHOICE_pinned, __WT_CONFIG_CHOICE_recovery, __WT_CONFIG_CHOICE_stable,
+  __WT_CONFIG_CHOICE_stable_timestamp, NULL};
 
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_query_timestamp[] = {
   {"get", "string", NULL,
-    "choices=[\"all_durable\",\"last_checkpoint\",\"oldest\","
-    "\"oldest_reader\",\"oldest_timestamp\",\"pinned\",\"recovery\","
-    "\"stable\",\"stable_timestamp\"]",
+    "choices=[\"all_durable\",\"backup_checkpoint\","
+    "\"last_checkpoint\",\"oldest\",\"oldest_reader\","
+    "\"oldest_timestamp\",\"pinned\",\"recovery\",\"stable\","
+    "\"stable_timestamp\"]",
     NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_STRING, 142, INT64_MIN, INT64_MAX, confchk_get_choices},
   {NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 0, 0, 0, NULL}};
 

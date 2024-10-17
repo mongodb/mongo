@@ -290,30 +290,68 @@ struct __wt_import_list {
     } while (0)
 
 /*
- * WT_WITH_HOTBACKUP_READ_LOCK --
+ * WT_WITH_HOTBACKUP_READ_INT --
  *	Acquire the hot backup read lock and perform an operation provided that
- *	there is no hot backup in progress.  The skipp parameter can be used to
+ *	the backup state is in the correct state.  The skipp parameter can be used to
  *	check whether the operation got skipped or not.
  */
-#define WT_WITH_HOTBACKUP_READ_LOCK(session, op, skipp)                     \
+#define WT_WITH_HOTBACKUP_READ_INT(session, op, bk_off, skipp)                    \
+    do {                                                                          \
+        WT_CONNECTION_IMPL *__conn = S2C(session);                                \
+        if ((skipp) != (bool *)NULL)                                              \
+            *(bool *)(skipp) = true;                                              \
+        if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP)) {        \
+            if ((__wt_atomic_load64(&__conn->hot_backup_start) == 0) == bk_off) { \
+                if ((skipp) != (bool *)NULL)                                      \
+                    *(bool *)(skipp) = false;                                     \
+                op;                                                               \
+            }                                                                     \
+        } else {                                                                  \
+            __wt_readlock(session, &__conn->hot_backup_lock);                     \
+            FLD_SET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_READ);       \
+            if ((__wt_atomic_load64(&__conn->hot_backup_start) == 0) == bk_off) { \
+                if ((skipp) != (bool *)NULL)                                      \
+                    *(bool *)(skipp) = false;                                     \
+                op;                                                               \
+            }                                                                     \
+            FLD_CLR(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_READ);       \
+            __wt_readunlock(session, &__conn->hot_backup_lock);                   \
+        }                                                                         \
+    } while (0)
+
+/*
+ * WT_WITH_HOTBACKUP_READ_LOCK --
+ *	Acquire the hot backup read lock and perform an operation provided that
+ *	there is no hot backup in progress.
+ */
+#define WT_WITH_HOTBACKUP_READ_LOCK(session, op, skipp) \
+    WT_WITH_HOTBACKUP_READ_INT(session, op, true, skipp);
+
+/*
+ * WT_WITH_HOTBACKUP_READ_LOCK_BACKUP --
+ *	Acquire the hot backup read lock and perform an operation provided that
+ *	there is a hot backup in progress.
+ */
+#define WT_WITH_HOTBACKUP_READ_LOCK_BACKUP(session, op, skipp) \
+    WT_WITH_HOTBACKUP_READ_INT(session, op, false, skipp);
+
+/*
+ * WT_WITH_HOTBACKUP_READ_LOCK_UNCOND --
+ *	Acquire the hot backup read lock and perform an operation
+ *	unconditionally.  This is a specialized macro for a few isolated cases.
+ *	Code that wishes to acquire the read lock should default to using
+ *	WT_WITH_HOTBACKUP_READ_LOCK which checks that there is no hot backup in
+ *	progress.
+ */
+#define WT_WITH_HOTBACKUP_READ_LOCK_UNCOND(session, op)                     \
     do {                                                                    \
         WT_CONNECTION_IMPL *__conn = S2C(session);                          \
-        if ((skipp) != (bool *)NULL)                                        \
-            *(bool *)(skipp) = true;                                        \
         if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP)) {  \
-            if (__wt_atomic_load64(&__conn->hot_backup_start) == 0) {       \
-                if ((skipp) != (bool *)NULL)                                \
-                    *(bool *)(skipp) = false;                               \
-                op;                                                         \
-            }                                                               \
+            op;                                                             \
         } else {                                                            \
             __wt_readlock(session, &__conn->hot_backup_lock);               \
             FLD_SET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_READ); \
-            if (__wt_atomic_load64(&__conn->hot_backup_start) == 0) {       \
-                if ((skipp) != (bool *)NULL)                                \
-                    *(bool *)(skipp) = false;                               \
-                op;                                                         \
-            }                                                               \
+            op;                                                             \
             FLD_CLR(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_READ); \
             __wt_readunlock(session, &__conn->hot_backup_lock);             \
         }                                                                   \
@@ -336,28 +374,6 @@ struct __wt_import_list {
             FLD_CLR(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_WRITE);                       \
             __wt_writeunlock(session, &__conn->hot_backup_lock);                                   \
         }                                                                                          \
-    } while (0)
-
-/*
- * WT_WITH_HOTBACKUP_READ_LOCK_UNCOND --
- *	Acquire the hot backup read lock and perform an operation
- *	unconditionally.  This is a specialized macro for a few isolated cases.
- *	Code that wishes to acquire the read lock should default to using
- *	WT_WITH_HOTBACKUP_READ_LOCK which checks that there is no hot backup in
- *	progress.
- */
-#define WT_WITH_HOTBACKUP_READ_LOCK_UNCOND(session, op)                     \
-    do {                                                                    \
-        WT_CONNECTION_IMPL *__conn = S2C(session);                          \
-        if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP)) {  \
-            op;                                                             \
-        } else {                                                            \
-            __wt_readlock(session, &__conn->hot_backup_lock);               \
-            FLD_SET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_READ); \
-            op;                                                             \
-            FLD_CLR(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_READ); \
-            __wt_readunlock(session, &__conn->hot_backup_lock);             \
-        }                                                                   \
     } while (0)
 
 /*

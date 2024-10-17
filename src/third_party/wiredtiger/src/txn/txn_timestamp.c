@@ -187,6 +187,10 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
 
         WT_STAT_CONN_INCR(session, txn_walk_sessions);
         WT_STAT_CONN_INCRV(session, txn_sessions_walked, i);
+    } else if (WT_CONFIG_LIT_MATCH("backup_checkpoint", cval)) {
+        /* This code will return set a timestamp only if a backup cursor is open. */
+        ts = WT_TS_NONE;
+        WT_WITH_HOTBACKUP_READ_LOCK_BACKUP(session, ts = conn->hot_backup_timestamp, NULL);
     } else if (WT_CONFIG_LIT_MATCH("last_checkpoint", cval)) {
         /* Read-only value forever. Make sure we don't used a cached version. */
         WT_COMPILER_BARRIER();

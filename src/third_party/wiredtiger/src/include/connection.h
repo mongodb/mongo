@@ -323,11 +323,14 @@ struct __wt_name_flag {
 /*
  * WT_CONN_HOTBACKUP_START --
  *	Macro to set connection data appropriately for when we commence hot backup.
+ *	This macro must be called with the hot backup lock held for writing.
  */
-#define WT_CONN_HOTBACKUP_START(conn)                                             \
-    do {                                                                          \
-        __wt_atomic_store64(&(conn)->hot_backup_start, (conn)->ckpt_most_recent); \
-        (conn)->hot_backup_list = NULL;                                           \
+#define WT_CONN_HOTBACKUP_START(conn)                                                          \
+    do {                                                                                       \
+        WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HOTBACKUP_WRITE)); \
+        (conn)->hot_backup_timestamp = (conn)->txn_global.last_ckpt_timestamp;                 \
+        __wt_atomic_store64(&(conn)->hot_backup_start, (conn)->ckpt_most_recent);              \
+        (conn)->hot_backup_list = NULL;                                                        \
     } while (0)
 
 /*
@@ -512,8 +515,9 @@ struct __wt_connection_impl {
 
     WT_RWLOCK hot_backup_lock; /* Hot backup serialization */
     wt_shared uint64_t
-      hot_backup_start;     /* Clock value of most recent checkpoint needed by hot backup */
-    char **hot_backup_list; /* Hot backup file list */
+      hot_backup_start;            /* Clock value of most recent checkpoint needed by hot backup */
+    uint64_t hot_backup_timestamp; /* Stable timestamp of checkpoint for the open backup */
+    char **hot_backup_list;        /* Hot backup file list */
     uint32_t *partial_backup_remove_ids; /* Remove btree id list for partial backup */
 
     WT_SESSION_IMPL *ckpt_session;       /* Checkpoint thread session */

@@ -2028,9 +2028,10 @@ methods = {
     Config('get', 'all_durable', r'''
         specify which timestamp to query: \c all_durable returns the largest timestamp such
         that all timestamps up to and including that value have been committed (possibly
-        bounded by the application-set \c durable timestamp); \c last_checkpoint returns the
-        timestamp of the most recent stable checkpoint; \c oldest_timestamp returns the most
-        recent \c oldest_timestamp set with WT_CONNECTION::set_timestamp; \c oldest_reader
+        bounded by the application-set \c durable timestamp); \c backup_checkpoint returns
+        the stable timestamp of the checkpoint pinned for an open backup cursor; \c last_checkpoint
+        returns the timestamp of the most recent stable checkpoint; \c oldest_timestamp returns the
+        most recent \c oldest_timestamp set with WT_CONNECTION::set_timestamp; \c oldest_reader
         returns the minimum of the read timestamps of all active readers; \c pinned returns
         the minimum of the \c oldest_timestamp and the read timestamps of all active readers;
         \c recovery returns the timestamp of the most recent stable checkpoint taken prior to
@@ -2038,7 +2039,7 @@ methods = {
         WT_CONNECTION::set_timestamp. (The \c oldest and \c stable arguments are deprecated
         short-hand for \c oldest_timestamp and \c stable_timestamp, respectively.) See @ref
         timestamp_global_api''',
-        choices=['all_durable','last_checkpoint','oldest',
+        choices=['all_durable','backup_checkpoint','last_checkpoint','oldest',
             'oldest_reader','oldest_timestamp','pinned','recovery','stable','stable_timestamp']),
 ]),
 
