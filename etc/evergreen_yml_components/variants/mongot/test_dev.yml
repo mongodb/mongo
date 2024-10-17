@@ -40,7 +40,7 @@ buildvariants:
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
-      - name: search_pinned_connections_auth
+      - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
       - name: vector_search_auth
@@ -103,7 +103,7 @@ buildvariants:
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
-      - name: search_pinned_connections_auth
+      - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
       - name: vector_search_auth
@@ -159,7 +159,7 @@ buildvariants:
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
-      - name: search_pinned_connections_auth
+      - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
       - name: vector_search_auth
@@ -220,7 +220,7 @@ buildvariants:
       - name: search_auth
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
-      - name: search_pinned_connections_auth
+      - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
       - name: vector_search_auth

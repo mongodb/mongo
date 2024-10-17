@@ -168,9 +168,9 @@ TEST_F(TaskExecutorCursorFixture, Basic) {
     ASSERT_EQUALS(count, numDocs);
 }
 
-// Test that we can actually use a TaskExecutorCursor that pins it's connection to read multiple
-// batches from a remote host.
-TEST_F(TaskExecutorCursorFixture, BasicPinned) {
+// Test that a TaskExecutorCursor can be used in a non-pinning mode to read multiple
+// batches from a remote host. The default mode for TaskExecutorCursor is pinned.
+TEST_F(TaskExecutorCursorFixture, BasicNonPinned) {
     const size_t numDocs = 100;
     ASSERT_EQ(createTestData("test.test", numDocs), numDocs);
 
@@ -184,7 +184,7 @@ TEST_F(TaskExecutorCursorFixture, BasicPinned) {
     executor::TaskExecutorCursorOptions opts(/*batchSize*/ 10,
                                              /*preFetchNextBatch*/ true,
                                              /*planYieldPolicy*/ nullptr,
-                                             /*pinConnection*/ true);
+                                             /*pinConnection*/ false);
     auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
     size_t count = 0;
@@ -304,7 +304,12 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
                                       << "batchSize" << 10),
                                  opCtx.get());
 
-        executor::TaskExecutorCursorOptions opts(/*batchSize*/ 10);
+        executor::TaskExecutorCursorOptions opts(
+            /*batchSize*/ 10,
+            /*preFetchNextBatch*/ true,
+            /*planYieldPolicy*/ nullptr,
+            /*pinConnection*/ false);  // Test relies on being in non-pinned mode
+
         auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
         tec->populateCursor(opCtx.get());

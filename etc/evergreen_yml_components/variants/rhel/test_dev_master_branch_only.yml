@@ -168,7 +168,7 @@ variables:
       - name: sasl
       - name: search
       - name: search_auth
-      - name: search_pinned_connections_auth
+      - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: sharding_auth_audit_gen
       - name: .stitch
@@ -727,7 +727,7 @@ buildvariants:
       - name: sasl
       - name: search
       - name: search_auth
-      - name: search_pinned_connections_auth
+      - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: secondary_reads_passthrough_gen
       - name: session_jscore_passthrough

@@ -734,7 +734,7 @@ tasks:
           use_large_distro: "true"
 
   - <<: *task_template
-    name: search_pinned_connections_auth
+    name: search_no_pinned_connections_auth
     tags:
       [
         "assigned_to_jira_team_server_servicearch",
