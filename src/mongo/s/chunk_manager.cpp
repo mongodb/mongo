@@ -154,29 +154,82 @@ size_t ChunkMap::size() const {
 }
 
 std::shared_ptr<ChunkInfo> ChunkMap::findIntersectingChunk(const BSONObj& shardKey) const {
-    const auto shardKeyString = ShardKeyPattern::toKeyString(shardKey);
+    auto it = find(shardKey);
+    if (it != end()) {
+        return *it;
+    }
+    return nullptr;
+}
 
-    const auto it = _chunkVectorMap.upper_bound(shardKeyString);
-    if (it == _chunkVectorMap.end()) {
-        // upper_bound() will miss the last chunkVector if shardKey is actually the MaxKey,
-        // thus we need to check explicitly if shardKey is contained in the last chunk.
-        if (const auto& lastChunk = std::prev(_chunkVectorMap.end())->second->back();
-            lastChunk->containsKey(shardKey)) {
-            return lastChunk;
+ChunkMap::ChunkMapIterator& ChunkMap::ChunkMapIterator::operator--() {
+    uassert(9526304,
+            "Cannot call prev() on an iterator for an empty ChunkMap.",
+            !_chunkVectorMap.empty());
+    if (_curChunkVector == _chunkVectorMap.cend()) {
+        _curChunkVector = std::prev(_curChunkVector);
+        _curChunk = std::prev(_curChunkVector->second->cend());
+    } else if (_curChunk == _curChunkVector->second->cbegin()) {
+        // No previous iterator in current ChunkVector.
+        if (_curChunkVector == _chunkVectorMap.cbegin()) {
+            // No previous iterator in ChunkVectorMap; we're done. Set both iterators to the end()
+            // of the last chunk to signal that we're done. Note that calling _prev on them again
+            // would return the "first" element in a reverse scan.
+            _curChunkVector = _chunkVectorMap.cend();
+            _curChunk = std::prev(_curChunkVector)->second->cend();
         } else {
-            return {};
+            _curChunkVector = std::prev(_curChunkVector);
+            _curChunk = std::prev(_curChunkVector->second->cend());
         }
+    } else {
+        _curChunk = std::prev(*_curChunk);
+    }
+    return *this;
+}
+
+ChunkMap::ChunkMapIterator& ChunkMap::ChunkMapIterator::operator++() {
+    uassert(9526305,
+            "Cannot advance an end() ChunkMap iterator",
+            _curChunkVector != _chunkVectorMap.cend());
+    _curChunk = std::next(*_curChunk);
+    if (_curChunk == _curChunkVector->second->cend()) {
+        _curChunkVector = std::next(_curChunkVector);
+        if (_curChunkVector != _chunkVectorMap.cend()) {
+            _curChunk = _curChunkVector->second->cbegin();
+        }
+    }
+    return *this;
+}
+
+ChunkMap::ChunkMapIterator ChunkMap::find(const BSONObj& shardKey) const {
+    if (_chunkVectorMap.empty()) {
+        // This is the only reason we would return an "end" iterator here, otherwise our chunk map
+        // is invalid.
+        return end();
+    }
+
+    const auto shardKeyString = ShardKeyPattern::toKeyString(shardKey);
+    auto it = _chunkVectorMap.upper_bound(shardKeyString);
+
+    if (it == _chunkVectorMap.end()) {
+        // upper_bound() will miss the last ChunkVector if 'shardKey' is actually the MaxKey,
+        // thus we need to check explicitly if 'shardKey' is contained in the last chunk.
+        auto lastVectorIt = std::prev(_chunkVectorMap.end());
+        if (ChunkVector::const_iterator lastChunk = std::prev(lastVectorIt->second->end());
+            (*lastChunk)->containsKey(shardKey)) {
+            return ChunkMapIterator(_chunkVectorMap, lastVectorIt, lastChunk);
+        }
+
+        // Did not find a chunk.
+        return end();
     }
 
     const auto& chunkVector = *(it->second);
-    const auto chunkIt = _findIntersectingChunkIterator(
+    auto chunkIt = _findIntersectingChunkIterator(
         shardKeyString, chunkVector.begin(), chunkVector.end(), true /*isMaxInclusive*/);
-
     if (chunkIt == chunkVector.end()) {
-        return {};
+        return end();
     }
-
-    return *chunkIt;
+    return ChunkMapIterator(_chunkVectorMap, it, chunkIt);
 }
 
 ChunkMap ChunkMap::createMerged(std::vector<std::shared_ptr<ChunkInfo>> changedChunks) const {
@@ -698,14 +751,65 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
 bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& shardId) const {
     tassert(7626419, "Expected routing table to be initialized", _rt->optRt);
 
-    if (shardKey.isEmpty())
+    if (shardKey.isEmpty()) {
         return false;
+    }
 
-    auto chunkInfo = _rt->optRt->findIntersectingChunk(shardKey);
-    if (!chunkInfo)
+    const auto& chunkMap = _rt->optRt->_chunkMap;
+    auto it = chunkMap.find(shardKey);
+    if (it == chunkMap.end()) {
         return false;
+    }
 
-    return chunkInfo->getShardIdAt(_clusterTime) == shardId;
+    return (*it)->getShardIdAt(_clusterTime) == shardId;
+}
+
+ChunkManager::ChunkOwnership ChunkManager::nearestOwnedChunk(const BSONObj& shardKey,
+                                                             const ShardId& shardId,
+                                                             ChunkMap::Direction direction) const {
+    tassert(9526302, "Expected routing table to be initialized", _rt->optRt);
+
+    if (shardKey.isEmpty()) {
+        // No chunks can be owned.
+        return {false, boost::none};
+    }
+
+    const auto& chunkMap = _rt->optRt->_chunkMap;
+    auto it = chunkMap.find(shardKey);
+    if (it == chunkMap.end()) {
+        // No chunk could be found for this shard key.
+        return {false, boost::none};
+    }
+
+    boost::optional<Chunk> nearestOwnedChunk;
+    const bool isOwned = (*it)->getShardIdAt(_clusterTime) == shardId;
+    if (isOwned) {
+        // The nearest owned chunk is the one that includes the 'shardKey'.
+        nearestOwnedChunk.emplace(*(*it).get(), _clusterTime);
+    } else {
+        // Find the nearest owned chunk.
+        auto end = chunkMap.end();
+        do {
+            switch (direction) {
+                case ChunkMap::Direction::Forward: {
+                    it++;
+                    break;
+                }
+                case ChunkMap::Direction::Backward: {
+                    it--;
+                    break;
+                }
+                default:
+                    MONGO_UNREACHABLE_TASSERT(9526306);
+            }
+        } while (it != end && it->getShardIdAt(_clusterTime) != shardId);
+
+        if (it != end) {
+            nearestOwnedChunk.emplace(*(*it).get(), _clusterTime);
+        }
+    }
+
+    return {isOwned, std::move(nearestOwnedChunk)};
 }
 
 void ChunkManager::getShardIdsForRange(const BSONObj& min,

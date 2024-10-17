@@ -128,4 +128,10 @@ BSONObj calculateIntermediateShardKey(const BSONObj& leftKey,
  */
 void performRandomChunkOperations(std::vector<ChunkType>* chunks, size_t numOperations);
 
+/**
+ * Helper used in chunk map generation.
+ */
+std::vector<std::shared_ptr<ChunkInfo>> toChunkInfoPtrVector(
+    const std::vector<ChunkType>& chunkTypes);
+
 }  // namespace mongo::chunks_test_util

@@ -41,7 +41,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
@@ -69,6 +68,7 @@ using chunks_test_util::calculateIntermediateShardKey;
 using chunks_test_util::genChunkVector;
 using chunks_test_util::genRandomSplitPoints;
 using chunks_test_util::performRandomChunkOperations;
+using chunks_test_util::toChunkInfoPtrVector;
 
 namespace {
 
@@ -94,16 +94,6 @@ std::map<ShardId, ChunkVersion> calculateShardVersions(
         }
     }
     return svMap;
-}
-
-std::vector<std::shared_ptr<ChunkInfo>> toChunkInfoPtrVector(
-    const std::vector<ChunkType>& chunkTypes) {
-    std::vector<std::shared_ptr<ChunkInfo>> chunkPtrs;
-    chunkPtrs.reserve(chunkTypes.size());
-    for (const auto& chunkType : chunkTypes) {
-        chunkPtrs.push_back(std::make_shared<ChunkInfo>(chunkType));
-    }
-    return chunkPtrs;
 }
 
 void validateChunkMap(const ChunkMap& chunkMap,
@@ -556,6 +546,48 @@ TEST_F(ChunkMapTest, TestEnumerateOverlappingChunksRandom) {
         return true;
     });
     ASSERT_EQ(0, std::distance(it, std::next(lastChunkIt)));
+}
+
+TEST_F(ChunkMapTest, EmptyChunkMapIteration) {
+    const ChunkMap chunkMap(collEpoch(), collTimestamp(), 0);
+    auto chunkMapIt = chunkMap.begin();
+    ASSERT_EQ(chunkMapIt, chunkMap.end());
+    ASSERT_THROWS_CODE(chunkMapIt--, AssertionException, 9526304);
+    ASSERT_THROWS_CODE(chunkMapIt++, AssertionException, 9526305);
+}
+
+TEST_F(ChunkMapTest, TestChunkMapForwardIteration) {
+    auto chunks = toChunkInfoPtrVector(genRandomChunkVector());
+    const auto chunkMap = makeChunkMap(chunks);
+
+    auto expectedChunkIt = chunks.begin();
+    auto chunkMapIt = chunkMap.begin();
+    while (expectedChunkIt != chunks.end()) {
+        ASSERT_NE(chunkMapIt, chunkMap.end());
+        ASSERT_EQ((*chunkMapIt).get(), expectedChunkIt->get());
+        chunkMapIt++;
+        expectedChunkIt = std::next(expectedChunkIt);
+    }
+    ASSERT_EQ(chunkMapIt, chunkMap.end());
+    // Can't call next() on end().
+    ASSERT_THROWS_CODE(chunkMapIt++, AssertionException, 9526305);
+}
+
+TEST_F(ChunkMapTest, TestChunkMapReverseIteration) {
+    auto chunks = toChunkInfoPtrVector(genRandomChunkVector());
+    const auto chunkMap = makeChunkMap(chunks);
+
+    auto expectedChunkIt = chunks.rbegin();
+    auto chunkMapIt = --chunkMap.end();
+    while (expectedChunkIt != chunks.rend()) {
+        ASSERT_NE(chunkMapIt, chunkMap.end());
+        ASSERT_EQ((*chunkMapIt).get(), expectedChunkIt->get());
+        chunkMapIt--;
+        expectedChunkIt = std::next(expectedChunkIt);
+    }
+    ASSERT_EQ(chunkMapIt, chunkMap.end());
+    // Calling prev() on end() returns iterator pointing to second-last element.
+    ASSERT_EQ((--chunkMapIt).get().get(), chunks.rbegin()->get());
 }
 
 }  // namespace

@@ -232,6 +232,17 @@ public:
     }
 
     /**
+     * This finds the nearest chunk to a given 'key' owned by the current shard in the
+     * specified chunk map scan 'direction', and returns it as a 'ChunkOwnership'. If the key is
+     * empty returns false. If key is not a valid shard key, the behaviour is undefined.
+     */
+    ChunkManager::ChunkOwnership nearestOwnedChunk(const BSONObj& key,
+                                                   ChunkMap::Direction direction) const {
+        tassert(9526301, "Expected a routing table to be initialized", hasRoutingTable());
+        return _cm->nearestOwnedChunk(key, _thisShardId, direction);
+    }
+
+    /**
      * Given a key 'lookupKey' in the shard key range, get the next chunk which overlaps or is
      * greater than this key.  Returns true if a chunk exists, false otherwise.
      *

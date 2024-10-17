@@ -37,7 +37,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -46,7 +45,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -57,11 +55,10 @@
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/chunks_test_util.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
-#include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -74,9 +71,39 @@
 namespace mongo {
 namespace {
 
+PseudoRandom _random{SecureRandom().nextInt64()};
+
 using shard_key_pattern_query_util::QueryTargetingInfo;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+
+boost::optional<Chunk> findPreviousOwnedChunk(auto chunkIt,
+                                              const std::vector<std::shared_ptr<ChunkInfo>>& chunks,
+                                              Timestamp clusterTime,
+                                              ShardId shardId) {
+    auto prev = chunkIt;
+    while (prev != chunks.begin()) {
+        prev = std::prev(prev);
+        if ((*prev)->getShardIdAt(clusterTime) == shardId) {
+            return Chunk(*(prev->get()), clusterTime);
+        }
+    }
+    return boost::none;
+}
+
+boost::optional<Chunk> findNextOwnedChunk(auto chunkIt,
+                                          const std::vector<std::shared_ptr<ChunkInfo>>& chunks,
+                                          Timestamp clusterTime,
+                                          ShardId shardId) {
+    auto next = chunkIt;
+    while (next != std::prev(chunks.end())) {
+        next = std::next(next);
+        if ((*next)->getShardIdAt(clusterTime) == shardId) {
+            return Chunk(*(next->get()), clusterTime);
+        }
+    }
+    return boost::none;
+}
 
 class ChunkManagerQueryTest : public RouterCatalogCacheTestFixture {
 protected:
@@ -624,6 +651,129 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     getShardIdsForQuery(
         expCtx, BSON("x" << BSON("$gt" << -20)), {}, chunkManager, &shardIds, nullptr /* info */);
     ASSERT_EQ(2, shardIds.size());
+}
+
+TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
+    const auto uuid = UUID::gen();
+    const auto epoch = OID::gen();
+    const Timestamp collTimestamp{1, 1};
+    auto chunkVec = chunks_test_util::genRandomChunkVector(
+        uuid, epoch, collTimestamp, 30 /* maxNumChunks */, 1 /* minNumChunks */);
+    auto chunks = chunks_test_util::toChunkInfoPtrVector(chunkVec);
+
+    Timestamp clusterTime{Date_t::now()};
+
+    // Collect all shards that own chunks at the times we're interested in.
+    std::set<ShardId> shards;
+    for (auto&& chunk : chunks) {
+        shards.insert(chunk->getShardIdAt(clusterTime));
+    }
+    ASSERT_GTE(shards.size(), 1);
+
+    // Pick some random shard.
+    ShardId thisShard;
+    auto shardIt = shards.begin();
+    std::advance(shardIt, _random.nextInt64(shards.size()));
+    thisShard = *shardIt;
+
+    // Create a bare-bones chunk map/ routing table history so we can test belongs logic.
+    KeyPattern shardKeyPattern{chunks_test_util::kShardKeyPattern};
+    auto rt = RoutingTableHistory::makeNew(kNss,
+                                           uuid,
+                                           shardKeyPattern,
+                                           false, /* unsplittable */
+                                           nullptr,
+                                           false,
+                                           epoch,
+                                           collTimestamp,
+                                           boost::none /* timeseriesFields */,
+                                           boost::none /* reshardingFields */,
+                                           true,
+                                           chunkVec);
+    ChunkManager cm(thisShard,
+                    DatabaseVersion(uuid, collTimestamp),
+                    makeStandaloneRoutingTableHistory(std::move(rt)),
+                    clusterTime);
+
+    auto chunkIt = chunks.begin();
+    while (chunkIt != chunks.end()) {
+        auto shardId = (*chunkIt)->getShardIdAt(clusterTime);
+
+        // Pick some random shard that this chunk doesn't belong to.
+        ShardId otherShard("notAShard");
+        if (shards.size() > 1) {
+            shards.erase(shardId);
+            shardIt = shards.begin();
+            std::advance(shardIt, _random.nextInt64(shards.size()));
+            otherShard = *shardIt;
+            shards.insert(shardId);
+        }
+
+        // Find previous owned chunk of 'otherShard' (if any) for 'otherShard'.
+        auto expectedPrevChunk = findPreviousOwnedChunk(chunkIt, chunks, clusterTime, otherShard);
+
+        // Find next owned chunk of 'otherShard' (if any) for 'otherShard'.
+        auto expectedNextChunk = findNextOwnedChunk(chunkIt, chunks, clusterTime, otherShard);
+
+        // Pick a random shard key in the chunk.
+        auto shardKey = chunks_test_util::calculateIntermediateShardKey(
+            (*chunkIt)->getMin(), (*chunkIt)->getMax(), 0.2 /* minKeyProb */);
+
+        // Validate shard key is correctly identified as being owned by its shard & the same chunk
+        // is found as the one we are curently looking at.
+        ASSERT(cm.keyBelongsToShard(shardKey, shardId));
+        {
+            auto out = cm.nearestOwnedChunk(shardKey, shardId, ChunkMap::Direction::Forward);
+            ASSERT(out.containsShardKey);
+            ASSERT(out.nearestOwnedChunk);
+            ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMin(), (*chunkIt)->getMin());
+            ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMax(), (*chunkIt)->getMax());
+            ASSERT_EQ(out.nearestOwnedChunk->getShardId(), (*chunkIt)->getShardId());
+        }
+
+        // Repeat for reverse direction.
+        {
+            auto out = cm.nearestOwnedChunk(shardKey, shardId, ChunkMap::Direction::Backward);
+            ASSERT(out.containsShardKey);
+            ASSERT(out.nearestOwnedChunk);
+            ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMin(), (*chunkIt)->getMin());
+            ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMax(), (*chunkIt)->getMax());
+            ASSERT_EQ(out.nearestOwnedChunk->getShardId(), (*chunkIt)->getShardId());
+        }
+
+        // Validate that if we use a different shard id, shard key is identified as an orphan, and
+        // the correct next/previous chunk is returned (we cannot return the same chunk here).
+        ASSERT_FALSE(cm.keyBelongsToShard(shardKey, otherShard));
+        {
+            auto out = cm.nearestOwnedChunk(shardKey, otherShard, ChunkMap::Direction::Forward);
+            ASSERT_FALSE(out.containsShardKey);
+            if (expectedNextChunk) {
+                ASSERT(out.nearestOwnedChunk);
+                ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMin(), expectedNextChunk->getMin());
+                ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMax(), expectedNextChunk->getMax());
+                ASSERT_EQ(out.nearestOwnedChunk->getShardId(), expectedNextChunk->getShardId());
+            } else {
+                ASSERT_FALSE(out.nearestOwnedChunk);
+            }
+        }
+
+        // Repeat for reverse direction.
+        {
+            auto out = cm.nearestOwnedChunk(shardKey, otherShard, ChunkMap::Direction::Backward);
+            ASSERT_FALSE(out.containsShardKey);
+            if (expectedPrevChunk) {
+                ASSERT(out.nearestOwnedChunk);
+                ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMin(), expectedPrevChunk->getMin());
+                ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMax(), expectedPrevChunk->getMax());
+                ASSERT_EQ(out.nearestOwnedChunk->getShardId(), expectedPrevChunk->getShardId());
+            } else {
+                ASSERT_FALSE(out.nearestOwnedChunk);
+            }
+        }
+
+        // Test the next chunk.
+        chunkIt = std::next(chunkIt);
+    }
 }
 
 }  // namespace

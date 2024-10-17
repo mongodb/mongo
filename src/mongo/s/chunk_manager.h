@@ -99,6 +99,59 @@ public:
     using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
     using ChunkVectorMap = std::map<std::string, std::shared_ptr<ChunkVector>>;
 
+    /**
+     * This class provides basic iterator functionality for iterating over chunks in the chunk map
+     * bidirectionally.
+     */
+    class ChunkMapIterator {
+    public:
+        ChunkMapIterator(const ChunkVectorMap& chunkVectorMap,
+                         ChunkVectorMap::const_iterator curRange,
+                         boost::optional<ChunkVector::const_iterator> curChunk)
+            : _chunkVectorMap(chunkVectorMap), _curChunkVector(curRange), _curChunk(curChunk) {}
+
+        ChunkMapIterator(const ChunkMapIterator& other) = default;
+        ChunkMapIterator& operator=(const ChunkMapIterator& other) = default;
+
+        std::shared_ptr<ChunkInfo> get() const {
+            tassert(9526300,
+                    "ChunkMapIterator must not point past the end of the chunk map.",
+                    _curChunkVector != _chunkVectorMap.cend() && _curChunk &&
+                        *_curChunk != _curChunkVector->second->cend());
+            return **_curChunk;
+        }
+
+        bool operator==(const ChunkMapIterator& other) const {
+            return _curChunkVector == other._curChunkVector && _curChunk == other._curChunk;
+        }
+        std::shared_ptr<ChunkInfo> operator*() const {
+            return this->get();
+        }
+        std::shared_ptr<ChunkInfo> operator->() const {
+            return **this;
+        }
+        ChunkMapIterator& operator++();
+        ChunkMapIterator operator++(int) {
+            ChunkMapIterator it = *this;
+            ++(*this);
+            return it;
+        }
+        ChunkMapIterator& operator--();
+        ChunkMapIterator operator--(int) {
+            ChunkMapIterator it = *this;
+            --(*this);
+            return it;
+        }
+
+    private:
+        const ChunkVectorMap& _chunkVectorMap;
+        ChunkVectorMap::const_iterator _curChunkVector;
+        boost::optional<ChunkVector::const_iterator> _curChunk;
+    };
+
+    // Used to specify a scan direction of the chunk map.
+    enum class Direction { Forward, Backward };
+
     explicit ChunkMap(OID epoch, const Timestamp& timestamp, size_t chunkVectorSize)
         : _collectionPlacementVersion({epoch, timestamp}, {0, 0}),
           _maxChunkVectorSize(chunkVectorSize) {}
@@ -214,6 +267,24 @@ public:
     }
 
     std::shared_ptr<ChunkInfo> findIntersectingChunk(const BSONObj& shardKey) const;
+
+    ChunkMapIterator begin() const {
+        auto chunkVectorMapBegin = _chunkVectorMap.cbegin();
+        return {_chunkVectorMap,
+                chunkVectorMapBegin,
+                _chunkVectorMap.empty()
+                    ? boost::none
+                    : boost::make_optional(_chunkVectorMap.cbegin()->second->cbegin())};
+    }
+    ChunkMapIterator find(const BSONObj& shardKey) const;
+    ChunkMapIterator end() const {
+        auto chunkVectorMapEnd = _chunkVectorMap.cend();
+        return {_chunkVectorMap,
+                chunkVectorMapEnd,
+                _chunkVectorMap.empty()
+                    ? boost::none
+                    : boost::make_optional(std::prev(chunkVectorMapEnd)->second->cend())};
+    }
 
     ChunkMap createMerged(ChunkVector changedChunks) const;
 
@@ -768,6 +839,21 @@ public:
      */
     bool keyBelongsToShard(const BSONObj& shardKey, const ShardId& shardId) const;
 
+    struct ChunkOwnership {
+        bool containsShardKey;
+        boost::optional<Chunk> nearestOwnedChunk;
+    };
+    /**
+     * This finds the nearest chunk to a given 'shardKey' owned by 'shardId' in the specified chunk
+     * map scan 'direction', and returns it as a 'ChunkOwnership'. Note that there may be no more
+     * owned chunks in the map for this 'shardId' along this 'direction' (in which case
+     * 'nearestOwnedChunk' = boost::none); it is also possible that the nearest chunk is the one
+     * which includes 'shardKey'(in which case 'containsShardKey' = true).
+     */
+    ChunkOwnership nearestOwnedChunk(const BSONObj& shardKey,
+                                     const ShardId& shardId,
+                                     ChunkMap::Direction direction) const;
+
     /**
      * Returns true if any chunk owned by the shard with the given "shardId" overlaps "range".
      */
@@ -791,8 +877,8 @@ public:
      *
      * If 'collation' is empty, we use the collection default collation for targeting.
      *
-     * Throws a DBException with the ShardKeyNotFound code if unable to target a single shard due to
-     * collation or due to the key not matching the shard key pattern.
+     * Throws a DBException with the ShardKeyNotFound code if unable to target a single shard due
+     * to collation or due to the key not matching the shard key pattern.
      */
     Chunk findIntersectingChunk(const BSONObj& shardKey,
                                 const BSONObj& collation,

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/s/chunk_manager.h"
 
 namespace mongo {
 
@@ -136,6 +137,11 @@ public:
 
     bool keyBelongsToMe(const BSONObj& key) const {
         return _impl->get().keyBelongsToMe(key);
+    }
+
+    ChunkManager::ChunkOwnership nearestOwnedChunk(const BSONObj& key,
+                                                   ChunkMap::Direction direction) const {
+        return _impl->get().nearestOwnedChunk(key, direction);
     }
 
     bool isRangeEntirelyOwned(const BSONObj& min,

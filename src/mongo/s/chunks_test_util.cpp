@@ -369,4 +369,14 @@ void performRandomChunkOperations(std::vector<ChunkType>* chunksPtr, size_t numO
     }
 }
 
+std::vector<std::shared_ptr<ChunkInfo>> toChunkInfoPtrVector(
+    const std::vector<ChunkType>& chunkTypes) {
+    std::vector<std::shared_ptr<ChunkInfo>> chunkPtrs;
+    chunkPtrs.reserve(chunkTypes.size());
+    for (const auto& chunkType : chunkTypes) {
+        chunkPtrs.push_back(std::make_shared<ChunkInfo>(chunkType));
+    }
+    return chunkPtrs;
+}
+
 }  // namespace mongo::chunks_test_util
