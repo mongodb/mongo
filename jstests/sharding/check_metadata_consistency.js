@@ -374,6 +374,35 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 })();
 
+(function testMissingRoutingTableInconsistency() {
+    const db = getNewDb();
+    const kSourceCollName = "missing_chunks";
+    const ns = db[kSourceCollName].getFullName();
+
+    st.shardColl(db[kSourceCollName], {skey: 1});
+
+    // Insert a MissingRoutingTable inconsistency
+    const collUuid = configDB.collections.findOne({_id: ns}).uuid;
+    assert.commandWorked(configDB.chunks.deleteMany({uuid: collUuid}));
+
+    // Restart nodes to clear filtering metadata to trigger a refresh with following operations.
+    // We do this so that we also test that, in addition to finding the MissingRoutingTable
+    // inconsistency, all inconsistency checks deal with a chunk metadata inconsistency gracefully.
+    if (jsTest.options().storageEngine !== "inMemory") {
+        st.restartShardRS(0);
+    }
+
+    // Cluster level mode command
+    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq("MissingRoutingTable", inconsistencies[0].type, tojson(inconsistencies[0]));
+
+    // Clean up the database to pass the hooks that detect inconsistencies
+    db.dropDatabase();
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+})();
+
 (function testClusterLevelMode() {
     jsTest.log("Executing testClusterLevelMode");
 
