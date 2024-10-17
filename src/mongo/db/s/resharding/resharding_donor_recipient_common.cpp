@@ -230,7 +230,8 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
                                                                   RecipientStateMachine,
                                                                   ReshardingRecipientDocument>(
             opCtx, reshardingFields.getReshardingUUID())) {
-        recipientStateMachine->get()->onReshardingFieldsChanges(opCtx, reshardingFields);
+        recipientStateMachine->get()->onReshardingFieldsChanges(
+            opCtx, reshardingFields, !metadata.currentShardHasAnyChunks() /* noChunksToCopy */);
         return;
     }
 

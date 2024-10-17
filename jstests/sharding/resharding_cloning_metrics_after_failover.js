@@ -7,7 +7,9 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-function checkMoveCollectionCloningMetrics(st, ns, numDocs, numBytes) {
+function checkMoveCollectionCloningMetrics(
+    st, ns, numDocs, numBytes, primaryShardName, toShardName) {
+    assert.neq(primaryShardName, toShardName);
     let currentOps;
     assert.soon(() => {
         currentOps = st.s.getDB("admin")
@@ -35,8 +37,15 @@ function checkMoveCollectionCloningMetrics(st, ns, numDocs, numBytes) {
 
     assert.eq(currentOps.length, 2, currentOps);
     currentOps.forEach(op => {
-        assert.eq(op.approxDocumentsToCopy, numDocs / 2, {op});
-        assert.eq(op.approxBytesToCopy, numBytes / 2, {op});
+        if (op.shard == primaryShardName) {
+            assert.eq(op.approxDocumentsToCopy, 0, {op});
+            assert.eq(op.approxBytesToCopy, 0, {op});
+        } else if (op.shard == toShardName) {
+            assert.eq(op.approxDocumentsToCopy, numDocs, {op});
+            assert.eq(op.approxBytesToCopy, numBytes, {op});
+        } else {
+            throw Error("Unexpected shard name " + tojson(op));
+        }
     });
 }
 
@@ -77,7 +86,12 @@ function runTest() {
     }, st.s.host, ns, st.shard1.shardName);
     thread.start();
 
-    checkMoveCollectionCloningMetrics(st, ns, numDocs, numBytes);
+    checkMoveCollectionCloningMetrics(st,
+                                      ns,
+                                      numDocs,
+                                      numBytes,
+                                      st.shard0.shardName /* primaryShard */,
+                                      st.shard1.shardName /* toShard */);
 
     // Trigger a failover on shard0.
     const oldShard0Primary = st.rs0.getPrimary();
@@ -93,7 +107,12 @@ function runTest() {
     assert.commandWorked(oldShard1Primary.adminCommand({replSetFreeze: 0}));
     st.rs1.waitForPrimary();
 
-    checkMoveCollectionCloningMetrics(st, ns, numDocs, numBytes);
+    checkMoveCollectionCloningMetrics(st,
+                                      ns,
+                                      numDocs,
+                                      numBytes,
+                                      st.shard0.shardName /* primaryShard */,
+                                      st.shard1.shardName /* toShard */);
     shard0CloningFps.forEach(fp => fp.off());
     shard1CloningFps.forEach(fp => fp.off());
     thread.join();

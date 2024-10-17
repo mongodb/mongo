@@ -205,7 +205,8 @@ public:
         MongoProcessInterface::CurrentOpSessionsMode) noexcept override;
 
     void onReshardingFieldsChanges(OperationContext* opCtx,
-                                   const TypeCollectionReshardingFields& reshardingFields);
+                                   const TypeCollectionReshardingFields& reshardingFields,
+                                   bool noChunksToCopy);
 
     static void insertStateDocument(OperationContext* opCtx,
                                     const ReshardingRecipientDocument& recipientDoc);
