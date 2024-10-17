@@ -366,7 +366,8 @@ def windows_extraction(ctx, cc_toolchain, inputs):
         ext = ".lib"
     elif ctx.attr.type == "program":
         ext = ".exe"
-        pdb = ctx.attr.binary_with_debug[OutputGroupInfo].pdb_file
+        if ctx.attr.enable_pdb:
+            pdb = ctx.attr.binary_with_debug[OutputGroupInfo].pdb_file
     else:
         fail("Can't extract debug info from unknown type: " + ctx.attr.type)
 
@@ -457,6 +458,7 @@ extract_debuginfo = rule(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "enable_pdb": attr.bool(default = False, doc = "Flag to enable pdb outputs on windows."),
         "deps": attr.label_list(providers = [CcInfo]),
         "cc_shared_library": attr.label(
             doc = "If extracting from a shared library, the target of the cc_shared_library. Otherwise empty.",
@@ -487,6 +489,7 @@ extract_debuginfo_binary = rule(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "enable_pdb": attr.bool(default = False, doc = "Flag to enable pdb outputs on windows."),
         "deps": attr.label_list(providers = [CcInfo]),
         "cc_shared_library": attr.label(
             doc = "If extracting from a shared library, the target of the cc_shared_library. Otherwise empty.",
@@ -518,6 +521,7 @@ extract_debuginfo_test = rule(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "enable_pdb": attr.bool(default = False, doc = "Flag to enable pdb outputs on windows."),
         "deps": attr.label_list(providers = [CcInfo]),
         "cc_shared_library": attr.label(
             doc = "If extracting from a shared library, the target of the cc_shared_library. Otherwise empty.",

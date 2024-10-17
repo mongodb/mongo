@@ -109,7 +109,12 @@ WINDOWS_GENERAL_COPTS = select({
 
         # Don't send error reports in case of internal compiler error
         "/errorReport:none",
+    ],
+    "//conditions:default": [],
+})
 
+WINDOWS_DEBUG_COPTS = select({
+    "//bazel/config:windows_debug_symbols_enabled": [
         # Generate debug info into the object files
         "/Z7",
     ],
@@ -225,6 +230,7 @@ MSVC_OPT_COPTS = select({
 
 WINDOWS_COPTS = (
     WINDOWS_GENERAL_COPTS +
+    WINDOWS_DEBUG_COPTS +
     WINDOWS_OPT_COPTS +
     WINDOWS_MULTITHREAD_RUNTIME_COPTS +
     WINDOWS_RUNTIME_ERROR_CHECK_COPTS +
@@ -234,7 +240,7 @@ WINDOWS_COPTS = (
 )
 
 WINDOWS_DEFAULT_LINKFLAGS = select({
-    "@platforms//os:windows": [
+    "//bazel/config:windows_debug_symbols_enabled": [
         # /DEBUG will tell the linker to create a .pdb file which WinDbg and
         # Visual Studio will use to resolve symbols if you want to debug a
         # release-mode image.
@@ -970,6 +976,11 @@ SEPARATE_DEBUG_ENABLED = select({
     "//conditions:default": False,
 })
 
+PDB_GENERATION_ENABLED = select({
+    "//bazel/config:debug_symbols_disabled": False,
+    "//conditions:default": True,
+})
+
 TCMALLOC_ERROR_MESSAGE = """
 Error:\n" +
     Build failed due to unsupported platform for current allocator selection:
@@ -1034,6 +1045,13 @@ GDWARF_FEATURES = select({
     "//bazel/config:linux_gcc": ["dwarf64"],
     # SUSE15 builds system libraries with dwarf32, use dwarf32 to be keep consistent
     "//bazel/config:suse15_gcc": ["dwarf32"],
+    "//conditions:default": [],
+})
+
+# These are added as both copts and linker flags. This should also be added after any debugging flags on the command
+# line to ensure debugging is disabled.
+DISABLE_DEBUGGING_SYMBOLS_FEATURE = select({
+    "//bazel/config:not_windows_debug_symbols_disabled": ["disable_debug_symbols"],
     "//conditions:default": [],
 })
 
@@ -1284,7 +1302,7 @@ MONGO_GLOBAL_LINKFLAGS = (
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES + SASL_WINDOWS_LIB_FILES
 
-MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES + OVERLOADED_VIRTUAL_FEATURES
+MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES + OVERLOADED_VIRTUAL_FEATURES + DISABLE_DEBUGGING_SYMBOLS_FEATURE
 
 MONGO_COPTS_THIRD_PARTY = UBSAN_OPTS_THIRD_PARTY
 
@@ -1571,7 +1589,7 @@ def mongo_cc_library(
         }) + target_compatible_with + enterprise_compatible,
         dynamic_deps = deps,
         features = select({
-            "@platforms//os:windows": ["generate_pdb_file"],
+            "//bazel/config:windows_debug_symbols_enabled": ["generate_pdb_file"],
             "//conditions:default": [],
         }),
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
@@ -1584,6 +1602,7 @@ def mongo_cc_library(
         type = "library",
         tags = tags,
         enabled = SEPARATE_DEBUG_ENABLED,
+        enable_pdb = PDB_GENERATION_ENABLED,
         cc_shared_library = select({
             "//bazel/config:linkstatic_disabled": ":" + name + CC_SHARED_LIBRARY_SUFFIX + WITH_DEBUG_SUFFIX,
             "//conditions:default": None,
@@ -1676,7 +1695,7 @@ def _mongo_cc_binary_and_program(
         "defines": defines,
         "includes": includes,
         "features": MONGO_GLOBAL_FEATURES + ["-pic", "pie"] + features + select({
-            "@platforms//os:windows": ["generate_pdb_file"],
+            "//bazel/config:windows_debug_symbols_enabled": ["generate_pdb_file"],
             "//conditions:default": [],
         }),
         "dynamic_deps": select({
@@ -1695,6 +1714,7 @@ def _mongo_cc_binary_and_program(
             type = "program",
             tags = tags,
             enabled = SEPARATE_DEBUG_ENABLED,
+            enable_pdb = PDB_GENERATION_ENABLED,
             deps = all_deps,
             visibility = visibility,
         )
@@ -1706,6 +1726,7 @@ def _mongo_cc_binary_and_program(
             type = "program",
             tags = tags,
             enabled = SEPARATE_DEBUG_ENABLED,
+            enable_pdb = PDB_GENERATION_ENABLED,
             deps = all_deps,
             visibility = visibility,
         )

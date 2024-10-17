@@ -49,6 +49,7 @@ build --flag_alias=allocator=//bazel/config:allocator
 build --flag_alias=use_lldbserver=//bazel/config:use_lldbserver
 build --flag_alias=opt=//bazel/config:opt
 build --flag_alias=dbg=//bazel/config:dbg
+build --flag_alias=debug_symbols=//bazel/config:debug_symbols
 build --flag_alias=thin_lto=//bazel/config:thin_lto
 build --flag_alias=separate_debug=//bazel/config:separate_debug
 build --flag_alias=use_wait_for_debugger=//bazel/config:use_wait_for_debugger

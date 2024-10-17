@@ -471,6 +471,11 @@ def _impl(ctx):
                         expand_if_available = "per_object_debug_info_file",
                     ),
                 ],
+                with_features = [
+                    with_feature_set(
+                        not_features = ["disable_debug_symbols"],
+                    ),
+                ],
             ),
         ],
     )
@@ -514,6 +519,11 @@ def _impl(ctx):
                         ],
                     ),
                 ],
+                with_features = [
+                    with_feature_set(
+                        not_features = ["disable_debug_symbols"],
+                    ),
+                ],
             ),
         ],
     )
@@ -527,6 +537,7 @@ def _impl(ctx):
                 # building assembly files since the assembler doesn't support gdwarf64.
                 actions = all_non_assembly_compile_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf-4"])],
+                with_features = [with_feature_set(not_features = ["disable_debug_symbols"])],
             ),
         ],
     )
@@ -540,6 +551,7 @@ def _impl(ctx):
                 # building assembly files since the assembler doesn't support gdwarf64.
                 actions = all_non_assembly_compile_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf-5"])],
+                with_features = [with_feature_set(not_features = ["disable_debug_symbols"])],
             ),
         ],
     )
@@ -553,10 +565,12 @@ def _impl(ctx):
                 # building assembly files since the assembler doesn't support gdwarf64.
                 actions = all_non_assembly_compile_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf32"])],
+                with_features = [with_feature_set(not_features = ["disable_debug_symbols"])],
             ),
             flag_set(
                 actions = all_link_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf32"])],
+                with_features = [with_feature_set(not_features = ["disable_debug_symbols"])],
             ),
         ],
     )
@@ -568,10 +582,27 @@ def _impl(ctx):
             flag_set(
                 actions = all_non_assembly_compile_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf64"])],
+                with_features = [with_feature_set(not_features = ["disable_debug_symbols"])],
             ),
             flag_set(
                 actions = all_link_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf64"])],
+                with_features = [with_feature_set(not_features = ["disable_debug_symbols"])],
+            ),
+        ],
+    )
+
+    disable_debug_symbols_feature = feature(
+        name = "disable_debug_symbols",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = ["-g0"])],
+            ),
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = ["-g0"])],
             ),
         ],
     )
@@ -686,6 +717,7 @@ def _impl(ctx):
         dwarf5_feature,
         dwarf32_feature,
         dwarf64_feature,
+        disable_debug_symbols_feature,
         no_warn_non_virtual_detour_feature,
         no_deprecated_enum_enum_conversion_feature,
         no_volatile_feature,

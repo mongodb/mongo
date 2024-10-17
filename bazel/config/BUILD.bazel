@@ -8,6 +8,7 @@ load(
     "build_grpc",
     "compiler_type",
     "dbg",
+    "debug_symbols",
     "detect_odr_violations",
     "developer_dir",
     "disable_warnings_as_errors",
@@ -402,6 +403,46 @@ config_setting(
     flag_values = {
         "//bazel/config:dbg": "False",
     },
+)
+
+# =========
+# debug symbols
+# =========
+
+debug_symbols(
+    name = "debug_symbols",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "debug_symbols_enabled",
+    flag_values = {
+        "//bazel/config:debug_symbols": "True",
+    },
+)
+
+config_setting(
+    name = "debug_symbols_disabled",
+    flag_values = {
+        "//bazel/config:debug_symbols": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "not_windows_debug_symbols_disabled",
+    match_all = [
+        ":not_windows",
+        ":debug_symbols_disabled",
+    ],
+)
+
+# We can't disable windows symbol generation with a flag, we can only omit the flags that generate them
+selects.config_setting_group(
+    name = "windows_debug_symbols_enabled",
+    match_all = [
+        "@platforms//os:windows",
+        ":debug_symbols_enabled",
+    ],
 )
 
 # ==========

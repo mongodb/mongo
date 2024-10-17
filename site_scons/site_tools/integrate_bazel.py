@@ -965,6 +965,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f"--compiler_type={env.ToolchainName()}",
         f'--opt={env.GetOption("opt")}',
         f'--dbg={env.GetOption("dbg") == "on"}',
+        f'--debug_symbols={env.GetOption("debug-symbols") == "on"}',
         f'--thin_lto={env.GetOption("thin-lto") is not None}',
         f'--separate_debug={True if env.GetOption("separate-debug") == "on" else False}',
         f'--libunwind={env.GetOption("use-libunwind")}',

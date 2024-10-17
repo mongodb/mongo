@@ -394,6 +394,19 @@ dbg = rule(
 )
 
 # =========
+# debug symbols
+# =========
+debug_symbols_provider = provider(
+    doc = """Enable the production of debug symbols.""",
+    fields = ["enabled"],
+)
+
+debug_symbols = rule(
+    implementation = lambda ctx: debug_symbols_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # opt
 # =========
 opt_values = ["auto", "on", "off", "size", "debug"]
