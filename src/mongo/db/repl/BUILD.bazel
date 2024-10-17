@@ -908,7 +908,6 @@ mongo_cc_library(
         "//src/mongo/transport:service_executor.h",
         "//src/mongo/transport:ssl_connection_context.h",
         "//src/mongo/transport:transport_layer.h",
-        "//src/mongo/util:bson_util.h",
         "//src/mongo/util:invalidating_lru_cache.h",
         "//src/mongo/util:lazily_initialized.h",
         "//src/mongo/util:lru_cache.h",

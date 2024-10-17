@@ -34,7 +34,6 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/session/logical_session_id.h"  // for StmtId.
-#include "mongo/util/bson_util.h"
 
 namespace mongo {
 namespace repl {
