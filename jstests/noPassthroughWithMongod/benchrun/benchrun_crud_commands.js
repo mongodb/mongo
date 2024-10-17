@@ -1,6 +1,6 @@
 // Tests the "writeCmd" and "readCmd" options to benchRun().
 
-var coll = db.bench_test_crud_commands;
+var coll = db.benchrun_crud_commands;
 coll.drop();
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
 

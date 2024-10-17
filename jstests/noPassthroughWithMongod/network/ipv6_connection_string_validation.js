@@ -26,7 +26,7 @@ if ("undefined" == typeof inner_mode) {
         mongod.port,
         "--eval",
         "inner_mode=true;port=" + mongod.port + ";",
-        "jstests/noPassthroughWithMongod/ipv6_connection_string_validation.js"
+        "jstests/noPassthroughWithMongod/network/ipv6_connection_string_validation.js"
     ];
     var exitCode = _runMongoProgram.apply(null, args);
     jsTest.log("Inner mode test finished, exit code was " + exitCode);

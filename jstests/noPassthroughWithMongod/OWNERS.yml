@@ -1,20 +1,5 @@
 version: 1.0.0
 filters:
-  - "connections_opened.js":
-    approvers:
-      - 10gen/server-networking-and-observability
-  - "host_connection_string_validation.js":
-    approvers:
-      - 10gen/server-networking-and-observability
-  - "ingress_handshake_and_auth_metrics.js":
-    approvers:
-      - 10gen/server-networking-and-observability
-  - "ipv6_connection_string_validation.js":
-    approvers:
-      - 10gen/server-networking-and-observability
-  - "replset_host_connection_validation.js":
-    approvers:
-      - 10gen/server-networking-and-observability
   - "tcmalloc.js":
     approvers:
       - 10gen/server-workload-scheduling

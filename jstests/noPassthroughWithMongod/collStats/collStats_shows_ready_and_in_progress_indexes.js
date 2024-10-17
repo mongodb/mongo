@@ -3,7 +3,7 @@
  */
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
-const collName = "collstats_show_ready_and_in_progress_indexes";
+const collName = "collStats_show_ready_and_in_progress_indexes";
 const testDB = db.getSiblingDB("test");
 const testColl = db.getCollection(collName);
 testColl.drop();
@@ -22,7 +22,7 @@ try {
     jsTest.log("Starting a parallel shell to run two background index builds");
     awaitParallelShell = startParallelShell(() => {
         db.getSiblingDB("test").runCommand({
-            createIndexes: "collstats_show_ready_and_in_progress_indexes",
+            createIndexes: "collStats_show_ready_and_in_progress_indexes",
             indexes: [{key: {a: 1}, name: 'a_1'}, {key: {b: 1}, name: 'b_1'}]
         });
     }, db.getMongo().port);

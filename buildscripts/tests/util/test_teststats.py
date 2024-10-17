@@ -152,7 +152,7 @@ class TestHistoricTaskData(unittest.TestCase):
         mock_response = MagicMock()
         mock_response.json.return_value = [
             {
-                "test_name": "jstests/noPassthroughWithMongod/geo_near_random1.js",
+                "test_name": "jstests/noPassthroughWithMongod/query/geo/geo_near_random1.js",
                 "num_pass": 74,
                 "num_fail": 0,
                 "avg_duration_pass": 23.16216216216216,
@@ -174,7 +174,7 @@ class TestHistoricTaskData(unittest.TestCase):
             result,
             [
                 under_test.HistoricalTestInformation(
-                    test_name="jstests/noPassthroughWithMongod/geo_near_random1.js",
+                    test_name="jstests/noPassthroughWithMongod/query/geo/geo_near_random1.js",
                     num_pass=74,
                     num_fail=0,
                     avg_duration_pass=23.16216216216216,

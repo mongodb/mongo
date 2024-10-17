@@ -29,7 +29,7 @@ if ("undefined" == typeof inner_mode) {
         "--nodb",
         "--eval",
         "inner_mode=true;port=" + primary.port + ";",
-        "jstests/noPassthroughWithMongod/replset_host_connection_validation.js"
+        "jstests/noPassthroughWithMongod/network/replset_host_connection_validation.js"
     ];
     const exitCode = _runMongoProgram(...args);
     jsTest.log("Inner mode test finished, exit code was " + exitCode);
