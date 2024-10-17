@@ -68,15 +68,17 @@ export class ReplSetTest {
      *     ShardingTest, the seed is generated as part of ShardingTest.
      * @param {boolean} [opts.useAutoBootstrapProcedure] If true, follow the procedure for
      *     auto-bootstrapped replica sets.
+     * @param {number} [opts.timeoutMS] Timeout value in milliseconds.
      */
     constructor(opts) {
         if (this.constructor === ReplSetTest && this.constructor[kOverrideConstructor]) {
             return new this.constructor[kOverrideConstructor][kOverrideConstructor](opts);
         }
 
-        // Some code still references kDefaultTimeoutMS as a (non-static) member variable, so make
-        // sure it's still accessible that way.
-        this.kDefaultTimeoutMS = ReplSetTest.kDefaultTimeoutMS;
+        // If opts.timeoutMS is present use that for the ReplSetTest instance, otherwise use global
+        // value.
+        // TODO(SERVER-95853): Rename instance kDefaultTimeoutMS to timeoutMS.
+        this.kDefaultTimeoutMS = opts.timeoutMS || ReplSetTest.kDefaultTimeoutMS;
 
         // If opts is passed in as a string, let it pass unmodified since strings are pass-by-value.
         // if it is an object, though, pass in a deep copy.
@@ -1328,7 +1330,7 @@ export class ReplSetTest {
                     config.version = primaryMember.configVersion + 1;
 
                     config.members = originalMembers.slice(0, i);
-                    cmd = {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS};
+                    cmd = {replSetReconfig: config, maxTimeMS: this.kDefaultTimeoutMS};
                     print("Running reconfig command: " + tojsononeline(cmd));
                     const reconfigRes = primary.adminCommand(cmd);
                     const retryableReconfigCodes = [
@@ -1345,7 +1347,7 @@ export class ReplSetTest {
                     }
                     assert.commandWorked(reconfigRes);
                     return true;
-                }, "reconfig for fixture set up failed", ReplSetTest.kDefaultTimeoutMS, 1000);
+                }, "reconfig for fixture set up failed", this.kDefaultTimeoutMS, 1000);
             }
         }
 
@@ -1706,7 +1708,7 @@ export class ReplSetTest {
 
         // Set a maxTimeMS so reconfig fails if it times out.
         assert.adminCommandWorkedAllowingNetworkError(
-            this.getPrimary(), {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS});
+            this.getPrimary(), {replSetReconfig: config, maxTimeMS: this.kDefaultTimeoutMS});
     }
 
     /**
@@ -1818,6 +1820,9 @@ export class ReplSetTest {
                 assert.commandWorked(db.adminCommand({
                     "appendOplogNote": 1,
                     "data": {"awaitLastStableRecoveryTimestamp": 1},
+                    // We use the global kDefaultTimeoutMS value since this func is passed to a new
+                    // shell without context.
+                    // TODO(SERVER-14017): Remove subshell use
                     "writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}
                 }));
             };
@@ -1871,7 +1876,7 @@ export class ReplSetTest {
                 return true;
             },
             "Not all members have a stable recovery timestamp",
-            ReplSetTest.kDefaultTimeoutMS,
+            this.kDefaultTimeoutMS,
             retryIntervalMS);
 
         print("AwaitLastStableRecoveryTimestamp: A stable recovery timestamp has successfully " +
@@ -2759,7 +2764,7 @@ export class ReplSetTest {
 
                 throw e;
             }
-        }, `Failed to run replSetFreeze cmd on ${node.host}`);
+        }, `Failed to run replSetFreeze cmd on ${node.host}`, this.kDefaultTimeoutMS);
     }
 
     /**

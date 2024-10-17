@@ -807,14 +807,20 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     boost::optional<std::string> appname = cs.getAppName();
     std::string errmsg;
+    ErrorCodes::Error errcode;
     std::shared_ptr<DBClientBase> conn(
         cs.connect(appname.value_or(MongoURI::kDefaultTestRunnerAppName),
                    errmsg,
                    boost::none,
                    &apiParameters,
-                   transientSSLParams));
+                   transientSSLParams,
+                   &errcode));
     if (!conn.get()) {
-        uasserted(ErrorCodes::InternalError, errmsg);
+        if (MONGO_unlikely(transientSSLParams)) {
+            uasserted(errcode, errmsg);
+        } else {
+            uasserted(ErrorCodes::InternalError, errmsg);
+        }
     }
     // Make the DBClientBase not throw on a StaleConfig error since the shell cannot handle this
     // error and for transactions throwing this error from inside DBClientBase makes the error lose

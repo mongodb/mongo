@@ -162,7 +162,8 @@ public:
         std::string& errmsg,
         boost::optional<double> socketTimeoutSecs = boost::none,
         const ClientAPIVersionParameters* apiParameters = nullptr,
-        const boost::optional<TransientSSLParams>& transientSSLParams = boost::none) const;
+        const boost::optional<TransientSSLParams>& transientSSLParams = boost::none,
+        ErrorCodes::Error* errcode = nullptr) const;
 
     const std::string& getUser() const {
         return _user;

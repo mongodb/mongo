@@ -76,9 +76,14 @@ function testServerIngress() {
     clientOpts.tls.certificateKeyFile = "jstests/libs/client.pem";
     assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
 
-    let error = assert.throwsWithCode(() => {
-        new Mongo(conn.host, undefined, clientOpts);
-    }, ErrorCodes.InternalError);
+    let error = assert.throwsWithCode(
+        () => {
+            new Mongo(conn.host, undefined, clientOpts);
+        },
+        [
+            ErrorCodes.SocketException,
+            ErrorCodes.HostUnreachable
+        ]);  // Different error depending on OS
     assert(error.reason.includes("handshake failed"), error.reason);
     checkLog.containsRelaxedJson(conn, 22988, {error: {code: ErrorCodes.SSLHandshakeFailed}});
 

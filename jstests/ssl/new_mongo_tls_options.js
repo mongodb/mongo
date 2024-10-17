@@ -24,7 +24,7 @@ const conn2 = new Mongo(host, undefined, {
 assert.commandWorked(conn2.adminCommand({connectionStatus: 1}));
 
 // Set allowInvalidCertificates=false and expect a failure.
-assert.throws(() => {
+assert.throwsWithCode(() => {
     new Mongo(host, undefined, {
         tls: {
             certificateKeyFile: CLIENT_CERT,
@@ -32,6 +32,6 @@ assert.throws(() => {
             allowInvalidCertificates: false
         }
     });
-});
+}, ErrorCodes.HostUnreachable);
 
 MongoRunner.stopMongod(mongod);
