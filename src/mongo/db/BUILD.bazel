@@ -2254,10 +2254,13 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/values:key_string_entry.h",
         "//src/mongo/db/exec/sbe/values:row.h",
         "//src/mongo/db/exec/sbe/values:scalar_mono_cell_block.h",
+        "//src/mongo/db/exec/sbe/values:slot.h",
         "//src/mongo/db/exec/sbe/values:slot_printer.h",
+        "//src/mongo/db/exec/sbe/values:slot_util.h",
         "//src/mongo/db/exec/sbe/values:ts_block.h",
         "//src/mongo/db/exec/sbe/values:util.h",
         "//src/mongo/db/exec/sbe/values:value.h",
+        "//src/mongo/db/exec/sbe/values:value_builder.h",
         "//src/mongo/db/exec/sbe/values:value_printer.h",
         "//src/mongo/db/exec/sbe/vm:code_fragment.h",
         "//src/mongo/db/exec/sbe/vm:makeobj_cursors.h",
@@ -2282,7 +2285,7 @@ mongo_cc_library(
         "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/datetime:date_time_support",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage/key_string",
         "//src/mongo/util:pcre_util",
         "//src/mongo/util:string_listset",
         "//src/mongo/util:summation",  # TODO(SERVER-93876): Remove.

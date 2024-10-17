@@ -364,6 +364,7 @@ mongo_cc_library(
     deps = [
         ":duplicate_key_error_info",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:index_catalog",
         "//src/mongo/db/storage/key_string",
     ],
 )

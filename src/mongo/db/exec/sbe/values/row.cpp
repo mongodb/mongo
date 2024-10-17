@@ -701,7 +701,7 @@ RowType RowBase<RowType>::deserializeFromKeyString(const key_string::Value& keyS
     RowValueBuilder<RowType> valBuilder(valueBufferBuilder);
     auto keepReading = true;
     do {
-        keepReading = key_string::readSBEValue(
+        keepReading = key_string::readValue(
             &reader, &typeBitsReader, false /* inverted */, typeBits.version, &valBuilder);
     } while (keepReading);
 

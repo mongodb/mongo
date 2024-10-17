@@ -66,11 +66,42 @@
 
 namespace mongo {
 
-namespace sbe::value {
-class ValueBuilder;
-}
-
 namespace key_string {
+
+class BuilderInterface {
+public:
+    virtual ~BuilderInterface() = default;
+
+    virtual void append(const MinKeyLabeler& id) = 0;
+    virtual void append(const MaxKeyLabeler& id) = 0;
+    virtual void append(const NullLabeler& id) = 0;
+    virtual void append(const UndefinedLabeler& id) = 0;
+    virtual void append(bool in) = 0;
+    virtual void append(const Date_t& in) = 0;
+    virtual void append(const Timestamp& in) = 0;
+    virtual void append(const OID& in) = 0;
+    virtual void append(const std::string& in) = 0;
+    virtual void append(StringData in) = 0;
+    virtual void append(const BSONSymbol& in) = 0;
+    virtual void append(const BSONCode& in) = 0;
+    virtual void append(const BSONCodeWScope& in) = 0;
+    virtual void append(const BSONBinData& in) = 0;
+    virtual void append(const BSONRegEx& in) = 0;
+    virtual void append(const BSONDBRef& in) = 0;
+    virtual void append(double in) = 0;
+    virtual void append(const Decimal128& in) = 0;
+    virtual void append(long long in) = 0;
+    virtual void append(int32_t in) = 0;
+
+    template <typename T>
+    BuilderInterface& operator<<(const T& t) {
+        append(t);
+        return *this;
+    }
+
+    virtual BufBuilder& subobjStart() = 0;
+    virtual BufBuilder& subarrayStart() = 0;
+};
 
 enum class Version : uint8_t { V0 = 0, V1 = 1, kLatestVersion = V1 };
 
@@ -1209,15 +1240,14 @@ int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t r
 
 /**
  * Read one KeyString component from the given 'reader' and 'typeBits' inputs and stream it to the
- * 'valueBuilder' object, which converts it to a "Slot-Based Execution" (SBE) representation. When
- * no components remain in the KeyString, this function returns false and leaves 'valueBuilder'
- * unmodified.
+ * 'BuilderInterface' object, When no components remain in the KeyString, this function returns
+ * false and leaves 'stream' unmodified.
  */
-bool readSBEValue(BufReader* reader,
-                  TypeBits::ReaderBase* typeBits,
-                  bool inverted,
-                  Version version,
-                  sbe::value::ValueBuilder* valueBuilder);
+bool readValue(BufReader* reader,
+               TypeBits::ReaderBase* typeBits,
+               bool inverted,
+               Version version,
+               BuilderInterface* stream);
 
 /*
  * Appends the first field of a key string to a BSON object.

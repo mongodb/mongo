@@ -48,7 +48,6 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -2972,23 +2971,27 @@ int Value::compareWithTypeBits(const Value& other) const {
         getBuffer(), other.getBuffer(), _buffer.size(), other._buffer.size());
 }
 
-bool readSBEValue(BufReader* reader,
-                  TypeBits::ReaderBase* typeBits,
-                  bool inverted,
-                  Version version,
-                  sbe::value::ValueBuilder* valueBuilder) {
+boost::optional<uint8_t> getAndValidateNextStoredCtype(BufReader* reader, bool inverted) {
     uint8_t ctype;
     if (!reader->remaining() || (ctype = readType<uint8_t>(reader, inverted)) == kEnd) {
-        return false;
+        return boost::none;
+    }
+    invariant(ctype > kLess && ctype < kGreater);
+    return boost::make_optional(ctype);
+}
+
+bool readValue(BufReader* reader,
+               TypeBits::ReaderBase* typeBits,
+               bool inverted,
+               Version version,
+               BuilderInterface* stream) {
+    if (auto ctype = key_string::getAndValidateNextStoredCtype(reader, inverted)) {
+        const uint32_t depth = 1;  // Only call this function for a top-level key_string::Value.
+        toBsonValue(*ctype, reader, typeBits, inverted, version, stream, depth);
+        return true;
     }
 
-    // This function is only intended to read stored index entries. The 'kLess' and 'kGreater'
-    // "discriminator" types are used for querying and are never stored in an index.
-    invariant(ctype > kLess && ctype < kGreater);
-
-    const uint32_t depth = 1;  // This function only gets called for a top-level key_string::Value.
-    toBsonValue(ctype, reader, typeBits, inverted, version, valueBuilder, depth);
-    return true;
+    return false;
 }
 
 void appendSingleFieldToBSONAs(

@@ -939,13 +939,13 @@ void readKeyStringValueIntoAccessors(const SortedDataKeyValueView& keyString,
     size_t componentIndex = 0;
     do {
         // In the edge case that 'componentIndex' indicates that we have already read
-        // 'kMaxCompoundIndexKeys' components, we expect that the next 'readSBEValue()' will
+        // 'kMaxCompoundIndexKeys' components, we expect that the next 'readValue()' will
         // return false (to indicate EOF), so the value of 'inverted' does not matter.
         bool inverted = (componentIndex < Ordering::kMaxCompoundIndexKeys)
             ? (ordering.get(componentIndex) == -1)
             : false;
 
-        keepReading = key_string::readSBEValue(
+        keepReading = key_string::readValue(
             &reader, &typeBitsReader, inverted, keyString.getVersion(), &valBuilder);
 
         invariant(componentIndex < Ordering::kMaxCompoundIndexKeys || !keepReading);
@@ -953,7 +953,7 @@ void readKeyStringValueIntoAccessors(const SortedDataKeyValueView& keyString,
         // If 'indexKeysToInclude' indicates that this index key component is not part of the
         // projection, remove it from the list of values that will be fed to the 'accessors'
         // list. Note that, even when we are excluding a key component, we can't skip the call
-        // to 'key_string::readSBEValue()' because it is needed to advance the 'reader' and
+        // to 'key_string::readValue()' because it is needed to advance the 'reader' and
         // 'typeBitsReader' stream.
         if (indexKeysToInclude && (componentIndex < Ordering::kMaxCompoundIndexKeys) &&
             !(*indexKeysToInclude)[componentIndex]) {

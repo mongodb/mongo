@@ -62,51 +62,50 @@ namespace mongo::sbe::value {
  * intended as a general-purpose tool for populating SBE accessors, and no new code should construct
  * or use a ValueBuilder.
  */
-class ValueBuilder {
+class ValueBuilder : public key_string::BuilderInterface {
 public:
     ValueBuilder(BufBuilder* valueBufferBuilder) : _valueBufferBuilder(valueBufferBuilder) {}
     ValueBuilder(ValueBuilder& other) = delete;
 
-    ~ValueBuilder() = default;
 
-    void append(const MinKeyLabeler& id) {
+    void append(const MinKeyLabeler& id) override {
         appendValue(TypeTags::MinKey, 0);
     }
 
-    void append(const MaxKeyLabeler& id) {
+    void append(const MaxKeyLabeler& id) override {
         appendValue(TypeTags::MaxKey, 0);
     }
 
-    void append(const NullLabeler& id) {
+    void append(const NullLabeler& id) override {
         appendValue(TypeTags::Null, 0);
     }
 
-    void append(const UndefinedLabeler& id) {
+    void append(const UndefinedLabeler& id) override {
         appendValue(TypeTags::bsonUndefined, 0);
     }
 
-    void append(const bool in) {
+    void append(const bool in) override {
         appendValue(TypeTags::Boolean, value::bitcastFrom<bool>(in));
     }
 
-    void append(const Date_t& in) {
+    void append(const Date_t& in) override {
         appendValue(TypeTags::Date, value::bitcastFrom<int64_t>(in.toMillisSinceEpoch()));
     }
 
-    void append(const Timestamp& in) {
+    void append(const Timestamp& in) override {
         appendValue(TypeTags::Timestamp, value::bitcastFrom<uint64_t>(in.asULL()));
     }
 
-    void append(const OID& in) {
+    void append(const OID& in) override {
         appendValueBufferOffset(TypeTags::ObjectId);
         _valueBufferBuilder->appendBuf(in.view().view(), OID::kOIDSize);
     }
 
-    void append(const std::string& in) {
+    void append(const std::string& in) override {
         append(StringData{in});
     }
 
-    void append(StringData in) {
+    void append(StringData in) override {
         if (canUseSmallString({in.rawData(), in.size()})) {
             appendValue(makeSmallString({in.rawData(), in.size()}));
         } else {
@@ -116,20 +115,20 @@ public:
         }
     }
 
-    void append(const BSONSymbol& in) {
+    void append(const BSONSymbol& in) override {
         appendValueBufferOffset(TypeTags::bsonSymbol);
         _valueBufferBuilder->appendNum(static_cast<int32_t>(in.symbol.size() + 1));
         _valueBufferBuilder->appendStrBytesAndNul(in.symbol);
     }
 
-    void append(const BSONCode& in) {
+    void append(const BSONCode& in) override {
         appendValueBufferOffset(TypeTags::bsonJavascript);
         // Add one to account null byte at the end.
         _valueBufferBuilder->appendNum(static_cast<uint32_t>(in.code.size() + 1));
         _valueBufferBuilder->appendStrBytesAndNul(in.code);
     }
 
-    void append(const BSONCodeWScope& in) {
+    void append(const BSONCodeWScope& in) override {
         appendValueBufferOffset(TypeTags::bsonCodeWScope);
         _valueBufferBuilder->appendNum(
             static_cast<uint32_t>(4 + in.code.size() + 1 + in.scope.objsize()));
@@ -138,49 +137,49 @@ public:
         _valueBufferBuilder->appendBuf(in.scope.objdata(), in.scope.objsize());
     }
 
-    void append(const BSONBinData& in) {
+    void append(const BSONBinData& in) override {
         appendValueBufferOffset(TypeTags::bsonBinData);
         _valueBufferBuilder->appendNum(in.length);
         _valueBufferBuilder->appendNum(static_cast<char>(in.type));
         _valueBufferBuilder->appendBuf(in.data, in.length);
     }
 
-    void append(const BSONRegEx& in) {
+    void append(const BSONRegEx& in) override {
         appendValueBufferOffset(TypeTags::bsonRegex);
         _valueBufferBuilder->appendCStr(in.pattern);
         _valueBufferBuilder->appendCStr(in.flags);
     }
 
-    void append(const BSONDBRef& in) {
+    void append(const BSONDBRef& in) override {
         appendValueBufferOffset(TypeTags::bsonDBPointer);
         _valueBufferBuilder->appendNum(static_cast<int32_t>(in.ns.size() + 1));
         _valueBufferBuilder->appendStrBytesAndNul(in.ns);
         _valueBufferBuilder->appendBuf(in.oid.view().view(), OID::kOIDSize);
     }
 
-    void append(double in) {
+    void append(double in) override {
         appendValue(TypeTags::NumberDouble, value::bitcastFrom<double>(in));
     }
 
-    void append(const Decimal128& in) {
+    void append(const Decimal128& in) override {
         appendValueBufferOffset(TypeTags::NumberDecimal);
         _valueBufferBuilder->appendNum(in);
     }
 
-    void append(long long in) {
+    void append(long long in) override {
         appendValue(TypeTags::NumberInt64, value::bitcastFrom<int64_t>(in));
     }
 
-    void append(int32_t in) {
+    void append(int32_t in) override {
         appendValue(TypeTags::NumberInt32, value::bitcastFrom<int32_t>(in));
     }
 
-    BufBuilder& subobjStart() {
+    BufBuilder& subobjStart() override {
         appendValueBufferOffset(TypeTags::bsonObject);
         return *_valueBufferBuilder;
     }
 
-    BufBuilder& subarrayStart() {
+    BufBuilder& subarrayStart() override {
         appendValueBufferOffset(TypeTags::bsonArray);
         return *_valueBufferBuilder;
     }
