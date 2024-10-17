@@ -53,8 +53,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
@@ -1601,7 +1599,6 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
             str::stream() << roleName << " is a built-in role and cannot be modified",
             !auth::isBuiltinRole(roleName));
 
-    auto* client = opCtx->getClient();
     auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     std::vector<std::string> unrecognizedActions;
@@ -1622,19 +1619,18 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
     }
 
     // Build up update modifier object to $set privileges.
-    mutablebson::Document updateObj;
-    mutablebson::Element setElement = updateObj.makeElementObject("$set");
-    uassertStatusOK(updateObj.root().pushBack(setElement));
-    mutablebson::Element privilegesElement = updateObj.makeElementArray("privileges");
-    uassertStatusOK(setElement.pushBack(privilegesElement));
-    uassertStatusOK(Privilege::getBSONForPrivileges(privileges, privilegesElement));
+    BSONObj updateBSON = [&] {
+        BSONObjBuilder updateBuilder;
+        BSONObjBuilder updateSetBuilder(updateBuilder.subobjStart("$set"_sd));
+        BSONArrayBuilder privilegeBuilder(updateSetBuilder.subarrayStart("privileges"_sd));
+        Privilege::serializePrivilegeVector(privileges, &privilegeBuilder);
+        privilegeBuilder.doneFast();
+        updateSetBuilder.doneFast();
+        return updateBuilder.obj();
+    }();
 
-    BSONObjBuilder updateBSONBuilder;
-    updateObj.writeTo(&updateBSONBuilder);
-
-    audit::logGrantPrivilegesToRole(client, roleName, newPrivileges);
-
-    auto status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
+    audit::logGrantPrivilegesToRole(opCtx->getClient(), roleName, newPrivileges);
+    auto status = updateRoleDocument(opCtx, roleName, updateBSON);
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
     AuthorizationManager::get(opCtx->getService())->invalidateUsersByTenant(dbname.tenantId());
     uassertStatusOK(status);
@@ -1655,7 +1651,6 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
             str::stream() << roleName << " is a built-in role and cannot be modified",
             !auth::isBuiltinRole(roleName));
 
-    auto* client = opCtx->getClient();
     auto lk = uassertStatusOK(getWritableAuthzLock(opCtx));
 
     std::vector<std::string> unrecognizedActions;
@@ -1683,19 +1678,18 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
     }
 
     // Build up update modifier object to $set privileges.
-    mutablebson::Document updateObj;
-    mutablebson::Element setElement = updateObj.makeElementObject("$set");
-    uassertStatusOK(updateObj.root().pushBack(setElement));
-    mutablebson::Element privilegesElement = updateObj.makeElementArray("privileges");
-    uassertStatusOK(setElement.pushBack(privilegesElement));
-    uassertStatusOK(Privilege::getBSONForPrivileges(privileges, privilegesElement));
+    BSONObj updateBSON = [&] {
+        BSONObjBuilder updateBuilder;
+        BSONObjBuilder updateSetBuilder(updateBuilder.subobjStart("$set"_sd));
+        BSONArrayBuilder privilegeBuilder(updateSetBuilder.subarrayStart("privileges"_sd));
+        Privilege::serializePrivilegeVector(privileges, &privilegeBuilder);
+        privilegeBuilder.doneFast();
+        updateSetBuilder.doneFast();
+        return updateBuilder.obj();
+    }();
 
-    audit::logRevokePrivilegesFromRole(client, roleName, rmPrivs);
-
-    BSONObjBuilder updateBSONBuilder;
-    updateObj.writeTo(&updateBSONBuilder);
-
-    auto status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
+    audit::logRevokePrivilegesFromRole(opCtx->getClient(), roleName, rmPrivs);
+    auto status = updateRoleDocument(opCtx, roleName, updateBSON);
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
     AuthorizationManager::get(opCtx->getService())->invalidateUsersByTenant(dbname.tenantId());
     uassertStatusOK(status);

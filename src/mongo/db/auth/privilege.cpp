@@ -217,21 +217,22 @@ bool Privilege::includesActions(const ActionSet& actions) const {
     return _actions.isSupersetOf(actions);
 }
 
+void Privilege::serialize(BSONObjBuilder* builder) const {
+    toParsedPrivilege().serialize(builder);
+}
+
 BSONObj Privilege::toBSON() const {
     BSONObjBuilder builder;
-    toParsedPrivilege().serialize(&builder);
+    serialize(&builder);
     return builder.obj();
 }
 
-Status Privilege::getBSONForPrivileges(const PrivilegeVector& privileges,
-                                       mutablebson::Element resultArray) try {
+void Privilege::serializePrivilegeVector(const PrivilegeVector& privileges,
+                                         BSONArrayBuilder* builder) {
     for (const auto& currPriv : privileges) {
-        uassertStatusOK(
-            resultArray.appendObject("privileges", currPriv.toParsedPrivilege().toBSON()));
+        BSONObjBuilder privBuilder(builder->subobjStart());
+        currPriv.serialize(&privBuilder);
     }
-    return Status::OK();
-} catch (...) {
-    return exceptionToStatus();
 }
 
 auth::ParsedPrivilege Privilege::toParsedPrivilege() const {

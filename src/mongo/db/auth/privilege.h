@@ -82,8 +82,7 @@ public:
      * Takes a vector of privileges and fills the output param "resultArray" with a BSON array
      * representation of the privileges.
      */
-    static Status getBSONForPrivileges(const PrivilegeVector& privileges,
-                                       mutablebson::Element resultArray);
+    static void serializePrivilegeVector(const PrivilegeVector& privileges, BSONArrayBuilder*);
 
 
     Privilege() = default;
@@ -124,6 +123,7 @@ public:
     // Checks if the given actions are present in the Privilege.
     bool includesActions(const ActionSet& actions) const;
 
+    void serialize(BSONObjBuilder*) const;
     BSONObj toBSON() const;
 
 private:
