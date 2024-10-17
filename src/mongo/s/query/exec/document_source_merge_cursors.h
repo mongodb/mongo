@@ -36,7 +36,7 @@
 #include <cstddef>
 #include <memory>
 #include <set>
-#include <utility>
+#include <variant>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -58,7 +58,6 @@
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/blocking_results_merger.h"
 #include "mongo/s/query/exec/router_stage_merge.h"
-#include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -159,27 +158,13 @@ public:
 
     bool remotesExhausted() const;
 
-    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-        if (!_blockingResultsMerger) {
-            // In cases where a cursor was established with a batchSize of 0, the first getMore
-            // might specify a custom maxTimeMS (AKA await data timeout). In these cases we will not
-            // have iterated the cursor yet so will not have populated the merger, but need to
-            // remember/track the custom await data timeout. We will soon iterate the cursor, so we
-            // just populate the merger now and let it track the await data timeout itself.
-            populateMerger();
-        }
-        return _blockingResultsMerger->setAwaitDataTimeout(awaitDataTimeout);
-    }
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
 
     /**
      * Adds the specified shard cursors to the set of cursors to be merged. The results from the
      * new cursors will be returned as normal through getNext().
      */
-    void addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
-        invariant(_blockingResultsMerger);
-        recordRemoteCursorShardIds(newCursors);
-        _blockingResultsMerger->addNewShardCursors(std::move(newCursors));
-    }
+    void addNewShardCursors(std::vector<RemoteCursor>&& newCursors);
 
     /**
      * Marks the remote cursors as unowned, meaning that they won't be killed upon disposing of this
@@ -223,16 +208,11 @@ private:
      * Get the Async Results Merger Params or return boost:none if it is not set. This is used by
      * DocumentSourceMergeCursorsMultiTenancyTest for unit test purpose.
      */
-    boost::optional<NamespaceString> getAsyncResultMergerParamsNss_forTest() const {
-        if (_armParams) {
-            return _armParams->getNss();
-        }
-        return boost::none;
-    }
+    boost::optional<NamespaceString> getAsyncResultMergerParamsNss_forTest() const;
 
     // When we have parsed the params out of a BSONObj, the object needs to stay around while the
     // params are in use. We store them here.
-    boost::optional<BSONObj> _armParamsObj;
+    const boost::optional<BSONObj> _armParamsObj;
 
     // '_blockingResultsMerger' is lazily populated. Until we need to use it, '_armParams' will be
     // populated with the parameters. Once we start using '_blockingResultsMerger', '_armParams'
@@ -242,7 +222,11 @@ private:
     // cursors within '_blockingResultsMerger' to be killed prematurely. For example, if this stage
     // is parsed on mongos then forwarded to the shards, it should not kill the cursors when it goes
     // out of scope on mongos.
+    // Note that there is a single case in which neither _armParams nor _blockingResultsMerger are
+    // set, and this after convertToRouterStage() is called. After that call the DocumentSource will
+    // remain in an unusable state.
     boost::optional<AsyncResultsMergerParams> _armParams;
+    // Can only be populated if _armParams is not set. Not populated initially.
     boost::optional<BlockingResultsMerger> _blockingResultsMerger;
 
     // Indicates whether the cursors stored in _armParams are "owned", meaning the cursors should be

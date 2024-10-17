@@ -194,6 +194,10 @@ AsyncResultsMerger::~AsyncResultsMerger() {
     invariant(_remotesExhausted(lk) || _lifecycleState == kKillComplete);
 }
 
+const AsyncResultsMergerParams& AsyncResultsMerger::params() const {
+    return _params;
+}
+
 bool AsyncResultsMerger::remotesExhausted() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _remotesExhausted(lk);

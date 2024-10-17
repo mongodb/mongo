@@ -48,8 +48,6 @@ selector:
     - jstests/core/commands_with_uuid.js
     # SERVER-95208 Fix timeseries query failing in explain, but passing when running.
     - jstests/core/timeseries/timeseries_union_with.js
-    # SERVER-95350 Fix jstests/aggregation/api_version_stage_allowance_checks.js.
-    - jstests/aggregation/api_version_stage_allowance_checks.js
 
   exclude_with_any_tags:
     # The suite spawns a replica set, therefore cannot run standalone only tests.

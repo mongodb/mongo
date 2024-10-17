@@ -8,9 +8,6 @@ selector:
     - jstests/core/**/*.js
     - jstests/aggregation/**/*.js
   exclude_files:
-    # SERVER-95350 Fix jstests/aggregation/api_version_stage_allowance_checks.js.
-    - jstests/aggregation/api_version_stage_allowance_checks.js
-
     # TODO SERVER-86996: Apply QuerySettings for queries involving timeseries collections.
     - jstests/core/timeseries/**/*.js
     - jstests/core/write/bypass_empty_ts_replacement_timeseries.js

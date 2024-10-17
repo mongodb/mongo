@@ -337,8 +337,8 @@ void generateExecutionInfo(PlanExecutor* exec,
  */
 void executePlan(PlanExecutor* exec) {
     // Using 'getNextBatch()' rather than 'getNext()' means we iterate the PlanExecutor in a tighter
-    // loop. We passing a null callback function because explain wishes to simply discard the query
-    // result set.
+    // loop. We are passing a null callback function because explain wishes to simply discard the
+    // query result set.
     (void)exec->getNextBatch(std::numeric_limits<int64_t>::max(), nullptr);
 }
 
