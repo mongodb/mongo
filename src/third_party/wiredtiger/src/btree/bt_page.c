@@ -60,7 +60,7 @@ __wt_page_alloc(
     WT_RET(__wt_calloc(session, 1, size, &page));
 
     page->type = type;
-    __wt_atomic_store64(&page->read_gen, WT_READGEN_NOTSET);
+    __wt_evict_page_init(page);
 
     switch (type) {
     case WT_PAGE_COL_FIX:

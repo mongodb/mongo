@@ -1,46 +1,14 @@
 /*-
  * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
- *	All rights reserved.
+ * All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
 
 #pragma once
 
-/*
- * Tuning constants: I hesitate to call this tuning, but we want to review some number of pages from
- * each file's in-memory tree for each page we evict.
- */
-#define WT_EVICT_MAX_TREES WT_THOUSAND /* Maximum walk points */
-#define WT_EVICT_WALK_BASE 300         /* Pages tracked across file visits */
-#define WT_EVICT_WALK_INCR 100         /* Pages added each walk */
-
-/*
- * WT_EVICT_ENTRY --
- *	Encapsulation of an eviction candidate.
- */
-struct __wt_evict_entry {
-    WT_BTREE *btree; /* Enclosing btree object */
-    WT_REF *ref;     /* Page to flush/evict */
-    uint64_t score;  /* Relative eviction priority */
-};
-
-#define WT_EVICT_QUEUE_MAX 3    /* Two ordinary queues plus urgent */
-#define WT_EVICT_URGENT_QUEUE 2 /* Urgent queue index */
-
-/*
- * WT_EVICT_QUEUE --
- *	Encapsulation of an eviction candidate queue.
- */
-struct __wt_evict_queue {
-    WT_SPINLOCK evict_lock;                /* Eviction LRU queue */
-    WT_EVICT_ENTRY *evict_queue;           /* LRU pages being tracked */
-    WT_EVICT_ENTRY *evict_current;         /* LRU current page to be evicted */
-    uint32_t evict_candidates;             /* LRU list pages to evict */
-    uint32_t evict_entries;                /* LRU entries in the queue */
-    wt_shared volatile uint32_t evict_max; /* LRU maximum eviction slot used */
-};
+#include "evict_private.h"
 
 struct __wt_evict {
     wt_shared volatile uint64_t eviction_progress; /* Eviction progress count */
@@ -161,14 +129,70 @@ struct __wt_evict {
     uint32_t flags;
 };
 
-#define WT_WITH_PASS_LOCK(session, op)                                                   \
-    do {                                                                                 \
-        WT_WITH_LOCK_WAIT(session, &evict->evict_pass_lock, WT_SESSION_LOCKED_PASS, op); \
-    } while (0)
-
 /* Flags used with __wt_evict */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_EVICT_CALL_CLOSING 0x1u  /* Closing connection or tree */
 #define WT_EVICT_CALL_NO_SPLIT 0x2u /* Splits not allowed */
 #define WT_EVICT_CALL_URGENT 0x4u   /* Urgent eviction */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+
+/* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
+
+extern bool __wt_evict_page_urgent(WT_SESSION_IMPL *session, WT_REF *ref)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state,
+  uint32_t flags) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_evict_destroy(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_evict_threads_create(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_evict_threads_destroy(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wt_evict_cache_stat_walk(WT_SESSION_IMPL *session);
+extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
+extern void __wt_evict_priority_clear(WT_SESSION_IMPL *session);
+extern void __wt_evict_priority_set(WT_SESSION_IMPL *session, uint64_t v);
+extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);
+extern void __wt_evict_stats_update(WT_SESSION_IMPL *session);
+static WT_INLINE bool __wt_evict_aggressive(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_evict_cache_stuck(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_evict_clean_needed(WT_SESSION_IMPL *session, double *pct_fullp)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_evict_clean_pressure(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_evict_dirty_needed(WT_SESSION_IMPL *session, double *pct_fullp)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_evict_needed(WT_SESSION_IMPL *session, bool busy, bool readonly,
+  double *pct_fullp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_evict_page_is_soon(WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_evict_page_is_soon_or_wont_need(WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE int __wt_evict_app_assist_worker_check(WT_SESSION_IMPL *session, bool busy,
+  bool readonly, bool *didworkp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE void __wt_evict_favor_clearing_dirty_cache(WT_SESSION_IMPL *session);
+static WT_INLINE void __wt_evict_inherit_page_state(WT_PAGE *orig_page, WT_PAGE *new_page);
+static WT_INLINE void __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page);
+static WT_INLINE void __wt_evict_page_first_dirty(WT_SESSION_IMPL *session, WT_PAGE *page);
+static WT_INLINE void __wt_evict_page_init(WT_PAGE *page);
+static WT_INLINE void __wt_evict_page_soon(WT_SESSION_IMPL *session, WT_REF *ref);
+static WT_INLINE void __wt_evict_touch_page(
+  WT_SESSION_IMPL *session, WT_PAGE *page, bool internal_only, bool wont_need);
+
+#ifdef HAVE_UNITTEST
+
+#endif
+
+/* DO NOT EDIT: automatically built by prototypes.py: END */

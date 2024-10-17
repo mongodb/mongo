@@ -284,7 +284,7 @@ __wti_rec_child_modify(
              */
             if (cmsp->hazard == false) {
                 ret = __wt_page_in(session, ref,
-                  WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT);
+                  WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_INTERNAL_OP | WT_READ_NO_WAIT);
                 if (ret == WT_NOTFOUND) {
                     ret = 0;
                     break;

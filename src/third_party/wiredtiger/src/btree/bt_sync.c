@@ -148,7 +148,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     tried_eviction = false;
 
     /* Don't bump page read generations. */
-    flags = WT_READ_NO_GEN;
+    flags = WT_READ_INTERNAL_OP;
 
     internal_bytes = leaf_bytes = 0;
     internal_pages = leaf_pages = 0;

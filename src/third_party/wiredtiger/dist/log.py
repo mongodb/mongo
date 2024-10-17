@@ -212,6 +212,7 @@ def run():
     tfile.write('''/* DO NOT EDIT: automatically built by dist/log.py. */
 
 #include "wt_internal.h"
+#include "log_private.h"
 
 #define WT_SIZE_CHECK_PACK_PTR(p, end)     WT_RET_TEST(!(p) || !(end) || (p) >= (end), ENOMEM)
 #define WT_SIZE_CHECK_UNPACK_PTR(p, end)   WT_RET_TEST(!(p) || !(end) || (p) >= (end), EINVAL)

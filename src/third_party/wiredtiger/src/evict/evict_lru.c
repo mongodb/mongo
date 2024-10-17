@@ -69,21 +69,21 @@ __evict_entry_priority(WT_SESSION_IMPL *session, WT_REF *ref)
     btree = S2BT(session);
     page = ref->page;
 
-    /* Any page set to the oldest generation should be discarded. */
-    if (__wt_readgen_evict_soon(&page->read_gen))
-        return (WT_READGEN_OLDEST);
+    /* Any page set to the evict_soon or wont_need generation should be discarded. */
+    if (__wti_evict_readgen_is_soon_or_wont_need(&page->read_gen))
+        return (WT_READGEN_EVICT_SOON);
 
     /* Any page from a dead tree is a great choice. */
     if (F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
-        return (WT_READGEN_OLDEST);
+        return (WT_READGEN_EVICT_SOON);
 
     /* Any empty page (leaf or internal), is a good choice. */
     if (__wt_page_is_empty(page))
-        return (WT_READGEN_OLDEST);
+        return (WT_READGEN_EVICT_SOON);
 
     /* Any large page in memory is likewise a good choice. */
     if (__wt_atomic_loadsize(&page->memory_footprint) > btree->splitmempage)
-        return (WT_READGEN_OLDEST);
+        return (WT_READGEN_EVICT_SOON);
 
     /*
      * The base read-generation is skewed by the eviction priority. Internal pages are also
@@ -771,7 +771,7 @@ __evict_pass(WT_SESSION_IMPL *session)
          * currently required, so that pages have some relative read generation when the eviction
          * server does need to do some work.
          */
-        __wti_evict_read_gen_incr(session);
+        __wt_atomic_add64(&evict->read_gen, 1);
         __wt_atomic_add64(&evict->evict_pass_gen, 1);
 
         /*
@@ -1366,7 +1366,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
         read_gen_oldest = WT_READGEN_START_VALUE;
         for (candidates = 0; candidates < entries; ++candidates) {
             WT_READ_ONCE(read_gen_oldest, queue->evict_queue[candidates].score);
-            if (!__wt_readgen_evict_soon(&read_gen_oldest))
+            if (!__wti_evict_readgen_is_soon_or_wont_need(&read_gen_oldest))
                 break;
         }
 
@@ -1378,7 +1378,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
          * 50% of the entries were at the oldest read generation, take
          * all of them.
          */
-        if (__wt_readgen_evict_soon(&read_gen_oldest))
+        if (__wti_evict_readgen_is_soon_or_wont_need(&read_gen_oldest))
             queue->evict_candidates = entries;
         else if (candidates > entries / 2)
             queue->evict_candidates = candidates;
@@ -1746,7 +1746,7 @@ __evict_push_candidate(
 
     /* Adjust for size when doing dirty eviction. */
     if (F_ISSET(S2C(session)->evict, WT_EVICT_CACHE_DIRTY) &&
-      evict_entry->score != WT_READGEN_OLDEST && evict_entry->score != UINT64_MAX &&
+      evict_entry->score != WT_READGEN_EVICT_SOON && evict_entry->score != UINT64_MAX &&
       !__wt_page_is_modified(ref->page))
         evict_entry->score +=
           WT_MEGABYTE - WT_MIN(WT_MEGABYTE, __wt_atomic_loadsize(&ref->page->memory_footprint));
@@ -2004,7 +2004,7 @@ __evict_walk_prepare(WT_SESSION_IMPL *session, uint32_t *walk_flagsp)
         WT_STAT_DSRC_INCR(session, cache_eviction_walk_saved_pos);
     }
 
-    *walk_flagsp = WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
+    *walk_flagsp = WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_INTERNAL_OP | WT_READ_NO_WAIT;
     if (!F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
         FLD_SET(*walk_flagsp, WT_READ_VISIBLE_ALL);
 
@@ -2031,7 +2031,7 @@ rand_prev:
     /* FALLTHROUGH */
     case WT_EVICT_WALK_RAND_NEXT:
 rand_next:
-        read_flags = WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT |
+        read_flags = WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_INTERNAL_OP | WT_READ_NO_WAIT |
           WT_READ_NOTFOUND_OK | WT_READ_RESTART_OK;
         if (btree->evict_ref == NULL) {
             for (;;) {
@@ -2145,11 +2145,11 @@ __evict_try_queue_page(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, WT_REF *
      * somehow leave a page without a read generation.
      */
     if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_NOTSET)
-        __wt_evict_read_gen_new(session, page);
+        __wti_evict_read_gen_new(session, page);
 
     /* Pages being forcibly evicted go on the urgent queue. */
     if (modified &&
-      (__wt_atomic_load64(&page->read_gen) == WT_READGEN_OLDEST ||
+      (__wt_atomic_load64(&page->read_gen) == WT_READGEN_EVICT_SOON ||
         __wt_atomic_loadsize(&page->memory_footprint) >= btree->splitmempage)) {
         WT_STAT_CONN_INCR(session, eviction_pages_queued_oldest);
         if (__wt_evict_page_urgent(session, ref))
@@ -2409,7 +2409,7 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
         } else {
             while (ref != NULL &&
               (WT_REF_GET_STATE(ref) != WT_REF_MEM ||
-                __wt_readgen_evict_soon(&ref->page->read_gen)))
+                __wti_evict_readgen_is_soon_or_wont_need(&ref->page->read_gen)))
                 WT_RET_NOTFOUND_OK(__wt_tree_walk_count(session, &ref, &refs_walked, walk_flags));
         }
         btree->evict_ref = ref;
@@ -2639,7 +2639,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
      * that point, eviction has already unlocked the page and some other thread may have evicted it
      * by the time we look at it.
      */
-    __wt_evict_read_gen_bump(session, ref->page);
+    __wti_evict_read_gen_bump(session, ref->page);
 
     WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, previous_state, flags));
 

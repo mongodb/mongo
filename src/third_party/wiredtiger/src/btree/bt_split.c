@@ -1405,7 +1405,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     WT_PAGE_MODIFY *mod;
     WT_SAVE_UPD *supd;
     WT_UPDATE *prev_onpage, *tmp, *upd;
-    uint64_t orig_read_gen, recno;
+    uint64_t recno;
     uint32_t i, slot;
     bool prepare;
 
@@ -1432,14 +1432,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     if (prepare && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
         WT_RET(__wti_page_inmem_prepare(session, ref));
 
-    /*
-     * Put the re-instantiated page in the same LRU queue location as the original page, unless this
-     * was a forced eviction, in which case we leave the new page with the read generation unset.
-     * Eviction will set the read generation next time it visits this page.
-     */
-    WT_READ_ONCE(orig_read_gen, orig->read_gen);
-    if (!__wt_readgen_evict_soon(&orig_read_gen))
-        __wt_atomic_store64(&page->read_gen, orig_read_gen);
+    __wt_evict_inherit_page_state(orig, page);
 
     /*
      * If there are no updates to apply to the page, we're done. Otherwise, there are updates we

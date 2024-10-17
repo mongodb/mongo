@@ -7,6 +7,7 @@
  */
 
 #include "wt_internal.h"
+#include "log_private.h"
 
 static int __log_newfile(WT_SESSION_IMPL *, bool, bool *);
 static int __log_openfile(WT_SESSION_IMPL *, uint32_t, uint32_t, WT_FH **);
@@ -797,7 +798,7 @@ __log_file_header(WT_SESSION_IMPL *session, WT_FH *fh, WT_LSN *end_lsn, bool pre
     desc->log_magic = WT_LOG_MAGIC;
     desc->version = log->log_version;
     desc->log_size = (uint64_t)conn->log_file_max;
-    __wt_log_desc_byteswap(desc);
+    __wti_log_desc_byteswap(desc);
 
     /*
      * Now that the record is set up, initialize the record header.
@@ -808,7 +809,7 @@ __log_file_header(WT_SESSION_IMPL *session, WT_FH *fh, WT_LSN *end_lsn, bool pre
      */
     logrec->len = log->allocsize;
     logrec->checksum = 0;
-    __wt_log_record_byteswap(logrec);
+    __wti_log_record_byteswap(logrec);
     logrec->checksum = __wt_checksum(logrec, log->allocsize);
 #ifdef WORDS_BIGENDIAN
     logrec->checksum = __wt_bswap32(logrec->checksum);
@@ -927,9 +928,9 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp, WT_LSN *ls
     WT_ERR(__log_openfile(session, id, 0, &fh));
     WT_ERR(__log_fs_read(session, fh, 0, allocsize, buf->mem));
     logrec = (WT_LOG_RECORD *)buf->mem;
-    __wt_log_record_byteswap(logrec);
+    __wti_log_record_byteswap(logrec);
     desc = (WT_LOG_DESC *)logrec->record;
-    __wt_log_desc_byteswap(desc);
+    __wti_log_desc_byteswap(desc);
     if (desc->log_magic != WT_LOG_MAGIC) {
         if (salvage_mode)
             WT_ERR_MSG(session, WT_ERROR, "log file %s corrupted: Bad magic number %" PRIu32,
@@ -996,7 +997,7 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp, WT_LSN *ls
           "%s: System log record checksum mismatch: calculated block checksum of %#" PRIx32
           " doesn't match expected checksum of %#" PRIx32,
           fh->name, __wt_checksum(buf, allocsize), logrec->checksum);
-    __wt_log_record_byteswap(logrec);
+    __wti_log_record_byteswap(logrec);
     p = WT_LOG_SKIP_HEADER(buf->data);
     end = (const uint8_t *)buf->data + allocsize;
     WT_ERR(__wt_logrec_read(session, &p, end, &rectype));
@@ -1043,7 +1044,7 @@ __log_record_verify(
      * Make our own copy of the header so we can get the bytes in the proper order.
      */
     logrec = *logrecp;
-    __wt_log_record_byteswap(&logrec);
+    __wti_log_record_byteswap(&logrec);
 
     if (F_ISSET(&logrec, ~(WT_LOG_RECORD_ALL_FLAGS))) {
         __wt_verbose_notice(session, WT_VERB_LOG,
@@ -2373,7 +2374,7 @@ advance:
             }
             break;
         }
-        __wt_log_record_byteswap(logrec);
+        __wti_log_record_byteswap(logrec);
 
         /*
          * We have a valid log record. If it is not the log file header, invoke the callback.
@@ -2680,7 +2681,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
     logrec = (WT_LOG_RECORD *)record->mem;
     logrec->len = (uint32_t)record->size;
     logrec->checksum = 0;
-    __wt_log_record_byteswap(logrec);
+    __wti_log_record_byteswap(logrec);
     logrec->checksum = __wt_checksum(logrec, record->size);
 #ifdef WORDS_BIGENDIAN
     logrec->checksum = __wt_bswap32(logrec->checksum);

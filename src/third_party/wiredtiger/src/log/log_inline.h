@@ -7,6 +7,41 @@
  */
 
 #pragma once
+#include "log_private.h"
+
+/*
+ * __wti_log_desc_byteswap --
+ *     Handle big- and little-endian transformation of the log file description block.
+ */
+static WT_INLINE void
+__wti_log_desc_byteswap(WT_LOG_DESC *desc)
+{
+#ifdef WORDS_BIGENDIAN
+    desc->log_magic = __wt_bswap32(desc->log_magic);
+    desc->version = __wt_bswap16(desc->version);
+    desc->unused = __wt_bswap16(desc->unused);
+    desc->log_size = __wt_bswap64(desc->log_size);
+#else
+    WT_UNUSED(desc);
+#endif
+}
+
+/*
+ * __wti_log_record_byteswap --
+ *     Handle big- and little-endian transformation of the log record header block.
+ */
+static WT_INLINE void
+__wti_log_record_byteswap(WT_LOG_RECORD *record)
+{
+#ifdef WORDS_BIGENDIAN
+    record->len = __wt_bswap32(record->len);
+    record->checksum = __wt_bswap32(record->checksum);
+    record->flags = __wt_bswap16(record->flags);
+    record->mem_len = __wt_bswap32(record->mem_len);
+#else
+    WT_UNUSED(record);
+#endif
+}
 
 /*
  * __wt_log_cmp --

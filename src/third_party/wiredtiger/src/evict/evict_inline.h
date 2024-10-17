@@ -20,6 +20,23 @@ __wt_evict_aggressive(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_evict_cache_stuck --
+ *     Indicate if the cache is stuck (i.e. eviction not making progress).
+ */
+static WT_INLINE bool
+__wt_evict_cache_stuck(WT_SESSION_IMPL *session)
+{
+    WT_EVICT *evict;
+    uint32_t tmp_evict_aggressive_score;
+
+    evict = S2C(session)->evict;
+    tmp_evict_aggressive_score = __wt_atomic_load32(&evict->evict_aggressive_score);
+    WT_ASSERT(session, tmp_evict_aggressive_score <= WT_EVICT_SCORE_MAX);
+    return (
+      tmp_evict_aggressive_score == WT_EVICT_SCORE_MAX && F_ISSET(evict, WT_EVICT_CACHE_HARD));
+}
+
+/*
  * __evict_read_gen --
  *     Get the current read generation number.
  */
@@ -30,24 +47,14 @@ __evict_read_gen(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wti_evict_read_gen_incr --
- *     Increment the current read generation number.
- */
-static WT_INLINE void
-__wti_evict_read_gen_incr(WT_SESSION_IMPL *session)
-{
-    (void)__wt_atomic_add64(&S2C(session)->evict->read_gen, 1);
-}
-
-/*
- * __wt_evict_read_gen_bump --
+ * __wti_evict_read_gen_bump --
  *     Update the page's read generation.
  */
 static WT_INLINE void
-__wt_evict_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wti_evict_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /* Ignore pages set for forcible eviction. */
-    if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_OLDEST)
+    if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_EVICT_SOON)
         return;
 
     /* Ignore pages already in the future. */
@@ -65,31 +72,50 @@ __wt_evict_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_evict_read_gen_new --
+ * __wti_evict_read_gen_new --
  *     Get the read generation for a new page in memory.
  */
 static WT_INLINE void
-__wt_evict_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wti_evict_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     __wt_atomic_store64(
       &page->read_gen, (__evict_read_gen(session) + S2C(session)->evict->read_gen_oldest) / 2);
 }
 
 /*
- * __wt_evict_cache_stuck --
- *     Indicate if the cache is stuck (i.e., eviction not making progress).
+ * __wti_evict_readgen_is_soon_or_wont_need --
+ *     Return whether a read generation value makes a page eligible for forced eviction. Read
+ *     generations reserve a range of low numbers for special meanings and currently - with the
+ *     exception of the generation not being set - these indicate the page may be evicted
+ *     forcefully.
  */
 static WT_INLINE bool
-__wt_evict_cache_stuck(WT_SESSION_IMPL *session)
+__wti_evict_readgen_is_soon_or_wont_need(uint64_t *readgen)
 {
-    WT_EVICT *evict;
-    uint32_t tmp_evict_aggressive_score;
+    uint64_t gen;
 
-    evict = S2C(session)->evict;
-    tmp_evict_aggressive_score = __wt_atomic_load32(&evict->evict_aggressive_score);
-    WT_ASSERT(session, tmp_evict_aggressive_score <= WT_EVICT_SCORE_MAX);
-    return (
-      tmp_evict_aggressive_score == WT_EVICT_SCORE_MAX && F_ISSET(evict, WT_EVICT_CACHE_HARD));
+    WT_READ_ONCE(gen, *readgen);
+    return (gen != WT_READGEN_NOTSET && gen < WT_READGEN_START_VALUE);
+}
+
+/*
+ * __wt_evict_page_is_soon_or_wont_need --
+ *     Return whether the page is eligible for forced eviction.
+ */
+static WT_INLINE bool
+__wt_evict_page_is_soon_or_wont_need(WT_PAGE *page)
+{
+    return (__wti_evict_readgen_is_soon_or_wont_need(&page->read_gen));
+}
+
+/*
+ * __wt_evict_page_is_soon --
+ *     Return whether the page is to be evicted as soon as possible.
+ */
+static WT_INLINE bool
+__wt_evict_page_is_soon(WT_PAGE *page)
+{
+    return (__wt_atomic_load64(&page->read_gen) == WT_READGEN_EVICT_SOON);
 }
 
 /*
@@ -101,7 +127,134 @@ __wt_evict_page_soon(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_UNUSED(session);
 
-    __wt_atomic_store64(&ref->page->read_gen, WT_READGEN_OLDEST);
+    __wt_atomic_store64(&ref->page->read_gen, WT_READGEN_EVICT_SOON);
+}
+
+/*
+ * __wt_evict_page_first_dirty --
+ *     Tell eviction when a page transitions from clean to dirty. The eviction mechanism will then
+ *     update the page's eviction state as needed.
+ */
+static WT_INLINE void
+__wt_evict_page_first_dirty(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+    /*
+     * In the event we dirty a page which is flagged as wont need, we update its read generation to
+     * avoid evicting a dirty page prematurely.
+     */
+    if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_WONT_NEED)
+        __wti_evict_read_gen_new(session, page);
+}
+
+/*
+ * __wt_evict_touch_page --
+ *     Tell eviction when we touch a page so it can update its eviction state for that page. The
+ *     caller may set flags indicating that it doesn't expect to need the page again or that it's an
+ *     internal operation which doesn't change eviction state. The latter is used by operations such
+ *     as compact, and eviction, itself, so internal operations don't update page's eviction state.
+ */
+static WT_INLINE void
+__wt_evict_touch_page(WT_SESSION_IMPL *session, WT_PAGE *page, bool internal_only, bool wont_need)
+{
+    /* Is this the first use of the page? */
+    if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_NOTSET) {
+        if (wont_need)
+            __wt_atomic_store64(&page->read_gen, WT_READGEN_WONT_NEED);
+        else
+            __wti_evict_read_gen_new(session, page);
+    } else if (!internal_only)
+        __wti_evict_read_gen_bump(session, page);
+}
+
+/*
+ * __wt_evict_page_init --
+ *     Initialize page's eviction state for a newly created page.
+ */
+static WT_INLINE void
+__wt_evict_page_init(WT_PAGE *page)
+{
+    __wt_atomic_store64(&page->read_gen, WT_READGEN_NOTSET);
+}
+
+/*
+ * __wt_evict_inherit_page_state --
+ *     When creating a new page from an existing page, for example during split, initialize the read
+ *     generation on the new page using the read generation of the original page, unless this was a
+ *     forced eviction, in which case we leave the new page with the default initialization.
+ */
+static WT_INLINE void
+__wt_evict_inherit_page_state(WT_PAGE *orig_page, WT_PAGE *new_page)
+{
+    uint64_t orig_read_gen;
+
+    WT_READ_ONCE(orig_read_gen, orig_page->read_gen);
+
+    if (!__wti_evict_readgen_is_soon_or_wont_need(&orig_read_gen))
+        __wt_atomic_store64(&new_page->read_gen, orig_read_gen);
+}
+
+/*
+ * __wt_evict_page_cache_bytes_decr --
+ *     Decrement the cache, btree, and page byte count in-memory to reflect eviction.
+ */
+static WT_INLINE void
+__wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+    WT_BTREE *btree;
+    WT_CACHE *cache;
+    WT_PAGE_MODIFY *modify;
+
+    btree = S2BT(session);
+    cache = S2C(session)->cache;
+    modify = page->modify;
+
+    /* Update the bytes in-memory to reflect the eviction. */
+    __wt_cache_decr_check_uint64(session, &btree->bytes_inmem,
+      __wt_atomic_loadsize(&page->memory_footprint), "WT_BTREE.bytes_inmem");
+    __wt_cache_decr_check_uint64(session, &cache->bytes_inmem,
+      __wt_atomic_loadsize(&page->memory_footprint), "WT_CACHE.bytes_inmem");
+
+    /* Update the bytes_internal value to reflect the eviction */
+    if (WT_PAGE_IS_INTERNAL(page)) {
+        __wt_cache_decr_check_uint64(session, &btree->bytes_internal,
+          __wt_atomic_loadsize(&page->memory_footprint), "WT_BTREE.bytes_internal");
+        __wt_cache_decr_check_uint64(session, &cache->bytes_internal,
+          __wt_atomic_loadsize(&page->memory_footprint), "WT_CACHE.bytes_internal");
+    }
+
+    /* Update the cache's dirty-byte count. */
+    if (modify != NULL && modify->bytes_dirty != 0) {
+        if (WT_PAGE_IS_INTERNAL(page)) {
+            __wt_cache_decr_check_uint64(
+              session, &btree->bytes_dirty_intl, modify->bytes_dirty, "WT_BTREE.bytes_dirty_intl");
+            __wt_cache_decr_check_uint64(
+              session, &cache->bytes_dirty_intl, modify->bytes_dirty, "WT_CACHE.bytes_dirty_intl");
+        } else if (!btree->lsm_primary) {
+            __wt_cache_decr_check_uint64(
+              session, &btree->bytes_dirty_leaf, modify->bytes_dirty, "WT_BTREE.bytes_dirty_leaf");
+            __wt_cache_decr_check_uint64(
+              session, &cache->bytes_dirty_leaf, modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf");
+        }
+    }
+
+    /* Update the cache's updates-byte count. */
+    if (modify != NULL) {
+        __wt_cache_decr_check_uint64(
+          session, &btree->bytes_updates, modify->bytes_updates, "WT_BTREE.bytes_updates");
+        __wt_cache_decr_check_uint64(
+          session, &cache->bytes_updates, modify->bytes_updates, "WT_CACHE.bytes_updates");
+    }
+
+    /* Update bytes and pages evicted. */
+    (void)__wt_atomic_add64(&cache->bytes_evict, __wt_atomic_loadsize(&page->memory_footprint));
+    (void)__wt_atomic_addv64(&cache->pages_evicted, 1);
+
+    /*
+     * Track if eviction makes progress. This is used in various places to determine whether
+     * eviction is stuck.
+     */
+    if (!F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_NO_PROGRESS))
+        (void)__wt_atomic_addv64(&S2C(session)->evict->eviction_progress, 1);
 }
 
 /*
@@ -258,6 +411,27 @@ __wt_evict_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double *pc
      * able to start until the cache is under the limit.
      */
     return (clean_needed || updates_needed || (!busy && dirty_needed));
+}
+
+/*
+ * __wt_evict_favor_clearing_dirty_cache --
+ *     !!! This function should only be called when closing WiredTiger. It aggressively adjusts
+ *     eviction settings to remove dirty bytes from the cache. Use with caution as this will
+ *     significantly impact eviction behavior.
+ */
+static WT_INLINE void
+__wt_evict_favor_clearing_dirty_cache(WT_SESSION_IMPL *session)
+{
+    WT_EVICT *evict;
+
+    evict = S2C(session)->evict;
+
+    /*
+     * Ramp the eviction dirty target down to encourage eviction threads to clear dirty content out
+     * of cache.
+     */
+    __wt_set_shared_double(&evict->eviction_dirty_trigger, 1.0);
+    __wt_set_shared_double(&evict->eviction_dirty_target, 0.1);
 }
 
 /*

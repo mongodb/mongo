@@ -1184,12 +1184,7 @@ err:
     __wt_verbose_info(session, WT_VERB_RECOVERY_PROGRESS, "%s", "closing WiredTiger library.");
     __wt_timer_start(session, &timer);
 
-    /*
-     * Ramp the eviction dirty target down to encourage eviction threads to clear dirty content out
-     * of cache.
-     */
-    __wt_set_shared_double(&conn->evict->eviction_dirty_trigger, 1.0);
-    __wt_set_shared_double(&conn->evict->eviction_dirty_target, 0.1);
+    __wt_evict_favor_clearing_dirty_cache(session);
 
     if (conn->default_session->event_handler->handle_general != NULL &&
       F_ISSET(conn, WT_CONN_MINIMAL | WT_CONN_READY))

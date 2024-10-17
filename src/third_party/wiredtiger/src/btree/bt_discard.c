@@ -95,7 +95,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
     }
 
     /* Update the cache's information. */
-    __wt_cache_page_evict(session, page);
+    __wt_evict_page_cache_bytes_decr(session, page);
 
     dsk = (WT_PAGE_HEADER *)page->dsk;
     if (F_ISSET_ATOMIC_16(page, WT_PAGE_DISK_ALLOC))

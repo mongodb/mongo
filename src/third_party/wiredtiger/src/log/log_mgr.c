@@ -7,6 +7,7 @@
  */
 
 #include "wt_internal.h"
+#include "log_private.h"
 
 /*
  * __logmgr_sync_cfg --

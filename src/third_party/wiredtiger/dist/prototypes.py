@@ -23,7 +23,7 @@ from collections import defaultdict
 # instead of in src/include/. As a result all relevant code is contained to a single folder. 
 # Adding modules to this list will automatically generate those headers, and we expect this list to 
 # grow as we modularise the code base.
-SELF_CONTAINED_MODULES = []
+SELF_CONTAINED_MODULES = ["log", "evict"]
 
 DO_NOT_EDIT_BEGIN = "/* DO NOT EDIT: automatically built by prototypes.py: BEGIN */\n"
 DO_NOT_EDIT_END = "/* DO NOT EDIT: automatically built by prototypes.py: END */\n"
@@ -100,13 +100,10 @@ def fn_prototypes(public_fns, private_fns, tests, name):
 
 # Create a new header file with function declarations.
 # As this is a new file also generate boilerplate like #pragma once
-def create_new_header(tmp_file, fns, tests, private_file=""):
+def create_new_header(tmp_file, fns, tests):
     tfile = open(tmp_file, 'w')
     tfile.write(COPYRIGHT)
     tfile.write("#pragma once\n\n")
-
-    if private_file:
-        tfile.write(f"#include \"{private_file}\"\n\n")
 
     tfile.write(f"{DO_NOT_EDIT_BEGIN}\n")
 
@@ -161,11 +158,11 @@ def update_existing_header(tmp_file, fns, tests, f):
 # Write results and compare to the current file.
 # Unit-testing functions are exposed separately in their own section to
 # allow them to be ifdef'd out.
-def output(fns, tests, f, private_file=""):
+def output(fns, tests, f):
     tmp_file = '__tmp_prototypes' + str(os.getpid())
 
     if not os.path.isfile(f):
-        create_new_header(tmp_file, fns, tests, private_file)
+        create_new_header(tmp_file, fns, tests)
     else:
         update_existing_header(tmp_file, fns, tests, f)
 
@@ -226,8 +223,7 @@ def write_header_files(public_fns_dict, private_fns_dict, tests_dict):
             output(public_fns_dict[mod] + private_fns_dict[mod], tests_dict[mod], 
                 f"../src/include/extern.h")
         else:
-            output(public_fns_dict[mod], tests_dict[mod], f"../src/{mod}/{mod}.h", 
-                private_file=f"{mod}_private.h")
+            output(public_fns_dict[mod], tests_dict[mod], f"../src/{mod}/{mod}.h")
             if len(private_fns_dict[mod]) > 0:
                 # The second argument (tests_dict) is empty. These test functions are defined to
                 # expose module internals outside the module, so it doens't make sense for them 

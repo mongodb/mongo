@@ -56,22 +56,6 @@ __wt_page_is_empty(WT_PAGE *page)
 }
 
 /*
- * __wt_readgen_evict_soon --
- *     Return whether a page's read generation makes it eligible for immediate eviction. Read
- *     generations reserve a range of low numbers for special meanings and currently - with the
- *     exception of the generation not being set - these indicate the page may be evicted
- *     immediately.
- */
-static WT_INLINE bool
-__wt_readgen_evict_soon(uint64_t *readgen)
-{
-    uint64_t gen;
-
-    WT_READ_ONCE(gen, *readgen);
-    return (gen != WT_READGEN_NOTSET && gen < WT_READGEN_START_VALUE);
-}
-
-/*
  * __wt_evict_page_soon_check --
  *     Check whether the page should be evicted urgently.
  */
@@ -94,7 +78,7 @@ __wt_evict_page_soon_check(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_sp
      * checkpointed, and no other thread can help with that. Checkpoints don't rely on this code for
      * dirty eviction: that is handled explicitly in __wt_sync_file.
      */
-    if (__wt_readgen_evict_soon(&page->read_gen) && btree->evict_disabled == 0 &&
+    if (__wt_evict_page_is_soon_or_wont_need(page) && btree->evict_disabled == 0 &&
       __wt_page_can_evict(session, ref, inmem_split) &&
       (!WT_SESSION_IS_CHECKPOINT(session) || __wt_page_evict_clean(page)))
         return (true);
@@ -601,70 +585,6 @@ __wt_cache_page_image_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_cache_page_evict --
- *     Evict pages from the cache.
- */
-static WT_INLINE void
-__wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-    WT_BTREE *btree;
-    WT_CACHE *cache;
-    WT_PAGE_MODIFY *modify;
-
-    btree = S2BT(session);
-    cache = S2C(session)->cache;
-    modify = page->modify;
-
-    /* Update the bytes in-memory to reflect the eviction. */
-    __wt_cache_decr_check_uint64(session, &btree->bytes_inmem,
-      __wt_atomic_loadsize(&page->memory_footprint), "WT_BTREE.bytes_inmem");
-    __wt_cache_decr_check_uint64(session, &cache->bytes_inmem,
-      __wt_atomic_loadsize(&page->memory_footprint), "WT_CACHE.bytes_inmem");
-
-    /* Update the bytes_internal value to reflect the eviction */
-    if (WT_PAGE_IS_INTERNAL(page)) {
-        __wt_cache_decr_check_uint64(session, &btree->bytes_internal,
-          __wt_atomic_loadsize(&page->memory_footprint), "WT_BTREE.bytes_internal");
-        __wt_cache_decr_check_uint64(session, &cache->bytes_internal,
-          __wt_atomic_loadsize(&page->memory_footprint), "WT_CACHE.bytes_internal");
-    }
-
-    /* Update the cache's dirty-byte count. */
-    if (modify != NULL && modify->bytes_dirty != 0) {
-        if (WT_PAGE_IS_INTERNAL(page)) {
-            __wt_cache_decr_check_uint64(
-              session, &btree->bytes_dirty_intl, modify->bytes_dirty, "WT_BTREE.bytes_dirty_intl");
-            __wt_cache_decr_check_uint64(
-              session, &cache->bytes_dirty_intl, modify->bytes_dirty, "WT_CACHE.bytes_dirty_intl");
-        } else if (!btree->lsm_primary) {
-            __wt_cache_decr_check_uint64(
-              session, &btree->bytes_dirty_leaf, modify->bytes_dirty, "WT_BTREE.bytes_dirty_leaf");
-            __wt_cache_decr_check_uint64(
-              session, &cache->bytes_dirty_leaf, modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf");
-        }
-    }
-
-    /* Update the cache's updates-byte count. */
-    if (modify != NULL) {
-        __wt_cache_decr_check_uint64(
-          session, &btree->bytes_updates, modify->bytes_updates, "WT_BTREE.bytes_updates");
-        __wt_cache_decr_check_uint64(
-          session, &cache->bytes_updates, modify->bytes_updates, "WT_CACHE.bytes_updates");
-    }
-
-    /* Update bytes and pages evicted. */
-    (void)__wt_atomic_add64(&cache->bytes_evict, __wt_atomic_loadsize(&page->memory_footprint));
-    (void)__wt_atomic_addv64(&cache->pages_evicted, 1);
-
-    /*
-     * Track if eviction makes progress. This is used in various places to determine whether
-     * eviction is stuck.
-     */
-    if (!F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_NO_PROGRESS))
-        (void)__wt_atomic_addv64(&S2C(session)->evict->eviction_progress, 1);
-}
-
-/*
  * __wt_update_list_memsize --
  *     The size in memory of a list of updates.
  */
@@ -721,12 +641,8 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
     if (__wt_atomic_load32(&page->modify->page_state) < WT_PAGE_DIRTY &&
       __wt_atomic_add32(&page->modify->page_state, 1) == WT_PAGE_DIRTY_FIRST) {
         __wt_cache_dirty_incr(session, page);
-        /*
-         * In the event we dirty a page which is flagged for eviction soon, we update its read
-         * generation to avoid evicting a dirty page prematurely.
-         */
-        if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_WONT_NEED)
-            __wt_evict_read_gen_new(session, page);
+
+        __wt_evict_page_first_dirty(session, page);
 
         /*
          * We won the race to dirty the page, but another thread could have committed in the

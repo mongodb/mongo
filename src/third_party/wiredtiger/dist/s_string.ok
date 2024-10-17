@@ -214,6 +214,7 @@ LLVMFuzzerTestOneInput
 LOGOP
 LOGREC
 LOGSCAN
+LOGSLOT
 LRU
 LSB
 LSM
@@ -1184,6 +1185,7 @@ rc
 rdlock
 rdtsc
 rduppo
+readdir
 readgen
 readlock
 readonly
