@@ -106,7 +106,10 @@ export const $config = (function() {
 
     return {
         threadCount: 5,
-        iterations: 5,
+        // The add/remove shard suites involve moving unsharded collections out of the shard being
+        // removed. Having up to 25 unsharded collections to move may make this test take too
+        // long to run and get killed by resmoke.
+        iterations: TestData.shardsAddedRemoved ? 3 : 5,
         data: data,
         states: states,
         transitions: transitions,
