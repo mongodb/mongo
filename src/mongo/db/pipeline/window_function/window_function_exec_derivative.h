@@ -85,7 +85,7 @@ public:
               return milliseconds;
           }()) {}
 
-    Value getNext() final;
+    Value getNext(boost::optional<Document> current = boost::none) final;
     void reset() final {}
 
 private:

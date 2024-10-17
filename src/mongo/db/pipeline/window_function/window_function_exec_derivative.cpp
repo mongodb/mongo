@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-Value WindowFunctionExecDerivative::getNext() {
+Value WindowFunctionExecDerivative::getNext(boost::optional<Document> current) {
     auto endpoints = _iter.getEndpoints(_bounds);
     if (!endpoints)
         return kDefault;

@@ -203,6 +203,13 @@ class DocumentSource;
             "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (featureFlag)); \
     }
 
+// Helper to apply an expression concisely.
+// Throws if anything goes wrong.
+template <typename Expression, typename... Args>
+inline Value throwingApply(Args&&... args) {
+    return uassertStatusOK(Expression::apply(args...));
+}
+
 class Expression : public RefCountable {
 public:
     using Parser = std::function<boost::intrusive_ptr<Expression>(

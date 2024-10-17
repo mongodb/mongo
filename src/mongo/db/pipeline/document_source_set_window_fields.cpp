@@ -518,7 +518,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             projSpec->addExpressionForPath(
                 FieldPath(fieldName),
                 ExpressionConstant::create(pExpCtx.get(),
-                                           _executableOutputs[fieldName]->getNext()));
+                                           _executableOutputs[fieldName]->getNext(*curDoc)));
         } catch (const DBException&) {
             _iterator.finalize();
             throw;

@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
@@ -56,7 +58,14 @@ public:
 
     virtual void add(Value) = 0;
     virtual void remove(Value) = 0;
-    virtual Value getValue() const = 0;
+    /**
+     * @param current The value of the current document whose output field Value
+     * is being computed.
+     * Some window functions implementations do not need the input Value of the current document
+     * and expect to be able to be called without it.
+     * Other window functions require this input Value and can assert this value present to proceed.
+     */
+    virtual Value getValue(boost::optional<Value> current = boost::none) const = 0;
     virtual void reset() = 0;
     size_t getApproximateSize() {
         tassert(5414200,

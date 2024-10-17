@@ -77,11 +77,11 @@ public:
         _count--;
     }
 
-    Value getValue() const final {
+    Value getValue(boost::optional<Value> current = boost::none) const final {
         if (_count == 0) {
             return getDefault();
         }
-        Value sum = RemovableSum::getValue();
+        Value sum = RemovableSum::getValue(current);
         switch (sum.getType()) {
             case NumberInt:
             case NumberLong:

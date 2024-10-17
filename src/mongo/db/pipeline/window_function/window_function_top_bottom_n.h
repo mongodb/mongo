@@ -69,7 +69,7 @@ public:
         updateMemUsage();
     }
 
-    Value getValue() const final {
+    Value getValue(boost::optional<Value> current = boost::none) const final {
         return _acc.getValueConst(false);
     }
 

@@ -89,7 +89,7 @@ WindowFunctionCovariance::WindowFunctionCovariance(ExpressionContext* const expC
     _memUsageTracker.set(sizeof(*this));
 }
 
-Value WindowFunctionCovariance::getValue() const {
+Value WindowFunctionCovariance::getValue(boost::optional<Value> current) const {
     if (_count == 1 && !_isSamp)
         return Value(0.0);
 

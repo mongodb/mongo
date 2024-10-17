@@ -54,7 +54,7 @@ public:
           _function(std::move(function)),
           _bounds(bounds) {}
 
-    Value getNext() final {
+    Value getNext(boost::optional<Document> current = boost::none) final {
         update();
         return _function->getValue(false);
     }

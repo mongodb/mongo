@@ -113,7 +113,7 @@ public:
         _memUsageTracker.set(sizeof(*this) + _ps.capacity() * sizeof(double));
     }
 
-    Value getValue() const final {
+    Value getValue(boost::optional<Value> current = boost::none) const final {
         if (_values.empty()) {
             std::vector<Value> nulls;
             nulls.insert(nulls.end(), _ps.size(), Value(BSONNULL));
@@ -150,7 +150,7 @@ public:
         _memUsageTracker.set(sizeof(*this));
     }
 
-    Value getValue() const final {
+    Value getValue(boost::optional<Value> current = boost::none) const final {
         if (_values.empty())
             return Value{BSONNULL};
 

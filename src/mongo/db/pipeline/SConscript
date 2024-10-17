@@ -183,6 +183,7 @@ env.CppUnitTest(
         "window_function/window_function_exec_removable_test.cpp",
         "window_function/window_function_integral_test.cpp",
         "window_function/window_function_min_max_test.cpp",
+        "window_function/window_function_min_max_scalar_test.cpp",
         "window_function/window_function_n_test.cpp",
         "window_function/window_function_push_test.cpp",
         "window_function/window_function_set_union_test.cpp",

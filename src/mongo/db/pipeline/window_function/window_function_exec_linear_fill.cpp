@@ -95,7 +95,7 @@ boost::optional<std::pair<Value, Value>> WindowFunctionExecLinearFill::findX2Y2(
     return boost::none;
 }
 
-Value WindowFunctionExecLinearFill::getNext() {
+Value WindowFunctionExecLinearFill::getNext(boost::optional<Document> current) {
     const auto currentDoc = *_iter[0];
     Value fillFieldValue = _input->evaluate(currentDoc, &_input->getExpressionContext()->variables);
     uassert(ErrorCodes::TypeMismatch,

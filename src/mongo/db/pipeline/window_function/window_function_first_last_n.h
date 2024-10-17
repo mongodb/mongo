@@ -81,7 +81,7 @@ public:
         _values.erase(iter);
     }
 
-    Value getValue() const final {
+    Value getValue(boost::optional<Value> current = boost::none) const final {
         if (_values.empty()) {
             return Value(std::vector<Value>{});
         }

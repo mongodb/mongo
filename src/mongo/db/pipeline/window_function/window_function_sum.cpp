@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-Value RemovableSum::getValue() const {
+Value RemovableSum::getValue(boost::optional<Value> current) const {
     if (_nanCount > 0) {
         return _decimalCount > 0 ? Value(Decimal128::kPositiveNaN)
                                  : Value(std::numeric_limits<double>::quiet_NaN());

@@ -50,7 +50,6 @@
 
 namespace mongo {
 
-template <AccumulatorMinMax::Sense sense>
 class WindowFunctionMinMaxCommon : public WindowFunctionState {
 public:
     void add(Value value) final {
@@ -91,10 +90,10 @@ protected:
 };
 
 template <AccumulatorMinMax::Sense sense>
-class WindowFunctionMinMax : public WindowFunctionMinMaxCommon<sense> {
+class WindowFunctionMinMax : public WindowFunctionMinMaxCommon {
 public:
-    using WindowFunctionMinMaxCommon<sense>::_values;
-    using WindowFunctionMinMaxCommon<sense>::_memUsageTracker;
+    using WindowFunctionMinMaxCommon::_memUsageTracker;
+    using WindowFunctionMinMaxCommon::_values;
 
     static inline const Value kDefault = Value{BSONNULL};
 
@@ -103,11 +102,11 @@ public:
     }
 
     explicit WindowFunctionMinMax(ExpressionContext* const expCtx)
-        : WindowFunctionMinMaxCommon<sense>(expCtx) {
+        : WindowFunctionMinMaxCommon(expCtx) {
         _memUsageTracker.set(sizeof(*this));
     }
 
-    Value getValue() const final {
+    Value getValue(boost::optional<Value> current = boost::none) const final {
         if (_values.empty())
             return kDefault;
         if constexpr (sense == AccumulatorMinMax::Sense::kMin) {
@@ -120,10 +119,10 @@ public:
 };
 
 template <AccumulatorMinMax::Sense sense>
-class WindowFunctionMinMaxN : public WindowFunctionMinMaxCommon<sense> {
+class WindowFunctionMinMaxN : public WindowFunctionMinMaxCommon {
 public:
-    using WindowFunctionMinMaxCommon<sense>::_values;
-    using WindowFunctionMinMaxCommon<sense>::_memUsageTracker;
+    using WindowFunctionMinMaxCommon::_memUsageTracker;
+    using WindowFunctionMinMaxCommon::_values;
 
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx,
                                                        long long n) {
@@ -145,11 +144,11 @@ public:
     }
 
     explicit WindowFunctionMinMaxN(ExpressionContext* const expCtx, long long n)
-        : WindowFunctionMinMaxCommon<sense>(expCtx), _n(n) {
+        : WindowFunctionMinMaxCommon(expCtx), _n(n) {
         _memUsageTracker.set(sizeof(*this));
     }
 
-    Value getValue() const final {
+    Value getValue(boost::optional<Value> current = boost::none) const final {
         if (_values.empty()) {
             return Value(std::vector<Value>());
         }

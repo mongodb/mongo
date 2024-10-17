@@ -92,7 +92,7 @@ public:
         _memUsageTracker.set(sizeof(*this));
     }
 
-    Value getValue() const override {
+    Value getValue(boost::optional<Value> current = boost::none) const override {
         std::vector<Value> output;
         if (_values.empty()) {
             return kDefault;

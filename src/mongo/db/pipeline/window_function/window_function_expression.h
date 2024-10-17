@@ -71,7 +71,7 @@
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_integral.h"
-#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/pipeline/window_function/window_function_min_max_scalar.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -957,6 +957,83 @@ public:
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
         MONGO_UNREACHABLE_TASSERT(5490709);
     }
+};
+
+class ExpressionMinMaxScalar : public Expression {
+public:
+    static constexpr StringData kWindowFnName = "$minMaxScalar"_sd;
+    static constexpr StringData kInputArg = "input"_sd;
+    static constexpr StringData kMinArg = "min"_sd;
+    static constexpr StringData kMaxArg = "max"_sd;
+
+    ExpressionMinMaxScalar(ExpressionContext* expCtx,
+                           boost::intrusive_ptr<::mongo::Expression> input,
+                           WindowBounds bounds,
+                           std::pair<Value, Value> sMinAndsMax)
+        : Expression(expCtx, std::string(kWindowFnName), std::move(input), std::move(bounds)),
+          _sMinAndsMax(sMinAndsMax) {}
+
+    static boost::intrusive_ptr<Expression> parse(BSONObj obj,
+                                                  const boost::optional<SortPattern>& sortBy,
+                                                  ExpressionContext* expCtx);
+
+    boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
+        // This function should be unreachable as the $minMaxScalar window function does
+        // not use an accumulator to implement the non-removable version of its execution.
+        // This is because $minMaxScalar relies on the "current" document value being
+        // processed, which implies a 1:1 ratio of input to output documents in the group
+        // of documents being operated over, whereas accumulators in general can reduce
+        // the number of documents output compared to the input.
+        // Instead $minMaxScalar has a custom WindowFunctionExec class that handles the
+        // non-removable implementation that is installed directly in the
+        // WindowFunctionExec::create() method.
+        MONGO_UNREACHABLE_TASSERT(9459900);
+    }
+
+    std::unique_ptr<WindowFunctionState> buildRemovable() const final {
+        return WindowFunctionMinMaxScalar::create(_expCtx, _sMinAndsMax);
+    }
+
+    Value serialize(const SerializationOptions& opts) const final {
+        MutableDocument result;
+        // $minMaxScalar args
+        result[_accumulatorName][kInputArg] = _input->serialize(opts);
+        result[_accumulatorName][kMinArg] = _sMinAndsMax.first;
+        result[_accumulatorName][kMaxArg] = _sMinAndsMax.second;
+
+        // window args
+        MutableDocument windowField;
+        _bounds.serialize(windowField, opts);
+        result[kWindowArg] = windowField.freezeToValue();
+
+        return result.freezeToValue();
+    }
+
+    // Get the sMin and sMax (the min and max of the output domain) as a pair.
+    // First is sMin. Second is sMax.
+    std::pair<Value, Value> getDomainMinAndMax() {
+        return _sMinAndsMax;
+    }
+
+private:
+    // Output domain Value is bounded between sMin and sMax (inclusive).
+    // First value is min, second value is max.
+    std::pair<Value, Value> _sMinAndsMax;
+
+    // Internal parsing helper functions.
+    //
+    // Parses the top level keys to the $minMaxScalar window function BSON.
+    // Expects a '$minMaxScalar' key, and optionally a 'window' key.
+    // First return value of the pair is the unparsed arguments to '$minMaxScalar'.
+    // Second return value of the pair is the parsed WindowBounds.
+    static std::pair<BSONElement, WindowBounds> parseTopLevelKeys(
+        BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx);
+    // Parses the BSON object that is the argument to the '$minMaxScalar' key.
+    // First return value of the pair is the parsed Expression of the 'input' key.
+    // Second return value is the pair representing the sMin and sMax arguments to the window
+    // function.
+    static std::pair<boost::intrusive_ptr<::mongo::Expression>, std::pair<Value, Value>>
+    parseMinMaxScalarArgs(BSONElement minMaxScalarElem, ExpressionContext* expCtx);
 };
 
 /**

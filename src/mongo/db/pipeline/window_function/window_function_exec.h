@@ -76,8 +76,13 @@ public:
 
     /**
      * Retrieve the next value computed by the window function.
+     * @param current The current document whose output fields are being calculated.
+     * This argument is optional as only some window functions rely on the current document
+     * to compute their output Value. Each window function may assert that the current doucment
+     * is present if they need it to compute their output Value.
+     * Normally, the current document is only absent in unit tests.
      */
-    virtual Value getNext() = 0;
+    virtual Value getNext(boost::optional<Document> current = boost::none) = 0;
 
     /**
      * Resets the executor as well as any execution state to a clean slate.
@@ -100,9 +105,13 @@ protected:
  */
 class WindowFunctionExecRemovable : public WindowFunctionExec {
 public:
-    Value getNext() override {
+    Value getNext(boost::optional<Document> current = boost::none) override {
         update();
-        return _function->getValue();
+        if (!current.has_value()) {
+            return _function->getValue();
+        }
+        return _function->getValue(
+            _input->evaluate(*current, &_input->getExpressionContext()->variables));
     }
 
     void reset() override {

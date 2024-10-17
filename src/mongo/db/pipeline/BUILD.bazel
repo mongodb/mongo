@@ -611,6 +611,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/window_function:spillable_cache.h",
         "//src/mongo/db/pipeline/window_function:window_function_exec.h",
         "//src/mongo/db/pipeline/window_function:window_function_exec_derivative.h",
+        "//src/mongo/db/pipeline/window_function:window_function_exec_min_max_scalar.h",
         "//src/mongo/db/pipeline/window_function:window_function_exec_linear_fill.h",
         "//src/mongo/db/pipeline/window_function:window_function_exec_removable_document.h",
         "//src/mongo/db/pipeline/window_function:window_function_exec_removable_range.h",

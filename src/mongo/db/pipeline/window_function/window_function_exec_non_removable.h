@@ -74,7 +74,7 @@ public:
           _function(std::move(function)),
           _upperDocumentBound(upperDocumentBound){};
 
-    Value getNext() final {
+    Value getNext(boost::optional<Document> current = boost::none) final {
         if (!_initialized) {
             initialize();
         } else if (!holds_alternative<WindowBounds::Unbounded>(_upperDocumentBound)) {

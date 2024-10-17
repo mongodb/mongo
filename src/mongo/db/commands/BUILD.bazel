@@ -621,6 +621,8 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/window_function:window_function_covariance.h",
         "//src/mongo/db/pipeline/window_function:window_function_expression.h",
         "//src/mongo/db/pipeline/window_function:window_function_integral.h",
+        "//src/mongo/db/pipeline/window_function:window_function_min_max.h",
+        "//src/mongo/db/pipeline/window_function:window_function_min_max_scalar.h",
         "//src/mongo/db/pipeline/window_function:window_function_statement.h",
         "//src/mongo/db/pipeline/window_function:window_function_sum.h",
         "//src/mongo/db/query:canonical_distinct.h",

@@ -70,7 +70,7 @@ public:
           _bounds(std::move(bounds)),
           _prevX1Y1(boost::none),
           _prevX2Y2(boost::none) {}
-    Value getNext() final;
+    Value getNext(boost::optional<Document> current = boost::none) final;
     void reset() final {
         _prevX1Y1 = boost::none;
         _prevX2Y2 = boost::none;

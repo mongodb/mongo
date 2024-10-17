@@ -59,7 +59,7 @@ public:
         update(std::move(value), -1);
     }
 
-    Value getValue() const final {
+    Value getValue(boost::optional<Value> current = boost::none) const final {
         if (_nonfiniteValueCount > 0)
             return Value(BSONNULL);
         const long long adjustedCount = _isSamp ? _count - 1 : _count;
