@@ -6,8 +6,7 @@ cd src
 # Additionally, a version of libfaketime containing the changes mentioned in SERVER-29336
 # is required to avoid needing to use libfaketimeMT.so.1 and serializing all calls to
 # fake_clock_gettime() with a mutex.
-
-git clone --branch=for-jepsen --depth=1 https://x-access-token:${github_token}@github.com/10gen/libfaketime.git
+git clone --branch=for-jepsen --depth=1 git@github.com:10gen/libfaketime.git
 cd libfaketime
 branch=$(git symbolic-ref --short HEAD)
 commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")

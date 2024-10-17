@@ -12,7 +12,7 @@ if [[ "${build_variant}" != *"query-patch-only"* ]]; then
 fi
 
 activate_venv
-git clone https://x-access-token:${github_token}@github.com/10gen/coredb-patchbuild-optimizer.git
+git clone git@github.com:10gen/coredb-patchbuild-optimizer.git
 
 pushd coredb-patchbuild-optimizer
 # Reusing bfsuggestion's password here to avoid having to
