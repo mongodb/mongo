@@ -301,11 +301,16 @@ enum class Builtin : uint16_t {
     aggRemovableLastNAdd,
     aggRemovableLastNRemove,
     aggRemovableLastNFinalize,
-    aggRemovableAddToSetInit,
-    aggRemovableAddToSetCollInit,
+
+    // $addToSet and $setUnion share some common functionality.
+    aggRemovableSetCommonInit,
+    aggRemovableSetCommonCollInit,
     aggRemovableAddToSetAdd,
     aggRemovableAddToSetRemove,
-    aggRemovableAddToSetFinalize,
+    aggRemovableSetUnionAdd,
+    aggRemovableSetUnionRemove,
+    aggRemovableSetCommonFinalize,
+
     aggRemovableMinMaxNCollInit,
     aggRemovableMinMaxNInit,
     aggRemovableMinMaxNAdd,

@@ -2881,8 +2881,8 @@ template FastTuple<bool, value::TypeTags, value::Value>
 ByteCode::builtinAggFirstLastNFinalize<(AccumulatorFirstLastN::Sense)1>(ArityType arity);
 
 namespace {
-std::tuple<value::Array*, value::ArrayMultiSet*, int32_t> addToSetState(value::TypeTags stateTag,
-                                                                        value::Value stateVal) {
+std::tuple<value::Array*, value::ArrayMultiSet*, int32_t> setOperatorCommonState(
+    value::TypeTags stateTag, value::Value stateVal) {
     tassert(8124900, "state should be of type Array", stateTag == value::TypeTags::Array);
     auto stateArr = value::getArrayView(stateVal);
     tassert(8124901,
@@ -2907,7 +2907,7 @@ std::tuple<value::Array*, value::ArrayMultiSet*, int32_t> addToSetState(value::T
     return {stateArr, accMultiSet, value::bitcastTo<int32_t>(accMultiSetSizeVal)};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> aggRemovableAddToSetInitImpl(
+FastTuple<bool, value::TypeTags, value::Value> aggRemovableSetCommonInitImpl(
     CollatorInterface* collator) {
     auto [stateTag, stateVal] = value::makeNewArray();
     value::ValueGuard stateGuard{stateTag, stateVal};
@@ -2924,17 +2924,17 @@ FastTuple<bool, value::TypeTags, value::Value> aggRemovableAddToSetInitImpl(
 }
 }  // namespace
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddToSetInit(
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSetCommonInit(
     ArityType arity) {
-    return aggRemovableAddToSetInitImpl(nullptr /* collator */);
+    return aggRemovableSetCommonInitImpl(nullptr /* collator */);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddToSetCollInit(
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSetCommonCollInit(
     ArityType arity) {
     auto [collatorOwned, collatorTag, collatorVal] = getFromStack(0);
     tassert(8124904, "expected value of type 'collator'", collatorTag == value::TypeTags::collator);
 
-    return aggRemovableAddToSetInitImpl(value::getCollatorView(collatorVal));
+    return aggRemovableSetCommonInitImpl(value::getCollatorView(collatorVal));
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddToSetAdd(
@@ -2949,7 +2949,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddT
             sizeCapTag == value::TypeTags::NumberInt32);
     auto capSize = value::bitcastTo<int32_t>(sizeCapVal);
 
-    auto [stateArr, accMultiSet, accMultiSetSize] = addToSetState(stateTag, stateVal);
+    auto [stateArr, accMultiSet, accMultiSetSize] = setOperatorCommonState(stateTag, stateVal);
 
     // Check the size of the accumulator will not exceed the cap.
     int32_t newElSize = value::getApproximateSize(newElTag, newElVal);
@@ -2981,7 +2981,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddT
     auto [elTag, elVal] = moveOwnedFromStack(1);
     value::ValueGuard elGuard{elTag, elVal};
 
-    auto [stateArr, accMultiSet, accMultiSetSize] = addToSetState(stateTag, stateVal);
+    auto [stateArr, accMultiSet, accMultiSetSize] = setOperatorCommonState(stateTag, stateVal);
 
     int32_t elSize = value::getApproximateSize(elTag, elVal);
     invariant(elSize <= accMultiSetSize);
@@ -2994,11 +2994,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddT
     return {true, stateTag, stateVal};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddToSetFinalize(
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSetCommonFinalize(
     ArityType arity) {
     auto [stateOwned, stateTag, stateVal] = getFromStack(0);
 
-    auto [stateArr, accMultiSet, _] = addToSetState(stateTag, stateVal);
+    auto [stateArr, accMultiSet, _] = setOperatorCommonState(stateTag, stateVal);
 
     // Convert the multiSet to Set.
     auto [accSetTag, accSetVal] = value::makeNewArraySet(accMultiSet->getCollator());
@@ -3010,6 +3010,98 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddT
     }
     resGuard.reset();
     return {true, accSetTag, accSetVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSetUnionAdd(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [newElTag, newElVal] = moveOwnedFromStack(1);
+    value::ValueGuard newElGuard{newElTag, newElVal};
+    auto [sizeCapOwned, sizeCapTag, sizeCapVal] = getFromStack(2);
+    tassert(9475901,
+            "The size cap must be of type NumberInt32",
+            sizeCapTag == value::TypeTags::NumberInt32);
+    auto capSize = value::bitcastTo<int32_t>(sizeCapVal);
+    auto [stateArr, accMultiSet, accMultiSetSize] = setOperatorCommonState(stateTag, stateVal);
+
+    // If the field resolves to Nothing (e.g. if it is missing in the document), then we want to
+    // leave the current state as is.
+    if (newElTag == value::TypeTags::Nothing) {
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
+
+    value::arrayForEach<true>(
+        newElTag,
+        newElVal,
+        // We do an initialization capture because clang fails when trying to capture a structured
+        // binding in a lambda expression.
+        [&accMultiSet = accMultiSet, &accMultiSetSize = accMultiSetSize, &capSize = capSize](
+            value::TypeTags elemTag, value::Value elemVal) {
+            // Check that the size of the accumulator will not exceed the cap.
+            auto elemSize = value::getApproximateSize(elemTag, elemVal);
+            if (accMultiSetSize + elemSize >= capSize) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "Used too much memory for a single set. Memory limit: " << capSize
+                              << " bytes. The set contains " << accMultiSet->size()
+                              << " elements and is of size " << accMultiSetSize
+                              << " bytes. The element being added has size " << elemSize
+                              << " bytes.");
+            }
+
+            // Update the state
+            accMultiSet->push_back(elemTag, elemVal);
+            accMultiSetSize += elemSize;
+        });
+
+    // Update the window field with the new total size.
+    stateArr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                    value::TypeTags::NumberInt32,
+                    value::bitcastFrom<int32_t>(accMultiSetSize));
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSetUnionRemove(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [elTag, elVal] = moveOwnedFromStack(1);
+    value::ValueGuard elGuard{elTag, elVal};
+    auto [stateArr, accMultiSet, accMultiSetSize] = setOperatorCommonState(stateTag, stateVal);
+
+    // If the field resolves to Nothing (e.g. if it is missing in the document), then we want to
+    // leave the current state as is.
+    if (elTag == value::TypeTags::Nothing) {
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
+
+    value::arrayForEach(elTag,
+                        elVal,
+                        // We do an initialization capture because clang fails when trying to
+                        // capture a structured binding in a lambda expression.
+                        [&accMultiSet = accMultiSet, &accMultiSetSize = accMultiSetSize](
+                            value::TypeTags elemBeingRemovedTag, value::Value elemBeingRemovedVal) {
+                            auto elemSize =
+                                value::getApproximateSize(elemBeingRemovedTag, elemBeingRemovedVal);
+                            invariant(elemSize <= accMultiSetSize);
+                            tassert(9475902,
+                                    "Can't remove a value that is not contained in the window",
+                                    accMultiSet->remove(elemBeingRemovedTag, elemBeingRemovedVal));
+                            accMultiSetSize -= elemSize;
+                        });
+
+    // Update the window field with the new total size.
+    stateArr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                    value::TypeTags::NumberInt32,
+                    value::bitcastFrom<int32_t>(accMultiSetSize));
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
 }
 
 namespace {

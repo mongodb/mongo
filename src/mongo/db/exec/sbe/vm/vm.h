@@ -1098,13 +1098,17 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillCanAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillFinalize(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetInit(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetCollInit(
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableSetCommonInit(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableSetCommonCollInit(
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetRemove(
         ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetFinalize(
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableSetUnionAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableSetUnionRemove(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableSetCommonFinalize(
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> aggRemovableMinMaxNInitImpl(
         CollatorInterface* collator);

@@ -497,16 +497,16 @@ SbExpr buildWindowFinalizeLastN(const WindowOp& op, StageBuilderState& state, Sb
     return b.makeFunction("aggRemovableLastNFinalize", slots[0]);
 }
 
-SbExpr::Vector buildWindowInitializeAddToSet(const WindowOp& op, StageBuilderState& state) {
+SbExpr::Vector buildWindowInitializeSetCommon(const WindowOp& op, StageBuilderState& state) {
     SbExprBuilder b(state);
     auto collatorSlot = state.getCollatorSlot();
 
     SbExpr::Vector exprs;
 
     if (collatorSlot) {
-        exprs.push_back(b.makeFunction("aggRemovableAddToSetCollInit", SbSlot{*collatorSlot}));
+        exprs.push_back(b.makeFunction("aggRemovableSetCommonCollInit", SbSlot{*collatorSlot}));
     } else {
-        exprs.push_back(b.makeFunction("aggRemovableAddToSetInit"));
+        exprs.push_back(b.makeFunction("aggRemovableSetCommonInit"));
     }
     return exprs;
 }
@@ -529,16 +529,53 @@ SbExpr::Vector buildWindowRemoveAddToSet(const WindowOp& op,
         b.makeFunction("aggRemovableAddToSetRemove", std::move(inputs->inputExpr)));
 }
 
-SbExpr buildWindowFinalizeAddToSet(const WindowOp& op,
-                                   StageBuilderState& state,
-                                   SbSlotVector slots) {
+SbExpr buildWindowFinalizeSetCommon(const WindowOp& op,
+                                    StageBuilderState& state,
+                                    SbSlotVector slots) {
     SbExprBuilder b(state);
 
     SbExpr::Vector exprs;
     for (auto slot : slots) {
         exprs.push_back(slot);
     }
-    return b.makeFunction("aggRemovableAddToSetFinalize", std::move(exprs));
+    return b.makeFunction("aggRemovableSetCommonFinalize", std::move(exprs));
+}
+
+SbExpr::Vector buildWindowAddSetUnion(const WindowOp& op,
+                                      std::unique_ptr<AddSingleInput> inputs,
+                                      StageBuilderState& state) {
+    SbExprBuilder b(state);
+
+    auto frameId = state.frameId();
+    auto argValue = SbLocalVar{frameId, 0};
+    auto expr = b.makeIf(
+        b.makeFunction("isArray", argValue),
+        argValue,
+        b.makeFail(ErrorCodes::TypeMismatch, "Expected new value for $setUnion to be an array"_sd));
+    auto argWithTypeCheck =
+        b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
+
+    const int cap = internalQueryMaxSetUnionBytes.load();
+    return SbExpr::makeSeq(b.makeFunction(
+        "aggRemovableSetUnionAdd", std::move(argWithTypeCheck), b.makeInt32Constant(cap)));
+}
+
+SbExpr::Vector buildWindowRemoveSetUnion(const WindowOp& op,
+                                         std::unique_ptr<AddSingleInput> inputs,
+                                         StageBuilderState& state) {
+    SbExprBuilder b(state);
+
+    auto frameId = state.frameId();
+    auto argValue = SbLocalVar{frameId, 0};
+    auto expr = b.makeIf(
+        b.makeFunction("isArray", argValue),
+        argValue,
+        b.makeFail(ErrorCodes::TypeMismatch, "Expected new value for $setUnion to be an array"_sd));
+    auto argWithTypeCheck =
+        b.makeLet(frameId, SbExpr::makeSeq(std::move(inputs->inputExpr)), std::move(expr));
+
+    return SbExpr::makeSeq(
+        b.makeFunction("aggRemovableSetUnionRemove", std::move(argWithTypeCheck)));
 }
 
 SbExpr::Vector buildWindowInitializeMinMax(const WindowOp& op, StageBuilderState& state) {
@@ -736,8 +773,8 @@ static const StringDataMap<WindowOpInfo> windowOpInfoMap = {
     {AccumulatorAddToSet::kName,
      WindowOpInfo{.buildAddAggs = makeBuildFn(&buildWindowAddAddToSet),
                   .buildRemoveAggs = makeBuildFn(&buildWindowRemoveAddToSet),
-                  .buildInit = makeBuildFn(&buildWindowInitializeAddToSet),
-                  .buildFinalize = makeBuildFn(&buildWindowFinalizeAddToSet)}},
+                  .buildInit = makeBuildFn(&buildWindowInitializeSetCommon),
+                  .buildFinalize = makeBuildFn(&buildWindowFinalizeSetCommon)}},
 
     // Avg
     {AccumulatorAvg::kName,
@@ -845,6 +882,13 @@ static const StringDataMap<WindowOpInfo> windowOpInfoMap = {
      WindowOpInfo{.buildAddAggs = makeBuildFn(&buildWindowAddPush),
                   .buildRemoveAggs = makeBuildFn(&buildWindowRemovePush),
                   .buildFinalize = makeBuildFn(&buildWindowFinalizePush)}},
+
+    // SetUnion
+    {AccumulatorSetUnion::kName,
+     WindowOpInfo{.buildAddAggs = makeBuildFn(&buildWindowAddSetUnion),
+                  .buildRemoveAggs = makeBuildFn(&buildWindowRemoveSetUnion),
+                  .buildInit = makeBuildFn(&buildWindowInitializeSetCommon),
+                  .buildFinalize = makeBuildFn(&buildWindowFinalizeSetCommon)}},
 
     // Shift
     {"$shift",

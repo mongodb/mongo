@@ -475,16 +475,20 @@ std::string builtinToString(Builtin b) {
             return "aggLinearFillAdd";
         case Builtin::aggLinearFillFinalize:
             return "aggLinearFillFinalize";
-        case Builtin::aggRemovableAddToSetInit:
-            return "aggRemovableAddToSetInit";
-        case Builtin::aggRemovableAddToSetCollInit:
-            return "aggRemovableAddToSetCollInit";
+        case Builtin::aggRemovableSetCommonInit:
+            return "aggRemovableSetCommonInit";
+        case Builtin::aggRemovableSetCommonCollInit:
+            return "aggRemovableSetCommonCollInit";
         case Builtin::aggRemovableAddToSetAdd:
             return "aggRemovableAddToSetAdd";
         case Builtin::aggRemovableAddToSetRemove:
             return "aggRemovableAddToSetRemove";
-        case Builtin::aggRemovableAddToSetFinalize:
-            return "aggRemovableAddToSetFinalize";
+        case Builtin::aggRemovableSetUnionAdd:
+            return "aggRemovableSetUnionAdd";
+        case Builtin::aggRemovableSetUnionRemove:
+            return "aggRemovableSetUnionRemove";
+        case Builtin::aggRemovableSetCommonFinalize:
+            return "aggRemovableSetCommonFinalize";
         case Builtin::aggRemovableMinMaxNCollInit:
             return "aggRemovableMinMaxNCollInit";
         case Builtin::aggRemovableMinMaxNInit:
@@ -1052,16 +1056,20 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggFirstLastNRemove(arity);
         case Builtin::aggRemovableLastNFinalize:
             return builtinAggFirstLastNFinalize<AccumulatorFirstLastN::Sense::kLast>(arity);
-        case Builtin::aggRemovableAddToSetInit:
-            return builtinAggRemovableAddToSetInit(arity);
-        case Builtin::aggRemovableAddToSetCollInit:
-            return builtinAggRemovableAddToSetCollInit(arity);
+        case Builtin::aggRemovableSetCommonInit:
+            return builtinAggRemovableSetCommonInit(arity);
+        case Builtin::aggRemovableSetCommonCollInit:
+            return builtinAggRemovableSetCommonCollInit(arity);
         case Builtin::aggRemovableAddToSetAdd:
             return builtinAggRemovableAddToSetAdd(arity);
         case Builtin::aggRemovableAddToSetRemove:
             return builtinAggRemovableAddToSetRemove(arity);
-        case Builtin::aggRemovableAddToSetFinalize:
-            return builtinAggRemovableAddToSetFinalize(arity);
+        case Builtin::aggRemovableSetUnionAdd:
+            return builtinAggRemovableSetUnionAdd(arity);
+        case Builtin::aggRemovableSetUnionRemove:
+            return builtinAggRemovableSetUnionRemove(arity);
+        case Builtin::aggRemovableSetCommonFinalize:
+            return builtinAggRemovableSetCommonFinalize(arity);
         case Builtin::aggRemovableMinMaxNCollInit:
             return builtinAggRemovableMinMaxNCollInit(arity);
         case Builtin::aggRemovableMinMaxNInit:

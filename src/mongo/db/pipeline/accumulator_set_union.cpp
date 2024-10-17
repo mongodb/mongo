@@ -39,8 +39,8 @@ REGISTER_UNSTABLE_ACCUMULATOR_WITH_FEATURE_FLAG(
 
 REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
     setUnion,
-    (mongo::window_function::genericParseSBEUnsupportedExpressionRemovable<AccumulatorSetUnion,
-                                                                           WindowFunctionSetUnion>),
+    (mongo::window_function::ExpressionRemovable<AccumulatorSetUnion,
+                                                 WindowFunctionSetUnion>::parse),
     feature_flags::gFeatureFlagArrayAccumulators,
     AllowedWithApiStrict::kNeverInVersion1);
 
