@@ -431,12 +431,22 @@ tasks:
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - func: "f_expansions_write"
+      - command: github.generate_token
+        params:
+          owner: 10gen
+          repo: coredb-patchbuild-optimizer
+          expansion_name: github_token
+          permissions:
+            metadata: read
+            contents: read
       - command: subprocess.exec
         type: test
         params:
           binary: bash
           args:
             - "src/evergreen/gen_patch_test_tags.sh"
+          include_expansions_in_env:
+            - "github_token"
 
   - name: generate_buildid_to_debug_symbols_mapping
     tags:
