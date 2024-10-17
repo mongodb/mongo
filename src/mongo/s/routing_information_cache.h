@@ -52,8 +52,6 @@ public:
     static RoutingInformationCache* get(ServiceContext* serviceCtx);
 
     static RoutingInformationCache* get(OperationContext* opCtx);
-
-    void shutDownAndJoin();
 };
 
 }  // namespace mongo

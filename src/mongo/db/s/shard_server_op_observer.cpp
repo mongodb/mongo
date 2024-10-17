@@ -56,6 +56,7 @@
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
@@ -76,7 +77,6 @@
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/sharding_state.h"
@@ -103,7 +103,8 @@ public:
         invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(_nss, MODE_IX));
         invariant(commitTime, "Invalid commit time");
 
-        CatalogCacheLoader::get(opCtx).notifyOfCollectionRefreshEndMarkerSeen(_nss, *commitTime);
+        FilteringMetadataCache::get(opCtx)->notifyOfCollectionRefreshEndMarkerSeen(_nss,
+                                                                                   *commitTime);
 
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
@@ -942,7 +943,7 @@ void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
                         return nss == NamespaceString::kShardConfigCollectionsNamespace ||
                             nss.isConfigDotCacheDotChunks();
                     })) {
-        CatalogCacheLoader::get(opCtx).onReplicationRollback();
+        FilteringMetadataCache::get(opCtx)->onReplicationRollback();
     }
 }
 

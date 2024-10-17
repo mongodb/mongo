@@ -254,7 +254,6 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query_analysis_client.h"
@@ -1946,8 +1945,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         validator->shutDown();
     }
 
-    // The migrationutil executor must be shut down before shutting down the CatalogCacheLoader and
-    // the ExecutorPool. Otherwise, it may try to schedule work on those components and fail.
+    // The migrationutil executor must be shut down before shutting down the CatalogCache and the
+    // ExecutorPool. Otherwise, it may try to schedule work on those components and fail.
     LOGV2_OPTIONS(4784921, {LogComponent::kSharding}, "Shutting down the MigrationUtilExecutor");
     auto migrationUtilExecutor = migrationutil::getMigrationUtilExecutor(serviceContext);
     {
@@ -1972,17 +1971,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 
     if (Grid::get(serviceContext)->isShardingInitialized()) {
-        // The CatalogCache must be shuted down before shutting down the CatalogCacheLoader as the
-        // CatalogCache may try to schedule work on CatalogCacheLoader and fail.
-        TimeElapsedBuilderScopedTimer scopedTimer(
-            serviceContext->getFastClockSource(),
-            "Shut down the catalog cache and catalog cache loader",
-            &shutdownTimeElapsedBuilder);
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Shut down the catalog cache",
+                                                  &shutdownTimeElapsedBuilder);
         LOGV2_OPTIONS(6773201, {LogComponent::kSharding}, "Shutting down the CatalogCache");
         Grid::get(serviceContext)->catalogCache()->shutDownAndJoin();
-
-        LOGV2_OPTIONS(4784922, {LogComponent::kSharding}, "Shutting down the CatalogCacheLoader");
-        CatalogCacheLoader::get(serviceContext).shutDown();
     }
 
     if (auto configServerRoutingInfoCache = RoutingInformationCache::get(serviceContext)) {

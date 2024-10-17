@@ -156,7 +156,7 @@ void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(
     // CollectionShardingRuntime (Note also that this code is indirectly used to notify to secondary
     // nodes to clear their filtering information).
     FilteringMetadataCache::get(opCtx)->forceShardFilteringMetadataRefresh(opCtx, nss());
-    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss());
+    FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss());
 
     // Ensures the refresh of the catalog cache will be waited majority at the end of the
     // command

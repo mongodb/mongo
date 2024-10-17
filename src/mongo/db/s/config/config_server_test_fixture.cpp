@@ -56,6 +56,7 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -72,7 +73,6 @@
 #include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/config_shard_wrapper.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
@@ -127,11 +127,15 @@ void ConfigServerTestFixture::setUp() {
 
     _addShardNetworkTestEnv =
         std::make_unique<NetworkTestEnv>(_executorForAddShard, _mockNetworkForAddShard);
-    auto configServerCatalogCacheLoader = std::make_unique<ConfigServerCatalogCacheLoader>();
-    CatalogCacheLoader::set(getServiceContext(), std::move(configServerCatalogCacheLoader));
+
+    auto loader = std::make_shared<ShardServerCatalogCacheLoader>(
+        std::make_unique<ConfigServerCatalogCacheLoader>());
+    auto catalogCache = std::make_unique<CatalogCache>(getServiceContext(), loader);
+
     RoutingInformationCache::set(getServiceContext());
 
-    uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
+    uassertStatusOK(initializeGlobalShardingStateForMongodForTest(
+        ConnectionString::forLocal(), std::move(catalogCache), std::move(loader)));
 
     auto shardLocal = Grid::get(getServiceContext())->shardRegistry()->createLocalConfigShard();
     ASSERT_EQ(typeid(*shardLocal).name(), typeid(ConfigShardWrapper).name());

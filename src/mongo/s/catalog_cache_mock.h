@@ -53,7 +53,7 @@ class CatalogCacheMock final : public CatalogCache {
     CatalogCacheMock& operator=(const CatalogCacheMock&) = delete;
 
 public:
-    CatalogCacheMock(ServiceContext* context, CatalogCacheLoaderMock& loader);
+    CatalogCacheMock(ServiceContext* context, std::shared_ptr<CatalogCacheLoaderMock> loader);
     ~CatalogCacheMock() override = default;
 
     StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx,

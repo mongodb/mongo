@@ -176,7 +176,7 @@ public:
         // Wait for the ShardServerCatalogCacheLoader to finish flushing the metadata to the
         // storage. This is not required for correctness, but helps mitigate stalls on secondaries
         // when a shard receives the first chunk for a collection with a large routing table.
-        CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
+        FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
         uassertStatusOK(MigrationDestinationManager::get(opCtx)->start(

@@ -195,12 +195,11 @@ ShardingTestFixture::ShardingTestFixture(
 
     auto catalogCache = [&]() -> std::unique_ptr<CatalogCache> {
         if (withMockCatalogCache) {
-            auto catalogCacheLoader = std::make_unique<CatalogCacheLoaderMock>();
-            CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
-            return std::make_unique<CatalogCacheMock>(getServiceContext(), *catalogCacheLoader);
+            return std::make_unique<CatalogCacheMock>(service,
+                                                      std::make_shared<CatalogCacheLoaderMock>());
         } else {
-            CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
-            return std::make_unique<CatalogCache>(service, CatalogCacheLoader::get(service));
+            return std::make_unique<CatalogCache>(
+                service, std::make_shared<ConfigServerCatalogCacheLoader>());
         }
     }();
 

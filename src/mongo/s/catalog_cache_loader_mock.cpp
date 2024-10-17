@@ -54,39 +54,7 @@ const Status CatalogCacheLoaderMock::kChunksInternalErrorStatus = {
 const Status CatalogCacheLoaderMock::kDatabaseInternalErrorStatus = {
     ErrorCodes::InternalError, "Mocked catalog cache loader received unexpected database request"};
 
-
-void CatalogCacheLoaderMock::initializeReplicaSetRole(bool isPrimary) {
-    MONGO_UNREACHABLE;
-}
-
-void CatalogCacheLoaderMock::onStepDown() {
-    MONGO_UNREACHABLE;
-}
-
-void CatalogCacheLoaderMock::onStepUp() {
-    MONGO_UNREACHABLE;
-}
-
-void CatalogCacheLoaderMock::onReplicationRollback() {
-    MONGO_UNREACHABLE;
-}
-
 void CatalogCacheLoaderMock::shutDown() {}
-
-void CatalogCacheLoaderMock::notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
-                                                                    const Timestamp& commitTime) {
-    MONGO_UNREACHABLE;
-}
-
-void CatalogCacheLoaderMock::waitForCollectionFlush(OperationContext* opCtx,
-                                                    const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
-}
-
-void CatalogCacheLoaderMock::waitForDatabaseFlush(OperationContext* opCtx,
-                                                  const DatabaseName& dbName) {
-    MONGO_UNREACHABLE;
-}
 
 CollectionAndChangedChunks getCollectionRefresh(
     const StatusWith<CollectionType>& swCollectionReturnValue,

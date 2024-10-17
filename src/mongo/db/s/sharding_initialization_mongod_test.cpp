@@ -58,7 +58,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
@@ -80,16 +79,17 @@ protected:
     void setUp() override {
         ShardingMongoDTestFixture::setUp();
 
-        CatalogCacheLoader::set(getServiceContext(),
-                                std::make_unique<ShardServerCatalogCacheLoader>(
-                                    std::make_unique<ConfigServerCatalogCacheLoader>()));
-
         ShardingInitializationMongoD::get(getServiceContext())
             ->setGlobalInitMethodForTest(
                 [&](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
                     const auto& configConnStr = shardIdentity.getConfigsvrConnectionString();
 
-                    uassertStatusOK(initializeGlobalShardingStateForMongodForTest(configConnStr));
+                    auto loader = std::make_shared<ShardServerCatalogCacheLoader>(
+                        std::make_unique<ConfigServerCatalogCacheLoader>());
+                    auto catalogCache =
+                        std::make_unique<CatalogCache>(opCtx->getServiceContext(), loader);
+                    uassertStatusOK(initializeGlobalShardingStateForMongodForTest(
+                        configConnStr, std::move(catalogCache), std::move(loader)));
 
                     // Set the ConnectionString return value on the mock targeter so that later
                     // calls to the targeter's getConnString() return the appropriate value

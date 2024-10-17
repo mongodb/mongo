@@ -52,7 +52,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
@@ -171,7 +170,7 @@ public:
                 uasserted(8454802, "config server is not storing cached metadata");
             }
 
-            CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, ns());
+            FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, ns());
 
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }

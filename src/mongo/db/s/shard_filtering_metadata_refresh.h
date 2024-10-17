@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
@@ -49,11 +50,56 @@ namespace mongo {
  */
 class FilteringMetadataCache {
 public:
-    static void init(ServiceContext* serviceCtx);
+    FilteringMetadataCache() = default;
+
+    static void init(ServiceContext* serviceCtx,
+                     std::shared_ptr<CatalogCacheLoader> loader,
+                     bool isPrimary);
+    static void initForTesting(ServiceContext* serviceCtx,
+                               std::shared_ptr<CatalogCacheLoader> loader);
 
     static FilteringMetadataCache* get(ServiceContext* serviceCtx);
 
     static FilteringMetadataCache* get(OperationContext* opCtx);
+
+    /**
+     * Updates internal state so that the loader can start behaving like a secondary.
+     */
+    void onStepDown();
+
+    /**
+     * Updates internal state so that the loader can start behaving like a primary.
+     */
+    void onStepUp();
+
+    /**
+     * Interrupts ongoing refreshes to prevent secondaries from waiting for opTimes from wrong terms
+     * in case of rollback. Primaries must step down before going through rollback, so this should
+     * only be run on secondaries.
+     */
+    void onReplicationRollback();
+
+    /**
+     * Sets any notifications waiting for this version to arrive and invalidates the catalog cache's
+     * chunk metadata for collection 'nss' so that the next caller provokes a refresh.
+     */
+    void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
+                                                const Timestamp& commitTime);
+
+    /**
+     * Waits for any pending changes for the specified database or collection to be persisted
+     * locally (not necessarily majority replicated). If newer changes come after this method has
+     * started running, they will not be waited for except if there is a drop.
+     *
+     * May throw if the node steps down from primary or if the operation time is exceeded or due to
+     * any other error condition.
+     *
+     * If the specific loader implementation does not support persistence, these methods are
+     * undefined and must fassert.
+     */
+    void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss);
+
+    void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName);
 
     /**
      * Must be invoked whenever code, which is executing on a shard encounters a StaleConfig error
@@ -133,6 +179,8 @@ private:
         const NamespaceString& nss,
         bool runRecover,
         CancellationToken cancellationToken);
+
+    std::shared_ptr<CatalogCacheLoader> _loader = nullptr;
 };
 
 }  // namespace mongo

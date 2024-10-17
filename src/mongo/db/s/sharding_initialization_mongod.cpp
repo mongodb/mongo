@@ -376,9 +376,25 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
 
     globalConnPool.addHook(new ShardingConnectionHook(makeShardingEgressHooksList(service)));
 
-    auto catalogCache = std::make_unique<CatalogCache>(service, CatalogCacheLoader::get(opCtx));
+    auto catalogCacheLoader = [&]() -> std::shared_ptr<CatalogCacheLoader> {
+        if (storageGlobalParams.queryableBackupMode) {
+            return std::make_shared<ReadOnlyCatalogCacheLoader>();
+        } else {
+            return std::make_shared<ShardServerCatalogCacheLoader>(
+                std::make_unique<ConfigServerCatalogCacheLoader>());
+        }
+    }();
+    auto catalogCache = std::make_unique<CatalogCache>(service, catalogCacheLoader);
 
-    FilteringMetadataCache::init(service);
+    bool isStandaloneOrPrimary = [&]() {
+        // This is only called in startup when there shouldn't be replication state changes, but to
+        // be safe we take the RSTL anyway.
+        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        bool isReplSet = replCoord->getSettings().isReplSet();
+        return !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
+    }();
+    FilteringMetadataCache::init(service, catalogCacheLoader, isStandaloneOrPrimary);
 
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.
@@ -426,6 +442,8 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
  * depend on persisted state.
  */
 void _initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+
     if (Grid::get(opCtx)->isShardingInitialized()) {
         return;
     }
@@ -438,24 +456,6 @@ void _initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
         return boost::none;
     }();
 
-    // TODO SERVER-84243 replace the block below with the initialisation of the filtering metadata
-    // cache.
-    {
-        CatalogCacheLoader::set(service,
-                                std::make_unique<ShardServerCatalogCacheLoader>(
-                                    std::make_unique<ConfigServerCatalogCacheLoader>()));
-
-        // This is only called in startup when there shouldn't be replication state changes, but
-        // to be safe we take the RSTL anyway.
-        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        bool isReplSet = replCoord->getSettings().isReplSet();
-        bool isStandaloneOrPrimary =
-            !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
-
-        CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
-    }
-
     // TODO SERVER-84243 replace the line below with the initialisation of the routing information
     // cache on the Grid.
     RoutingInformationCache::set(service);
@@ -464,17 +464,15 @@ void _initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
 
     ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(service);
 
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        // ShardLocal to use for explicitly local commands on the config server.
-        auto localConfigShard = Grid::get(opCtx)->shardRegistry()->createLocalConfigShard();
-        auto localCatalogClient = std::make_unique<ShardingCatalogClientImpl>(localConfigShard);
+    // ShardLocal to use for explicitly local commands on the config server.
+    auto localConfigShard = Grid::get(opCtx)->shardRegistry()->createLocalConfigShard();
+    auto localCatalogClient = std::make_unique<ShardingCatalogClientImpl>(localConfigShard);
 
-        ShardingCatalogManager::create(
-            service,
-            makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")),
-            std::move(localConfigShard),
-            std::move(localCatalogClient));
-    }
+    ShardingCatalogManager::create(
+        service,
+        makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")),
+        std::move(localConfigShard),
+        std::move(localCatalogClient));
 
     Grid::get(opCtx)->setShardingInitialized();
 }
@@ -694,24 +692,8 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
     OperationContext* opCtx, const ShardIdentity& shardIdentity) {
     auto const service = opCtx->getServiceContext();
 
-    // Determine primary/secondary/standalone state in order to properly initialize sharding
-    // components.
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool isReplSet = replCoord->getSettings().isReplSet();
-    bool isStandaloneOrPrimary =
-        !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
-
+    // A config server added as a shard would have already set this up at startup.
     if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        // A config server added as a shard would have already set this up at startup.
-        if (storageGlobalParams.queryableBackupMode) {
-            CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());
-        } else {
-            CatalogCacheLoader::set(service,
-                                    std::make_unique<ShardServerCatalogCacheLoader>(
-                                        std::make_unique<ConfigServerCatalogCacheLoader>()));
-        }
-
-        CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
         _initializeGlobalShardingState(opCtx, {shardIdentity.getConfigsvrConnectionString()});
 
         installReplicaSetChangeListener(service);
@@ -737,10 +719,18 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
             UserCacheInvalidator::start(service, opCtx);
         }
     }
+
     // Start reporting statistics from the router port uptime if opened.
     if (serverGlobalParams.routerPort) {
         RouterUptimeReporter::get(service).startPeriodicThread(service);
     }
+
+    // Determine primary/secondary/standalone state in order to properly initialize sharding
+    // components.
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool isReplSet = replCoord->getSettings().isReplSet();
+    bool isStandaloneOrPrimary =
+        !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
 
     // Start transaction coordinator service only if the node is the primary of a replica set.
     TransactionCoordinatorService::get(opCtx)->onShardingInitialization(

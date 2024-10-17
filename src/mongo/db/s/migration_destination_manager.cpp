@@ -117,7 +117,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -2070,7 +2069,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
     // placement version inclusive of the migration. NOTE: We rely on the
     // deleteMigrationRecipientRecoveryDocument call below to wait for the CatalogCache on-disk
     // persistence to be majority committed.
-    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, _nss);
+    FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, _nss);
 
     // Delete the recovery document
     migrationutil::deleteMigrationRecipientRecoveryDocument(opCtx, *_migrationId);

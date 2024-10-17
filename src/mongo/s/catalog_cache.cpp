@@ -259,7 +259,7 @@ bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other
 }
 
 CatalogCache::CatalogCache(ServiceContext* const service,
-                           CatalogCacheLoader& cacheLoader,
+                           std::shared_ptr<CatalogCacheLoader> cacheLoader,
                            StringData kind)
     : _kind(kind),
       _cacheLoader(cacheLoader),
@@ -283,8 +283,12 @@ CatalogCache::~CatalogCache() {
 }
 
 void CatalogCache::shutDownAndJoin() {
+    // The CatalogCache must be shuted down before shutting down the CatalogCacheLoader as the
+    // CatalogCache may try to schedule work on CatalogCacheLoader and fail.
     _executor.shutdown();
     _executor.join();
+
+    _cacheLoader->shutDown();
 }
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
@@ -836,7 +840,7 @@ void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
 
 CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
                                            ThreadPoolInterface& threadPool,
-                                           CatalogCacheLoader& catalogCacheLoader)
+                                           std::shared_ptr<CatalogCacheLoader> catalogCacheLoader)
     : ReadThroughCache(
           _mutex,
           service->getService(),
@@ -868,7 +872,7 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
 
     Timer t{};
     try {
-        auto newDb = _catalogCacheLoader.getDatabase(dbName).get();
+        auto newDb = _catalogCacheLoader->getDatabase(dbName).get();
         uassertStatusOKWithContext(
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, newDb.getPrimary()),
             str::stream() << "The primary shard for database " << dbName.toStringForErrorMsg()
@@ -898,9 +902,10 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
     }
 }
 
-CatalogCache::CollectionCache::CollectionCache(ServiceContext* service,
-                                               ThreadPoolInterface& threadPool,
-                                               CatalogCacheLoader& catalogCacheLoader)
+CatalogCache::CollectionCache::CollectionCache(
+    ServiceContext* service,
+    ThreadPoolInterface& threadPool,
+    std::shared_ptr<CatalogCacheLoader> catalogCacheLoader)
     : ReadThroughCache(
           _mutex,
           service->getService(),
@@ -984,7 +989,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                   "lookupSinceVersion"_attr = lookupVersion,
                                   "timeInStore"_attr = timeInStore);
 
-        auto collectionAndChunks = _catalogCacheLoader.getChunksSince(nss, lookupVersion).get();
+        auto collectionAndChunks = _catalogCacheLoader->getChunksSince(nss, lookupVersion).get();
 
         std::shared_ptr<RoutingTableHistory> newRoutingHistory = createUpdatedRoutingTableHistory(
             opCtx, nss, isIncremental, existingHistory, collectionAndChunks);

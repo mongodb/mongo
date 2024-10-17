@@ -38,19 +38,6 @@
 #include "mongo/util/decorable.h"
 
 namespace mongo {
-namespace {
-
-const auto getCatalogCacheLoader =
-    ServiceContext::declareDecoration<std::unique_ptr<CatalogCacheLoader>>();
-
-const auto catalogCacheLoaderDecorationRegisterer =
-    ServiceContext::ConstructorActionRegisterer{"CatalogCacheLoader",
-                                                [](ServiceContext* ctx) { /* Noop */ },
-                                                [](ServiceContext* ctx) {
-                                                    getCatalogCacheLoader(ctx) = nullptr;
-                                                }};
-
-}  // namespace
 
 CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks() = default;
 
@@ -81,24 +68,5 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
 CatalogCacheLoader::CatalogCacheLoader() = default;
 
 CatalogCacheLoader::~CatalogCacheLoader() = default;
-
-void CatalogCacheLoader::set(ServiceContext* serviceContext,
-                             std::unique_ptr<CatalogCacheLoader> loader) {
-    auto& catalogCacheLoader = getCatalogCacheLoader(serviceContext);
-    invariant(!catalogCacheLoader);
-
-    catalogCacheLoader = std::move(loader);
-}
-
-CatalogCacheLoader& CatalogCacheLoader::get(ServiceContext* serviceContext) {
-    auto& catalogCacheLoader = getCatalogCacheLoader(serviceContext);
-    invariant(catalogCacheLoader);
-
-    return *catalogCacheLoader;
-}
-
-CatalogCacheLoader& CatalogCacheLoader::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
-}
 
 }  // namespace mongo

@@ -79,17 +79,17 @@ public:
      * Initializes internal state so that the loader behaves as a primary or secondary. This can
      * only be called once, when the sharding state is initialized.
      */
-    void initializeReplicaSetRole(bool isPrimary) override;
+    void initializeReplicaSetRole(bool isPrimary);
 
     /**
      * Updates internal state so that the loader can start behaving like a secondary.
      */
-    void onStepDown() override;
+    void onStepDown();
 
     /**
      * Updates internal state so that the loader can start behaving like a primary.
      */
-    void onStepUp() override;
+    void onStepUp();
 
     void shutDown() override;
 
@@ -98,23 +98,34 @@ public:
      * in case of rollback. Primaries must step down before going through rollback, so this should
      * only be run on secondaries.
      */
-    void onReplicationRollback() override;
+    void onReplicationRollback();
 
     /**
      * Sets any notifications waiting for this version to arrive and invalidates the catalog cache's
      * chunk metadata for collection 'nss' so that the next caller provokes a refresh.
      */
     void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
-                                                const Timestamp& commitTime) override;
+                                                const Timestamp& commitTime);
 
     SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
                                                           ChunkVersion version) override;
 
     SemiFuture<DatabaseType> getDatabase(const DatabaseName& dbName) override;
 
-    void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
+    /**
+     * Waits for any pending changes for the specified database or collection to be persisted
+     * locally (not necessarily majority replicated). If newer changes come after this method has
+     * started running, they will not be waited for except if there is a drop.
+     *
+     * May throw if the node steps down from primary or if the operation time is exceeded or due to
+     * any other error condition.
+     *
+     * If the specific loader implementation does not support persistence, these methods are
+     * undefined and must fassert.
+     */
+    void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss);
 
-    void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) override;
+    void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName);
 
 private:
     // Differentiates the server's role in the replica set so that the chunk loader knows whether to

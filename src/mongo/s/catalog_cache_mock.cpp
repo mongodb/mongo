@@ -44,7 +44,8 @@
 
 namespace mongo {
 
-CatalogCacheMock::CatalogCacheMock(ServiceContext* serviceContext, CatalogCacheLoaderMock& loader)
+CatalogCacheMock::CatalogCacheMock(ServiceContext* serviceContext,
+                                   std::shared_ptr<CatalogCacheLoaderMock> loader)
     : CatalogCache(serviceContext, loader) {}
 
 StatusWith<CachedDatabaseInfo> CatalogCacheMock::getDatabase(OperationContext* opCtx,
@@ -100,9 +101,9 @@ void CatalogCacheMock::advanceCollectionTimeInStore(const NamespaceString& nss,
 }
 
 std::unique_ptr<CatalogCacheMock> CatalogCacheMock::make() {
-    auto catalogCacheLoader = std::make_unique<CatalogCacheLoaderMock>();
+    auto catalogCacheLoader = std::make_shared<CatalogCacheLoaderMock>();
     auto serviceContext = ServiceContext::make();
-    return std::make_unique<CatalogCacheMock>(serviceContext.get(), *catalogCacheLoader);
+    return std::make_unique<CatalogCacheMock>(serviceContext.get(), catalogCacheLoader);
 }
 
 CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoUntracked(

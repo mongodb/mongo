@@ -169,7 +169,9 @@ class CatalogCache {
     CatalogCache& operator=(const CatalogCache&) = delete;
 
 public:
-    CatalogCache(ServiceContext* service, CatalogCacheLoader& cacheLoader, StringData kind = ""_sd);
+    CatalogCache(ServiceContext* service,
+                 std::shared_ptr<CatalogCacheLoader> cacheLoader,
+                 StringData kind = ""_sd);
     virtual ~CatalogCache();
 
     /**
@@ -359,7 +361,7 @@ private:
     public:
         DatabaseCache(ServiceContext* service,
                       ThreadPoolInterface& threadPool,
-                      CatalogCacheLoader& catalogCacheLoader);
+                      std::shared_ptr<CatalogCacheLoader> catalogCacheLoader);
 
     private:
         LookupResult _lookupDatabase(OperationContext* opCtx,
@@ -367,7 +369,7 @@ private:
                                      const ValueHandle& dbType,
                                      const ComparableDatabaseVersion& previousDbVersion);
 
-        CatalogCacheLoader& _catalogCacheLoader;
+        std::shared_ptr<CatalogCacheLoader> _catalogCacheLoader;
         stdx::mutex _mutex;
     };
 
@@ -375,7 +377,7 @@ private:
     public:
         CollectionCache(ServiceContext* service,
                         ThreadPoolInterface& threadPool,
-                        CatalogCacheLoader& catalogCacheLoader);
+                        std::shared_ptr<CatalogCacheLoader> catalogCacheLoader);
 
         void reportStats(BSONObjBuilder* builder) const;
 
@@ -385,7 +387,7 @@ private:
                                        const ValueHandle& collectionHistory,
                                        const ComparableChunkVersion& previousChunkVersion);
 
-        CatalogCacheLoader& _catalogCacheLoader;
+        std::shared_ptr<CatalogCacheLoader> _catalogCacheLoader;
         stdx::mutex _mutex;
 
         struct Stats {
@@ -464,7 +466,7 @@ private:
     std::string _kind;
 
     // Interface from which chunks will be retrieved
-    CatalogCacheLoader& _cacheLoader;
+    std::shared_ptr<CatalogCacheLoader> _cacheLoader;
 
     // Executor on which the caches below will execute their blocking work
     ThreadPool _executor;

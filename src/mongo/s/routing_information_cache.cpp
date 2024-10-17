@@ -39,30 +39,20 @@ namespace {
 const auto getDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<RoutingInformationCache>>();
 
-
-boost::optional<ConfigServerCatalogCacheLoader> routingInfoCacheLoader;
-
-CatalogCacheLoader& buildCacheLoader() {
-    invariant(!routingInfoCacheLoader.has_value());
-    routingInfoCacheLoader.emplace();
-    return *routingInfoCacheLoader;
-}
-
 const auto decorationActionRegisterer = ServiceContext::ConstructorActionRegisterer(
     "RoutingInformationCache",
     [](ServiceContext* serviceCtx) {
         /* Noop; construction will be executed through the RoutingInformationCache::set() method */
     },
-    [](ServiceContext* serviceCtx) {
-        getDecoration(serviceCtx).reset();
-        routingInfoCacheLoader = boost::none;
-    });
+    [](ServiceContext* serviceCtx) { getDecoration(serviceCtx).reset(); });
 
 
 }  // namespace
 
 RoutingInformationCache::RoutingInformationCache(ServiceContext* serviceCtx)
-    : CatalogCache(serviceCtx, buildCacheLoader(), "ConfigServerRoutingInfo"_sd /*kind*/) {}
+    : CatalogCache(serviceCtx,
+                   std::make_shared<ConfigServerCatalogCacheLoader>(),
+                   "ConfigServerRoutingInfo"_sd /*kind*/) {}
 
 void RoutingInformationCache::set(ServiceContext* serviceCtx) {
     auto& decoration = getDecoration(serviceCtx);
@@ -76,11 +66,6 @@ RoutingInformationCache* RoutingInformationCache::get(ServiceContext* serviceCtx
 
 RoutingInformationCache* RoutingInformationCache::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
-}
-
-void RoutingInformationCache::shutDownAndJoin() {
-    static_cast<CatalogCache*>(this)->shutDownAndJoin();
-    routingInfoCacheLoader->shutDown();
 }
 
 }  // namespace mongo

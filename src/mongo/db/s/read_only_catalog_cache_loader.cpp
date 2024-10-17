@@ -38,16 +38,6 @@ ReadOnlyCatalogCacheLoader::~ReadOnlyCatalogCacheLoader() {
     shutDown();
 }
 
-void ReadOnlyCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
-                                                        const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
-}
-
-void ReadOnlyCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx,
-                                                      const DatabaseName& dbName) {
-    MONGO_UNREACHABLE;
-}
-
 void ReadOnlyCatalogCacheLoader::shutDown() {
     _configServerLoader.shutDown();
 }

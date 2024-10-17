@@ -46,20 +46,8 @@ class ConfigServerCatalogCacheLoader final : public CatalogCacheLoader {
 public:
     ConfigServerCatalogCacheLoader();
     ~ConfigServerCatalogCacheLoader() override = default;
-    ;
 
-    /**
-     * These functions should never be called. They trigger invariants if called.
-     */
-    void initializeReplicaSetRole(bool isPrimary) override;
-    void onStepDown() override;
-    void onStepUp() override;
-    void onReplicationRollback() override;
     void shutDown() override;
-    void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
-                                                const Timestamp& commitTime) override;
-    void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
-    void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) override;
 
     SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
                                                           ChunkVersion version) override;

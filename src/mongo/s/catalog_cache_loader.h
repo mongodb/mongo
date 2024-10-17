@@ -62,15 +62,6 @@ public:
     virtual ~CatalogCacheLoader();
 
     /**
-     * Stores a loader on the specified service context. May only be called once for the lifetime of
-     * the service context.
-     */
-    static void set(ServiceContext* serviceContext, std::unique_ptr<CatalogCacheLoader> loader);
-
-    static CatalogCacheLoader& get(ServiceContext* serviceContext);
-    static CatalogCacheLoader& get(OperationContext* opCtx);
-
-    /**
      * Used as a return value for getChunksSince.
      */
     struct CollectionAndChangedChunks {
@@ -118,38 +109,10 @@ public:
         std::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>;
 
     /**
-     * Initializes internal state. Must be called only once when sharding state is initialized.
-     */
-    virtual void initializeReplicaSetRole(bool isPrimary) = 0;
-
-    /**
-     * Changes internal state on step down.
-     */
-    virtual void onStepDown() = 0;
-
-    /**
-     * Changes internal state on step up.
-     */
-    virtual void onStepUp() = 0;
-
-    /**
-     * Interrupts ongoing refreshes on rollback.
-     */
-    virtual void onReplicationRollback() = 0;
-
-    /**
      * Transitions into shut down and cleans up state. Once this transitions to shut down, should
      * not be able to transition back to normal. Should be safe to be called more than once.
      */
     virtual void shutDown() = 0;
-
-    /**
-     * Notifies the loader that the persisted collection placement version for 'nss' has been
-     * updated. `commitTime` represents the commit time of the update to config.collections for
-     * `nss` setting the refreshing flag to false.
-     */
-    virtual void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
-                                                        const Timestamp& commitTime) = 0;
 
     /**
      * Non-blocking call, which returns the chunks changed since the specified version to be
@@ -169,21 +132,6 @@ public:
      * shutdown), throws a DBException.
      */
     virtual SemiFuture<DatabaseType> getDatabase(const DatabaseName& dbName) = 0;
-
-    /**
-     * Waits for any pending changes for the specified database or collection to be persisted
-     * locally (not necessarily majority replicated). If newer changes come after this method has
-     * started running, they will not be waited for except if there is a drop.
-     *
-     * May throw if the node steps down from primary or if the operation time is exceeded or due to
-     * any other error condition.
-     *
-     * If the specific loader implementation does not support persistence, these methods are
-     * undefined and must fassert.
-     */
-    virtual void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) = 0;
-
-    virtual void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
 protected:
     CatalogCacheLoader();

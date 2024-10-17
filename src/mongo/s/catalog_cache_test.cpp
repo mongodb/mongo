@@ -86,7 +86,7 @@ protected:
 
         // Setup catalogCache with mock loader
         _catalogCacheLoader = std::make_shared<CatalogCacheLoaderMock>();
-        _catalogCache = std::make_unique<CatalogCache>(getServiceContext(), *_catalogCacheLoader);
+        _catalogCache = std::make_unique<CatalogCache>(getServiceContext(), _catalogCacheLoader);
 
         // Populate the shardRegistry with the shards from kShards vector
         std::vector<std::tuple<ShardId, HostAndPort>> shardInfos;

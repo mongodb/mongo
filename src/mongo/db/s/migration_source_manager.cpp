@@ -91,7 +91,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
@@ -914,7 +913,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
                 // is possible that the persisted metadata is rolled back after step down, but the
                 // write which cleared the 'inMigration' flag is not, a secondary node will report
                 // itself at an older placement version.
-                CatalogCacheLoader::get(newOpCtx).waitForCollectionFlush(newOpCtx, nss());
+                FilteringMetadataCache::get(newOpCtx)->waitForCollectionFlush(newOpCtx, nss());
             }
             if (completeMigration) {
                 // This can be called on an exception path after the OperationContext has been

@@ -105,40 +105,9 @@ ConfigServerCatalogCacheLoader::ConfigServerCatalogCacheLoader()
     _executor->startup();
 }
 
-void ConfigServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
-    MONGO_UNREACHABLE;
-}
-
-void ConfigServerCatalogCacheLoader::onStepDown() {
-    MONGO_UNREACHABLE;
-}
-
-void ConfigServerCatalogCacheLoader::onStepUp() {
-    MONGO_UNREACHABLE;
-}
-
-void ConfigServerCatalogCacheLoader::onReplicationRollback() {
-    // no-op
-}
-
 void ConfigServerCatalogCacheLoader::shutDown() {
     _executor->shutdown();
     _executor->join();
-}
-
-void ConfigServerCatalogCacheLoader::notifyOfCollectionRefreshEndMarkerSeen(
-    const NamespaceString& nss, const Timestamp& commitTime) {
-    // no-op
-}
-
-void ConfigServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
-                                                            const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
-}
-
-void ConfigServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx,
-                                                          const DatabaseName& dbName) {
-    MONGO_UNREACHABLE;
 }
 
 SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunksSince(

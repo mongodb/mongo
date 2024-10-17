@@ -75,7 +75,6 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_state.h"
@@ -174,7 +173,7 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
     // code is indirectly used to notify to secondary nodes to clear their filtering information
     // once the data flushed to disk get replicated.
     FilteringMetadataCache::get(opCtx)->forceShardFilteringMetadataRefresh(opCtx, nss);
-    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
+    FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
 
     // Ensures the remove of range deletions and the refresh of the catalog cache will be waited for
     // majority at the end of the command

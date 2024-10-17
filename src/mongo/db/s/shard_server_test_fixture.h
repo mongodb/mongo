@@ -61,7 +61,12 @@ protected:
      * Sets the catalog cache loader for mocking. This must be called before the setUp function is
      * invoked.
      */
-    void setCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> loader);
+    void setCatalogCacheLoader(std::shared_ptr<CatalogCacheLoader> loader);
+
+    /**
+     * Sets the catalog cache for mocking. This must be called before the setUp function is invoked.
+     */
+    void setCatalogCache(std::unique_ptr<CatalogCache> cache);
 
     /**
      * Returns the mock targeter for the config server. Useful to use like so,
@@ -79,28 +84,28 @@ protected:
 
     service_context_test::ShardRoleOverride _shardRole;
 
-    std::unique_ptr<CatalogCacheLoader> _catalogCacheLoader;
+    std::shared_ptr<CatalogCacheLoader> _catalogCacheLoader;
+    std::unique_ptr<CatalogCache> _catalogCache;
 };
 
 class ShardServerTestFixtureWithCatalogCacheMock : public ShardServerTestFixture {
 protected:
     void setUp() override;
-    std::unique_ptr<CatalogCache> makeCatalogCache() override;
     CatalogCacheMock* getCatalogCacheMock();
-    CatalogCacheLoaderMock* getCatalogCacheLoaderMock();
+    std::shared_ptr<CatalogCacheLoaderMock> getCatalogCacheLoaderMock();
 
 private:
-    CatalogCacheLoaderMock* _cacheLoaderMock;
+    std::shared_ptr<CatalogCacheLoaderMock> _cacheLoaderMock;
 };
 
 class ShardServerTestFixtureWithCatalogCacheLoaderMock : public ShardServerTestFixture {
 protected:
     void setUp() override;
     CatalogCacheMock* getCatalogCacheMock();
-    CatalogCacheLoaderMock* getCatalogCacheLoaderMock();
+    std::shared_ptr<CatalogCacheLoaderMock> getCatalogCacheLoaderMock();
 
 private:
-    CatalogCacheLoaderMock* _cacheLoaderMock;
+    std::shared_ptr<CatalogCacheLoaderMock> _cacheLoaderMock;
 };
 
 }  // namespace mongo

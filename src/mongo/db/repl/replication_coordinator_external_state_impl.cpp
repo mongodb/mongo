@@ -99,6 +99,7 @@
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/sharding_util.h"
@@ -132,7 +133,6 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
@@ -1016,7 +1016,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
         }
 
         // TODO SERVER-84243: replace with cache for filtering metadata
-        CatalogCacheLoader::get(_service).onStepDown();
+        FilteringMetadataCache::get(_service)->onStepDown();
     }
     if (auto validator = LogicalTimeValidator::get(_service)) {
         auto opCtx = cc().getOperationContext();
@@ -1116,7 +1116,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
 
         // TODO SERVER-84243: replace with cache for filtering metadata
-        CatalogCacheLoader::get(_service).onStepUp();
+        FilteringMetadataCache::get(_service)->onStepUp();
 
         ShardingCatalogManager::get(opCtx)->scheduleAsyncUnblockDDLCoordinators(opCtx);
     }
@@ -1127,7 +1127,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 // Called earlier for config servers.
                 TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
-                CatalogCacheLoader::get(_service).onStepUp();
+                FilteringMetadataCache::get(opCtx)->onStepUp();
             }
 
             const auto configsvrConnStr =

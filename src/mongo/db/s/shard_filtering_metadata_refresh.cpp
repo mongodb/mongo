@@ -58,6 +58,7 @@
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/shard_filtering_util.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
@@ -96,17 +97,7 @@ MONGO_FAIL_POINT_DEFINE(skipDatabaseVersionMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
 
-const auto getDecoration =
-    ServiceContext::declareDecoration<std::unique_ptr<FilteringMetadataCache>>();
-
-void initDecoration(ServiceContext* serviceCtx) {
-    invariant(serviceCtx->getService(ClusterRole::ShardServer) != nullptr);
-
-    auto& decoration = getDecoration(serviceCtx);
-    invariant(!decoration);
-
-    decoration = std::make_unique<FilteringMetadataCache>();
-}
+const auto getDecoration = ServiceContext::declareDecoration<FilteringMetadataCache>();
 
 /**
  * Waits for a refresh operation to complete. Returns true if the refresh completed successfully,
@@ -216,17 +207,135 @@ bool joinCollectionPlacementVersionOperation(OperationContext* opCtx,
 
 }  // namespace
 
-void FilteringMetadataCache::init(ServiceContext* serviceCtx) {
-    initDecoration(serviceCtx);
+void FilteringMetadataCache::init(ServiceContext* serviceCtx,
+                                  std::shared_ptr<CatalogCacheLoader> loader,
+                                  bool isPrimary) {
+    invariant(serviceCtx->getService(ClusterRole::ShardServer) != nullptr);
+
+    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(loader.get());
+    if (shardLoader) {
+        shardLoader->initializeReplicaSetRole(isPrimary);
+    }
+
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache has a CatalogCache and SSCCL.
+    auto readOnlyLoader = dynamic_cast<ReadOnlyCatalogCacheLoader*>(loader.get());
+    invariant(shardLoader || readOnlyLoader);
+
+    auto decoration = FilteringMetadataCache::get(serviceCtx);
+    invariant(decoration->_loader == nullptr);
+    decoration->_loader = loader;
+}
+
+void FilteringMetadataCache::initForTesting(ServiceContext* serviceCtx,
+                                            std::shared_ptr<CatalogCacheLoader> loader) {
+    invariant(serviceCtx->getService(ClusterRole::ShardServer) != nullptr);
+
+    auto decoration = FilteringMetadataCache::get(serviceCtx);
+    invariant(decoration->_loader == nullptr);
+    decoration->_loader = loader;
 }
 
 FilteringMetadataCache* FilteringMetadataCache::get(ServiceContext* serviceCtx) {
-    ShardingState::get(serviceCtx)->assertCanAcceptShardedCommands();
-    return getDecoration(serviceCtx).get();
+    return &getDecoration(serviceCtx);
 }
 
 FilteringMetadataCache* FilteringMetadataCache::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
+}
+
+void FilteringMetadataCache::onStepDown() {
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
+    // SSCCL as part of its constructor.
+    tassert(9539100,
+            "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
+            _loader);
+
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache has a CatalogCache and SSCCL.
+    auto readOnlyLoader = dynamic_cast<ReadOnlyCatalogCacheLoader*>(_loader.get());
+    if (readOnlyLoader)
+        return;
+
+    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
+    invariant(shardLoader);
+    shardLoader->onStepDown();
+}
+
+void FilteringMetadataCache::onStepUp() {
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
+    // SSCCL as part of its constructor.
+    tassert(9539101,
+            "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
+            _loader);
+
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache has a CatalogCache and SSCCL.
+    auto readOnlyLoader = dynamic_cast<ReadOnlyCatalogCacheLoader*>(_loader.get());
+    if (readOnlyLoader)
+        return;
+
+    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
+    invariant(shardLoader);
+    shardLoader->onStepUp();
+}
+
+void FilteringMetadataCache::onReplicationRollback() {
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
+    // SSCCL as part of its constructor.
+    tassert(9539102,
+            "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
+            _loader);
+
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache has a CatalogCache and SSCCL.
+    auto readOnlyLoader = dynamic_cast<ReadOnlyCatalogCacheLoader*>(_loader.get());
+    if (readOnlyLoader)
+        return;
+
+    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
+    invariant(shardLoader);
+    shardLoader->onReplicationRollback();
+}
+
+void FilteringMetadataCache::notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
+                                                                    const Timestamp& commitTime) {
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
+    // SSCCL as part of its constructor.
+    tassert(9539103,
+            "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
+            _loader);
+
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache has a CatalogCache and SSCCL.
+    auto readOnlyLoader = dynamic_cast<ReadOnlyCatalogCacheLoader*>(_loader.get());
+    if (readOnlyLoader)
+        return;
+
+    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
+    invariant(shardLoader);
+    shardLoader->notifyOfCollectionRefreshEndMarkerSeen(nss, commitTime);
+}
+
+void FilteringMetadataCache::waitForCollectionFlush(OperationContext* opCtx,
+                                                    const NamespaceString& nss) {
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
+    // SSCCL as part of its constructor.
+    tassert(9539104,
+            "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
+            _loader);
+
+    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
+    invariant(shardLoader);
+    shardLoader->waitForCollectionFlush(opCtx, nss);
+}
+
+void FilteringMetadataCache::waitForDatabaseFlush(OperationContext* opCtx,
+                                                  const DatabaseName& dbName) {
+    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
+    // SSCCL as part of its constructor.
+    tassert(9539105,
+            "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
+            _loader);
+
+    auto shardLoader = dynamic_cast<ShardServerCatalogCacheLoader*>(_loader.get());
+    invariant(shardLoader);
+    shardLoader->waitForDatabaseFlush(opCtx, dbName);
 }
 
 void FilteringMetadataCache::onCollectionPlacementVersionMismatch(
@@ -235,6 +344,7 @@ void FilteringMetadataCache::onCollectionPlacementVersionMismatch(
     boost::optional<ChunkVersion> chunkVersionReceived) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
@@ -340,6 +450,7 @@ CollectionMetadata FilteringMetadataCache::forceGetCurrentMetadata(OperationCont
                                                                    const NamespaceString& nss) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
@@ -367,6 +478,7 @@ ChunkVersion FilteringMetadataCache::forceShardFilteringMetadataRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
@@ -466,6 +578,7 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
                                                   CancellationToken cancellationToken) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     ScopeGuard resetRefreshFutureOnError([&] {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
@@ -569,6 +682,7 @@ void FilteringMetadataCache::_onDbVersionMismatch(
     boost::optional<DatabaseVersion> receivedDbVersion) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");

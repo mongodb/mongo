@@ -188,15 +188,11 @@ std::unique_ptr<BalancerConfiguration> ShardingMongoDTestFixture::makeBalancerCo
     return std::make_unique<BalancerConfiguration>();
 }
 
-std::unique_ptr<CatalogCache> ShardingMongoDTestFixture::makeCatalogCache() {
-    return std::make_unique<CatalogCache>(getServiceContext(),
-                                          CatalogCacheLoader::get(getServiceContext()));
-}
-
 Status ShardingMongoDTestFixture::initializeGlobalShardingStateForMongodForTest(
-    const ConnectionString& configConnStr) {
-    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
-              serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+    const ConnectionString& configConnStr,
+    std::unique_ptr<CatalogCache> catalogCache,
+    std::shared_ptr<CatalogCacheLoader> catalogCacheLoader) {
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
     // Create and initialize each sharding component individually before moving them to the Grid
     // in order to control the order of initialization, since some components depend on others.
@@ -208,14 +204,14 @@ Status ShardingMongoDTestFixture::initializeGlobalShardingStateForMongodForTest(
 
     auto const grid = Grid::get(operationContext());
     grid->init(makeShardingCatalogClient(),
-               makeCatalogCache(),
+               std::move(catalogCache),
                makeShardRegistry(configConnStr),
                makeClusterCursorManager(),
                makeBalancerConfiguration(),
                std::move(executorPoolPtr),
                _mockNetwork);
 
-    FilteringMetadataCache::init(getServiceContext());
+    FilteringMetadataCache::initForTesting(getServiceContext(), catalogCacheLoader);
 
     return Status::OK();
 }

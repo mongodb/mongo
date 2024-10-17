@@ -53,7 +53,6 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/version/releases.h"

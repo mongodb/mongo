@@ -90,7 +90,6 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -205,7 +204,7 @@ public:
     }
 
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override {
-        CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
+        FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
     }
 
     void updateCoordinatorDocument(OperationContext* opCtx,

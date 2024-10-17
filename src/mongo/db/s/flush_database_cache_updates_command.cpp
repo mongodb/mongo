@@ -65,7 +65,6 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/type_database_gen.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/sharding_state.h"
@@ -226,7 +225,7 @@ public:
                 uasserted(8454801, "config server is not storing cached metadata");
             }
 
-            CatalogCacheLoader::get(opCtx).waitForDatabaseFlush(opCtx, dbName);
+            FilteringMetadataCache::get(opCtx)->waitForDatabaseFlush(opCtx, dbName);
 
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }

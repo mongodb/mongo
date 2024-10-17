@@ -178,12 +178,13 @@ public:
                                     ConnectionString(kConfigHostAndPort),
                                     _sourceId.getShardId()});
 
-        auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
-        _mockCatalogCacheLoader = mockLoader.get();
-        CatalogCacheLoader::set(getServiceContext(), std::move(mockLoader));
-
+        _mockCatalogCacheLoader = std::make_shared<CatalogCacheLoaderMock>();
+        auto catalogCache =
+            std::make_unique<CatalogCache>(getServiceContext(), _mockCatalogCacheLoader);
         uassertStatusOK(
-            initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
+            initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort),
+                                                          std::move(catalogCache),
+                                                          _mockCatalogCacheLoader));
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
 
@@ -483,7 +484,7 @@ protected:
     service_context_test::ShardRoleOverride _shardRole;
 
     boost::optional<ChunkManager> _cm;
-    CatalogCacheLoaderMock* _mockCatalogCacheLoader;
+    std::shared_ptr<CatalogCacheLoaderMock> _mockCatalogCacheLoader;
 
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;
