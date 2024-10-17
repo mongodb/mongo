@@ -282,3 +282,10 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
+
+  - <<: *task_template
+    name: streams_external_api
+    tags: ["assigned_to_jira_team_streams", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
