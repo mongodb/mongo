@@ -3,6 +3,10 @@
  *
  * Intersperse queries which use the ID_HACK stage with updates and deletes of documents they may
  * match.
+ * @tags: [
+ *   # Runs a multi: true delete which is non-retryable.
+ *   requires_non_retryable_writes
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/yield/yield.js";

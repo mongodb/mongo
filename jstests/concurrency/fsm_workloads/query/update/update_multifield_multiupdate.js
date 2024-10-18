@@ -3,6 +3,10 @@
  *
  * Does updates that affect multiple fields on multiple documents.
  * The collection has an index for each field, and a multikey index for all fields.
+ * @tags: [
+ *   # Runs a multi-update which is non-retryable.
+ *   requires_non_retryable_writes
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";

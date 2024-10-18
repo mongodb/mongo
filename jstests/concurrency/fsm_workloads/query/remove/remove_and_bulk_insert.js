@@ -6,6 +6,12 @@
  *
  * This workload was designed to reproduce SERVER-20512, where a record in an evicted page was
  * accessed after a WriteConflictException occurred in Collection::deleteDocument().
+ *
+ * @tags: [
+ *   # Runs a multi-delete which is non-retryable.
+ *   requires_non_retryable_writes
+ * ]
+ *
  */
 export const $config = (function() {
     var states = {

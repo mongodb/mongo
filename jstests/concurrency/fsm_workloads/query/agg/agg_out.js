@@ -12,6 +12,8 @@
  *
  * @tags: [
  *   requires_capped,
+ *   # Uses $out, which is non-retryable.
+ *   requires_non_retryable_writes,
  * ]
  */
 

@@ -7,6 +7,10 @@
  * of increments performed.
  *
  * Uses an ordered, bulk operation to perform the updates.
+ * @tags: [
+ *   # Runs a multi-update which is non-retryable.
+ *   requires_non_retryable_writes
+ * ]
  */
 
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";

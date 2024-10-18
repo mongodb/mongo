@@ -3,6 +3,10 @@
  *
  * Ensures that concurrent multi updates cannot produce duplicate index entries. Regression test
  * for SERVER-17132.
+ * @tags: [
+ *   # Runs a multi-update which is non-retryable.
+ *   requires_non_retryable_writes
+ * ]
  */
 export const $config = (function() {
     var states = (function() {

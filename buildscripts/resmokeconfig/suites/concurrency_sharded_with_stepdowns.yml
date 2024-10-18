@@ -33,17 +33,8 @@ selector:
     # Uses getmores.
 
     # Uses non retryable writes.
-    - jstests/concurrency/fsm_workloads/query/remove/remove_and_bulk_insert.js
-    - jstests/concurrency/fsm_workloads/query/update/update_and_bulk_insert.js
-    - jstests/concurrency/fsm_workloads/query/update/update_check_index.js
-    - jstests/concurrency/fsm_workloads/query/update/update_multifield_multiupdate.js
-    - jstests/concurrency/fsm_workloads/query/update/update_multifield_multiupdate_noindex.js
-    - jstests/concurrency/fsm_workloads/query/update/update_ordered_bulk_inc.js
-    - jstests/concurrency/fsm_workloads/query/yield/yield_id_hack.js
 
     # Uses non retryable commands.
-    - jstests/concurrency/fsm_workloads/query/agg/agg_out.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
     - jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
     - jstests/concurrency/fsm_workloads/ddl/collMod/collMod_separate_collections.js
     - jstests/concurrency/fsm_workloads/view_catalog/view_catalog.js

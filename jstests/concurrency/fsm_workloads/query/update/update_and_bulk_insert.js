@@ -7,6 +7,12 @@
  * This workload was designed to test for an issue similar to SERVER-20512 with UpdateStage, where
  * we attempted to make a copy of a record after a WriteConflictException occurred in
  * Collection::updateDocument().
+ *
+ * @tags: [
+ *   # Runs a multi-update which is non-retryable.
+ *   requires_non_retryable_writes
+ * ]
+ *
  */
 export const $config = (function() {
     var states = {

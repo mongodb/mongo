@@ -7,6 +7,8 @@
  *  # Uses $where operator
  *  requires_scripting,
  *  requires_getmore,
+ *  # Uses multi-update which is non-retryable.
+ *  requires_non_retryable_writes,
  * ]
  */
 

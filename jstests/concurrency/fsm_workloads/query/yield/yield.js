@@ -5,6 +5,8 @@
  * removing documents that they operate on.
  * @tags: [
  *   requires_getmore,
+ *   # Runs a multi-delete which is non-retryable.
+ *   requires_non_retryable_writes,
  * ]
  */
 

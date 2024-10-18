@@ -3,6 +3,10 @@
  *
  * Runs an aggregation with a $match that returns half the documents followed
  * by a $sort on a field containing a random float.
+ * @tags: [
+ *   # Uses $out, which is non-retryable.
+ *   requires_non_retryable_writes,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_base.js";
