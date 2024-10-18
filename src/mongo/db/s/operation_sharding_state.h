@@ -184,6 +184,14 @@ public:
         _treatAsFromRouter = treatAsFromRouter;
     }
 
+    bool shouldSkipDirectConnectionChecks() {
+        return _shouldSkipDirectConnectionChecks;
+    }
+
+    void setShouldSkipDirectShardConnectionChecks(bool skipDirectConnectionChecks = true) {
+        _shouldSkipDirectConnectionChecks = skipDirectConnectionChecks;
+    }
+
 private:
     friend class ScopedSetShardRole;
     friend class ScopedStashShardRole;
@@ -224,6 +232,10 @@ private:
     // Set when the operation comes from a router but intentionally skips setting the database or
     // the shard version.
     bool _treatAsFromRouter{false};
+
+    // Set when an operation wishes to entirely skip direct shard connection checks. This should be
+    // false in almost all situations.
+    bool _shouldSkipDirectConnectionChecks{false};
 };
 
 }  // namespace mongo

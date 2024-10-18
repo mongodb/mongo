@@ -486,7 +486,7 @@ const allCommands = {
         },
     },
     dbCheck: {command: {dbCheck: 1}, shouldFail: true},
-    dbHash: {command: {dbHash: 1}, shouldFail: true},
+    dbHash: {command: {dbHash: 1}, shouldFail: false},
     dbStats: {
         command: {dbStats: 1},
         shouldFail: true,

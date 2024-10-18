@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_api_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/logv2/log.h"
@@ -55,6 +56,11 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceSt
     // each shard. The direct shard connection check still applies to the sharding metadata
     // collection namespaces because those collections exist on a single, particular shard.
     if ((nss.isDbOnly() && nss.dbName().isInternalDb()) || nss.isShardLocalNamespace()) {
+        return;
+    }
+    // Skip direct shard connection checks for commands which explicitly request skipping these
+    // checks. There should be very few cases in which this is true.
+    if (OperationShardingState::get(opCtx).shouldSkipDirectConnectionChecks()) {
         return;
     }
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
