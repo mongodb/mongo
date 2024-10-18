@@ -1208,11 +1208,13 @@ MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc/third_party/SafeInt",
     "-I$(GENDIR)/src/mongo/db/modules/enterprise/src",
     "-Isrc/mongo/db/modules/enterprise/src",
+    "-Isrc/third_party/valgrind/include",
 ]
 
 MONGO_GLOBAL_ACCESSIBLE_HEADERS = [
     "//src/third_party/immer:headers",
     "//src/third_party/SafeInt:headers",
+    "//src/third_party/valgrind/include/valgrind:valgrind.h",
 ] + SASL_WINDOWS_INCLUDE_FILES
 
 MONGO_GLOBAL_SRC_DEPS = [
