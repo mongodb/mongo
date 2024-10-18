@@ -63,8 +63,6 @@
 
 namespace mongo {
 
-static constexpr int kMaxNumStaleVersionRetries = 10;
-
 class ComparableDatabaseVersion;
 
 using DatabaseTypeCache = ReadThroughCache<DatabaseName, DatabaseType, ComparableDatabaseVersion>;

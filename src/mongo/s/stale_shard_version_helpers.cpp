@@ -34,6 +34,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/str.h"
 
@@ -52,7 +53,7 @@ void checkErrorStatusAndMaxRetries(const Status& status,
                                    size_t altMaxNumRetries) {
     auto logAndTestMaxRetries =
         [numAttempts, taskDescription, altMaxNumRetries](const Status& status) {
-            size_t maxNumRetries = kMaxNumStaleVersionRetries;
+            size_t maxNumRetries = gMaxNumStaleVersionRetries.load();
             if (MONGO_unlikely(altMaxNumRetries > 0)) {
                 maxNumRetries = altMaxNumRetries;
             }

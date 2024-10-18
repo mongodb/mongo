@@ -42,6 +42,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
@@ -106,11 +107,12 @@ void DBPrimaryRouter::_onException(OperationContext* opCtx, RouteContext* contex
         uassertStatusOK(s);
     }
 
-    if (++context->numAttempts > kMaxNumStaleVersionRetries) {
-        uassertStatusOKWithContext(
-            s,
-            str::stream() << "Exceeded maximum number of " << kMaxNumStaleVersionRetries
-                          << " retries attempting \'" << context->comment << "\'");
+    int maxNumStaleVersionRetries = gMaxNumStaleVersionRetries.load();
+    if (++context->numAttempts > maxNumStaleVersionRetries) {
+        uassertStatusOKWithContext(s,
+                                   str::stream()
+                                       << "Exceeded maximum number of " << maxNumStaleVersionRetries
+                                       << " retries attempting \'" << context->comment << "\'");
     } else {
         LOGV2_DEBUG(6375902,
                     3,
@@ -191,11 +193,12 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
         uassertStatusOK(s);
     }
 
-    if (++context->numAttempts > kMaxNumStaleVersionRetries) {
-        uassertStatusOKWithContext(
-            s,
-            str::stream() << "Exceeded maximum number of " << kMaxNumStaleVersionRetries
-                          << " retries attempting \'" << context->comment << "\'");
+    int maxNumStaleVersionRetries = gMaxNumStaleVersionRetries.load();
+    if (++context->numAttempts > maxNumStaleVersionRetries) {
+        uassertStatusOKWithContext(s,
+                                   str::stream()
+                                       << "Exceeded maximum number of " << maxNumStaleVersionRetries
+                                       << " retries attempting \'" << context->comment << "\'");
     } else {
         LOGV2_DEBUG(6375906,
                     3,

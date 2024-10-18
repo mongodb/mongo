@@ -60,6 +60,7 @@
 #include "mongo/s/commands/cluster_command_test_fixture.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/duration.h"
@@ -235,13 +236,13 @@ void ClusterCommandTestFixture::runTxnCommandMaxErrors(BSONObj cmd,
     auto future = launchAsync([&] { runCommand(cmd); });
 
     size_t numTargetedShards = isTargeted ? 1 : numShards;
-    for (size_t i = 0; i < kMaxNumStaleVersionRetries - 1; i++) {
+    for (int i = 0; i < gMaxNumStaleVersionRetries.load() - 1; i++) {
         for (size_t j = 0; j < numTargetedShards; j++) {
             expectReturnsError(code);
         }
 
-        // In a transaction, when the router encounters a retryable error it sends abortTransaction
-        // to each pending participant shard before retrying.
+        // In a transaction, when the router encounters a retryable error it sends
+        // abortTransaction to each pending participant shard before retrying.
         for (size_t j = 0; j < numTargetedShards; j++) {
             expectAbortTransaction();
         }

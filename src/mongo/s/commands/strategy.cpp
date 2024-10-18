@@ -110,6 +110,7 @@
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/load_balancer_support.h"
+#include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/session_catalog_router.h"
@@ -420,7 +421,7 @@ public:
 
 private:
     bool _canRetry() const {
-        return _tries < kMaxNumStaleVersionRetries;
+        return _tries < gMaxNumStaleVersionRetries.load();
     }
 
     // Sets up the environment for running the invocation, and clears the state from the last try.
@@ -1111,7 +1112,7 @@ void ParseAndRunCommand::RunAndRetry::_onCannotImplicitlyCreateCollection(Status
 void ParseAndRunCommand::RunAndRetry::run() {
     do {
         try {
-            // Try kMaxNumStaleVersionRetries times. On the last try, exceptions are
+            // Try gMaxNumStaleVersionRetries times. On the last try, exceptions are
             // rethrown.
             _tries++;
 

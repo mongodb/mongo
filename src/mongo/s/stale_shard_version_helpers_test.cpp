@@ -42,6 +42,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/index_version.h"
+#include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
@@ -164,7 +165,7 @@ TEST_F(SyncShardVersionRetry, ExhaustedRetriesShouldThrowOriginalException) {
     int tries = 0;
     auto shardVersionRetryInvocation = [&]() {
         return shardVersionRetry(operationContext(), catalogCache, nss(), desc(), [&]() {
-            if (++tries < 2 * kMaxNumStaleVersionRetries) {
+            if (++tries < 2 * gMaxNumStaleVersionRetries.load()) {
                 uassert(StaleDbRoutingVersion(nss().dbName(),
                                               DatabaseVersion(UUID::gen(), Timestamp(2, 3)),
                                               DatabaseVersion(UUID::gen(), Timestamp(5, 3))),
