@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/stage_builder/sbe/builder.h"
 
-namespace mongo::optimizer::ce {
+namespace mongo::ce {
 
 using Cardinality = double;
 
@@ -46,13 +47,23 @@ public:
     enum class SamplingStyle { kRandom, kChunk };
 
     /**
-     * 'opCtx' and 'nss' are used to create a new CanonicalQuery for the sampling SBE plan. 'nss' is
-     * is the NamespaceString of the collection accessed by the query being optimized. 'collections'
-     * is needed to create a sampling SBE plan. 'samplingStyle' can specify the sampling method.
+     * 'opCtx' is used to create a new CanonicalQuery for the sampling SBE plan.
+     * 'collections' is needed to create a sampling SBE plan. 'samplingStyle' can specify the
+     * sampling method.
      */
     SamplingEstimator(OperationContext* opCtx,
-                      const NamespaceString& nss,
                       const MultipleCollectionAccessor& collections,
+                      SamplingEstimator::SamplingStyle samplingStyle);
+
+    /*
+     * This constructor allows the caller to specify the sample size if necessary. This constructor
+     * is useful when a certain scale of sample is more appropriate, for example, the planner wants
+     * to do preliminary data distribution analysis with a small sample size. Testing cases may
+     * require only a small sample.
+     */
+    SamplingEstimator(OperationContext* opCtx,
+                      const MultipleCollectionAccessor& collections,
+                      size_t sampleSize,
                       SamplingEstimator::SamplingStyle samplingStyle);
     ~SamplingEstimator();
 
@@ -69,9 +80,11 @@ public:
     std::vector<Cardinality> estimateCardinality(const std::vector<MatchExpression*>& expr);
 
     /*
-     * Generates a sample using a random cursor. The caller can call this function to re-sample.
-     * The old sample will be freed.
+     * Generates a sample using a random cursor. The caller can call this function to draw a sample
+     * of 'sampleSize'. If it's a re-sample request, the old sample will be freed and replaced by
+     * the new sample.
      */
+    void generateRandomSample(size_t sampleSize);
     void generateRandomSample();
 
     /*
@@ -79,6 +92,7 @@ public:
      * random chunks. Similar to the other sampling function, the caller can call this function to
      * re-sample. The old sample will be freed.
      */
+    void generateChunkSample(size_t sampleSize);
     void generateChunkSample();
 
     /*
@@ -89,11 +103,28 @@ public:
     }
 
 protected:
-    // This CanonicalQuery is for the sampling SBE plan. This is needed to construct and execute the
-    // sampling plan.
-    std::unique_ptr<CanonicalQuery> _cq;
+    /*
+     * This helper creates a CanonicalQuery for the sampling plan.
+     */
+    static std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
+                                                              OperationContext* opCtx,
+                                                              const size_t sampleSize);
+
+    // The sample is stored in memory for estimating the cardinality of all predicates of one query
+    // request. The sample will be freed on destruction of the SamplingEstimator instance or when a
+    // re-sample is requested. A new sample will replace this.
+    std::vector<BSONObj> _sample;
 
 private:
+    /**
+     * Constructs a sampling SBE plan using the random-walk method.
+     * The SBE plan consists of a sbe::ScanStage which uses a random cursor to read documents
+     * randomly from the collection and a sbe::LimitSkipStage on the top of the scan stage to limit
+     * '_sampleSize' of the documents for the sample.
+     */
+    std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
+    generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolicy);
+
     /*
      * The SamplingEstimator calculates the size of a sample based on the confidence level and
      * margin of error required.
@@ -105,11 +136,6 @@ private:
     // optimized.
     const MultipleCollectionAccessor& _collections;
     size_t _sampleSize;
-
-    // The sample is stored in memory for estimating the cardinality of all predicates of one query
-    // request. The sample will be freed on destruction of the SamplingEstimator instance or when a
-    // re-sample is requested. A new sample will replace this.
-    std::vector<BSONObj> _sample;
 };
 
-}  // namespace mongo::optimizer::ce
+}  // namespace mongo::ce

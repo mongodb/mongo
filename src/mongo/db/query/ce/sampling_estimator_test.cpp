@@ -27,64 +27,127 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/ce/sampling_estimator.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
-namespace mongo::optimizer::ce {
 
-class SamplingEstimatorForTesting : public SamplingEstimator {
-public:
-    const CanonicalQuery& getCanonicalQuery() {
-        return *_cq;
-    }
-    using SamplingEstimator::SamplingEstimator;
-};
+namespace mongo::ce {
 
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+const size_t kSampleSize = 5;
 
-class SamplingEstimatorTest : public ServiceContextTest {
+class SamplingEstimatorForTesting : public SamplingEstimator {
+public:
+    using SamplingEstimator::SamplingEstimator;
+
+    const std::vector<BSONObj>& getSample() {
+        return _sample;
+    }
+
+    static std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
+                                                              OperationContext* opCtx,
+                                                              const size_t sampleSize) {
+        return SamplingEstimator::makeCanonicalQuery(nss, opCtx, sampleSize);
+    }
+};
+
+class SamplingEstimatorTest : public CatalogTestFixture {
 public:
     void setUp() override {
-        _opCtx = makeOperationContext();
-        CollectionMock coll(kTestNss);
-        CollectionPtr collPtr(&coll);
-        _colls = MultipleCollectionAccessor(_opCtx.get(),
-                                            &collPtr,
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+        CatalogTestFixture::setUp();
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), kTestNss, CollectionOptions()));
     }
 
     void tearDown() override {
-        _opCtx.reset();
+        CatalogTestFixture::tearDown();
     }
 
-protected:
-    ServiceContext::UniqueOperationContext _opCtx;
-    MultipleCollectionAccessor _colls;
+    /*
+     * Insert documents to the default collection.
+     */
+    void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj> docs) {
+        std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
+
+        AutoGetCollection agc(operationContext(), nss, LockMode::MODE_IX);
+        {
+            WriteUnitOfWork wuow{operationContext()};
+            ASSERT_OK(collection_internal::insertDocuments(
+                operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
+            wuow.commit();
+        }
+    }
+
+    std::vector<BSONObj> createDocuments(int num) {
+        std::vector<BSONObj> docs;
+        for (int i = 0; i < num; i++) {
+            BSONObj obj = BSON("_id" << i);
+            docs.push_back(obj);
+        }
+        return docs;
+    }
 };
 
 TEST_F(SamplingEstimatorTest, SamplingCanonicalQueryTest) {
-    // A sample as well as the CanonicalQuery required is generated on construction.
-    SamplingEstimatorForTesting samplingEstimator(
-        _opCtx.get(), kTestNss, _colls, SamplingEstimator::SamplingStyle::kRandom);
+    const int64_t sampleSize = 500;
     // The samplingCQ is a different CQ than the one for the query being optimized. 'samplingCQ'
     // should contain information about the sample size and the same nss as the CQ for the query
     // being optimized.
-    const CanonicalQuery& samplingCQ = samplingEstimator.getCanonicalQuery();
-    // TODO SERVER-94063: Update the sample size. 500 is the current default amount.
-    int64_t sampleSize = 500;
-    ASSERT_EQUALS(*samplingCQ.getFindCommandRequest().getLimit(), sampleSize);
-    ASSERT_EQUALS(kTestNss, samplingCQ.nss());
+    auto samplingCQ =
+        SamplingEstimatorForTesting::makeCanonicalQuery(kTestNss, operationContext(), sampleSize);
+    ASSERT_EQUALS(samplingCQ->getFindCommandRequest().getLimit(), sampleSize);
+    ASSERT_EQUALS(kTestNss, samplingCQ->nss());
 }
 
-}  // namespace mongo::optimizer::ce
+TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
+    insertDocuments(kTestNss, createDocuments(10));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(), colls, kSampleSize, SamplingEstimator::SamplingStyle::kRandom);
+
+    auto sample = samplingEstimator.getSample();
+    ASSERT_EQUALS(sample.size(), kSampleSize);
+}
+
+TEST_F(SamplingEstimatorTest, DrawANewSample) {
+    insertDocuments(kTestNss, createDocuments(10));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    // A sample was generated on construction with size being the pre-determined size.
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(), colls, kSampleSize, SamplingEstimator::SamplingStyle::kRandom);
+
+    auto sample = samplingEstimator.getSample();
+    ASSERT_EQUALS(sample.size(), kSampleSize);
+
+    // Specifing a new sample size and re-sample. The old sample should be replaced by the new
+    // sample of a different sample size.
+    samplingEstimator.generateRandomSample(3);
+    auto newSample = samplingEstimator.getSample();
+    ASSERT_EQUALS(newSample.size(), 3);
+}
+
+}  // namespace mongo::ce
