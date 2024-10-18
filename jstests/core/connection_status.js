@@ -32,6 +32,19 @@ function validateConnectionStatus(expectedUser, expectedRole, showPrivileges) {
     assert.commandWorked(connectionStatus);
     var authInfo = connectionStatus.authInfo;
 
+    // Test that UUID is properly returned.
+    // This UUID is from the runCommand connection, not the user, so it cannot be asserted against
+    // the userId.
+    const uuid = connectionStatus.uuid;
+    assert(uuid, "UUID returned from runCommand is falsy: " + tojson(uuid));
+
+    const parsedUUID = JSON.parse(JSON.stringify(uuid));
+    const kUUIDSubtype = 4;
+    assert.eq(NumberInt(parsedUUID["$type"]),
+              kUUIDSubtype,
+              "UUID field should be a BinDataUUID, got: " + tojson(uuid));
+    assert(parsedUUID["$binary"], "Missing payload for client UUID: " + tojson(uuid));
+
     // Test that authenticated users are properly returned.
     var users = authInfo.authenticatedUsers;
     var matches = 0;

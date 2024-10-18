@@ -55,6 +55,9 @@ structs:
             authInfo:
                 description: 'Authenticated users and roles'
                 type: ConnectionStatusReplyAuthInfo
+            uuid:
+                description: 'UUID of the current client'
+                type: uuid
 
 commands:
     connectionStatus:
