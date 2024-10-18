@@ -222,30 +222,6 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
         stage->setSource(mock.get());
         ASSERT_THROWS_CODE(stage->getNext(), DBException, 4770507);
     }
-
-#if 0  // TODO(SERVER-95699): Disabling test which creates fieldnames with embedded NULs
-    {
-        auto spec = BSON("$_internalApplyOplogUpdate"
-                         << BSON("oplogUpdate" << BSON("$v" << 2 << "diff"
-                                                            << BSON("u" << BSON("b\0c"_sd << 3)))));
-        auto stage = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
-                                                                            getExpCtx());
-        auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}}}, getExpCtx());
-        stage->setSource(mock.get());
-        ASSERT_THROWS_CODE(stage->getNext(), DBException, 4728000);
-    }
-
-    {
-        auto spec = BSON(
-            "$_internalApplyOplogUpdate" << BSON(
-                "oplogUpdate" << BSON("$v" << 2 << "diff" << BSON("sb\0c"_sd << BSON("d" << 5)))));
-        auto stage = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
-                                                                            getExpCtx());
-        auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}}}, getExpCtx());
-        stage->setSource(mock.get());
-        ASSERT_THROWS_CODE(stage->getNext(), DBException, 4770505);
-    }
-#endif
 }
 
 TEST_F(DocumentSourceInternalApplyOplogUpdateTest, RedactsCorrectly) {
