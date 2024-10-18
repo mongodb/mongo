@@ -2,7 +2,7 @@
  * Test that a sharded explain command with a value set for the lsid's uid field in the inner
  * command invocation will ignore the lsid field and succeed so long as the user is authorized to
  * run the command being explained. Also tests that a user can only set a lsid + uid in the the
- * top-level explain command if they are authorized to do so. Verifies the fix for CVE-138.
+ * top-level explain command if they are authorized to do so.
  *
  * @tags: [requires_sharding]
  */
