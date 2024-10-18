@@ -22,35 +22,16 @@ export const $config = (function() {
             this.session = db.getMongo().startSession();
         }
 
-        function runOpInTxn(
-            session, db, startCollName, ddlDBName, ddlCollName, loggingCollName, opName, op) {
+        function runOpInTxn(session, db, startCollName, ddlDBName, ddlCollName, opName, op) {
             const startColl = session.getDatabase(db.getName())[startCollName];
             const ddlColl = session.getDatabase(ddlDBName)[ddlCollName];
 
-            const expectedTxnErrorCodes = [
-                ErrorCodes.OperationNotSupportedInTransaction,
-                // As of SERVER-45405, inserts that implicitly create collections inside of
-                // multi- document transactions can fail at commit time with WriteConflict
-                // errors, if a conflicting collection does not get created until commit time.
-                ErrorCodes.WriteConflict,
-            ];
+            jsTestLog("Running operation '" + opName + "'");
 
-            let success = false;
-
-            try {
-                withTxnAndAutoRetry(session, () => {
-                    assert.eq(1, startColl.find({_id: "startTxnDoc"}).itcount());
-                    op(ddlColl);
-                });
-                success = true;
-            } catch (e) {
-                if (!e.hasOwnProperty("code") || !expectedTxnErrorCodes.includes(e.code)) {
-                    throw e;
-                }
-            }
-
-            // Record whether the operation succeeded or failed.
-            assert.commandWorked(db[loggingCollName].insert({op: opName, success: success}));
+            withTxnAndAutoRetry(session, () => {
+                assert.eq(1, startColl.find({_id: "startTxnDoc"}).itcount());
+                op(ddlColl);
+            });
         }
 
         /**
@@ -61,84 +42,48 @@ export const $config = (function() {
             const op = function(ddlColl) {
                 ddlColl.aggregate([{$limit: 1}]).itcount();
             };
-            runOpInTxn(this.session,
-                       db,
-                       collName,
-                       this.ddlDBName,
-                       this.ddlCollName,
-                       this.loggingCollName,
-                       "aggregate",
-                       op);
+            runOpInTxn(
+                this.session, db, collName, this.ddlDBName, this.ddlCollName, "aggregate", op);
         }
 
         function distinct(db, collName) {
             const op = function(ddlColl) {
                 ddlColl.distinct("x");
             };
-            runOpInTxn(this.session,
-                       db,
-                       collName,
-                       this.ddlDBName,
-                       this.ddlCollName,
-                       this.loggingCollName,
-                       "distinct",
-                       op);
+            runOpInTxn(
+                this.session, db, collName, this.ddlDBName, this.ddlCollName, "distinct", op);
         }
 
         function findAndModify(db, collName) {
             const op = function(ddlColl) {
                 ddlColl.findAndModify({query: {}, sort: {x: 1}, update: {$inc: {x: 1}}});
             };
-            runOpInTxn(this.session,
-                       db,
-                       collName,
-                       this.ddlDBName,
-                       this.ddlCollName,
-                       this.loggingCollName,
-                       "findAndModify",
-                       op);
+            runOpInTxn(
+                this.session, db, collName, this.ddlDBName, this.ddlCollName, "findAndModify", op);
         }
 
         function findCollScan(db, collName) {
             const op = function(ddlColl) {
                 ddlColl.findOne();
             };
-            runOpInTxn(this.session,
-                       db,
-                       collName,
-                       this.ddlDBName,
-                       this.ddlCollName,
-                       this.loggingCollName,
-                       "findCollScan",
-                       op);
+            runOpInTxn(
+                this.session, db, collName, this.ddlDBName, this.ddlCollName, "findCollScan", op);
         }
 
         function findGetMore(db, collName) {
             const op = function(ddlColl) {
                 ddlColl.find().batchSize(1).itcount();
             };
-            runOpInTxn(this.session,
-                       db,
-                       collName,
-                       this.ddlDBName,
-                       this.ddlCollName,
-                       this.loggingCollName,
-                       "findGetMore",
-                       op);
+            runOpInTxn(
+                this.session, db, collName, this.ddlDBName, this.ddlCollName, "findGetMore", op);
         }
 
         function findIdScan(db, collName) {
             const op = function(ddlColl) {
                 ddlColl.findOne({_id: 0});
             };
-            runOpInTxn(this.session,
-                       db,
-                       collName,
-                       this.ddlDBName,
-                       this.ddlCollName,
-                       this.loggingCollName,
-                       "findIdScan",
-                       op);
+            runOpInTxn(
+                this.session, db, collName, this.ddlDBName, this.ddlCollName, "findIdScan", op);
         }
 
         function findSecondaryIndexScan(db, collName) {
@@ -150,7 +95,6 @@ export const $config = (function() {
                        collName,
                        this.ddlDBName,
                        this.ddlCollName,
-                       this.loggingCollName,
                        "findSecondaryIndexScan",
                        op);
         }
@@ -164,42 +108,21 @@ export const $config = (function() {
                     assert.commandWorked(res);
                 }
             };
-            runOpInTxn(this.session,
-                       db,
-                       collName,
-                       this.ddlDBName,
-                       this.ddlCollName,
-                       this.loggingCollName,
-                       "insert",
-                       op);
+            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "insert", op);
         }
 
         function remove(db, collName) {
             const op = function(ddlColl) {
                 assert.commandWorked(ddlColl.remove({}, {justOne: true}));
             };
-            runOpInTxn(this.session,
-                       db,
-                       collName,
-                       this.ddlDBName,
-                       this.ddlCollName,
-                       this.loggingCollName,
-                       "remove",
-                       op);
+            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "remove", op);
         }
 
         function update(db, collName) {
             const op = function(ddlColl) {
                 assert.commandWorked(ddlColl.update({}, {$inc: {x: 1}}));
             };
-            runOpInTxn(this.session,
-                       db,
-                       collName,
-                       this.ddlDBName,
-                       this.ddlCollName,
-                       this.loggingCollName,
-                       "update",
-                       op);
+            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "update", op);
         }
 
         /**
@@ -255,23 +178,6 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         assert.commandWorked(db[collName].insert({_id: "startTxnDoc"}));
-        assert.commandWorked(db.runCommand({create: this.loggingCollName}));
-    }
-
-    function teardown(db, collName, cluster) {
-        // Report the number of successful and failed transaction operations of each type. This test
-        // does not provide value if all transaction operations fail with LockTimeout, since then we
-        // are not accessing the DDL collection.
-        let res =
-            db[this.loggingCollName]
-                .aggregate([{$match: {success: true}}, {$group: {_id: "$op", count: {$sum: 1}}}])
-                .toArray();
-        jsTestLog("Successful transaction operations: " + tojson(res));
-
-        res = db[this.loggingCollName]
-                  .aggregate([{$match: {success: false}}, {$group: {_id: "$op", count: {$sum: 1}}}])
-                  .toArray();
-        jsTestLog("Failed transaction operations: " + tojson(res));
     }
 
     var randomTxnState = {
@@ -321,10 +227,8 @@ export const $config = (function() {
         data: {
             ddlCollName: "ddl_coll",
             ddlDBName: "access_collection_in_transaction_after_catalog_changes_ddl_db",
-            loggingCollName: "access_collection_in_transaction_after_catalog_changes_logging",
             renameCollName: "rename_coll"
         },
-        setup: setup,
-        teardown: teardown
+        setup: setup
     };
 })();
