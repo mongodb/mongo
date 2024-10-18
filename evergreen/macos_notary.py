@@ -61,6 +61,8 @@ for archive in archives:
         "--entitlements",
         "etc/macos_entitlements.xml",
         "--verify",
+        "--timeout",
+        "30",
         "-b",
         "server.mongodb.com",
         "-i",
