@@ -2,6 +2,7 @@
 
 import collections
 import copy
+import itertools
 import os
 import pathlib
 from threading import Lock
@@ -124,7 +125,17 @@ def get_suites(suite_names_or_paths: list[str], test_files: list[str]) -> List[_
             override_suite_config = suite_config.copy()
             override_suite_config.update(suite_roots)
             override_suite = _suite.Suite(suite_filename, override_suite_config)
-            for test in override_suite.tests:
+            # override_suite.tests is a list[list[str]] because of how the test_kind: parallel_fsm_workload_test
+            # behaves, grouping the list of tests into a single group to run simultaneously. However, suite.excluded
+            # is a list[str], and thus we need to flatten override_suite.tests to ensure we correctly check
+            # whether each individual test is excluded.
+            if override_suite.tests and all(
+                isinstance(item, list) for item in override_suite.tests
+            ):
+                flattened_tests = list(itertools.chain.from_iterable(override_suite.tests))
+            else:
+                flattened_tests = override_suite.tests
+            for test in flattened_tests:
                 if test in suite.excluded:
                     if _config.FORCE_EXCLUDED_TESTS:
                         loggers.ROOT_EXECUTOR_LOGGER.warning(
