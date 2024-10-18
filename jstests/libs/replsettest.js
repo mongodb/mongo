@@ -958,8 +958,9 @@ export class ReplSetTest {
     _notX509Auth(conn) {
         const nodeId = "n" + this.getNodeId(conn);
         const nodeOptions = this.nodeOptions[nodeId] || {};
-        const options =
-            (nodeOptions === {} || !this.startOptions) ? nodeOptions : this.startOptions;
+        const options = (Object.keys(nodeOptions).length !== 0 || !this.startOptions)
+            ? nodeOptions
+            : this.startOptions;
         const authMode = options.clusterAuthMode;
         return authMode != "sendX509" && authMode != "x509" && authMode != "sendKeyFile";
     }
@@ -3501,8 +3502,9 @@ function runFnWithAuthOnPrimary(rst, fn, fnName) {
     const primary = rst.getPrimary();
     const primaryId = "n" + rst.getNodeId(primary);
     const primaryOptions = rst.nodeOptions[primaryId] || {};
-    const options =
-        (primaryOptions === {} || !rst.startOptions) ? primaryOptions : rst.startOptions;
+    const options = (Object.keys(primaryOptions).length !== 0 || !rst.startOptions)
+        ? primaryOptions
+        : rst.startOptions;
     const authMode = options.clusterAuthMode;
     if (authMode === "x509") {
         print(fnName + ": authenticating on separate shell with x509 for " + rst.name);
