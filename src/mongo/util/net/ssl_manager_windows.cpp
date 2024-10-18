@@ -1381,7 +1381,9 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     }
 
     if (_sslCertificate) {
-        _clientCertificates[0] = _sslCertificate.get();
+        if (!_clientCertificates[0]) {
+            _clientCertificates[0] = _sslCertificate.get();
+        }
         _serverCertificates[0] = _sslCertificate.get();
     }
 

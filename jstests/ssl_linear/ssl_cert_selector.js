@@ -35,13 +35,12 @@ const testCases = [
         expectIngressKeyUsed: SERVER,
         expectEgressKeyUsed: CLIENT,
     },
-    // TODO: SERVER-95653 uncomment this test case once bug is fixed
-    /*{
+    {
         selector: `thumbprint=${serverThumbprint}`,
         clusterFile: TRUSTED_CLIENT_CERT,
         expectIngressKeyUsed: SERVER,
         expectEgressKeyUsed: CLIENT,
-    },*/
+    },
     {
         selector: 'subject=Trusted Kernel Test Server',
         clusterSelector: 'subject=Trusted Kernel Test Client',
