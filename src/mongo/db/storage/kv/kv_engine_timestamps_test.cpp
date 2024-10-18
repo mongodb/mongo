@@ -231,7 +231,7 @@ public:
         WriteUnitOfWork wuow(op);
         std::string ns = "a.b";
         ASSERT_OK(engine->createRecordStore(
-            op, NamespaceString::createNamespaceString_forTest(ns), ns, CollectionOptions()));
+            NamespaceString::createNamespaceString_forTest(ns), ns, CollectionOptions()));
         rs = engine->getRecordStore(
             op, NamespaceString::createNamespaceString_forTest(ns), ns, CollectionOptions());
         ASSERT(rs);

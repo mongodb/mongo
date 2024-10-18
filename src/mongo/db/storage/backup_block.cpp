@@ -49,8 +49,7 @@ const std::set<std::string> kRequiredMDBFiles = {"_mdb_catalog.wt", "sizeStorer.
 
 }  // namespace
 
-BackupBlock::BackupBlock(OperationContext* opCtx,
-                         boost::optional<NamespaceString> nss,
+BackupBlock::BackupBlock(boost::optional<NamespaceString> nss,
                          boost::optional<UUID> uuid,
                          std::string filePath,
                          std::uint64_t offset,

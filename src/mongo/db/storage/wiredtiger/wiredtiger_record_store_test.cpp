@@ -227,7 +227,8 @@ RecordId oplogOrderInsertOplog(OperationContext* opCtx,
                                const std::unique_ptr<RecordStore>& rs,
                                int inc) {
     Timestamp opTime = Timestamp(5, inc);
-    Status status = engine->oplogDiskLocRegister(opCtx, rs.get(), opTime, false);
+    Status status = engine->oplogDiskLocRegister(
+        *shard_role_details::getRecoveryUnit(opCtx), rs.get(), opTime, false);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
     StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime);
@@ -386,7 +387,8 @@ StatusWith<RecordId> insertBSONWithSize(
     WriteUnitOfWork wuow(opCtx);
     WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs);
     invariant(wtrs);
-    Status status = engine->oplogDiskLocRegister(opCtx, rs, opTime, false);
+    Status status = engine->oplogDiskLocRegister(
+        *shard_role_details::getRecoveryUnit(opCtx), rs, opTime, false);
     if (!status.isOK()) {
         return StatusWith<RecordId>(status);
     }
@@ -1372,7 +1374,10 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     params.forceUpdateWithFullDocument = false;
 
     const auto wtKvEngine = dynamic_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
-    auto rs = std::make_unique<WiredTigerRecordStore>(wtKvEngine, opCtx.get(), params);
+    auto rs = std::make_unique<WiredTigerRecordStore>(
+        wtKvEngine,
+        WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
+        params);
     rs->postConstructorInit(opCtx.get(), nss);
 
     const auto id = StringData{"1"};

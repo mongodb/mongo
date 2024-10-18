@@ -207,7 +207,7 @@ public:
     ~WiredTigerKVEngine() override;
 
     void notifyStorageStartupRecoveryComplete() override;
-    void notifyReplStartupRecoveryComplete(OperationContext* opCtx) override;
+    void notifyReplStartupRecoveryComplete(RecoveryUnit&) override;
 
     void setRecordStoreExtraOptions(const std::string& options);
     void setSortedDataInterfaceExtraOptions(const std::string& options);
@@ -244,8 +244,7 @@ public:
 
     RecoveryUnit* newRecoveryUnit() override;
 
-    Status createRecordStore(OperationContext* opCtx,
-                             const NamespaceString& ns,
+    Status createRecordStore(const NamespaceString& ns,
                              StringData ident,
                              const CollectionOptions& options,
                              KeyFormat keyFormat = KeyFormat::Long) override;
@@ -263,7 +262,7 @@ public:
                                                           StringData ident,
                                                           KeyFormat keyFormat) override;
 
-    Status createSortedDataInterface(OperationContext* opCtx,
+    Status createSortedDataInterface(RecoveryUnit&,
                                      const NamespaceString& ns,
                                      const CollectionOptions& collOptions,
                                      StringData ident,
@@ -275,12 +274,11 @@ public:
         StringData ident,
         const IndexDescriptor* desc) override;
 
-    Status importRecordStore(OperationContext* opCtx,
-                             StringData ident,
+    Status importRecordStore(StringData ident,
                              const BSONObj& storageMetadata,
                              const ImportOptions& importOptions) override;
 
-    Status importSortedDataInterface(OperationContext* opCtx,
+    Status importSortedDataInterface(RecoveryUnit&,
                                      StringData ident,
                                      const BSONObj& storageMetadata,
                                      const ImportOptions& importOptions) override;
@@ -288,15 +286,15 @@ public:
     /**
      * Drops the specified ident for resumable index builds.
      */
-    Status dropSortedDataInterface(OperationContext* opCtx, StringData ident) override;
+    Status dropSortedDataInterface(RecoveryUnit&, StringData ident) override;
 
     Status dropIdent(RecoveryUnit* ru,
                      StringData ident,
                      const StorageEngine::DropIdentCallback& onDrop = nullptr) override;
 
-    void dropIdentForImport(OperationContext* opCtx, StringData ident) override;
+    void dropIdentForImport(Interruptible&, RecoveryUnit&, StringData ident) override;
 
-    void alterIdentMetadata(OperationContext* opCtx,
+    void alterIdentMetadata(RecoveryUnit&,
                             StringData ident,
                             const IndexDescriptor* desc,
                             bool isForceUpdateMetadata) override;
@@ -305,31 +303,30 @@ public:
 
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
-    Status beginBackup(OperationContext* opCtx) override;
+    Status beginBackup() override;
 
-    void endBackup(OperationContext* opCtx) override;
+    void endBackup() override;
 
-    Status disableIncrementalBackup(OperationContext* opCtx) override;
+    Status disableIncrementalBackup() override;
 
     StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const StorageEngine::BackupOptions& options) override;
+        const StorageEngine::BackupOptions& options) override;
 
-    void endNonBlockingBackup(OperationContext* opCtx) override;
+    void endNonBlockingBackup() override;
 
-    StatusWith<std::deque<std::string>> extendBackupCursor(OperationContext* opCtx) override;
+    StatusWith<std::deque<std::string>> extendBackupCursor() override;
 
-    int64_t getIdentSize(OperationContext* opCtx, StringData ident) override;
+    int64_t getIdentSize(RecoveryUnit&, StringData ident) override;
 
-    Status repairIdent(OperationContext* opCtx, StringData ident) override;
+    Status repairIdent(RecoveryUnit& ru, StringData ident) override;
 
-    Status recoverOrphanedIdent(OperationContext* opCtx,
-                                const NamespaceString& nss,
+    Status recoverOrphanedIdent(const NamespaceString& nss,
                                 StringData ident,
                                 const CollectionOptions& options) override;
 
-    bool hasIdent(OperationContext* opCtx, StringData ident) const override;
+    bool hasIdent(RecoveryUnit&, StringData ident) const override;
 
-    std::vector<std::string> getAllIdents(OperationContext* opCtx) const override;
+    std::vector<std::string> getAllIdents(RecoveryUnit&) const override;
 
     void cleanShutdown() override;
 
@@ -358,7 +355,7 @@ public:
 
     bool supportsRecoveryTimestamp() const override;
 
-    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
+    StatusWith<Timestamp> recoverToStableTimestamp(Interruptible&) override;
 
     boost::optional<Timestamp> getRecoveryTimestamp() const override;
 
@@ -382,7 +379,7 @@ public:
 
     bool supportsOplogTruncateMarkers() const final;
 
-    Status oplogDiskLocRegister(OperationContext* opCtx,
+    Status oplogDiskLocRegister(RecoveryUnit&,
                                 RecordStore* oplogRecordStore,
                                 const Timestamp& opTime,
                                 bool orderedCommit) override;
@@ -518,12 +515,12 @@ public:
         return _clockSource;
     }
 
-    StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
+    StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,
                                              const std::string& requestingServiceName,
                                              Timestamp requestedTimestamp,
                                              bool roundUpIfTooOld) override;
 
-    Status autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) override;
+    Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) override;
 
 private:
     StatusWith<Timestamp> _pinOldestTimestamp(WithLock,
@@ -549,7 +546,7 @@ public:
 
     StatusWith<BSONObj> getStorageMetadata(StringData ident) const override;
 
-    KeyFormat getKeyFormat(OperationContext* opCtx, StringData ident) const override;
+    KeyFormat getKeyFormat(RecoveryUnit&, StringData ident) const override;
 
     size_t getCacheSizeMB() const override;
 

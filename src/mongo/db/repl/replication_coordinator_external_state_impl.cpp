@@ -357,7 +357,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
 
     // Notify the storage engine that we have completed startup recovery and are transitioning to
     // steady state replication.
-    storageEngine->notifyReplStartupRecoveryComplete(opCtx);
+    storageEngine->notifyReplStartupRecoveryComplete(*shard_role_details::getRecoveryUnit(opCtx));
 }
 
 void ReplicationCoordinatorExternalStateImpl::_stopDataReplication(

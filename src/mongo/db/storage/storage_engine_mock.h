@@ -67,22 +67,22 @@ public:
                       "The current storage engine doesn't support dropCollections");
     }
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) final {}
-    Status beginBackup(OperationContext* opCtx) final {
+    Status beginBackup() final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
-    void endBackup(OperationContext* opCtx) final {}
-    Status disableIncrementalBackup(OperationContext* opCtx) override {
+    void endBackup() final {}
+    Status disableIncrementalBackup() override {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
     StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const StorageEngine::BackupOptions& options) final {
+        const StorageEngine::BackupOptions& options) final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
-    void endNonBlockingBackup(OperationContext* opCtx) final {}
-    StatusWith<std::deque<std::string>> extendBackupCursor(OperationContext* opCtx) final {
+    void endNonBlockingBackup() final {}
+    StatusWith<std::deque<std::string>> extendBackupCursor() final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
@@ -208,7 +208,7 @@ public:
         return nullptr;
     }
 
-    StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
+    StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,
                                              const std::string& requestingServiceName,
                                              Timestamp requestedTimestamp,
                                              bool roundUpIfTooOld) final {
@@ -244,7 +244,7 @@ public:
 
     void dump() const final {}
 
-    Status autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) final {
+    Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) final {
         return Status::OK();
     }
 };

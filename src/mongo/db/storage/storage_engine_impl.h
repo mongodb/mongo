@@ -92,7 +92,7 @@ public:
 
     void notifyStorageStartupRecoveryComplete() override;
 
-    void notifyReplStartupRecoveryComplete(OperationContext* opCtx) override;
+    void notifyReplStartupRecoveryComplete(RecoveryUnit&) override;
 
     RecoveryUnit* newRecoveryUnit() override;
 
@@ -110,18 +110,18 @@ public:
 
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
-    Status beginBackup(OperationContext* opCtx) override;
+    Status beginBackup() override;
 
-    void endBackup(OperationContext* opCtx) override;
+    void endBackup() override;
 
-    Status disableIncrementalBackup(OperationContext* opCtx) override;
+    Status disableIncrementalBackup() override;
 
     StatusWith<std::unique_ptr<StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const BackupOptions& options) override;
+        const BackupOptions& options) override;
 
-    void endNonBlockingBackup(OperationContext* opCtx) override;
+    void endNonBlockingBackup() override;
 
-    StatusWith<std::deque<std::string>> extendBackupCursor(OperationContext* opCtx) override;
+    StatusWith<std::deque<std::string>> extendBackupCursor() override;
 
     bool supportsCheckpoints() const override;
 
@@ -384,7 +384,7 @@ public:
         return _options.directoryForIndexes;
     }
 
-    StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
+    StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,
                                              const std::string& requestingServiceName,
                                              Timestamp requestedTimestamp,
                                              bool roundUpIfTooOld) override;
@@ -410,7 +410,7 @@ public:
 
     void dump() const override;
 
-    Status autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) override;
+    Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) override;
 
 private:
     using CollIter = std::list<std::string>::iterator;

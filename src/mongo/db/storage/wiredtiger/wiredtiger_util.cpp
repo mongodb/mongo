@@ -1232,7 +1232,7 @@ BSONObj WiredTigerUtil::getSanitizedStorageOptionsForSecondaryReplication(const 
     return setConfigStringToStorageOptions(options, *configString);
 }
 
-Status WiredTigerUtil::canRunAutoCompact(OperationContext* opCtx, bool isEphemeral) {
+Status WiredTigerUtil::canRunAutoCompact(bool isEphemeral) {
     if (!gFeatureFlagAutoCompact.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status(ErrorCodes::IllegalOperation,
@@ -1241,10 +1241,6 @@ Status WiredTigerUtil::canRunAutoCompact(OperationContext* opCtx, bool isEphemer
     if (isEphemeral) {
         return Status(ErrorCodes::IllegalOperation,
                       "autoCompact() cannot be executed for in-memory configurations");
-    }
-    if (!opCtx->getServiceContext()->userWritesAllowed()) {
-        return Status(ErrorCodes::IllegalOperation,
-                      "autoCompact() can only be executed when writes are allowed");
     }
     if (storageGlobalParams.syncdelay == 0) {
         return Status(ErrorCodes::IllegalOperation,

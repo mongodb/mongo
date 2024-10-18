@@ -125,7 +125,10 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = collOptions.timeseries != boost::none;
 
-    auto ret = std::make_unique<WiredTigerRecordStore>(&_engine, opCtx.get(), params);
+    auto ret = std::make_unique<WiredTigerRecordStore>(
+        &_engine,
+        WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
+        params);
     ret->postConstructorInit(opCtx.get(), nss);
     return std::move(ret);
 }
@@ -181,7 +184,10 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = false;
-    return std::make_unique<WiredTigerRecordStore>(&_engine, opCtx.get(), params);
+    return std::make_unique<WiredTigerRecordStore>(
+        &_engine,
+        WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
+        params);
 }
 
 std::unique_ptr<RecoveryUnit> WiredTigerHarnessHelper::newRecoveryUnit() {

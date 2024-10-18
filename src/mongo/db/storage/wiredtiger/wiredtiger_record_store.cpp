@@ -137,9 +137,8 @@ static CompiledConfiguration upperExclusiveBoundConfig("WT_CURSOR.bound",
                                                        "bound=upper,inclusive=false");
 static CompiledConfiguration clearBoundConfig("WT_CURSOR.bound", "action=clear");
 
-void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
-    StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), uri);
+void checkOplogFormatVersion(WiredTigerRecoveryUnit& ru, const std::string& uri) {
+    StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(ru, uri);
     fassert(39999, appMetadata);
 
     fassertNoTrace(39998, appMetadata.getValue().getIntField("oplogKeyExtractionVersion") == 1);
@@ -437,7 +436,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
 }
 
 WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
-                                             OperationContext* ctx,
+                                             WiredTigerRecoveryUnit& ru,
                                              Params params)
     : RecordStore(params.uuid, params.ident, params.isCapped),
       _uri(WiredTigerKVEngine::kTableUriPrefix + params.ident),
@@ -459,20 +458,16 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
     if (kDebugBuild && _keyFormat == KeyFormat::String) {
         // This is a clustered record store. Its WiredTiger table requires key_format='u' for
         // correct operation.
-        const std::string wtTableConfig = uassertStatusOK(WiredTigerUtil::getMetadataCreate(
-            *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(ctx)), _uri));
+        const std::string wtTableConfig =
+            uassertStatusOK(WiredTigerUtil::getMetadataCreate(ru, _uri));
         const bool wtTableConfigMatchesStringKeyFormat =
             wtTableConfig.find("key_format=u") != std::string::npos;
         invariant(wtTableConfigMatchesStringKeyFormat);
     }
 
-    Status versionStatus =
-        WiredTigerUtil::checkApplicationMetadataFormatVersion(
-            *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(ctx)),
-            _uri,
-            kMinimumRecordStoreVersion,
-            kMaximumRecordStoreVersion)
-            .getStatus();
+    Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
+                               ru, _uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion)
+                               .getStatus();
 
     if (!versionStatus.isOK()) {
         LOGV2_ERROR(7887900,
@@ -487,12 +482,11 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
         }
     }
 
-    uassertStatusOK(WiredTigerUtil::setTableLogging(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(ctx)), _uri, _isLogged));
+    uassertStatusOK(WiredTigerUtil::setTableLogging(ru, _uri, _isLogged));
 
     if (_oplog) {
         invariant(_keyFormat == KeyFormat::Long);
-        checkOplogFormatVersion(ctx, _uri);
+        checkOplogFormatVersion(ru, _uri);
         // The oplog always needs to be marked for size adjustment since it is journaled and also
         // may change during replication recovery (if truncated).
         sizeRecoveryState(getGlobalServiceContext())

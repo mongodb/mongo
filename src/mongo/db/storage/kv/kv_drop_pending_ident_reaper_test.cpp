@@ -68,7 +68,7 @@ public:
                      StringData ident,
                      const StorageEngine::DropIdentCallback& onDrop) override;
 
-    void dropIdentForImport(OperationContext* opCtx, StringData ident) override {}
+    void dropIdentForImport(Interruptible&, RecoveryUnit&, StringData ident) override {}
 
     // Unused KVEngine functions below.
     RecoveryUnit* newRecoveryUnit() override {
@@ -89,8 +89,7 @@ public:
         return nullptr;
     }
 
-    Status createRecordStore(OperationContext* opCtx,
-                             const NamespaceString& nss,
+    Status createRecordStore(const NamespaceString& nss,
                              StringData ident,
                              const CollectionOptions& options,
                              KeyFormat keyFormat) override {
@@ -108,20 +107,20 @@ public:
                                                           KeyFormat keyFormat) override {
         return {};
     }
-    Status createSortedDataInterface(OperationContext* opCtx,
+    Status createSortedDataInterface(RecoveryUnit&,
                                      const NamespaceString& nss,
                                      const CollectionOptions& collOptions,
                                      StringData ident,
                                      const IndexDescriptor* desc) override {
         return Status::OK();
     }
-    Status dropSortedDataInterface(OperationContext* opCtx, StringData ident) override {
+    Status dropSortedDataInterface(RecoveryUnit&, StringData ident) override {
         return Status::OK();
     }
-    int64_t getIdentSize(OperationContext* opCtx, StringData ident) override {
+    int64_t getIdentSize(RecoveryUnit&, StringData ident) override {
         return 0;
     }
-    Status repairIdent(OperationContext* opCtx, StringData ident) override {
+    Status repairIdent(RecoveryUnit&, StringData ident) override {
         return Status::OK();
     }
 
@@ -131,10 +130,10 @@ public:
     bool supportsDirectoryPerDB() const override {
         return false;
     }
-    bool hasIdent(OperationContext* opCtx, StringData ident) const override {
+    bool hasIdent(RecoveryUnit&, StringData ident) const override {
         return false;
     }
-    std::vector<std::string> getAllIdents(OperationContext* opCtx) const override {
+    std::vector<std::string> getAllIdents(RecoveryUnit&) const override {
         return {};
     }
     void cleanShutdown() override {}
@@ -157,7 +156,7 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override {}
 
-    Status oplogDiskLocRegister(OperationContext* opCtx,
+    Status oplogDiskLocRegister(RecoveryUnit&,
                                 RecordStore* oplogRecordStore,
                                 const Timestamp& opTime,
                                 bool orderedCommit) override {

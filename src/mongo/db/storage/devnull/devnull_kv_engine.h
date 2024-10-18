@@ -70,8 +70,7 @@ public:
 
     RecoveryUnit* newRecoveryUnit() override;
 
-    Status createRecordStore(OperationContext* opCtx,
-                             const NamespaceString& nss,
+    Status createRecordStore(const NamespaceString& nss,
                              StringData ident,
                              const CollectionOptions& options,
                              KeyFormat keyFormat = KeyFormat::Long) override {
@@ -91,7 +90,7 @@ public:
                                                           StringData ident,
                                                           KeyFormat keyFormat) override;
 
-    Status createSortedDataInterface(OperationContext* opCtx,
+    Status createSortedDataInterface(RecoveryUnit&,
                                      const NamespaceString& nss,
                                      const CollectionOptions& collOptions,
                                      StringData ident,
@@ -99,7 +98,7 @@ public:
         return Status::OK();
     }
 
-    Status dropSortedDataInterface(OperationContext* opCtx, StringData ident) override {
+    Status dropSortedDataInterface(RecoveryUnit&, StringData ident) override {
         return Status::OK();
     }
 
@@ -116,7 +115,7 @@ public:
         return Status::OK();
     }
 
-    void dropIdentForImport(OperationContext* opCtx, StringData ident) override {}
+    void dropIdentForImport(Interruptible&, RecoveryUnit&, StringData ident) override {}
 
     bool supportsDirectoryPerDB() const override {
         return false;
@@ -126,19 +125,19 @@ public:
         return true;
     }
 
-    int64_t getIdentSize(OperationContext* opCtx, StringData ident) override {
+    int64_t getIdentSize(RecoveryUnit&, StringData ident) override {
         return 1;
     }
 
-    Status repairIdent(OperationContext* opCtx, StringData ident) override {
+    Status repairIdent(RecoveryUnit&, StringData ident) override {
         return Status::OK();
     }
 
-    bool hasIdent(OperationContext* opCtx, StringData ident) const override {
+    bool hasIdent(RecoveryUnit&, StringData ident) const override {
         return true;
     }
 
-    std::vector<std::string> getAllIdents(OperationContext* opCtx) const override {
+    std::vector<std::string> getAllIdents(RecoveryUnit&) const override {
         return std::vector<std::string>();
     }
 
@@ -154,18 +153,18 @@ public:
         return boost::none;
     }
 
-    Status beginBackup(OperationContext* opCtx) override {
+    Status beginBackup() override {
         return Status::OK();
     }
 
-    void endBackup(OperationContext* opCtx) override {}
+    void endBackup() override {}
 
     StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const StorageEngine::BackupOptions& options) override;
+        const StorageEngine::BackupOptions& options) override;
 
-    void endNonBlockingBackup(OperationContext* opCtx) override {}
+    void endNonBlockingBackup() override {}
 
-    StatusWith<std::deque<std::string>> extendBackupCursor(OperationContext* opCtx) override;
+    StatusWith<std::deque<std::string>> extendBackupCursor() override;
 
     boost::optional<Timestamp> getLastStableRecoveryTimestamp() const override {
         return boost::none;
@@ -184,7 +183,7 @@ public:
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
                                                  RecordStore* recordsStore) const override {}
 
-    Status oplogDiskLocRegister(OperationContext* opCtx,
+    Status oplogDiskLocRegister(RecoveryUnit&,
                                 RecordStore* oplogRecordStore,
                                 const Timestamp& opTime,
                                 bool orderedCommit) override {

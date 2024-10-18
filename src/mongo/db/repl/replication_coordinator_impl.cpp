@@ -1127,7 +1127,8 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
         // function to avoid deadlock.
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         invariant(storageEngine);
-        storageEngine->notifyReplStartupRecoveryComplete(opCtx);
+        storageEngine->notifyReplStartupRecoveryComplete(
+            *shard_role_details::getRecoveryUnit(opCtx));
 
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _setConfigState(lk, kConfigReplicationDisabled);

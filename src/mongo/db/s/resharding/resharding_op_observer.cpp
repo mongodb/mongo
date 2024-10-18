@@ -170,8 +170,11 @@ void _doPin(OperationContext* opCtx) {
         return;
     }
 
-    StatusWith<Timestamp> res = storageEngine->pinOldestTimestamp(
-        opCtx, ReshardingHistoryHook::kName.toString(), pin.value(), false);
+    StatusWith<Timestamp> res =
+        storageEngine->pinOldestTimestamp(*shard_role_details::getRecoveryUnit(opCtx),
+                                          ReshardingHistoryHook::kName.toString(),
+                                          pin.value(),
+                                          false);
     if (!res.isOK()) {
         if (!replCoord->getSettings().isReplSet()) {
             // The pin has failed, but we're in standalone mode. Ignore the error.

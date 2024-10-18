@@ -100,7 +100,11 @@ public:
         ASSERT_OK(result.getStatus());
 
         std::string uri = "table:" + ns;
-        invariant(Status::OK() == WiredTigerIndex::create(opCtx, uri, result.getValue()));
+        invariant(Status::OK() ==
+                  WiredTigerIndex::create(
+                      WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
+                      uri,
+                      result.getValue()));
 
         return std::make_unique<WiredTigerIdIndex>(
             opCtx, uri, UUID::gen(), "" /* ident */, &desc, isLogged);
@@ -140,7 +144,11 @@ public:
         ASSERT_OK(result.getStatus());
 
         std::string uri = "table:" + ns;
-        invariant(Status::OK() == WiredTigerIndex::create(opCtx, uri, result.getValue()));
+        invariant(Status::OK() ==
+                  WiredTigerIndex::create(
+                      WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
+                      uri,
+                      result.getValue()));
 
         if (unique) {
             return std::make_unique<WiredTigerIndexUnique>(opCtx,

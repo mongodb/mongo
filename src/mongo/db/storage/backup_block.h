@@ -56,8 +56,7 @@ namespace mongo {
  */
 class BackupBlock final {
 public:
-    explicit BackupBlock(OperationContext* opCtx,
-                         boost::optional<NamespaceString> nss,
+    explicit BackupBlock(boost::optional<NamespaceString> nss,
                          boost::optional<UUID> uuid,
                          std::string filePath,
                          std::uint64_t offset = 0,

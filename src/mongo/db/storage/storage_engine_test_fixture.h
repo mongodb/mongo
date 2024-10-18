@@ -102,7 +102,7 @@ public:
     Status createCollTable(OperationContext* opCtx, NamespaceString collName) {
         const std::string identName = "collection-" + collName.ns_forTest();
         return _storageEngine->getEngine()->createRecordStore(
-            opCtx, collName, identName, CollectionOptions());
+            collName, identName, CollectionOptions());
     }
 
     Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, std::string indexName) {
@@ -130,7 +130,8 @@ public:
     }
 
     std::vector<std::string> getAllKVEngineIdents(OperationContext* opCtx) {
-        return _storageEngine->getEngine()->getAllIdents(opCtx);
+        return _storageEngine->getEngine()->getAllIdents(
+            *shard_role_details::getRecoveryUnit(opCtx));
     }
 
     bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {

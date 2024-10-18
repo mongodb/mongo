@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -109,6 +110,10 @@ Status autoCompact(OperationContext* opCtx,
                    bool enable,
                    bool runOnce,
                    boost::optional<int64_t> freeSpaceTargetMB) {
+    if (!opCtx->getServiceContext()->userWritesAllowed()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "autoCompact can only be executed when writes are allowed");
+    }
 
     auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
@@ -147,7 +152,8 @@ Status autoCompact(OperationContext* opCtx,
 
     AutoCompactOptions options{enable, runOnce, freeSpaceTargetMB, std::move(excludedIdents)};
 
-    Status status = storageEngine->autoCompact(opCtx, options);
+    Status status =
+        storageEngine->autoCompact(*shard_role_details::getRecoveryUnit(opCtx), options);
     if (!status.isOK())
         return status;
     LOGV2(8012100, "AutoCompact", "enabled"_attr = enable);

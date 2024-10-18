@@ -39,6 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -91,8 +92,8 @@ void DurableHistoryRegistry::reconcilePins(OperationContext* opCtx) {
                            "name"_attr = pin->getName(),
                            "ts"_attr = pinTs);
         if (pinTs) {
-            auto swTimestamp =
-                engine->pinOldestTimestamp(opCtx, pin->getName(), pinTs.value(), false);
+            auto swTimestamp = engine->pinOldestTimestamp(
+                *shard_role_details::getRecoveryUnit(opCtx), pin->getName(), pinTs.value(), false);
             if (!swTimestamp.isOK()) {
                 LOGV2_WARNING(5384105,
                               "Unable to repin oldest timestamp",

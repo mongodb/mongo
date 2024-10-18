@@ -234,7 +234,10 @@ public:
         // also results in the pin being lifted.
         Timestamp pinTs =
             uassertStatusOK(opCtx->getServiceContext()->getStorageEngine()->pinOldestTimestamp(
-                opCtx, kTestingDurableHistoryPinName, requestedPinTs, round));
+                *shard_role_details::getRecoveryUnit(opCtx),
+                kTestingDurableHistoryPinName,
+                requestedPinTs,
+                round));
 
         uassertStatusOK(Helpers::insert(
             opCtx, collection, fixDocumentForInsert(opCtx, BSON("pinTs" << pinTs)).getValue()));

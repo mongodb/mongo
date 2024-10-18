@@ -51,6 +51,7 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -126,14 +127,14 @@ public:
      * Creates a WiredTiger table suitable for implementing a MongoDB index.
      * 'config' should be created with generateCreateString().
      */
-    static Status create(OperationContext* opCtx,
+    static Status create(WiredTigerRecoveryUnit&,
                          const std::string& uri,
                          const std::string& config);
 
     /**
      * Drops the specified WiredTiger table. This should only be used for resuming index builds.
      */
-    static Status Drop(OperationContext* opCtx, const std::string& uri);
+    static Status Drop(WiredTigerRecoveryUnit&, const std::string& uri);
 
     /**
      * Constructs an index. The rsKeyFormat is the RecordId key format of the related RecordStore.

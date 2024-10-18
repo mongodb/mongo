@@ -134,7 +134,7 @@ public:
         bool forceUpdateWithFullDocument;
     };
 
-    WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, OperationContext* opCtx, Params params);
+    WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, WiredTigerRecoveryUnit&, Params params);
 
     ~WiredTigerRecordStore() override;
 

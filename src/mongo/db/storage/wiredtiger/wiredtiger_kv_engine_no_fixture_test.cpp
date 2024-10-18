@@ -202,9 +202,8 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
     StringData ident("rollback_to_stable40");
     CollectionOptions collectionOptions;
     auto keyFormat = KeyFormat::Long;
-    ASSERT_OK(kvEngine->createRecordStore(opCtx.get(), nss, ident, collectionOptions, keyFormat))
-        << fmt::format("failed to create record store with namespace {}",
-                       nss.toStringForErrorMsg());
+    ASSERT_OK(kvEngine->createRecordStore(nss, ident, collectionOptions, keyFormat)) << fmt::format(
+        "failed to create record store with namespace {}", nss.toStringForErrorMsg());
 
     // Pin oldest and stable to timestamps (1,10).
     // The timestamps in the RollbackToStable40 in the C API test translate to MDB timestamps

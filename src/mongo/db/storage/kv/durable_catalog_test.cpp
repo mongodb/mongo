@@ -297,8 +297,11 @@ protected:
             BSON(ident << unittest::assertGet(engine->getStorageMetadata(ident)) << idxIdent
                        << unittest::assertGet(engine->getStorageMetadata(idxIdent)));
 
-        engine->dropIdentForImport(operationContext(), ident);
-        engine->dropIdentForImport(operationContext(), idxIdent);
+        engine->dropIdentForImport(
+            *operationContext(), *shard_role_details::getRecoveryUnit(operationContext()), ident);
+        engine->dropIdentForImport(*operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()),
+                                   idxIdent);
     }
 
     StatusWith<DurableCatalog::ImportResult> importCollectionTest(const NamespaceString& nss,

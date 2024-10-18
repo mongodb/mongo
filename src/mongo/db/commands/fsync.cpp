@@ -490,7 +490,7 @@ void FSyncLockThread::run() {
                                        // Have the uassert be caught by the DBException
                                        // block. Maintain "allowFsyncFailure" compatibility in
                                        // community.
-                                       uassertStatusOK(storageEngine->beginBackup(&opCtx));
+                                       uassertStatusOK(storageEngine->beginBackup());
                                        successfulFsyncLock = true;
                                    }
                                });
@@ -522,7 +522,7 @@ void FSyncLockThread::run() {
             if (backupCursorHooks->enabled()) {
                 backupCursorHooks->fsyncUnlock(&opCtx);
             } else {
-                storageEngine->endBackup(&opCtx);
+                storageEngine->endBackup();
             }
         }
 

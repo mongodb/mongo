@@ -261,25 +261,19 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
     return StatusWith<std::string>(ss);
 }
 
-Status WiredTigerIndex::create(OperationContext* opCtx,
+Status WiredTigerIndex::create(WiredTigerRecoveryUnit& ru,
                                const std::string& uri,
                                const std::string& config) {
     // Don't use the session from the recovery unit: create should not be used in a transaction
-    WiredTigerSession session(
-        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
-            ->getSessionCache()
-            ->conn());
+    WiredTigerSession session(ru.getSessionCache()->conn());
     WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(
         51780, 1, "create uri: {uri} config: {config}", "uri"_attr = uri, "config"_attr = config);
     return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()), s);
 }
 
-Status WiredTigerIndex::Drop(OperationContext* opCtx, const std::string& uri) {
-    WiredTigerSession session(
-        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
-            ->getSessionCache()
-            ->conn());
+Status WiredTigerIndex::Drop(WiredTigerRecoveryUnit& ru, const std::string& uri) {
+    WiredTigerSession session(ru.getSessionCache()->conn());
     WT_SESSION* s = session.getSession();
 
     return wtRCToStatus(s->drop(s, uri.c_str(), nullptr), s);
@@ -689,8 +683,10 @@ void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
         (!desc->unique() &&
          ((isIndexVersion1 && isDataFormat13) || (isIndexVersion2 && isDataFormat14)))) {
         auto engine = opCtx->getServiceContext()->getStorageEngine();
-        engine->getEngine()->alterIdentMetadata(
-            opCtx, ident, desc, /* isForceUpdateMetadata */ false);
+        engine->getEngine()->alterIdentMetadata(*shard_role_details::getRecoveryUnit(opCtx),
+                                                ident,
+                                                desc,
+                                                /* isForceUpdateMetadata */ false);
         auto prevVersion = _dataFormatVersion;
         // The updated data format is guaranteed to be within the supported version range.
         _dataFormatVersion =

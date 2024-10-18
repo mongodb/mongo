@@ -199,7 +199,7 @@ public:
      * This function may race with shutdown. As a result, any steps within this function that should
      * not race with shutdown should obtain the global lock.
      */
-    virtual void notifyReplStartupRecoveryComplete(OperationContext* opCtx) {}
+    virtual void notifyReplStartupRecoveryComplete(RecoveryUnit&) {}
 
     /**
      * Returns a new interface to the storage engine's recovery unit.  The recovery
@@ -288,7 +288,7 @@ public:
      * retried, returns a non-OK status. This function may throw a WriteConflictException, which
      * should trigger a retry by the caller. All other exceptions should be treated as errors.
      */
-    virtual Status beginBackup(OperationContext* opCtx) = 0;
+    virtual Status beginBackup() = 0;
 
     /**
      * Transitions the storage engine out of backup mode.
@@ -297,7 +297,7 @@ public:
      *
      * Storage engines implementing this feature should fassert when unable to leave backup mode.
      */
-    virtual void endBackup(OperationContext* opCtx) = 0;
+    virtual void endBackup() = 0;
 
     /**
      * Disables the storage of incremental backup history until a subsequent incremental backup
@@ -305,7 +305,7 @@ public:
      *
      * The storage engine must release all incremental backup information and resources.
      */
-    virtual Status disableIncrementalBackup(OperationContext* opCtx) = 0;
+    virtual Status disableIncrementalBackup() = 0;
 
     /**
      * Represents the options that the storage engine can use during full and incremental backups.
@@ -347,19 +347,18 @@ public:
             stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>
                 identsToNsAndUUID) = 0;
 
-        virtual StatusWith<std::deque<BackupBlock>> getNextBatch(OperationContext* opCtx,
-                                                                 std::size_t batchSize) = 0;
+        virtual StatusWith<std::deque<BackupBlock>> getNextBatch(std::size_t batchSize) = 0;
 
     protected:
         BackupOptions options;
     };
 
     virtual StatusWith<std::unique_ptr<StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const BackupOptions& options) = 0;
+        const BackupOptions& options) = 0;
 
-    virtual void endNonBlockingBackup(OperationContext* opCtx) = 0;
+    virtual void endNonBlockingBackup() = 0;
 
-    virtual StatusWith<std::deque<std::string>> extendBackupCursor(OperationContext* opCtx) = 0;
+    virtual StatusWith<std::deque<std::string>> extendBackupCursor() = 0;
 
     /**
      * Recover as much data as possible from a potentially corrupt RecordStore.
@@ -705,7 +704,7 @@ public:
      * If the input OperationContext is in a WriteUnitOfWork, an `onRollback` handler will be
      * registered to return the pin for the `requestingServiceName` to the previous value.
      */
-    virtual StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
+    virtual StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,
                                                      const std::string& requestingServiceName,
                                                      Timestamp requestedTimestamp,
                                                      bool roundUpIfTooOld) = 0;
@@ -789,7 +788,7 @@ public:
      * Toggles auto compact for a database. Auto compact periodically iterates through all of
      * the files available and runs compaction if they are eligible.
      */
-    virtual Status autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) = 0;
+    virtual Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) = 0;
 };
 
 }  // namespace mongo

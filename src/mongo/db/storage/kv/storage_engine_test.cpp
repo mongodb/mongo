@@ -481,7 +481,10 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     ASSERT_OK(swCollInfo.getStatus());
 
     // Drop the ident from the storage engine but keep the underlying files.
-    _storageEngine->getEngine()->dropIdentForImport(opCtx.get(), swCollInfo.getValue().ident);
+    _storageEngine->getEngine()->dropIdentForImport(
+        *opCtx.get(),
+        *shard_role_details::getRecoveryUnit(opCtx.get()),
+        swCollInfo.getValue().ident);
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // After the catalog is reloaded, we expect that the ident has been recovered because the

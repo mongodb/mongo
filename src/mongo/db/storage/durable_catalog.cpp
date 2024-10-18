@@ -596,8 +596,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::cr
         }
         return KeyFormat::Long;
     }();
-    Status status =
-        _engine->getEngine()->createRecordStore(opCtx, nss, entry.ident, options, keyFormat);
+    Status status = _engine->getEngine()->createRecordStore(nss, entry.ident, options, keyFormat);
     if (!status.isOK())
         return status;
 
@@ -622,7 +621,8 @@ Status DurableCatalog::createIndex(OperationContext* opCtx,
     std::string ident = getIndexIdent(opCtx, catalogId, spec->indexName());
 
     auto kvEngine = _engine->getEngine();
-    Status status = kvEngine->createSortedDataInterface(opCtx, nss, collOptions, ident, spec);
+    Status status = kvEngine->createSortedDataInterface(
+        *shard_role_details::getRecoveryUnit(opCtx), nss, collOptions, ident, spec);
     if (status.isOK()) {
         shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [this, ident, recoveryUnit = shard_role_details::getRecoveryUnit(opCtx)](
@@ -707,20 +707,24 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
 
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [catalog = this, ident = entry.ident, indexIdents = indexIdents](OperationContext* opCtx) {
-            catalog->_engine->getEngine()->dropIdentForImport(opCtx, ident);
+            catalog->_engine->getEngine()->dropIdentForImport(
+                *opCtx, *shard_role_details::getRecoveryUnit(opCtx), ident);
             for (const auto& indexIdent : indexIdents) {
-                catalog->_engine->getEngine()->dropIdentForImport(opCtx, indexIdent);
+                catalog->_engine->getEngine()->dropIdentForImport(
+                    *opCtx, *shard_role_details::getRecoveryUnit(opCtx), indexIdent);
             }
         });
 
     auto kvEngine = _engine->getEngine();
-    Status status = kvEngine->importRecordStore(opCtx, entry.ident, storageMetadata, importOptions);
+    Status status = kvEngine->importRecordStore(entry.ident, storageMetadata, importOptions);
     if (!status.isOK())
         return status;
 
     for (const std::string& indexIdent : indexIdents) {
-        status =
-            kvEngine->importSortedDataInterface(opCtx, indexIdent, storageMetadata, importOptions);
+        status = kvEngine->importSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
+                                                     indexIdent,
+                                                     storageMetadata,
+                                                     importOptions);
         if (!status.isOK()) {
             return status;
         }
@@ -792,11 +796,13 @@ Status DurableCatalog::dropAndRecreateIndexIdentForResume(OperationContext* opCt
                                                           const CollectionOptions& collOptions,
                                                           const IndexDescriptor* spec,
                                                           StringData ident) {
-    auto status = _engine->getEngine()->dropSortedDataInterface(opCtx, ident);
+    auto status = _engine->getEngine()->dropSortedDataInterface(
+        *shard_role_details::getRecoveryUnit(opCtx), ident);
     if (!status.isOK())
         return status;
 
-    status = _engine->getEngine()->createSortedDataInterface(opCtx, nss, collOptions, ident, spec);
+    status = _engine->getEngine()->createSortedDataInterface(
+        *shard_role_details::getRecoveryUnit(opCtx), nss, collOptions, ident, spec);
 
     return status;
 }

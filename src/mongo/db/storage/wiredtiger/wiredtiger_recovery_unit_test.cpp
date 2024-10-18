@@ -143,7 +143,10 @@ public:
         params.tracksSizeAdjustments = true;
         params.forceUpdateWithFullDocument = false;
 
-        auto ret = std::make_unique<WiredTigerRecordStore>(&_engine, opCtx, params);
+        auto ret = std::make_unique<WiredTigerRecordStore>(
+            &_engine,
+            WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
+            params);
         ret->postConstructorInit(opCtx, nss);
         return std::move(ret);
     }
