@@ -366,15 +366,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
-        OperationContext* opCtx,
-        const CollectionPtr& yieldableCollection,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        ScanDirection scanDirection,
-        const boost::optional<RecordId>& resumeAfterRecordId) const {
-        MONGO_UNREACHABLE;
-    }
-
     void onDeregisterFromCatalog(OperationContext* opCtx) override {}
 
     UUID uuid() const override {

@@ -148,14 +148,6 @@ public:
 class Collection : public Decorable<Collection> {
 public:
     /**
-     * Direction of collection scan plan executor returned by makePlanExecutor().
-     */
-    enum class ScanDirection {
-        kForward = 1,
-        kBackward = -1,
-    };
-
-    /**
      * A Collection::Factory is a factory class that constructs Collection objects.
      */
     class Factory {
