@@ -35,12 +35,12 @@ assert.commandWorked(testDb.createView(viewName, 'underlyingSourceCollection', v
 let addFieldsView = testDb[viewName];
 
 assert.commandWorked(addFieldsView.createSearchIndex(
-    {name: "addFieldsIndex", definition: {"mappings": {"dynamic": true}}}));
+    {name: "populationAddFieldsIndex", definition: {"mappings": {"dynamic": true}}}));
 
 // Test basic $search pipeline on the newly created view.
 let pipeline = [{
     $search: {
-        index: "addFieldsIndex",
+        index: "populationAddFieldsIndex",
         exists: {
             path: "state",
         }
@@ -67,7 +67,7 @@ assertArrayEq({actual: results, expected: expectedResults});
 pipeline = [
     {
         $search: {
-            index: "addFieldsIndex",
+            index: "populationAddFieldsIndex",
             exists: {
                 path: "state",
             }

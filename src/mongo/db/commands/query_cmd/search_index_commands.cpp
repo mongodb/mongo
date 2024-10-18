@@ -40,6 +40,44 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+
+namespace {
+template <typename CommandType>
+BSONObj retrieveSearchIndexManagerResponse(OperationContext* opCtx, CommandType& cmd) {
+    const auto& currentOperationNss = cmd.getNamespace();
+    auto role = opCtx->getService()->role();
+    // TODO SERVER-93637 remove the separate logic for sharded vs unsharded once sharded
+    // views can support all search commands.
+    if (role.hasExclusively(ClusterRole::ShardServer)) {
+        // If the index management command is being run on a view, this call will return the
+        // underlying source collection UUID and NSS. If not, it will just return a UUID.
+        auto collUUIDresolvedNSSpair =
+            SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveViewOrThrow(
+                opCtx, currentOperationNss);
+        // If the query is on a normal collection, the source collection will be the same as
+        // the current NS.
+        auto sourceCollectionNss = currentOperationNss;
+        boost::optional<StringData> viewNss;
+        auto collUUID = collUUIDresolvedNSSpair.first;
+        if (auto resolvedNss = collUUIDresolvedNSSpair.second) {
+            // The request is on a view! Therefore, currentOperationNss refers to the view
+            // NS and resolvedNss refers to the underlying source collection.
+            sourceCollectionNss = *resolvedNss;
+            viewNss.emplace(currentOperationNss.coll());
+        }
+        // Run the search index command against the remote search index management server.
+        return getSearchIndexManagerResponse(
+            opCtx, sourceCollectionNss, collUUID, cmd.toBSON(), viewNss);
+    } else if (role.hasExclusively(ClusterRole::RouterServer)) {
+        auto collectionUUID = SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(
+            opCtx, currentOperationNss);
+        // Run the search index command against the remote search index management server.
+        return getSearchIndexManagerResponse(
+            opCtx, currentOperationNss, collectionUUID, cmd.toBSON());
+    }
+    MONGO_UNREACHABLE;
+}
+}  // namespace
 namespace {
 
 /**
@@ -93,42 +131,8 @@ public:
             auto cmd = request();
             generic_argument_util::prepareRequestForSearchIndexManagerPassthrough(cmd);
 
-            const auto& currentOperationNss = cmd.getNamespace();
-            // TODO SERVER-93637 remove the separate logic for sharded vs unsharded once sharded
-            // views can support all search commands.
-            auto role = opCtx->getService()->role();
-            auto manageSearchIndexResponse = BSONObj();
-            if (role.hasExclusively(ClusterRole::ShardServer)) {
-                // If the index management command is being run on a view, this call will return the
-                // underlying source collection UUID and NSS. If not, it will just return a UUID.
-                auto collUUIDresolvedNSSpair =
-                    SearchIndexProcessInterface::get(opCtx)
-                        ->fetchCollectionUUIDAndResolveViewOrThrow(opCtx, currentOperationNss);
-                // If the query is on a normal collection, the source collection will be the same as
-                // the current NS.
-                auto sourceCollectionNss = currentOperationNss;
-                boost::optional<StringData> viewNss;
-                auto collUUID = collUUIDresolvedNSSpair.first;
-                if (auto resolvedNss = collUUIDresolvedNSSpair.second) {
-                    // The request is on a view! Therefore, currentOperationNss refers to the view
-                    // NS and resolvedNss refers to the underlying source collection.
-                    sourceCollectionNss = *resolvedNss;
-                    viewNss.emplace(currentOperationNss.coll());
-                }
-                // Run the search index command against the remote search index management server.
-                manageSearchIndexResponse = getSearchIndexManagerResponse(
-                    opCtx, sourceCollectionNss, collUUID, cmd.toBSON(), viewNss);
-            } else if (role.hasExclusively(ClusterRole::RouterServer)) {
-                auto collectionUUID =
-                    SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(
-                        opCtx, currentOperationNss);
-
-                // Run the search index command against the remote search index management server.
-                manageSearchIndexResponse = getSearchIndexManagerResponse(
-                    opCtx, currentOperationNss, collectionUUID, cmd.toBSON());
-            }
-
             IDLParserContext ctx("CreateSearchIndexesReply Parser");
+            BSONObj manageSearchIndexResponse = retrieveSearchIndexManagerResponse(opCtx, cmd);
             return CreateSearchIndexesReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
         }
 
@@ -285,15 +289,8 @@ public:
                     "Must set either 'name' or 'id'.",
                     cmd.getName() || cmd.getId());
 
-            const auto& nss = cmd.getNamespace();
-
-            auto collectionUUID =
-                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
-
-            BSONObj manageSearchIndexResponse =
-                getSearchIndexManagerResponse(opCtx, nss, collectionUUID, cmd.toBSON());
-
             IDLParserContext ctx("UpdateSearchIndexReply Parser");
+            BSONObj manageSearchIndexResponse = retrieveSearchIndexManagerResponse(opCtx, cmd);
             return UpdateSearchIndexReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
         }
 
