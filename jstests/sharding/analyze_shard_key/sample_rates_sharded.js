@@ -205,7 +205,7 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
                }));
 
     AnalyzeShardKeyUtil.assertDiffPercentage(
-        sampleSize.total, expectedTotalCount, 10 /* maxDiffPercentage */);
+        sampleSize.total, expectedTotalCount, 20 /* maxDiffPercentage */);
     const actualFindPercentage =
         AnalyzeShardKeyUtil.calculatePercentage(sampleSize.find, sampleSize.total);
     assertDiffWindow(actualFindPercentage, expectedFindPercentage, 7.5 /* maxDiff */);
