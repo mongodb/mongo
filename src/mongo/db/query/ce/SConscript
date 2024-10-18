@@ -94,7 +94,7 @@ env.CppUnitTest(
         "sampling_estimator_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "sampling_estimator",
     ],
 )
