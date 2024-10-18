@@ -124,6 +124,9 @@ MONGO_FAIL_POINT_DEFINE(pauseInHandleHeartbeatResponse);
 
 using executor::RemoteCommandRequest;
 
+auto& heartBeatHandleQueueSize = *MetricBuilder<Counter64>("repl.heartBeat.handleQueueSize");
+
+
 long long ReplicationCoordinatorImpl::_getElectionOffsetUpperBound(WithLock lk) {
     long long electionTimeout =
         durationCount<Milliseconds>(_rsConfig.getConfig(lk).getElectionTimeoutPeriod());
@@ -1096,6 +1099,7 @@ void ReplicationCoordinatorImpl::_trackHeartbeatHandle(
     // there should not be a situation where the target node's HostAndPort changes but this
     // heartbeat handle remains active.
     _heartbeatHandles.push_back({handle.getValue(), hbState, target});
+    heartBeatHandleQueueSize.increment();
 }
 
 void ReplicationCoordinatorImpl::_untrackHeartbeatHandle(
@@ -1104,6 +1108,7 @@ void ReplicationCoordinatorImpl::_untrackHeartbeatHandle(
                                        _heartbeatHandles.end(),
                                        [&](auto& hbHandle) { return hbHandle.handle == handle; });
     invariant(newEnd != _heartbeatHandles.end());
+    heartBeatHandleQueueSize.decrement(std::distance(newEnd, _heartbeatHandles.end()));
     _heartbeatHandles.erase(newEnd, _heartbeatHandles.end());
 }
 
