@@ -34,7 +34,8 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
@@ -54,13 +55,15 @@ using namespace fmt::literals;
 
 constexpr auto kTestLogTag = "test"_sd;
 
-class LogRotateSignalTest : public ServiceContextTest {
+class LogRotateSignalTest : public unittest::Test {
 public:
     void setUp() override {
+        // We don't plan on destructing the global service context in order to prevent a race
+        // with the signal processing thread.
+        setGlobalServiceContext(ServiceContext::make());
         static constexpr auto kNumThreadsForBarrier = 2;
         _barrier = std::make_unique<unittest::Barrier>(kNumThreadsForBarrier);
 
-        ServiceContextTest::setUp();
         startSignalProcessingThread(LogFileStatus::kNeedToRotateLogFile);
 
         logv2::addLogRotator(kTestLogTag, [&](bool, StringData, std::function<void(Status)>) {
