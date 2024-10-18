@@ -90,8 +90,6 @@ enums:
             kCommitIndexBuild: "commitIndexBuild"
             kAbortIndexBuild: "abortIndexBuild"
             kDropIndexes: "dropIndexes"
-            # TODO SERVER-87911: Remove 'deleteIndexes' as CommandType.
-            kDeleteIndexes: "deleteIndexes"
             kCommitTransaction: "commitTransaction"
             kAbortTransaction: "abortTransaction"
             kImportCollection: "importCollection"

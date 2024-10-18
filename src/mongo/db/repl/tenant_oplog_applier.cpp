@@ -1220,8 +1220,7 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
     auto op = entryOrGroupedInserts.getOp();
     if (op->isIndexCommandType() &&
         op->getCommandType() != OplogEntry::CommandType::kCreateIndexes &&
-        op->getCommandType() != OplogEntry::CommandType::kDropIndexes &&
-        op->getCommandType() != OplogEntry::CommandType::kDeleteIndexes) {
+        op->getCommandType() != OplogEntry::CommandType::kDropIndexes) {
         LOGV2_ERROR(488610,
                     "Index creation, except createIndex on empty collections, is not supported in "
                     "tenant migration",

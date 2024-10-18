@@ -529,8 +529,7 @@ bool DurableOplogEntry::isIndexCommandType() const {
          (getCommandType() == CommandTypeEnum::kStartIndexBuild) ||
          (getCommandType() == CommandTypeEnum::kCommitIndexBuild) ||
          (getCommandType() == CommandTypeEnum::kAbortIndexBuild) ||
-         (getCommandType() == CommandTypeEnum::kDropIndexes) ||
-         (getCommandType() == CommandTypeEnum::kDeleteIndexes));
+         (getCommandType() == CommandTypeEnum::kDropIndexes));
 }
 
 BSONElement DurableOplogEntry::getIdElement() const {
