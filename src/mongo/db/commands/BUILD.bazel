@@ -1150,7 +1150,7 @@ mongo_cc_library(
         "//src/mongo/db:query_exec",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/catalog:catalog_helpers",
-        "//src/mongo/db/catalog:collection_crud",
+        "//src/mongo/db/collection_crud",
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/query/write_ops:write_ops_exec",
         "//src/mongo/util:system_perf",

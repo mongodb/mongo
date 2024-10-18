@@ -286,9 +286,9 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_filterer",
         "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:collection_crud",
         "//src/mongo/db/catalog:collection_query_info",
         "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/collection_crud",
         "//src/mongo/executor:task_executor_cursor",
     ],
 )

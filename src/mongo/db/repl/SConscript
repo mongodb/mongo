@@ -120,9 +120,9 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
         "$BUILD_DIR/mongo/db/catalog/health_log",
         "$BUILD_DIR/mongo/db/catalog/health_log_interface",
+        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
         "$BUILD_DIR/mongo/db/commands/dbcheck_command",
         "$BUILD_DIR/mongo/db/dbdirectclient",
         "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",
@@ -143,7 +143,7 @@ env.Library(
         "rollback_test_fixture.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
+        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
         "$BUILD_DIR/mongo/db/dbhelpers",
         "$BUILD_DIR/mongo/db/multitenancy",
         "$BUILD_DIR/mongo/db/op_observer/op_observer",
@@ -218,9 +218,9 @@ env.Library(
         "storage_interface",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
         "$BUILD_DIR/mongo/db/change_stream_change_collection_manager",
         "$BUILD_DIR/mongo/db/change_stream_serverless_helpers",
+        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
         "$BUILD_DIR/mongo/db/commands/mongod_fsync",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
@@ -280,9 +280,9 @@ env.Library(
         "storage_interface",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
         "$BUILD_DIR/mongo/db/change_stream_change_collection_manager",
         "$BUILD_DIR/mongo/db/change_stream_serverless_helpers",
+        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
         "$BUILD_DIR/mongo/db/commands/mongod_fsync",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
@@ -718,8 +718,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
         "$BUILD_DIR/mongo/db/catalog/local_oplog_info",
+        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface",
         "$BUILD_DIR/mongo/db/query/write_ops/write_ops_exec",
@@ -757,8 +757,8 @@ env.Library(
         "tenant_migration_utils",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
         "$BUILD_DIR/mongo/db/catalog/local_oplog_info",
+        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",
         "$BUILD_DIR/mongo/db/serverless/serverless_lock",
@@ -833,7 +833,7 @@ env.Library(
         "mock_repl_coord_server_fixture.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
+        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
         "$BUILD_DIR/mongo/db/dbdirectclient",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/db/shard_role",

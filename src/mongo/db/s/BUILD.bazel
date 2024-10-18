@@ -516,7 +516,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:collection_crud",
+        "//src/mongo/db/collection_crud",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/query/write_ops",

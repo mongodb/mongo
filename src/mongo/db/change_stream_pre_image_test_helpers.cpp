@@ -29,9 +29,9 @@
 
 #include "mongo/db/change_stream_pre_image_test_helpers.h"
 
-#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 
 namespace mongo {
 namespace change_stream_pre_image_test_helper {

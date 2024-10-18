@@ -53,6 +53,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/audit",
+        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
         "$BUILD_DIR/mongo/db/collection_index_usage_tracker",
         "$BUILD_DIR/mongo/db/commands/server_status_core",
         "$BUILD_DIR/mongo/db/dbcommands_idl",
@@ -90,7 +91,6 @@ env.Library(
         "capped_visibility",
         "catalog_helpers",
         "catalog_stats",
-        "collection_crud",
         "collection_options",
         "collection_query_info",
         "document_validation",
@@ -204,6 +204,7 @@ if wiredtiger:
         LIBDEPS=[
             "$BUILD_DIR/mongo/db/auth/authmocks",
             "$BUILD_DIR/mongo/db/coll_mod_command_idl",
+            "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
             "$BUILD_DIR/mongo/db/commands/create_command",
             "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
             "$BUILD_DIR/mongo/db/concurrency/exception_util",
@@ -242,7 +243,6 @@ if wiredtiger:
             "catalog_impl",
             "catalog_test_fixture",
             "collection_catalog",
-            "collection_crud",
             "collection_options",
             "collection_query_info",
             "collection_validation",

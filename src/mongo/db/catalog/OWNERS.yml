@@ -7,9 +7,6 @@ filters:
     approvers:
       - 10gen/server-storage-execution
       - 10gen/server-rss-sydney
-  - "collection_write_path*":
-    approvers:
-      - 10gen/server-storage-execution
   - "commit_quorum*":
     approvers:
       - 10gen/server-storage-execution

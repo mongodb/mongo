@@ -151,8 +151,8 @@ env.Library(
         "$BUILD_DIR/mongo/crypto/fle_crypto",
         "$BUILD_DIR/mongo/db/auth/user_cache_invalidator",
         "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
         "$BUILD_DIR/mongo/db/coll_mod_command_idl",
+        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
         "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",
         "$BUILD_DIR/mongo/db/index_commands_idl",
         "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
@@ -760,7 +760,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
+        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
         "$BUILD_DIR/mongo/db/commands/cluster_server_parameter_commands_invocation",
         "$BUILD_DIR/mongo/db/commands/set_feature_compatibility_version_idl",
         "$BUILD_DIR/mongo/db/multitenancy",

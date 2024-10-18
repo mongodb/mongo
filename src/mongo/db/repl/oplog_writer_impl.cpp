@@ -30,10 +30,10 @@
 #include "mongo/db/repl/oplog_writer_impl.h"
 
 #include "mongo/db/admission/execution_admission_context.h"
-#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/repl/initial_syncer.h"

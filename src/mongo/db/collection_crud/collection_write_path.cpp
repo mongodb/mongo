@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -48,12 +48,12 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/crypto/fle_crypto_types.h"
-#include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/collection_crud/capped_collection_maintenance.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"

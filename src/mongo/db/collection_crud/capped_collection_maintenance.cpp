@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/capped_collection_maintenance.h"
+#include "mongo/db/collection_crud/capped_collection_maintenance.h"
 
 #include <cstdint>
 #include <memory>

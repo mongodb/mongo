@@ -124,33 +124,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "collection_crud",
-    srcs = [
-        "capped_collection_maintenance.cpp",
-        "collection_write_path.cpp",
-    ],
-    hdrs = [
-        "capped_collection_maintenance.h",
-        "collection_write_path.h",
-    ],
-    deps = [
-        ":document_validation",
-        ":local_oplog_info",
-        "//src/mongo/db:record_id_helpers",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:shard_role_api",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:write_stage_common",
-        "//src/mongo/db/op_observer:op_observer_util",
-        "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:capped_snapshots",
-        "//src/mongo/db/storage:index_entry_comparison",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:record_store_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
     name = "collection_catalog",
     srcs = [
         "collection_catalog.cpp",
@@ -167,11 +140,11 @@ mongo_cc_library(
         "views_for_database.h",
     ],
     deps = [
-        ":collection_crud",
         "//src/mongo/db:audit",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:shard_role_api_stor_ex",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/collection_crud",
         "//src/mongo/db/concurrency:lock_manager",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/index:index_access_method",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
@@ -527,10 +500,10 @@ mongo_cc_library(
         "index_repair.h",
     ],
     deps = [
-        ":collection_crud",
         ":collection_options",
         ":validate_state",
         "//src/mongo/db:shard_role",
+        "//src/mongo/db/collection_crud",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/query_stats",
@@ -656,7 +629,6 @@ mongo_cc_library(
     ],
     deps = [
         ":cannot_convert_index_to_unique_info",
-        ":collection_crud",
         ":collection_options",
         ":collection_uuid_mismatch_info",
         ":document_validation",
@@ -677,6 +649,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:shard_role",
+        "//src/mongo/db/collection_crud",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/write_ops",
