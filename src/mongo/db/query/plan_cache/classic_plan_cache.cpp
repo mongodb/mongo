@@ -153,8 +153,17 @@ bool shouldCacheQuery(const CanonicalQuery& query) {
         return false;
     }
 
-    if (!query.getSortPattern() && expr->matchType() == MatchExpression::AND &&
-        expr->numChildren() == 0 && !query.isSbeCompatible()) {
+    bool noSortPattern = !query.getSortPattern();
+    // For some DISTINCT_SCAN-eligible queries (e.g. $group with $top/$sortBy), the sort pattern is
+    // not stored in CanonicalQuery's _sortPattern field. In these cases, we use CanonicalDistinct's
+    // _sortRequirement field.
+    if (query.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled()) {
+        noSortPattern =
+            noSortPattern && !(query.getDistinct() && query.getDistinct()->getSortRequirement());
+    }
+
+    if (noSortPattern && expr->matchType() == MatchExpression::AND && expr->numChildren() == 0 &&
+        !query.isSbeCompatible()) {
         return false;
     }
 

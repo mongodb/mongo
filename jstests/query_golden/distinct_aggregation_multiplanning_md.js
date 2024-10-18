@@ -101,7 +101,7 @@ outputAggregationPlanAndResults(coll, [
     {$group: {_id: "$a", accumB: {$first: "$b"}, accumC: {$first: "$c"}, accumD: {$first: "$d"}}}
 ]);
 
-// TODO SERVER-92469: See if we have to do something to break the tie.
+// TODO SERVER-92468: See if we have to do something to break the tie.
 subSection("Multiplanning tie between DISTINCT_SCAN and IXSCAN");
 const coll2 = db[jsTestName() + "-2"];
 coll2.drop();

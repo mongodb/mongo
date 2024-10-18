@@ -91,6 +91,23 @@ export function outputDistinctPlanAndResults(coll, key, filter = {}, options = {
 }
 
 /**
+ * Takes a collection and outputs the current state of the plan cache.
+ */
+export function outputPlanCacheStats(coll) {
+    let stats = coll.aggregate([{$planCacheStats: {}}]).toArray();
+    const fieldsToUse = ["cachedPlan", "createdFromQuery", "isActive"];
+    stats.forEach(entry => {
+        Object.keys(entry).forEach(field => {
+            if (!fieldsToUse.includes(field)) {
+                delete entry[field];
+            }
+        });
+    });
+    code(tojsonMultiLineSortKeys(stats));
+    linebreak();
+}
+
+/**
  * Helper function that manually computes the unique values for the given key in the given
  * collection (filtered on `filter`). Useful to compare with the actual output from a distinct()
  * query. Note that this function doesn't perfectly mimic actual MQL distinct semantics. For

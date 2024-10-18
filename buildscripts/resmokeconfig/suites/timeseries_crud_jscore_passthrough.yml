@@ -179,6 +179,7 @@ selector:
     # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
     # first stage in a pipeline. This will be incomplatible with timeseries.
     - jstests/core/query/plan_cache/in_expression_plan_cache.js
+    - jstests/core/query/plan_cache/plan_cache_distinct.js
     - jstests/core/query/find/find_getmore_cmd.js # singleBatch
     - jstests/core/query/find/finda.js # returnKey
     - jstests/core/query/index_key_expression.js # Unclean aggregation result
