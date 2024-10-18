@@ -314,6 +314,43 @@ function runTest(testSuite, testCase) {
 
 const retryOnNetworkErrorTests = [
     {
+        name: "retry the explain command when it fails with the Interupted error code",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({_id: 1}));
+
+            // Mock the explain response, when the command got interrupted.
+            setCommandMockResponse("explain", {
+                "ok": 1,
+                "executionStats": {
+                    "executionSuccess": false,
+                    "errorMessage": "operation was interrupted",
+                    "errorCode": ErrorCodes.Interrupted,
+                    "nReturned": 0,
+                    "executionTimeMillis": 2,
+                    "totalKeysExamined": 0,
+                    "totalDocsExamined": 0,
+                    "executionStages": {
+                        "isCached": false,
+                        "stage": "EXPRESS_UPDATE",
+                        "keyPattern": "{ _id: 1 }",
+                        "indexName": "_id_",
+                        "keysExamined": 0,
+                        "docsExamined": 0,
+                        "nReturned": 0,
+                        "nWouldModify": 0,
+                        "nWouldUpsert": 0,
+                        "nWouldDelete": 0
+                    }
+                }
+            });
+            const explain = assert.commandWorked(testDB.runCommand(
+                {explain: {findAndModify: collName1, update: {$inc: {i: 1}}, query: {_id: 1}}}));
+            assert.eq(explain.executionStats.nReturned, 1, explain);
+            assert.eq(explain.executionStats.executionSuccess, true, explain);
+        }
+    },
+    {
         name: "update with network error after success",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));

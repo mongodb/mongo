@@ -4,7 +4,10 @@
  */
 
 export function hasError(res) {
-    return res.ok !== 1 || res.writeErrors || (res.hasOwnProperty("nErrors") && res.nErrors != 0);
+    const hasExecutionStatsErrorCode =
+        res.hasOwnProperty("executionStats") && res.executionStats.hasOwnProperty("errorCode");
+    return res.ok !== 1 || res.writeErrors || (res.hasOwnProperty("nErrors") && res.nErrors != 0) ||
+        hasExecutionStatsErrorCode;
 }
 
 export function hasWriteConcernError(res) {

@@ -267,7 +267,8 @@ function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentP
     Object.keys(expectedMatches).forEach(function(key) {
         var totalFieldName = isRootLevel ? key : currentPath + "." + key;
         assert(explainOut.hasOwnProperty(key),
-               preMsg + "Explain's output does not have a value for " + key);
+               preMsg + "Explain's output does not have a value for " + key + "\n" +
+                   tojson(explainOut));
         if (typeof expectedMatches[key] === "object") {
             // Sub-doc, recurse to match on it's fields
             assertExplainResultsMatch(
@@ -278,7 +279,8 @@ function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentP
             assert.contains(explainOut[key],
                             want,
                             preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +
-                                " does not match one of the expected values (" + want + ").");
+                                " does not match one of the expected values (" + want + ")." +
+                                "\n" + tojson(explainOut));
 
         } else if (key == "stage" && expectedMatches[key] == "DELETE") {
             // Express handles delete-by-id post 8.0
@@ -286,13 +288,15 @@ function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentP
             assert.contains(explainOut[key],
                             want,
                             preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +
-                                " does not match one of the expected values (" + want + ").");
+                                " does not match one of the expected values (" + want + ")." +
+                                "\n" + tojson(explainOut));
 
         } else {
             assert.eq(explainOut[key],
                       expectedMatches[key],
                       preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +
-                          " does not match expected value (" + expectedMatches[key] + ").");
+                          " does not match expected value (" + expectedMatches[key] + ")." +
+                          "\n" + tojson(explainOut));
         }
     });
 }
