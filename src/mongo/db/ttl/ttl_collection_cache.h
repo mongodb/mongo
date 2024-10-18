@@ -34,7 +34,6 @@
 #include <variant>
 #include <vector>
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"

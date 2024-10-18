@@ -29,8 +29,6 @@
 
 #include "mongo/db/ttl/ttl_collection_cache.h"
 
-#include <memory>
-
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/base/string_data.h"
