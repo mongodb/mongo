@@ -17,6 +17,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/api_parameters",
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/auth/authserver",
+        "$BUILD_DIR/mongo/db/commands/buildinfo_common",
         "$BUILD_DIR/mongo/db/commands/core",
         "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
         "$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers",

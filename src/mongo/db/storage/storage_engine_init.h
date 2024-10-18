@@ -31,6 +31,7 @@
 
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -124,9 +125,9 @@ Status validateStorageOptions(
     const BSONObj& storageEngineOptions,
     std::function<Status(const StorageEngine::Factory* const, const BSONObj&)> validateFunc);
 
-/*
- * Appends a the list of available storage engines to a BSONObjBuilder for reporting purposes.
+/**
+ * Returns the list of all storage engines.
  */
-void appendStorageEngineList(ServiceContext* service, BSONObjBuilder* result);
+std::vector<StringData> getStorageEngineNames(ServiceContext* svcCtx);
 
 }  // namespace mongo

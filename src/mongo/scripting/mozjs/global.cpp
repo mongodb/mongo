@@ -54,6 +54,7 @@
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/buildinfo.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/version.h"
 
@@ -111,7 +112,7 @@ void GlobalInfo::Functions::version::call(JSContext* cx, JS::CallArgs args) {
 
 void GlobalInfo::Functions::buildInfo::call(JSContext* cx, JS::CallArgs args) {
     BSONObjBuilder b;
-    VersionInfoInterface::instance().appendBuildInfo(&b);
+    getBuildInfo().serialize(&b);
     ValueReader(cx, args.rval()).fromBSON(b.obj(), nullptr, false);
 }
 
