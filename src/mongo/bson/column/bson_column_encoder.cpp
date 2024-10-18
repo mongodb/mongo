@@ -35,7 +35,6 @@
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/util/errno_util.h"
 #include <algorithm>
 #include <boost/filesystem/operations.hpp>
 #include <boost/program_options.hpp>

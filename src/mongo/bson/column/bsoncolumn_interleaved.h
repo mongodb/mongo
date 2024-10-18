@@ -34,6 +34,7 @@
 
 #include "mongo/bson/column/bsoncolumn_helpers.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::bsoncolumn {
 

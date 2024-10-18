@@ -38,14 +38,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
-#include <memory>
 #include <span>
 #include <variant>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -53,11 +51,9 @@
 #include "mongo/bson/column/bsoncolumn_interleaved.h"
 #include "mongo/bson/column/bsoncolumn_util.h"
 #include "mongo/bson/column/simple8b.h"
-#include "mongo/bson/column/simple8b_type_util.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/platform/int128.h"
-#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 
