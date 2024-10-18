@@ -36,7 +36,7 @@ imports:
 
 feature_flags:
     featureFlagReshardingImprovements:
-        description: "Feature flag for applying improvements on resharding to make it faster and 
+        description: "Feature flag for applying improvements on resharding to make it faster and
         support same-key resharding."
         cpp_varname: gFeatureFlagReshardingImprovements
         default: true
@@ -70,4 +70,12 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingRelaxedMode
         default: true
         version: 8.1
+        shouldBeFCVGated: true
+    featureFlagReshardingSkipCloningAndApplyingIfApplicable:
+        description: "Feature flag to make recipient shards that are not going to own any chunks for
+                      the collection after resharding only clone the options and indexes for the
+                      collection (i.e. skip cloning the documents and fetch/apply the oplog entries
+                      for it). Currently, only the primary shard can be such a recipient shard."
+        cpp_varname: gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
+        default: false
         shouldBeFCVGated: true

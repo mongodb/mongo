@@ -337,8 +337,8 @@ last-continuous:
       ticket: SERVER-94259
     - test_file: jstests/core/timeseries/drop_timeseries.js
       ticket: SERVER-94829
-    - test_file: jstests/sharding/resharding_cloning_metrics_after_failover.js
-      ticket: SERVER-92978
+    - test_file: jstests/sharding/resharding_skip_cloning_and_applying.js
+      ticket: SERVER-91109
   suites: null
 last-lts:
   all:
@@ -690,6 +690,6 @@ last-lts:
       ticket: SERVER-94259
     - test_file: jstests/core/timeseries/drop_timeseries.js
       ticket: SERVER-94829
-    - test_file: jstests/sharding/resharding_cloning_metrics_after_failover.js
-      ticket: SERVER-92978
+    - test_file: jstests/sharding/resharding_skip_cloning_and_applying.js
+      ticket: SERVER-91109
   suites: null
