@@ -62,6 +62,7 @@
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
@@ -149,7 +150,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData se
     }
 }
 
-void ReplicaSetMonitorManager::_setupTaskExecutorAndStatsInLock() {
+void ReplicaSetMonitorManager::_setupTaskExecutorAndStats(WithLock) {
     if (_isShutdown || _taskExecutor) {
         // do not restart taskExecutor if is in shutdown
         return;
@@ -189,7 +190,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
             !_isShutdown);
 
     _doGarbageCollectionLocked(lk);
-    _setupTaskExecutorAndStatsInLock();
+    _setupTaskExecutorAndStats(lk);
     const auto& setName = uri.getSetName();
     auto monitor = _monitors[setName].lock();
     if (monitor) {
