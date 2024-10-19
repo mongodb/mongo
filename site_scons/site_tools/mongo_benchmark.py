@@ -62,9 +62,7 @@ def build_benchmark(env, target, source, **kwargs):
         and "CONSOLIDATED_TARGET" in kwargs
         and kwargs["CONSOLIDATED_TARGET"]
     ):
-        # TODO(SERVER-95967): swap back to consolidated-benchmarks when the consolidated AIB components
-        # are constructed with all required files.
-        kwargs["AIB_COMPONENTS_EXTRA"] = ["benchmarks"]
+        kwargs["AIB_COMPONENTS_EXTRA"] += ["consolidated-benchmarks"]
         return bmEnv.AddToConsolidatedTarget(
             target, source, kwargs, "$BENCHMARK_ALIAS", "$BENCHMARK_LIST"
         )
