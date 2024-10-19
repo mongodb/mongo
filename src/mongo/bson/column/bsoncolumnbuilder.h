@@ -33,6 +33,7 @@
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <utility>
 #include <variant>
@@ -40,6 +41,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelementvalue.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"

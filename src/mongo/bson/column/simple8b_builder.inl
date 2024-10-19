@@ -34,7 +34,9 @@
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <memory>
 #include <type_traits>
+#include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>

@@ -41,6 +41,7 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/bson/column/simple8b_helpers.h"
+#include "mongo/platform/int128.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

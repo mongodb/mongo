@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/base/compare_numbers.h"
+#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumn_expressions_internal.h"
 
 namespace mongo::bsoncolumn {

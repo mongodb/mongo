@@ -37,7 +37,11 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <type_traits>
 #include <vector>
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/platform/int128.h"
 
 namespace mongo {
 /**

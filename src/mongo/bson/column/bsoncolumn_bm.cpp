@@ -47,6 +47,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
