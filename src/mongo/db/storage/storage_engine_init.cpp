@@ -362,13 +362,23 @@ Status validateStorageOptions(
     return Status::OK();
 }
 
-std::vector<StringData> getStorageEngineNames(ServiceContext* svcCtx) {
-    const auto& factories = storageFactories(svcCtx);
-    std::vector<StringData> ret;
-    std::transform(factories.begin(), factories.end(), std::back_inserter(ret), [](auto& it) {
-        return StringData(it.first);
-    });
-    return ret;
+namespace {
+BSONArray storageEngineList(ServiceContext* service) {
+    if (!service)
+        return BSONArray();
+
+    BSONArrayBuilder engineArrayBuilder;
+
+    for (const auto& nameAndFactory : storageFactories(service)) {
+        engineArrayBuilder.append(nameAndFactory.first);
+    }
+
+    return engineArrayBuilder.arr();
+}
+}  // namespace
+
+void appendStorageEngineList(ServiceContext* service, BSONObjBuilder* result) {
+    result->append("storageEngines", storageEngineList(service));
 }
 
 }  // namespace mongo

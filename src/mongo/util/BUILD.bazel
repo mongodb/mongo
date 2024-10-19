@@ -28,27 +28,6 @@ filegroup(
 )
 
 idl_generator(
-    name = "buildinfo_gen",
-    src = "buildinfo.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-mongo_cc_library(
-    name = "buildinfo",
-    srcs = [
-        "buildinfo.cpp",
-        ":buildinfo_gen",
-    ],
-    hdrs = ["buildinfo.h"],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/idl:idl_parser",
-    ],
-)
-
-idl_generator(
     name = "fail_point_server_parameter_gen",
     src = "fail_point_server_parameter.idl",
 )

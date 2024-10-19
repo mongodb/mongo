@@ -176,7 +176,6 @@ mongo_cc_library(
         "//src/mongo/scripting",
         "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
         "//src/mongo/unittest:golden_test_base",
-        "//src/mongo/util:buildinfo",
         "//src/mongo/util:icu",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:password",
     ],

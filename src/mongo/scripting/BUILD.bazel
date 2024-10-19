@@ -195,7 +195,6 @@ mongo_cc_library(
     }),
     deps = [
         ":scripting_common",
-        "//src/mongo/util:buildinfo",
     ] + select({
         "//bazel/config:js_engine_none": [
             ":scripting_none",

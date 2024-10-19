@@ -27,7 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/buildinfo_common.h"
+#include "mongo/db/commands.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 namespace {
@@ -35,18 +36,36 @@ namespace {
 /**
  * Implements { buildInfo : 1} for mock mongocryptd.
  */
-class MongotMockBuildInfo : public CmdBuildInfoCommon {
+class MongotMockBuildInfo : public BasicCommand {
 public:
-    using CmdBuildInfoCommon::CmdBuildInfoCommon;
+    MongotMockBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         MONGO_UNREACHABLE;
     }
 
-    BuildInfo generateBuildInfo(OperationContext* opCtx) const final {
-        auto reply = CmdBuildInfoCommon::generateBuildInfo(opCtx);
-        reply.setMongotmock(true);
-        return reply;
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    std::string help() const final {
+        return "get version #, etc.\n"
+               "{ buildinfo:1 }";
+    }
+
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj& jsobj,
+             BSONObjBuilder& result) final {
+        VersionInfoInterface::instance().appendBuildInfo(&result);
+        result.append("mongotmock", true);
+        return true;
     }
 };
 MONGO_REGISTER_COMMAND(MongotMockBuildInfo).forShard();

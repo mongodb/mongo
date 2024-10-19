@@ -272,7 +272,6 @@
 #include "mongo/util/allocator_thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
-#include "mongo/util/buildinfo.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -357,12 +356,10 @@ void logStartup(OperationContext* opCtx) {
     toLog.append("pid", ProcessId::getCurrent().asLongLong());
 
 
-    {
-        BSONObjBuilder buildinfo(toLog.subobjStart("buildinfo"));
-        auto info = getBuildInfo();
-        info.setStorageEngines(getStorageEngineNames(opCtx->getServiceContext()));
-        info.serialize(&buildinfo);
-    }
+    BSONObjBuilder buildinfo(toLog.subobjStart("buildinfo"));
+    VersionInfoInterface::instance().appendBuildInfo(&buildinfo);
+    appendStorageEngineList(opCtx->getServiceContext(), &buildinfo);
+    buildinfo.doneFast();
 
     BSONObj o = toLog.obj();
 

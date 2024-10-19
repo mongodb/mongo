@@ -33,13 +33,8 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/buildinfo_common_gen.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/request_execution_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/executor/async_request_executor.h"
 
 namespace mongo {
 
@@ -51,62 +46,54 @@ namespace mongo {
  * invoked in a pre-auth state to return either the entire reply (allowedPreAuth),
  * or a redacted reply of just version information (versionOnlyIfPreAuth).
  *
- * The default implementation available here provide every field except 'storageEngines'
- * which is only provided by the CmdBuildInfoShard specialization.
+ * The Router and Shard specializations determine the contents of a full reply
+ * in their respective implementations.
  */
-class CmdBuildInfoCommon : public TypedCommand<CmdBuildInfoCommon> {
+class CmdBuildInfoBase : public BasicCommand {
 public:
-    using Request = BuildInfoCommand;
-    using Reply = typename BuildInfoCommand::Reply;
+    CmdBuildInfoBase() : BasicCommand("buildInfo", "buildinfo") {}
 
-    CmdBuildInfoCommon() : TypedCommand(Request::kCommandName, Request::kCommandAlias) {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext* svcCtx) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext* svcCtx) const final {
         return AllowedOnSecondary::kAlways;
     }
 
     // See class comment.
-    bool requiresAuth() const override;
+    bool requiresAuth() const final;
 
-    bool adminOnly() const override {
+    bool adminOnly() const final {
         return false;
     }
 
-    bool allowedWithSecurityToken() const override {
+    bool allowedWithSecurityToken() const final {
         return true;
     }
 
-    class Invocation : public InvocationBase {
-    public:
-        using InvocationBase::InvocationBase;
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
+        return false;
+    }
 
-        bool supportsWriteConcern() const override {
-            return false;
-        }
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbname,
+                                 const BSONObj& request) const final {
+        // See class comment.
+        return Status::OK();
+    }
 
-        void doCheckAuthorization(OperationContext*) const override {
-            // See class comment.
-        }
+    std::string help() const final {
+        return "get version #, etc.\n"
+               "{ buildinfo:1 }";
+    }
 
-        NamespaceString ns() const override {
-            return NamespaceString(request().getDbName());
-        }
-
-        Reply typedRun(OperationContext*);
-
-        Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec) override;
-    };
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbname,
+             const BSONObj& request,
+             BSONObjBuilder& result) final;
 
     /**
      * Generates complete buildInfo response for authenticated user (or when configured for
      * preAuth).
      */
-    virtual Reply generateBuildInfo(OperationContext*) const;
-
-    /**
-     * Provide an executor on which to run the command.
-     */
-    virtual AsyncRequestExecutor* getAsyncRequestExecutor(ServiceContext* svcCtx) const;
+    virtual void generateBuildInfo(OperationContext* opCtx, BSONObjBuilder& result) = 0;
 };
 
 }  // namespace mongo
