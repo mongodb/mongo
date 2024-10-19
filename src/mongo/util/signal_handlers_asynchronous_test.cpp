@@ -105,7 +105,10 @@ TEST_F(LogRotateSignalTest, LogRotateSignal) {
         waitForShutdown();                                             \
     }
 
+// TODO SERVER-95705 re-enable this test on MacOS once the MacOS signal handling bug is fixed.
+#ifndef __APPLE__
 TEST_SIGNAL_CLEAN_EXIT(SIGHUP);
+#endif
 TEST_SIGNAL_CLEAN_EXIT(SIGINT);
 TEST_SIGNAL_CLEAN_EXIT(SIGTERM);
 TEST_SIGNAL_CLEAN_EXIT(SIGXCPU);
