@@ -424,3 +424,23 @@ mongo_cc_library(
         ":connection_pool_executor",
     ],
 )
+
+mongo_cc_library(
+    name = "async_rpc",
+    srcs = [
+        "async_rpc.cpp",
+    ],
+    hdrs = [
+        "async_rpc.h",
+    ],
+    deps = [
+        ":async_rpc_error_info",
+        ":remote_command",
+        ":task_executor_interface",
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:kill_common",
+        "//src/mongo/rpc:command_status",
+    ],
+)

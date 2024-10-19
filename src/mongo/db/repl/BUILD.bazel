@@ -1704,6 +1704,34 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "tenant_oplog_processing",
+    srcs = [
+        "tenant_oplog_applier.cpp",
+        "tenant_oplog_batcher.cpp",
+    ],
+    hdrs = [
+        "tenant_all_database_cloner.h",
+        "tenant_base_cloner.h",
+        "tenant_collection_cloner.h",
+        "tenant_database_cloner.h",
+        "tenant_migration_recipient_service.h",
+        "tenant_oplog_applier.h",
+        "tenant_oplog_batcher.h",
+    ],
+    deps = [
+        ":abstract_async_component",
+        ":cloner_utils",
+        ":oplog",
+        ":oplog_application",
+        ":oplog_application_interface",
+        ":repl_server_parameters",
+        "//src/mongo:base",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/session:session_catalog_mongod",
+    ],
+)
+
+mongo_cc_library(
     name = "isself",
     srcs = [
         "isself.cpp",
@@ -1717,5 +1745,570 @@ mongo_cc_library(
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authorization_manager_global",
         "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "oplog_application_interface",
+    srcs = [
+        "oplog_applier.cpp",
+        "oplog_applier_batcher.cpp",
+    ],
+    hdrs = [
+        "oplog_applier.h",
+        "oplog_applier_batcher.h",
+    ],
+    deps = [
+        ":oplog_entry",
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_library(
+    name = "replication_auth",
+    srcs = [
+        "replication_auth.cpp",
+        "//src/mongo/client:dbclient_connection.h",
+        "//src/mongo/client:dbclient_session.h",
+    ],
+    hdrs = [
+        "replication_auth.h",
+    ],
+    deps = [
+        "//src/mongo/client:authentication",
+        "//src/mongo/db/auth:authorization_manager_global",
+    ],
+)
+
+mongo_cc_library(
+    name = "initial_sync_cloners",
+    srcs = [
+        "all_database_cloner.cpp",
+        "collection_cloner.cpp",
+        "database_cloner.cpp",
+        "initial_sync_base_cloner.cpp",
+    ],
+    hdrs = [
+        "all_database_cloner.h",
+        "collection_cloner.h",
+        "database_cloner.h",
+        "initial_sync_base_cloner.h",
+    ],
+    deps = [
+        ":base_cloner",
+        ":cloner_utils",
+        ":member_data",
+        ":repl_server_parameters",
+        ":repl_sync_shared_data",
+        ":replication_auth",
+        ":replication_consistency_markers_impl",
+        ":task_runner",
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:index_build_entry_helpers",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/commands:list_collections_filter",
+        "//src/mongo/util:progress_meter",
+        "//src/mongo/util/concurrency:thread_pool",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "oplog_fetcher",
+    srcs = [
+        "oplog_fetcher.cpp",
+    ],
+    hdrs = [
+        "data_replicator_external_state.h",
+        "oplog_applier.h",
+        "oplog_applier_batcher.h",
+        "oplog_fetcher.h",
+    ],
+    deps = [
+        ":abstract_async_component",
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        ":replica_set_messages",
+        ":replication_auth",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:logical_time_metadata_hook",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/db/stats:timer_stats",
+        "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "initial_syncer",
+    srcs = [
+        "initial_syncer.cpp",
+        "initial_syncer_common_stats.cpp",
+        "initial_syncer_factory.cpp",
+        "multiapplier.cpp",
+    ],
+    hdrs = [
+        "callback_completion_guard.h",
+        "initial_sync_state.h",
+        "initial_syncer.h",
+        "initial_syncer_common_stats.h",
+        "initial_syncer_factory.h",
+        "initial_syncer_interface.h",
+        "multiapplier.h",
+        "//src/mongo/dbtests/mock:mock_dbclient_connection.h",
+        "//src/mongo/dbtests/mock:mock_remote_db_server.h",
+    ],
+    deps = [
+        ":initial_sync_cloners",
+        ":oplog",
+        ":oplog_application_interface",
+        ":oplog_buffer_blocking_queue",
+        ":oplog_entry",
+        ":oplog_fetcher",
+        ":optime",
+        ":repl_server_parameters",
+        ":repl_sync_shared_data",
+        ":rollback_checker",
+        ":storage_interface",
+        ":tenant_migration_access_blocker",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/client:fetcher",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/serverless:serverless_lock",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/transaction",
+        "//src/mongo/executor:scoped_task_executor",
+        "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "oplog_write",
+    srcs = [
+        "oplog_writer_impl.cpp",
+    ],
+    hdrs = [
+        "oplog_writer_impl.h",
+    ],
+    deps = [
+        ":initial_syncer",
+        ":oplog_write_interface",
+        ":storage_interface",
+        "//src/mongo/db:change_stream_change_collection_manager",
+        "//src/mongo/db:change_stream_serverless_helpers",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands:mongod_fsync",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/storage:journal_flusher",
+    ],
+)
+
+mongo_cc_library(
+    name = "replication_info",
+    srcs = [
+        "replication_info.cpp",
+    ],
+    deps = [
+        ":hello_auth",
+        ":hello_command",
+        ":oplog",
+        ":primary_only_service",
+        ":repl_coordinator_interface",
+        ":repl_settings",
+        ":replica_set_messages",
+        ":replication_auth",
+        ":split_horizon",
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:read_write_concern_defaults",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:saslauth",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "rollback_source_impl",
+    srcs = [
+        "rollback_source_impl.cpp",
+    ],
+    hdrs = [
+        "rollback_source.h",
+        "rollback_source_impl.h",
+    ],
+    deps = [
+        ":oplog",
+        ":oplog_interface_remote",
+        ":repl_coordinator_interface",
+        ":replication_auth",
+        "//src/mongo:base",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "topology_coordinator",
+    srcs = [
+        "heartbeat_response_action.cpp",
+        "topology_coordinator.cpp",
+        ":topology_coordinator_gen",
+    ],
+    hdrs = [
+        "election_reason_counter.h",
+        "election_reason_counter_parser.h",
+        "heartbeat_response_action.h",
+        "topology_coordinator.h",
+        ":election_reason_counter_gen",
+        ":replication_metrics_gen",
+    ],
+    deps = [
+        ":isself",
+        ":member_data",
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        ":repl_settings",
+        ":replica_set_messages",
+        "//src/mongo/db:audit",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:commit_quorum_options",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "replication_metrics",
+    srcs = [
+        "replication_metrics.cpp",
+        ":replication_metrics_gen",
+    ],
+    hdrs = [
+        "replication_metrics.h",
+    ],
+    deps = [
+        ":election_reason_counter",
+        ":election_reason_counter_parser",
+        ":topology_coordinator",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)
+
+mongo_cc_library(
+    name = "oplog_application",
+    srcs = [
+        "insert_group.cpp",
+        "oplog_applier_impl.cpp",
+        "oplog_applier_utils.cpp",
+        "session_update_tracker.cpp",
+    ],
+    hdrs = [
+        "insert_group.h",
+        "oplog_applier_impl.h",
+        "oplog_applier_utils.h",
+        "session_update_tracker.h",
+    ],
+    deps = [
+        ":initial_syncer",
+        ":oplog",
+        ":oplog_application_interface",
+        ":oplog_entry",
+        ":oplog_write",
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        ":repl_settings",
+        ":replication_auth",
+        ":replication_metrics",
+        ":storage_interface",
+        "//src/mongo/db:change_stream_change_collection_manager",
+        "//src/mongo/db:change_stream_serverless_helpers",
+        "//src/mongo/db:curop_metrics",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands:mongod_fsync",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/stats:timer_stats",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util/concurrency:thread_pool",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "data_replicator_external_state_impl",
+    srcs = [
+        "data_replicator_external_state_impl.cpp",
+    ],
+    hdrs = [
+        "data_replicator_external_state_impl.h",
+        "replication_coordinator_external_state.h",
+    ],
+    deps = [
+        ":oplog_application",
+        ":oplog_buffer_blocking_queue",
+        ":oplog_buffer_collection",
+        ":oplog_buffer_proxy",
+        ":optime",
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        ":storage_interface",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "data_replicator_external_state_initial_sync",
+    srcs = [
+        "data_replicator_external_state_initial_sync.cpp",
+    ],
+    hdrs = [
+        "data_replicator_external_state_initial_sync.h",
+    ],
+    deps = [
+        ":data_replicator_external_state_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "replication_recovery",
+    srcs = [
+        "replication_recovery.cpp",
+    ],
+    hdrs = [
+        "replication_recovery.h",
+    ],
+    deps = [
+        ":oplog",
+        ":oplog_application",
+        ":oplog_interface_local",
+        ":repl_server_parameters",
+        ":replica_set_aware_service",
+        "//src/mongo:base",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db/storage:journal_flusher",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "tenant_migration_donor_service",
+    srcs = [
+        "tenant_migration_donor_op_observer.cpp",
+        "tenant_migration_donor_service.cpp",
+    ],
+    hdrs = [
+        "tenant_migration_donor_op_observer.h",
+        "tenant_migration_donor_service.h",
+    ],
+    tags = ["compile_requires_large_memory"],
+    deps = [
+        ":primary_only_service",
+        ":tenant_migration_access_blocker",
+        ":tenant_migration_statistics",
+        ":tenant_migration_utils",
+        "//src/mongo/client:fetcher",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db/catalog:local_oplog_info",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/serverless:serverless_lock",
+        "//src/mongo/executor:async_rpc",
+    ],
+)
+
+mongo_cc_library(
+    name = "rollback_impl",
+    srcs = [
+        "rollback_impl.cpp",
+        ":rollback_impl_gen",
+    ],
+    hdrs = [
+        "rollback_impl.h",
+    ],
+    deps = [
+        "drop_pending_collection_reaper",
+        ":optime",
+        ":repl_coordinator_interface",
+        ":replica_set_aware_service",
+        ":roll_back_local_operations",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/catalog:import_collection_oplog_entry",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/repl:tenant_migration_access_blocker",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/serverless:serverless_lock",
+        "//src/mongo/db/session:kill_sessions_local",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/storage:remove_saver",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "bgsync",
+    srcs = [
+        "bgsync.cpp",
+    ],
+    hdrs = [
+        "bgsync.h",
+    ],
+    deps = [
+        ":abstract_async_component",
+        ":data_replicator_external_state_impl",
+        ":oplog",
+        ":oplog_fetcher",
+        ":oplog_interface_local",
+        ":oplog_interface_remote",
+        ":oplog_write_interface",
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        ":rollback_impl",
+        ":rollback_source_impl",
+        ":storage_interface",
+        ":sync_source_resolver",
+        "//src/mongo/client:fetcher",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_library(
+    name = "serveronly_repl",
+    srcs = [
+        "noop_writer.cpp",
+        "replication_coordinator_external_state_impl.cpp",
+        "sync_source_feedback.cpp",
+    ],
+    hdrs = [
+        "noop_writer.h",
+        "replication_coordinator_external_state_impl.h",
+        "sync_source_feedback.h",
+        "//src/mongo/db/storage:journal_listener.h",
+        "//src/mongo/db/storage:snapshot_manager.h",
+    ],
+    deps = [
+        "drop_pending_collection_reaper",
+        ":bgsync",
+        ":oplog_application",
+        ":oplog_buffer_batched_queue",
+        ":oplog_buffer_collection",
+        ":oplog_buffer_proxy",
+        ":oplog_interface_remote",
+        ":oplog_write",
+        ":optime",
+        ":primary_only_service",
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        ":repl_settings",
+        ":replication_consistency_markers_impl",
+        ":replication_info",
+        ":replication_metrics",
+        ":replication_process",
+        ":replication_recovery",
+        ":reporter",
+        ":rollback_source_impl",
+        ":tenant_migration_access_blocker",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:change_stream_change_collection_manager",
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db:change_stream_serverless_helpers",
+        "//src/mongo/db:cloner",
+        "//src/mongo/db:index_builds_coordinator_interface",
+        "//src/mongo/db:not_primary_error_tracker",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:system_index",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:local_oplog_info",
+        "//src/mongo/db/commands:mongod_fcv",
+        "//src/mongo/db/commands:rwc_defaults_commands",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/session:kill_sessions_local",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/db/storage:flow_control",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/rpc:client_metadata",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "repl_set_commands",
+    srcs = [
+        "repl_set_commands.cpp",
+        "repl_set_request_votes.cpp",
+    ],
+    deps = [
+        "drop_pending_collection_reaper",
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        ":repl_set_status_commands",
+        ":repl_settings",
+        ":replica_set_messages",
+        ":replication_process",
+        ":serveronly_repl",
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:not_primary_error_tracker",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/storage:storage_options",
     ],
 )

@@ -761,3 +761,29 @@ mongo_cc_library(
         "//src/mongo/db/session:sessions_collection",
     ],
 )
+
+mongo_cc_library(
+    name = "startup_initialization",
+    srcs = [
+        "client_transport_observer_mongos.cpp",
+        "router_transactions_server_status.cpp",
+        "s_sharding_server_status.cpp",
+        "service_entry_point_router_role.cpp",
+    ],
+    hdrs = [
+        "client_transport_observer_mongos.h",
+        "service_entry_point_router_role.h",
+    ],
+    deps = [
+        ":load_balancer_support",
+        ":sharding_router_api",
+        "//src/mongo/db:curop_metrics",
+        "//src/mongo/db:not_primary_error_tracker",
+        "//src/mongo/db:profile_settings",
+        "//src/mongo/db/session:session_catalog",
+        "//src/mongo/db/stats:top",
+        "//src/mongo/idl:cluster_server_parameter_server_status",
+        "//src/mongo/s/commands:cluster_commands_common",
+        "//src/mongo/transport:session_manager",
+    ],
+)

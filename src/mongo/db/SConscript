@@ -245,22 +245,6 @@ env.Library(
 )
 
 env.Library(
-    target="cluster_transaction_api",
-    source=[
-        "cluster_transaction_api.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/session/logical_session_id",
-        "$BUILD_DIR/mongo/db/session/logical_session_id_helpers",
-        "$BUILD_DIR/mongo/db/transaction/transaction_api",
-        "$BUILD_DIR/mongo/rpc/rpc",
-        "$BUILD_DIR/mongo/s/startup_initialization",
-        "service_context",
-        "shared_request_handling",
-    ],
-)
-
-env.Library(
     target="service_context_d",
     source=[
         "service_entry_point_rs_endpoint.cpp",
@@ -334,29 +318,6 @@ env.Library(
         "s/forwardable_operation_metadata",
         "shard_role",
         "storage/two_phase_index_build_knobs_idl",
-    ],
-)
-
-env.Library(
-    target="cloner",
-    source=[
-        "cloner.cpp",
-        "cloner_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/authentication",
-        "catalog/collection_options",
-        "catalog/multi_index_block",
-        "collection_crud/collection_crud",
-        "commands/list_collections_filter",
-        "concurrency/exception_util",
-        "dbdirectclient",
-        "index_builds_coordinator_interface",
-        "multitenancy",
-        "query/write_ops/write_ops",
-        "repl/isself",
-        "server_base",
-        "shard_role",
     ],
 )
 

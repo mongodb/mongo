@@ -79,23 +79,6 @@ env.Library(
 )
 
 env.Library(
-    target="async_rpc",
-    source=[
-        "async_rpc.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/commands/kill_common",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/rpc/command_status",
-        "async_rpc_error_info",
-        "remote_command",
-        "task_executor_interface",
-    ],
-)
-
-env.Library(
     target="thread_pool_task_executor_test_fixture",
     source=[
         "thread_pool_task_executor_test_fixture.cpp",

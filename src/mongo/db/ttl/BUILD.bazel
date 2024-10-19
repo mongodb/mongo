@@ -27,3 +27,32 @@ idl_generator(
     name = "ttl_gen",
     src = "ttl.idl",
 )
+
+mongo_cc_library(
+    name = "ttl_d",
+    srcs = [
+        "ttl.cpp",
+        ":ttl_gen",
+    ],
+    hdrs = [
+        "ttl.h",
+    ],
+    deps = [
+        ":ttl_collection_cache",
+        "//src/mongo/db:coll_mod_command_idl",
+        "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:index_key_validate",
+        "//src/mongo/db/commands:fsync_locked",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/repl:replica_set_aware_service",
+        "//src/mongo/db/repl:tenant_migration_access_blocker",
+        "//src/mongo/db/s:sharding_runtime_d",
+    ],
+)

@@ -2986,3 +2986,49 @@ mongo_cc_library(
         "//src/mongo/util:signal_handlers",
     ],
 )
+
+mongo_cc_library(
+    name = "cloner",
+    srcs = [
+        "cloner.cpp",
+        ":cloner_gen",
+    ],
+    hdrs = [
+        "cloner.h",
+    ],
+    deps = [
+        ":dbdirectclient",
+        ":index_builds_coordinator_interface",
+        ":multitenancy",
+        ":server_base",
+        ":shard_role",
+        "//src/mongo/client:authentication",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/catalog:multi_index_block",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands:list_collections_filter",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/repl:isself",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_transaction_api",
+    srcs = [
+        "cluster_transaction_api.cpp",
+    ],
+    hdrs = [
+        "cluster_command_translations.h",
+        "cluster_transaction_api.h",
+    ],
+    deps = [
+        ":service_context",
+        ":shared_request_handling",
+        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/transaction:transaction_api",
+        "//src/mongo/rpc",
+        "//src/mongo/s:startup_initialization",
+    ],
+)

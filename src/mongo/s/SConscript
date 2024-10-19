@@ -32,28 +32,6 @@ def shouldBuildGRPC(myEnv):
 
 
 env.Library(
-    target="startup_initialization",
-    source=[
-        "client_transport_observer_mongos.cpp",
-        "router_transactions_server_status.cpp",
-        "s_sharding_server_status.cpp",
-        "service_entry_point_router_role.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/curop_metrics",
-        "$BUILD_DIR/mongo/db/not_primary_error_tracker",
-        "$BUILD_DIR/mongo/db/profile_settings",
-        "$BUILD_DIR/mongo/db/session/session_catalog",
-        "$BUILD_DIR/mongo/db/stats/top",
-        "$BUILD_DIR/mongo/idl/cluster_server_parameter_server_status",
-        "$BUILD_DIR/mongo/transport/session_manager",
-        "commands/cluster_commands_common",
-        "load_balancer_support",
-        "sharding_router_api",
-    ],
-)
-
-env.Library(
     target="mongos_initializers",
     source=[
         "cluster_cursor_stats.cpp",
