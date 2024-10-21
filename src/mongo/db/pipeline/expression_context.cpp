@@ -246,7 +246,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     OperationContext* operationContext, const AggregateCommandRequest& request, bool useDisk) {
     opCtx(operationContext);
     explain(request.getExplain());
-    fromRouter(request.getFromMongos());
+    fromRouter(aggregation_request_helper::getFromRouter(request));
     needsMerge(request.getNeedsMerge());
     allowDiskUse(request.getAllowDiskUse().value_or(useDisk));
     bypassDocumentValidation(request.getBypassDocumentValidation().value_or(false));

@@ -247,7 +247,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     MutableDocument mergeCmd(serializedCommand);
 
     mergeCmd["pipeline"] = Value(pipelineForMerging->serialize());
-    mergeCmd[AggregateCommandRequest::kFromMongosFieldName] = Value(true);
+    aggregation_request_helper::setFromRouter(mergeCmd, Value(true));
 
     mergeCmd[AggregateCommandRequest::kLetFieldName] =
         Value(mergeCtx->variablesParseState.serialize(mergeCtx->variables));

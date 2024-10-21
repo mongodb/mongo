@@ -181,7 +181,7 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
               << BSON(DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName
                       << startMonitoringAtTime
                       << DocumentSourceChangeStreamSpec::kAllowToRunOnConfigDBFieldName << true))});
-    aggReq.setFromMongos(true);
+    aggregation_request_helper::setFromRouter(aggReq, true);
     aggReq.setNeedsMerge(true);
 
     SimpleCursorOptions cursor;
@@ -206,7 +206,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     cmdForShards[AggregateCommandRequest::kLetFieldName] =
         Value(expCtx->variablesParseState.serialize(expCtx->variables));
 
-    cmdForShards[AggregateCommandRequest::kFromMongosFieldName] = Value(expCtx->inRouter);
+    aggregation_request_helper::setFromRouter(cmdForShards, Value(expCtx->inRouter));
 
     if (auto collationObj = expCtx->getCollatorBSON();
         !collationObj.isEmpty() && !expCtx->getIgnoreCollator()) {

@@ -256,6 +256,10 @@ commands:
                 description: "True if this request originated from a mongoS."
                 type: optionalBool
                 stability: internal
+            fromRouter:
+                description: "True if this request originated from a router."
+                type: optionalBool
+                stability: internal
             $_requestReshardingResumeToken:
                 description: "True if this requests resharding resume token."
                 cpp_name: requestReshardingResumeToken

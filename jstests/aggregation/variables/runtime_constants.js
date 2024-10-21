@@ -1,5 +1,8 @@
 /*
  * Tests the behavior of runtime constants $$IS_MR and $$JS_SCOPE.
+ * @tags: [
+ *   requires_fcv_81,
+ * ]
  */
 
 import "jstests/libs/query/sbe_assert_error_override.js";
@@ -22,28 +25,28 @@ assert.commandFailedWithCode(
         {aggregate: coll.getName(), pipeline: [{$addFields: {field: "$$JS_SCOPE"}}], cursor: {}}),
     [51144]);
 
-// Tests that runtimeConstants can't be specified on a mongod if fromMongos is false.
+// Tests that runtimeConstants can't be specified on a mongod if 'fromRouter' is false.
 const rtc = {
     localNow: new Date(),
     clusterTime: new Timestamp(0, 0),
 };
 
 if (!FixtureHelpers.isMongos(db)) {
-    // RuntimeConstants is disallowed when fromMongos is false.
+    // RuntimeConstants is disallowed when 'fromRouter' is false.
     assert.commandFailedWithCode(db.runCommand({
         aggregate: coll.getName(),
         pipeline: [{$project: {_id: 0}}],
         cursor: {},
         runtimeConstants: rtc,
-        fromMongos: false
+        fromRouter: false
     }),
                                  463840);
-    // RuntimeConstants is allowed when fromMongos is true.
+    // RuntimeConstants is allowed when 'fromRouter' is true.
     assert.commandWorked(db.runCommand({
         aggregate: coll.getName(),
         pipeline: [{$project: {_id: 0}}],
         cursor: {},
         runtimeConstants: rtc,
-        fromMongos: true
+        fromRouter: true
     }));
 }

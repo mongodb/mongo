@@ -154,22 +154,22 @@ TEST_F(ClusterAggregateTest, SnapshotReadConcernWithAfterClusterTime) {
     testSnapshotReadConcernWithAfterClusterTime(kAggregateCmdTargeted, kAggregateCmdScatterGather);
 }
 
-TEST_F(ClusterAggregateTest, ShouldFailWhenFromMongosIsTrue) {
+TEST_F(ClusterAggregateTest, ShouldFailWhenFromRouterIsTrue) {
     const BSONObj inputBson =
-        fromjson("{aggregate: 'coll', pipeline: [], cursor: {}, fromMongos: true, $db: 'test'}");
+        fromjson("{aggregate: 'coll', pipeline: [], cursor: {}, fromRouter: true, $db: 'test'}");
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
 }
 
-TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsFalse) {
+TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromRouterIsFalse) {
     const BSONObj inputBson = fromjson(
-        "{aggregate: 'coll', pipeline: [], cursor: {}, needsMerge: true, fromMongos: false, $db: "
+        "{aggregate: 'coll', pipeline: [], cursor: {}, needsMerge: true, fromRouter: false, $db: "
         "'test'}");
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
 }
 
-TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsTrue) {
+TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromRouterIsTrue) {
     const BSONObj inputBson = fromjson(
-        "{aggregate: 'coll', pipeline: [], cursor: {}, needsMerge: true, fromMongos: true, $db: "
+        "{aggregate: 'coll', pipeline: [], cursor: {}, needsMerge: true, fromRouter: true, $db: "
         "'test'}");
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
 }

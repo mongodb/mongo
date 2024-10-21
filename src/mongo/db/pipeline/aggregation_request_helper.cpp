@@ -127,7 +127,7 @@ void validate(const AggregateCommandRequest& aggregate,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
     bool hasExplainElem = aggregate.getExplain().has_value();
     bool hasExplain = explainVerbosity.has_value() || aggregate.getExplain().has_value();
-    bool hasFromMongosElem = aggregate.getFromMongos().has_value();
+    bool hasFromRouterElem = getFromRouter(aggregate).has_value();
     bool hasNeedsMergeElem = aggregate.getNeedsMerge().has_value();
 
     uassert(ErrorCodes::InvalidNamespace,
@@ -150,8 +150,8 @@ void validate(const AggregateCommandRequest& aggregate,
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "Cannot specify '" << AggregateCommandRequest::kNeedsMergeFieldName
-                          << "' without '" << AggregateCommandRequest::kFromMongosFieldName << "'",
-            (!hasNeedsMergeElem || hasFromMongosElem));
+                          << "' without '" << AggregateCommandRequest::kFromRouterFieldName << "'",
+            (!hasNeedsMergeElem || hasFromRouterElem));
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << AggregateCommandRequest::kRequestReshardingResumeTokenFieldName
@@ -197,11 +197,11 @@ void validateRequestForAPIVersion(const OperationContext* opCtx,
     //     - Does not have any transport session
     //     - The transport session tag is internal
     bool isInternalThreadOrClient = !client->session() || client->isInternalClient();
-    // Checks that the 'exchange' or 'fromMongos' option can only be specified by the internal
+    // Checks that the 'exchange' or 'fromRouter' option can only be specified by the internal
     // client.
-    if ((request.getExchange() || request.getFromMongos()) && apiStrict && apiVersion == "1") {
+    if ((request.getExchange() || getFromRouter(request)) && apiStrict && apiVersion == "1") {
         uassert(ErrorCodes::APIStrictError,
-                str::stream() << "'exchange' and 'fromMongos' option cannot be specified with "
+                str::stream() << "'exchange' and 'fromRouter' option cannot be specified with "
                                  "'apiStrict: true' in API Version "
                               << apiVersion,
                 isInternalThreadOrClient);
@@ -211,8 +211,8 @@ void validateRequestForAPIVersion(const OperationContext* opCtx,
 void validateRequestFromClusterQueryWithoutShardKey(const AggregateCommandRequest& request) {
     if (request.getIsClusterQueryWithoutShardKeyCmd()) {
         uassert(ErrorCodes::InvalidOptions,
-                "Only mongos can set the isClusterQueryWithoutShardKeyCmd field",
-                request.getFromMongos());
+                "Only router can set the isClusterQueryWithoutShardKeyCmd field",
+                getFromRouter(request));
     }
 }
 
@@ -233,6 +233,35 @@ PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateComm
         return PlanExecutorPipeline::ResumableScanType::kNaturalOrderScan;
     }
     return PlanExecutorPipeline::ResumableScanType::kNone;
+}
+
+const mongo::OptionalBool& getFromRouter(const AggregateCommandRequest& request) {
+    // Check both fields because we cannot rely on the feature flag checks. An aggregate command
+    // with 'fromRouter' field set could be sent directly to an initial sync node with uninitialized
+    // FCV, and creating/parsing/validating this command invocation happens before any check that
+    // the node is a primary.
+    if (const auto& fromRouter = request.getFromRouter(); fromRouter.has_value()) {
+        return fromRouter;
+    }
+    return request.getFromMongos();
+}
+
+void setFromRouter(AggregateCommandRequest& request, mongo::OptionalBool value) {
+    if (feature_flags::gFeatureFlagAggMongosToRouter.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        request.setFromRouter(value);
+    } else {
+        request.setFromMongos(value);
+    }
+}
+
+void setFromRouter(MutableDocument& doc, mongo::Value value) {
+    if (feature_flags::gFeatureFlagAggMongosToRouter.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        doc[AggregateCommandRequest::kFromRouterFieldName] = value;
+    } else {
+        doc[AggregateCommandRequest::kFromMongosFieldName] = value;
+    }
 }
 }  // namespace aggregation_request_helper
 

@@ -1,5 +1,8 @@
 // Test that sharded $lookup can resolve sharded views correctly.
-// @tags: [requires_sharding, requires_fcv_51]
+// @tags: [
+//   requires_sharding,
+//   requires_fcv_81,
+// ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -577,7 +580,7 @@ profilerHasSingleMatchingEntryOrThrow({
     filter: {
         "command.aggregate": foreign.getName(),
         "command.comment": comment,
-        "command.fromMongos": false,
+        "command.fromRouter": false,
         "errMsg": {$exists: false}  // For the StaleConfig error that resulted from moveChunk.
     }
 });
@@ -587,7 +590,7 @@ profilerHasSingleMatchingEntryOrThrow({
     filter: {
         "command.aggregate": foreign.getName(),
         "command.comment": comment,
-        "command.fromMongos": false,
+        "command.fromRouter": false,
         "errMsg": {$exists: false}  // For the StaleConfig error that resulted from moveChunk.
     }
 });

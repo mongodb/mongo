@@ -143,7 +143,7 @@ public:
               .explain = request.getExplain(),
               .runtimeConstants = request.getLegacyRuntimeConstants(),
               .letParameters = request.getLet(),
-              .fromRouter = request.getFromMongos(),
+              .fromRouter = aggregation_request_helper::getFromRouter(request),
               .needsMerge = request.getNeedsMerge(),
               .forPerShardCursor = request.getPassthroughToShard().has_value(),
               .allowDiskUse = request.getAllowDiskUse().value_or(false),

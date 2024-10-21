@@ -2,10 +2,11 @@
 // specified in runtimeConstants.
 //
 // Do not run in sharded passthroughs since 'runtimeConstants' is disallowed on mongos.
-// Must also set 'fromMongos: true' as otherwise 'runtimeConstants' is disallowed on mongod.
+// Must also set 'fromRouter: true' as otherwise 'runtimeConstants' is disallowed on mongod.
 // @tags: [
 //   assumes_against_mongod_not_mongos,
 //   requires_scripting,
+//   requires_fcv_81,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
@@ -49,7 +50,7 @@ let pipeline = [
 assert.commandWorked(coll.insert({text: 'wood chuck could chuck wood'}));
 
 let results =
-    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromMongos: true}).toArray();
+    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromRouter: true}).toArray();
 assert(resultsEq(results,
                  [
                      {k: "wood", v: weights["wood"]},
@@ -71,7 +72,7 @@ pipeline[0].$project.emits.$_internalJsEmit.eval = function() {
 };
 
 results =
-    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromMongos: true}).toArray();
+    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromRouter: true}).toArray();
 assert(resultsEq(results,
                  [
                      {k: "wood", v: weights["wood"]},
@@ -95,7 +96,7 @@ pipeline[0].$project.emits.$_internalJsEmit.eval = function() {
 /* eslint-enable */
 
 results =
-    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromMongos: true}).toArray();
+    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromRouter: true}).toArray();
 assert(resultsEq(results,
                  [
                      {k: "wood", v: weights["wood"] * 5},
@@ -112,7 +113,7 @@ pipeline[0].$project.emits.$_internalJsEmit.eval = function() {
     }
 };
 results =
-    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromMongos: true}).toArray();
+    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromRouter: true}).toArray();
 assert(resultsEq(results,
                  [
                      {k: "wood", v: 1},
@@ -132,6 +133,6 @@ assert.commandFailedWithCode(db.runCommand({
     pipeline: pipeline,
     cursor: {},
     runtimeConstants: constants,
-    fromMongos: true
+    fromRouter: true
 }),
                              ErrorCodes.TypeMismatch);

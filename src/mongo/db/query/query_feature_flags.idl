@@ -178,3 +178,10 @@ feature_flags:
       default: true
       version: 8.1
       shouldBeFCVGated: true
+    # TODO SERVER-95358 remove once 9.0 becomes last LTS
+    featureFlagAggMongosToRouter:
+      description: "Feature flag to switch from 'fromMongos' to 'fromRouter' field on aggregate commands."
+      cpp_varname: gFeatureFlagAggMongosToRouter
+      default: true
+      version: 8.1
+      shouldBeFCVGated: true

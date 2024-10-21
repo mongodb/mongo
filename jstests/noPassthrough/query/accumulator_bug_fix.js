@@ -3,6 +3,7 @@
  *
  * @tags: [
  *  requires_sharding,
+ *  requires_fcv_81,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -68,7 +69,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
             aggregate: coll.getName(),
             pipeline: pipeline,
             needsMerge: true,
-            fromMongos: true,
+            fromRouter: true,
             cursor: {}
         };
 

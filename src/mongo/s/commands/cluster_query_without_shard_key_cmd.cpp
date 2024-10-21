@@ -225,7 +225,7 @@ BSONObj createAggregateCmdObj(
 
     aggregate.setCollation(parsedInfo.collation);
     aggregate.setIsClusterQueryWithoutShardKeyCmd(true);
-    aggregate.setFromMongos(true);
+    aggregation_request_helper::setFromRouter(aggregate, true);
 
     if (parsedInfo.sort) {
         aggregate.setNeedsMerge(true);

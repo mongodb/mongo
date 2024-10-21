@@ -1,7 +1,10 @@
 /**
  * Tests basic functionality of pushing $group into the find layer.
  *
- * @tags: [featureFlagSbeFull]
+ * @tags: [
+ *   featureFlagSbeFull,
+ *   requires_fcv_81,
+ * ]
  */
 import {getAggPlanStage, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
@@ -78,7 +81,7 @@ let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCount
         aggregate: coll.getName(),
         pipeline: pipeline,
         needsMerge: true,
-        fromMongos: true,
+        fromRouter: true,
         cursor: {}
     };
 
@@ -89,7 +92,7 @@ let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCount
         aggregate: coll.getName(),
         pipeline: pipeline,
         needsMerge: true,
-        fromMongos: true,
+        fromRouter: true,
         explain: true,
         cursor: {}
     };
@@ -659,14 +662,14 @@ assert(explain.stages[1].hasOwnProperty("$group"));
 // In a sharded environment, the mongos splits a $group stage into two different stages. One is a
 // merge $group stage at the mongos-side which does the global aggregation and the other is a $group
 // stage at the shard-side which does the partial aggregation. The shard-side $group stage is
-// requested with 'needsMerge' and 'fromMongos' flags set to true from the mongos, which we should
+// requested with 'needsMerge' and 'fromRouter' flags set to true from the mongos, which we should
 // verify that is also pushed down and produces the correct results.
 explain = coll.runCommand({
     aggregate: coll.getName(),
     explain: true,
     pipeline: [{$group: {_id: "$item"}}],
     needsMerge: true,
-    fromMongos: true,
+    fromRouter: true,
     cursor: {}
 });
 assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);

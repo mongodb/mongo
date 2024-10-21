@@ -168,7 +168,7 @@ Document serializeToCommand(const MapReduceCommandRequest& parsedMr, Pipeline* p
     translatedCmd[AggregateCommandRequest::kCursorFieldName] =
         Value(Document{{"batchSize", std::numeric_limits<long long>::max()}});
     translatedCmd[AggregateCommandRequest::kAllowDiskUseFieldName] = Value(true);
-    translatedCmd[AggregateCommandRequest::kFromMongosFieldName] = Value(true);
+    aggregation_request_helper::setFromRouter(translatedCmd, Value(true));
     translatedCmd[AggregateCommandRequest::kLetFieldName] = Value(
         pipeline->getContext()->variablesParseState.serialize(pipeline->getContext()->variables));
     translatedCmd[AggregateCommandRequest::kIsMapReduceCommandFieldName] = Value(true);

@@ -304,5 +304,5 @@ const response2 = assert.commandFailedWithCode(
     admin.runCommand({aggregate: 1, pipeline: [{$shardedDataDistribution: {}}], cursor: {}}),
     6789101);
 assert.neq(
-    -1, response2.errmsg.indexOf("The $shardedDataDistribution stage can only be run on mongoS"));
+    -1, response2.errmsg.indexOf("The $shardedDataDistribution stage can only be run on router"));
 rsTest.stopSet();

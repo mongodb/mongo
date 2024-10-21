@@ -2,10 +2,11 @@
 // specified in runtimeConstants.
 //
 // Do not run in sharded passthroughs since 'runtimeConstants' is disallowed on mongos.
-// Must also set 'fromMongos: true' as otherwise 'runtimeConstants' is disallowed on mongod.
+// Must also set 'fromRouter: true' as otherwise 'runtimeConstants' is disallowed on mongod.
 // @tags: [
 //   assumes_against_mongod_not_mongos,
 //   requires_scripting,
+//   requires_fcv_81,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
@@ -39,7 +40,7 @@ const command = {
             }
         }
     }],
-    fromMongos: true,
+    fromRouter: true,
 };
 
 const expectedResults = [

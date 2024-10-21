@@ -1,10 +1,10 @@
 // Tests that commands like find, aggregate and update accepts a 'let' parameter which defines
 // variables for use in expressions within the command.
+// Before 7.2, $rand was evaluated more than once in sharded find (SERVER-75927).
 // @tags: [
-//   # Before 7.2, $rand was evaluated more than once in sharded find (SERVER-75927).
-//   requires_fcv_72,
 //   # Requires a batch size greater than one.
 //   does_not_support_config_fuzzer,
+//   requires_fcv_81,
 // ]
 //
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -109,7 +109,7 @@ if (!isMongos) {
 if (!isMongos && !TestData.testingReplicaSetEndpoint) {
     // Test that if runtimeConstants and let are both specified, both will coexist.
     // Runtime constants are not allowed on mongos passthroughs.
-    // Must set 'fromMongos: true' as otherwise 'runtimeConstants' is disallowed on mongod.
+    // Must set 'fromRouter: true' as otherwise 'runtimeConstants' is disallowed on mongod.
     let constants = {
         localNow: new Date(),
         clusterTime: new Timestamp(0, 0),
@@ -118,7 +118,7 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
     assert.eq(coll.aggregate(pipeline, {
                       runtimeConstants: constants,
                       let : {target_trend: "weak decline"},
-                      fromMongos: true
+                      fromRouter: true
                   })
                   .toArray(),
               expectedResults);
@@ -130,7 +130,7 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
         runtimeConstants: constants,
         cursor: {},
         let : {cat: "not_a_bird"},
-        fromMongos: true
+        fromRouter: true
     }),
                                  17276);
     // Test null and empty let parameters
@@ -141,7 +141,7 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
         {$sort: {Species: 1}}
     ];
     assert.eq(
-        coll.aggregate(pipeline_no_lets, {runtimeConstants: constants, let : {}, fromMongos: true})
+        coll.aggregate(pipeline_no_lets, {runtimeConstants: constants, let : {}, fromRouter: true})
             .toArray(),
         expectedResults);
 
@@ -151,7 +151,7 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
         runtimeConstants: constants,
         cursor: {},
         let : null,
-        fromMongos: true
+        fromRouter: true
     }));
 
     assert.commandFailedWithCode(testDB.runCommand({
@@ -160,7 +160,7 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
         runtimeConstants: constants,
         cursor: {},
         let : 1,
-        fromMongos: true
+        fromRouter: true
     }),
                                  ErrorCodes.TypeMismatch);
 }

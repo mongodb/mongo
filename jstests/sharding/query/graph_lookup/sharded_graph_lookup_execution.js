@@ -6,10 +6,9 @@
  * Shard targeting logic for $lookup changed in 7.3 and may not match the expected behavior in a
  * multiversion environment.
  * @tags: [
- *   requires_fcv_73,
  *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
  *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
- *   requires_fcv_80
+ *   requires_fcv_81,
  * ]
  */
 
@@ -115,7 +114,7 @@ function assertGraphLookupExecution(pipeline, opts, expectedResults, executionLi
                                         .find({
                                             "command.aggregate": fromCollName,
                                             "command.comment": opts.comment,
-                                            "command.fromMongos": exec.mongosMerger === true,
+                                            "command.fromRouter": exec.mongosMerger === true,
                                             "errName": {$ne: "StaleConfig"}
                                         })
                                         .itcount();

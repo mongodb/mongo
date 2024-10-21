@@ -85,7 +85,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     // Using oplog namespace so that validation of $_requestReshardingResumeToken succeeds.
     BSONObj inputBson = fromjson(
         "{aggregate: 'oplog.rs', pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: "
-        "true, fromMongos: true, "
+        "true, fromRouter: true, "
         "needsMerge: true, bypassDocumentValidation: true, $_requestReshardingResumeToken: true, "
         "collation: {locale: 'en_US'}, cursor: {batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, "
         "readConcern: {level: 'linearizable'}, $queryOptions: {$readPreference: 'nearest'}, "
@@ -100,7 +100,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
         unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.getAllowDiskUse());
-    ASSERT_TRUE(request.getFromMongos());
+    ASSERT_TRUE(aggregation_request_helper::getFromRouter(request));
     ASSERT_TRUE(request.getNeedsMerge());
     ASSERT_TRUE(request.getBypassDocumentValidation().value_or(false));
     ASSERT_TRUE(request.getRequestReshardingResumeToken());
@@ -217,7 +217,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
     AggregateCommandRequest request(nss, std::vector<mongo::BSONObj>());
     request.setAllowDiskUse(true);
-    request.setFromMongos(true);
+    request.setFromRouter(true);
     request.setNeedsMerge(true);
     request.setBypassDocumentValidation(true);
     request.setRequestReshardingResumeToken(true);
@@ -256,7 +256,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
         {AggregateCommandRequest::kHintFieldName, hintObj},
         {AggregateCommandRequest::kLetFieldName, letParamsObj},
         {AggregateCommandRequest::kNeedsMergeFieldName, true},
-        {AggregateCommandRequest::kFromMongosFieldName, true},
+        {AggregateCommandRequest::kFromRouterFieldName, true},
         {AggregateCommandRequest::kRequestReshardingResumeTokenFieldName, true},
         {AggregateCommandRequest::kIsMapReduceCommandFieldName, true},
         {AggregateCommandRequest::kCollectionUUIDFieldName, uuid},
@@ -495,16 +495,16 @@ TEST(AggregationRequestTest, ShouldRejectExplainIfObject) {
     aggregationRequestParseFailureHelper(validRequest, objectExplain, ErrorCodes::TypeMismatch);
 }
 
-TEST(AggregationRequestTest, ShouldRejectNonBoolFromMongos) {
+TEST(AggregationRequestTest, ShouldRejectNonBoolFromRouter) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
     const BSONObj validRequest = fromjson(
         "{aggregate: 'collection',"
         "pipeline: [{$match: {a: 'abc'}}],"
         "cursor: {}, "
-        "fromMongos: true, "
+        "fromRouter: true, "
         "$db: 'a'}");
-    const BSONObj nonBoolFromMongos = fromjson("{fromMongos: 1}");
-    aggregationRequestParseFailureHelper(validRequest, nonBoolFromMongos, ErrorCodes::TypeMismatch);
+    const BSONObj nonBoolFromRouter = fromjson("{fromRouter: 1}");
+    aggregationRequestParseFailureHelper(validRequest, nonBoolFromRouter, ErrorCodes::TypeMismatch);
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge) {
@@ -514,7 +514,7 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge) {
         "pipeline: [{$match: {a: 'abc'}}], "
         "cursor: {},"
         "needsMerge: true, "
-        "fromMongos: true,"
+        "fromRouter: true,"
         "$db: 'a'}");
     const BSONObj nonBoolNeedsMerge = fromjson("{needsMerge: 1}");
     aggregationRequestParseFailureHelper(validRequest, nonBoolNeedsMerge, ErrorCodes::TypeMismatch);
@@ -533,16 +533,16 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolIncludeQueryStatsMetrics) {
         validRequest, nonBoolIncludeQueryStatsMetrics, ErrorCodes::TypeMismatch);
 }
 
-TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfFromMongosNotPresent) {
+TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfFromRouterNotPresent) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
     const BSONObj validRequest = fromjson(
         "{aggregate: 'collection',"
         "pipeline: [{$match: {a: 'abc'}}],"
         "cursor: {}, "
         "$db: 'a'}");
-    const BSONObj needsMergeNoFromMongos = fromjson("{needsMerge: true}");
+    const BSONObj needsMergeNoFromRouter = fromjson("{needsMerge: true}");
     aggregationRequestParseFailureHelper(
-        validRequest, needsMergeNoFromMongos, ErrorCodes::FailedToParse);
+        validRequest, needsMergeNoFromRouter, ErrorCodes::FailedToParse);
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolAllowDiskUse) {

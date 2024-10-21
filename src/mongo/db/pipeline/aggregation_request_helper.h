@@ -119,7 +119,7 @@ void validateRequestForAPIVersion(const OperationContext* opCtx,
                                   const AggregateCommandRequest& request);
 /**
  * Validates if 'AggregateCommandRequest' sets the "isClusterQueryWithoutShardKeyCmd" field then the
- * request must have been fromMongos.
+ * request must have been fromRouter.
  */
 void validateRequestFromClusterQueryWithoutShardKey(const AggregateCommandRequest& request);
 
@@ -129,6 +129,15 @@ void validateRequestFromClusterQueryWithoutShardKey(const AggregateCommandReques
  */
 PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommandRequest& request,
                                                              bool isChangeStream);
+
+// TODO SERVER-95358 remove once 9.0 becomes last LTS.
+const mongo::OptionalBool& getFromRouter(const AggregateCommandRequest& request);
+
+// TODO SERVER-95358 remove once 9.0 becomes last LTS.
+void setFromRouter(AggregateCommandRequest& request, mongo::OptionalBool value);
+
+// TODO SERVER-95358 remove once 9.0 becomes last LTS.
+void setFromRouter(MutableDocument& doc, mongo::Value value);
 }  // namespace aggregation_request_helper
 
 /**

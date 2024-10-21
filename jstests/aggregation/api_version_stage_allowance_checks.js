@@ -9,6 +9,7 @@
  *   assumes_unsharded_collection,
  *   do_not_wrap_aggregations_in_facets,
  *   uses_api_parameters,
+ *   requires_fcv_81,
  * ]
  */
 const dbName = jsTestName();
@@ -102,7 +103,7 @@ result = testDB.runCommand({
 });
 assert.commandFailedWithCode(result, ErrorCodes.APIStrictError);
 
-// Tests that the 'fromMongos' option cannot be specified by external client with 'apiStrict' set to
+// Tests that the 'fromRouter' option cannot be specified by external client with 'apiStrict' set to
 // true.
 result = testDB.runCommand({
     aggregate: collName,
@@ -111,11 +112,11 @@ result = testDB.runCommand({
     writeConcern: {w: "majority"},
     apiVersion: "1",
     apiStrict: true,
-    fromMongos: true
+    fromRouter: true
 });
 assert.commandFailedWithCode(result, ErrorCodes.APIStrictError);
 
-// Tests that the 'fromMongos' option should not fail by internal client with 'apiStrict' set to
+// Tests that the 'fromRouter' option should not fail by internal client with 'apiStrict' set to
 // true.
 result = curDB.runCommand({
     aggregate: collName,
@@ -128,7 +129,7 @@ result = curDB.runCommand({
 });
 assert.commandWorked(result);
 
-// Tests that the 'fromMongos' option should not fail by external client without 'apiStrict'.
+// Tests that the 'fromRouter' option should not fail by external client without 'apiStrict'.
 result = testDB.runCommand({
     aggregate: collName,
     pipeline: [{$project: {_id: 0}}],
