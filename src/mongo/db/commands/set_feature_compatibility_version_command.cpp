@@ -702,6 +702,15 @@ private:
                                                            DDLCoordinatorTypeEnum::kMovePrimary);
         }
 
+        // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
+        if (isDowngrading &&
+            feature_flags::gCreateDatabaseDDLCoordinator
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
+                                                           DDLCoordinatorTypeEnum::kCreateDatabase);
+        }
+
         if (isUpgrading) {
             _createShardingIndexCatalogIndexes(
                 opCtx, requestedVersion, NamespaceString::kShardIndexCatalogNamespace);
