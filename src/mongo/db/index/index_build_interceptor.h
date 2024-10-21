@@ -139,6 +139,7 @@ public:
      * constraint violations on the index.
      */
     Status checkDuplicateKeyConstraints(OperationContext* opCtx,
+                                        const CollectionPtr&,
                                         const IndexCatalogEntry* indexCatalogEntry) const;
 
 

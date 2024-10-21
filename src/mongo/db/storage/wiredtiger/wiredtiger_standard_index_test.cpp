@@ -37,6 +37,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -58,12 +59,10 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        auto res = sdi->insert(opCtx.get(), ks, true);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx.get(), ks, true));
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
-        res = sdi->insert(opCtx.get(), ks, true);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx.get(), ks, true));
 
         uow.commit();
     }
@@ -105,12 +104,10 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        auto res = sdi->insert(opCtx.get(), ks, true);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx.get(), ks, true));
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
-        res = sdi->insert(opCtx.get(), ks, true);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx.get(), ks, true));
 
         uow.commit();
     }
@@ -159,16 +156,13 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        auto res = sdi->insert(opCtx.get(), ks, dupsAllowed);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx.get(), ks, dupsAllowed));
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
-        res = sdi->insert(opCtx.get(), ks, dupsAllowed);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx.get(), ks, dupsAllowed));
 
         ks = makeKeyString(sdi.get(), BSON("" << 3), RecordId(3));
-        res = sdi->insert(opCtx.get(), ks, dupsAllowed);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx.get(), ks, dupsAllowed));
 
         uow.commit();
     }
@@ -201,16 +195,16 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        auto res = sdi->insert(opCtx.get(), ks, dupsAllowed);
-        ASSERT_EQ(ErrorCodes::DuplicateKey, res.code());
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(
+            sdi->insert(opCtx.get(), ks, dupsAllowed), BSON("" << 1), boost::none);
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
-        res = sdi->insert(opCtx.get(), ks, dupsAllowed);
-        ASSERT_EQ(ErrorCodes::DuplicateKey, res.code());
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(
+            sdi->insert(opCtx.get(), ks, dupsAllowed), BSON("" << 2), boost::none);
 
         ks = makeKeyString(sdi.get(), BSON("" << 3), RecordId(3));
-        res = sdi->insert(opCtx.get(), ks, dupsAllowed);
-        ASSERT_EQ(ErrorCodes::DuplicateKey, res.code());
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(
+            sdi->insert(opCtx.get(), ks, dupsAllowed), BSON("" << 3), boost::none);
     }
 
     // Ensure that it is not possible to remove a key with a mismatched RecordId.
@@ -238,8 +232,7 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
         sdi->unindex(opCtx.get(), ks, dupsAllowed);
 
-        auto res = sdi->insert(opCtx.get(), ks, dupsAllowed);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx.get(), ks, dupsAllowed));
         uow.commit();
     }
 }

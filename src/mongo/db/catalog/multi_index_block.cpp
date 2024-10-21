@@ -1036,7 +1036,7 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx, const Collecti
             continue;
 
         auto status = interceptor->checkDuplicateKeyConstraints(
-            opCtx, _indexes[i].block->getEntry(opCtx, collection));
+            opCtx, collection, _indexes[i].block->getEntry(opCtx, collection));
         if (!status.isOK()) {
             return status;
         }

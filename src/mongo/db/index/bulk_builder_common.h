@@ -145,7 +145,19 @@ public:
             try {
                 writeConflictRetry(opCtx, "addingKey", _ns, [&] {
                     WriteUnitOfWork wunit(opCtx);
-                    static_cast<T*>(this)->insertKey(builder, data);
+                    visit(OverloadedVisitor{[](const Status& status) { uassertStatusOK(status); },
+                                            [opCtx, entry, &collection](
+                                                SortedDataInterface::DuplicateKey&& duplicate) {
+                                                uassertStatusOK(buildDupKeyErrorStatus(
+                                                    duplicate.key,
+                                                    collection->ns(),
+                                                    entry->descriptor()->indexName(),
+                                                    entry->descriptor()->keyPattern(),
+                                                    entry->descriptor()->collation(),
+                                                    std::move(duplicate.foundValue),
+                                                    std::move(duplicate.id)));
+                                            }},
+                          static_cast<T*>(this)->insertKey(builder, data));
                     wunit.commit();
                 });
             } catch (DBException& e) {

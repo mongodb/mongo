@@ -294,8 +294,6 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
       _tableId(WiredTigerSession::genTableId()),
       _collectionUUID(collectionUUID),
       _indexName(desc->indexName()),
-      _keyPattern(desc->keyPattern()),
-      _collation(desc->collation()),
       _isLogged(isLogged) {}
 
 NamespaceString WiredTigerIndex::getCollectionNamespace(OperationContext* opCtx) const {
@@ -324,10 +322,11 @@ void dassertRecordIdAtEnd(const key_string::Value& keyString, KeyFormat keyForma
 }
 }  // namespace
 
-Status WiredTigerIndex::insert(OperationContext* opCtx,
-                               const key_string::Value& keyString,
-                               bool dupsAllowed,
-                               IncludeDuplicateRecordId includeDuplicateRecordId) {
+std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndex::insert(
+    OperationContext* opCtx,
+    const key_string::Value& keyString,
+    bool dupsAllowed,
+    IncludeDuplicateRecordId includeDuplicateRecordId) {
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
     LOGV2_TRACE_INDEX(20093, "KeyString: {keyString}", "keyString"_attr = keyString);
@@ -411,7 +410,8 @@ bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
         _uri);
 }
 
-Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const key_string::Value& key) {
+boost::optional<SortedDataInterface::DuplicateKey> WiredTigerIndex::dupKeyCheck(
+    OperationContext* opCtx, const key_string::Value& key) {
     invariant(unique());
 
     // Allow overwrite because it's faster and this is a read-only cursor.
@@ -424,10 +424,10 @@ Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const key_string::V
     WT_CURSOR* c = curwrap.get();
 
     if (isDup(opCtx, c, curwrap.getSession(), key)) {
-        return buildDupKeyErrorStatus(
-            key, getCollectionNamespace(opCtx), _indexName, _keyPattern, _collation, _ordering);
+        return DuplicateKey{
+            key_string::toBson(key.getBuffer(), key.getSize(), _ordering, key.getTypeBits())};
     }
-    return Status::OK();
+    return boost::none;
 }
 
 bool WiredTigerIndex::isEmpty(OperationContext* opCtx) {
@@ -598,11 +598,12 @@ void WiredTigerIndex::_setUpperBoundForKeyExists(WT_CURSOR* c,
     invariantWTOK(c->bound(c, upperInclusiveBoundConfig.getConfig(session)), c->session);
 }
 
-StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
-                                             WT_CURSOR* c,
-                                             WiredTigerSession* session,
-                                             const key_string::Value& keyString,
-                                             IncludeDuplicateRecordId includeDuplicateRecordId) {
+std::variant<bool, SortedDataInterface::DuplicateKey> WiredTigerIndex::_checkDups(
+    OperationContext* opCtx,
+    WT_CURSOR* c,
+    WiredTigerSession* session,
+    const key_string::Value& keyString,
+    IncludeDuplicateRecordId includeDuplicateRecordId) {
     int ret;
     // A prefix key is KeyString of index key. It is the component of the index entry that
     // should be unique.
@@ -618,10 +619,8 @@ StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
     // An entry with prefix key already exists. This can happen only during rolling upgrade when
     // both timestamp unsafe and timestamp safe index format keys could be present.
     if (ret == WT_DUPLICATE_KEY) {
-        auto key = key_string::toBson(
-            keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
-        return buildDupKeyErrorStatus(
-            key, getCollectionNamespace(opCtx), _indexName, _keyPattern, _collation);
+        return DuplicateKey{key_string::toBson(
+            keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits())};
     }
     invariantWTOK(ret,
                   c->session,
@@ -652,15 +651,10 @@ StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
         foundRecordId = *rid;
     }
 
-    return buildDupKeyErrorStatus(
+    return DuplicateKey{
         key_string::toBson(
             keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits()),
-        getCollectionNamespace(opCtx),
-        _indexName,
-        _keyPattern,
-        _collation,
-        std::monostate(),
-        foundRecordId);
+        std::move(foundRecordId)};
 }
 
 void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
@@ -799,7 +793,7 @@ public:
     StandardBulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx)
         : BulkBuilder(idx, opCtx), _idx(idx) {}
 
-    Status addKey(const key_string::Value& keyString) override {
+    std::variant<Status, DuplicateKey> addKey(const key_string::Value& keyString) override {
         dassertRecordIdAtEnd(keyString, _idx->rsKeyFormat());
 
         // Can't use WiredTigerCursor since we aren't using the cache.
@@ -845,7 +839,7 @@ public:
         invariant(!_idx->isIdIndex());
     }
 
-    Status addKey(const key_string::Value& newKeyString) override {
+    std::variant<Status, DuplicateKey> addKey(const key_string::Value& newKeyString) override {
         dassertRecordIdAtEnd(newKeyString, _idx->rsKeyFormat());
 
         // Do a duplicate check, but only if dups aren't allowed.
@@ -855,12 +849,7 @@ public:
                 : newKeyString.compareWithoutRecordIdStr(_previousKeyString);
             if (cmp == 0) {
                 // Duplicate found!
-                auto newKey = key_string::toBson(newKeyString, _idx->_ordering);
-                return buildDupKeyErrorStatus(newKey,
-                                              _idx->getCollectionNamespace(_opCtx),
-                                              _idx->indexName(),
-                                              _idx->keyPattern(),
-                                              _idx->_collation);
+                return DuplicateKey{key_string::toBson(newKeyString, _idx->_ordering)};
             } else {
                 /*
                  * _previousKeyString.isEmpty() is only true on the first call to addKey().
@@ -908,7 +897,7 @@ public:
         invariant(_idx->isIdIndex());
     }
 
-    Status addKey(const key_string::Value& newKeyString) override {
+    std::variant<Status, DuplicateKey> addKey(const key_string::Value& newKeyString) override {
         dassertRecordIdAtEnd(newKeyString, KeyFormat::Long);
 
         const int cmp = newKeyString.compareWithoutRecordIdLong(_previousKeyString);
@@ -1664,12 +1653,13 @@ std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIdIndex::newCursor(Operat
     return std::make_unique<WiredTigerIdIndexCursor>(*this, opCtx, forward);
 }
 
-Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
-                                  WT_CURSOR* c,
-                                  WiredTigerSession* session,
-                                  const key_string::Value& keyString,
-                                  bool dupsAllowed,
-                                  IncludeDuplicateRecordId includeDuplicateRecordId) {
+std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIdIndex::_insert(
+    OperationContext* opCtx,
+    WT_CURSOR* c,
+    WiredTigerSession* session,
+    const key_string::Value& keyString,
+    bool dupsAllowed,
+    IncludeDuplicateRecordId includeDuplicateRecordId) {
     invariant(KeyFormat::Long == _rsKeyFormat);
     invariant(!dupsAllowed);
     RecordId id;
@@ -1711,14 +1701,9 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
         foundValueRecordId = *duplicateRecordId;
     }
 
-    auto key = key_string::toBson(keyString, _ordering);
-    return buildDupKeyErrorStatus(key,
-                                  getCollectionNamespace(opCtx),
-                                  _indexName,
-                                  _keyPattern,
-                                  _collation,
-                                  std::move(foundValueRecordId),
-                                  duplicateRecordId);
+    return DuplicateKey{key_string::toBson(keyString, _ordering),
+                        std::move(duplicateRecordId),
+                        std::move(foundValueRecordId)};
 }
 
 Status WiredTigerIndexUnique::_insertOldFormatKey(OperationContext* opCtx,
@@ -1736,7 +1721,6 @@ Status WiredTigerIndexUnique::_insertOldFormatKey(OperationContext* opCtx,
                 "key"_attr = keyString.toString(),
                 "recordId"_attr = id.toString(),
                 "indexName"_attr = _indexName,
-                "keyPattern"_attr = _keyPattern,
                 "collectionUUID"_attr = _collectionUUID);
 
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
@@ -1767,12 +1751,13 @@ Status WiredTigerIndexUnique::_insertOldFormatKey(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
-                                      WT_CURSOR* c,
-                                      WiredTigerSession* session,
-                                      const key_string::Value& keyString,
-                                      bool dupsAllowed,
-                                      IncludeDuplicateRecordId includeDuplicateRecordId) {
+std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexUnique::_insert(
+    OperationContext* opCtx,
+    WT_CURSOR* c,
+    WiredTigerSession* session,
+    const key_string::Value& keyString,
+    bool dupsAllowed,
+    IncludeDuplicateRecordId includeDuplicateRecordId) {
     LOGV2_TRACE_INDEX(
         20097, "Timestamp safe unique idx KeyString: {keyString}", "keyString"_attr = keyString);
 
@@ -1781,9 +1766,9 @@ Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
     // Pre-checks before inserting on a primary.
     if (!dupsAllowed) {
         auto result = _checkDups(opCtx, c, session, keyString, includeDuplicateRecordId);
-        if (!result.isOK()) {
-            return result.getStatus();
-        } else if (result.getValue()) {
+        if (auto* duplicate = std::get_if<DuplicateKey>(&result)) {
+            return *duplicate;
+        } else if (std::get<bool>(result)) {
             return Status::OK();
         }
     }
@@ -2041,20 +2026,21 @@ std::unique_ptr<SortedDataBuilderInterface> WiredTigerIndexStandard::makeBulkBui
     return std::make_unique<StandardBulkBuilder>(this, opCtx);
 }
 
-Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
-                                        WT_CURSOR* c,
-                                        WiredTigerSession* session,
-                                        const key_string::Value& keyString,
-                                        bool dupsAllowed,
-                                        IncludeDuplicateRecordId includeDuplicateRecordId) {
+std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexStandard::_insert(
+    OperationContext* opCtx,
+    WT_CURSOR* c,
+    WiredTigerSession* session,
+    const key_string::Value& keyString,
+    bool dupsAllowed,
+    IncludeDuplicateRecordId includeDuplicateRecordId) {
     int ret;
 
     // Pre-checks before inserting on a primary.
     if (!dupsAllowed) {
         auto result = _checkDups(opCtx, c, session, keyString, includeDuplicateRecordId);
-        if (!result.isOK()) {
-            return result.getStatus();
-        } else if (result.getValue()) {
+        if (auto* duplicate = std::get_if<DuplicateKey>(&result)) {
+            return *duplicate;
+        } else if (std::get<bool>(result)) {
             return Status::OK();
         }
     }

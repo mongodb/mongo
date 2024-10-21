@@ -147,11 +147,11 @@ public:
                     const IndexDescriptor* desc,
                     bool isLogged);
 
-    Status insert(OperationContext* opCtx,
-                  const key_string::Value& keyString,
-                  bool dupsAllowed,
-                  IncludeDuplicateRecordId includeDuplicateRecordId =
-                      IncludeDuplicateRecordId::kOff) override;
+    std::variant<Status, DuplicateKey> insert(OperationContext* opCtx,
+                                              const key_string::Value& keyString,
+                                              bool dupsAllowed,
+                                              IncludeDuplicateRecordId includeDuplicateRecordId =
+                                                  IncludeDuplicateRecordId::kOff) override;
 
     void unindex(OperationContext* opCtx,
                  const key_string::Value& keyString,
@@ -164,7 +164,8 @@ public:
     bool appendCustomStats(OperationContext* opCtx,
                            BSONObjBuilder* output,
                            double scale) const override;
-    Status dupKeyCheck(OperationContext* opCtx, const key_string::Value& keyString) override;
+    boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
+                                              const key_string::Value& keyString) override;
 
     bool isEmpty(OperationContext* opCtx) override;
 
@@ -197,10 +198,6 @@ public:
 
     NamespaceString getCollectionNamespace(OperationContext* opCtx) const;
 
-    const BSONObj& keyPattern() const {
-        return _keyPattern;
-    }
-
     virtual bool isIdIndex() const {
         return false;
     }
@@ -222,7 +219,7 @@ public:
     }
 
 protected:
-    virtual Status _insert(
+    virtual std::variant<Status, SortedDataInterface::DuplicateKey> _insert(
         OperationContext* opCtx,
         WT_CURSOR* c,
         WiredTigerSession* session,
@@ -268,7 +265,7 @@ protected:
      * Returns true if the prefix key exists in the index with the same RecordId. Returns false if
      * the prefix key does not exist in the index. Should only be used for non-_id indexes.
      */
-    StatusWith<bool> _checkDups(
+    std::variant<bool, DuplicateKey> _checkDups(
         OperationContext* opCtx,
         WT_CURSOR* c,
         WiredTigerSession* session,
@@ -310,8 +307,6 @@ protected:
     uint64_t _tableId;
     const UUID _collectionUUID;
     const std::string _indexName;
-    const BSONObj _keyPattern;
-    const BSONObj _collation;
     const bool _isLogged;
 };
 
@@ -344,13 +339,14 @@ public:
 
 
 protected:
-    Status _insert(OperationContext* opCtx,
-                   WT_CURSOR* c,
-                   WiredTigerSession* session,
-                   const key_string::Value& keyString,
-                   bool dupsAllowed,
-                   IncludeDuplicateRecordId includeDuplicateRecordId =
-                       IncludeDuplicateRecordId::kOff) override;
+    std::variant<Status, SortedDataInterface::DuplicateKey> _insert(
+        OperationContext* opCtx,
+        WT_CURSOR* c,
+        WiredTigerSession* session,
+        const key_string::Value& keyString,
+        bool dupsAllowed,
+        IncludeDuplicateRecordId includeDuplicateRecordId =
+            IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
@@ -409,13 +405,14 @@ public:
     }
 
 protected:
-    Status _insert(OperationContext* opCtx,
-                   WT_CURSOR* c,
-                   WiredTigerSession* session,
-                   const key_string::Value& keyString,
-                   bool dupsAllowed,
-                   IncludeDuplicateRecordId includeDuplicateRecordId =
-                       IncludeDuplicateRecordId::kOff) override;
+    std::variant<Status, SortedDataInterface::DuplicateKey> _insert(
+        OperationContext* opCtx,
+        WT_CURSOR* c,
+        WiredTigerSession* session,
+        const key_string::Value& keyString,
+        bool dupsAllowed,
+        IncludeDuplicateRecordId includeDuplicateRecordId =
+            IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
@@ -464,13 +461,14 @@ public:
     }
 
 protected:
-    Status _insert(OperationContext* opCtx,
-                   WT_CURSOR* c,
-                   WiredTigerSession* session,
-                   const key_string::Value& keyString,
-                   bool dupsAllowed,
-                   IncludeDuplicateRecordId includeDuplicateRecordId =
-                       IncludeDuplicateRecordId::kOff) override;
+    std::variant<Status, SortedDataInterface::DuplicateKey> _insert(
+        OperationContext* opCtx,
+        WT_CURSOR* c,
+        WiredTigerSession* session,
+        const key_string::Value& keyString,
+        bool dupsAllowed,
+        IncludeDuplicateRecordId includeDuplicateRecordId =
+            IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,

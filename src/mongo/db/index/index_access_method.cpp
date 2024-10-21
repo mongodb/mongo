@@ -447,21 +447,32 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
     }
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
     for (const auto& keyString : keys) {
-        auto status =
+        auto result =
             _newInterface->insert(opCtx, keyString, dupsAllowed, includeDuplicateRecordId);
 
         // When duplicates are encountered and allowed, retry with dupsAllowed. Call
         // onDuplicateKey() with the inserted duplicate key.
-        if (ErrorCodes::DuplicateKey == status.code() && options.dupsAllowed && !prepareUnique) {
+        if (std::holds_alternative<SortedDataInterface::DuplicateKey>(result) &&
+            options.dupsAllowed && !prepareUnique) {
             invariant(unique);
 
-            status = _newInterface->insert(
+            result = _newInterface->insert(
                 opCtx, keyString, true /* dupsAllowed */, includeDuplicateRecordId);
-            if (status.isOK() && onDuplicateKey) {
-                status = onDuplicateKey(keyString);
+            if (auto status = std::get_if<Status>(&result)) {
+                if (status->isOK() && onDuplicateKey) {
+                    result = onDuplicateKey(keyString);
+                }
             }
         }
-        if (!status.isOK()) {
+        if (auto duplicate = std::get_if<SortedDataInterface::DuplicateKey>(&result)) {
+            return buildDupKeyErrorStatus(duplicate->key,
+                                          coll->ns(),
+                                          entry->descriptor()->indexName(),
+                                          entry->descriptor()->keyPattern(),
+                                          entry->descriptor()->collation(),
+                                          std::move(duplicate->foundValue),
+                                          std::move(duplicate->id));
+        } else if (auto& status = std::get<Status>(result); !status.isOK()) {
             return status;
         }
     }
@@ -718,9 +729,18 @@ Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
         bool dupsAllowed =
             (!entry->descriptor()->prepareUnique() || !opCtx->isEnforcingConstraints()) &&
             ticket.dupsAllowed;
-        auto status = _newInterface->insert(opCtx, keyString, dupsAllowed);
-        if (!status.isOK())
+        auto result = _newInterface->insert(opCtx, keyString, dupsAllowed);
+        if (auto duplicate = std::get_if<SortedDataInterface::DuplicateKey>(&result)) {
+            return buildDupKeyErrorStatus(duplicate->key,
+                                          coll->ns(),
+                                          entry->descriptor()->indexName(),
+                                          entry->descriptor()->keyPattern(),
+                                          entry->descriptor()->collation(),
+                                          std::move(duplicate->foundValue),
+                                          std::move(duplicate->id));
+        } else if (auto& status = std::get<Status>(result); !status.isOK()) {
             return status;
+        }
     }
 
     // If these keys should cause the index to become multikey, pass them into the catalog.
@@ -921,7 +941,8 @@ public:
                         bool dupsAllowed,
                         const RecordIdHandlerFn& onDuplicateRecord);
 
-    void insertKey(std::unique_ptr<SortedDataBuilderInterface>& inserter, const Sorter::Data& data);
+    std::variant<Status, SortedDataInterface::DuplicateKey> insertKey(
+        std::unique_ptr<SortedDataBuilderInterface>& inserter, const Sorter::Data& data);
 
     Status keyCommitted(const KeyHandlerFn& onDuplicateKeyInserted,
                         const Sorter::Data& data,
@@ -1157,9 +1178,10 @@ bool SortedDataIndexAccessMethod::BulkBuilderImpl::duplicateCheck(
     return isDup;
 }
 
-void SortedDataIndexAccessMethod::BulkBuilderImpl::insertKey(
+std::variant<Status, SortedDataInterface::DuplicateKey>
+SortedDataIndexAccessMethod::BulkBuilderImpl::insertKey(
     std::unique_ptr<SortedDataBuilderInterface>& inserter, const Sorter::Data& data) {
-    uassertStatusOK(inserter->addKey(data.first));
+    return inserter->addKey(data.first);
 }
 
 Status SortedDataIndexAccessMethod::BulkBuilderImpl::keyCommitted(

@@ -44,6 +44,7 @@
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
@@ -75,15 +76,15 @@ TEST(SortedDataInterface, KeyFormatStringInsertDuplicates) {
 
     {
         WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid1),
-                                 /*dupsAllowed*/ true));
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid2),
-                                 /*dupsAllowed*/ true));
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid3),
-                                 /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid1),
+                                            /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid2),
+                                            /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid3),
+                                            /*dupsAllowed*/ true));
         uow.commit();
     }
     ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
@@ -145,20 +146,28 @@ TEST(SortedDataInterface, KeyFormatStringUniqueInsertRemoveDuplicates) {
 
     {
         WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid1),
-                                 /*dupsAllowed*/ true));
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid1),
-                                 /*dupsAllowed*/ false));
-        auto status = sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), key1, rid2),
-                                     /*dupsAllowed*/ false);
-        ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid1),
+                                            /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid1),
+                                            /*dupsAllowed*/ false));
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx.get(),
+                                                       makeKeyString(sorted.get(), key1, rid2),
+                                                       /*dupsAllowed*/ false,
+                                                       IncludeDuplicateRecordId::kOff),
+                                        key1,
+                                        boost::none);
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx.get(),
+                                                       makeKeyString(sorted.get(), key1, rid2),
+                                                       /*dupsAllowed*/ false,
+                                                       IncludeDuplicateRecordId::kOn),
+                                        key1,
+                                        rid1);
 
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid3),
-                                 /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid3),
+                                            /*dupsAllowed*/ true));
         uow.commit();
     }
 
@@ -170,9 +179,9 @@ TEST(SortedDataInterface, KeyFormatStringUniqueInsertRemoveDuplicates) {
                         makeKeyString(sorted.get(), key1, rid1),
                         /*dupsAllowed*/ true);
 
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key2, rid1),
-                                 /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key2, rid1),
+                                            /*dupsAllowed*/ true));
         uow.commit();
     }
 
@@ -234,15 +243,15 @@ TEST(SortedDataInterface, KeyFormatStringSetEndPosition) {
 
     {
         WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid1),
-                                 /*dupsAllowed*/ true));
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key2, rid2),
-                                 /*dupsAllowed*/ true));
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key3, rid3),
-                                 /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid1),
+                                            /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key2, rid2),
+                                            /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key3, rid3),
+                                            /*dupsAllowed*/ true));
         uow.commit();
     }
     ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
@@ -305,15 +314,15 @@ TEST(SortedDataInterface, KeyFormatStringUnindex) {
 
     {
         WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid1),
-                                 /*dupsAllowed*/ true));
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid2),
-                                 /*dupsAllowed*/ true));
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid3),
-                                 /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid1),
+                                            /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid2),
+                                            /*dupsAllowed*/ true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid3),
+                                            /*dupsAllowed*/ true));
         uow.commit();
     }
     ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
@@ -353,15 +362,15 @@ TEST(SortedDataInterface, KeyFormatStringUniqueUnindex) {
 
     {
         WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, rid1),
-                                 /*dupsAllowed*/ false));
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key2, rid2),
-                                 /*dupsAllowed*/ false));
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key3, rid3),
-                                 /*dupsAllowed*/ false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key1, rid1),
+                                            /*dupsAllowed*/ false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key2, rid2),
+                                            /*dupsAllowed*/ false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                            makeKeyString(sorted.get(), key3, rid3),
+                                            /*dupsAllowed*/ false));
         uow.commit();
     }
     ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
@@ -400,9 +409,9 @@ TEST(SortedDataInterface, InsertReservedRecordIdStr) {
     RecordId reservedLoc(record_id_helpers::reservedIdFor(
         record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::String));
     invariant(record_id_helpers::isReserved(reservedLoc));
-    ASSERT_OK(sorted->insert(opCtx.get(),
-                             makeKeyString(sorted.get(), key1, reservedLoc),
-                             /*dupsAllowed*/ true));
+    ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                        makeKeyString(sorted.get(), key1, reservedLoc),
+                                        /*dupsAllowed*/ true));
     uow.commit();
     ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
 }
@@ -426,7 +435,7 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdStr) {
         ASSERT(record_id_helpers::isReserved(reservedLoc));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
         wuow.commit();
     }
 

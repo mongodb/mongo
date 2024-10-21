@@ -140,11 +140,22 @@ Status IndexBuildInterceptor::recordDuplicateKey(OperationContext* opCtx,
 }
 
 Status IndexBuildInterceptor::checkDuplicateKeyConstraints(
-    OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry) const {
+    OperationContext* opCtx,
+    const CollectionPtr& coll,
+    const IndexCatalogEntry* indexCatalogEntry) const {
     if (!_duplicateKeyTracker) {
         return Status::OK();
     }
-    return _duplicateKeyTracker->checkConstraints(opCtx, indexCatalogEntry);
+    if (auto duplicate = _duplicateKeyTracker->checkConstraints(opCtx, indexCatalogEntry)) {
+        return buildDupKeyErrorStatus(duplicate->key,
+                                      coll->ns(),
+                                      indexCatalogEntry->descriptor()->indexName(),
+                                      indexCatalogEntry->descriptor()->keyPattern(),
+                                      indexCatalogEntry->descriptor()->collation(),
+                                      std::move(duplicate->foundValue),
+                                      std::move(duplicate->id));
+    }
+    return Status::OK();
 }
 
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,

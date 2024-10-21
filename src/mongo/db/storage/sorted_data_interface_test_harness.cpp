@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/assert_util_core.h"
@@ -71,7 +72,8 @@ void insertToIndex(OperationContext* opCtx,
                    bool dupsAllowed) {
     WriteUnitOfWork wuow(opCtx);
     for (auto&& entry : toInsert) {
-        ASSERT_OK(index->insert(opCtx, makeKeyString(index, entry.key, entry.loc), dupsAllowed));
+        ASSERT_SDI_INSERT_OK(
+            index->insert(opCtx, makeKeyString(index, entry.key, entry.loc), dupsAllowed));
     }
     wuow.commit();
 }

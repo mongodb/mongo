@@ -45,6 +45,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
@@ -80,10 +81,11 @@ struct Fixture {
             BSONObj key = BSON("" << i);
             if (keyFormat == KeyFormat::Long) {
                 RecordId loc(42, i * 2);
-                ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
+                ASSERT_SDI_INSERT_OK(
+                    sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
             } else {
                 RecordId loc(record_id_helpers::keyForObj(key));
-                ASSERT_OK(sorted->insert(
+                ASSERT_SDI_INSERT_OK(sorted->insert(
                     opCtx.get(), makeKeyString(sorted.get(), key, std::move(loc)), true));
             }
         }

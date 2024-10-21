@@ -132,8 +132,8 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx,
-                                             const IndexCatalogEntry* indexCatalogEntry) const {
+boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkConstraints(
+    OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry) const {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     auto constraintsCursor = _keyConstraintsTable->rs()->getCursor(opCtx);
@@ -158,9 +158,9 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx,
         auto key = key_string::Value::deserialize(
             reader, index->getKeyStringVersion(), boost::none /* RecordId format */);
 
-        auto status = index->dupKeyCheck(opCtx, key);
-        if (!status.isOK())
-            return status;
+        if (auto duplicateKey = index->dupKeyCheck(opCtx, key)) {
+            return duplicateKey;
+        }
 
         WriteUnitOfWork wuow(opCtx);
         _keyConstraintsTable->rs()->deleteRecord(opCtx, record->id);
@@ -189,7 +189,7 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx,
                 "index build: resolved duplicate key conflicts for unique index",
                 "numResolved"_attr = resolved,
                 "indexName"_attr = indexCatalogEntry->descriptor()->indexName());
-    return Status::OK();
+    return boost::none;
 }
 
 }  // namespace mongo

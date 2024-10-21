@@ -43,6 +43,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
@@ -73,7 +74,8 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursor) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
             uow.commit();
         }
     }
@@ -129,7 +131,8 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorWithEndPosition) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
             uow.commit();
         }
     }
@@ -181,7 +184,8 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorReversed) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
             uow.commit();
         }
     }
@@ -231,7 +235,8 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorOnIdIndex) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), false));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), false));
             uow.commit();
         }
     }
@@ -281,7 +286,8 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorReversedOnIdIndex) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), false));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), false));
             uow.commit();
         }
     }
@@ -332,7 +338,7 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorWithDupKeys) {
         {
             WriteUnitOfWork uow(opCtx.get());
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key1, loc), true /* allow duplicates */));
             uow.commit();
         }
@@ -383,7 +389,7 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorWithDupKeysReversed) {
         {
             WriteUnitOfWork uow(opCtx.get());
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key1, loc), true /* allow duplicates */));
             uow.commit();
         }
@@ -431,7 +437,8 @@ TEST(SortedDataInterface, saveWithoutRestore) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false));
             uow.commit();
         }
     }
@@ -468,7 +475,8 @@ TEST(SortedDataInterface, saveWithoutRestoreReversed) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
             uow.commit();
         }
     }

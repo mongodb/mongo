@@ -222,7 +222,8 @@ class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
 public:
     DevNullSortedDataBuilderInterface() {}
 
-    Status addKey(const key_string::Value& keyString) override {
+    std::variant<Status, SortedDataInterface::DuplicateKey> addKey(
+        const key_string::Value& keyString) override {
         return Status::OK();
     }
 };
@@ -242,10 +243,11 @@ public:
         return {};
     }
 
-    Status insert(OperationContext* opCtx,
-                  const key_string::Value& keyString,
-                  bool dupsAllowed,
-                  IncludeDuplicateRecordId includeDuplicateRecordId) override {
+    std::variant<Status, DuplicateKey> insert(
+        OperationContext* opCtx,
+        const key_string::Value& keyString,
+        bool dupsAllowed,
+        IncludeDuplicateRecordId includeDuplicateRecordId) override {
         return Status::OK();
     }
 
@@ -253,8 +255,9 @@ public:
                  const key_string::Value& keyString,
                  bool dupsAllowed) override {}
 
-    Status dupKeyCheck(OperationContext* opCtx, const key_string::Value& keyString) override {
-        return Status::OK();
+    boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
+                                              const key_string::Value& keyString) override {
+        return boost::none;
     }
 
     boost::optional<RecordId> findLoc(OperationContext* opCtx,

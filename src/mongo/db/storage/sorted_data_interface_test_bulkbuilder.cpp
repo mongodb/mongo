@@ -40,6 +40,7 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
@@ -65,7 +66,7 @@ TEST(SortedDataInterface, BuilderAddKey) {
             sorted->makeBulkBuilder(opCtx.get(), true));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
         wuow.commit();
     }
 
@@ -98,7 +99,7 @@ TEST(SortedDataInterface, BuilderAddKeyString) {
             sorted->makeBulkBuilder(opCtx.get(), true));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(keyString1.getValueCopy()));
+        ASSERT_SDI_INSERT_OK(builder->addKey(keyString1.getValueCopy()));
         wuow.commit();
     }
 
@@ -129,7 +130,7 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdLong) {
         ASSERT(record_id_helpers::isReserved(reservedLoc));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
         wuow.commit();
     }
 
@@ -157,7 +158,7 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
             sorted->makeBulkBuilder(opCtx.get(), true));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
         wuow.commit();
     }
 
@@ -168,9 +169,8 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
     }
 }
 
-// Add the same key multiple times using a bulk builder and verify that
-// the returned status is ErrorCodes::DuplicateKey when duplicates are
-// not allowed.
+// Add the same key multiple times using a bulk builder and verify that duplicate key information is
+// returned when duplicates are not allowed.
 TEST(SortedDataInterface, BuilderAddSameKey) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
@@ -187,9 +187,9 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
             sorted->makeBulkBuilder(opCtx.get(), false));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey,
-                      builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(
+            builder->addKey(makeKeyString(sorted.get(), key1, loc2)), key1, boost::none);
         wuow.commit();
     }
 
@@ -200,9 +200,9 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
     }
 }
 
-/*
- * Add the same KeyString multiple times using a bulk builder and verify that the returned status is
- * ErrorCodes::DuplicateKey when duplicates are not allowed.
+/**
+ * Add the same KeyString multiple times using a bulk builder and verify that duplicate key
+ * information is returned when duplicates are not allowed.
  */
 TEST(SortedDataInterface, BuilderAddSameKeyString) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
@@ -225,8 +225,9 @@ TEST(SortedDataInterface, BuilderAddSameKeyString) {
             sorted->makeBulkBuilder(opCtx.get(), false));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(keyStringLoc1.getValueCopy()));
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, builder->addKey(keyStringLoc2.getValueCopy()));
+        ASSERT_SDI_INSERT_OK(builder->addKey(keyStringLoc1.getValueCopy()));
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(
+            builder->addKey(keyStringLoc2.getValueCopy()), key1, boost::none);
         wuow.commit();
     }
 
@@ -255,8 +256,8 @@ TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
             sorted->makeBulkBuilder(opCtx.get(), true /* allow duplicates */));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
         wuow.commit();
     }
 
@@ -292,8 +293,8 @@ TEST(SortedDataInterface, BuilderAddSameKeyStringWithDupsAllowed) {
             sorted->makeBulkBuilder(opCtx.get(), true /* allow duplicates */));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(keyStringLoc1.getValueCopy()));
-        ASSERT_OK(builder->addKey(keyStringLoc2.getValueCopy()));
+        ASSERT_SDI_INSERT_OK(builder->addKey(keyStringLoc1.getValueCopy()));
+        ASSERT_SDI_INSERT_OK(builder->addKey(keyStringLoc2.getValueCopy()));
         wuow.commit();
     }
 
@@ -321,9 +322,9 @@ TEST(SortedDataInterface, BuilderAddMultipleKeys) {
             sorted->makeBulkBuilder(opCtx.get(), true));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key2, loc2)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key3, loc3)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key2, loc2)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key3, loc3)));
         wuow.commit();
     }
 
@@ -360,9 +361,9 @@ TEST(SortedDataInterface, BuilderAddMultipleKeyStrings) {
             sorted->makeBulkBuilder(opCtx.get(), true));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(keyString1.getValueCopy()));
-        ASSERT_OK(builder->addKey(keyString2.getValueCopy()));
-        ASSERT_OK(builder->addKey(keyString3.getValueCopy()));
+        ASSERT_SDI_INSERT_OK(builder->addKey(keyString1.getValueCopy()));
+        ASSERT_SDI_INSERT_OK(builder->addKey(keyString2.getValueCopy()));
+        ASSERT_SDI_INSERT_OK(builder->addKey(keyString3.getValueCopy()));
         wuow.commit();
     }
 
@@ -390,11 +391,11 @@ TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
             sorted->makeBulkBuilder(opCtx.get(), true));
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1b, loc2)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1c, loc4)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey2b, loc3)));
-        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey3a, loc5)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1b, loc2)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1c, loc4)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey2b, loc3)));
+        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey3a, loc5)));
         wuow.commit();
     }
 

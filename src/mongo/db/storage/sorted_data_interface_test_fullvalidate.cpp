@@ -39,6 +39,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
@@ -67,7 +68,8 @@ TEST(SortedDataInterface, FullValidate) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
             uow.commit();
         }
     }

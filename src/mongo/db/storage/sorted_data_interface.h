@@ -55,6 +55,12 @@ class SortedDataKeyValueView;
  */
 class SortedDataInterface {
 public:
+    struct DuplicateKey {
+        BSONObj key;
+        boost::optional<RecordId> id;
+        DuplicateKeyErrorInfo::FoundValue foundValue;
+    };
+
     /**
      * Constructs a SortedDataInterface. The rsKeyFormat is the RecordId key format of the related
      * RecordStore.
@@ -95,7 +101,7 @@ public:
      * If `includeDuplicateRecordId` is kOn and DuplicateKey is returned, embeds the record id of
      * the duplicate in the returned status.
      */
-    virtual Status insert(
+    virtual std::variant<Status, DuplicateKey> insert(
         OperationContext* opCtx,
         const key_string::Value& keyString,
         bool dupsAllowed,
@@ -122,13 +128,14 @@ public:
                                               StringData keyString) const = 0;
 
     /**
-     * Return ErrorCodes::DuplicateKey if there is more than one occurence of 'KeyString' in this
-     * index, and Status::OK() otherwise. This call is only allowed on a unique index, and will
-     * invariant otherwise.
+     * Return duplicate key information if there is more than one occurence of 'KeyString' in this
+     * index, or boost::none otherwise. This call is only allowed on a unique index, and will fail
+     * an invariant otherwise.
      *
      * @param opCtx the transaction under which this operation takes place
      */
-    virtual Status dupKeyCheck(OperationContext* opCtx, const key_string::Value& keyString) = 0;
+    virtual boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
+                                                      const key_string::Value& keyString) = 0;
 
     /**
      * Attempt to reduce the storage space used by this index via compaction. Only called if the
@@ -441,7 +448,8 @@ public:
      * transactionally. Other storage engines do not perform inserts transactionally and will ignore
      * any parent WriteUnitOfWork.
      */
-    virtual Status addKey(const key_string::Value& keyString) = 0;
+    virtual std::variant<Status, SortedDataInterface::DuplicateKey> addKey(
+        const key_string::Value& keyString) = 0;
 };
 
 /**

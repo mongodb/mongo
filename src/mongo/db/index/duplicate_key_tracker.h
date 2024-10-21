@@ -41,6 +41,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/platform/atomic_word.h"
 
@@ -84,14 +85,14 @@ public:
                      const key_string::Value& key);
 
     /**
-     * Returns Status::OK if all previously recorded duplicate key constraint violations have been
-     * resolved for the index. Returns a DuplicateKey error if there are still duplicate key
+     * Returns boost::none if all previously recorded duplicate key constraint violations have been
+     * resolved for the index. Returns duplicate key information if there are still duplicate key
      * constraint violations on the index.
      *
      * Must not be in a WriteUnitOfWork.
      */
-    Status checkConstraints(OperationContext* opCtx,
-                            const IndexCatalogEntry* indexCatalogEntry) const;
+    boost::optional<SortedDataInterface::DuplicateKey> checkConstraints(
+        OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry) const;
 
     std::string getTableIdent() const {
         return _keyConstraintsTable->rs()->getIdent();

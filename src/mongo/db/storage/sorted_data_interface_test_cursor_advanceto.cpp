@@ -41,6 +41,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
@@ -69,13 +70,16 @@ TEST(SortedDataInterface, AdvanceTo) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key1, loc2), true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key1, loc3), true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc4), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc5), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc4), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc5), true));
             uow.commit();
         }
     }
@@ -144,12 +148,15 @@ TEST(SortedDataInterface, AdvanceToReversed) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key3, loc4), true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key3, loc5), true /* allow duplicates */));
             uow.commit();
         }
@@ -220,8 +227,10 @@ TEST(SortedDataInterface, AdvanceToKeyBeforeCursorPosition) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
             uow.commit();
         }
     }
@@ -276,8 +285,10 @@ TEST(SortedDataInterface, AdvanceToKeyAfterCursorPositionReversed) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
             uow.commit();
         }
     }
@@ -337,7 +348,8 @@ TEST(SortedDataInterface, AdvanceToKeyAtCursorPosition) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
             uow.commit();
         }
     }
@@ -394,7 +406,8 @@ TEST(SortedDataInterface, AdvanceToKeyAtCursorPositionReversed) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
             uow.commit();
         }
     }
@@ -453,13 +466,16 @@ TEST(SortedDataInterface, AdvanceToExclusive) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key1, loc2), true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key1, loc3), true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc4), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc5), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc4), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc5), true));
             uow.commit();
         }
     }
@@ -527,12 +543,15 @@ TEST(SortedDataInterface, AdvanceToExclusiveReversed) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key3, loc4), true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key3, loc5), true /* allow duplicates */));
             uow.commit();
         }
@@ -605,9 +624,12 @@ TEST(SortedDataInterface, AdvanceToIndirect) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
             uow.commit();
         }
     }
@@ -667,9 +689,12 @@ TEST(SortedDataInterface, AdvanceToIndirectReversed) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
             uow.commit();
         }
     }
@@ -732,9 +757,12 @@ TEST(SortedDataInterface, AdvanceToIndirectExclusive) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
             uow.commit();
         }
     }
@@ -806,9 +834,12 @@ TEST(SortedDataInterface, AdvanceToIndirectExclusiveReversed) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc2), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key5, loc3), true));
             uow.commit();
         }
     }
@@ -880,17 +911,17 @@ TEST(SortedDataInterface, AdvanceToCompoundWithPrefixAndSuffixInclusive) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), compoundKey1a, loc2),
-                                     true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(opCtx.get(),
-                                     makeKeyString(sorted.get(), compoundKey1a, loc3),
-                                     true /* allow duplicates */));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                                makeKeyString(sorted.get(), compoundKey1a, loc2),
+                                                true /* allow duplicates */));
+            ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(),
+                                                makeKeyString(sorted.get(), compoundKey1a, loc3),
+                                                true /* allow duplicates */));
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
             uow.commit();
         }
@@ -970,15 +1001,15 @@ TEST(SortedDataInterface, AdvanceToCompoundWithPrefixExclusive) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey1c, loc3), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
             uow.commit();
         }
@@ -1057,15 +1088,15 @@ TEST(SortedDataInterface, AdvanceToCompoundWithPrefixAndSuffixExclusive) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey1c, loc3), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
             uow.commit();
         }
@@ -1144,15 +1175,15 @@ TEST(SortedDataInterface, AdvanceToCompoundWithSuffixExclusive) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey1c, loc3), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
             uow.commit();
         }

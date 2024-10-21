@@ -45,6 +45,7 @@
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
@@ -120,7 +121,8 @@ TEST(SortedDataInterface, ExhaustCursor) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
             uow.commit();
         }
     }
@@ -167,7 +169,7 @@ TEST(SortedDataInterface, ExhaustKeyStringCursor) {
             RecordId loc(42, i * 2);
             key_string::Value ks = makeKeyString(sorted.get(), key, loc);
             keyStrings.push_back(ks);
-            ASSERT_OK(sorted->insert(opCtx.get(), ks, true));
+            ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(), ks, true));
             uow.commit();
         }
     }
@@ -229,7 +231,8 @@ TEST(SortedDataInterface, ExhaustCursorReversed) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
             uow.commit();
         }
     }
@@ -277,7 +280,7 @@ TEST(SortedDataInterface, ExhaustKeyStringCursorReversed) {
             RecordId loc(42, i * 2);
             key_string::Value ks = makeKeyString(sorted.get(), key, loc);
             keyStrings.push_back(ks);
-            ASSERT_OK(sorted->insert(opCtx.get(), ks, true));
+            ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(), ks, true));
             uow.commit();
         }
     }
@@ -333,7 +336,7 @@ TEST(SortedDataInterface, CursorIterate1) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), BSON("" << i), RecordId(5, i * 2)), true));
             uow.commit();
         }
@@ -363,7 +366,7 @@ TEST(SortedDataInterface, CursorIterate1WithSaveRestore) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), BSON("" << i), RecordId(5, i * 2)), true));
             uow.commit();
         }
@@ -396,7 +399,7 @@ TEST(SortedDataInterface, CursorIterateAllDupKeysWithSaveRestore) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(
+            ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), BSON("" << 5), RecordId(5, i * 2)), true));
             uow.commit();
         }
@@ -437,7 +440,7 @@ void testBoundaries(IndexType type, bool forward, bool inclusive) {
         WriteUnitOfWork uow(opCtx.get());
         BSONObj key = BSON("" << i);
         RecordId loc(42 + i * 2);
-        ASSERT_OK(sorted->insert(
+        ASSERT_SDI_INSERT_OK(sorted->insert(
             opCtx.get(), makeKeyString(sorted.get(), key, loc), false /* dupsAllowed*/));
         uow.commit();
     }
