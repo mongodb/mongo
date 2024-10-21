@@ -70,7 +70,7 @@ mongo_cc_library(
         "//src/mongo/util/options_parser",
     ] + select({
         "//bazel/config:non_system_allocator_enabled": [
-            # "//src/mongo/util:tcmalloc_set_parameter",
+            "//src/mongo/util:tcmalloc_set_parameter",
         ],
         "//conditions:default": [],
     }),

@@ -1019,7 +1019,7 @@ selects.config_setting_group(
 
 use_wiredtiger(
     name = "use_wiredtiger",
-    build_setting_default = False,
+    build_setting_default = True,
 )
 
 config_setting(
@@ -2084,6 +2084,38 @@ selects.config_setting_group(
     for feature in ALL_ENTERPRISE_FEATURES
 ]
 
+selects.config_setting_group(
+    name = "enterprise_feature_queryable_and_wiredtiger_enabled",
+    match_all = [
+        ":enterprise_feature_queryable_enabled",
+        ":use_wiredtiger_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "enterprise_feature_fle_and_js_engine_enabled",
+    match_all = [
+        ":enterprise_feature_fle_enabled",
+        ":js_engine_mozjs",
+    ],
+)
+
+selects.config_setting_group(
+    name = "enterprise_feature_streams_and_streams_build_enabled",
+    match_all = [
+        ":enterprise_feature_queryable_enabled",
+        ":streams_release_build_required_setting",
+    ],
+)
+
+selects.config_setting_group(
+    name = "enterprise_feature_audit_or_encryptdb_enabled",
+    match_any = [
+        ":enterprise_feature_audit_enabled",
+        ":enterprise_feature_encryptdb_enabled",
+    ],
+)
+
 # --------------------------------------
 # server_js
 # --------------------------------------
@@ -2113,5 +2145,21 @@ config_setting(
     name = "xray_enabled",
     flag_values = {
         "//bazel/config:xray": "True",
+    },
+)
+
+# --------------------------------------
+# use_sasl_client
+# --------------------------------------
+
+bool_flag(
+    name = "use_sasl_client",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_sasl_client_enabled",
+    flag_values = {
+        "//bazel/config:use_sasl_client": "True",
     },
 )

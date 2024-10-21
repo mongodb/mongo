@@ -122,60 +122,6 @@ env.Library(
 )
 
 env.Library(
-    target="repl_coordinator_impl",
-    source=[
-        "check_quorum_for_config_change.cpp",
-        "repl_set_config_checks.cpp",
-        "replication_coordinator_impl.cpp",
-        "replication_coordinator_impl_elect_v1.cpp",
-        "replication_coordinator_impl_heartbeat.cpp",
-        "vote_requester.cpp",
-        "replication_coordinator_impl_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/commands/mongod_fcv",
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/mongod_options",
-        "$BUILD_DIR/mongo/db/prepare_conflict_tracker",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/session/kill_sessions_local",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/rpc/command_status",
-        "$BUILD_DIR/mongo/rpc/metadata",
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "data_replicator_external_state_initial_sync",
-        "initial_syncer",
-        "repl_coordinator_interface",
-        "repl_settings",
-        "replica_set_messages",
-        "replication_metrics",
-        "replication_process",
-        "reporter",
-        "scatter_gather",
-        "tenant_migration_cloners",
-        "topology_coordinator",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/catalog/local_oplog_info",
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/serverless/serverless_lock",
-        "$BUILD_DIR/mongo/db/session/session_catalog",
-        "$BUILD_DIR/mongo/db/storage/journal_flusher",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "delayable_timeout_callback",
-        "repl_server_parameters",
-        "replica_set_aware_service",
-        "split_horizon",
-    ],
-)
-
-env.Library(
     target="repl_coordinator_test_fixture",
     source=[
         "replication_coordinator_test_fixture.cpp",
@@ -238,46 +184,6 @@ env.Library(
 )
 
 env.Library(
-    target="tenant_migration_cloners",
-    source=[
-        "tenant_all_database_cloner.cpp",
-        "tenant_collection_cloner.cpp",
-        "tenant_database_cloner.cpp",
-        "tenant_base_cloner.cpp",
-        "tenant_file_cloner.cpp",
-    ],
-    LIBDEPS=[
-        "base_cloner",
-        "cloner_utils",
-        "repl_sync_shared_data",
-        "task_runner",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/catalog/document_validation",
-        "$BUILD_DIR/mongo/db/commands/list_collections_filter",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_exec",
-        "$BUILD_DIR/mongo/db/stats/top",
-        "$BUILD_DIR/mongo/db/storage/durable_catalog",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger_import",
-        "$BUILD_DIR/mongo/idl/cluster_parameter_synchronization_helpers",
-        "$BUILD_DIR/mongo/rpc/metadata",
-        "$BUILD_DIR/mongo/util/progress_meter",
-        "oplog",
-        "oplog_application_interface",
-        "repl_server_parameters",
-        "replica_set_aware_service",
-        "replication_auth",
-        "tenant_migration_state_machine_idl",
-        "tenant_migration_utils",
-    ],
-)
-
-env.Library(
     target="data_replicator_external_state_mock",
     source=[
         "data_replicator_external_state_mock.cpp",
@@ -289,47 +195,6 @@ env.Library(
         "oplog_entry",
         "optime",
         "replica_set_messages",
-    ],
-)
-
-env.Library(
-    target="tenant_migration_recipient_service",
-    source=[
-        "tenant_migration_recipient_op_observer.cpp",
-        "tenant_migration_recipient_service.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/fetcher",
-        "$BUILD_DIR/mongo/client/read_preference",
-        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
-        "$BUILD_DIR/mongo/db/vector_clock_mutable",
-        "tenant_migration_access_blocker",
-        "tenant_migration_statistics",
-        "tenant_migration_utils",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/db/catalog/local_oplog_info",
-        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_exec",
-        "$BUILD_DIR/mongo/db/serverless/serverless_lock",
-        "$BUILD_DIR/mongo/db/session/session_catalog_mongod",
-        "$BUILD_DIR/mongo/db/transaction/transaction",
-        "cloner_utils",
-        "oplog",
-        "oplog_buffer_collection",
-        "oplog_entry",
-        "oplog_fetcher",
-        "oplog_interface_local",
-        "primary_only_service",
-        "repl_server_parameters",
-        "replica_set_aware_service",
-        "replication_auth",
-        "tenant_migration_cloners",
-        "tenant_migration_state_machine_idl",
-        "tenant_oplog_processing",
     ],
 )
 

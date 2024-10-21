@@ -183,50 +183,6 @@ if tcmallocAttrs:
         # Include valgrind since tcmalloc disables itself while running under valgrind
         tcmspEnv.InjectThirdParty("valgrind")
 
-    tcmspEnv.Library(
-        target="allocator_thread",
-        source=[
-            "allocator_tcmalloc_thread.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/db/server_base",
-            "$BUILD_DIR/mongo/db/service_context",
-            "tcmalloc_server_status",
-            "tcmalloc_set_parameter",
-        ],
-    )
-
-    tcmspEnv.Library(
-        target="tcmalloc_set_parameter",
-        source=[
-            "tcmalloc_set_parameter.cpp",
-            "tcmalloc_parameters_gen.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/db/server_base",
-            "processinfo",
-        ],
-        LIBDEPS_TAGS=[
-            "lint-allow-bidirectional-edges",
-            "lint-allow-nonprivate-on-deps-dependents",
-        ],
-    )
-
-    tcmspEnv.Library(
-        target="tcmalloc_server_status",
-        source=[
-            "tcmalloc_server_status_section.cpp",
-            "heap_profiler.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/base",
-            "$BUILD_DIR/mongo/db/commands/server_status_core",
-            "$BUILD_DIR/mongo/db/server_base",
-            "processinfo",
-            "tcmalloc_set_parameter",
-        ],
-    )
-
     tcmspEnv.CppUnitTest(
         target="tcmalloc_set_parameters_test",
         source=[
@@ -238,16 +194,6 @@ if tcmallocAttrs:
             "processinfo",
             "tcmalloc_server_status",
             "tcmalloc_set_parameter",
-        ],
-    )
-else:
-    env.Library(
-        target="allocator_thread",
-        source=[
-            "allocator_system_thread.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/db/server_base",
         ],
     )
 

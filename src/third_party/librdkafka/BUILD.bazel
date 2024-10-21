@@ -136,6 +136,9 @@ mongo_cc_library(
         ],
         "//conditions:default": ["//conditions:incompatible"],
     }),
+    includes = [
+        "dist/src",
+    ],
     linkopts = [
         "-lcurl",
         "-lsasl2",
@@ -173,6 +176,9 @@ mongo_cc_library(
     hdrs = glob(["dist/src-cpp/**/*.h"]),
     copts = [
         "-I$(GENDIR)/src/third_party/librdkafka/dist/FAKE",
+    ],
+    includes = [
+        "dist/src-cpp",
     ],
     deps = [
         ":rdkafka",

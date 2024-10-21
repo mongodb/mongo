@@ -193,25 +193,17 @@ mongo_cc_library(
         "//conditions:default": ["ssl_manager_none.cpp"],
     }),
     hdrs = [
+        "ssl.hpp",
         "ssl_manager.h",
-    ] + select({
-        "//bazel/config:ssl_enabled": [
-            "ssl.hpp",
-            "ssl_parameters.h",
-            "ssl_peer_info.h",
-            "//src/mongo/executor:network_interface_factory.h",
-            "//src/mongo/rpc/metadata:metadata_hook.h",
-            "//src/mongo/util/net/ocsp:ocsp_manager.h",
-            "//src/mongo/util/net/private:ssl_expiration.h",
-        ],
-        "//conditions:default": [],
-    }) + select({
-        "//bazel/config:ssl_provider_openssl": [
-            "//src/mongo/util:strong_weak_finish_line.h",
-            "//src/mongo/util/net:dh_openssl.h",
-        ],
-        "//conditions:default": [],
-    }),
+        "ssl_parameters.h",
+        "ssl_peer_info.h",
+        "//src/mongo/executor:network_interface_factory.h",
+        "//src/mongo/rpc/metadata:metadata_hook.h",
+        "//src/mongo/util:strong_weak_finish_line.h",
+        "//src/mongo/util/net:dh_openssl.h",
+        "//src/mongo/util/net/ocsp:ocsp_manager.h",
+        "//src/mongo/util/net/private:ssl_expiration.h",
+    ],
     deps = [
         "network",
         "ssl_options",

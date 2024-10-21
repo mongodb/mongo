@@ -41,105 +41,6 @@ env.Benchmark(
 )
 
 env.Library(
-    target="catalog_impl",
-    source=[
-        "collection_impl.cpp",
-        "database_holder_impl.cpp",
-        "database_impl.cpp",
-        "index_catalog_entry_impl.cpp",
-        "index_catalog_impl.cpp",
-        "index_consistency.cpp",
-        "virtual_collection_impl.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/audit",
-        "$BUILD_DIR/mongo/db/collection_crud/collection_crud",
-        "$BUILD_DIR/mongo/db/collection_index_usage_tracker",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/dbcommands_idl",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/repl/oplog",
-        "$BUILD_DIR/mongo/db/repl/repl_server_parameters",
-        "$BUILD_DIR/mongo/db/repl/repl_settings",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/stats/top",
-        "$BUILD_DIR/mongo/db/storage/capped_snapshots",
-        "$BUILD_DIR/mongo/db/storage/durable_catalog",
-        "$BUILD_DIR/mongo/db/storage/execution_context",
-        "$BUILD_DIR/mongo/db/storage/key_string/key_string",
-        "$BUILD_DIR/mongo/db/storage/record_store_base",
-        "$BUILD_DIR/mongo/db/storage/storage_engine_common",
-        "$BUILD_DIR/mongo/db/storage/storage_engine_impl",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/storage/storage_util",
-        "$BUILD_DIR/mongo/db/system_index",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_extended_range",
-        "$BUILD_DIR/mongo/db/transaction/transaction",
-        "$BUILD_DIR/mongo/db/ttl/ttl_collection_cache",
-        "$BUILD_DIR/mongo/db/vector_clock",
-        "$BUILD_DIR/mongo/db/views/view_catalog_helpers",
-        "$BUILD_DIR/mongo/util/log_and_backoff",
-        "$BUILD_DIR/mongo/util/progress_meter",
-        "capped_visibility",
-        "catalog_helpers",
-        "catalog_stats",
-        "collection_options",
-        "collection_query_info",
-        "document_validation",
-        "health_log_interface",
-        "index_build_block",
-        "index_catalog",
-        "index_key_validate",
-        "index_repair",
-        "local_oplog_info",
-        "storage_engine_collection_options_flags_parser",
-        "throttle_cursor",
-        "validate_idl",
-        "validate_state",
-    ],
-)
-
-env.Library(
-    target="collection_validation",
-    source=[
-        "collection_validation.cpp",
-        "validate_adaptor.cpp",
-        "validate_results.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/column/column",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/multi_key_path_tracker",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/storage/execution_context",
-        "$BUILD_DIR/mongo/db/storage/key_string/key_string",
-        "$BUILD_DIR/mongo/db/storage/record_store_base",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
-        "$BUILD_DIR/mongo/util/progress_meter",
-        "catalog_impl",
-        "collection_options",
-        "index_catalog",
-        "index_key_validate",
-        "throttle_cursor",
-        "validate_state",
-    ],
-)
-
-env.Library(
     target="catalog_test_fixture",
     source=[
         "catalog_test_fixture.cpp",
@@ -158,17 +59,6 @@ env.Library(
 if wiredtiger:
     wtEnv = env.Clone()
     wtEnv.InjectThirdParty(libraries=["wiredtiger"])
-
-    wtEnv.Library(
-        target="storage_engine_collection_options_flags_parser",
-        source=[
-            "storage_engine_collection_options_flags_parser.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger",
-            "$BUILD_DIR/mongo/util/pcre_wrapper",
-        ],
-    )
 
     wtEnv.CppUnitTest(
         target="db_catalog_test",

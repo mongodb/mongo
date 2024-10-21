@@ -17,34 +17,6 @@ def shouldBuildGRPC(myEnv):
     return myEnv.TargetOSIs("linux") and myEnv["ENABLE_GRPC_BUILD"]
 
 
-if env["MONGO_BUILD_SASL_CLIENT"]:
-    # Client-side SASL source necessary for mongo shell.
-    # Includes Cyrus SASL, OIDC, PLAIN, and AWS (if TLS support is on)
-    # support. Depends on sasl_client_native.
-    cyrusSaslClientEnv = env.Clone()
-
-    saslLibs = ["sasl2"]
-    if env.TargetOSIs("windows"):
-        saslLibs.extend(["secur32"])
-
-    cyrusSaslClientEnv.Library(
-        target="cyrus_sasl_client",
-        source=[
-            "cyrus_sasl_client_session.cpp",
-            "sasl_sspi.cpp",
-            "sasl_sspi_options.cpp",
-            "sasl_sspi_options_gen.cpp",
-        ],
-        LIBDEPS=[
-            "native_sasl_client",
-        ],
-        SYSLIBDEPS=saslLibs,
-        LIBDEPS_TAGS=[
-            "lint-allow-nonprivate-on-deps-dependents",
-            "lint-allow-bidirectional-edges",
-        ],
-    )
-
 clientDriverEnv = env.Clone()
 clientDriverEnv.InjectThirdParty("asio")
 if shouldBuildGRPC(env):

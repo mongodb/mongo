@@ -130,6 +130,7 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
                 cc_toolchain = cc_toolchain,
                 dynamic_library = shared_lib,
                 static_library = static_lib if cc_shared_library == None else None,
+                alwayslink = True,
             )
             linker_input = cc_common.create_linker_input(
                 owner = ctx.label,

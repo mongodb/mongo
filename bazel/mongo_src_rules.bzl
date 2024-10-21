@@ -1635,6 +1635,7 @@ def _mongo_cc_binary_and_program(
         defines = [],
         additional_linker_inputs = [],
         features = [],
+        exec_properties = {},
         _program_type = ""):
     if linkstatic == True:
         fail("""Linking specific targets statically is not supported.
@@ -1706,6 +1707,7 @@ def _mongo_cc_binary_and_program(
         }),
         "target_compatible_with": target_compatible_with + enterprise_compatible,
         "additional_linker_inputs": additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
+        "exec_properties": exec_properties,
     }
 
     if _program_type == "binary":
@@ -1750,7 +1752,8 @@ def mongo_cc_binary(
         target_compatible_with = [],
         defines = [],
         additional_linker_inputs = [],
-        features = []):
+        features = [],
+        exec_properties = {}):
     """Wrapper around cc_binary.
 
     Args:
@@ -1796,6 +1799,7 @@ def mongo_cc_binary(
         defines,
         additional_linker_inputs,
         features,
+        exec_properties,
         _program_type = "binary",
     )
 
@@ -1815,7 +1819,8 @@ def mongo_cc_test(
         target_compatible_with = [],
         defines = [],
         additional_linker_inputs = [],
-        features = []):
+        features = [],
+        exec_properties = {}):
     """Wrapper around cc_test.
 
     Args:
@@ -1860,6 +1865,7 @@ def mongo_cc_test(
         defines,
         additional_linker_inputs,
         features,
+        exec_properties,
         _program_type = "test",
     )
 

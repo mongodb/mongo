@@ -658,3 +658,94 @@ mongo_cc_library(
         "//src/mongo/util/options_parser",
     ],
 )
+
+# mongo_cc_library(
+#     name = "version_impl",
+#     srcs = [
+#         "version_impl.cpp",
+#     ],
+#     hdrs = [
+#         "version_constants.h",
+#     ],
+#     deps = [
+#         "//src/mongo:base",
+#     ],
+# )
+
+mongo_cc_library(
+    name = "tcmalloc_set_parameter",
+    srcs = [
+        "tcmalloc_parameters_gen",
+        "tcmalloc_set_parameter.cpp",
+    ],
+    hdrs = [
+        "tcmalloc_set_parameter.h",
+    ],
+    local_defines = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:tcmalloc_gperf_enabled": [],
+        "//bazel/config:tcmalloc_google_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "processinfo",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "tcmalloc_server_status",
+    srcs = [
+        "heap_profiler.cpp",
+        "tcmalloc_server_status_section.cpp",
+    ],
+    local_defines = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:tcmalloc_gperf_enabled": [],
+        "//bazel/config:tcmalloc_google_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "processinfo",
+        "tcmalloc_set_parameter",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)
+
+mongo_cc_library(
+    name = "allocator_thread",
+    srcs = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["allocator_tcmalloc_thread.cpp"],
+        "//bazel/config:tcmalloc_google_enabled": ["allocator_tcmalloc_thread.cpp"],
+        "//conditions:default": ["allocator_system_thread.cpp"],
+    }),
+    hdrs = [
+        "allocator_thread.h",
+    ],
+    copts = select({
+        "//bazel/config:gcc_or_clang": ["-Wno-sign-compare"],
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:server_base",
+    ] + select({
+        "//bazel/config:system_allocator_enabled": [],
+        "//conditions:default": [
+            "tcmalloc_server_status",
+            "tcmalloc_set_parameter",
+            "//src/mongo/db:service_context",
+        ],
+    }),
+)

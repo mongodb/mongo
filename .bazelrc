@@ -58,6 +58,7 @@ build --flag_alias=pgo_profile=//bazel/config:pgo_profile
 build --flag_alias=server_js=//bazel/config:server_js
 build --flag_alias=ssl=//bazel/config:ssl
 build --flag_alias=js_engine=//bazel/config:js_engine
+build --flag_alias=use_sasl_client=//bazel/config:use_sasl_client
 build --flag_alias=enterprise_feature_all=//bazel/config:enterprise_feature_all
 build --flag_alias=enterprise_feature_all=//bazel/config:enterprise_feature_all
 build --flag_alias=enterprise_feature_all=//bazel/config:enterprise_feature_all

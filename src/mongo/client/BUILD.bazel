@@ -486,3 +486,34 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
     ],
 )
+
+# Client-side SASL source necessary for mongo shell.
+# Includes Cyrus SASL, OIDC, PLAIN, and AWS (if TLS support is on)
+# support. Depends on sasl_client_native.
+mongo_cc_library(
+    name = "cyrus_sasl_client",
+    srcs = [
+        "cyrus_sasl_client_session.cpp",
+        "sasl_sspi.cpp",
+        "sasl_sspi_options.cpp",
+        "sasl_sspi_options_gen",
+    ],
+    hdrs = [
+        "cyrus_sasl_client_session.h",
+        "sasl_sspi_options.h",
+    ],
+    linkopts = [
+        "-lsasl2",
+    ] + select({
+        "@platforms//os:windows": ["secur32.lib"],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:use_sasl_client_enabled": [],
+        "//bazel/config:enterprise_feature_sasl_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "native_sasl_client",
+    ],
+)

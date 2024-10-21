@@ -133,14 +133,6 @@ env.Library(
     ],
 )
 
-
-def abc():
-    import pdb
-
-    pdb.set_trace()
-    return False
-
-
 env.Library(
     target="mongos_main",
     source=[

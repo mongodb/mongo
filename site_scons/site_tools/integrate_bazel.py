@@ -995,6 +995,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--server_js={env.GetOption("server-js") == "on"}',
         f'--ssl={"True" if env.GetOption("ssl") == "on" else "False"}',
         f'--js_engine={env.GetOption("js-engine")}',
+        f'--use_sasl_client={env.GetOption("use-sasl-client") is not None}',
         "--define",
         f"MONGO_VERSION={env['MONGO_VERSION']}",
         "--compilation_mode=dbg",  # always build this compilation mode as we always build with -g
