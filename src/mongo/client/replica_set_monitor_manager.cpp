@@ -149,7 +149,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData se
     }
 }
 
-void ReplicaSetMonitorManager::_setupTaskExecutorAndStatsInLock() {
+void ReplicaSetMonitorManager::_setupTaskExecutorAndStats(WithLock) {
     if (_isShutdown || _taskExecutor) {
         // do not restart taskExecutor if is in shutdown
         return;
@@ -189,7 +189,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
             !_isShutdown);
 
     _doGarbageCollectionLocked(lk);
-    _setupTaskExecutorAndStatsInLock();
+    _setupTaskExecutorAndStats(lk);
     const auto& setName = uri.getSetName();
     auto monitor = _monitors[setName].lock();
     if (monitor) {

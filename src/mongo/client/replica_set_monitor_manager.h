@@ -219,7 +219,7 @@ private:
 
     int _numMonitorsCreated;
 
-    void _setupTaskExecutorAndStatsInLock();
+    void _setupTaskExecutorAndStats(WithLock);
 
     // Set to true when shutdown has been called.
     bool _isShutdown{false};
