@@ -89,14 +89,12 @@ namespace {
 
 const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("test.collection");
 
-class CursorManagerTestBase : public unittest::Test, public ScopedGlobalServiceContextForTest {
+class CursorManagerTestBase : public ServiceContextTest {
 protected:
     CursorManagerTestBase()
-        : _cursorManager([&] {
-              getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
-              return getServiceContext()->getPreciseClockSource();
-          }()),
-          _tc("CursorManagerTestBase", getServiceContext()->getService()) {}
+        : ServiceContextTest(
+              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+                  std::make_unique<ClockSourceMock>(), std::make_unique<ClockSourceMock>()))) {}
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
         OperationContext* opCtx) {
@@ -136,14 +134,12 @@ protected:
         return static_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
     }
 
-    CursorManager _cursorManager;
-
-    ThreadClient _tc;
+    CursorManager _cursorManager{getServiceContext()->getPreciseClockSource()};
 };
 
 class CursorManagerTest : public CursorManagerTestBase {
 protected:
-    CursorManagerTest() : _opCtx(_tc->makeOperationContext()) {}
+    CursorManagerTest() : _opCtx(getClient()->makeOperationContext()) {}
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor() {
         return CursorManagerTestBase::makeFakePlanExecutor(_opCtx.get());
@@ -488,7 +484,7 @@ TEST_F(CursorManagerTest, CursorStoresAPIParameters) {
 class CursorManagerTestCustomOpCtx : public CursorManagerTestBase {
 protected:
     auto makeOperationContext() {
-        return _tc->makeOperationContext();
+        return getClient()->makeOperationContext();
     }
 };
 

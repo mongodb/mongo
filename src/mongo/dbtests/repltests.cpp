@@ -64,6 +64,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
@@ -160,14 +161,6 @@ public:
           _defaultReplSettings(
               ReplicationCoordinator::get(_opCtx.getServiceContext())->getSettings()) {
         auto* const sc = _opCtx.getServiceContext();
-        transport::AsioTransportLayer::Options opts;
-        opts.mode = transport::AsioTransportLayer::Options::kEgress;
-        auto tl = std::make_unique<transport::AsioTransportLayer>(opts, nullptr);
-
-        sc->setTransportLayerManager(
-            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
-        ASSERT_OK(sc->getTransportLayerManager()->setup());
-        ASSERT_OK(sc->getTransportLayerManager()->start());
 
         ReplSettings replSettings;
         replSettings.setReplSetString("rs0/host1");
@@ -181,7 +174,7 @@ public:
         // to avoid the invariant in ReplClientInfo::setLastOp that the optime only goes forward.
         repl::ReplClientInfo::forClient(_opCtx.getClient()).clearLastOp();
 
-        sc->setOpObserver(
+        sc->resetOpObserver_forTest(
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
         createOplog(&_opCtx);
@@ -221,8 +214,6 @@ public:
             repl::ReplicationCoordinator::get(sc)
                 ->setFollowerMode(repl::MemberState::RS_PRIMARY)
                 .ignore();
-
-            sc->getTransportLayerManager()->shutdown();
         } catch (...) {
             FAIL("Exception while cleaning up test");
         }

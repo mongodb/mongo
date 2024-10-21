@@ -2189,6 +2189,7 @@ mongo_cc_library(
     name = "service_context_test_fixture",
     srcs = [
         "service_context_test_fixture.cpp",
+        "//src/mongo/util:tick_source_mock.h",
     ],
     hdrs = [
         "service_context_test_fixture.h",

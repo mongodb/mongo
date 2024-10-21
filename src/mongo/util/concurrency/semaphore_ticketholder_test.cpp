@@ -58,9 +58,6 @@ public:
     void setUp() override {
         TicketHolderTestFixture::setUp();
 
-        auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
-        _tickSource = tickSource.get();
-        getServiceContext()->setTickSource(std::move(tickSource));
         ThreadPool::Options opts;
         _pool = std::make_unique<ThreadPool>(opts);
         _pool->startup();
@@ -70,10 +67,6 @@ public:
         TicketHolderTestFixture::tearDown();
         _pool->shutdown();
         //_pool->join();
-    }
-
-    TickSourceMock<Microseconds>* getTickSource() {
-        return _tickSource;
     }
 
     /**
@@ -104,7 +97,6 @@ public:
 
 private:
     std::unique_ptr<ThreadPool> _pool;
-    TickSourceMock<Microseconds>* _tickSource;
 };
 
 TEST_F(SemaphoreTicketHolderTest, BasicTimeoutSemaphore) {

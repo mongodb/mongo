@@ -38,6 +38,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/admission/throughput_probing_gen.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -72,29 +73,20 @@ TEST(ThroughputProbingParameterTest, MaxConcurrency) {
     ASSERT_NOT_OK(validateMaxConcurrency(gMinConcurrency - 1, {}));
 }
 
-class ThroughputProbingTest : public unittest::Test {
+class ThroughputProbingTest : public ServiceContextTest {
 protected:
     explicit ThroughputProbingTest(int32_t size = 64, double readWriteRatio = 0.5)
-        : _svcCtx([]() {
-              auto ctx = ServiceContext::make();
-              auto ptr = ctx.get();
-              setGlobalServiceContext(std::move(ctx));
-              return ptr;
-          }()),
-          _runner([svcCtx = _svcCtx] {
-              auto runner = std::make_unique<MockPeriodicRunner>();
-              auto runnerPtr = runner.get();
-              svcCtx->setPeriodicRunner(std::move(runner));
-              return runnerPtr;
-          }()),
-          _tickSource(initTickSourceMock<ServiceContext, Microseconds>(_svcCtx)),
-          _readTicketHolder(_svcCtx),
-          _writeTicketHolder(_svcCtx),
-          _throughputProbing([&]() -> ThroughputProbing {
-              throughput_probing::gInitialConcurrency = size;
-              throughput_probing::gReadWriteRatio.store(readWriteRatio);
-              return {_svcCtx, &_readTicketHolder, &_writeTicketHolder, Milliseconds{1}};
-          }()) {
+        : ServiceContextTest(
+              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+                  nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {
+        _svcCtx->setPeriodicRunner(std::make_unique<MockPeriodicRunner>());
+
+        // The ThroughputProbing constructor requires the periodic runner to be set up on _svcCtx.
+        throughput_probing::gInitialConcurrency = size;
+        throughput_probing::gReadWriteRatio.store(readWriteRatio);
+        _throughputProbing = std::make_unique<ThroughputProbing>(
+            _svcCtx, &_readTicketHolder, &_writeTicketHolder, Milliseconds{1});
+
         // We need to advance the ticks to something other than zero, since that is used to
         // determine the if we're in the first iteration or not.
         _tick();
@@ -104,23 +96,26 @@ protected:
     }
 
     void _run() {
-        _runner->run(_client.get());
-        _statsTester.set(_throughputProbing);
+        _runner()->run(getClient());
+        _statsTester.set(*_throughputProbing);
     }
 
     void _tick() {
-        _tickSource->advance(Microseconds(1000));
+        _tickSource()->advance(Microseconds(1000));
     }
 
-    ServiceContext* _svcCtx;
-    ServiceContext::UniqueClient _client =
-        _svcCtx->getService()->makeClient("ThroughputProbingTest");
+    TickSourceMock<Microseconds>* _tickSource() {
+        return checked_cast<decltype(_tickSource())>(getServiceContext()->getTickSource());
+    }
 
-    MockPeriodicRunner* _runner;
-    TickSourceMock<Microseconds>* _tickSource;
-    MockTicketHolder _readTicketHolder;
-    MockTicketHolder _writeTicketHolder;
-    ThroughputProbing _throughputProbing;
+    MockPeriodicRunner* _runner() {
+        return checked_cast<decltype(_runner())>(getServiceContext()->getPeriodicRunner());
+    }
+
+    ServiceContext* _svcCtx{getServiceContext()};
+    MockTicketHolder _readTicketHolder{_svcCtx};
+    MockTicketHolder _writeTicketHolder{_svcCtx};
+    std::unique_ptr<ThroughputProbing> _throughputProbing;
 
     class StatsTester {
     public:

@@ -77,10 +77,11 @@ Simulation::Simulation(StringData suiteName, StringData workloadName)
 Simulation::~Simulation() {}
 
 void Simulation::setup() {
-    _svcCtx = ServiceContext::make();
+    _svcCtx =
+        ServiceContext::make(nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>());
     _client = _svcCtx->getService()->makeClient(suiteName());
 
-    _tickSource = initTickSourceMock<ServiceContext, Nanoseconds>(_svcCtx.get());
+    _tickSource = checked_cast<TickSourceMock<Nanoseconds>*>(_svcCtx->getTickSource());
     _eventQueue = std::make_unique<EventQueue>(*_tickSource, [this]() {
         // Make the queue wait to process events until it has the same number of events queued as we
         // have busy actors. Otherwise it may advance the clock before we have a chance to queue our

@@ -59,19 +59,15 @@
 namespace mongo {
 namespace {
 
-class MongosTopoCoordTest : public ServiceContextTest {
+class MongosTopoCoordTest : public SharedClockSourceAdapterServiceContextTest {
+    explicit MongosTopoCoordTest(std::shared_ptr<ClockSourceMock> mockClock)
+        : SharedClockSourceAdapterServiceContextTest(mockClock), _clkSource(std::move(mockClock)) {}
+
 public:
-    MongosTopoCoordTest() = default;
+    MongosTopoCoordTest() : MongosTopoCoordTest(std::make_shared<ClockSourceMock>()) {}
 
     void setUp() override {
         _topo = std::make_unique<MongosTopologyCoordinator>();
-
-        // The fast clock is used by OperationContext::hasDeadlineExpired.
-        getServiceContext()->setFastClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
-        // The precise clock is used by waitForConditionOrInterruptNoAssertUntil.
-        getServiceContext()->setPreciseClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
     }
 
     void tearDown() override {}
@@ -100,7 +96,7 @@ protected:
 
 private:
     std::unique_ptr<MongosTopologyCoordinator> _topo;
-    std::shared_ptr<ClockSourceMock> _clkSource = std::make_shared<ClockSourceMock>();
+    std::shared_ptr<ClockSourceMock> _clkSource;
 };
 
 TEST_F(MongosTopoCoordTest, MongosTopologyVersionCounterInitializedAtStartup) {

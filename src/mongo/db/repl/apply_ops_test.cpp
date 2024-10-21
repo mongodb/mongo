@@ -119,7 +119,7 @@ void ApplyOpsTest::setUp() {
     // Use OpObserverMock to track notifications for applyOps().
     auto opObserver = std::make_unique<OpObserverMock>();
     _opObserver = opObserver.get();
-    service->setOpObserver(std::move(opObserver));
+    opObserverRegistry()->addObserver(std::move(opObserver));
 
     // This test uses StorageInterface to create collections and inspect documents inside
     // collections.

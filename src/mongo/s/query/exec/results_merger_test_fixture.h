@@ -89,7 +89,7 @@ public:
 
     static const NamespaceString kTestNss;
 
-    ResultsMergerTestFixture() {}
+    ResultsMergerTestFixture() = default;
 
     void setUp() override;
 

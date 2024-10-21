@@ -397,10 +397,8 @@ public:
         // to avoid the invariant in ReplClientInfo::setLastOp that the optime only goes forward.
         repl::ReplClientInfo::forClient(_opCtx->getClient()).clearLastOp();
 
-        auto registry = std::make_unique<OpObserverRegistry>();
-        registry->addObserver(
+        opObserverRegistry()->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-        _opCtx->getServiceContext()->setOpObserver(std::move(registry));
 
         repl::createOplog(_opCtx);
 

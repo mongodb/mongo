@@ -46,8 +46,13 @@
 namespace mongo {
 namespace {
 
-class InternalSessionPoolTest : public ServiceContextTest {
+class InternalSessionPoolTest : public SharedClockSourceAdapterServiceContextTest {
+    explicit InternalSessionPoolTest(std::shared_ptr<ClockSourceMock> mockClock)
+        : SharedClockSourceAdapterServiceContextTest(mockClock), _mockClock(std::move(mockClock)) {}
+
 public:
+    InternalSessionPoolTest() : InternalSessionPoolTest(std::make_shared<ClockSourceMock>()) {}
+
     void setUp() override {
         ServiceContextTest::setUp();
         serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
@@ -64,6 +69,7 @@ public:
     }
 
 protected:
+    std::shared_ptr<ClockSourceMock> _mockClock;
     InternalSessionPool* _pool;
 
 private:
@@ -232,14 +238,10 @@ TEST_F(InternalSessionPoolTest, UserCannotAcquireSystemStandaloneSession) {
 }
 
 TEST_F(InternalSessionPoolTest, StaleStandaloneSessionIsNotAcquired) {
-    auto service = getServiceContext();
-    const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
-    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
-
     auto expectedLsid = makeSystemLogicalSessionId();
     auto sessionToRelease = InternalSessionPool::Session(expectedLsid, TxnNumber(0));
     _pool->release(sessionToRelease);
-    mockClock->advance(Minutes{localLogicalSessionTimeoutMinutes});
+    _mockClock->advance(Minutes{localLogicalSessionTimeoutMinutes});
 
     auto acquiredSession = _pool->acquireSystemSession();
     ASSERT_NE(expectedLsid, acquiredSession.getSessionId());
@@ -248,17 +250,13 @@ TEST_F(InternalSessionPoolTest, StaleStandaloneSessionIsNotAcquired) {
 }
 
 TEST_F(InternalSessionPoolTest, ExpiredSessionReapedDuringRelease) {
-    auto service = getServiceContext();
-    const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
-    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
-
     auto lsid0 = makeSystemLogicalSessionId();
     auto session0 = InternalSessionPool::Session(lsid0, TxnNumber(0));
     _pool->release(session0);
 
     auto lsid1 = makeSystemLogicalSessionId();
     auto session1 = InternalSessionPool::Session(lsid1, TxnNumber(0));
-    mockClock->advance(Minutes{localLogicalSessionTimeoutMinutes});
+    _mockClock->advance(Minutes{localLogicalSessionTimeoutMinutes});
     _pool->release(session1);
 
     // Both system sessions have the same userDigest, but the session with lsid0 should've been
@@ -267,17 +265,13 @@ TEST_F(InternalSessionPoolTest, ExpiredSessionReapedDuringRelease) {
 }
 
 TEST_F(InternalSessionPoolTest, UserExpiredSessionsReapedWhenAnotherUserReleasesSession) {
-    auto service = getServiceContext();
-    const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
-    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
-
     auto lsid0 = makeLogicalSessionId(opCtx());
     auto sessionToRelease = InternalSessionPool::Session(lsid0, TxnNumber(0));
     _pool->release(sessionToRelease);
 
     auto lsid1 = makeSystemLogicalSessionId();
     auto session1 = InternalSessionPool::Session(lsid1, TxnNumber(0));
-    mockClock->advance(Minutes{localLogicalSessionTimeoutMinutes});
+    _mockClock->advance(Minutes{localLogicalSessionTimeoutMinutes});
     _pool->release(session1);
 
     // The session with lsid0 should've been removed from the session pool when lsid1 was released.

@@ -141,10 +141,9 @@ public:
         auto client2 = serviceContext->getService()->makeClient("client2");
         auto opCtx2 = client2->makeOperationContext();
 
-        auto registry = std::make_unique<OpObserverRegistry>();
-        registry->addObserver(
+        serviceContext->resetOpObserver_forTest(
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-        opCtx1.get()->getServiceContext()->setOpObserver(std::move(registry));
+
         repl::createOplog(opCtx1.get());
 
         Lock::DBLock dbLk1(opCtx1.get(), nss.dbName(), LockMode::MODE_IX);

@@ -148,15 +148,13 @@ private:
     std::shared_ptr<MockChannel> _channel;
 };
 
-class ServiceContextWithClockSourceMockTest : public ServiceContextTest {
+class ServiceContextWithClockSourceMockTest : public SharedClockSourceAdapterServiceContextTest {
+    explicit ServiceContextWithClockSourceMockTest(std::shared_ptr<ClockSourceMock> mockClock)
+        : SharedClockSourceAdapterServiceContextTest(mockClock), _clkSource(std::move(mockClock)) {}
+
 public:
-    void setUp() override {
-        _clkSource = std::make_shared<ClockSourceMock>();
-        getServiceContext()->setFastClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
-        getServiceContext()->setPreciseClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
-    }
+    ServiceContextWithClockSourceMockTest()
+        : ServiceContextWithClockSourceMockTest(std::make_shared<ClockSourceMock>()) {}
 
     auto& clockSource() {
         return *_clkSource;

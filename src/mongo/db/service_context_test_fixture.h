@@ -75,6 +75,7 @@ using RouterRoleOverride = RoleOverride<ServerRoleIndex::router>;
 class ScopedGlobalServiceContextForTest {
 public:
     ScopedGlobalServiceContextForTest();
+    explicit ScopedGlobalServiceContextForTest(ServiceContext::UniqueServiceContext serviceContext);
     virtual ~ScopedGlobalServiceContextForTest();
 
     /**
@@ -125,9 +126,31 @@ private:
     ThreadClient _threadClient;
 };
 
+/**
+ * Test fixture for tests that require a properly-initialized global service context with
+ * the fast and precise clock sources set to instances of ClockSourceMock and the tick source
+ * set to an instance of TickSourceMock.
+ */
+class ClockSourceMockServiceContextTest : public ServiceContextTest {
+protected:
+    ClockSourceMockServiceContextTest();
+};
+
+/**
+ * Test fixture for tests that require a properly-initialized global service context with
+ * the fast and precise clock sources set to instances of SharedClockSourceAdapter with the
+ * same underlying clock source.
+ */
+class SharedClockSourceAdapterServiceContextTest : public ServiceContextTest {
+protected:
+    explicit SharedClockSourceAdapterServiceContextTest(std::shared_ptr<ClockSource> clock);
+};
+
 }  // namespace service_context_test
 
+using service_context_test::ClockSourceMockServiceContextTest;
 using service_context_test::ScopedGlobalServiceContextForTest;
 using service_context_test::ServiceContextTest;
+using service_context_test::SharedClockSourceAdapterServiceContextTest;
 
 }  // namespace mongo

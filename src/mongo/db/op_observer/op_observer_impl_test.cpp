@@ -2919,11 +2919,8 @@ class BatchedWriteOutputsTest : public OpObserverTest {
 public:
     void setUp() override {
         OpObserverTest::setUp();
-
-        auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-        opObserverRegistry->addObserver(
+        opObserverRegistry()->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-        getServiceContext()->setOpObserver(std::move(opObserverRegistry));
     }
 
 protected:

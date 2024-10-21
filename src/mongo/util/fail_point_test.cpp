@@ -463,11 +463,10 @@ namespace mongo {
  * the function is interruptible.
  */
 void assertFunctionInterruptible(std::function<void(Interruptible* interruptible)> f) {
-    const auto service = ServiceContext::make();
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
-    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
-    service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
-    service->setTickSource(std::make_unique<TickSourceMock<>>());
+    const auto service = ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(mockClock),
+                                              std::make_unique<SharedClockSourceAdapter>(mockClock),
+                                              std::make_unique<TickSourceMock<>>());
 
     const auto client = service->getService()->makeClient("FailPointTest");
     auto opCtx = client->makeOperationContext();

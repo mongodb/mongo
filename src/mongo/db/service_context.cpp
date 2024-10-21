@@ -139,10 +139,12 @@ private:
 Service::~Service() = default;
 Service::Service(ServiceContext* sc, ClusterRole role) : _sc{sc}, _role{role} {}
 
-ServiceContext::ServiceContext()
-    : _tickSource(makeSystemTickSource()),
-      _fastClockSource(std::make_unique<SystemClockSource>()),
-      _preciseClockSource(std::make_unique<SystemClockSource>()),
+ServiceContext::ServiceContext(std::unique_ptr<ClockSource> fastClockSource,
+                               std::unique_ptr<ClockSource> preciseClockSource,
+                               std::unique_ptr<TickSource> tickSource)
+    : _tickSource(std::move(tickSource)),
+      _fastClockSource(std::move(fastClockSource)),
+      _preciseClockSource(std::move(preciseClockSource)),
       _serviceSet(std::make_unique<ServiceSet>(this)) {}
 
 
@@ -169,7 +171,8 @@ Service* ServiceContext::getService() const {
 }
 
 void Service::setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep) {
-    _serviceEntryPoint = std::move(sep);
+    auto old = _serviceEntryPoint.swap(std::move(sep));
+    invariant(!old);
 }
 
 namespace {
@@ -237,8 +240,8 @@ ServiceContext::UniqueClient ServiceContext::makeClientForService(
 }
 
 void ServiceContext::setPeriodicRunner(std::unique_ptr<PeriodicRunner> runner) {
-    invariant(!_runner);
-    _runner = std::move(runner);
+    auto old = _runner.swap(std::move(runner));
+    invariant(!old);
 }
 
 PeriodicRunner* ServiceContext::getPeriodicRunner() const {
@@ -256,24 +259,18 @@ void ServiceContext::setStorageEngine(std::unique_ptr<StorageEngine> engine) {
 }
 
 void ServiceContext::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
+    auto old = _opObserver.swap(std::move(opObserver));
+    invariant(!old);
+}
+
+void ServiceContext::resetOpObserver_forTest(std::unique_ptr<OpObserver> opObserver) {
     _opObserver = std::move(opObserver);
-}
-
-void ServiceContext::setTickSource(std::unique_ptr<TickSource> newSource) {
-    _tickSource = std::move(newSource);
-}
-
-void ServiceContext::setFastClockSource(std::unique_ptr<ClockSource> newSource) {
-    _fastClockSource = std::move(newSource);
-}
-
-void ServiceContext::setPreciseClockSource(std::unique_ptr<ClockSource> newSource) {
-    _preciseClockSource = std::move(newSource);
 }
 
 void ServiceContext::setTransportLayerManager(
     std::unique_ptr<transport::TransportLayerManager> tl) {
-    _transportLayerManager = std::move(tl);
+    auto old = _transportLayerManager.swap(std::move(tl));
+    invariant(!old);
 }
 
 void ServiceContext::ClientDeleter::operator()(Client* client) const {
@@ -534,8 +531,14 @@ ConstructorActionRegistererType<T>::ConstructorActionRegistererType(
 template class ConstructorActionRegistererType<ServiceContext>;
 template class ConstructorActionRegistererType<Service>;
 
-ServiceContext::UniqueServiceContext ServiceContext::make() {
-    auto service = std::make_unique<ServiceContext>();
+ServiceContext::UniqueServiceContext ServiceContext::make(
+    std::unique_ptr<ClockSource> fastClockSource,
+    std::unique_ptr<ClockSource> preciseClockSource,
+    std::unique_ptr<TickSource> tickSource) {
+    auto service = std::make_unique<ServiceContext>(
+        fastClockSource ? std::move(fastClockSource) : std::make_unique<SystemClockSource>(),
+        preciseClockSource ? std::move(preciseClockSource) : std::make_unique<SystemClockSource>(),
+        tickSource ? std::move(tickSource) : makeSystemTickSource());
     onCreate(service.get(), ConstructorActionRegisterer::registeredConstructorActions());
     return UniqueServiceContext{service.release()};
 }

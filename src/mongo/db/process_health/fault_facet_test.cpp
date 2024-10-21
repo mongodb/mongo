@@ -47,8 +47,7 @@ namespace {
 class FaultFacetTestWithMock : public unittest::Test {
 public:
     void startMock(FaultFacetMock::MockCallback callback) {
-        _svcCtx = ServiceContext::make();
-        _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+        _svcCtx = ServiceContext::make(std::make_unique<ClockSourceMock>());
         _facetMock = std::make_unique<FaultFacetMock>(
             FaultFacetType::kMock1, _svcCtx->getFastClockSource(), callback);
     }
@@ -81,8 +80,7 @@ public:
         HealthCheckStatus(FaultFacetType::kMock1, Severity::kFailure, "test");
 
     void setUp() override {
-        _svcCtx = ServiceContext::make();
-        _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+        _svcCtx = ServiceContext::make(std::make_unique<ClockSourceMock>());
     }
 
     void tearDown() override {

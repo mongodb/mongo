@@ -36,13 +36,18 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 
 class ServiceEntryPointTestFixture : public ServiceContextTest {
 public:
     ServiceEntryPointTestFixture()
-        : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(),
+        : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
+                                 ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                                                      std::make_unique<ClockSourceMock>(),
+                                                      std::make_unique<TickSourceMock<>>())),
                              std::make_shared<transport::MockSession>(nullptr)) {}
     void setUp() override;
 
@@ -80,7 +85,6 @@ public:
 
 private:
     ReadWriteConcernDefaultsLookupMock _lookupMock;
-    ServiceContext _serviceContext;
 };
 
 class TestCmdBase : public BasicCommand {

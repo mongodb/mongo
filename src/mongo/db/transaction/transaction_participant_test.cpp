@@ -6784,7 +6784,7 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
     OperationContext* opCtx = this->opCtx();
     DurableHistoryRegistry::set(opCtx->getServiceContext(),
                                 std::make_unique<DurableHistoryRegistry>());
-    opCtx->getServiceContext()->setOpObserver(
+    opObserverRegistry()->addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
     OpDebug* const nullOpDbg = nullptr;
@@ -6963,7 +6963,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     OperationContext* opCtx = this->opCtx();
     DurableHistoryRegistry::set(opCtx->getServiceContext(),
                                 std::make_unique<DurableHistoryRegistry>());
-    opCtx->getServiceContext()->setOpObserver(
+    opObserverRegistry()->addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
     OpDebug* const nullOpDbg = nullptr;

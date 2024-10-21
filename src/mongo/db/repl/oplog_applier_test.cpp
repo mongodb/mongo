@@ -91,12 +91,13 @@ StatusWith<OpTime> OplogApplierMock::_applyOplogBatch(OperationContext* opCtx,
 
 class OplogApplierTest : public ServiceContextTest {
 public:
+    using ServiceContextTest::ServiceContextTest;
+
     void setUp() override;
     void tearDown() override;
     virtual OperationContext* opCtx() {
         return _opCtxHolder.get();
     }
-
 
 protected:
     std::unique_ptr<OplogBuffer> _buffer;
@@ -514,17 +515,24 @@ TEST_F(OplogApplierTest, LastOpInLargeTransactionIsProcessedIndividually) {
 }
 
 class OplogApplierDelayTest : public OplogApplierTest {
+    // This constructor lets us give a variable name to mockClock so we can copy the same
+    // shared_ptr into SharedClockSourceAdapters we give to ServiceContext::make and the
+    // _mockClock member variable.
+    explicit OplogApplierDelayTest(std::shared_ptr<ClockSourceMock> mockClock)
+        : OplogApplierTest(std::make_unique<ScopedGlobalServiceContextForTest>(
+              ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(mockClock),
+                                   std::make_unique<SharedClockSourceAdapter>(mockClock)))),
+          _mockClock(std::move(mockClock)) {}
+
 public:
+    OplogApplierDelayTest() : OplogApplierDelayTest(std::make_shared<ClockSourceMock>()) {}
+
     void setUp() override {
         OplogApplierTest::setUp();
 
         // Avoid any issues due to a clock exactly at 0 (e.g. dates being default Date_t());
         _mockClock = std::make_shared<ClockSourceMock>();
         _mockClock->advance(Milliseconds(60000));
-
-        auto service = getServiceContext();
-        service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_mockClock));
-        service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(_mockClock));
 
         // Use a smaller limit for these tests.
         _limits.ops = 3;

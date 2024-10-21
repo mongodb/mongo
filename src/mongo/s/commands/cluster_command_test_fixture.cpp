@@ -67,7 +67,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/tick_source.h"
-#include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -95,9 +94,9 @@ void ClusterCommandTestFixture::setUp() {
     LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
 
     // Set up a tick source for transaction metrics.
-    auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
+    auto tickSource =
+        checked_cast<TickSourceMock<Microseconds>*>(getServiceContext()->getTickSource());
     tickSource->reset(1);
-    getServiceContext()->setTickSource(std::move(tickSource));
 
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);
 

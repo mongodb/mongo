@@ -420,8 +420,13 @@ void assertTxnMetadata(BSONObj obj,
     }
 }
 
-class TxnAPITest : public ServiceContextTest {
+class TxnAPITest : public SharedClockSourceAdapterServiceContextTest {
+    explicit TxnAPITest(std::shared_ptr<ClockSourceMock> mockClock)
+        : SharedClockSourceAdapterServiceContextTest(mockClock), _mockClock(std::move(mockClock)) {}
+
 protected:
+    TxnAPITest() : TxnAPITest(std::make_shared<ClockSourceMock>()) {}
+
     void setUp() final {
         ServiceContextTest::setUp();
 
@@ -482,6 +487,10 @@ protected:
         return _mockClient;
     }
 
+    ClockSourceMock* mockClock() {
+        return _mockClock.get();
+    }
+
     MockResourceYielder* resourceYielder() {
         return _resourceYielder;
     }
@@ -539,6 +548,7 @@ protected:
     }
 
 private:
+    std::shared_ptr<ClockSourceMock> _mockClock;
     ServiceContext::UniqueOperationContext _opCtx;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
 
@@ -2337,12 +2347,10 @@ TEST_F(TxnAPITest, OwnSession_CommitTransactionRetryLimitOnTransientErrors) {
 TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadlineAndIgnoresDefaultRetryLimit) {
     FailPointEnableBlock fp("overrideTransactionApiMaxRetriesToThree");
 
-    const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
-    mockClock->reset(getServiceContext()->getFastClockSource()->now());
-    getServiceContext()->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
+    mockClock()->reset(getServiceContext()->getFastClockSource()->now());
     int maxTimeMS = 1000 * 60 * 60 * 24;        // 1 day.
     int advanceTimeByMS = 1000 * 60 * 60 * 23;  // 23 hours.
-    opCtx()->setDeadlineByDate(mockClock->now() + Milliseconds(maxTimeMS),
+    opCtx()->setDeadlineByDate(mockClock()->now() + Milliseconds(maxTimeMS),
                                ErrorCodes::MaxTimeMSExpired);
 
     // txnNumber will be incremented upon the release of a session.
@@ -2374,7 +2382,7 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadlineAndIgnoresDefaultR
             // is disabled when a deadline is set.
             uassert(ErrorCodes::HostUnreachable, "Host unreachable error", attempt > 3);
 
-            mockClock->advance(Milliseconds(advanceTimeByMS));
+            mockClock()->advance(Milliseconds(advanceTimeByMS));
 
             // The commit response.
             mockClient()->setNextCommandResponse(kOKCommandResponse);

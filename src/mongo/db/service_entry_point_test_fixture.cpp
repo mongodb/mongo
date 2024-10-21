@@ -52,11 +52,6 @@ namespace mongo {
 void ServiceEntryPointTestFixture::setUp() {
     // Minimal set up necessary for ServiceEntryPoint.
     auto service = getGlobalServiceContext();
-
-    // Use mock clock source and tick source to test opCtx deadline timings.
-    getGlobalServiceContext()->setFastClockSource(std::make_unique<ClockSourceMock>());
-    service->setTickSource(std::make_unique<TickSourceMock<>>());
-
     ReadWriteConcernDefaults::create(service, _lookupMock.getFetchDefaultsFn());
     _lookupMock.setLookupCallReturnValue({});
 }

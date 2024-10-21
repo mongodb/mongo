@@ -47,8 +47,7 @@ namespace {
 class FaultTest : public unittest::Test {
 public:
     void setUp() override {
-        _svcCtx = ServiceContext::make();
-        _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+        _svcCtx = ServiceContext::make(std::make_unique<ClockSourceMock>());
         _faultImpl = std::make_unique<Fault>(_svcCtx->getFastClockSource());
     }
 

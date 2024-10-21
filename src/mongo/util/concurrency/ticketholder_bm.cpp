@@ -44,6 +44,7 @@
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/latency_distribution.h"
+#include "mongo/util/system_clock_source.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -102,8 +103,9 @@ void BM_acquireAndRelease(benchmark::State& state) {
         if (state.thread_index == 0) {
             resultingDistribution = LatencyPercentileDistribution{resolution};
             numRemainingToMerge = state.threads;
-            serviceContext = ServiceContext::make();
-            serviceContext->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+            serviceContext = ServiceContext::make(std::make_unique<SystemClockSource>(),
+                                                  std::make_unique<SystemClockSource>(),
+                                                  std::make_unique<TickSourceMock<Microseconds>>());
             ticketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
                 state.threads, serviceContext.get());
             isReady = true;

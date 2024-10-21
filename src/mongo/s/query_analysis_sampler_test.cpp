@@ -82,15 +82,19 @@ const auto smoothingFactor = gQueryAnalysisQueryStatsSmoothingFactor.load();
 
 class QueryAnalysisSamplerRateLimiterTest : public ServiceContextTest {
 public:
+    QueryAnalysisSamplerRateLimiterTest()
+        : ServiceContextTest(
+              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+                  nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
+
     void setUp() override {
         ServiceContextTest::setUp();
-        getServiceContext()->setTickSource(std::make_unique<TickSourceMock<Nanoseconds>>());
     }
 
 protected:
-    void advanceTime(Nanoseconds millis) {
+    void advanceTime(Nanoseconds nanos) {
         dynamic_cast<TickSourceMock<Nanoseconds>*>(getServiceContext()->getTickSource())
-            ->advance(millis);
+            ->advance(nanos);
     }
 
     const NamespaceString nss =
@@ -418,6 +422,12 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, NanosecondsResolution) {
 
 class QueryAnalysisSamplerTest : public ShardingTestFixture {
 public:
+    QueryAnalysisSamplerTest()
+        : ShardingTestFixture(
+              false /* withMockCatalogCache */,
+              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+                  nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
+
     void setUp() override {
         ShardingTestFixture::setUp();
         serverGlobalParams.clusterRole = ClusterRole::RouterServer;
@@ -427,7 +437,6 @@ public:
 
         // Set up a periodic runner.
         auto runner = makePeriodicRunner(getServiceContext());
-        getServiceContext()->setTickSource(std::make_unique<TickSourceMock<Nanoseconds>>());
         getServiceContext()->setPeriodicRunner(std::move(runner));
 
         // Reset the counters since each test assumes that the count starts at 0.

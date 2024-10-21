@@ -89,10 +89,8 @@ protected:
 private:
     ServiceContext::UniqueOperationContext _makeOpCtx() {
         auto opCtx = cc().makeOperationContext();
-        auto registry = std::make_unique<OpObserverRegistry>();
-        registry->addObserver(
+        opObserverRegistry()->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-        opCtx.get()->getServiceContext()->setOpObserver(std::move(registry));
         repl::createOplog(opCtx.get());
         return opCtx;
     }

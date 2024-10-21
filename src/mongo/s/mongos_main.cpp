@@ -1080,7 +1080,8 @@ ExitCode mongos_main(int argc, char* argv[]) {
     startSignalProcessingThread();
 
     try {
-        setGlobalServiceContext(ServiceContext::make());
+        setGlobalServiceContext(
+            ServiceContext::make(FastClockSourceFactory::create(Milliseconds{10})));
     } catch (...) {
         auto cause = exceptionToStatus();
         LOGV2_FATAL_OPTIONS(
@@ -1092,9 +1093,6 @@ ExitCode mongos_main(int argc, char* argv[]) {
     }
 
     const auto service = getGlobalServiceContext();
-    // This FastClockSourceFactory creates a background thread ClockSource. It must be set
-    // on ServiceContext before any other threads can get and use it.
-    service->setFastClockSource(FastClockSourceFactory::create(Milliseconds{10}));
 
     // Attempt to rotate the audit log pre-emptively on startup to avoid any potential conflicts
     // with existing log state. If this rotation fails, then exit nicely with failure

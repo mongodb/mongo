@@ -401,11 +401,9 @@ void RenameCollectionTest::setUp() {
     ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
     // Use OpObserverMock to track notifications for collection and database drops.
-    auto opObserver = std::make_unique<OpObserverRegistry>();
     auto mockObserver = std::make_unique<OpObserverMock>();
     _opObserver = mockObserver.get();
-    opObserver->addObserver(std::move(mockObserver));
-    service->setOpObserver(std::move(opObserver));
+    opObserverRegistry()->addObserver(std::move(mockObserver));
 }
 
 void RenameCollectionTest::tearDown() {

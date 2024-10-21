@@ -136,28 +136,29 @@ public:
         if (haveClient()) {
             Client::releaseCurrent();
         }
-        setGlobalServiceContext(ServiceContext::make());
-        _svcCtx = getGlobalServiceContext();
 
-        _svcCtx->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
 
         auto fastClock = std::make_unique<ClockSourceMock>();
+        auto preciseClock = std::make_unique<ClockSourceMock>();
         // Timestamps are split into two 32-bit integers, seconds and "increments". Currently (but
         // maybe not for eternity), a Timestamp with a value of `0` seconds is always considered
         // "null" by `Timestamp::isNull`, regardless of its increment value. Ticking the
         // `ClockSourceMock` only bumps the "increment" counter, thus by default, generating "null"
         // timestamps. Bumping by one second here avoids any accidental interpretations.
         fastClock->advance(Seconds(1));
-        _svcCtx->setFastClockSource(std::move(fastClock));
-
-        auto preciseClock = std::make_unique<ClockSourceMock>();
-        // See above.
         preciseClock->advance(Seconds(1));
-        CursorManager::get(_svcCtx)->setPreciseClockSource(preciseClock.get());
-        _svcCtx->setPreciseClockSource(std::move(preciseClock));
+
+        auto svcCtx = ServiceContext::make(std::move(fastClock), std::move(preciseClock));
+        _svcCtx = svcCtx.get();
+
+        _svcCtx->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+
+        CursorManager::get(_svcCtx)->setPreciseClockSource(_svcCtx->getPreciseClockSource());
 
         auto runner = makePeriodicRunner(_svcCtx);
         _svcCtx->setPeriodicRunner(std::move(runner));
+
+        setGlobalServiceContext(std::move(svcCtx));
 
         Collection::Factory::set(_svcCtx, std::make_unique<CollectionImpl::FactoryImpl>());
         storageGlobalParams.engine = "wiredTiger";

@@ -46,6 +46,7 @@
 #include "mongo/platform/basic.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 
@@ -60,6 +61,12 @@ protected:
     const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(10, 1));
 
     const Timestamp kAfterClusterTime = Timestamp(50, 2);
+
+    ClusterCommandTestFixture()
+        : RouterCatalogCacheTestFixture(std::make_unique<ScopedGlobalServiceContextForTest>(
+              ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                                   std::make_unique<ClockSourceMock>(),
+                                   std::make_unique<TickSourceMock<Microseconds>>()))) {}
 
     void setUp() override;
 

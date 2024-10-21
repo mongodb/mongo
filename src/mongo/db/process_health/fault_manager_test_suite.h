@@ -140,10 +140,9 @@ public:
         if (!_svcCtx) {
             // Reset only once because the Ldap connection reaper is running asynchronously
             // and is using the simulated clock, which should not go out of scope.
-            _svcCtx = ServiceContext::make();
-            _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
-            _svcCtx->setPreciseClockSource(std::make_unique<ClockSourceMock>());
-            _svcCtx->setTickSource(std::make_unique<TickSourceMock<Milliseconds>>());
+            _svcCtx = ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                                           std::make_unique<ClockSourceMock>(),
+                                           std::make_unique<TickSourceMock<Milliseconds>>());
             advanceTime(Seconds(100));
         }
     }

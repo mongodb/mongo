@@ -2109,12 +2109,10 @@ int mongod_main(int argc, char* argv[]) {
 
     auto* service = [] {
         try {
-            auto serviceContextHolder = ServiceContext::make();
+            auto serviceContextHolder =
+                ServiceContext::make(FastClockSourceFactory::create(Milliseconds(10)));
             auto* serviceContext = serviceContextHolder.get();
 
-            // This FastClockSourceFactory creates a background thread ClockSource. It must be set
-            // on ServiceContext before any other threads can get and use it.
-            serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
             setGlobalServiceContext(std::move(serviceContextHolder));
 
             return serviceContext;

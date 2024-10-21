@@ -59,9 +59,6 @@ void AuthorizationSessionTestFixture::setUp() {
     gMultitenancySupport = true;
     ServiceContextMongoDTest::setUp();
 
-    // Initialize the serviceEntryPoint so that DBDirectClient can function.
-    getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
-
     // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
     repl::ReplicationCoordinator::set(getServiceContext(),
                                       std::make_unique<repl::ReplicationCoordinatorMock>(

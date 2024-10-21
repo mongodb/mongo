@@ -37,10 +37,7 @@
 
 namespace mongo {
 
-class FTDCTest : public ServiceContextTest {
-public:
-    FTDCTest();
-};
+class FTDCTest : public ClockSourceMockServiceContextTest {};
 
 /**
  * Validation mode for tests, strict by default

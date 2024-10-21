@@ -44,14 +44,13 @@ namespace {
 class PrepareConflictTrackerTest : public unittest::Test {
 public:
     void setUp() override {
-        setGlobalServiceContext(ServiceContext::make());
-        auto serviceContext = getGlobalServiceContext();
-        _client = serviceContext->getService()->makeClient("myClient");
-        _opCtx = serviceContext->makeOperationContext(_client.get());
         auto tickSource = std::make_unique<TickSourceMock<>>();
         tickSource->advance(Milliseconds(10));
         _tickSource = tickSource.get();
-        _opCtx->getServiceContext()->setTickSource(std::move(tickSource));
+        setGlobalServiceContext(ServiceContext::make(nullptr, nullptr, std::move(tickSource)));
+        auto serviceContext = getGlobalServiceContext();
+        _client = serviceContext->getService()->makeClient("myClient");
+        _opCtx = serviceContext->makeOperationContext(_client.get());
         _pct = &PrepareConflictTracker::get(_opCtx.get());
         _pct->resetGlobalPrepareConflictStats();
     }

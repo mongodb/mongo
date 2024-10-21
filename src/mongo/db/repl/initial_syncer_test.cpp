@@ -186,7 +186,9 @@ class InitialSyncerTest : public executor::ThreadPoolExecutorTest,
                           public SyncSourceSelector,
                           public ScopedGlobalServiceContextForTest {
 public:
-    InitialSyncerTest() : _threadClient(getGlobalServiceContext()->getService()) {}
+    InitialSyncerTest()
+        : ScopedGlobalServiceContextForTest(ServiceContext::make(
+              std::make_unique<ClockSourceMock>(), std::make_unique<ClockSourceMock>())) {}
 
     executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override;
     executor::ThreadPoolMock::Options makeClonerThreadPoolMockOptions() const;
@@ -406,8 +408,6 @@ protected:
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings);
         repl::ReplicationCoordinator::set(service, std::move(replCoord));
 
-        service->setFastClockSource(std::make_unique<ClockSourceMock>());
-        service->setPreciseClockSource(std::make_unique<ClockSourceMock>());
         ThreadPool::Options dbThreadPoolOptions;
         dbThreadPoolOptions.poolName = "dbthread";
         dbThreadPoolOptions.minThreads = 1U;
@@ -592,7 +592,7 @@ protected:
 private:
     DataReplicatorExternalStateMock* _externalState;
     std::unique_ptr<InitialSyncer> _initialSyncer;
-    ThreadClient _threadClient;
+    ThreadClient _threadClient{getServiceContext()->getService()};
     bool _executorThreadShutdownComplete = false;
 };
 

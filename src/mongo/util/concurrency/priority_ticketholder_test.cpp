@@ -89,23 +89,7 @@ void assertSoon(std::function<bool()> predicate, Milliseconds timeout = kWaitTim
     }
 }
 
-class PriorityTicketHolderTest : public TicketHolderTestFixture {
-public:
-    void setUp() override {
-        TicketHolderTestFixture::setUp();
-
-        auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
-        _tickSource = tickSource.get();
-        getServiceContext()->setTickSource(std::move(tickSource));
-    }
-
-    TickSourceMock<Microseconds>* getTickSource() {
-        return _tickSource;
-    }
-
-private:
-    TickSourceMock<Microseconds>* _tickSource;
-};
+class PriorityTicketHolderTest : public TicketHolderTestFixture {};
 
 TEST_F(PriorityTicketHolderTest, BasicTimeoutPriority) {
     basicTimeout(_opCtx.get(),

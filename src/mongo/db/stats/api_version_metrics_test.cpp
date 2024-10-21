@@ -50,23 +50,20 @@ namespace mongo {
 using VersionMetricsMap = APIVersionMetrics::VersionMetricsMap;
 namespace {
 
-class APIVersionMetricsTest : public ServiceContextTest {
+class APIVersionMetricsTest : public SharedClockSourceAdapterServiceContextTest {
+    explicit APIVersionMetricsTest(std::shared_ptr<ClockSourceMock> mockClock)
+        : SharedClockSourceAdapterServiceContextTest(mockClock), _clkSource(std::move(mockClock)) {}
 
 public:
     void setUp() override {
         apiParams = APIParameters();
-
-        // The fast clock is used by OperationContext::hasDeadlineExpired.
-        getServiceContext()->setFastClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
-        // The precise clock is used by waitForConditionOrInterruptNoAssertUntil.
-        getServiceContext()->setPreciseClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
     }
 
     void tearDown() override {}
 
 protected:
+    APIVersionMetricsTest() : APIVersionMetricsTest(std::make_shared<ClockSourceMock>()) {}
+
     /**
      * Returns the APIVersionMetrics.
      */
@@ -98,7 +95,7 @@ protected:
     APIParameters apiParams;
 
 private:
-    std::shared_ptr<ClockSourceMock> _clkSource = std::make_shared<ClockSourceMock>();
+    std::shared_ptr<ClockSourceMock> _clkSource;
 };
 
 TEST_F(APIVersionMetricsTest, StoresDefaultMetrics) {

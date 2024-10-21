@@ -45,7 +45,6 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -64,10 +63,58 @@
 
 namespace mongo {
 
+ServiceContext::UniqueServiceContext MongoDScopedGlobalServiceContextForTest::makeServiceContext(
+    bool useMockClock,
+    Milliseconds autoAdvancingMockClockIncrement,
+    std::unique_ptr<TickSource> tickSource) {
+    {
+        // Reset the global clock source
+        ClockSourceMock clkSource;
+        clkSource.reset();
+    }
+
+    std::unique_ptr<ClockSource> fastClockSource, preciseClockSource;
+
+    if (useMockClock) {
+        // Copied from dbtests.cpp. DBTests sets up a controlled mock clock while
+        // ScopedGlobalServiceContextMongoDForTest uses the system clock. Tests moved from dbtests
+        // to unittests may depend on a deterministic clock. Additionally, if a test chooses to set
+        // a non-zero _autoAdvancingMockClockIncrement, the mock clock will automatically advance by
+        // that increment each time it is read.
+        auto fastClock =
+            std::make_unique<AutoAdvancingClockSourceMock>(autoAdvancingMockClockIncrement);
+        // Timestamps are split into two 32-bit integers, seconds and "increments". Currently
+        // (but maybe not for eternity), a Timestamp with a value of `0` seconds is always
+        // considered "null" by `Timestamp::isNull`, regardless of its increment value. Ticking
+        // the `ClockSourceMock` only bumps the "increment" counter, thus by default, generating
+        // "null" timestamps. Bumping by one second here avoids any accidental interpretations.
+        fastClock->advance(Seconds(1));
+        fastClockSource = std::move(fastClock);
+
+        auto preciseClock =
+            std::make_unique<AutoAdvancingClockSourceMock>(autoAdvancingMockClockIncrement);
+        // See above.
+        preciseClock->advance(Seconds(1));
+        preciseClockSource = std::move(preciseClock);
+    }
+
+    return ServiceContext::make(
+        std::move(fastClockSource), std::move(preciseClockSource), std::move(tickSource));
+}
+
 MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest(Options options)
-    : _journalListener(std::move(options._journalListener)),
-      _tempDir("service_context_d_test_fixture") {
-    auto setupClient = getServiceContext()->getService()->makeClient("MongoDSCTestCtor");
+    : MongoDScopedGlobalServiceContextForTest(nullptr, std::move(options)) {}
+
+MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest(
+    ServiceContext::UniqueServiceContext serviceContextHolder, Options options)
+    : ScopedGlobalServiceContextForTest(
+          serviceContextHolder ? std::move(serviceContextHolder)
+                               : makeServiceContext(options._useMockClock,
+                                                    options._autoAdvancingMockClockIncrement,
+                                                    std::move(options._mockTickSource))),
+      _journalListener(std::move(options._journalListener)) {
+    auto serviceContext = getServiceContext();
+    auto setupClient = serviceContext->getService()->makeClient("MongoDSCTestCtor");
     AlternativeClientRegion acr(setupClient);
 
     if (options._forceDisableTableLogging) {
@@ -93,8 +140,6 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
     _stashedStorageParams.repair =
         std::exchange(storageGlobalParams.repair, (options._repair == RepairAction::kRepair));
 
-    auto const serviceContext = getServiceContext();
-
     // Set up the AuthorizationManager.
     if (options._setAuthObjects) {
         // Setup the repl coordinator in standalone mode so that DBDirectClient can work.
@@ -111,37 +156,11 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
         AuthorizationManager::get(getService())->setAuthEnabled(options._setAuthEnabled);
     }
 
-    if (options._useMockClock) {
-        // Copied from dbtests.cpp. DBTests sets up a controlled mock clock while
-        // this class uses the system clock. Tests moved from dbtests
-        // to unittests may depend on a deterministic clock. Additionally, if a test chooses to set
-        // a non-zero _autoAdvancingMockClockIncrement, the mock clock will automatically advance by
-        // that increment each time it is read.
-        auto fastClock = std::make_unique<AutoAdvancingClockSourceMock>(
-            options._autoAdvancingMockClockIncrement);
-        // Timestamps are split into two 32-bit integers, seconds and "increments". Currently
-        // (but maybe not for eternity), a Timestamp with a value of `0` seconds is always
-        // considered "null" by `Timestamp::isNull`, regardless of its increment value. Ticking
-        // the `ClockSourceMock` only bumps the "increment" counter, thus by default, generating
-        // "null" timestamps. Bumping by one second here avoids any accidental interpretations.
-        fastClock->advance(Seconds(1));
-        serviceContext->setFastClockSource(std::move(fastClock));
-
-        auto preciseClock = std::make_unique<AutoAdvancingClockSourceMock>(
-            options._autoAdvancingMockClockIncrement);
-        // See above.
-        preciseClock->advance(Seconds(1));
-        serviceContext->setPreciseClockSource(std::move(preciseClock));
-    }
-
-    if (options._mockTickSource) {
-        serviceContext->setTickSource(std::move(options._mockTickSource));
-    }
-
     serviceContext->getService()->setServiceEntryPoint(
         std::make_unique<ServiceEntryPointShardRole>());
 
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
+    _opObserverRegistry = observerRegistry.get();
     serviceContext->setOpObserver(std::move(observerRegistry));
 
     // Set up the periodic runner to allow background job execution for tests that require it.

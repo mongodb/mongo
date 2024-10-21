@@ -176,6 +176,14 @@ protected:
         StaleConfigInfo(kViewNss, ShardVersion::UNSHARDED(), boost::none, shard1),
         "The metadata for the collection is not loaded"};
 
+    TransactionRouterTest()
+        : ShardingTestFixture(
+              false /* withMockCatalogCache */,
+              std::make_unique<ScopedGlobalServiceContextForTest>(
+                  ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                                       std::make_unique<ClockSourceMock>(),
+                                       std::make_unique<TickSourceMock<Microseconds>>()))) {}
+
     void setUp() override {
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
@@ -192,9 +200,9 @@ protected:
         VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
 
         // Set up a tick source for transaction metrics.
-        auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
+        auto tickSource =
+            checked_cast<TickSourceMock<Microseconds>*>(getServiceContext()->getTickSource());
         tickSource->reset(1);
-        getServiceContext()->setTickSource(std::move(tickSource));
 
         _staleVersionAndSnapshotRetriesBlock = std::make_unique<FailPointEnableBlock>(
             "enableStaleVersionAndSnapshotRetriesWithinTransactions");
@@ -4781,10 +4789,9 @@ protected:
     }
 
     /**
-     * Set up and return a mock clock source.
+     * Returns a mock clock source.
      */
     ClockSourceMock* preciseClockSource() {
-        getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
         return dynamic_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
     }
 

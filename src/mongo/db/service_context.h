@@ -131,6 +131,10 @@ public:
         return static_cast<bool>(get());
     }
 
+    std::unique_ptr<T> swap(std::unique_ptr<T> p) noexcept {
+        return std::unique_ptr<T>{_ptr.swap(p.release())};
+    }
+
 private:
     AtomicWord<T*> _ptr{nullptr};
 };
@@ -455,9 +459,13 @@ public:
      * Factory function for making instances of ServiceContext. It is the only means by which they
      * should be created.
      */
-    static UniqueServiceContext make();
+    static UniqueServiceContext make(std::unique_ptr<ClockSource> fastClockSource = nullptr,
+                                     std::unique_ptr<ClockSource> preciseClockSource = nullptr,
+                                     std::unique_ptr<TickSource> tickSource = nullptr);
 
-    ServiceContext();
+    ServiceContext(std::unique_ptr<ClockSource> fastClockSource,
+                   std::unique_ptr<ClockSource> preciseClockSource,
+                   std::unique_ptr<TickSource> tickSource);
     ~ServiceContext() override;
 
     /**
@@ -644,6 +652,11 @@ public:
     void setOpObserver(std::unique_ptr<OpObserver> opObserver);
 
     /**
+     * Set the OpObserver, even if that means overwriting an existing one.
+     */
+    void resetOpObserver_forTest(std::unique_ptr<OpObserver> opObserver);
+
+    /**
      * Return the OpObserver instance we're using. This may be an OpObserverRegistry that in fact
      * contains multiple observers.
      */
@@ -672,30 +685,6 @@ public:
     ClockSource* getPreciseClockSource() const {
         return _preciseClockSource.get();
     }
-
-    /**
-     * Replaces the current tick/clock source with a new one. In other words, the old source will be
-     * destroyed. So make sure that no one is using the old source when calling this.
-     */
-    void setTickSource(std::unique_ptr<TickSource> newSource);
-
-    /**
-     * Replaces the current tick/clock source with a new one. In other words, the old source will be
-     * destroyed. So make sure that no one is using the old source when calling this.
-     */
-    void setFastTickSource(std::unique_ptr<TickSource> newSource);
-
-    /**
-     * Call this method with a ClockSource implementation that may be less precise than
-     * the _preciseClockSource but may be cheaper to call.
-     */
-    void setFastClockSource(std::unique_ptr<ClockSource> newSource);
-
-    /**
-     * Call this method with a ClockSource implementation that is very precise but
-     * may be expensive to call.
-     */
-    void setPreciseClockSource(std::unique_ptr<ClockSource> newSource);
 
     /**
      * Binds the TransportLayerManager to the service context. The TransportLayerManager should have

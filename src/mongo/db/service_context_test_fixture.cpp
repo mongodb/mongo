@@ -37,17 +37,25 @@
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 
-ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
+ServiceContext::UniqueServiceContext makeServiceContext() {
     {
         // Reset the global clock source
         ClockSourceMock clkSource;
         clkSource.reset();
     }
 
-    auto serviceContext = ServiceContext::make();
+    return ServiceContext::make();
+}
+
+ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest()
+    : ScopedGlobalServiceContextForTest(makeServiceContext()) {}
+
+ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest(
+    ServiceContext::UniqueServiceContext serviceContext) {
     WireSpec::getWireSpec(serviceContext.get()).initialize(WireSpec::Specification{});
     setGlobalServiceContext(std::move(serviceContext));
 
@@ -92,5 +100,18 @@ ServiceContextTest::ServiceContextTest(
       _threadClient(_scopedServiceContext->getService(), session) {}
 
 ServiceContextTest::~ServiceContextTest() = default;
+
+ClockSourceMockServiceContextTest::ClockSourceMockServiceContextTest()
+    : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
+          ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                               std::make_unique<ClockSourceMock>(),
+                               std::make_unique<TickSourceMock<Milliseconds>>()))) {}
+
+SharedClockSourceAdapterServiceContextTest::SharedClockSourceAdapterServiceContextTest(
+    std::shared_ptr<ClockSource> clock)
+    : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
+          ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(clock),
+                               std::make_unique<SharedClockSourceAdapter>(clock),
+                               std::make_unique<TickSourceMock<>>()))) {}
 
 }  // namespace mongo

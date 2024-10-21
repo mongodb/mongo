@@ -142,14 +142,15 @@ protected:
  */
 class ScopedSetStandaloneMode {
 public:
-    ScopedSetStandaloneMode(ServiceContext* serviceContext) : _serviceContext(serviceContext) {
+    explicit ScopedSetStandaloneMode(ServiceContext* serviceContext)
+        : _serviceContext(serviceContext) {
         serverGlobalParams.clusterRole = ClusterRole::None;
-        _serviceContext->setOpObserver(std::make_unique<OpObserverRegistry>());
+        _serviceContext->resetOpObserver_forTest(std::make_unique<OpObserverRegistry>());
     }
 
     ~ScopedSetStandaloneMode() {
         serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
-        _serviceContext->setOpObserver([&] {
+        _serviceContext->resetOpObserver_forTest([&] {
             auto opObserver = std::make_unique<OpObserverRegistry>();
             opObserver->addObserver(
                 std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerMock>()));

@@ -38,7 +38,21 @@ namespace mongo {
 
 namespace {
 
-class CurOpStatsTest : public ServiceContextTest {};
+class CurOpStatsTest : public ServiceContextTest {
+protected:
+    CurOpStatsTest()
+        : ServiceContextTest(
+              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+                  nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {}
+
+    void advanceTime(Microseconds amount) {
+        tickSource()->advance(amount);
+    }
+
+    TickSourceMock<Microseconds>* tickSource() {
+        return checked_cast<decltype(tickSource())>(getServiceContext()->getTickSource());
+    }
+};
 
 int64_t addWaitForLock(OperationContext* opCtx,
                        ServiceContext* svcCtx,
@@ -84,26 +98,22 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
     Milliseconds waitForTickets = Milliseconds(2);
     Milliseconds waitForFlowControlTicket = Milliseconds(4);
 
-    auto tickSourceMock = std::make_unique<TickSourceMock<Microseconds>>();
-    auto& tickSource = *tickSourceMock.get();
-
-    // The prepare conflict tracker uses the service context's tick source to measure time.
-    opCtx->getServiceContext()->setTickSource(std::move(tickSourceMock));
-
+    // The prepare conflict tracker uses the service context's tick source to measure time,
+    // so we'll make the service context and curop have the same tick source.
     // The tick source is set to a non-zero value as CurOp equates a value of 0 with a
     // not-started timer.
-    tickSource.advance(Milliseconds{100});
-    curop->setTickSource_forTest(&tickSource);
+    advanceTime(Milliseconds{100});
+    curop->setTickSource_forTest(tickSource());
 
     // Check that execution time advances as expected
     curop->ensureStarted();
-    tickSource.advance(executionTime);
+    advanceTime(executionTime);
     curop->done();
     ASSERT_EQ(duration_cast<Milliseconds>(curop->elapsedTimeExcludingPauses()), executionTime);
 
     // Check that workingTimeMillis correctly accounts for ticket wait time
     auto locker = shard_role_details::getLocker(opCtx.get());
-    addTicketQueueTime(admCtx, &tickSource, executionTime, waitForTickets);
+    addTicketQueueTime(admCtx, tickSource(), executionTime, waitForTickets);
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     ASSERT_EQ(curop->debug().workingTimeMillis, executionTime - waitForTickets);
 
@@ -123,9 +133,9 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
 
     // Check that workingTimeMillis correctly excludes time spent waiting for prepare conflicts.
     // Simulate a prepare conflict and check that workingMillis is the same as before.
-    PrepareConflictTracker::get(opCtx.get()).beginPrepareConflict(tickSource);
-    tickSource.advance(Milliseconds(1000));
-    PrepareConflictTracker::get(opCtx.get()).endPrepareConflict(tickSource);
+    PrepareConflictTracker::get(opCtx.get()).beginPrepareConflict(*tickSource());
+    advanceTime(Milliseconds(1000));
+    PrepareConflictTracker::get(opCtx.get()).endPrepareConflict(*tickSource());
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     // This wait time should be excluded from workingTimeMillis.
     ASSERT_EQ(curop->debug().workingTimeMillis,

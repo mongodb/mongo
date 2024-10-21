@@ -61,7 +61,16 @@ namespace mongo {
  */
 class TicketHolderTestFixture : public ServiceContextTest {
 public:
+    TicketHolderTestFixture()
+        : ServiceContextTest(
+              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+                  nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {}
+
     void setUp() override;
+
+    TickSourceMock<Microseconds>* getTickSource() {
+        return checked_cast<decltype(getTickSource())>(getServiceContext()->getTickSource());
+    }
 
 protected:
     class Stats;

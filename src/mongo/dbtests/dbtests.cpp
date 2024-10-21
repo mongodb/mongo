@@ -82,6 +82,7 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+#include "mongo/util/tick_source_mock.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
@@ -229,10 +230,6 @@ int dbtestsMain(int argc, char** argv) {
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
     repl::ReplSettings replSettings;
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
-    setGlobalServiceContext(ServiceContext::make());
-
-    const auto service = getGlobalServiceContext();
-    service->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
 
     auto fastClock = std::make_unique<ClockSourceMock>();
     // Timestamps are split into two 32-bit integers, seconds and "increments". Currently (but
@@ -241,16 +238,23 @@ int dbtestsMain(int argc, char** argv) {
     // `ClockSourceMock` only bumps the "increment" counter, thus by default, generating "null"
     // timestamps. Bumping by one second here avoids any accidental interpretations.
     fastClock->advance(Seconds(1));
-    service->setFastClockSource(std::move(fastClock));
 
     auto preciseClock = std::make_unique<ClockSourceMock>();
     // See above.
     preciseClock->advance(Seconds(1));
-    CursorManager::get(service)->setPreciseClockSource(preciseClock.get());
-    service->setPreciseClockSource(std::move(preciseClock));
 
-    service->setTransportLayerManager(
+    auto tickSource = std::make_unique<TickSourceMock<Milliseconds>>();
+
+    auto serviceUniq =
+        ServiceContext::make(std::move(fastClock), std::move(preciseClock), std::move(tickSource));
+    serviceUniq->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+
+    serviceUniq->setTransportLayerManager(
         transport::TransportLayerManagerImpl::makeAndStartDefaultEgressTransportLayer());
+
+    setGlobalServiceContext(std::move(serviceUniq));
+
+    const auto service = getGlobalServiceContext();
 
     repl::ReplicationCoordinator::set(
         service,
