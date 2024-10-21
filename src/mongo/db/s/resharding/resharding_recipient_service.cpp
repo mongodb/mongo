@@ -303,6 +303,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _metadata{recipientDoc.getCommonReshardingMetadata()},
       _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
       _oplogBatchTaskCount{recipientDoc.getOplogBatchTaskCount()},
+      _skipCloningAndApplying{recipientDoc.getSkipCloningAndApplying().value_or(false)},
       _relaxed{recipientDoc.getRelaxed()},
       _recipientCtx{recipientDoc.getMutableState()},
       _donorShards{recipientDoc.getDonorShards()},
@@ -671,6 +672,9 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
         invariant(recipientFields.getCloneTimestamp());
         invariant(recipientFields.getApproxDocumentsToCopy());
         invariant(recipientFields.getApproxBytesToCopy());
+        if (_skipCloningAndApplying) {
+            invariant(noChunksToCopy);
+        }
 
         int64_t approxDocumentsToCopy =
             noChunksToCopy ? 0 : *recipientFields.getApproxDocumentsToCopy();
@@ -914,7 +918,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
         reshardingPauseRecipientBeforeCloning.pauseWhileSet(opCtx.get());
     }
 
-    {
+    if (!_skipCloningAndApplying) {
         auto opCtx = factory.makeOperationContext(&cc());
         _ensureDataReplicationStarted(opCtx.get(), executor, abortToken, factory);
     }
@@ -929,16 +933,24 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
         reshardingPauseRecipientDuringCloning.pauseWhileSet(opCtx.get());
     }
 
-    return future_util::withCancellation(_dataReplication->awaitCloningDone(), abortToken)
-        .thenRunOn(**executor)
-        .then([this, &factory] {
-            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                _transitionState(RecipientStateEnum::kBuildingIndex, factory);
-            } else {
-                _transitionState(RecipientStateEnum::kApplying, factory);
-            }
-        });
+    auto cloningFuture = [this, abortToken] {
+        if (_skipCloningAndApplying) {
+            LOGV2(9110901,
+                  "Skip cloning documents since this recipient shard is not going to own any "
+                  "chunks for the collection after resharding");
+            return SemiFuture<void>();
+        }
+        return future_util::withCancellation(_dataReplication->awaitCloningDone(), abortToken);
+    }();
+
+    return std::move(cloningFuture).thenRunOn(**executor).then([this, &factory] {
+        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            _transitionState(RecipientStateEnum::kBuildingIndex, factory);
+        } else {
+            _transitionState(RecipientStateEnum::kApplying, factory);
+        }
+    });
 }
 
 ExecutorFuture<void>
@@ -1062,7 +1074,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    {
+    if (!_skipCloningAndApplying) {
         auto opCtx = factory.makeOperationContext(&cc());
         _ensureDataReplicationStarted(opCtx.get(), executor, abortToken, factory);
     }
@@ -1070,15 +1082,25 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     auto opCtx = factory.makeOperationContext(&cc());
     return _updateCoordinator(opCtx.get(), executor, factory)
         .then([this, abortToken] {
+            if (_skipCloningAndApplying) {
+                LOGV2(9110902,
+                      "Skip fetching and applying oplog entries since this recipient shard is not "
+                      "going to own any chunks for the collection after resharding");
+                return SemiFuture<void>();
+            }
+
             {
                 auto opCtx = cc().makeOperationContext();
                 reshardingPauseRecipientDuringOplogApplication.pauseWhileSet(opCtx.get());
             }
-
             return future_util::withCancellation(_dataReplication->awaitStrictlyConsistent(),
                                                  abortToken);
         })
         .then([this, &factory] {
+            if (_skipCloningAndApplying) {
+                return;
+            }
+
             auto opCtx = factory.makeOperationContext(&cc());
             for (const auto& donor : _donorShards) {
                 auto stashNss = resharding::getLocalConflictStashNamespace(

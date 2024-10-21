@@ -92,6 +92,12 @@ structs:
                 type: timestamp
                 optional: true
                 description:  "The timestamp for the snapshot read while cloning from the donors."
+            skipCloningAndApplying:
+                type: bool
+                optional: true
+                description: "Whether this recipient can skip cloning documents and
+                              fetching/applying oplog entries because it is not going to own any
+                              chunks for the collection after resharding."
             # We intentionally have the mutable state nested in a subobject to make it easy to
             # overwrite with a single $set.
             mutableState: RecipientShardContext
