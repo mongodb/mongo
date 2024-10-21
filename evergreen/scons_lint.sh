@@ -21,7 +21,7 @@ echo "Found mypy executable at '$MYPY'"
 echo "Setting evergreen tmp dir to $TMPDIR"
 compile_flags="$compile_flags --evergreen-tmp-dir='${TMPDIR}'"
 
-eval ${compile_env} python3 ./buildscripts/scons.py ${compile_flags} --stack-size=1024 ${targets} | tee scons-lint.log
+eval ${compile_env} python3 ./buildscripts/scons.py ${compile_flags} --separate-debug=${separate_debug} --stack-size=1024 ${targets} | tee scons-lint.log
 exit_code=$?
 
 $python ./buildscripts/simple_report.py --test-name "${targets}" --log-file scons-lint.log --exit-code $exit_code
