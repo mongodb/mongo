@@ -35,13 +35,26 @@ withRetryOnTransientTxnError(
             assert.commandWorked(sessionColl.insert(doc2));
             assert.commandWorked(session.commitTransaction_forTesting());
         } catch (e) {
-            // It may be possible for this test to run in a passthrough where such a large
-            // transaction fills up the cache and cannot commit. The transaction will be rolled-back
-            // with a WriteConflict as a result.
-            if (e.code === ErrorCodes.WriteConflict) {
-                jsTestLog("Ignoring WriteConflict due to large transaction's size");
-            } else {
-                throw e;
+            switch (e.code) {
+                case ErrorCodes.WriteConflict:
+                    // It may be possible for this test to run in a passthrough where such a large
+                    // transaction fills up the cache and cannot commit. The transaction will be
+                    // rolled-back with a WriteConflict as a result.
+                    jsTestLog("Ignoring WriteConflict due to large transaction's size");
+                    break;
+                case ErrorCodes.TemporarilyUnavailable:
+                    // It may be possible that high cache pressure caused this operation to be
+                    // rolled back. We should retry as this should be a transient error.
+                    jsTestLog("Transaction was rolled back due to high cache pressure, retrying");
+                    break;
+                case ErrorCodes.TransactionTooLargeForCache:
+                    // It may be possible that high cache pressure caused this operation to be
+                    // rolled back because the transaction was too large for the cache.
+                    // We should retry as this should be a transient error.
+                    jsTestLog("Transaction was too large for cache, retrying");
+                    break;
+                default:
+                    throw e;
             }
         }
     },
