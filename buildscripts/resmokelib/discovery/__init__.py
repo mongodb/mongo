@@ -99,6 +99,15 @@ class DiscoveryPlugin(PluginInterface):
             TEST_DISCOVERY_SUBCOMMAND, help="Discover what tests are run by a suite."
         )
         parser.add_argument("--suite", metavar="SUITE", help="Suite to run against.")
+        parser.add_argument(
+            "--skipTestsCoveredByMoreComplexSuites",
+            dest="skip_tests_covered_by_more_complex_suites",
+            action="store_true",
+            help=(
+                "Excludes tests from running on some suite_A if a more complex"
+                " suite_A_B will also run the same tests."
+            ),
+        )
 
         parser = subparsers.add_parser(
             SUITECONFIG_SUBCOMMAND, help="Display configuration of a test suite."

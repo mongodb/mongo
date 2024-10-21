@@ -1211,6 +1211,16 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
+            "--skipTestsCoveredByMoreComplexSuites",
+            dest="skip_tests_covered_by_more_complex_suites",
+            action="store_true",
+            help=(
+                "Excludes tests from running on some suite_A if a more complex"
+                " suite_A_B will also run the same tests."
+            ),
+        )
+
+        parser.add_argument(
             "--genny",
             dest="genny_executable",
             metavar="PATH",

@@ -7,6 +7,7 @@ from buildscripts.resmokelib import (
     parser,
     reportfile,
     sighandler,
+    suite_hierarchy,
     suitesconfig,
     testing,
     utils,
@@ -20,6 +21,7 @@ __all__ = [
     "reportfile",
     "sighandler",
     "suitesconfig",
+    "suite_hierarchy",
     "testing",
     "utils",
 ]

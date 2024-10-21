@@ -12,7 +12,7 @@ import yaml
 
 import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import errors, utils
+from buildscripts.resmokelib import errors, suite_hierarchy, utils
 from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
@@ -120,6 +120,7 @@ def get_suites(suite_names_or_paths: list[str], test_files: list[str]) -> List[_
     for suite_filename in suite_names_or_paths:
         suite_config = _get_suite_config(suite_filename)
         suite = _suite.Suite(suite_filename, suite_config)
+
         if suite_roots:
             # Override the suite's default test files with those passed in from the command line.
             override_suite_config = suite_config.copy()
@@ -146,8 +147,51 @@ def get_suites(suite_names_or_paths: list[str], test_files: list[str]) -> List[_
                             f"'{test}' excluded in '{suite.get_name()}'"
                         )
             suite = override_suite
+
+        if _config.SKIP_TESTS_COVERED_BY_MORE_COMPLEX_SUITES:
+            if suite_roots:
+                raise ValueError(
+                    "Cannot use '--skipTestsCoveredByMoreComplexSuites' when tests have been passed in from the command line."
+                )
+            if _config.ORIGIN_SUITE:
+                raise ValueError(
+                    "Cannot use '--originSuite' with '--skipTestsCoveredByMoreComplexSuites'."
+                )
+            suite = _compute_minimal_test_set_suite(suite_filename)
+
         suites.append(suite)
     return suites
+
+
+def _compute_minimal_test_set_suite(origin_suite_name):
+    """
+    Given a suite_A, returns the set of tests compatible with it, but incompatible
+    with any suite_A_B more complex than it.
+
+    The relationship of "more complex" is defined in suite_hierarchy.py.
+    """
+
+    # Compute the dag from the complexity graph
+    dag = suite_hierarchy.compute_dag(suite_hierarchy.SUITE_HIERARCHY)
+
+    # If we don't know how to compute the minimal test set because the suite's
+    # information isn't present in the hierarchy, just return the suite as is.
+    if origin_suite_name not in dag:
+        suite_config = _get_suite_config(origin_suite_name)
+        suite = _suite.Suite(origin_suite_name, suite_config)
+        return suite
+
+    # Build a dictionary of the tests in each suite.
+    tests_in_suite = {}
+    for suite_in_dag in dag.keys():
+        suite_config = _get_suite_config(suite_in_dag)
+        suite = _suite.Suite(suite_in_dag, suite_config)
+        tests_in_suite[suite_in_dag] = set(suite.tests)
+
+    tests = suite_hierarchy.compute_minimal_test_set(origin_suite_name, dag, tests_in_suite)
+    min_suite_config = _get_suite_config(origin_suite_name).copy()
+    min_suite_config.update(_make_suite_roots(list(tests)))
+    return _suite.Suite(origin_suite_name, min_suite_config)
 
 
 def _make_suite_roots(files):
@@ -527,5 +571,4 @@ class SuiteFinder(object):
 
 def get_suite(suite_name_or_path) -> _suite.Suite:
     """Retrieve the Suite instance corresponding to a suite configuration file."""
-    suite_config = _get_suite_config(suite_name_or_path)
-    return _suite.Suite(suite_name_or_path, suite_config)
+    return get_suites([suite_name_or_path], None)[0]
