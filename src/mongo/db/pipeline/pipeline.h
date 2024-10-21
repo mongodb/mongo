@@ -221,7 +221,7 @@ public:
 
     static std::unique_ptr<Pipeline, PipelineDeleter> makePipelineFromViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
-        ExpressionContext::ResolvedNamespace resolvedNs,
+        ResolvedNamespace resolvedNs,
         std::vector<BSONObj> currentPipeline,
         MakePipelineOptions opts);
 

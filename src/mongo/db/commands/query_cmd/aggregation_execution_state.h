@@ -161,7 +161,7 @@ public:
         }
     }
 
-    StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNamespaces() const;
+    StatusWith<StringMap<ResolvedNamespace>> resolveInvolvedNamespaces() const;
 
     /* Setter functions */
 

@@ -53,9 +53,9 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(matchSpec);
         findCommand->setProjection(projectSpec);
-        auto cq = std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx, *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
         cq->setSbeCompatible(true);
 
         return canonical_query_encoder::encodeSBE(*cq);

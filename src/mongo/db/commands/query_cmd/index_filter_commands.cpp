@@ -302,7 +302,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         findCommand->setCollation(entry.collation);
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = makeExpressionContext(opCtx, *findCommand),
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
             .parsedFind = ParsedFindCommandParams{
                 .findCommand = std::move(findCommand),
                 .extensionsCallback = extensionsCallback,

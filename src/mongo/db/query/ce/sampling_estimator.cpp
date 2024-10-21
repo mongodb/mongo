@@ -49,7 +49,7 @@ std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
     findCommand->setLimit(sampleSize);
 
-    auto expCtx = makeExpressionContext(opCtx, *findCommand);
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build();
 
     auto statusWithCQ = CanonicalQuery::make(
         {.expCtx = expCtx,

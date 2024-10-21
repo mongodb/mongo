@@ -510,10 +510,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
             // this invocation of the parser is just for validity checking. It's also legal to parse
             // with an empty namespace string, because we are only doing validity checking and not
             // resolving the expression against a given namespace.
-            auto simpleCollator = nullptr;
-            boost::intrusive_ptr<ExpressionContext> expCtx(
-                new ExpressionContext(opCtx, simpleCollator, NamespaceString::kEmpty));
-
+            auto expCtx =
+                ExpressionContextBuilder{}.opCtx(opCtx).ns(NamespaceString::kEmpty).build();
             // Special match expression features (e.g. $jsonSchema, $expr, ...) are not allowed in a
             // partialFilterExpression on index creation.
             auto statusWithMatcher =

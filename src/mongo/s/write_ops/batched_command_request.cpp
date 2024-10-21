@@ -65,14 +65,12 @@ BSONObj freezeLet(OperationContext* opCtx,
                   const boost::optional<mongo::LegacyRuntimeConstants>& legacyRuntimeConstants,
                   const NamespaceString& nss) {
     // Evaluate the let parameters.
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                    nullptr /* collator */,
-                                                    nss,
-                                                    legacyRuntimeConstants,
-                                                    let,
-                                                    false,  // disk use is banned on mongos
-                                                    false,  // mongos has no profile collection
-                                                    boost::none /* verbosity */);
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .ns(nss)
+                      .runtimeConstants(legacyRuntimeConstants)
+                      .letParameters(let)
+                      .build();
     expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), let);
     return expCtx->variables.toBSON(expCtx->variablesParseState, let);
 }

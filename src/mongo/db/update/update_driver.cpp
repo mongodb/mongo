@@ -209,7 +209,7 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures &
         ~MatchExpressionParser::AllowedFeatures::kExpr;
     auto statusWithCQ = CanonicalQuery::make(
-        {.expCtx = makeExpressionContext(opCtx, *findCommand),
+        {.expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
          .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                                .allowedFeatures = allowedFeatures}});
     if (!statusWithCQ.isOK()) {

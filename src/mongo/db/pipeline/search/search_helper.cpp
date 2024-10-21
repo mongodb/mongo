@@ -294,7 +294,7 @@ void setResolvedNamespaceForSearch(const NamespaceString& origNss,
                                    const ResolvedView& resolvedView,
                                    boost::intrusive_ptr<ExpressionContext> expCtx,
                                    boost::optional<UUID> uuid) {
-    auto resolvedNamespaces = StringMap<ExpressionContext::ResolvedNamespace>{
+    auto resolvedNamespaces = StringMap<ResolvedNamespace>{
         {origNss.coll().toString(),
          {resolvedView.getNamespace(), resolvedView.getPipeline(), uuid}}};
     expCtx->setResolvedNamespaces(resolvedNamespaces);

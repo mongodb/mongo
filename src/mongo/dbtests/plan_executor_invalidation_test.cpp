@@ -88,7 +88,7 @@ static const NamespaceString nss =
 class PlanExecutorInvalidationTest : public unittest::Test {
 public:
     PlanExecutorInvalidationTest()
-        : _client(&_opCtx), _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss)) {
+        : _client(&_opCtx), _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build()) {
         _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns_forTest()));
         _client.dropCollection(nss);
 

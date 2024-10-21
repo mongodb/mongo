@@ -106,22 +106,17 @@
 namespace mongo {
 namespace {
 boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext* opCtx) {
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    StringMap<ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[NamespaceString::kRsOplogNamespace.coll()] = {
         NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
-    return make_intrusive<ExpressionContext>(opCtx,
-                                             boost::none, /* explain */
-                                             false,       /* fromRouter */
-                                             false,       /* needsMerge */
-                                             true,        /* allowDiskUse */
-                                             true,        /* bypassDocumentValidation */
-                                             false,       /* isMapReduceCommand */
-                                             NamespaceString::kRsOplogNamespace,
-                                             boost::none, /* runtimeConstants */
-                                             nullptr,     /* collator */
-                                             MongoProcessInterface::create(opCtx),
-                                             std::move(resolvedNamespaces),
-                                             boost::none); /* collUUID */
+    return ExpressionContextBuilder{}
+        .opCtx(opCtx)
+        .mongoProcessInterface(MongoProcessInterface::create(opCtx))
+        .ns(NamespaceString::kRsOplogNamespace)
+        .resolvedNamespace(std::move(resolvedNamespaces))
+        .allowDiskUse(true)
+        .bypassDocumentValidation(true)
+        .build();
 }
 }  // namespace
 

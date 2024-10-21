@@ -211,9 +211,7 @@ public:
         CollectionScanParams params;
         params.direction = direction;
         params.tailable = false;
-
-        boost::intrusive_ptr<ExpressionContext> expCtx =
-            make_intrusive<ExpressionContext>(opCtx, nullptr, collection->ns());
+        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collection->ns()).build();
         std::unique_ptr<CollectionScan> scan(
             new CollectionScan(expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
@@ -230,9 +228,9 @@ public:
     std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
-        return std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(&_opCtx, *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(&_opCtx, *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
     // Uses the default _expCtx tied to the test suite.
@@ -247,7 +245,6 @@ public:
         CollectionAcquisition coll,
         ExpressionContext* expCtx,
         CanonicalQuery* deleteParamsFilter = nullptr) {
-
         auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
         batchedDeleteParams->targetBatchDocs = targetBatchDocs;
         batchedDeleteParams->targetBatchTimeMS = targetBatchTimeMS;
@@ -261,7 +258,6 @@ public:
         ExpressionContext* expCtx,
         std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
         CanonicalQuery* deleteParamsFilter = nullptr) {
-
         // DeleteStageParams must always be multi.
         auto deleteParams = std::make_unique<DeleteStageParams>();
         deleteParams->isMulti = true;
@@ -282,7 +278,7 @@ protected:
     OperationContext& _opCtx = *_opCtxPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build();
     ClockAdvancingOpObserver* _opObserver;
     static TickSourceMock<Milliseconds>* _tickSource;
 
@@ -395,7 +391,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeletedWriteConflict
     auto batchedDeleteClient = serviceContext->getService()->makeClient("batchedDeleteClient");
     auto batchedDeleteOpCtx = batchedDeleteClient->makeOperationContext();
     boost::intrusive_ptr<ExpressionContext> batchedDeleteExpCtx =
-        make_intrusive<ExpressionContext>(batchedDeleteOpCtx.get(), nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(batchedDeleteOpCtx.get()).ns(nss).build();
 
     // Acquire locks for the batched delete.
     Lock::DBLock dbLk1(batchedDeleteOpCtx.get(), nss.dbName(), LockMode::MODE_IX);
@@ -533,7 +529,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsUpdatedToNotMatchCli
     auto batchedDeleteClient = serviceContext->getService()->makeClient("batchedDeleteClient");
     auto batchedDeleteOpCtx = batchedDeleteClient->makeOperationContext();
     boost::intrusive_ptr<ExpressionContext> batchedDeleteExpCtx =
-        make_intrusive<ExpressionContext>(batchedDeleteOpCtx.get(), nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(batchedDeleteOpCtx.get()).ns(nss).build();
 
     // Acquire locks for the batched delete.
     Lock::DBLock dbLk1(batchedDeleteOpCtx.get(), nss.dbName(), LockMode::MODE_IX);

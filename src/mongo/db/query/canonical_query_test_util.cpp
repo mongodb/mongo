@@ -63,7 +63,7 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const BSONObj& 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(queryObj);
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx(), *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{
             .findCommand = std::move(findCommand),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
@@ -84,7 +84,7 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(BSONObj query,
     findCommand->setProjection(proj);
     findCommand->setCollation(collation);
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx(), *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{
             .findCommand = std::move(findCommand),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
@@ -120,7 +120,7 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const char* que
     findCommand->setMin(fromjson(minStr));
     findCommand->setMax(fromjson(maxStr));
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx(), *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{
             .findCommand = std::move(findCommand),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
@@ -149,10 +149,10 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const char* que
     findCommand->setMin(fromjson(minStr));
     findCommand->setMax(fromjson(maxStr));
 
-    auto expCtx = makeExpressionContext(opCtx(), *findCommand);
-    if (explain) {
-        expCtx->explain = explain::VerbosityEnum::kQueryPlanner;
-    }
+    boost::optional<ExplainOptions::Verbosity> verbosity =
+        explain ? boost::make_optional(explain::VerbosityEnum::kQueryPlanner) : boost::none;
+    auto expCtx =
+        ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).explain(verbosity).build();
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = std::move(expCtx),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),

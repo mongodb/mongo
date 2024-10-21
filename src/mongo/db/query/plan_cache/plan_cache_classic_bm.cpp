@@ -322,7 +322,7 @@ void BM_PlanCacheClassic(benchmark::State& state) {
     const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
 
     auto findCommand = makeFindFromBmParams(bmParams);
-    auto expCtx = makeExpressionContext(opCtx.get(), *findCommand);
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build();
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = expCtx,
         .parsedFind = ParsedFindCommandParams{

@@ -1498,9 +1498,7 @@ public:
 
             // We have replies left that will not make the first batch. Need to construct a cursor.
             if (numRepliesInFirstBatch != replies.size()) {
-                auto expCtx = make_intrusive<ExpressionContext>(
-                    opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns());
-
+                auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(ns()).build();
                 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
                 auto ws = std::make_unique<WorkingSet>();
                 auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());

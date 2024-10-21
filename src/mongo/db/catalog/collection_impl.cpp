@@ -729,8 +729,11 @@ Collection::Validator CollectionImpl::parseValidator(
         return {validator, nullptr, canUseValidatorInThisContext};
     }
 
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, CollatorInterface::cloneCollator(_shared->_collator.get()), ns());
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .collator(CollatorInterface::cloneCollator(_shared->_collator.get()))
+                      .ns(ns())
+                      .build();
 
     expCtx->variables.setDefaultRuntimeConstants(opCtx);
 

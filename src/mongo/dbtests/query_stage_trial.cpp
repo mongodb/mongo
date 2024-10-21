@@ -69,7 +69,7 @@ class TrialStageTest : public unittest::Test {
 public:
     TrialStageTest()
         : _opCtx(cc().makeOperationContext()),
-          _expCtx(make_intrusive<ExpressionContext>(_opCtx.get(), nullptr, kTestNss)) {}
+          _expCtx(ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kTestNss).build()) {}
 
 protected:
     // Pushes BSONObjs from the given vector into the given MockStage. Each empty BSONObj in

@@ -107,7 +107,7 @@ protected:
     }
 
 private:
-    StringMap<ExpressionContext::ResolvedNamespace> _resolvedNamespaces;
+    StringMap<ResolvedNamespace> _resolvedNamespaces;
 };
 
 using namespace pipeline_metadata_tree;

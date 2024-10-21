@@ -78,7 +78,7 @@ const BSONObj kTestKeyPattern = BSON("testIndex" << 1);
 class QueryStageNearTest : public unittest::Test {
 public:
     void setUp() override {
-        _expCtx = make_intrusive<ExpressionContext>(_opCtx, nullptr, kTestNamespace);
+        _expCtx = ExpressionContextBuilder{}.opCtx(_opCtx).ns(kTestNamespace).build();
 
         directClient.createCollection(kTestNamespace);
         ASSERT_OK(dbtests::createIndex(_opCtx, kTestNamespace.ns_forTest(), kTestKeyPattern));

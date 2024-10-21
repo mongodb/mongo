@@ -122,10 +122,12 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
 
     if (_descriptor.isPartial()) {
         const BSONObj& filter = _descriptor.partialFilterExpression();
-
-        _shared->_expCtxForFilter = make_intrusive<ExpressionContext>(
-            opCtx, CollatorInterface::cloneCollator(_shared->_collator.get()), collection->ns());
-
+        _shared->_expCtxForFilter =
+            ExpressionContextBuilder{}
+                .opCtx(opCtx)
+                .collator(CollatorInterface::cloneCollator(_shared->_collator.get()))
+                .ns(collection->ns())
+                .build();
         // Parsing the partial filter expression is not expected to fail here since the
         // expression would have been successfully parsed upstream during index creation.
         _shared->_filterExpression =

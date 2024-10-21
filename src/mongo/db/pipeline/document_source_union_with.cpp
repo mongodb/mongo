@@ -73,7 +73,7 @@ REGISTER_DOCUMENT_SOURCE(unionWith,
 namespace {
 std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    ExpressionContext::ResolvedNamespace resolvedNs,
+    ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline) {
 
     auto validatorCallback = [](const Pipeline& pipeline) {
@@ -296,7 +296,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             _pipeline = buildPipelineFromViewDefinition(
                 pExpCtx,
-                ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()},
+                ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                 std::move(serializedPipe));
             logShardedViewFound(e);
             return doGetNext();
@@ -456,7 +456,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                 logShardedViewFound(e);
                 auto resolvedPipeline = buildPipelineFromViewDefinition(
                     pExpCtx,
-                    ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()},
+                    ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                     std::move(serializedPipe));
                 return preparePipelineAndExplain(resolvedPipeline.release());
             }

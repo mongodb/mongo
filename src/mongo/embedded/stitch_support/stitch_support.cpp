@@ -191,9 +191,11 @@ struct stitch_support_v1_matcher {
                               stitch_support_v1_collator* collator)
         : client(std::move(client)),
           opCtx(this->client->makeOperationContext()),
-          expCtx(new mongo::ExpressionContext(opCtx.get(),
-                                              collator ? collator->collator->clone() : nullptr,
-                                              mongo::kDummyNamespaceStr)),
+          expCtx(mongo::ExpressionContextBuilder{}
+                     .opCtx(opCtx.get())
+                     .collator(collator ? collator->collator->clone() : nullptr)
+                     .ns(mongo::kDummyNamespaceStr)
+                     .build()),
           matcher(filterBSON.getOwned(), expCtx){};
 
     mongo::ServiceContext::UniqueClient client;
@@ -208,11 +210,11 @@ struct stitch_support_v1_projection {
                                  stitch_support_v1_matcher* matcher,
                                  stitch_support_v1_collator* collator)
         : client(std::move(client)), opCtx(this->client->makeOperationContext()), matcher(matcher) {
-
-        auto expCtx = mongo::make_intrusive<mongo::ExpressionContext>(
-            opCtx.get(),
-            collator ? collator->collator->clone() : nullptr,
-            mongo::kDummyNamespaceStr);
+        auto expCtx = mongo::ExpressionContextBuilder{}
+                          .opCtx(opCtx.get())
+                          .collator(collator ? collator->collator->clone() : nullptr)
+                          .ns(mongo::kDummyNamespaceStr)
+                          .build();
         const auto policies = mongo::ProjectionPolicies::findProjectionPolicies();
         auto proj = mongo::projection_ast::parseAndAnalyze(
             expCtx,
@@ -251,9 +253,11 @@ struct stitch_support_v1_update {
                              stitch_support_v1_collator* collator)
         : client(std::move(client)),
           opCtx(this->client->makeOperationContext()),
-          expCtx(new mongo::ExpressionContext(opCtx.get(),
-                                              collator ? collator->collator->clone() : nullptr,
-                                              mongo::kDummyNamespaceStr)),
+          expCtx(mongo::ExpressionContextBuilder{}
+                     .opCtx(opCtx.get())
+                     .collator(collator ? collator->collator->clone() : nullptr)
+                     .ns(mongo::kDummyNamespaceStr)
+                     .build()),
           updateExpr(updateExpr.getOwned()),
           arrayFilters(arrayFilters.getOwned()),
           matcher(matcher),

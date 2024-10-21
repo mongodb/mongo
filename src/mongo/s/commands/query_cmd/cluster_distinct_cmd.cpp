@@ -130,9 +130,11 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
             "BSON field 'querySettings' is an unknown field",
             !distinctCommand->getQuerySettings().has_value());
 
-    auto expCtx = CanonicalDistinct::makeExpressionContext(
-        opCtx, nss, *distinctCommand, defaultCollator, verbosity);
-
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(opCtx, *distinctCommand, defaultCollator)
+                      .ns(nss)
+                      .explain(verbosity)
+                      .build();
     auto parsedDistinct =
         parsed_distinct_command::parse(expCtx,
                                        std::move(distinctCommand),

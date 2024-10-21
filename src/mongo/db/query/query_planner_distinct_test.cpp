@@ -53,7 +53,7 @@ public:
         findCommand->setProjection(proj);
 
         cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
             .parsedFind =
                 ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                         .allowedFeatures =

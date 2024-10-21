@@ -40,7 +40,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/matcher/match_expression_dependencies.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -49,9 +48,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -59,16 +56,8 @@
 
 namespace mongo {
 
-namespace {
-boost::intrusive_ptr<ExpressionContext> makeExpCtx() {
-    // The namespace string can't be database-specific, because the profile filter applies to all
-    // databases in the process.
-    // Similar to collection validators, it's not safe to share an opCtx in a stored query.
-    return make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString{});
-}
-}  // namespace
-
-ProfileFilterImpl::ProfileFilterImpl(BSONObj expr) : _matcher(expr.getOwned(), makeExpCtx()) {
+ProfileFilterImpl::ProfileFilterImpl(BSONObj expr)
+    : _matcher(expr.getOwned(), ExpressionContextBuilder{}.build()) {
     DepsTracker deps;
     match_expression::addDependencies(_matcher.getMatchExpression(), &deps);
     uassert(4910201,

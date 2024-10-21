@@ -125,9 +125,9 @@ public:
     std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
-        return std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(&_opCtx, *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(&_opCtx, *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
     static size_t numObj() {
@@ -139,7 +139,7 @@ protected:
     OperationContext& _opCtx = *_txnPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build();
 
 private:
     DBDirectClient _client;

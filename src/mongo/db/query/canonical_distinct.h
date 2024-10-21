@@ -117,13 +117,6 @@ public:
             : BSONObj();
     }
 
-    static boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const DistinctCommandRequest& distinctCommand,
-        const CollatorInterface* defaultCollator,
-        boost::optional<ExplainOptions::Verbosity> verbosity = boost::none);
-
 private:
     // The field for which we are getting distinct values.
     const std::string _key;

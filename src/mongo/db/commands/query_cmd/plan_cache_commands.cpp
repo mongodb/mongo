@@ -107,7 +107,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx
             findCommand->getNamespaceOrUUID().isNamespaceString());
 
     return CanonicalQuery::make(
-        {.expCtx = makeExpressionContext(opCtx, *findCommand),
+        {.expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
          .parsedFind = ParsedFindCommandParams{
              .findCommand = std::move(findCommand),
              .extensionsCallback = ExtensionsCallbackReal(opCtx, &nss),

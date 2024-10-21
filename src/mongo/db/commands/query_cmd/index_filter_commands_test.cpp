@@ -274,9 +274,11 @@ private:
         findCommand->setSort(sort);
         findCommand->setProjection(projection);
         findCommand->setCollation(collation);
-        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = makeExpressionContext(_operationContext.get(), *findCommand),
-            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        return std::make_unique<CanonicalQuery>(
+            CanonicalQueryParams{.expCtx = ExpressionContextBuilder{}
+                                               .fromRequest(_operationContext.get(), *findCommand)
+                                               .build(),
+                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
     std::unique_ptr<CanonicalQuery> makeCQ(const char* queryStr,

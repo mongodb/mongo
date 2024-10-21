@@ -103,22 +103,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::makePipeline(
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
     const boost::optional<LogicalSessionId>& startAfter) {
     const auto& sourceNss = NamespaceString::kSessionTransactionsTableNamespace;
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    StringMap<ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[sourceNss.coll()] = {sourceNss, std::vector<BSONObj>{}};
-
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                    boost::none, /* explain */
-                                                    false,       /* fromRouter */
-                                                    false,       /* needsMerge */
-                                                    false,       /* allowDiskUse */
-                                                    false,       /* bypassDocumentValidation */
-                                                    false,       /* isMapReduceCommand */
-                                                    sourceNss,
-                                                    boost::none, /* runtimeConstants */
-                                                    nullptr,     /* collator */
-                                                    std::move(mongoProcessInterface),
-                                                    std::move(resolvedNamespaces),
-                                                    boost::none /* collUUID */);
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .mongoProcessInterface(std::move(mongoProcessInterface))
+                      .ns(sourceNss)
+                      .resolvedNamespace(std::move(resolvedNamespaces))
+                      .build();
 
     Pipeline::SourceContainer stages;
 

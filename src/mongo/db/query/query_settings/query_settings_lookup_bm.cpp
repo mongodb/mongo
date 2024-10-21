@@ -232,7 +232,7 @@ public:
         auto client = getGlobalServiceContext()->getService()->makeClient("setup");
         auto opCtx = client->makeOperationContext();
         auto expCtx =
-            make_intrusive<ExpressionContext>(opCtx.get(), nullptr, makeNamespace(tenantId));
+            ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(makeNamespace(tenantId)).build();
         std::vector<QueryShapeConfiguration> queryShapeConfigs;
 
         auto generateQueryShapeConfiguration =
@@ -284,7 +284,7 @@ public:
         auto opCtx = client->makeOperationContext();
         auto tid = tenantId(state.thread_index);
         auto ns = makeNamespace(tid);
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx.get(), nullptr, ns);
+        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(ns).build();
 
         bool isTestingHitCase = state.range(0) > 0 && state.range(2) == 1;
         BSONObjBuilder bob;

@@ -308,7 +308,7 @@ WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPat
     // ExpressionContext's OperationContext and CollatorInterface to 'nullptr' and the namespace
     // string to '' here; since we ban computed fields from the projection, the ExpressionContext
     // will never be used.
-    auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString::kEmpty);
+    auto expCtx = ExpressionContextBuilder{}.ns(NamespaceString::kEmpty).build();
     auto policies = ProjectionPolicies::wildcardIndexSpecProjectionPolicies();
     auto projection = projection_ast::parseAndAnalyze(expCtx, projSpec, policies);
     return WildcardProjection{projection_executor::buildProjectionExecutor(

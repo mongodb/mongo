@@ -600,7 +600,7 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
                 str::stream() << "Partial filter expression is not an object: " << filterElem,
                 filterElem.type() == BSONType::Object);
 
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr /* collator */, bucketNs);
+        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(bucketNs).build();
 
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
             MatchExpressionParser::kDefaultSpecialFeatures;

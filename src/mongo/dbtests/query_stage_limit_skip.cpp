@@ -112,11 +112,10 @@ int countResults(PlanStage* stage) {
 class QueryStageLimitSkipBasicTest {
 public:
     void run() {
-        const boost::intrusive_ptr<ExpressionContext> expCtx(make_intrusive<ExpressionContext>(
-            _opCtx,
-            std::unique_ptr<CollatorInterface>(nullptr),
-            NamespaceString::createNamespaceString_forTest("test.dummyNS")));
-
+        const auto expCtx = ExpressionContextBuilder{}
+                                .opCtx(_opCtx)
+                                .ns(NamespaceString::createNamespaceString_forTest("test.dummyNS"))
+                                .build();
         for (int i = 0; i < 2 * N; ++i) {
             WorkingSet ws;
 

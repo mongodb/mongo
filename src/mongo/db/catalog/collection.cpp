@@ -102,11 +102,11 @@ void Collection::Factory::set(ServiceContext* service,
     factory = std::move(newFactory);
 }
 
-std::pair<std::unique_ptr<CollatorInterface>, ExpressionContext::CollationMatchesDefault>
+std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>
 resolveCollator(OperationContext* opCtx, BSONObj userCollation, const CollectionPtr& collection) {
     if (!collection || !collection->getDefaultCollator()) {
         if (userCollation.isEmpty()) {
-            return {nullptr, ExpressionContext::CollationMatchesDefault::kYes};
+            return {nullptr, ExpressionContextCollationMatchesDefault::kYes};
         } else {
             return {getUserCollator(opCtx, userCollation),
                     // If the user explicitly provided a simple collation, we can still treat it as
@@ -114,21 +114,21 @@ resolveCollator(OperationContext* opCtx, BSONObj userCollation, const Collection
                     // functionally equivalent in the query code.
                     (SimpleBSONObjComparator::kInstance.evaluate(userCollation ==
                                                                  CollationSpec::kSimpleSpec))
-                        ? ExpressionContext::CollationMatchesDefault::kYes
-                        : ExpressionContext::CollationMatchesDefault::kNo};
+                        ? ExpressionContextCollationMatchesDefault::kYes
+                        : ExpressionContextCollationMatchesDefault::kNo};
         }
     }
 
     auto defaultCollator = collection->getDefaultCollator()->clone();
     if (userCollation.isEmpty()) {
-        return {std::move(defaultCollator), ExpressionContext::CollationMatchesDefault::kYes};
+        return {std::move(defaultCollator), ExpressionContextCollationMatchesDefault::kYes};
     }
     auto userCollator = getUserCollator(opCtx, userCollation);
 
     if (CollatorInterface::collatorsMatch(defaultCollator.get(), userCollator.get())) {
-        return {std::move(defaultCollator), ExpressionContext::CollationMatchesDefault::kYes};
+        return {std::move(defaultCollator), ExpressionContextCollationMatchesDefault::kYes};
     } else {
-        return {std::move(userCollator), ExpressionContext::CollationMatchesDefault::kNo};
+        return {std::move(userCollator), ExpressionContextCollationMatchesDefault::kNo};
     }
 }
 

@@ -168,9 +168,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::sampleColl
     invariant(collectionPtr);
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
 
     auto rsRandCursor = collectionPtr->getRecordStore()->getRandomCursor(opCtx);
     std::unique_ptr<PlanStage> root =
@@ -206,9 +204,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
-
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
     auto collScanParams = createCollectionScanParams(expCtx,
                                                      ws.get(),
                                                      &collectionPtr,
@@ -243,8 +239,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collection->ns()).build();
     auto cs = _collectionScan(expCtx, ws.get(), &collection, params);
 
     // Takes ownership of 'ws' and 'cs'.
@@ -281,8 +276,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     }
 
     auto ws = std::make_unique<WorkingSet>();
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
 
     if (collectionPtr->isCapped()) {
         expCtx->setIsCappedDelete();
@@ -335,9 +329,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
     int options) {
     const auto& collection = *coll;
     auto ws = std::make_unique<WorkingSet>();
-
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collection->ns()).build();
 
     std::unique_ptr<PlanStage> root = _indexScan(expCtx,
                                                  ws.get(),
@@ -375,8 +367,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     invariant(collectionPtr);
     auto ws = std::make_unique<WorkingSet>();
 
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
 
     std::unique_ptr<PlanStage> root = _indexScan(expCtx,
                                                  ws.get(),
@@ -472,8 +463,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
 
     auto root = _collectionScan(expCtx, ws.get(), &collectionPtr, collectionScanParams);
     root = std::make_unique<DeleteStage>(
@@ -501,8 +491,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
     invariant(collectionPtr);
     auto ws = std::make_unique<WorkingSet>();
 
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
 
     auto idHackStage =
         std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collection, descriptor);

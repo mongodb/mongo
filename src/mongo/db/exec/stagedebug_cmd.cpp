@@ -168,8 +168,7 @@ public:
                 str::stream() << nss.toStringForErrorMsg() << " is not a valid namespace",
                 nss.isValid());
 
-        auto expCtx = make_intrusive<ExpressionContext>(
-            opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
+        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(nss).build();
 
         // Need a context to get the actual const CollectionPtr&
         // TODO A write lock is currently taken here to accommodate stages that perform writes

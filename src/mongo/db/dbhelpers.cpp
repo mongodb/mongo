@@ -129,7 +129,7 @@ RecordId Helpers::findOne(OperationContext* opCtx,
         return RecordId();
 
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx, *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{
             .findCommand = std::move(findCommand),
             .extensionsCallback = ExtensionsCallbackReal(opCtx, &collection->ns()),

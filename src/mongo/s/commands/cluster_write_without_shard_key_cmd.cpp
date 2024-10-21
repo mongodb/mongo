@@ -126,8 +126,7 @@ bool requiresOriginalQuery(OperationContext* opCtx,
 
         // We can ignore the collation for this check since we're only checking if the field name in
         // the projection requires extra information from the query.
-        auto expCtx =
-            make_intrusive<ExpressionContext>(opCtx, findCommand, nullptr /* collator */, false);
+        auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, findCommand).build();
         auto res = MatchExpressionParser::parse(findCommand.getFilter(),
                                                 expCtx,
                                                 ExtensionsCallbackNoop(),

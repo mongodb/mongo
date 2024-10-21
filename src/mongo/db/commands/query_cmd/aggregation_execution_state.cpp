@@ -30,15 +30,14 @@
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 
 namespace mongo {
-StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> AggExState::resolveInvolvedNamespaces()
-    const {
+StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces() const {
     auto request = getRequest();
     auto pipelineInvolvedNamespaces = getInvolvedNamespaces();
 
     // If there are no involved namespaces, return before attempting to take any locks. This is
     // important for collectionless aggregations, which may be expected to run without locking.
     if (pipelineInvolvedNamespaces.empty()) {
-        return {StringMap<ExpressionContext::ResolvedNamespace>()};
+        return {StringMap<ResolvedNamespace>()};
     }
 
     // Acquire a single const view of the CollectionCatalog and use it for all view and collection
@@ -50,7 +49,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> AggExState::resolveI
 
     std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
                                                         pipelineInvolvedNamespaces.end());
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    StringMap<ResolvedNamespace> resolvedNamespaces;
 
     while (!involvedNamespacesQueue.empty()) {
         auto involvedNs = std::move(involvedNamespacesQueue.front());

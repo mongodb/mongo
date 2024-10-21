@@ -114,8 +114,7 @@ Status AuthorizationBackendMock::updateOne(OperationContext* opCtx,
                                            bool upsert,
                                            const BSONObj& writeConcern) {
     namespace mmb = mutablebson;
-    boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionName));
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionName).build();
     UpdateDriver driver(std::move(expCtx));
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     driver.parse(write_ops::UpdateModification::parseFromClassicUpdate(updatePattern),
@@ -192,8 +191,7 @@ Status AuthorizationBackendMock::_queryVector(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const BSONObj& query,
                                               std::vector<BSONObjCollection::iterator>* result) {
-    boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionName));
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionName).build();
     StatusWithMatchExpression parseResult = MatchExpressionParser::parse(query, std::move(expCtx));
     if (!parseResult.isOK()) {
         return parseResult.getStatus();

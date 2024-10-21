@@ -101,22 +101,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePip
     using Arr = std::vector<Value>;
     using V = Value;
 
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    StringMap<ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[_oplogBufferNss.coll()] = {_oplogBufferNss, std::vector<BSONObj>{}};
-
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                    boost::none, /* explain */
-                                                    false,       /* fromRouter */
-                                                    false,       /* needsMerge */
-                                                    false,       /* allowDiskUse */
-                                                    false,       /* bypassDocumentValidation */
-                                                    false,       /* isMapReduceCommand */
-                                                    _oplogBufferNss,
-                                                    boost::none, /* runtimeConstants */
-                                                    nullptr,     /* collator */
-                                                    std::move(mongoProcessInterface),
-                                                    std::move(resolvedNamespaces),
-                                                    boost::none /* collUUID */);
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .mongoProcessInterface(std::move(mongoProcessInterface))
+                      .ns(_oplogBufferNss)
+                      .resolvedNamespace(std::move(resolvedNamespaces))
+                      .build();
 
     Pipeline::SourceContainer stages;
 

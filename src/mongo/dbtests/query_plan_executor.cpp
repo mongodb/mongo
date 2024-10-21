@@ -135,9 +135,9 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(filterObj);
         query_request_helper::setTailableMode(tailableMode, findCommand.get());
-        auto cq = std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(&_opCtx, *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(&_opCtx, *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // Make the stage.
         unique_ptr<PlanStage> root(new CollectionScan(
@@ -181,9 +181,9 @@ public:
             std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ixscan), nullptr, coll);
 
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
-        auto cq = std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(&_opCtx, *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(&_opCtx, *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor =
@@ -202,7 +202,7 @@ protected:
     OperationContext& _opCtx = *_opCtxPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build();
 
 private:
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {

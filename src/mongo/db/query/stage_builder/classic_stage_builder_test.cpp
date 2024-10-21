@@ -96,9 +96,9 @@ public:
      */
     std::unique_ptr<PlanStage> buildPlanStage(std::unique_ptr<QuerySolution> querySolution) {
         auto findCommand = std::make_unique<FindCommandRequest>(kNss);
-        auto cq = std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         auto coll = CollectionPtr(_collection.get());
         stage_builder::ClassicStageBuilder builder{

@@ -80,7 +80,7 @@ public:
         : _dbLock(&_opCtx, nss().dbName(), MODE_X),
           _ctx(&_opCtx, nss()),
           _coll(nullptr),
-          _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss())) {}
+          _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss()).build()) {}
 
     virtual ~IndexScanTest() {}
 

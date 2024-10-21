@@ -1241,10 +1241,10 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldExcludesSimpleBoundsStringFieldWhen
 auto createMatchExprAndProjection(const BSONObj& query, const BSONObj& projObj) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
-    const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(),
-                              std::unique_ptr<CollatorInterface>(nullptr),
-                              NamespaceString::createNamespaceString_forTest("test.dummy")));
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
     StatusWithMatchExpression queryMatchExpr = MatchExpressionParser::parse(query, expCtx);
     ASSERT(queryMatchExpr.isOK());
     projection_ast::Projection res = projection_ast::parseAndAnalyze(
@@ -1537,10 +1537,10 @@ TEST(QuerySolutionTest, NodeIdsAssignedInPostOrderFashionStartingFromOne) {
 TEST(QuerySolutionTest, GroupNodeWithIndexScan) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
-    const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(),
-                              std::unique_ptr<CollatorInterface>(nullptr),
-                              NamespaceString::createNamespaceString_forTest("test.dummy")));
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
     auto scanNode =
         std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
     scanNode->bounds.isSimpleRange = true;

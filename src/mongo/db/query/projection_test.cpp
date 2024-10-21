@@ -78,8 +78,7 @@ projection_ast::Projection createProjection(const BSONObj& query,
                                             ProjectionPolicies policies = {}) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
-    const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), kTestNss));
+    const auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(kTestNss).build();
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(statusWithMatcher.getStatus());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
@@ -106,8 +105,7 @@ void assertInvalidFindProjection(const char* queryStr, const char* projStr, size
     BSONObj projObj = fromjson(projStr);
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
-    const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), kTestNss));
+    const auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(kTestNss).build();
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(statusWithMatcher.getStatus());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
@@ -231,8 +229,7 @@ TEST(QueryProjectionTest, ValidPositionalOperatorProjections) {
 TEST(QueryProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
-    const boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx.get(), nullptr, kTestNss));
+    const auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(kTestNss).build();
 
     unique_ptr<MatchExpression> queryMatchExpr(new AlwaysFalseMatchExpression());
     ASSERT_EQ(nullptr, queryMatchExpr->path().rawData());

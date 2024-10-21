@@ -77,22 +77,6 @@ boost::optional<size_t> loadMaxMatchExpressionParams() {
 
 }  // namespace
 
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
-    OperationContext* opCtx,
-    FindCommandRequest& findCommand,
-    boost::optional<ExplainOptions::Verbosity> verbosity) {
-    auto collator = [&]() -> std::unique_ptr<mongo::CollatorInterface> {
-        if (findCommand.getCollation().isEmpty()) {
-            return nullptr;
-        }
-        return uassertStatusOKWithContext(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                              ->makeFromBSON(findCommand.getCollation()),
-                                          "unable to parse collation");
-    }();
-    return make_intrusive<ExpressionContext>(
-        opCtx, findCommand, std::move(collator), true /* mayDbProfile */, std::move(verbosity));
-}
-
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::makeForSubplanner(
     OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i) {

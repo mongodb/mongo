@@ -345,11 +345,13 @@ boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
         uassertStatusOK(statusWithCollator.getStatus());
         collator = std::move(statusWithCollator.getValue());
     }
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                    std::move(collator),
-                                                    request.getNamespace(),
-                                                    request.getLegacyRuntimeConstants(),
-                                                    request.getLet());
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .collator(std::move(collator))
+                      .ns(request.getNamespace())
+                      .runtimeConstants(request.getLegacyRuntimeConstants())
+                      .letParameters(request.getLet())
+                      .build();
     expCtx->stopExpressionCounters();
     return expCtx;
 }
@@ -1338,12 +1340,14 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
     OperationContext* opCtx, const BatchedCommandRequest& request) {
     invariant(request.hasEncryptionInformation());
     auto getExpCtx = [&](const auto& op) {
-        auto expCtx = make_intrusive<ExpressionContext>(
-            opCtx,
-            fle::collatorFromBSON(opCtx, op.getCollation().value_or(BSONObj())),
-            request.getNS(),
-            request.getLegacyRuntimeConstants(),
-            request.getLet());
+        auto expCtx =
+            ExpressionContextBuilder{}
+                .opCtx(opCtx)
+                .collator(fle::collatorFromBSON(opCtx, op.getCollation().value_or(BSONObj())))
+                .ns(request.getNS())
+                .runtimeConstants(request.getLegacyRuntimeConstants())
+                .letParameters(request.getLet())
+                .build();
         expCtx->stopExpressionCounters();
         return expCtx;
     };

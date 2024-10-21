@@ -352,8 +352,7 @@ public:
                 SerializationContext::stateCommandReply(listCollRequest.getSerializationContext());
 
             // The collator is null because collection objects are compared using binary comparison.
-            auto expCtx = make_intrusive<ExpressionContext>(
-                opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns());
+            auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(ns()).build();
 
             if (listCollRequest.getFilter()) {
                 matcher = uassertStatusOK(

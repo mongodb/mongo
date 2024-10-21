@@ -411,7 +411,7 @@ bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
     }
 
     auto cq = CanonicalQuery::make({
-        .expCtx = makeExpressionContext(opCtx, *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                               .allowedFeatures =
                                                   MatchExpressionParser::kAllowAllSpecialFeatures},

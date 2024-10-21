@@ -59,7 +59,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
@@ -584,21 +583,15 @@ void OplogFetcher::_setMetadataWriterAndReader() {
 AggregateCommandRequest OplogFetcher::_makeAggregateCommandRequest(long long maxTimeMs,
                                                                    Timestamp startTs) const {
     auto opCtx = cc().makeOperationContext();
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    boost::intrusive_ptr<ExpressionContext> expCtx =
-        make_intrusive<ExpressionContext>(opCtx.get(),
-                                          boost::none, /* explain */
-                                          false,       /* fromRouter */
-                                          false,       /* needsMerge */
-                                          true,        /* allowDiskUse */
-                                          true,        /* bypassDocumentValidation */
-                                          false,       /* isMapReduceCommand */
-                                          _nss,
-                                          boost::none, /* runtimeConstants */
-                                          nullptr,     /* collator */
-                                          MongoProcessInterface::create(opCtx.get()),
-                                          std::move(resolvedNamespaces),
-                                          boost::none); /* collUUID */
+    StringMap<ResolvedNamespace> resolvedNamespaces;
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .mongoProcessInterface(MongoProcessInterface::create(opCtx.get()))
+                      .ns(_nss)
+                      .resolvedNamespace(std::move(resolvedNamespaces))
+                      .allowDiskUse(true)
+                      .bypassDocumentValidation(true)
+                      .build();
     Pipeline::SourceContainer stages;
     // Match oplog entries greater than or equal to the last fetched timestamp.
     BSONObjBuilder builder(BSON("$or" << BSON_ARRAY(_config.queryFilter << BSON("ts" << startTs))));
@@ -836,8 +829,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
             },
             [&](const BSONObj& data) {
                 auto opCtx = cc().makeOperationContext();
-                boost::intrusive_ptr<ExpressionContext> expCtx(
-                    new ExpressionContext(opCtx.get(), nullptr, _nss));
+                auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(_nss).build();
                 Matcher m(data["document"].Obj(), expCtx);
                 // TODO SERVER-46240: Handle batchSize 1 in DBClientCursor.
                 // Due to a bug in DBClientCursor, it actually uses batchSize 2 if the given
@@ -904,8 +896,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
             firstDocToApply++;
         } else if (!_config.queryFilter.isEmpty()) {
             auto opCtx = cc().makeOperationContext();
-            auto expCtx =
-                make_intrusive<ExpressionContext>(opCtx.get(), nullptr /* collator */, _nss);
+            auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(_nss).build();
             Matcher m(_config.queryFilter, expCtx);
             if (!m.matches(*firstDocToApply))
                 firstDocToApply++;

@@ -192,7 +192,10 @@ public:
             setReadConcern(opCtx);
             doFLERewriteIfNeeded(opCtx);
 
-            auto expCtx = makeExpressionContext(opCtx, *_cmdRequest, verbosity);
+            auto expCtx = ExpressionContextBuilder{}
+                              .fromRequest(opCtx, *_cmdRequest)
+                              .explain(verbosity)
+                              .build();
             auto parsedFind = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
                 {.findCommand = std::move(_cmdRequest),
@@ -210,7 +213,10 @@ public:
             });
 
             _cmdRequest = std::make_unique<FindCommandRequest>(cq.getFindCommandRequest());
-            expCtx = makeExpressionContext(opCtx, *_cmdRequest, verbosity);
+            expCtx = ExpressionContextBuilder{}
+                         .fromRequest(opCtx, *_cmdRequest)
+                         .explain(verbosity)
+                         .build();
 
             try {
                 long long millisElapsed;
@@ -273,8 +279,7 @@ public:
                 auto findRequest = parseCmdObjectToFindCommandRequest(opCtx, _request);
                 setReadConcern(opCtx);
                 doFLERewriteIfNeeded(opCtx);
-                auto expCtx = make_intrusive<ExpressionContext>(
-                    opCtx, *findRequest, nullptr, true /* mayDbProfile */);
+                auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findRequest).build();
                 auto&& parsedFindResult = uassertStatusOK(parsed_find_command::parse(
                     expCtx,
                     {.findCommand = std::move(findRequest),
@@ -294,7 +299,7 @@ public:
             setReadConcern(opCtx);
             doFLERewriteIfNeeded(opCtx);
 
-            auto expCtx = makeExpressionContext(opCtx, *_cmdRequest);
+            auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *_cmdRequest).build();
             auto parsedFind = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
                 {.findCommand = std::move(_cmdRequest),

@@ -49,7 +49,7 @@ std::unique_ptr<CanonicalQuery> getCanonicalQuery(OperationContext* opCtx, Query
     auto findCommand = query_request_helper::makeFromFindCommandForTests(
         BSON("find" << kCollName << "$db" << kDbName << "filter" << query.filter << "projection"
                     << query.proj << "sort" << query.sort << "hint" << query.hint));
-    auto expCtx = makeExpressionContext(opCtx, *findCommand);
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build();
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = expCtx,
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)},

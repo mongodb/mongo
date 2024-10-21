@@ -84,9 +84,9 @@ protected:
         findCommand->setFilter(fromjson(queryStr));
         findCommand->setSort(fromjson(sortStr));
         findCommand->setProjection(fromjson(projStr));
-        return std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(_opCtx.get(), *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(_opCtx.get(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
     auto createProjectionExecutor(const BSONObj& spec, const ProjectionPolicies& policies) {

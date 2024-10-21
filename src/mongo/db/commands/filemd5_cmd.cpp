@@ -163,7 +163,7 @@ public:
             findCommand->setSort(sort.getOwned());
 
             auto statusWithCQ = CanonicalQuery::make(
-                {.expCtx = makeExpressionContext(opCtx, *findCommand),
+                {.expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
                  .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
             if (!statusWithCQ.isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());

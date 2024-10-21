@@ -344,22 +344,15 @@ public:
                                          const NamespaceString& nss,
                                          std::vector<RemoteCursor>&& cursors) {
 
-            StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+            StringMap<ResolvedNamespace> resolvedNamespaces;
             resolvedNamespaces[nss.coll()] = {nss, std::vector<BSONObj>{}};
 
-            auto expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                            boost::none, /* explain */
-                                                            false,       /* fromRouter */
-                                                            false,       /* needsMerge */
-                                                            false,       /* allowDiskUse */
-                                                            false, /* bypassDocumentValidation */
-                                                            false, /* isMapReduceCommand */
-                                                            nss,
-                                                            boost::none, /* runtimeConstants */
-                                                            nullptr,     /* collator */
-                                                            MongoProcessInterface::create(opCtx),
-                                                            std::move(resolvedNamespaces),
-                                                            boost::none /* collection UUID */);
+            auto expCtx = ExpressionContextBuilder{}
+                              .opCtx(opCtx)
+                              .mongoProcessInterface(MongoProcessInterface::create(opCtx))
+                              .ns(nss)
+                              .resolvedNamespace(std::move(resolvedNamespaces))
+                              .build();
 
             AsyncResultsMergerParams armParams{std::move(cursors), nss};
             auto docSourceMergeStage =

@@ -235,7 +235,7 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
         fcr->setMax(BSON("z" << 25));
         fcr->setMin(BSON("z" << 80));
         fcr->setSort(BSON("sortVal" << 1 << "otherSort" << -1));
-        auto expCtx = makeExpressionContext(opCtx.get(), *fcr);
+        auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcr).build();
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
 
         key = std::make_unique<query_stats::FindKey>(expCtx, *parsedFind, collectionType);
@@ -272,7 +272,7 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     fcr.setFilter(bob.obj());
     auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
     auto opCtx = makeOperationContext();
-    auto expCtx = makeExpressionContext(opCtx.get(), *fcrCopy);
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrCopy).build();
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
     RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
 

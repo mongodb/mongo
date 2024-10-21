@@ -271,15 +271,19 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
     for (const auto& shard : shardIds) {
         // Build an aggregation pipeline to get the collections with mergeable chunks placed on a
         // specific shard
-        Pipeline::SourceContainer stages;
 
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, ChunkType::ConfigNS);
-        StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+        StringMap<ResolvedNamespace> resolvedNamespaces;
         resolvedNamespaces[ChunkType::ConfigNS.coll()] = {ChunkType::ConfigNS,
                                                           std::vector<BSONObj>()};
         resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
                                                                std::vector<BSONObj>()};
-        expCtx->setResolvedNamespaces(resolvedNamespaces);
+
+        Pipeline::SourceContainer stages;
+        auto expCtx = ExpressionContextBuilder{}
+                          .opCtx(opCtx)
+                          .ns(ChunkType::ConfigNS)
+                          .resolvedNamespace(std::move(resolvedNamespaces))
+                          .build();
 
         // 1. Match all collections where `automerge` is enabled and `defragmentation` is disabled
         // {

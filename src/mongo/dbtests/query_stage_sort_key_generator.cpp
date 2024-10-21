@@ -90,9 +90,11 @@ protected:
                          const char* doc,
                          std::unique_ptr<CollatorInterface> collator = nullptr) {
         auto opCtx = cc().makeOperationContext();
-        boost::intrusive_ptr<ExpressionContext> pExpCtx(
-            new ExpressionContext(opCtx.get(), std::move(collator), kTestNss));
-
+        auto pExpCtx = ExpressionContextBuilder{}
+                           .opCtx(opCtx.get())
+                           .collator(std::move(collator))
+                           .ns(kTestNss)
+                           .build();
         WorkingSet workingSet;
 
         auto mockStage = std::make_unique<QueuedDataStage>(pExpCtx.get(), &workingSet);
@@ -119,8 +121,11 @@ protected:
                                 const IndexKeyDatum& ikd,
                                 std::unique_ptr<CollatorInterface> collator = nullptr) {
         auto opCtx = cc().makeOperationContext();
-        boost::intrusive_ptr<ExpressionContext> pExpCtx(
-            new ExpressionContext(opCtx.get(), std::move(collator), kTestNss));
+        auto pExpCtx = ExpressionContextBuilder{}
+                           .opCtx(opCtx.get())
+                           .collator(std::move(collator))
+                           .ns(kTestNss)
+                           .build();
 
         WorkingSet workingSet;
 

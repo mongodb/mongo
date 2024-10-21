@@ -635,8 +635,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFromViewDefinition(
-    std::vector<BSONObj> serializedPipeline,
-    ExpressionContext::ResolvedNamespace resolvedNamespace) {
+    std::vector<BSONObj> serializedPipeline, ResolvedNamespace resolvedNamespace) {
     // We don't want to optimize or attach a cursor source here because we need to update
     // _resolvedPipeline so we can reuse it on subsequent calls to getNext(), and we may need to
     // update _fieldMatchPipelineIdx as well in the case of a field join.
@@ -722,8 +721,7 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
             // This exception returns the information we need to resolve a sharded view. Update the
             // pipeline with the resolved view definition.
             auto pipeline = buildPipelineFromViewDefinition(
-                _resolvedPipeline,
-                ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()});
+                _resolvedPipeline, ResolvedNamespace{e->getNamespace(), e->getPipeline()});
 
             LOGV2_DEBUG(3254800,
                         3,
@@ -768,7 +766,7 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
             // pipeline with the resolved view definition.
             pipeline = buildPipelineFromViewDefinition(
                 std::move(serializedPipeline),
-                ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()});
+                ResolvedNamespace{e->getNamespace(), e->getPipeline()});
 
             // The serialized pipeline does not have a cache stage, so we will add it back to the
             // pipeline here if the cache has not been abandoned.

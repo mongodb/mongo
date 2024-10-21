@@ -287,7 +287,7 @@ protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        new ExpressionContext(&_opCtx, nullptr, nss());
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss()).build();
     DBDirectClient _client;
     WorkingSet* _workingSet = nullptr;
 };

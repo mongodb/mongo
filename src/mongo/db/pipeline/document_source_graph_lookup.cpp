@@ -356,7 +356,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
                 opts.attachCursorSource = false;
                 pipeline = Pipeline::makePipelineFromViewDefinition(
                     _fromExpCtx,
-                    ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()},
+                    ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                     _fromPipeline,
                     opts);
 

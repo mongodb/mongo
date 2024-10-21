@@ -99,7 +99,7 @@ public:
     CountStageTest()
         : _dbLock(&_opCtx, nss().dbName(), MODE_X),
           _ctx(&_opCtx, nss()),
-          _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, kTestNss)),
+          _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(kTestNss).build()),
           _coll(nullptr) {}
 
     virtual ~CountStageTest() {}

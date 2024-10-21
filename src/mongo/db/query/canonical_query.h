@@ -76,11 +76,6 @@ struct CanonicalQueryParams {
     bool isSearchQuery = false;
 };
 
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
-    OperationContext* opCtx,
-    FindCommandRequest& findCommand,
-    boost::optional<ExplainOptions::Verbosity> verbosity = boost::none);
-
 class CanonicalQuery {
 public:
     // A type that encodes the notion of query shape suitable for use with the plan cache. Encodes

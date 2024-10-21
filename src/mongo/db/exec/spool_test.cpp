@@ -65,7 +65,7 @@ class SpoolStageTest : public ServiceContextMongoDTest {
 public:
     SpoolStageTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {
         _opCtx = makeOperationContext();
-        _expCtx = std::make_unique<ExpressionContext>(_opCtx.get(), nullptr, kNss);
+        _expCtx = ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build();
     }
 
     ExpressionContext* expCtx() {
@@ -161,7 +161,7 @@ public:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
-    std::unique_ptr<ExpressionContext> _expCtx;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
     std::unique_ptr<unittest::TempDir> _tempDir;
 
     long _memUsage = 0;

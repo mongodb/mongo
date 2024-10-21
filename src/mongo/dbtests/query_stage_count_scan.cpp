@@ -128,7 +128,7 @@ protected:
     OperationContext& _opCtx = *_txnPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, ns());
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(ns()).build();
 
 private:
     DBDirectClient _client;

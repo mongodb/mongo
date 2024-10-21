@@ -61,13 +61,14 @@ public:
     InternalSearchIdLookupTest() : InternalSearchIdLookupTest(NamespaceString(kTestNss)) {}
 
     InternalSearchIdLookupTest(NamespaceString nss) {
-        _expCtx = new ExpressionContext(_opCtx.get(), nullptr, kTestNss);
-        _expCtx->ns = std::move(nss);
         unittest::TempDir tempDir("AggregationContextFixture");
-        _expCtx->tempDir = tempDir.path();
-
-        _expCtx->mongoProcessInterface =
-            std::make_unique<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>());
+        _expCtx = ExpressionContextBuilder{}
+                      .opCtx(_opCtx.get())
+                      .ns(nss)
+                      .mongoProcessInterface(std::make_unique<MockMongoInterface>(
+                          std::deque<DocumentSource::GetNextResult>()))
+                      .tmpDir(tempDir.path())
+                      .build();
     }
 
     boost::intrusive_ptr<ExpressionContext> getExpCtx() {

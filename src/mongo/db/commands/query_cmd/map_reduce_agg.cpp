@@ -112,24 +112,21 @@ auto makeExpressionContext(OperationContext* opCtx,
     // Manually build an ExpressionContext with the desired options for the translated
     // aggregation. The one option worth noting here is allowDiskUse, which is required to allow
     // the $group stage of the translated pipeline to spill to disk.
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx,
-        verbosity,
-        false,                         // fromRouter
-        false,                         // needsMerge
-        allowDiskUseByDefault.load(),  // allowDiskUse
-        parsedMr.getBypassDocumentValidation().get_value_or(false),
-        true,  // isMapReduceCommand
-        parsedMr.getNamespace(),
-        runtimeConstants,
-        std::move(resolvedCollator),
-        MongoProcessInterface::create(opCtx),
-        StringMap<ExpressionContext::ResolvedNamespace>{},  // resolvedNamespaces
-        uuid,
-        boost::none,                             // let
-        CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
-    );
-    expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+    auto expCtx =
+        ExpressionContextBuilder{}
+            .opCtx(opCtx)
+            .collator(std::move(resolvedCollator))
+            .mongoProcessInterface(MongoProcessInterface::create(opCtx))
+            .ns(parsedMr.getNamespace())
+            .mayDbProfile(CurOp::get(opCtx)->dbProfileLevel() > 0)
+            .allowDiskUse(allowDiskUseByDefault.load())
+            .bypassDocumentValidation(parsedMr.getBypassDocumentValidation().get_value_or(false))
+            .isMapReduceCommand(true)
+            .collUUID(uuid)
+            .explain(verbosity)
+            .runtimeConstants(runtimeConstants)
+            .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+            .build();
     return expCtx;
 }
 

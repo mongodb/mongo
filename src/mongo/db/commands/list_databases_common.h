@@ -67,8 +67,7 @@ std::unique_ptr<MatchExpression> getFilter(CommandType cmd,
     if (auto filterObj = cmd.getFilter()) {
         // The collator is null because database metadata objects are compared using simple
         // binary comparison.
-        auto expCtx = make_intrusive<ExpressionContext>(
-            opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns);
+        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(ns).build();
         auto matcher =
             uassertStatusOK(MatchExpressionParser::parse(filterObj.get(), std::move(expCtx)));
         return matcher;

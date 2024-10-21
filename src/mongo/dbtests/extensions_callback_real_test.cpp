@@ -273,8 +273,7 @@ const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest(
 TEST_F(ExtensionsCallbackRealTest, WhereExpressionDesugarsToExprAndInternalJs) {
     if (_isDesugarWhereToFunctionOn) {
         auto query1 = fromjson("{$where: 'function() { return this.x == 10; }'}");
-        boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(&_opCtx, nullptr, kTestNss));
+        auto expCtx = ExpressionContextBuilder{}.opCtx(&_opCtx).ns(kTestNss).build();
 
         auto expr1 = unittest::assertGet(
             ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(expCtx, query1.firstElement()));

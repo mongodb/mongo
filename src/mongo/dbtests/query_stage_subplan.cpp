@@ -188,7 +188,7 @@ protected:
     const ServiceContext::UniqueOperationContext _opCtx = cc().makeOperationContext();
     ClockSource* _clock = _opCtx->getServiceContext()->getFastClockSource();
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(_opCtx.get(), nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(nss).build();
 
 private:
     DBDirectClient _client;
@@ -214,9 +214,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     CollectionPtr collection = ctx.getCollection();
 
@@ -250,9 +250,9 @@ void QueryStageSubplanTest::assertSubplanFromCache(QueryStageSubplanTest* test,
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(test->opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(test->opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Get planner params.
     auto plannerParams = makePlannerParams(collection, *cq);
@@ -335,9 +335,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDoesNotCacheZeroResults) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Get planner params.
     auto plannerParams = makePlannerParams(ctx.getCollection(), *cq);
@@ -392,9 +392,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Get planner params.
     auto plannerParams = makePlannerParams(collection, *cq);
@@ -563,9 +563,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:5}}]}"));
     findCommand->setSort(BSON("d" << 1));
-    auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     CollectionPtr collection = ctx.getCollection();
     auto plannerParams = makePlannerParams(collection, *cq);
@@ -594,9 +594,9 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Add 4 indices: 2 for each predicate to choose from.
     addIndex(BSON("p1" << 1 << "opt1" << 1));
@@ -629,9 +629,9 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Add 4 indices: 2 for each predicate to choose from.
     addIndex(BSON("p1" << 1 << "opt1" << 1));
@@ -668,9 +668,9 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     boost::optional<AutoGetCollectionForReadCommand> collLock;
     collLock.emplace(opCtx(), nss);
@@ -710,9 +710,9 @@ TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSele
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     boost::optional<AutoGetCollectionForReadCommand> collLock;
     collLock.emplace(opCtx(), nss);

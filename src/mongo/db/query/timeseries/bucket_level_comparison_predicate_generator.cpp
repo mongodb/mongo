@@ -58,7 +58,7 @@ boost::optional<StringData> checkComparisonPredicateEligibility(
     const StringData matchExprPath,
     const BSONElement& matchExprData,
     const BucketSpec& bucketSpec,
-    ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
+    ExpressionContextCollationMatchesDefault collationMatchesDefault) {
     // The control field's min and max are chosen using a field-order insensitive comparator, while
     // MatchExpressions use a comparator that treats field-order as significant. Because of this we
     // will not perform this optimization on queries with operands of compound types.
@@ -91,7 +91,7 @@ boost::optional<StringData> checkComparisonPredicateEligibility(
     // The control field's min and max are chosen based on the collation of the collection. If the
     // query's collation does not match the collection's collation and the query operand is a
     // string or compound type (skipped above) we will not perform this optimization.
-    if (collationMatchesDefault == ExpressionContext::CollationMatchesDefault::kNo &&
+    if (collationMatchesDefault == ExpressionContextCollationMatchesDefault::kNo &&
         matchExprData.type() == BSONType::String) {
         return "can't handle string comparison with a non-default collation"_sd;
     }

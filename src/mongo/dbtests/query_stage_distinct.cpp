@@ -76,7 +76,7 @@ static const NamespaceString nss =
 class DistinctBase {
 public:
     DistinctBase()
-        : _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss)), _client(&_opCtx) {}
+        : _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build()), _client(&_opCtx) {}
 
     virtual ~DistinctBase() {
         _client.dropCollection(nss);

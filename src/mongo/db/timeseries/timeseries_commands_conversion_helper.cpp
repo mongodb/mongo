@@ -149,16 +149,17 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                 }
                 // Since no collation was specified in the command, we know the index collation will
                 // match the collection's collation.
-                auto collationMatchesDefault = ExpressionContext::CollationMatchesDefault::kYes;
+                auto collationMatchesDefault = ExpressionContextCollationMatchesDefault::kYes;
 
                 // Even though the index collation will match the collection's collation, we don't
                 // know whether or not that collation is simple. However, I think we can correctly
                 // rewrite the filter expression without knowing this... Looking up the correct
                 // value would require handling mongos and mongod separately.
-                std::unique_ptr<CollatorInterface> collator{nullptr};
-
-                auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), origNs);
-                expCtx->collationMatchesDefault = collationMatchesDefault;
+                auto expCtx = ExpressionContextBuilder{}
+                                  .opCtx(opCtx)
+                                  .ns(origNs)
+                                  .collationMatchesDefault(collationMatchesDefault)
+                                  .build();
                 // We can't know if there won't be extended range values in the collection, so
                 // assume there will be.
                 expCtx->setRequiresTimeseriesExtendedRangeSupport(true);

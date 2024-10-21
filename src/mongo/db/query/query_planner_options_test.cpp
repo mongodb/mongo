@@ -818,9 +818,9 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     auto findCommand = std::make_unique<FindCommandRequest>(
         NamespaceString::createNamespaceString_forTest("test.collection"));
     findCommand->setFilter(BSON("a" << 3));
-    auto scopedCq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto scopedCq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     scopedCq->getPrimaryMatchExpression()->setTag(new IndexTag(1));
 
     ASSERT_NOT_OK(QueryPlanner::cacheDataFromTaggedTree(scopedCq->getPrimaryMatchExpression(),
@@ -833,9 +833,9 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("a" << 3));
-    auto scopedCq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto scopedCq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     std::unique_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
     indexTree->setIndexEntry(buildSimpleIndexEntry(BSON("a" << 1), "a_1"));
@@ -865,7 +865,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     auto newQR = std::make_unique<FindCommandRequest>(nss);
     newQR->setFilter(BSON("a" << 3));
     scopedCq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx.get(), *newQR),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *newQR).build(),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(newQR)}});
 
     // Mismatched tree topology.

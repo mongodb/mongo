@@ -101,14 +101,17 @@ const StringData kShardingIndexCatalogEntriesFieldName = "indexes"_sd;
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
 
 AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* opCtx) {
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, nullptr, NamespaceString::kShardCollectionCatalogNamespace);
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    StringMap<ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[NamespaceString::kShardCollectionCatalogNamespace.coll()] = {
         NamespaceString::kShardCollectionCatalogNamespace, std::vector<BSONObj>()};
     resolvedNamespaces[NamespaceString::kShardIndexCatalogNamespace.coll()] = {
         NamespaceString::kShardIndexCatalogNamespace, std::vector<BSONObj>()};
-    expCtx->setResolvedNamespaces(resolvedNamespaces);
+
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .ns(NamespaceString::kShardCollectionCatalogNamespace)
+                      .resolvedNamespace(std::move(resolvedNamespaces))
+                      .build();
 
     using Doc = Document;
     using Arr = std::vector<Value>;

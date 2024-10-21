@@ -171,9 +171,11 @@ public:
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
-
-    boost::intrusive_ptr<ExpressionContext> _expCtx = new ExpressionContext(
-        &_opCtx, nullptr, NamespaceString::createNamespaceString_forTest(ns()));
+    boost::intrusive_ptr<ExpressionContext> _expCtx =
+        ExpressionContextBuilder{}
+            .opCtx(&_opCtx)
+            .ns(NamespaceString::createNamespaceString_forTest(ns()))
+            .build();
 
 private:
     DBDirectClient _client;

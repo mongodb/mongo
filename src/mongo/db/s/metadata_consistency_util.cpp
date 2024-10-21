@@ -401,8 +401,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
     std::vector<MetadataInconsistencyItem>&& inconsistencies,
     const NamespaceString& nss) {
 
-    auto expCtx =
-        make_intrusive<ExpressionContext>(opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(nss).build();
     auto ws = std::make_unique<WorkingSet>();
     auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
 

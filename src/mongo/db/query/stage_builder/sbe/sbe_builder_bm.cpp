@@ -134,7 +134,7 @@ void BM_Simple(benchmark::State& state) {
     auto findCommand = std::make_unique<FindCommandRequest>(kNss);
     findCommand->setFilter(fixture.buildFilter(state.range(0), true));
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx, *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)},
     });
     cq->setSbeCompatible(true);

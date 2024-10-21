@@ -868,7 +868,7 @@ inline std::unique_ptr<CollatorInterface> getUserCollator(OperationContext* opCt
  * the collection-default collation and also returns a flag indicating whether the user-provided
  * collation matches the collection default collation.
  */
-std::pair<std::unique_ptr<CollatorInterface>, ExpressionContext::CollationMatchesDefault>
+std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>
 resolveCollator(OperationContext* opCtx, BSONObj userCollation, const CollectionPtr& collection);
 
 }  // namespace mongo

@@ -132,7 +132,7 @@ namespace impl {
                 return boost::intrusive_ptr<ExpressionContext>(expCtx);
             }
 
-            return makeExpressionContext(opCtx, *findCommand);
+            return ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build();
         }();
         return CanonicalQuery::make(
             {.expCtx = std::move(expCtxForCq),

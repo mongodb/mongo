@@ -272,7 +272,8 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     // would match the same set of documents, but these are not currently considered equivalent.
     // TODO SERVER-47664: take collation into account while comparing string predicates.
     if (existingIndex->getFilterExpression()) {
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), ns);
+        auto expCtx =
+            ExpressionContextBuilder{}.opCtx(opCtx).collator(std::move(collator)).ns(ns).build();
         auto filter = MatchExpressionParser::parseAndNormalize(partialFilterExpression(), expCtx);
         if (!filter->equivalent(existingIndex->getFilterExpression())) {
             return Comparison::kDifferent;

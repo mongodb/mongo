@@ -151,7 +151,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo {
 namespace {
 // Ticks for server-side Javascript deprecation log messages.
@@ -160,35 +159,6 @@ Rarely _samplerFunctionJs, _samplerWhereClause;
 MONGO_FAIL_POINT_DEFINE(allowExternalReadsForReverseOplogScanRule);
 
 const auto kTermField = "term"_sd;
-
-
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
-    OperationContext* opCtx,
-    const FindCommandRequest& findCommand,
-    const CollectionPtr& collPtr,
-    boost::optional<ExplainOptions::Verbosity> verbosity) {
-    std::unique_ptr<CollatorInterface> collator;
-    if (!findCommand.getCollation().isEmpty()) {
-        collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                       ->makeFromBSON(findCommand.getCollation()));
-    } else if (collPtr && collPtr->getDefaultCollator()) {
-        // The 'collPtr' will be null for views, but we don't need to worry about views here. The
-        // views will get rewritten into aggregate command and will regenerate the
-        // ExpressionContext.
-        collator = collPtr->getDefaultCollator()->clone();
-    }
-    auto expCtx =
-        make_intrusive<ExpressionContext>(opCtx,
-                                          findCommand,
-                                          std::move(collator),
-                                          CurOp::get(opCtx)->dbProfileLevel() > 0,  // mayDbProfile
-                                          verbosity,
-                                          allowDiskUseByDefault.load());
-    expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-    expCtx->startExpressionCounters();
-
-    return expCtx;
-}
 
 /**
  * Fills out the CurOp for "opCtx" with information about this query.
@@ -215,8 +185,12 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     beginQueryOp(opCtx, nss, requestBody);
 
     const auto& collection = collOrViewAcquisition.getCollectionPtr();
-    auto expCtx =
-        makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
+    const auto* collator = collection ? collection->getDefaultCollator() : nullptr;
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(opCtx, *findCommand, collator, allowDiskUseByDefault.load())
+                      .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                      .build();
+    expCtx->startExpressionCounters();
     auto parsedRequest = uassertStatusOK(parsed_find_command::parse(
         expCtx,
         {.findCommand = std::move(findCommand),
@@ -481,7 +455,14 @@ public:
                 uassertStatusOK(query_request_helper::validateResumeAfter(
                     opCtx, _cmdRequest->getResumeAfter(), isClusteredCollection));
             }
-            auto expCtx = makeExpressionContext(opCtx, *_cmdRequest, collectionPtr, verbosity);
+            const auto* collator = collectionPtr ? collectionPtr->getDefaultCollator() : nullptr;
+            auto expCtx =
+                ExpressionContextBuilder{}
+                    .fromRequest(opCtx, *_cmdRequest, collator, allowDiskUseByDefault.load())
+                    .explain(verbosity)
+                    .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                    .build();
+            expCtx->startExpressionCounters();
             auto parsedRequest = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
                 {.findCommand = std::move(_cmdRequest),

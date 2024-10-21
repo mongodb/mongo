@@ -535,26 +535,6 @@ boost::optional<ClientCursorPin> executeUntilFirstBatch(
     return boost::none;
 }
 
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
-    const AggExState& aggExState,
-    std::unique_ptr<CollatorInterface> collator,
-    boost::optional<UUID> uuid,
-    ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
-    auto opCtx = aggExState.getOpCtx();
-    auto expCtx =
-        make_intrusive<ExpressionContext>(aggExState.getOpCtx(),
-                                          aggExState.getRequest(),
-                                          std::move(collator),
-                                          MongoProcessInterface::create(opCtx),
-                                          uassertStatusOK(aggExState.resolveInvolvedNamespaces()),
-                                          uuid,
-                                          CurOp::get(opCtx)->dbProfileLevel() > 0,
-                                          allowDiskUseByDefault.load());
-    expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-    expCtx->collationMatchesDefault = collationMatchesDefault;
-    return expCtx;
-}
-
 /**
  * If the aggregation 'request' contains an exchange specification, create a new pipeline for each
  * consumer and put it into the resulting vector. Otherwise, return the original 'pipeline' as a
@@ -578,12 +558,20 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
             // cannot be shared between threads. There is no synchronization for pieces of
             // the execution machinery above the Exchange, so nothing above the Exchange can be
             // shared between different exchange-producer cursors.
-            expCtx = makeExpressionContext(aggExState,
-                                           expCtx->getCollator() ? expCtx->getCollator()->clone()
-                                                                 : nullptr,
-                                           expCtx->uuid,
-                                           expCtx->collationMatchesDefault);
 
+            auto collator = expCtx->getCollator() ? expCtx->getCollator()->clone() : nullptr;
+            expCtx = ExpressionContextBuilder{}
+                         .fromRequest(aggExState.getOpCtx(),
+                                      aggExState.getRequest(),
+                                      allowDiskUseByDefault.load())
+                         .collator(std::move(collator))
+                         .collUUID(expCtx->uuid)
+                         .mongoProcessInterface(MongoProcessInterface::create(opCtx))
+                         .mayDbProfile(CurOp::get(aggExState.getOpCtx())->dbProfileLevel() > 0)
+                         .resolvedNamespace(uassertStatusOK(aggExState.resolveInvolvedNamespaces()))
+                         .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                         .collationMatchesDefault(expCtx->collationMatchesDefault)
+                         .build();
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.
             auto consumer = make_intrusive<DocumentSourceExchange>(
@@ -828,15 +816,24 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     const boost::optional<AutoGetCollectionForReadCommandMaybeLockFree>& ctx,
     std::unique_ptr<CollatorInterface> collator,
     boost::optional<UUID> uuid,
-    ExpressionContext::CollationMatchesDefault collationMatchesDefault,
+    ExpressionContextCollationMatchesDefault collationMatchesDefault,
     const MultipleCollectionAccessor& collections,
     bool isCollectionless) {
     // If we're operating over a view, we first parse just the original user-given request
     // for the sake of registering query stats. Then, we'll parse the view pipeline and stitch
     // the two pipelines together below.
-    auto expCtx =
-        makeExpressionContext(aggExState, std::move(collator), uuid, collationMatchesDefault);
-
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(aggExState.getOpCtx(),
+                                   aggExState.getRequest(),
+                                   allowDiskUseByDefault.load())
+                      .collator(std::move(collator))
+                      .collUUID(uuid)
+                      .mongoProcessInterface(MongoProcessInterface::create(aggExState.getOpCtx()))
+                      .mayDbProfile(CurOp::get(aggExState.getOpCtx())->dbProfileLevel() > 0)
+                      .resolvedNamespace(uassertStatusOK(aggExState.resolveInvolvedNamespaces()))
+                      .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                      .collationMatchesDefault(collationMatchesDefault)
+                      .build();
     // If any involved collection contains extended-range data, set a flag which individual
     // DocumentSource parsers can check.
     collections.forEach([&](const CollectionPtr& coll) {
@@ -943,7 +940,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     // The collation to use for this aggregation. boost::optional to distinguish between the case
     // where the collation has not yet been resolved, and where it has been resolved to nullptr.
     boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse;
-    ExpressionContext::CollationMatchesDefault collatorToUseMatchesDefault;
+    ExpressionContextCollationMatchesDefault collatorToUseMatchesDefault;
 
     // The UUID of the collection for the execution namespace of this aggregation.
     boost::optional<UUID> uuid;

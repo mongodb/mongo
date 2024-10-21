@@ -947,7 +947,7 @@ Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
-    ExpressionContext::ResolvedNamespace resolvedNs,
+    ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline,
     MakePipelineOptions opts) {
 

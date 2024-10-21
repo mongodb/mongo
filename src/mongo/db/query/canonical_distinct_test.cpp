@@ -67,9 +67,11 @@ public:
     CanonicalDistinctTest() {
         uniqueTxn = serviceContext.makeOperationContext();
         opCtx = uniqueTxn.get();
-        expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, testns);
-        expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-        expCtx->explain = boost::none;
+        expCtx = ExpressionContextBuilder{}
+                     .opCtx(opCtx)
+                     .ns(testns)
+                     .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                     .build();
     }
 
 private:

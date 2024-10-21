@@ -948,9 +948,8 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
 
     // Create an ExpressionContext, used to parse the match expression and to house the collator for
     // the remaining checks.
-    boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, std::move(collator), nss));
-
+    auto expCtx =
+        ExpressionContextBuilder{}.opCtx(opCtx).collator(std::move(collator)).ns(nss).build();
     // Ensure if there is a filter, its valid.
     BSONElement filterElement = spec.getField("partialFilterExpression");
     if (filterElement) {

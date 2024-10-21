@@ -82,7 +82,8 @@ protected:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(queryObj);
         return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = makeExpressionContext(operationContext(), *findCommand),
+            .expCtx =
+                ExpressionContextBuilder{}.fromRequest(operationContext(), *findCommand).build(),
             .parsedFind = ParsedFindCommandParams{
                 .findCommand = std::move(findCommand),
                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
@@ -304,7 +305,7 @@ TEST_F(CMCollapseTreeTest, SortInReverseDirection) {
     findCommand->setFilter(queryObj);
     findCommand->setSort(BSON("a" << -1 << "b" << -1));
     auto query = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(operationContext(), *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(operationContext(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{
             .findCommand = std::move(findCommand),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
@@ -349,7 +350,7 @@ TEST_F(CMCollapseTreeTest, SortMergeFromOrInReverseDirection) {
     findCommand->setLimit(1);
     findCommand->setSort(BSON("c" << -1));
     auto query = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(operationContext(), *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(operationContext(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{
             .findCommand = std::move(findCommand),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
@@ -735,7 +736,9 @@ TEST_F(CMCollapseTreeTest, GeoNearLimitationsInPlace) {
         findCommand->setFilter(queryObj);
         ASSERT_THROWS_CODE(
             std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-                .expCtx = makeExpressionContext(operationContext(), *findCommand),
+                .expCtx = ExpressionContextBuilder{}
+                              .fromRequest(operationContext(), *findCommand)
+                              .build(),
                 .parsedFind =
                     ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                             .allowedFeatures =
@@ -754,7 +757,9 @@ TEST_F(CMCollapseTreeTest, GeoNearLimitationsInPlace) {
         findCommand->setFilter(queryObj);
         ASSERT_THROWS_CODE(
             std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-                .expCtx = makeExpressionContext(operationContext(), *findCommand),
+                .expCtx = ExpressionContextBuilder{}
+                              .fromRequest(operationContext(), *findCommand)
+                              .build(),
                 .parsedFind =
                     ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                             .allowedFeatures =

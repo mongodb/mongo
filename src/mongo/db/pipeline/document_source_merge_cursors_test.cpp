@@ -156,7 +156,7 @@ public:
 
 protected:
     virtual boost::intrusive_ptr<ExpressionContext> makeExpCtx() {
-        return new ExpressionContext(operationContext(), nullptr, _nss);
+        return ExpressionContextBuilder{}.opCtx(operationContext()).ns(_nss).build();
     }
 
     NamespaceString _nss;
@@ -455,7 +455,7 @@ protected:
 
 private:
     boost::intrusive_ptr<ExpressionContext> makeExpCtx() override {
-        return new ExpressionContext(operationContext(), nullptr, _nss);
+        return ExpressionContextBuilder{}.opCtx(operationContext()).ns(_nss).build();
     }
 
     std::unique_ptr<RAIIServerParameterControllerForTest> _multitenancyController;

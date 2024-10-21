@@ -169,35 +169,6 @@ bool isMigrationCompleted(TenantMigrationRecipientStateEnum state) {
         state == TenantMigrationRecipientStateEnum::kCommitted;
 }
 
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx) {
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-
-    // Add kTenantMigrationOplogView, kSessionTransactionsTableNamespace, and kRsOplogNamespace
-    // to resolvedNamespaces since they are all used during different pipeline stages.
-    resolvedNamespaces[NamespaceString::kTenantMigrationOplogView.coll()] = {
-        NamespaceString::kTenantMigrationOplogView, std::vector<BSONObj>()};
-
-    resolvedNamespaces[NamespaceString::kSessionTransactionsTableNamespace.coll()] = {
-        NamespaceString::kSessionTransactionsTableNamespace, std::vector<BSONObj>()};
-
-    resolvedNamespaces[NamespaceString::kRsOplogNamespace.coll()] = {
-        NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
-
-    return make_intrusive<ExpressionContext>(opCtx,
-                                             boost::none, /* explain */
-                                             false,       /* fromRouter */
-                                             false,       /* needsMerge */
-                                             true,        /* allowDiskUse */
-                                             true,        /* bypassDocumentValidation */
-                                             false,       /* isMapReduceCommand */
-                                             NamespaceString::kSessionTransactionsTableNamespace,
-                                             boost::none, /* runtimeConstants */
-                                             nullptr,     /* collator */
-                                             MongoProcessInterface::create(opCtx),
-                                             std::move(resolvedNamespaces),
-                                             boost::none); /* collUUID */
-}
-
 // We allow retrying on the following oplog fetcher errors:
 // 1) InvalidSyncSource - we cannot sync from the chosen sync source, potentially because the sync
 //    source is too stale or there was a network error when connecting to the sync source.
@@ -997,7 +968,14 @@ AggregateCommandRequest
 TenantMigrationRecipientService::Instance::_makeCommittedTransactionsAggregation() const {
 
     auto opCtx = cc().makeOperationContext();
-    auto expCtx = makeExpressionContext(opCtx.get());
+    auto expCtx = ExpressionContextBuilder{}
+                      .withReplicationResolvedNamespaces()
+                      .opCtx(opCtx.get())
+                      .mongoProcessInterface(MongoProcessInterface::create(opCtx.get()))
+                      .ns(NamespaceString::kSessionTransactionsTableNamespace)
+                      .allowDiskUse(true)
+                      .bypassDocumentValidation(true)
+                      .build();
 
     Timestamp startApplyingDonorOpTime;
     {
@@ -1241,7 +1219,14 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
     }
 
     auto opCtx = cc().makeOperationContext();
-    auto expCtx = makeExpressionContext(opCtx.get());
+    auto expCtx = ExpressionContextBuilder{}
+                      .withReplicationResolvedNamespaces()
+                      .opCtx(opCtx.get())
+                      .mongoProcessInterface(MongoProcessInterface::create(opCtx.get()))
+                      .ns(NamespaceString::kSessionTransactionsTableNamespace)
+                      .allowDiskUse(true)
+                      .bypassDocumentValidation(true)
+                      .build();
     // If the oplog buffer contains entries at this point, it indicates that the recipient went
     // through failover before it finished writing all oplog entries to the buffer. Clear it and
     // redo the work.

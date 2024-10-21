@@ -193,15 +193,12 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     const NamespaceString& nss,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     invariant(opCtx);
-
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                    nullptr /* collator */,
-                                                    nss,
-                                                    boost::none /* runtimeConstants */,
-                                                    boost::none /* letParameters */,
-                                                    false /* allowDiskUse */,
-                                                    true /* mayDbProfile */,
-                                                    verbosity);
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .ns(nss)
+                      .mayDbProfile(true)
+                      .explain(verbosity)
+                      .build();
     if (!requestCollation.isEmpty()) {
         auto statusWithCollator = CollatorFactoryInterface::get(expCtx->opCtx->getServiceContext())
                                       ->makeFromBSON(requestCollation);

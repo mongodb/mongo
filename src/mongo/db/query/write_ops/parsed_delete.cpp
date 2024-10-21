@@ -83,11 +83,13 @@ Status ParsedDelete::parseRequest() {
 
     auto [collatorToUse, collationMatchesDefault] =
         resolveCollator(_opCtx, _request->getCollation(), _collection);
-    _expCtx = make_intrusive<ExpressionContext>(_opCtx,
-                                                std::move(collatorToUse),
-                                                _request->getNsString(),
-                                                _request->getLegacyRuntimeConstants(),
-                                                _request->getLet());
+    _expCtx = ExpressionContextBuilder{}
+                  .opCtx(_opCtx)
+                  .collator(std::move(collatorToUse))
+                  .ns(_request->getNsString())
+                  .runtimeConstants(_request->getLegacyRuntimeConstants())
+                  .letParameters(_request->getLet())
+                  .build();
     _expCtx->collationMatchesDefault = collationMatchesDefault;
 
     // The '_id' field of a time-series collection needs to be handled as other fields.

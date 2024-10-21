@@ -70,23 +70,23 @@
 #include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
-#include "mongo/db/query/tailable_mode.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
 
+class FindCommandRequest;
+class DistinctCommandRequest;
 class AggregateCommandRequest;
+
 
 enum struct SbeCompatibility {
     // Not implemented in SBE.
@@ -102,19 +102,100 @@ enum struct SbeCompatibility {
     noRequirements,
 };
 
+struct ResolvedNamespace {
+    ResolvedNamespace() = default;
+    ResolvedNamespace(NamespaceString ns,
+                      std::vector<BSONObj> pipeline,
+                      boost::optional<UUID> uuid = boost::none);
+
+    NamespaceString ns;
+    std::vector<BSONObj> pipeline;
+    boost::optional<UUID> uuid = boost::none;
+};
+
+enum class ExpressionContextCollationMatchesDefault { kYes, kNo };
+
+struct ExpressionContextParams {
+    OperationContext* opCtx = nullptr;
+    std::unique_ptr<CollatorInterface> collator = nullptr;
+    std::shared_ptr<MongoProcessInterface> mongoProcessInterface = nullptr;
+    NamespaceString ns;
+    StringMap<ResolvedNamespace> resolvedNamespaces;
+    SerializationContext serializationContext;
+    boost::optional<UUID> collUUID = boost::none;
+    boost::optional<ExplainOptions::Verbosity> explain = boost::none;
+    boost::optional<LegacyRuntimeConstants> runtimeConstants = boost::none;
+    boost::optional<BSONObj> letParameters = boost::none;
+    std::string tmpDir;
+    ExpressionContextCollationMatchesDefault collationMatchesDefault =
+        ExpressionContextCollationMatchesDefault::kYes;
+    bool mayDbProfile = false;
+    bool fromRouter = false;
+    bool needsMerge = false;
+    bool inRouter = false;
+    bool forPerShardCursor = false;
+    bool allowDiskUse = false;
+    bool bypassDocumentValidation = false;
+    bool isMapReduceCommand = false;
+    bool hasWhereClause = false;
+    bool isUpsert = false;
+    bool blankExpressionContext = false;
+};
+
+class ExpressionContextBuilder {
+public:
+    ExpressionContextBuilder& opCtx(OperationContext*);
+    ExpressionContextBuilder& collator(std::unique_ptr<CollatorInterface>&&);
+    ExpressionContextBuilder& mongoProcessInterface(std::shared_ptr<MongoProcessInterface>);
+    ExpressionContextBuilder& ns(NamespaceString);
+    ExpressionContextBuilder& resolvedNamespace(StringMap<ResolvedNamespace>);
+    ExpressionContextBuilder& serializationContext(SerializationContext);
+    ExpressionContextBuilder& collUUID(boost::optional<UUID>);
+    ExpressionContextBuilder& explain(boost::optional<ExplainOptions::Verbosity>);
+    ExpressionContextBuilder& runtimeConstants(boost::optional<LegacyRuntimeConstants>);
+    ExpressionContextBuilder& letParameters(boost::optional<BSONObj>);
+    ExpressionContextBuilder& tmpDir(std::string);
+    ExpressionContextBuilder& mayDbProfile(bool);
+    ExpressionContextBuilder& fromRouter(bool);
+    ExpressionContextBuilder& needsMerge(bool);
+    ExpressionContextBuilder& inRouter(bool);
+    ExpressionContextBuilder& forPerShardCursor(bool);
+    ExpressionContextBuilder& allowDiskUse(bool);
+    ExpressionContextBuilder& bypassDocumentValidation(bool);
+    ExpressionContextBuilder& isMapReduceCommand(bool);
+    ExpressionContextBuilder& hasWhereClause(bool);
+    ExpressionContextBuilder& isUpsert(bool);
+    ExpressionContextBuilder& blankExpressionContext(bool);
+    ExpressionContextBuilder& collationMatchesDefault(ExpressionContextCollationMatchesDefault);
+
+    /**
+     * Add kTenantMigrationOplogView, kSessionTransactionsTableNamespace, and kRsOplogNamespace
+     * to resolvedNamespaces since they are all used during different pipeline stages
+     */
+    ExpressionContextBuilder& withReplicationResolvedNamespaces();
+
+    ExpressionContextBuilder& fromRequest(OperationContext*,
+                                          const FindCommandRequest&,
+                                          const CollatorInterface*,
+                                          bool useDisk = false);
+    ExpressionContextBuilder& fromRequest(OperationContext*,
+                                          const FindCommandRequest&,
+                                          bool dbProfile = true);
+    ExpressionContextBuilder& fromRequest(OperationContext*,
+                                          const DistinctCommandRequest&,
+                                          const CollatorInterface* = nullptr);
+    ExpressionContextBuilder& fromRequest(OperationContext*,
+                                          const AggregateCommandRequest&,
+                                          bool useDisk = false);
+
+    boost::intrusive_ptr<ExpressionContext> build();
+
+private:
+    ExpressionContextParams params;
+};
+
 class ExpressionContext : public RefCountable {
 public:
-    struct ResolvedNamespace {
-        ResolvedNamespace() = default;
-        ResolvedNamespace(NamespaceString ns,
-                          std::vector<BSONObj> pipeline,
-                          boost::optional<UUID> uuid = boost::none);
-
-        NamespaceString ns;
-        std::vector<BSONObj> pipeline;
-        boost::optional<UUID> uuid = boost::none;
-    };
-
     /**
      * An RAII type that will temporarily change the ExpressionContext's collator. Resets the
      * collator to the previous value upon destruction.
@@ -139,6 +220,7 @@ public:
 
         friend class ExpressionContext;
 
+
         boost::intrusive_ptr<ExpressionContext> _expCtx;
 
         std::shared_ptr<CollatorInterface> _originalCollator;
@@ -154,72 +236,6 @@ public:
         StringMap<uint64_t> groupAccumulatorExprCountersMap;
         StringMap<uint64_t> windowAccumulatorExprCountersMap;
     };
-
-    /**
-     * Constructs an ExpressionContext to be used for find command parsing and evaluation.
-     */
-    ExpressionContext(OperationContext* opCtx,
-                      const FindCommandRequest& findCmd,
-                      std::unique_ptr<CollatorInterface> collator,
-                      bool mayDbProfile,
-                      boost::optional<ExplainOptions::Verbosity> verbosity = boost::none,
-                      bool allowDiskUseByDefault = false);
-
-    ExpressionContext(OperationContext* opCtx,
-                      const DistinctCommandRequest& distinctCmd,
-                      const NamespaceString& nss,
-                      std::unique_ptr<CollatorInterface> collator,
-                      bool mayDbProfile,
-                      boost::optional<ExplainOptions::Verbosity> verbosity);
-    /**
-     * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation.
-     * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
-     */
-    ExpressionContext(OperationContext* opCtx,
-                      const AggregateCommandRequest& request,
-                      std::unique_ptr<CollatorInterface> collator,
-                      std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
-                      StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
-                      boost::optional<UUID> collUUID,
-                      bool mayDbProfile = true,
-                      bool allowDiskUseByDefault = false);
-
-    /**
-     * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation. This version
-     * requires finer-grained parameters but does not require an AggregateCommandRequest.
-     * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
-     */
-    ExpressionContext(OperationContext* opCtx,
-                      const boost::optional<ExplainOptions::Verbosity>& explain,
-                      bool fromRouter,
-                      bool needsMerge,
-                      bool allowDiskUse,
-                      bool bypassDocumentValidation,
-                      bool isMapReduceCommand,
-                      const NamespaceString& ns,
-                      const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-                      std::unique_ptr<CollatorInterface> collator,
-                      const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
-                      StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
-                      boost::optional<UUID> collUUID,
-                      const boost::optional<BSONObj>& letParameters = boost::none,
-                      bool mayDbProfile = true,
-                      const SerializationContext& serializationCtx = SerializationContext());
-
-    /**
-     * Constructs an ExpressionContext suitable for use outside of the aggregation system, including
-     * for MatchExpression parsing and executing pipeline-style operations in the Update system.
-     *
-     * If 'collator' is null, the simple collator will be used.
-     */
-    ExpressionContext(OperationContext* opCtx,
-                      std::unique_ptr<CollatorInterface> collator,
-                      const NamespaceString& ns,
-                      const boost::optional<LegacyRuntimeConstants>& runtimeConstants = boost::none,
-                      const boost::optional<BSONObj>& letParameters = boost::none,
-                      bool allowDiskUse = false,
-                      bool mayDbProfile = true,
-                      boost::optional<ExplainOptions::Verbosity> explain = boost::none);
 
     /**
      * Constructs a blank ExpressionContext suitable for creating Query Shapes, but it could be
@@ -636,15 +652,15 @@ public:
     SbeCompatibility sbePipelineCompatibility = SbeCompatibility::noRequirements;
 
     // These fields can be used in a context when API version validations were not enforced during
-    // parse time (Example creating a view or validator), but needs to be enforce while querying
-    // later.
+    // parse time (Example creating a view or validator), but needs to be enforce while
+    // querying later.
     bool exprUnstableForApiV1 = false;
     bool exprDeprectedForApiV1 = false;
 
     // Tracks whether the collator to use for the aggregation matches the default collation of the
     // collection or view.
-    enum class CollationMatchesDefault { kYes, kNo };
-    CollationMatchesDefault collationMatchesDefault = CollationMatchesDefault::kYes;
+    ExpressionContextCollationMatchesDefault collationMatchesDefault =
+        ExpressionContextCollationMatchesDefault::kYes;
 
     // When non-empty, contains the unmodified user provided aggregation command.
     BSONObj originalAggregateCommand;
@@ -728,9 +744,16 @@ public:
     }
 
 protected:
+    /**
+     * Construct an expression context using ExpressionContextParams. Consider using
+     * ExpressonContextBuilder instead.
+     */
+    ExpressionContext(ExpressionContextParams&& config);
+
     static const int kInterruptCheckPeriod = 128;
 
     friend class CollatorStash;
+    friend ExpressionContextBuilder;
 
     // Performs the heavy work of checking whether an interrupt has occurred. Should only be called
     // when _interruptCounter has been decremented to zero.
@@ -796,14 +819,6 @@ protected:
     bool _requiresTimeseriesExtendedRangeSupport = false;
 
 private:
-    // Instantiates an ExpressionContext which does not increment expression counters and does not
-    // enforce FCV restrictions. It is used for implementing the `makeBlankExpressionContext()`
-    // factory method. Please also note that the runtime constants are not given real/accurate
-    // values of '$$NOW' and '$$CLUSTER_TIME', in the name of efficiency.
-    ExpressionContext(OperationContext* opCtx,
-                      const NamespaceString& ns,
-                      const boost::optional<BSONObj>& letParameters = boost::none);
-
     std::unique_ptr<ExpressionCounters> _expressionCounters;
     bool _gotTemporarilyUnavailableException = false;
 
@@ -826,5 +841,4 @@ private:
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }};
 };
-
 }  // namespace mongo

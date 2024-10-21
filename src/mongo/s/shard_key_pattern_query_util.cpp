@@ -197,7 +197,7 @@ StatusWith<BSONObj> extractShardKeyFromBasicQuery(OperationContext* opCtx,
     findCommand->setFilter(basicQuery.getOwned());
 
     auto statusWithCQ = CanonicalQuery::make(
-        {.expCtx = makeExpressionContext(opCtx, *findCommand),
+        {.expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
          .parsedFind = ParsedFindCommandParams{
              .findCommand = std::move(findCommand),
              .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});

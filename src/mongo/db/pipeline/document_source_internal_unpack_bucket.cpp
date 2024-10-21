@@ -1244,7 +1244,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer:
     // (e.g. numeric and lexicographic collations compare "5" and "10" in opposite order).
     // NB: Unfortuntealy, this means we have to forgo the optimization even if the source field is
     // numeric and not affected by the collation as we cannot know the data type until runtime.
-    if (pExpCtx->collationMatchesDefault == ExpressionContext::CollationMatchesDefault::kNo) {
+    if (pExpCtx->collationMatchesDefault == ExpressionContextCollationMatchesDefault::kNo) {
         return {};
     }
 

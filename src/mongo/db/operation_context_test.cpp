@@ -1092,10 +1092,10 @@ TEST_F(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
 TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
     auto client = getService()->makeClient("MainClient");
     auto opCtx = client->makeOperationContext();
-
-    const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
-        opCtx.get(), nullptr, NamespaceString::createNamespaceString_forTest("foo.bar"_sd)));
-
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("foo.bar"_sd))
+                            .build();
     for (auto truncateOps : {true, false}) {
         BSONObjBuilder bobNoOpCtx, bobKilledOpCtx;
         // We use a separate client thread to generate CurrentOp reports in presence and absence

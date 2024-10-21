@@ -355,9 +355,9 @@ public:
     PipelineBuilder(OperationContext* opCtx,
                     const NamespaceString& nss,
                     std::vector<NamespaceString>&& resolvedNamespaces)
-        : _expCtx{make_intrusive<ExpressionContext>(opCtx, nullptr /*collator*/, nss)} {
+        : _expCtx{ExpressionContextBuilder{}.opCtx(opCtx).ns(nss).build()} {
 
-        StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespacesMap;
+        StringMap<ResolvedNamespace> resolvedNamespacesMap;
 
         for (const auto& collNs : resolvedNamespaces) {
             resolvedNamespacesMap[collNs.coll()] = {collNs, std::vector<BSONObj>() /* pipeline */};

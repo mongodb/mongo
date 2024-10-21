@@ -43,10 +43,9 @@ namespace test {
 namespace mock {
 
 MockNetwork::Matcher::Matcher(const BSONObj& matcherQuery) {
-    auto expCtx = make_intrusive<ExpressionContext>(
-        nullptr /* opCtx */,
-        nullptr /* collator */,
-        NamespaceString::createNamespaceString_forTest("db.coll") /* dummy nss */);
+    auto expCtx = ExpressionContextBuilder{}
+                      .ns(NamespaceString::createNamespaceString_forTest("db.coll"))
+                      .build();
     // Expression matcher doesn't have copy constructor, so wrap it in a shared_ptr for capture.
     auto m = std::make_shared<mongo::Matcher>(matcherQuery, std::move(expCtx));
     _matcherFunc = [=](const BSONObj& request) {

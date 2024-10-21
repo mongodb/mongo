@@ -40,7 +40,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/commands.h"
@@ -74,14 +73,11 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query_analysis_sampler_util.h"
-#include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -182,27 +178,21 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
         }
     }();
 
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces.emplace(nss.coll(),
-                               ExpressionContext::ResolvedNamespace(nss, std::vector<BSONObj>{}));
+    StringMap<ResolvedNamespace> resolvedNamespaces;
+    resolvedNamespaces.emplace(nss.coll(), ResolvedNamespace(nss, std::vector<BSONObj>{}));
 
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx,
-        verbosity,
-        true,   // fromRouter
-        false,  // needs merge
-        false,  // disk use is banned on mongos
-        true,   // bypass document validation, mongos isn't a storage node
-        false,  // not mapReduce
-        nss,
-        runtimeConstants,
-        std::move(cif),
-        MongoProcessInterface::create(opCtx),
-        std::move(resolvedNamespaces),
-        boost::none,  // collection uuid
-        letParameters,
-        false  // mongos has no profile collection
-    );
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .collator(std::move(cif))
+                      .mongoProcessInterface(MongoProcessInterface::create(opCtx))
+                      .ns(nss)
+                      .resolvedNamespace(std::move(resolvedNamespaces))
+                      .fromRouter(true)
+                      .bypassDocumentValidation(true)
+                      .explain(verbosity)
+                      .runtimeConstants(runtimeConstants)
+                      .letParameters(letParameters)
+                      .build();
 
     // Ignore the collator if the collection is untracked and the user did not specify a collator.
     if (!cri.cm.hasRoutingTable() && noCollationSpecified) {

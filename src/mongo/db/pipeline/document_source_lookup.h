@@ -383,8 +383,7 @@ private:
      * 'foreign' join.
      */
     std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
-        std::vector<BSONObj> serializedPipeline,
-        ExpressionContext::ResolvedNamespace resolvedNamespace);
+        std::vector<BSONObj> serializedPipeline, ResolvedNamespace resolvedNamespace);
 
     /**
      * Reinitialize the cache with a new max size. May only be called if this DSLookup was created

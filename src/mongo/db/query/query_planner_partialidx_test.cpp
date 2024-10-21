@@ -464,10 +464,12 @@ TEST_F(QueryPlannerTest, PartialIndexStringComparisonMatchingCollators) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 'cba'}}"));
 
-    auto expCtxForPartialFilter = make_intrusive<ExpressionContext>(
-        opCtx.get(),
-        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
-        kNs);
+    auto expCtxForPartialFilter = ExpressionContextBuilder{}
+                                      .opCtx(opCtx.get())
+                                      .collator(std::make_unique<CollatorInterfaceMock>(
+                                          CollatorInterfaceMock::MockType::kReverseString))
+                                      .ns(kNs)
+                                      .build();
     std::unique_ptr<MatchExpression> filterExpr =
         parseMatchExpression(filterObj, expCtxForPartialFilter);
     addIndex(fromjson("{a: 1}"), filterExpr.get(), expCtxForPartialFilter->getCollator());
@@ -489,10 +491,12 @@ TEST_F(QueryPlannerTest, PartialIndexNoStringComparisonNonMatchingCollators) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));
 
-    auto expCtxForPartialFilter = make_intrusive<ExpressionContext>(
-        opCtx.get(),
-        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
-        kNs);
+    auto expCtxForPartialFilter = ExpressionContextBuilder{}
+                                      .opCtx(opCtx.get())
+                                      .collator(std::make_unique<CollatorInterfaceMock>(
+                                          CollatorInterfaceMock::MockType::kReverseString))
+                                      .ns(kNs)
+                                      .build();
     std::unique_ptr<MatchExpression> filterExpr =
         parseMatchExpression(filterObj, expCtxForPartialFilter);
     addIndex(fromjson("{a: 1}"), filterExpr.get(), expCtxForPartialFilter->getCollator());

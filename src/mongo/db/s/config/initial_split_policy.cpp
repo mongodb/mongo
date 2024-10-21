@@ -910,7 +910,7 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
                                                       int samplesPerChunk,
                                                       MakePipelineOptions opts) {
     auto rawPipeline = createRawPipeline(shardKey, numInitialChunks, samplesPerChunk);
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    StringMap<ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
 
     auto pi = [&]() -> std::shared_ptr<MongoProcessInterface> {
@@ -928,22 +928,15 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
         return MongoProcessInterface::create(opCtx);
     }();
 
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                    boost::none, /* explain */
-                                                    false,       /* fromRouter */
-                                                    false,       /* needsMerge */
-                                                    true,        /* allowDiskUse */
-                                                    true,        /* bypassDocumentValidation */
-                                                    false,       /* isMapReduceCommand */
-                                                    ns,
-                                                    boost::none, /* runtimeConstants */
-                                                    nullptr,     /* collator */
-                                                    std::move(pi),
-                                                    std::move(resolvedNamespaces),
-                                                    boost::none); /* collUUID */
-
-    expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .mongoProcessInterface(std::move(pi))
+                      .ns(ns)
+                      .resolvedNamespace(std::move(resolvedNamespaces))
+                      .allowDiskUse(true)
+                      .bypassDocumentValidation(true)
+                      .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                      .build();
     return std::make_unique<PipelineDocumentSource>(
         Pipeline::makePipeline(rawPipeline, expCtx, opts), samplesPerChunk - 1);
 }

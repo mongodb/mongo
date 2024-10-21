@@ -72,7 +72,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
     // stages are not allowed within an update context.
     LiteParsedPipeline liteParsedPipeline(
         NamespaceString::makeDummyNamespace(expCtx->ns.tenantId()), pipeline);
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    StringMap<ResolvedNamespace> resolvedNamespaces;
     for (const auto& nss : liteParsedPipeline.getInvolvedNamespaces()) {
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }

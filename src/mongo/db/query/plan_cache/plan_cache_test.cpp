@@ -1071,7 +1071,7 @@ protected:
         findCommand->setMin(minObj);
         findCommand->setMax(maxObj);
         auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
             .parsedFind = ParsedFindCommandParams{
                 .findCommand = std::move(findCommand),
                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
@@ -1090,7 +1090,7 @@ protected:
         std::unique_ptr<FindCommandRequest> findCommand(
             query_request_helper::makeFromFindCommandForTests(cmdObj));
         auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
             .parsedFind = ParsedFindCommandParams{
                 .findCommand = std::move(findCommand),
                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
@@ -1168,7 +1168,7 @@ protected:
         findCommand->setProjection(proj);
         findCommand->setCollation(collation);
         auto scopedCq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
             .parsedFind = ParsedFindCommandParams{
                 .findCommand = std::move(findCommand),
                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
@@ -2224,9 +2224,11 @@ private:
         findCommand->setSort(sort);
         findCommand->setProjection(projection);
         findCommand->setCollation(collation);
-        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = makeExpressionContext(_operationContext.get(), *findCommand),
-            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        return std::make_unique<CanonicalQuery>(
+            CanonicalQueryParams{.expCtx = ExpressionContextBuilder{}
+                                               .fromRequest(_operationContext.get(), *findCommand)
+                                               .build(),
+                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
     std::unique_ptr<CanonicalQuery> makeCQ(const char* queryStr,
@@ -2243,9 +2245,11 @@ private:
         findCommand->setSort(sort);
         findCommand->setProjection(projection);
         findCommand->setCollation(collation);
-        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = makeExpressionContext(_operationContext.get(), *findCommand),
-            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        return std::make_unique<CanonicalQuery>(
+            CanonicalQueryParams{.expCtx = ExpressionContextBuilder{}
+                                               .fromRequest(_operationContext.get(), *findCommand)
+                                               .build(),
+                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;

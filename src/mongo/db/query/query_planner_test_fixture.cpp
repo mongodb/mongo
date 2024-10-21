@@ -72,8 +72,7 @@ namespace mongo {
 void QueryPlannerTest::setUp() {
     nss = NamespaceString::createNamespaceString_forTest("test.collection");
     opCtx = serviceContext.makeOperationContext();
-    expCtx = make_intrusive<ExpressionContext>(
-        opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), nss);
+    expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
     internalQueryPlannerEnableHashIntersection.store(true);
     params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("_id" << 1));
@@ -380,7 +379,7 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
     findCommand->setMin(minObj);
     findCommand->setMax(maxObj);
     cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                               .allowedFeatures =
                                                   MatchExpressionParser::kAllowAllSpecialFeatures},
@@ -456,7 +455,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     findCommand->setMin(minObj);
     findCommand->setMax(maxObj);
     cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                               .allowedFeatures =
                                                   MatchExpressionParser::kAllowAllSpecialFeatures},
@@ -481,7 +480,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
     cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                               .allowedFeatures =
                                                   MatchExpressionParser::kAllowAllSpecialFeatures},
@@ -507,7 +506,7 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
     cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                               .allowedFeatures =
                                                   MatchExpressionParser::kAllowAllSpecialFeatures},

@@ -124,7 +124,7 @@ Rarely _samplerAccumulatorJs, _samplerFunctionJs;
 // mongod. Note that this function must be called before forwarding an aggregation command on an
 // unsharded collection, in order to verify that the involved namespaces are allowed to be sharded.
 auto resolveInvolvedNamespaces(const stdx::unordered_set<NamespaceString>& involvedNamespaces) {
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    StringMap<ResolvedNamespace> resolvedNamespaces;
     for (auto&& nss : involvedNamespaces) {
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
@@ -158,7 +158,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     const boost::optional<CollectionRoutingInfo>& cri,
     BSONObj collationObj,
     boost::optional<UUID> uuid,
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
+    StringMap<ResolvedNamespace> resolvedNamespaces,
     bool hasChangeStream) {
 
     std::unique_ptr<CollatorInterface> collation;
@@ -170,16 +170,16 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
 
     // Create the expression context, and set 'inRouter' to true. We explicitly do *not* set
     // mergeCtx->tempDir.
-    auto mergeCtx = make_intrusive<ExpressionContext>(
-        opCtx,
-        request,
-        std::move(collation),
-        std::make_shared<MongosProcessInterface>(
-            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()),
-        std::move(resolvedNamespaces),
-        uuid);
-
-    mergeCtx->inRouter = true;
+    auto mergeCtx = ExpressionContextBuilder{}
+                        .fromRequest(opCtx, request)
+                        .collator(std::move(collation))
+                        .mongoProcessInterface(std::make_shared<MongosProcessInterface>(
+                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()))
+                        .resolvedNamespace(std::move(resolvedNamespaces))
+                        .mayDbProfile(true)
+                        .inRouter(true)
+                        .collUUID(uuid)
+                        .build();
 
     if ((!cri || !cri->cm.hasRoutingTable()) && collationObj.isEmpty()) {
         mergeCtx->setIgnoreCollator();
@@ -626,13 +626,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                             ->makeFromBSON(*collationObj));
         }
 
-        expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                   std::move(collation),
-                                                   namespaces.executionNss,
-                                                   boost::none /* runtimeConstants */,
-                                                   request.getLet());
+        expCtx = ExpressionContextBuilder{}
+                     .opCtx(opCtx)
+                     .collator(std::move(collation))
+                     .ns(namespaces.executionNss)
+                     .letParameters(request.getLet())
+                     .build();
         expCtx->addResolvedNamespaces(involvedNamespaces);
-
 
         // We might need 'inRouter' temporarily set to true for query stats parsing, but we don't
         // want to modify the value of 'expCtx' for future code execution so we will set it back to

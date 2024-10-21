@@ -59,7 +59,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
 
     auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
     auto opCtx = makeOperationContext();
-    auto expCtx = makeExpressionContext(opCtx.get(), *fcrCopy);
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrCopy).build();
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
 
     RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
@@ -117,7 +117,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
 
     {
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
-        auto expCtx = makeExpressionContext(opCtx.get(), *fcrCopy);
+        auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrCopy).build();
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
         ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
             return std::make_unique<query_stats::FindKey>(
@@ -142,7 +142,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
         fcrCopy->setFilter(BSON("x" << 1));
         fcrCopy->setSort(BSON("x" << 1));
-        auto expCtx = makeExpressionContext(opCtx.get(), *fcrCopy);
+        auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrCopy).build();
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
 
         ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {

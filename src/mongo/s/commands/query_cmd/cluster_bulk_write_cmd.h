@@ -351,15 +351,7 @@ public:
 
             if (auto let = bulkRequest.getLet()) {
                 // Evaluate the let parameters.
-                auto expCtx = make_intrusive<mongo::ExpressionContext>(
-                    opCtx,
-                    nullptr /* collator */,
-                    NamespaceString(),
-                    boost::none /* legacyRuntimeConstants */,
-                    *let,
-                    false,  // disk use is banned on mongos
-                    false,  // mongos has no profile collection
-                    boost::none /* verbosity */);
+                auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).letParameters(*let).build();
                 expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), *let);
                 bulkRequest.setLet(expCtx->variables.toBSON(expCtx->variablesParseState, *let));
             }

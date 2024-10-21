@@ -690,13 +690,12 @@ void FleCrudTest::doSingleUpdateWithUpdateDoc(int id,
     updateRequest.setUpdates({entry});
     updateRequest.getWriteCommandRequestBase().setEncryptionInformation(ei);
 
-
-    std::unique_ptr<CollatorInterface> collator;
-    auto expCtx = make_intrusive<ExpressionContext>(_opCtx.get(),
-                                                    std::move(collator),
-                                                    updateRequest.getNamespace(),
-                                                    updateRequest.getLegacyRuntimeConstants(),
-                                                    updateRequest.getLet());
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(_opCtx.get())
+                      .ns(updateRequest.getNamespace())
+                      .runtimeConstants(updateRequest.getLegacyRuntimeConstants())
+                      .letParameters(updateRequest.getLet())
+                      .build();
     processUpdate(_queryImpl.get(), expCtx, updateRequest);
 }
 
@@ -716,13 +715,12 @@ void FleCrudTest::doSingleDelete(int id, Fle2AlgorithmInt alg) {
     deleteRequest.setDeletes({entry});
     deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(ei);
 
-    std::unique_ptr<CollatorInterface> collator;
-    auto expCtx = make_intrusive<ExpressionContext>(_opCtx.get(),
-                                                    std::move(collator),
-                                                    deleteRequest.getNamespace(),
-                                                    deleteRequest.getLegacyRuntimeConstants(),
-                                                    deleteRequest.getLet());
-
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(_opCtx.get())
+                      .ns(deleteRequest.getNamespace())
+                      .runtimeConstants(deleteRequest.getLegacyRuntimeConstants())
+                      .letParameters(deleteRequest.getLet())
+                      .build();
     processDelete(_queryImpl.get(), expCtx, deleteRequest);
 }
 
@@ -735,13 +733,12 @@ void FleCrudTest::doFindAndModify(write_ops::FindAndModifyCommandRequest& reques
     auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
 
     request.setEncryptionInformation(ei);
-
-    std::unique_ptr<CollatorInterface> collator;
-    auto expCtx = make_intrusive<ExpressionContext>(_opCtx.get(),
-                                                    std::move(collator),
-                                                    request.getNamespace(),
-                                                    request.getLegacyRuntimeConstants(),
-                                                    request.getLet());
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(_opCtx.get())
+                      .ns(request.getNamespace())
+                      .runtimeConstants(request.getLegacyRuntimeConstants())
+                      .letParameters(request.getLet())
+                      .build();
     processFindAndModify(expCtx, _queryImpl.get(), request);
 }
 

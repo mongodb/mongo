@@ -95,12 +95,14 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_getTarg
         return uassertStatusOK(
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
     }();
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx,
-        std::move(cif),
-        _getChunkManager().getNss(),
-        runtimeConstants.value_or(Variables::generateRuntimeConstants(opCtx)),
-        letParameters);
+    auto expCtx =
+        ExpressionContextBuilder{}
+            .opCtx(opCtx)
+            .collator(std::move(cif))
+            .ns(_getChunkManager().getNss())
+            .runtimeConstants(runtimeConstants.value_or(Variables::generateRuntimeConstants(opCtx)))
+            .letParameters(letParameters)
+            .build();
 
     std::set<ShardId> shardIds;  // This is not used.
     QueryTargetingInfo info;

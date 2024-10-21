@@ -104,33 +104,4 @@ void addMatchRemovingNestedArrays(BSONArrayBuilder* pipelineBuilder, const Field
 }
 
 }  // namespace
-
-boost::intrusive_ptr<ExpressionContext> CanonicalDistinct::makeExpressionContext(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const DistinctCommandRequest& distinctCommand,
-    const CollatorInterface* defaultCollator,
-    boost::optional<ExplainOptions::Verbosity> verbosity) {
-
-    std::unique_ptr<CollatorInterface> collator;
-    if (auto collationObj = distinctCommand.getCollation().get_value_or(BSONObj());
-        !collationObj.isEmpty()) {
-        collator = uassertStatusOK(
-            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationObj));
-    } else if (defaultCollator) {
-        // The 'collPtr' will be null for views, but we don't need to worry about views here. The
-        // views will get rewritten into aggregate command and will regenerate the
-        // ExpressionContext.
-        collator = defaultCollator->clone();
-    }
-    auto expCtx =
-        make_intrusive<ExpressionContext>(opCtx,
-                                          distinctCommand,
-                                          nss,
-                                          std::move(collator),
-                                          CurOp::get(opCtx)->dbProfileLevel() > 0,  // mayDbProfile
-                                          verbosity);
-    return expCtx;
-}
-
 }  // namespace mongo

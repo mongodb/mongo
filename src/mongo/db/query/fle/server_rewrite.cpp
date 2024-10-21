@@ -157,9 +157,9 @@ public:
         auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
         esc = efc.getEscCollection()->toString();
     }
-    virtual ~RewriteBase() {}
+    virtual ~RewriteBase(){};
 
-    virtual void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) {}
+    virtual void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc){};
 
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -175,7 +175,7 @@ public:
                     std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
         : RewriteBase(toRewrite->getContext(), nss, encryptInfo), pipeline(std::move(toRewrite)) {}
 
-    ~PipelineRewrite() override {}
+    ~PipelineRewrite() override{};
 
     void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
         auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc);
@@ -204,7 +204,7 @@ public:
                   EncryptedCollScanModeAllowed mode)
         : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
 
-    ~FilterRewrite() override {}
+    ~FilterRewrite() override{};
 
     void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
         rewrittenFilter = rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _mode);
@@ -287,13 +287,11 @@ void processFindCommand(OperationContext* opCtx,
                         FindCommandRequest* findCommand,
                         GetTxnCallback getTransaction) {
     invariant(findCommand->getEncryptionInformation());
-
-    auto expCtx =
-        make_intrusive<ExpressionContext>(opCtx,
-                                          collatorFromBSON(opCtx, findCommand->getCollation()),
-                                          nss,
-                                          findCommand->getLegacyRuntimeConstants(),
-                                          findCommand->getLet());
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(opCtx, *findCommand)
+                      .collator(collatorFromBSON(opCtx, findCommand->getCollation()))
+                      .ns(nss)
+                      .build();
     expCtx->stopExpressionCounters();
     findCommand->setFilter(rewriteQuery(opCtx,
                                         expCtx,
@@ -313,8 +311,13 @@ void processCountCommand(OperationContext* opCtx,
     invariant(countCommand->getEncryptionInformation());
     // Count command does not have legacy runtime constants, and does not support user variables
     // defined in a let expression.
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, collatorFromBSON(opCtx, countCommand->getCollation().value_or(BSONObj())), nss);
+    auto expCtx =
+        ExpressionContextBuilder{}
+            .opCtx(opCtx)
+            .collator(collatorFromBSON(opCtx, countCommand->getCollation().value_or(BSONObj())))
+            .ns(nss)
+            .build();
+
     expCtx->stopExpressionCounters();
 
     countCommand->setQuery(rewriteQuery(opCtx,
@@ -334,7 +337,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
     const EncryptionInformation& encryptInfo,
     std::unique_ptr<Pipeline, PipelineDeleter> toRewrite,
     GetTxnCallback txn) {
-
     auto sharedBlock = std::make_shared<PipelineRewrite>(nss, encryptInfo, std::move(toRewrite));
     doFLERewriteInTxn(opCtx, sharedBlock, txn);
 

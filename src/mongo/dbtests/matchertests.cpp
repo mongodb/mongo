@@ -247,9 +247,7 @@ public:
         const NamespaceString nss =
             NamespaceString::createNamespaceString_forTest("unittests.matchertests");
         AutoGetCollectionForReadCommand ctx(&opCtx, nss);
-
-        const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
-            opCtxPtr.get(), std::unique_ptr<CollatorInterface>(nullptr), kTestNss));
+        const auto expCtx = ExpressionContextBuilder{}.opCtx(opCtxPtr.get()).ns(kTestNss).build();
         M m(BSON("$where"
                  << "function(){ return this.a == 1; }"),
             expCtx,

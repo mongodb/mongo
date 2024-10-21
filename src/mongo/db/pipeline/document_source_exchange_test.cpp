@@ -109,8 +109,6 @@ const NamespaceString kTestNss =
 class DocumentSourceExchangeTest : public AggregationContextFixture {
 protected:
     void setUp() override {
-        getExpCtx()->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>();
-
         auto net = executor::makeNetworkInterface("ExchangeTest");
 
         ThreadPool::Options options;
@@ -170,14 +168,14 @@ protected:
                 std::move(client),
                 std::move(opCtxOwned),
                 new DocumentSourceExchange(
-                    new ExpressionContext(opCtx, nullptr, kTestNss), ex, idx, nullptr),
+                    ExpressionContextBuilder{}.opCtx(opCtx).ns(kTestNss).build(), ex, idx, nullptr),
             });
         }
         return threads;
     }
 
     std::shared_ptr<executor::TaskExecutor> _executor;
-};
+};  // namespace mongo
 
 TEST_F(DocumentSourceExchangeTest, SimpleExchange1Consumer) {
     const size_t nDocs = 500;
@@ -550,12 +548,13 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
         OperationContext* opCtx = opCtxOwned.get();
         auto yielder = std::make_unique<MutexYielder>(&artificalGlobalMutex);
         auto yielderRaw = yielder.get();
-
         threads.push_back(ThreadInfo{
             std::move(client),
             std::move(opCtxOwned),
-            new DocumentSourceExchange(
-                new ExpressionContext(opCtx, nullptr, kTestNss), ex, idx, std::move(yielder)),
+            new DocumentSourceExchange(ExpressionContextBuilder{}.opCtx(opCtx).ns(kTestNss).build(),
+                                       ex,
+                                       idx,
+                                       std::move(yielder)),
             yielderRaw});
     }
 

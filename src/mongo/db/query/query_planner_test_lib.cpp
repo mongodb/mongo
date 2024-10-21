@@ -1101,8 +1101,9 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         // Create an empty/dummy expression context without access to the operation context and
         // collator. This should be sufficient to parse a projection.
-        auto expCtx = make_intrusive<ExpressionContext>(
-            nullptr, nullptr, NamespaceString::createNamespaceString_forTest("test.dummy"));
+        auto expCtx = ExpressionContextBuilder{}
+                          .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                          .build();
         auto projection = projection_ast::parseAndAnalyze(
             expCtx,
             spec.Obj(),

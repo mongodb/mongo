@@ -99,9 +99,11 @@ public:
         // so it's fine to declare
         WorkingSet ws;
 
-        auto expCtx = make_intrusive<ExpressionContext>(
-            opCtx(), CollatorInterface::cloneCollator(collator), kNss);
-
+        auto expCtx = ExpressionContextBuilder{}
+                          .opCtx(opCtx())
+                          .collator(CollatorInterface::cloneCollator(collator))
+                          .ns(kNss)
+                          .build();
         // QueuedDataStage will be owned by SortStageDefault.
         auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), &ws);
         BSONObj inputObj = fromjson(inputStr);
@@ -183,9 +185,7 @@ private:
 
 TEST_F(SortStageDefaultTest, SortEmptyWorkingSet) {
     WorkingSet ws;
-
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx(), nullptr, kNss);
-
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx()).ns(kNss).build();
     // QueuedDataStage will be owned by SortStageDefault.
     auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), &ws);
     auto sortKeyGen =
