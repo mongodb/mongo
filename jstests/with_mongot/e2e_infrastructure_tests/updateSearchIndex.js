@@ -1,10 +1,7 @@
 /**
  * This test validates that updateSearchIndex works for standalone and sharded configurations.
- * @tags: [
- * requires_mongot_1_42
- * ]
  */
-import {updateSearchIndex} from "jstests/libs/search.js";
+import {dropSearchIndex, updateSearchIndex} from "jstests/libs/search.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
@@ -59,3 +56,5 @@ results.forEach(state => {
     assert(!state.facts.hasOwnProperty("state_flower"));
     assert(state.facts.hasOwnProperty("state_motto"));
 });
+
+dropSearchIndex(coll, {name: "updateSearchIndexTest"});

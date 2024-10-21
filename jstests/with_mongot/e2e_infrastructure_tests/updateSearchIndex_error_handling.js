@@ -1,9 +1,4 @@
-/**
- * This test ensures correct error handling for the updateSearchIndex shell command.
- * @tags: [
- * requires_mongot_1_42
- * ]
- */
+// This test ensures correct error handling for the updateSearchIndex shell command.
 
 import {updateSearchIndex} from "jstests/libs/search.js";
 

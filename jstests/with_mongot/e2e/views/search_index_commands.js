@@ -3,12 +3,9 @@
  * views.
  *
  * TODO SERVER-92919 add dropSearchIndex.
- * @tags: [
- * requires_mongot_1_42
- * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {updateSearchIndex} from "jstests/libs/search.js";
+import {dropSearchIndex, updateSearchIndex} from "jstests/libs/search.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
@@ -69,5 +66,4 @@ assert.eq(results[0].latestDefinition.storedSource, indexDef.storedSource);
 //    }}];
 // let results = addFieldsView.aggregate(pipeline).toArray();
 
-// TODO SERVER-92919 add dropSearchIndex.
-// assert.commandWorked(addFieldsView.dropSearchIndex({name: "addFieldsIndex"}));
+dropSearchIndex(addFieldsView, {name: "addFieldsIndex"});

@@ -203,15 +203,8 @@ public:
                     "Cannot set both 'name' and 'id'.",
                     !(cmd.getName() && cmd.getId()));
 
-            const auto& nss = cmd.getNamespace();
-
-            auto collectionUUID =
-                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
-
-            BSONObj manageSearchIndexResponse =
-                getSearchIndexManagerResponse(opCtx, nss, collectionUUID, cmd.toBSON());
-
             IDLParserContext ctx("DropSearchIndexReply Parser");
+            BSONObj manageSearchIndexResponse = retrieveSearchIndexManagerResponse(opCtx, cmd);
             return DropSearchIndexReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
         }
 

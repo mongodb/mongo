@@ -114,3 +114,40 @@ export function updateSearchIndex(coll, keys, blockUntilSearchIndexQueryable = {
     }
     return _runUpdateSearchIndexOnShard(coll, keys, blockOnIndexQueryable);
 }
+function _runDropSearchIndexOnShard(coll, keys, shardConn) {
+    let shardDB = shardConn != undefined
+        ? shardConn.getDB("admin").getSiblingDB(coll.getDB().getName())
+        : coll.getDB();
+    let collName = coll.getName();
+
+    let name = keys["name"];
+    return assert.commandWorked(shardDB.runCommand({dropSearchIndex: collName, name}));
+}
+export function dropSearchIndex(coll, keys) {
+    if (Object.keys(keys).length != 1 || !keys.hasOwnProperty('name')) {
+        /**
+         * dropSearchIndex server command accepts search index ID or name. However, the
+         * createSearchIndex library helper only returns the response from issuing the creation
+         * command on the last shard. This is problematic for sharded configurations as a server dev
+         * won't have all the IDs associated with the search index across all of the shards. To
+         * ensure correctness, the dropSearchIndex library helper will only accept specifiying
+         * search index by name.
+         */
+        throw new Error("dropSearchIndex library helper only accepts a search index name");
+    }
+
+    // Please see block comment at the top of this file to understand the sharded implementation.
+    if (FixtureHelpers.isSharded(coll)) {
+        let response = {};
+        let topology = DiscoverTopology.findConnectedNodes(coll.getDB().getMongo());
+
+        for (const shardName of Object.keys(topology.shards)) {
+            topology.shards[shardName].nodes.forEach((node) => {
+                let sconn = new Mongo(node);
+                response = _runDropSearchIndexOnShard(coll, keys, sconn);
+            });
+        }
+        return response;
+    }
+    return _runDropSearchIndexOnShard(coll, keys);
+}
