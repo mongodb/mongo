@@ -660,6 +660,34 @@ functions:
         content_type: application/json
         display_name: clang_tidy_fixes.json
 
+  "generate network diagnostics": &generate_network_diagnostics
+    command: subprocess.exec
+    display_name: "get network diagnostics"
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "evergreen/functions/get_network_diagnostics.py"
+
+  "upload network diagnostics": &upload_network_diagnostics
+    command: s3.put
+    dipslay_name: "upload network diagnostics"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/network_diagnostics.txt
+      remote_file: ${project}/${version_id}/${bv_future_git_tag|version}_network_diagnostics.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: Network Diagnostics - netstat output
+      optional: true
+
+  "generate and upload network diagnostics":
+    - *f_expansions_write
+    - *generate_network_diagnostics
+    - *upload_network_diagnostics
+
   "send benchmark results": &send_benchmark_results
     command: perf.send
     display_name: "send benchmark results"
