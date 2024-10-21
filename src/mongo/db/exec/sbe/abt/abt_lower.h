@@ -71,39 +71,20 @@ private:
     LowerFuncT _lowerFn;
 };
 
-/*
- * Represent how ABT expression to SBE EExpression lowering should treat the meaning of
- * BinaryOp<Gt/Gte/Lt/Lte/Eq>.
- */
-enum class ComparisonOpSemantics {
-    // Translate comparisons as full BSON order comparisons. For example, 5 < "str" evaluates to
-    // true because numbers are less than strings on the BSON numberline. BinaryOp<Eq> will return
-    // false for operands of different types.
-    kTotalOrder,
-    // Translate comparisons as type-bracketed comparisons. This causes comparisons with operands of
-    // different types to evaluate to Nothing. This option will means the ABT BinaryOp operators
-    // have the same semantics as 'sbe::EPrimBinary'; for example, numbers have IEEE semantics,
-    // where NaN == NaN evaluates to false.
-    kTypeBracketing
-};
-
 class SBEExpressionLowering {
 public:
-    SBEExpressionLowering(
-        const VariableEnvironment& env,
-        VarResolver vr,
-        SlotsProvider& providedSlots,
-        sbe::value::SlotIdGenerator& ids,
-        sbe::InputParamToSlotMap& inputParamToSlotMap,
-        ComparisonOpSemantics compOpSemantics = ComparisonOpSemantics::kTotalOrder,
-        sbe::value::FrameIdGenerator* frameIdGenerator = nullptr)
+    SBEExpressionLowering(const VariableEnvironment& env,
+                          VarResolver vr,
+                          SlotsProvider& providedSlots,
+                          sbe::value::SlotIdGenerator& ids,
+                          sbe::InputParamToSlotMap& inputParamToSlotMap,
+                          sbe::value::FrameIdGenerator* frameIdGenerator = nullptr)
         : _env(env),
           _varResolver(vr),
           _providedSlots(providedSlots),
           _slotIdGenerator(ids),
           _inputParamToSlotMap(inputParamToSlotMap),
-          _frameIdGenerator(frameIdGenerator),
-          _comparisonOpSemantics(compOpSemantics) {}
+          _frameIdGenerator(frameIdGenerator) {}
 
     // The default noop transport.
     template <typename T, typename... Ts>
@@ -167,11 +148,6 @@ private:
 
     stdx::unordered_map<const Let*, sbe::FrameId> _letMap;
     stdx::unordered_map<const LambdaAbstraction*, sbe::FrameId> _lambdaMap;
-    // Allow SBE stage builders to specify a different meaning for comparison operations. This is
-    // mainly offered as a crutch to allow SBE stage builders to continue using this class. The
-    // default for Bonsai is that comparison operators form a total order; many rewrites make this
-    // assumption.
-    ComparisonOpSemantics _comparisonOpSemantics{ComparisonOpSemantics::kTotalOrder};
 };
 
 inline sbe::EPrimUnary::Op getEPrimUnaryOp(optimizer::Operations op) {

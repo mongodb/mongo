@@ -237,22 +237,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
             return nullptr;
         };
 
-        switch (_comparisonOpSemantics) {
-            case ComparisonOpSemantics::kTypeBracketing:
-                // If binary operations are type bracketed, then we can translate this comparison
-                // directly to SBE's type bracketed comparison operator.
-                return sbe::makeE<sbe::EPrimBinary>(
-                    sbeOp, std::move(lhs), std::move(rhs), collationExpr());
-            case ComparisonOpSemantics::kTotalOrder:
-                // If binary operations have a total order, then we generate the comparison using a
-                // cmp3w expression to achieve the desired semantics. For example, a < b will
-                // generate lt(cmp3w(a, b), 0).
-                return sbe::makeE<sbe::EPrimBinary>(
-                    sbeOp,
-                    sbe::makeE<sbe::EPrimBinary>(
-                        sbe::EPrimBinary::cmp3w, std::move(lhs), std::move(rhs), collationExpr()),
-                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0));
-        }
+        return sbe::makeE<sbe::EPrimBinary>(sbeOp, std::move(lhs), std::move(rhs), collationExpr());
     }
 
     return sbe::makeE<sbe::EPrimBinary>(sbeOp, std::move(lhs), std::move(rhs));

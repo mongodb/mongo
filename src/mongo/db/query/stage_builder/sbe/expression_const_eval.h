@@ -50,9 +50,6 @@ namespace mongo::stage_builder {
 /**
  * 'ExpressionConstEval' is a constant-folding rewrite designed to be used by the SBE stage builder.
  * This class was originally adapted from optimizer::ConstEval.
- *
- * Note that ExpressionConstEval assumes 'ComparisonOpSemantics::kTypeBracketing' semantics for
- * comparison ops.
  */
 class ExpressionConstEval {
 public:

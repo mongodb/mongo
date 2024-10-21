@@ -293,16 +293,12 @@ std::unique_ptr<sbe::EExpression> SbExpr::lower(StageBuilderState& state,
 
     // Invoke 'SBEExpressionLowering' to lower the ABT to SBE.
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
-    optimizer::SBEExpressionLowering exprLower{
-        env,
-        std::move(varResolver),
-        runtimeEnv,
-        *state.slotIdGenerator,
-        staticData->inputParamToSlotMap,
-        // SBE stage builders assume that binary comparison operations in ABT are type bracketed and
-        // must specify this to the class responsible for lowering to SBE.
-        optimizer::ComparisonOpSemantics::kTypeBracketing,
-        state.frameIdGenerator};
+    optimizer::SBEExpressionLowering exprLower{env,
+                                               std::move(varResolver),
+                                               runtimeEnv,
+                                               *state.slotIdGenerator,
+                                               staticData->inputParamToSlotMap,
+                                               state.frameIdGenerator};
 
     return exprLower.optimize(abt);
 }
