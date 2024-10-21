@@ -113,7 +113,8 @@ class ContinuousStepdown(interface.Hook):
     def before_suite(self, test_report):
         """Before suite."""
         if not self._rs_fixtures:
-            self._add_fixture(self._fixture)
+            for cluster in self._fixture.get_testable_clusters():
+                self._add_fixture(cluster)
 
         if self.__action_files is not None:
             lifecycle = lifecycle_interface.FileBasedThreadLifecycle(self.__action_files)
@@ -172,10 +173,6 @@ class ContinuousStepdown(interface.Hook):
                 self._add_fixture(fixture.configsvr)
             for mongos_fixture in fixture.mongos:
                 self._mongos_fixtures.append(mongos_fixture)
-        elif isinstance(fixture, fixture_interface.MultiClusterFixture):
-            # Recursively call _add_fixture on all the independent clusters.
-            for cluster_fixture in fixture.get_independent_clusters():
-                self._add_fixture(cluster_fixture)
 
 
 class _StepdownThread(threading.Thread):

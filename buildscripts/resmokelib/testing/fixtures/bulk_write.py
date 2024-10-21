@@ -150,5 +150,9 @@ class BulkWriteFixture(interface.MultiClusterFixture):
         return output
 
     def get_independent_clusters(self):
+        """Return all of the clusters in the fixture."""
+        return self.clusters.copy()
+
+    def get_testable_clusters(self):
         """Return the clusters we want to be modified by hooks."""
         return [self.clusters[0]]

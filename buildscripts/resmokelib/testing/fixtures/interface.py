@@ -248,6 +248,14 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
     def __repr__(self):
         return "%r(%r, %r)" % (self.__class__.__name__, self.logger, self.job_num)
 
+    def get_independent_clusters(self) -> List["Fixture"]:
+        """Return a list of the independent clusters that participate in this fixture."""
+        return [self]
+
+    def get_testable_clusters(self) -> List["Fixture"]:
+        """Return a list of the clusters in this fixture that we want to run tests against."""
+        return [self]
+
 
 class DockerComposeException(Exception):
     """Exception to use when there is a failure in the docker compose interface."""
@@ -313,11 +321,15 @@ class MultiClusterFixture(Fixture):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED  # type: ignore
 
-    def get_independent_clusters(self):
-        """Return a list of the independent clusters (fixtures) that participate in this fixture."""
+    def get_independent_clusters(self) -> List[Fixture]:
+        """Return a list of the independent clusters that participate in this fixture."""
         raise NotImplementedError(
             "get_independent_clusters must be implemented by MultiClusterFixture subclasses"
         )
+
+    def get_testable_clusters(self) -> List[Fixture]:
+        """Return a list of the clusters in this fixture that we want to run tests against."""
+        return self.get_independent_clusters()
 
 
 class ReplFixture(Fixture):

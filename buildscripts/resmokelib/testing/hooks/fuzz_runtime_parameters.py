@@ -89,7 +89,8 @@ class FuzzRuntimeParameters(interface.Hook):
 
     def before_suite(self, test_report):
         """Before suite."""
-        self._add_fixture(self._fixture)
+        for cluster in self._fixture.get_testable_clusters():
+            self._add_fixture(cluster)
 
         from buildscripts.resmokelib.config_fuzzer_limits import (
             config_fuzzer_params,
@@ -216,10 +217,6 @@ class FuzzRuntimeParameters(interface.Hook):
                 self._add_fixture(fixture.configsvr)
             for mongos_fixture in fixture.mongos:
                 self._mongos_fixtures.append(mongos_fixture)
-        elif isinstance(fixture, fixture_interface.MultiClusterFixture):
-            # Recursively call _add_fixture on all the independent clusters.
-            for cluster_fixture in fixture.get_independent_clusters():
-                self._add_fixture(cluster_fixture)
         else:
             raise ValueError("No fixture to run setParameter on.")
 
