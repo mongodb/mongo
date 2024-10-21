@@ -4,8 +4,6 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   requires_replication,
- *   # SERVER-90248 fixed in 8.1
- *   requires_fcv_81,
  *   serverless
  *  ]
  */

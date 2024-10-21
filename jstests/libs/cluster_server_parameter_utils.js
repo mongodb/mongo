@@ -13,8 +13,8 @@
  * Use the name of the featureFlag if it is required in order to consider the parameter.
  * Prefix the name with a bang '!' if it is only considered when the featureFlag is disabled.
  *
- * Analogously, the 'setParameters', 'serverless' and 'standaloneIncompatible' properties may
- * be set to specify that the scenarios under which a parameter can be validated.
+ * Analogously, the 'minFCV' and 'setParameters' properties may be set if the parameter can be
+ * tested exclusively since a certain FCV or when a server parameter has a certain value.
  *
  * CWSPs with the 'isSetInternally' property are set by the cluster itself, and generally not by
  * the user. We don't set them nor check their value from generic tests, as we can not assume that
@@ -36,24 +36,16 @@ export const kNonTestOnlyClusterParameters = {
             {preAndPostImages: {expireAfterSeconds: 30}},
             {preAndPostImages: {expireAfterSeconds: 20}}
         ],
-        featureFlag: '!ServerlessChangeStreams',
-        standaloneIncompatible: false,
+        setParameters: {'multitenancySupport': false},
     },
     changeStreams: {
         default: {expireAfterSeconds: NumberLong(3600)},
         testValues: [{expireAfterSeconds: 30}, {expireAfterSeconds: 10}],
-        featureFlag: 'ServerlessChangeStreams',
-        setParameters: {'multitenancySupport': true},
-        serverless: true,
-        standaloneIncompatible: false,
     },
     defaultMaxTimeMS: {
         default: {readOperations: 0},
         testValues: [{readOperations: 42}, {readOperations: 60000}],
         featureFlag: 'DefaultReadMaxTimeMS',
-        setParameters: {'multitenancySupport': true},
-        serverless: true,
-        standaloneIncompatible: false,
     },
     addOrRemoveShardInProgress: {
         default: {inProgress: false},
@@ -68,7 +60,43 @@ export const kNonTestOnlyClusterParameters = {
     configServerReadPreferenceForCatalogQueries: {
         default: {mustAlwaysUseNearest: false},
         testValues: [{mustAlwaysUseNearest: true}, {mustAlwaysUseNearest: false}],
-    }
+    },
+    pauseMigrationsDuringMultiUpdates: {
+        default: {enabled: false},
+        testValues: [{enabled: true}, {enabled: false}],
+        isSetInternally: true,
+    },
+    internalQueryCutoffForSampleFromRandomCursor: {
+        default: {sampleCutoff: 0.05},
+        testValues: [{sampleCutoff: 0.5}, {sampleCutoff: 0.001}],
+    },
+    fleCompactionOptions: {
+        default: {
+            maxCompactionSize: NumberInt(268435456),
+            maxAnchorCompactionSize: NumberInt(268435456),
+            maxESCEntriesPerCompactionDelete: NumberInt(350000)
+        },
+        testValues: [
+            {
+                maxCompactionSize: NumberInt(123),
+                maxAnchorCompactionSize: NumberInt(231),
+                maxESCEntriesPerCompactionDelete: NumberInt(312)
+            },
+            {
+                maxCompactionSize: NumberInt(10000000),
+                maxAnchorCompactionSize: NumberInt(10000000),
+                maxESCEntriesPerCompactionDelete: NumberInt(350000)
+            }
+        ],
+    },
+    internalSearchOptions: {
+        default: {oversubscriptionFactor: 1.064, batchSizeGrowthFactor: 1.5},
+        testValues: [
+            {oversubscriptionFactor: 5, batchSizeGrowthFactor: 4.5},
+            {oversubscriptionFactor: 1, batchSizeGrowthFactor: 1}
+        ],
+        minFCV: '8.1',
+    },
 };
 
 export const kTestOnlyClusterParameters = {
@@ -115,14 +143,21 @@ export const kNonTestOnlyClusterParameterDefaults =
         .map((name) => Object.assign({_id: name}, kAllClusterParameters[name].default));
 
 export function considerParameter(paramName, conn) {
-    // { featureFlag: 'name' } indicates that the CWSP should only be considered with the FF
-    // enabled. { featureFlag: '!name' } indicates that the CWSP should only be considered with the
-    // FF disabled.
+    // {featureFlag: 'name'} indicates that the CWSP should only be considered with the FF enabled.
     function validateFeatureFlag(cp) {
         if (cp.featureFlag) {
-            const considerWhenFFEnabled = cp.featureFlag[0] !== '!';
-            const ff = cp.featureFlag.substr(considerWhenFFEnabled ? 0 : 1);
-            return FeatureFlagUtil.isEnabled(conn, ff) === considerWhenFFEnabled;
+            return FeatureFlagUtil.isPresentAndEnabled(conn, cp.featureFlag);
+        }
+        return true;
+    }
+
+    // {minFCV: "X.Y"} indicates that the CWSP should only be considered when the FCV is greater
+    // than or equal to the specified version.
+    function validateMinFCV(cp) {
+        if (cp.minFCV) {
+            const fcvDoc =
+                conn.getDB("admin").system.version.findOne({_id: "featureCompatibilityVersion"});
+            return MongoRunner.compareBinVersions(fcvDoc.version, cp.minFCV) >= 0;
         }
         return true;
     }
@@ -131,9 +166,11 @@ export function considerParameter(paramName, conn) {
     function validateSetParameter(cp) {
         if (cp.setParameters) {
             for (let [param, value] of Object.entries(cp.setParameters)) {
-                const resp = conn.getDB("admin").runCommand({getParameter: 1, param: 1});
-                const hasParam = resp.hasOwnProperty(param) && resp[param] === value;
-                if (!hasParam) {
+                const resp = assert.commandWorked(conn.adminCommand({getParameter: 1, [param]: 1}));
+                assert(typeof resp[param] === typeof value,
+                       "Cowardly refusing to compare parameter " + param + " of type " +
+                           typeof resp[param] + " to value of type " + typeof value);
+                if (resp[param] !== value) {
                     return false;
                 }
             }
@@ -141,30 +178,8 @@ export function considerParameter(paramName, conn) {
         return true;
     }
 
-    // Check if the current CWSP should be run in the serverless.
-    function validateServerless(cp) {
-        if (cp.hasOwnProperty("serverless")) {
-            const resp =
-                assert.commandWorked(conn.getDB("admin").adminCommand({getCmdLineOpts: 1}));
-            return cp.serverless === resp.parsed && resp.parsed.replication &&
-                resp.parsed.replication.serverless;
-        }
-        return true;
-    }
-
-    // Check if the current CWSP should be run in standalone.
-    function validateStandalone(cp) {
-        if (cp.hasOwnProperty("standaloneIncompatible")) {
-            const hello = conn.getDB("admin").runCommand({hello: 1});
-            const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
-            return !isStandalone;
-        }
-        return true;
-    }
-
     const cp = kAllClusterParameters[paramName] || {};
-    return validateFeatureFlag(cp) && validateSetParameter(cp) && validateServerless(cp) &&
-        validateStandalone(cp);
+    return validateFeatureFlag(cp) && validateMinFCV(cp) && validateSetParameter(cp);
 }
 
 // Set the log level for get/setClusterParameter logging to appear.

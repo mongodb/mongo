@@ -8,8 +8,6 @@
 //    not_allowed_with_signed_security_token,
 //   # Transactions aborted upon fcv upgrade or downgrade; cluster parameters use internal txns.
 //    uses_transactions,
-//   # SERVER-90248 fixed in 8.1
-//    requires_fcv_81
 //   ]
 
 import {

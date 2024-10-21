@@ -4,7 +4,6 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   requires_replication,
- *   multiversion_incompatible
  *  ]
  */
 import {
