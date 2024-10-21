@@ -19,47 +19,6 @@
 #include "util_block.h"
 #include "../wrappers/mock_session.h"
 
-void
-validate_ext_block(WT_EXT *ext)
-{
-    REQUIRE(ext != nullptr);
-    REQUIRE(ext->depth != 0);
-    REQUIRE(ext->size == 0);
-    REQUIRE(ext->off == 0);
-
-    for (int i = 0; i < ext->depth; i++) {
-        REQUIRE(ext->next[i + ext->depth] == nullptr);
-    }
-}
-
-void
-free_ext_block(WT_EXT *ext)
-{
-    __wt_free(nullptr, ext);
-}
-
-void
-validate_ext_list(WT_BLOCK_MGR_SESSION *bms, int expected_items)
-{
-    REQUIRE(bms != nullptr);
-    REQUIRE(bms->ext_cache_cnt == expected_items);
-    if (bms->ext_cache_cnt == 0)
-        REQUIRE(bms->ext_cache == nullptr);
-
-    WT_EXT *curr = bms->ext_cache;
-    for (int i = 0; i < expected_items; i++) {
-        validate_ext_block(curr);
-        curr = curr->next[0];
-    }
-    REQUIRE(curr == nullptr);
-}
-void
-validate_and_free_ext_block(WT_EXT *ext)
-{
-    validate_ext_block(ext);
-    free_ext_block(ext);
-}
-
 TEST_CASE("Block session: __block_ext_alloc", "[block_session_ext]")
 {
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
@@ -109,7 +68,8 @@ TEST_CASE("Block session: __block_ext_prealloc", "[block_session_ext]")
     }
 }
 
-TEST_CASE("Block session: __wti_block_ext_alloc", "[block_session_ext]")
+TEST_CASE(
+  "Block session: __wti_block_ext_alloc with null block manager session", "[block_session_ext]")
 {
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
 
@@ -124,8 +84,13 @@ TEST_CASE("Block session: __wti_block_ext_alloc", "[block_session_ext]")
         REQUIRE(__wti_block_ext_alloc(session->get_wt_session_impl(), &ext) == 0);
         validate_and_free_ext_block(ext);
     }
+}
 
+TEST_CASE("Block session: __wti_block_ext_alloc", "[block_session_ext]")
+{
+    std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
     WT_BLOCK_MGR_SESSION *bms = session->setup_block_manager_session();
+
     SECTION("Allocate with fake zero cache extent count")
     {
         WT_EXT *ext;

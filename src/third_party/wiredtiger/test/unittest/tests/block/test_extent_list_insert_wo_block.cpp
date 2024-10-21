@@ -33,12 +33,12 @@ TEST_CASE("Extent Lists: block_ext_insert", "[extent_list]")
 
     std::vector<WT_EXT **> stack(WT_SKIP_MAXDEPTH, nullptr);
 
+    /* Common setup. */
+    WT_EXTLIST extlist = {};
+
     SECTION("insert into an empty list has one element")
     {
         BREAK;
-        /* Setup. */
-        WT_EXTLIST extlist = {};
-
         /* Test. */
         /* Insert one extent. */
         WT_EXT *first = alloc_new_ext(session, 4096, 4096);
@@ -49,9 +49,6 @@ TEST_CASE("Extent Lists: block_ext_insert", "[extent_list]")
 
         /* Verify. */
         REQUIRE(__ut_block_off_srch_last(&extlist.off[0], &stack[0]) == extlist.off[0]);
-
-        /* Cleanup. */
-        extlist_free(session, extlist);
     }
 
     SECTION("insert multiple extents and retrieve in correct order")
@@ -75,9 +72,6 @@ TEST_CASE("Extent Lists: block_ext_insert", "[extent_list]")
               off_size(5 * 4096, 4096), // [20,480, 24,575].
             }},
         };
-
-        /* Setup. */
-        WT_EXTLIST extlist = {};
 
         /* Test. */
         /* Insert extents and verify. */
@@ -94,10 +88,10 @@ TEST_CASE("Extent Lists: block_ext_insert", "[extent_list]")
             verify_off_extent_list(extlist, test.expected_list, true);
             ++idx;
         }
-
-        /* Cleanup. */
-        extlist_free(session, extlist);
     }
+
+    /* Common cleanup. */
+    extlist_free(session, extlist);
 }
 
 TEST_CASE("Extent Lists: block_off_insert", "[extent_list]")
@@ -108,12 +102,12 @@ TEST_CASE("Extent Lists: block_off_insert", "[extent_list]")
 
     std::vector<WT_EXT **> stack(WT_SKIP_MAXDEPTH, nullptr);
 
+    /* Common setup. */
+    WT_EXTLIST extlist = {};
+
     SECTION("insert into an empty list has one element")
     {
         BREAK;
-        /* Setup. */
-        WT_EXTLIST extlist = {};
-
         /* Test. */
         /* Insert one extent. */
         /* Call. */
@@ -123,9 +117,6 @@ TEST_CASE("Extent Lists: block_off_insert", "[extent_list]")
 
         /* Verify. */
         REQUIRE(__ut_block_off_srch_last(&extlist.off[0], &stack[0]) == extlist.off[0]);
-
-        /* Cleanup. */
-        extlist_free(session, extlist);
     }
 
     SECTION("insert multiple extents and retrieve in correct order")
@@ -150,9 +141,6 @@ TEST_CASE("Extent Lists: block_off_insert", "[extent_list]")
             }},
         };
 
-        /* Setup. */
-        WT_EXTLIST extlist = {};
-
         /* Test. */
         /* Insert extents and verify. */
         int idx = 0;
@@ -168,8 +156,8 @@ TEST_CASE("Extent Lists: block_off_insert", "[extent_list]")
             verify_off_extent_list(extlist, test.expected_list, true);
             ++idx;
         }
-
-        /* Cleanup. */
-        extlist_free(session, extlist);
     }
+
+    /* Common cleanup. */
+    extlist_free(session, extlist);
 }

@@ -9,6 +9,7 @@ check_fast_mode_flag
 l=`(find bench/wtperf examples ext src test tools/checksum_bitflip -name '*.[chsy]' &&
     find dist -name '*.py' &&
     find src -name '*.in') |
+    git check-ignore --stdin -nv | grep -E "^::" | cut -f2 | # exclude gitignored files
     filter_if_fast |
     sed -e '/checksum\/power8/d' \
         -e '/checksum\/zseries/d' \

@@ -109,7 +109,7 @@ validate_free_block(std::shared_ptr<mock_session> session, WT_BLOCK *block, conf
     REQUIRE(conn->block_lock.session_id != session->get_wt_session_impl()->id);
 }
 
-TEST_CASE("Block: __wt_block_open and __wti_bm_close_block", "[block_file]")
+TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_file]")
 {
     /* Build Mock session, this will automatically create a mock connection. */
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();

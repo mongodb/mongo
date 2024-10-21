@@ -5690,7 +5690,7 @@ buildvariants:
 - name: rhel8-ppc
   display_name: "~ RHEL8 PPC"
   run_on:
-  - rhel81-power8-small
+  - rhel8-power-small
   batchtime: 120 # 2 hours
   expansions:
     format_test_setting: ulimit -c unlimited

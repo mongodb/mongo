@@ -12,7 +12,7 @@
 #include "../wrappers/block_mods.h"
 #include "../wrappers/mock_session.h"
 
-TEST_CASE("Block helper: __wt_rduppo2", "[block]")
+TEST_CASE("Block manager: helper function __wt_rduppo2", "[block]")
 {
     // Expected valid calls, where the 2nd param is a power of two
     REQUIRE(__wt_rduppo2(0, 8) == 0);

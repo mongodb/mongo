@@ -32,7 +32,7 @@ using namespace utils;
  */
 struct {
     bool
-    operator()(const off_size &left, const off_size &right)
+    operator()(const off_size &left, const off_size &right) const
     {
         return (left < right);
     }

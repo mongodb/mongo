@@ -19,13 +19,11 @@
 static void
 test_block_header_byteswap_copy(WT_BLOCK_HEADER *from, WT_BLOCK_HEADER *to)
 {
-    WT_BLOCK_HEADER prev_from, prev_to;
+    WT_BLOCK_HEADER prev_from;
 
     // Save the original values before any potential byte re-orderings.
     prev_from.disk_size = from->disk_size;
     prev_from.checksum = from->checksum;
-    prev_to.disk_size = to->disk_size;
-    prev_to.checksum = to->checksum;
 
 #ifdef WORDS_BIGENDIAN
     __wt_block_header_byteswap_copy(from, to);
@@ -33,6 +31,10 @@ test_block_header_byteswap_copy(WT_BLOCK_HEADER *from, WT_BLOCK_HEADER *to)
     REQUIRE(to->disk_size == __wt_bswap32(prev_from.disk_size));
 #else
     // Test that the byte orderings remain the same in both block headers.
+    WT_BLOCK_HEADER prev_to;
+    prev_to.disk_size = to->disk_size;
+    prev_to.checksum = to->checksum;
+
     REQUIRE(from->disk_size == prev_from.disk_size);
     REQUIRE(from->checksum == prev_from.checksum);
     REQUIRE(to->disk_size == prev_to.disk_size);
@@ -46,7 +48,7 @@ test_block_header_byteswap_copy(WT_BLOCK_HEADER *from, WT_BLOCK_HEADER *to)
     }
 }
 
-TEST_CASE("Block header byteswap copy", "[block_other]")
+TEST_CASE("Block manager: header byteswap copy", "[block_other]")
 {
     WT_BLOCK_HEADER from, to;
 
@@ -123,7 +125,7 @@ TEST_CASE("Block header byteswap copy", "[block_other]")
     }
 }
 
-TEST_CASE("Block header byteswap", "[block_other]")
+TEST_CASE("Block manager: block header byteswap", "[block_other]")
 {
     WT_BLOCK_HEADER to;
     to.disk_size = 12121;
@@ -145,7 +147,7 @@ TEST_CASE("Block header byteswap", "[block_other]")
 #endif
 }
 
-TEST_CASE("Block eligible for sweep", "[block_other]")
+TEST_CASE("Block manager: block eligible for sweep", "[block_other]")
 {
     WT_BLOCK block;
     WT_BM bm;

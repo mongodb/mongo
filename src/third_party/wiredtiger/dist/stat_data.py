@@ -106,7 +106,7 @@ class EvictCacheWalkStat(Stat):
         flags += ',cache_walk'
         Stat.__init__(self, name, EvictCacheWalkStat.prefix, desc, flags)
 class EvictStat(Stat):
-    prefix = 'eviction'
+    prefix = 'cache'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, EvictStat.prefix, desc, flags)
 class JoinStat(Stat):

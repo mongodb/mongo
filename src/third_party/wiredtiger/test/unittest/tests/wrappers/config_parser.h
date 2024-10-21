@@ -22,13 +22,13 @@ public:
     ~config_parser() = default;
 
     // Fetch the configuration value. If it does not exist an exception will be returned.
-    const std::string &get_config_value(std::string config) const;
+    const std::string &get_config_value(const std::string &config) const;
 
     // Insert the configuration and value into map.
-    void insert_config(std::string config, std::string value);
+    void insert_config(const std::string &config, const std::string &value);
 
     // Erase the configuration and value into map. Return true if the erase was successful.
-    bool erase_config(std::string config);
+    bool erase_config(const std::string &config);
 
     // Construct the configuration array used to be passed into wiredtiger.
     const char **get_config_array();

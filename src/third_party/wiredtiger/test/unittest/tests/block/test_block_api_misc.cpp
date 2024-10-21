@@ -24,7 +24,6 @@
 #include "wt_internal.h"
 #include "util_block.h"
 #include "../utils_extlist.h"
-#include "../wrappers/config_parser.h"
 #include "../wrappers/mock_session.h"
 
 const std::string ALLOCATION_SIZE = "256";
@@ -95,7 +94,7 @@ test_addr_string(WT_SESSION_IMPL *session, WT_BM *bm, wt_off_t pack_offset, uint
     __wt_free(nullptr, buf.data);
 }
 
-TEST_CASE("Block manager addr invalid", "[block_api_misc]")
+TEST_CASE("Block manager: addr invalid", "[block_api_misc]")
 {
     // Build Mock session, this will automatically create a mock connection.
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
@@ -106,7 +105,8 @@ TEST_CASE("Block manager addr invalid", "[block_api_misc]")
     // will crash if it attempts to check various session flags.
     auto path = std::filesystem::current_path();
     std::string file_path(path.string() + "/test.wt");
-    setup_bm(session, &bm, file_path);
+    setup_bm(session, &bm, file_path, ALLOCATION_SIZE, BLOCK_ALLOCATION, OS_CACHE_MAX,
+      OS_CACHE_DIRTY_MAX, ACCESS_PATTERN);
     WT_SESSION_IMPL *s = session->get_wt_session_impl();
 
     SECTION("Test addr invalid with a valid address cookie containing non-zero values")
@@ -154,7 +154,7 @@ TEST_CASE("Block manager addr invalid", "[block_api_misc]")
     REQUIRE(__wt_block_manager_drop(s, file_path.c_str(), false) == 0);
 }
 
-TEST_CASE("Block manager addr string", "[block_api_misc]")
+TEST_CASE("Block manager: addr string", "[block_api_misc]")
 {
     // Build Mock session, this will automatically create a mock connection.
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
@@ -163,7 +163,8 @@ TEST_CASE("Block manager addr string", "[block_api_misc]")
     WT_CLEAR(bm);
     auto path = std::filesystem::current_path();
     std::string file_path(path.string() + "/test.wt");
-    setup_bm(session, &bm, file_path);
+    setup_bm(session, &bm, file_path, ALLOCATION_SIZE, BLOCK_ALLOCATION, OS_CACHE_MAX,
+      OS_CACHE_DIRTY_MAX, ACCESS_PATTERN);
     WT_SESSION_IMPL *s = session->get_wt_session_impl();
 
     SECTION("Test addr string with non-zero values")
@@ -187,7 +188,7 @@ TEST_CASE("Block manager addr string", "[block_api_misc]")
     REQUIRE(__wt_block_close(s, bm.block) == 0);
 }
 
-TEST_CASE("Block header", "[block_api_misc]")
+TEST_CASE("Block manager: block header", "[block_api_misc]")
 {
     // Declare a block manager and set it up so that we can use its legal API methods.
     WT_BM bm;
@@ -200,7 +201,7 @@ TEST_CASE("Block header", "[block_api_misc]")
     }
 }
 
-TEST_CASE("Block manager is mapped", "[block_api_misc]")
+TEST_CASE("Block manager: is mapped", "[block_api_misc]")
 {
     // Declare a block manager and set it up so that we can use its legal API methods.
     WT_BM bm;
@@ -221,7 +222,7 @@ TEST_CASE("Block manager is mapped", "[block_api_misc]")
     }
 }
 
-TEST_CASE("Block manager size and stat", "[block_api_misc]")
+TEST_CASE("Block manager: size and stat", "[block_api_misc]")
 {
     // Build Mock session, this will automatically create a mock connection.
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
@@ -230,7 +231,8 @@ TEST_CASE("Block manager size and stat", "[block_api_misc]")
     WT_CLEAR(bm);
     auto path = std::filesystem::current_path();
     std::string file_path(path.string() + "/test.wt");
-    setup_bm(session, &bm, file_path);
+    setup_bm(session, &bm, file_path, ALLOCATION_SIZE, BLOCK_ALLOCATION, OS_CACHE_MAX,
+      OS_CACHE_DIRTY_MAX, ACCESS_PATTERN);
     WT_SESSION_IMPL *s = session->get_wt_session_impl();
 
     SECTION("Test that the bm->stat method updates statistics correctly")

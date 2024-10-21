@@ -17,45 +17,8 @@
 #include <catch2/catch.hpp>
 
 #include "wt_internal.h"
+#include "util_block.h"
 #include "../wrappers/mock_session.h"
-
-void
-validate_size_block(WT_SIZE *size)
-{
-    REQUIRE(size != nullptr);
-    REQUIRE(size->depth == 0);
-    REQUIRE(size->off[0] == nullptr);
-    REQUIRE(size->size == 0);
-}
-
-void
-free_size_block(WT_SIZE *size)
-{
-    __wt_free(nullptr, size);
-}
-
-void
-validate_and_free_size_block(WT_SIZE *size)
-{
-    validate_size_block(size);
-    free_size_block(size);
-}
-
-void
-validate_size_list(WT_BLOCK_MGR_SESSION *bms, int expected_items)
-{
-    REQUIRE(bms != nullptr);
-    if (bms->sz_cache_cnt == 0)
-        REQUIRE(bms->sz_cache == nullptr);
-
-    REQUIRE(bms->sz_cache_cnt == expected_items);
-    WT_SIZE *curr = bms->sz_cache;
-    for (int i = 0; i < expected_items; i++) {
-        validate_size_block(curr);
-        curr = curr->next[0];
-    }
-    REQUIRE(curr == nullptr);
-}
 
 TEST_CASE("Block session: __block_size_alloc", "[block_session_size]")
 {

@@ -7,24 +7,30 @@
  */
 #pragma once
 
+#include <string>
+#include <memory>
+
 #include "wt_internal.h"
 #include "../wrappers/mock_session.h"
 
 /* Extent validation functions. */
-void free_ext_list(WT_BLOCK_MGR_SESSION *);
-void validate_and_free_ext_block(WT_EXT *);
-void validate_ext_list(WT_BLOCK_MGR_SESSION *, int);
-void free_ext_block(WT_EXT *);
-void validate_ext_block(WT_EXT *);
+void validate_and_free_ext_block(WT_EXT *ext);
+void validate_ext_list(WT_BLOCK_MGR_SESSION *bms, int expected_items);
+void free_ext_block(WT_EXT *ext);
+void validate_ext_block(WT_EXT *ext);
 
 /* Size validation functions. */
-void free_size_list(WT_BLOCK_MGR_SESSION *);
-void validate_and_free_size_block(WT_SIZE *);
-void validate_size_list(WT_BLOCK_MGR_SESSION *, int);
-void free_size_block(WT_SIZE *);
-void validate_size_block(WT_SIZE *);
+void validate_and_free_size_block(WT_SIZE *size);
+void validate_size_list(WT_BLOCK_MGR_SESSION *bms, int expected_items);
+void free_size_block(WT_SIZE *size);
+void validate_size_block(WT_SIZE *size);
 
 /* Block Manager file API functions. */
-void create_write_buffer(WT_BM *, std::shared_ptr<mock_session>, std::string, WT_ITEM *, size_t);
-void setup_bm(std::shared_ptr<mock_session> &, WT_BM *, const std::string &);
-void test_and_validate_write_size(WT_BM *, std::shared_ptr<mock_session>, const size_t);
+void create_write_buffer(WT_BM *bm, std::shared_ptr<mock_session> session, std::string contents,
+  WT_ITEM *buf, size_t buf_memsize);
+void setup_bm(std::shared_ptr<mock_session> &session, WT_BM *bm, const std::string &file_path,
+  const std::string &allocation_size, const std::string &block_allocation,
+  const std::string &os_cache_max, const std::string &os_cache_dirty_max,
+  const std::string &access_pattern);
+void test_and_validate_write_size(
+  WT_BM *bm, const std::shared_ptr<mock_session> &session, size_t size);
