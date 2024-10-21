@@ -10,6 +10,8 @@ rst.initiate();
 let primary = rst.getPrimary();
 let primaryDB = primary.getDB('test');
 
+primaryDB.setLogLevel(5, 'assert');
+
 assert.commandWorked(primaryDB.foo.insert({_id: 1}));
 
 const nodeId = rst.getNodeId(primary);
@@ -19,10 +21,11 @@ rst.awaitReplication();
 primary = rst.getPrimary();
 primaryDB = primary.getDB('test');
 
+primaryDB.setLogLevel(5, 'assert');
+
 let oldAssertCounts = primaryDB.serverStatus().asserts;
 jsTestLog('Before running aggregation: Assert counts reported by db.serverStatus(): ' +
           tojson(oldAssertCounts));
-primaryDB.setLogLevel(1, 'assert');
 try {
     assert.eq(0, primaryDB.system.profile.count());
     assert.eq([{_id: 1}], primaryDB.foo.aggregate([]).toArray());
