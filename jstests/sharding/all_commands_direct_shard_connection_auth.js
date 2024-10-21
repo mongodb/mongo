@@ -199,7 +199,6 @@ const allCommands = {
         },
     },
     analyze: {
-        checkFeatureFlag: "CommonQueryFramework",
         setUp: function(mongoS) {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({create: collName}));
         },

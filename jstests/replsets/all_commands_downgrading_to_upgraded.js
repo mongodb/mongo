@@ -236,7 +236,6 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
         },
         command: {analyze: collName},
-        checkFeatureFlag: "CommonQueryFramework",
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
