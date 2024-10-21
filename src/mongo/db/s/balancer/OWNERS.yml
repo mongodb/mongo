@@ -3,3 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "balance_stats*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_statistics*":
+    approvers:
+      - 10gen/server-cluster-scalability

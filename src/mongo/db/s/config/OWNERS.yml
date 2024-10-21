@@ -87,3 +87,18 @@ filters:
   - "initial_split_policy*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "configsvr_commit_refine_collection_shard_key.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "configsvr_commit_move_primary_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "configsvr_commit_chunk_migration_command.cpp":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "configsvr_move_range_command.cpp":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*reshard*":
+    approvers:
+      - 10gen/server-cluster-scalability

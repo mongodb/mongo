@@ -21,3 +21,6 @@ filters:
   - "timeseries/*":
     approvers:
       - 10gen/server-storage-execution
+  - "splitvector.js":
+    approvers:
+      - 10gen/server-cluster-scalability

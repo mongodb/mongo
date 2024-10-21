@@ -6,17 +6,28 @@ filters:
   - "*analyze_shard_key*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "cleanup_orphaned_cmd.cpp":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "cluster_*cmd_d*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "migration*":
+  - "chunk_move_write_concern_options*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "*move_primary*":
+  - "*migration*":
     approvers:
       - 10gen/server-cluster-scalability
-      - 10gen/server-catalog-and-routing
   - "*move_range*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "move_timing_helper*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "query_analysis*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*query*analyzer*":
     approvers:
       - 10gen/server-cluster-scalability
   - "*range*deleter*":
@@ -25,14 +36,19 @@ filters:
   - "*range*deletion*":
     approvers:
       - "10gen/server-cluster-scalability"
-  - "*refine_collection_shard_key*":
-    approvers:
-      - 10gen/server-cluster-scalability
-      - 10gen/server-catalog-and-routing
   - "*reshard*":
     approvers:
       - 10gen/server-cluster-scalability
   - "session_catalog_migration*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "sharding_runtime_d_params*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*split*vector*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "start_chunk_clone_request*":
     approvers:
       - 10gen/server-cluster-scalability
   - "*transaction*":
@@ -86,6 +102,9 @@ filters:
   - "namespace_metadata_change_notifications*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "*move_primary*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "*participant_block*":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -93,6 +112,9 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
   - "*placement_history*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*refine_collection_shard_key*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "remove*":

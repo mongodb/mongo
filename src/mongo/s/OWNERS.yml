@@ -6,16 +6,19 @@ filters:
   - "*move*collection*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "*move*primary*":
+  - "*move*range*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "*move*range*":
+  - "*query_analyzer*":
     approvers:
       - 10gen/server-cluster-scalability
   - "*refine_collection_shard_key*":
     approvers:
       - 10gen/server-cluster-scalability
   - "*reshard*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "session_catalog_router*":
     approvers:
       - 10gen/server-cluster-scalability
   - "*transaction*":

@@ -103,12 +103,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/**/*move*chunk* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/**/*moveChunk* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/**/*move*collection* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/**/*move*primary* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/**/*movePrimary* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/**/*move*range* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/**/*refine_collection_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/**/*reshard* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/**/*unshard*collection* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/jstests/**/*move*primary* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/**/*movePrimary* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/**/*refine_collection_shard_key* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/aggregation/OWNERS.yml
 /jstests/aggregation/**/* @10gen/query @svc-auto-approve-bot
@@ -175,7 +175,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/updateOne_without_shard_key/OWNERS.yml
-/jstests/concurrency/fsm_workloads/updateOne_without_shard_key/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/jstests/concurrency/fsm_workloads/updateOne_without_shard_key/**/* @10gen/query-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/OWNERS.yml
 /jstests/core/**/connection_string_validation.js @10gen/server-networking-and-observability @svc-auto-approve-bot
@@ -185,6 +185,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/capped/* @10gen/server-storage-execution @svc-auto-approve-bot
 /jstests/core/clustered/* @10gen/server-storage-execution @svc-auto-approve-bot
 /jstests/core/timeseries/* @10gen/server-storage-execution @svc-auto-approve-bot
+/jstests/core/**/splitvector.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/OWNERS.yml
 /jstests/core/query/**/* @10gen/query @svc-auto-approve-bot
@@ -509,9 +510,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/replsets/**/*capped* @10gen/server-storage-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/OWNERS.yml
+/jstests/sharding/**/auto_split_vector_basic.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*fsync_lock* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*chunk_migration* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*migration_coordinator* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/jstests/sharding/**/move_primary_clone.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*range*deleter* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*range*deletion* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*retryable_write* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -1002,15 +1005,21 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/s/OWNERS.yml
 /src/mongo/db/s/**/*active_migrations_registry* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*analyze_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/**/cleanup_orphaned_cmd.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/cluster_*cmd_d* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/db/s/**/migration* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/db/s/**/*move_primary* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/**/chunk_move_write_concern_options* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/**/*migration* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*move_range* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/**/move_timing_helper* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/**/query_analysis* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/**/*query*analyzer* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*range*deleter* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*range*deletion* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/db/s/**/*refine_collection_shard_key* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*reshard* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/session_catalog_migration* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/**/sharding_runtime_d_params* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/**/*split*vector* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/**/start_chunk_clone_request* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*transaction* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*txn* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/balancer_stats_registry* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1028,9 +1037,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/*user_write* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*metadata* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/namespace_metadata_change_notifications* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/**/*move_primary* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*participant_block* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*consistency* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*placement_history* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/**/*refine_collection_shard_key* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/remove* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*rename* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*reshard*coordinator* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1100,6 +1111,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/s/balancer/OWNERS.yml
 /src/mongo/db/s/balancer/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/balancer/**/balance_stats* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/balancer/**/cluster_statistics* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/s/config/OWNERS.yml
 /src/mongo/db/s/config/**/*chunk_migration_command* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -1131,6 +1144,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_control_balancer_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/index_on_config* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/initial_split_policy* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/config/**/configsvr_commit_refine_collection_shard_key.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/config/**/configsvr_commit_move_primary_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/config/**/configsvr_commit_chunk_migration_command.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/config/**/configsvr_move_range_command.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/config/**/*reshard* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/s/metrics/OWNERS.yml
 /src/mongo/db/s/metrics/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -1243,10 +1261,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/s/OWNERS.yml
 /src/mongo/s/**/*analyze_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*move*collection* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/s/**/*move*primary* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*move*range* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/**/*query_analyzer* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*refine_collection_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*reshard* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/**/session_catalog_router* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*transaction* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*unshard*collection* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/cannot_implicitly_create_collection_info.* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1302,8 +1321,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_fle2* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/s/commands/**/document_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/commands/**/*fsync_unlock* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/commands/**/*split*vector* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/commands/**/*transition_from_dedicated* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/commands/**/*transition_to_dedicated* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/commands/**/cluster_move_chunk_cmd.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/commands/**/cluster_split_cmd.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_add_shard_* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_change_primary_cmd.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_check_metadata_consistency_cmd.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1369,7 +1391,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/query/planner/**/* @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/s/request_types/OWNERS.yml
+/src/mongo/s/request_types/**/auto_split_vector.idl @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/request_types/**/coordinate_multi_update.idl @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/request_types/**/migration_blocking_operation.idl @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/request_types/**/migration_secondary_throttle_options* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/request_types/**/add_shard* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/clone_catalog_data.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/request_types/**/drop_collection_if_uuid_not_matching.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1399,7 +1424,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/write_ops/**/* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/s/write_ops/**/coordinate_multi_update* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/write_ops/**/pause_migrations_during_multi_update* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/s/write_ops/**/write_without_shard_key* @10gen/query-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/scripting/OWNERS.yml
 /src/mongo/scripting/**/dbdirectclient_factory.* @10gen/server-programmability @svc-auto-approve-bot

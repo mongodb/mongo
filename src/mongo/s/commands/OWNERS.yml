@@ -12,10 +12,19 @@ filters:
   - "*fsync_unlock*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "*split*vector*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "*transition_from_dedicated*":
     approvers:
       - 10gen/server-cluster-scalability
   - "*transition_to_dedicated*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_move_chunk_cmd.cpp":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_split_cmd.cpp":
     approvers:
       - 10gen/server-cluster-scalability
   - "cluster_add_shard_*":

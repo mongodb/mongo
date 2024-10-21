@@ -1,6 +1,15 @@
 version: 1.0.0
 filters:
+  - "auto_split_vector.idl":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "coordinate_multi_update.idl":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "migration_blocking_operation.idl":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "migration_secondary_throttle_options*":
     approvers:
       - 10gen/server-cluster-scalability
   - "add_shard*":
