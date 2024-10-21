@@ -24,20 +24,6 @@ build --experimental_cc_shared_library
 # Reuse sandboxes to save sandbox execution and deletion times.
 build --experimental_reuse_sandbox_directories
 
-# while in hybrid build state, using local unsandboxed linking should be faster. When most of our link
-# targets have been converted (i.e. unittest binaries) and we can BWOB, remote linking should be faster
-# in those cases:
-build --strategy=CppLink=local
-build --modify_execution_info=CppLink=+no-remote-cache
-build --strategy=CppArchive=local
-build --modify_execution_info=CppArchive=+no-remote-cache
-build --strategy=SolibSymlink=local
-build --modify_execution_info=SolibSymlink=+no-remote-cache
-build --strategy=ExtractDebugInfo=local
-build --modify_execution_info=ExtractDebugInfo=+no-remote-cache
-build --strategy=StripDebugInfo=local
-build --modify_execution_info=StripDebugInfo=+no-remote-cache
-
 # Aliases for config flags
 build --flag_alias=linkstatic=//bazel/config:linkstatic
 build --flag_alias=compiler_type=//bazel/config:compiler_type
@@ -85,14 +71,6 @@ build --flag_alias=msan=//bazel/config:msan
 build --flag_alias=lsan=//bazel/config:lsan
 build --flag_alias=tsan=//bazel/config:tsan
 build --flag_alias=ubsan=//bazel/config:ubsan
-
---config=remote_link
-build:remote_link --strategy=CppLink=remote
-build:remote_link --strategy=CppArchive=remote
-build:remote_link --strategy=SolibSymlink=remote
-build:remote_link --strategy=ExtractDebugInfo=remote
-build:remote_link --strategy=StripDebugInfo=remote
-build:remote_link --features=-thin_archive
 
 # Disable the default compiler flags to avoid certain flags that conflict with flags we setup.
 build:windows --features=-smaller_binary
