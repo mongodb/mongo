@@ -40,7 +40,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/unittest/assert.h"

@@ -39,10 +39,8 @@
 
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
-#include "mongo/db/query/optimizer/utils/const_fold_interface.h"
-
 
 namespace mongo::optimizer {
 

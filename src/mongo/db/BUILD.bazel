@@ -1305,7 +1305,6 @@ mongo_cc_library(
         "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query/bson:dotted_path_support",
         "//src/mongo/db/query/client_cursor",
-        "//src/mongo/db/query/optimizer:optimizer_rewrites",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
         "//src/mongo/db/query/query_settings",
         "//src/mongo/db/query/write_ops:delete_request_idl",

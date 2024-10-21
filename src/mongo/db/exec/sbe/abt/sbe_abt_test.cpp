@@ -62,14 +62,13 @@
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/decimal128.h"
@@ -86,8 +85,7 @@ using namespace unit_test_abt_literals;
 class AbtToSbeExpression : public sbe::EExpressionTestFixture {
 public:
     ABT constFold(ABT tree) {
-        auto env = VariableEnvironment::build(tree);
-        ConstEval{env}.optimize(tree);
+        stage_builder::ExpressionConstEval{nullptr /* collator */}.optimize(tree);
         return tree;
     }
 
@@ -387,13 +385,13 @@ TEST_F(AbtToSbeExpression, LowerComparisonCollation) {
     checkCmp3w("AbX", "aBy", -1);
 }
 
-// The following nullability tests verify that ConstEval, which performs rewrites and
+// The following nullability tests verify that ExpressionConstEval, which performs rewrites and
 // simplifications based on the nullability value of expressions, does not change the result of the
-// evaluation of And and Or. eval(E) == eval(constEval(E))
+// evaluation of And and Or. eval(E) == eval(ExpressionConstEval(E))
 
 TEST_F(AbtToSbeExpression, NonNullableLhsOrTrueConstFold) {
     // E = non-nullable lhs (resolvable variable) || true
-    // eval(E) == eval(constEval(E))
+    // eval(E) == eval(ExpressionConstEval(E))
     auto tree = _binary("Or", _binary("Gt", "x"_var, "5"_cint32), _cbool(true))._n;
     auto treeConstFold = constFold(tree);
 
@@ -408,7 +406,7 @@ TEST_F(AbtToSbeExpression, NonNullableLhsOrTrueConstFold) {
 
 TEST_F(AbtToSbeExpression, NonNullableLhsOrFalseConstFold) {
     // E = non-nullable lhs (resolvable variable) || false
-    // eval(E) == eval(constEval(E))
+    // eval(E) == eval(ExpressionConstEval(E))
     auto tree = _binary("Or", _binary("Gt", "x"_var, "5"_cint32), _cbool(false))._n;
     auto treeConstFold = constFold(tree);
 
@@ -423,7 +421,7 @@ TEST_F(AbtToSbeExpression, NonNullableLhsOrFalseConstFold) {
 
 TEST_F(AbtToSbeExpression, NullableLhsOrTrueConstFold) {
     // E = nullable lhs (Nothing) || true
-    // eval(E) == eval(constEval(E))
+    // eval(E) == eval(ExpressionConstEval(E))
     auto tree = _binary("Or", _cnothing(), _cbool(true))._n;
     auto treeConstFold = constFold(tree);
 
@@ -436,7 +434,7 @@ TEST_F(AbtToSbeExpression, NullableLhsOrTrueConstFold) {
 
 TEST_F(AbtToSbeExpression, NullableLhsOrFalseConstFold) {
     // E = nullable lhs (Nothing) || false
-    // eval(E) == eval(constEval(E))
+    // eval(E) == eval(ExpressionConstEval(E))
     auto tree = _binary("Or", _cnothing(), _cbool(false))._n;
     auto treeConstFold = constFold(tree);
 
@@ -449,7 +447,7 @@ TEST_F(AbtToSbeExpression, NullableLhsOrFalseConstFold) {
 
 TEST_F(AbtToSbeExpression, NonNullableLhsAndFalseConstFold) {
     // E = non-nullable lhs (resolvable variable) && false
-    // eval(E) == eval(constEval(E))
+    // eval(E) == eval(ExpressionConstEval(E))
     auto tree = _binary("And", _binary("Gt", "x"_var, "5"_cint32), _cbool(false))._n;
     auto treeConstFold = constFold(tree);
 
@@ -463,7 +461,7 @@ TEST_F(AbtToSbeExpression, NonNullableLhsAndFalseConstFold) {
 
 TEST_F(AbtToSbeExpression, NonNullableLhsAndTrueConstFold) {
     // E = non-nullable lhs (resolvable variable) && true
-    // eval(E) == eval(constEval(E))
+    // eval(E) == eval(ExpressionConstEval(E))
     auto tree = _binary("And", _binary("Gt", "x"_var, "5"_cint32), _cbool(true))._n;
     auto treeConstFold = constFold(tree);
 
@@ -477,7 +475,7 @@ TEST_F(AbtToSbeExpression, NonNullableLhsAndTrueConstFold) {
 
 TEST_F(AbtToSbeExpression, NullableLhsAndFalseConstFold) {
     // E = nullable lhs (Nothing) && false
-    // eval(E) == eval(constEval(E))
+    // eval(E) == eval(ExpressionConstEval(E))
     auto tree = _binary("And", _cnothing(), _cbool(false))._n;
     auto treeConstFold = constFold(tree);
 
@@ -490,7 +488,7 @@ TEST_F(AbtToSbeExpression, NullableLhsAndFalseConstFold) {
 
 TEST_F(AbtToSbeExpression, NullableLhsAndTrueConstFold) {
     // E = nullable lhs (Nothing) && true
-    // eval(E) == eval(constEval(E))
+    // eval(E) == eval(ExpressionConstEval(E))
     auto tree = _binary("And", _cnothing(), _cbool(true))._n;
     auto treeConstFold = constFold(tree);
 

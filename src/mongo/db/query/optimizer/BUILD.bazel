@@ -41,7 +41,6 @@ mongo_cc_library(
         "//src/mongo/db/query/optimizer/utils:abt_compare.h",
         "//src/mongo/db/query/optimizer/utils:abt_hash.h",
         "//src/mongo/db/query/optimizer/utils:ce_math.h",
-        "//src/mongo/db/query/optimizer/utils:const_fold_interface.h",
         "//src/mongo/db/query/optimizer/utils:physical_plan_builder.h",
         "//src/mongo/db/query/optimizer/utils:reftracker_utils.h",
         "//src/mongo/db/query/optimizer/utils:strong_alias.h",
@@ -52,23 +51,5 @@ mongo_cc_library(
         # arithmetic for constant folding.
         "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",
         "//src/mongo/db:sbe_values",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-# Rewrites which manipulate the ABT directly.
-mongo_cc_library(
-    name = "optimizer_rewrites",
-    srcs = [
-        "//src/mongo/db/query/optimizer/rewrites:const_eval.cpp",
-        "//src/mongo/db/query/optimizer/rewrites:normalize_projections.cpp",
-        "//src/mongo/db/query/optimizer/rewrites:path.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/query/optimizer/rewrites:const_eval.h",
-        "//src/mongo/db/query/optimizer/rewrites:normalize_projections.h",
-        "//src/mongo/db/query/optimizer/rewrites:path.h",
-    ],
-    deps = [
-        ":optimizer_base",
     ],
 )

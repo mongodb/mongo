@@ -50,7 +50,6 @@
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/utils/const_fold_interface.h"
 #include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/id_generator.h"

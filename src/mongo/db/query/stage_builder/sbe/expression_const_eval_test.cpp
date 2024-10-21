@@ -36,6 +36,7 @@
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
+#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -175,6 +176,84 @@ TEST(SbeStageBuilderConstEvalTest, CompareSimplificationCollation) {
     const CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
     ABT tree = _binary("Lt", "a"_cstr, "B"_cstr)._n;
     ASSERT_TRUE(constEval(tree, &collator)->getValueBool());
+}
+
+TEST(SbeStageBuilderConstEvalTest, ConstEvalNotNegate) {
+    // !true = false
+    ABT tree1 = make<UnaryOp>(Operations::Not, Constant::boolean(true));
+    ASSERT_EQ(constEval(tree1)->getValueBool(), false);
+    // !false = true
+    ABT tree2 = make<UnaryOp>(Operations::Not, Constant::boolean(false));
+    ASSERT_EQ(constEval(tree2)->getValueBool(), true);
+}
+
+TEST(ConstEvalTest, FoldRedundantExists) {
+    ABT exists = make<FunctionCall>("exists", makeSeq(Constant::int32(1)));
+
+    // Eliminates the exists call in favor of a boolean true.
+    ASSERT_EQ(constEval(exists)->getValueBool(), true);
+}
+
+TEST(ConstEvalTest, AndOrFoldNonNothingLhs) {
+    ExpressionConstEval evaluator{nullptr};
+
+    /* OR */
+    // nullable lhs (variable) || false -> lhs.
+    ABT abt = _binary("Or", _binary("Lte", "x"_var, "2"_cint64), _cbool(false))._n;
+    while (evaluator.optimize(abt))
+        ;
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [Lte]\n"
+        "|   Const [2]\n"
+        "Variable [x]\n",
+        abt);
+
+    // nullable lhs (variable) || true -> no change.
+    abt = _binary("Or", _binary("Lte", "x"_var, "2"_cint64), _cbool(true))._n;
+    while (evaluator.optimize(abt))
+        ;
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [Or]\n"
+        "|   Const [true]\n"
+        "BinaryOp [Lte]\n"
+        "|   Const [2]\n"
+        "Variable [x]\n",
+        abt);
+
+    // nothing lhs (const) || true -> no change.
+    abt = _binary("Or", _cnothing(), _cbool(true))._n;
+    while (evaluator.optimize(abt))
+        ;
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [Or]\n"
+        "|   Const [true]\n"
+        "Const [Nothing]\n",
+        abt);
+
+    /* AND */
+    // nullable lhs (if) && true -> lhs.
+    abt = _binary("And", _if("x"_var, "y"_var, "z"_var), _cbool(true))._n;
+    while (evaluator.optimize(abt))
+        ;
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "If []\n"
+        "|   |   Variable [z]\n"
+        "|   Variable [y]\n"
+        "Variable [x]\n",
+        abt);
+
+    // nullable lhs (if) && false -> no change.
+    abt = _binary("And", _if("x"_var, "y"_var, "z"_var), _cbool(false))._n;
+    while (evaluator.optimize(abt))
+        ;
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [And]\n"
+        "|   Const [false]\n"
+        "If []\n"
+        "|   |   Variable [z]\n"
+        "|   Variable [y]\n"
+        "Variable [x]\n",
+        abt);
 }
 
 }  // namespace

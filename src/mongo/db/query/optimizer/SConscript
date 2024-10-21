@@ -22,7 +22,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_rewrites",
+        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_base",
         "$BUILD_DIR/mongo/unittest/unittest",
     ],
 )
@@ -33,8 +33,6 @@ env.CppUnitTest(
         "explain_paths_exprs_test.cpp",
         "optimizer_test.cpp",
         "reference_tracker_test.cpp",
-        "rewrites/const_eval_test.cpp",
-        "rewrites/path_optimizer_test.cpp",
         "unit_test_infra_test.cpp",
     ],
     LIBDEPS=[
@@ -51,7 +49,6 @@ optimizer_gdb_test_program = env.Program(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/service_context_non_d",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "optimizer_rewrites",
         "unit_test_utils",
     ],
     AIB_COMPONENT="pretty-printer-tests",
