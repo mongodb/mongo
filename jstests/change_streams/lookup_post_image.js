@@ -15,7 +15,6 @@ import {
     ChangeStreamTest,
     isChangeStreamPassthrough
 } from "jstests/libs/query/change_stream_util.js";
-import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_post_image");
 const cst = new ChangeStreamTest(db);
@@ -136,11 +135,8 @@ cursor = cst.startWatchingChanges({
     aggregateOptions: {cursor: {batchSize: 0}}
 });
 
-// Drop the collection and wait until two-phase drop finishes.
+// Drop the collection.
 assertDropCollection(db, coll.getName());
-assert.soon(function() {
-    return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(db, coll.getName());
-});
 // If this test is running with secondary read preference, it's necessary for the drop
 // to propagate to all secondary nodes and be available for majority reads before we can
 // assume looking up the document will fail.
@@ -238,10 +234,6 @@ cursor = cst.startWatchingChanges({
 });
 assert.commandWorked(coll.insert({_id: "testing invalidate"}));
 assertDropCollection(db, coll.getName());
-// Wait until two-phase drop finishes.
-assert.soon(function() {
-    return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(db, coll.getName());
-});
 latestChange = cst.getOneChange(cursor);
 assert.eq(latestChange.operationType, "insert");
 latestChange = cst.getOneChange(cursor);

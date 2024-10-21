@@ -121,17 +121,6 @@ Status checkReplState(OperationContext* opCtx,
                                     << " with collection " << dbAndUUID.uuid());
     }
 
-    // Disallow index drops on drop-pending namespaces (system.drop.*) if we are primary.
-    auto isPrimary = replCoord->getSettings().isReplSet() && canAcceptWrites;
-    const auto& nss = collection->ns();
-    if (isPrimary && nss.isDropPendingNamespace()) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Cannot drop indexes on drop-pending namespace "
-                                    << nss.toStringForErrorMsg() << " in database "
-                                    << dbAndUUID.dbName().toStringForErrorMsg() << " with uuid "
-                                    << dbAndUUID.uuid());
-    }
-
     return Status::OK();
 }
 

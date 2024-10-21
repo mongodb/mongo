@@ -52,7 +52,6 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
@@ -151,8 +150,6 @@ public:
 
         auto serviceContext = getServiceContext();
         auto storageMock = std::make_unique<repl::StorageInterfaceMock>();
-        repl::DropPendingCollectionReaper::set(
-            serviceContext, std::make_unique<repl::DropPendingCollectionReaper>(storageMock.get()));
         repl::StorageInterface::set(serviceContext, std::move(storageMock));
 
         _controller = std::make_shared<DonorStateTransitionController>();

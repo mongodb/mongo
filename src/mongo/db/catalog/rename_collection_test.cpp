@@ -67,7 +67,6 @@
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
@@ -147,7 +146,6 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType,
                                   bool markFromMigrate) override;
 
     void onRenameCollection(OperationContext* opCtx,
@@ -274,7 +272,6 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
-                                              const CollectionDropType dropType,
                                               bool markFromMigrate) {
     _logOp(opCtx, collectionName, "drop");
     // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
@@ -282,8 +279,8 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
     if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(dropOpTime);
     }
-    auto noopOptime = OpObserverNoop::onDropCollection(
-        opCtx, collectionName, uuid, numRecords, dropType, markFromMigrate);
+    auto noopOptime =
+        OpObserverNoop::onDropCollection(opCtx, collectionName, uuid, numRecords, markFromMigrate);
     invariant(noopOptime.isNull());
     return {};
 }
@@ -393,9 +390,6 @@ void RenameCollectionTest::setUp() {
     _opCtx = cc().makeOperationContext();
 
     repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
-    repl::DropPendingCollectionReaper::set(
-        service,
-        std::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 
     // Set up ReplicationCoordinator and create oplog.
     auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
@@ -422,7 +416,6 @@ void RenameCollectionTest::tearDown() {
     _opCtx = {};
 
     auto service = getServiceContext();
-    repl::DropPendingCollectionReaper::set(service, {});
     repl::StorageInterface::set(service, {});
 
     ServiceContextMongoDTest::tearDown();
@@ -564,20 +557,6 @@ TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseD
                   renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
 }
 
-TEST_F(RenameCollectionTest,
-       RenameCollectionReturnsNamespaceNotFoundIfSourceCollectionIsDropPending) {
-    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    auto dropPendingNss = _sourceNss.makeDropPendingNamespace(dropOpTime);
-
-    _createCollection(_opCtx.get(), dropPendingNss);
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  renameCollection(_opCtx.get(), dropPendingNss, _targetNss, {}));
-
-    // Source collections stays in drop-pending state.
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
-}
-
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNotWritablePrimaryIfNotPrimary) {
     _createCollection(_opCtx.get(), _sourceNss);
     ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
@@ -627,43 +606,6 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseWithUuid) {
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
     ASSERT(options.uuid);
     ASSERT_NOT_EQUALS(*options.uuid, _getCollectionUuid(_opCtx.get(), _targetNssDifferentDb));
-}
-
-TEST_F(RenameCollectionTest,
-       RenameCollectionForApplyOpsReturnsNamespaceNotFoundIfSourceCollectionIsDropPending) {
-    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    auto dropPendingNss = _sourceNss.makeDropPendingNamespace(dropOpTime);
-    _createCollection(_opCtx.get(), dropPendingNss);
-
-    auto cmd =
-        BSON("renameCollection" << dropPendingNss.ns_forTest() << "to" << _targetNss.ns_forTest());
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  renameCollectionForApplyOps(_opCtx.get(), boost::none, boost::none, cmd, {}));
-
-    // Source collections stays in drop-pending state.
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
-}
-
-TEST_F(
-    RenameCollectionTest,
-    RenameCollectionForApplyOpsReturnsNamespaceNotFoundIfTargetUuidRefersToDropPendingCollection) {
-    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    auto dropPendingNss = _sourceNss.makeDropPendingNamespace(dropOpTime);
-    auto options = _makeCollectionOptionsWithUuid();
-    _createCollection(_opCtx.get(), dropPendingNss, options);
-
-    NamespaceString ignoredSourceNss =
-        NamespaceString::createNamespaceString_forTest(_sourceNss.dbName(), "ignored");
-    auto cmd = BSON("renameCollection" << ignoredSourceNss.ns_forTest() << "to"
-                                       << _targetNss.ns_forTest());
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  renameCollectionForApplyOps(_opCtx.get(), options.uuid, boost::none, cmd, {}));
-
-    // Source collections stays in drop-pending state.
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), ignoredSourceNss));
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionToItselfByNsForApplyOps) {

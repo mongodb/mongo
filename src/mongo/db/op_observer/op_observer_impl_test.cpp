@@ -736,7 +736,6 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
                                     nss,
                                     uuid,
                                     0U,
-                                    OpObserver::CollectionDropType::kTwoPhase,
                                     /*markFromMigrate=*/false);
         dropOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
@@ -773,7 +772,6 @@ TEST_F(OpObserverTest, OnDropCollectionInlcudesTenantId) {
                                     nss,
                                     uuid,
                                     0U,
-                                    OpObserver::CollectionDropType::kTwoPhase,
                                     /*markFromMigrate=*/false);
         wunit.commit();
     }

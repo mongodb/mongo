@@ -573,7 +573,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         return false;
     }
 
-    if (nss->isTemporaryReshardingCollection() || nss->isDropPendingNamespace()) {
+    if (nss->isTemporaryReshardingCollection()) {
         // For resharding, the donor shard primary is responsible for performing the TTL
         // deletions.
         return false;
@@ -913,7 +913,7 @@ void TTLMonitor::onStepUp() {
                 continue;
             }
 
-            if (nss->isTemporaryReshardingCollection() || nss->isDropPendingNamespace()) {
+            if (nss->isTemporaryReshardingCollection()) {
                 continue;
             }
 

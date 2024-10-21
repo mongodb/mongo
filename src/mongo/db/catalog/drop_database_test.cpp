@@ -55,7 +55,6 @@
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
@@ -95,7 +94,6 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType,
                                   bool markFromMigrate) override;
 
     std::set<DatabaseName> droppedDatabaseNames;
@@ -118,11 +116,10 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
-                                              const CollectionDropType dropType,
                                               bool markFromMigrate) {
     ASSERT_TRUE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    auto opTime = OpObserverNoop::onDropCollection(
-        opCtx, collectionName, uuid, numRecords, dropType, markFromMigrate);
+    auto opTime =
+        OpObserverNoop::onDropCollection(opCtx, collectionName, uuid, numRecords, markFromMigrate);
     invariant(opTime.isNull());
     // Do not update 'droppedCollectionNames' if OpObserverNoop::onDropCollection() throws.
     droppedCollectionNames.insert(collectionName);
@@ -167,9 +164,6 @@ void DropDatabaseTest::setUp() {
     _opCtx = cc().makeOperationContext();
 
     repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
-    repl::DropPendingCollectionReaper::set(
-        service,
-        std::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 
     // Set up ReplicationCoordinator and create oplog.
     auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
@@ -197,7 +191,6 @@ void DropDatabaseTest::tearDown() {
     _opCtx = {};
 
     auto service = getServiceContext();
-    repl::DropPendingCollectionReaper::set(service, {});
     repl::StorageInterface::set(service, {});
 
     ServiceContextMongoDTest::tearDown();
@@ -292,41 +285,6 @@ TEST_F(DropDatabaseTest, DropDatabaseNotifiesOpObserverOfDroppedReplicatedSystem
     NamespaceString replicatedSystemNss =
         NamespaceString::createNamespaceString_forTest(_nss.getSisterNS("system.js"));
     _testDropDatabase(_opCtx.get(), _opObserver, replicatedSystemNss, true);
-}
-
-TEST_F(DropDatabaseTest, DropDatabaseWaitsForDropPendingCollectionOpTimeIfNoCollectionsAreDropped) {
-    repl::OpTime clientLastOpTime;
-
-    // Update ReplicationCoordinatorMock so that we record the optime passed to awaitReplication().
-    _replCoord->setAwaitReplicationReturnValueFunction(
-        [&clientLastOpTime, this](OperationContext*, const repl::OpTime& opTime) {
-            clientLastOpTime = opTime;
-            ASSERT_GREATER_THAN(clientLastOpTime, repl::OpTime());
-            return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
-        });
-
-    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
-    _testDropDatabase(_opCtx.get(), _opObserver, dpns, false);
-
-    ASSERT_EQUALS(dropOpTime, clientLastOpTime);
-}
-
-TEST_F(DropDatabaseTest, DropDatabasePassedThroughAwaitReplicationErrorForDropPendingCollection) {
-    // Update ReplicationCoordinatorMock so that we record the optime passed to awaitReplication().
-    _replCoord->setAwaitReplicationReturnValueFunction(
-        [this](OperationContext*, const repl::OpTime& opTime) {
-            ASSERT_GREATER_THAN(opTime, repl::OpTime());
-            return repl::ReplicationCoordinator::StatusAndDuration(
-                Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
-        });
-
-    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
-    _createCollection(_opCtx.get(), dpns);
-
-    ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
-                  dropDatabaseForApplyOps(_opCtx.get(), _nss.dbName()));
 }
 
 TEST_F(DropDatabaseTest, DropDatabaseDropsSystemProfileCollectionWhenDroppingCollections) {

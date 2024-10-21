@@ -282,10 +282,6 @@ public:
                 desiredCollections.count(collNss.coll().toString()) == 0)
                 return true;
 
-            // Don't include 'drop pending' collections.
-            if (collNss.isDropPendingNamespace())
-                return true;
-
             if (collection->isCapped()) {
                 cappedCollectionSet.insert(collNss.coll().toString());
             }

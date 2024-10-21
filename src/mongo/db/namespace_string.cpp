@@ -262,67 +262,6 @@ void NamespaceString::serializeCollectionName(BSONObjBuilder* builder, StringDat
     }
 }
 
-bool NamespaceString::isDropPendingNamespace() const {
-    return coll().startsWith(dropPendingNSPrefix);
-}
-
-NamespaceString NamespaceString::makeDropPendingNamespace(const repl::OpTime& opTime) const {
-    StringBuilder ss;
-    ss << db_deprecated() << "." << dropPendingNSPrefix;
-    ss << opTime.getSecs() << "i" << opTime.getTimestamp().getInc() << "t" << opTime.getTerm();
-    ss << "." << coll();
-    return NamespaceString(tenantId(), ss.stringData());
-}
-
-StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const {
-    if (!isDropPendingNamespace()) {
-        return Status(ErrorCodes::BadValue, fmt::format("Not a drop-pending namespace: {}", ns()));
-    }
-
-    auto collectionName = coll();
-    auto opTimeBeginIndex = dropPendingNSPrefix.size();
-    auto opTimeEndIndex = collectionName.find('.', opTimeBeginIndex);
-    auto opTimeStr = std::string::npos == opTimeEndIndex
-        ? collectionName.substr(opTimeBeginIndex)
-        : collectionName.substr(opTimeBeginIndex, opTimeEndIndex - opTimeBeginIndex);
-
-    auto incrementSeparatorIndex = opTimeStr.find('i');
-    if (std::string::npos == incrementSeparatorIndex) {
-        return Status(ErrorCodes::FailedToParse,
-                      fmt::format("Missing 'i' separator in drop-pending namespace: {}", ns()));
-    }
-
-    auto termSeparatorIndex = opTimeStr.find('t', incrementSeparatorIndex);
-    if (std::string::npos == termSeparatorIndex) {
-        return Status(ErrorCodes::FailedToParse,
-                      fmt::format("Missing 't' separator in drop-pending namespace: {}", ns()));
-    }
-
-    long long seconds;
-    auto status = NumberParser{}(opTimeStr.substr(0, incrementSeparatorIndex), &seconds);
-    if (!status.isOK()) {
-        return status.withContext(
-            fmt::format("Invalid timestamp seconds in drop-pending namespace: {}", ns()));
-    }
-
-    unsigned int increment;
-    status = NumberParser{}(opTimeStr.substr(incrementSeparatorIndex + 1,
-                                             termSeparatorIndex - (incrementSeparatorIndex + 1)),
-                            &increment);
-    if (!status.isOK()) {
-        return status.withContext(
-            fmt::format("Invalid timestamp increment in drop-pending namespace: {}", ns()));
-    }
-
-    long long term;
-    status = mongo::NumberParser{}(opTimeStr.substr(termSeparatorIndex + 1), &term);
-    if (!status.isOK()) {
-        return status.withContext(fmt::format("Invalid term in drop-pending namespace: {}", ns()));
-    }
-
-    return repl::OpTime(Timestamp(Seconds(seconds), increment), term);
-}
-
 bool NamespaceString::isNamespaceAlwaysUntracked() const {
     // Local and admin never have sharded collections
     if (isLocalDB() || isAdminDB())

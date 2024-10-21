@@ -134,7 +134,10 @@ commands:
                 default: false
                 stability: stable
             includePendingDrops:
+                # Deprecated: This field has no effect since ~4.2 when we stopped
+                # using drop pending namespaces.
+                # TODO(SERVER-92839): remove this option.
+                ignore: true
                 type: safeBool
                 stability: unstable
-                optional: true
         reply_type: ListCollectionsReply

@@ -107,11 +107,6 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             "Cannot convert an encrypted collection to a capped collection",
             !fromCollection->getCollectionOptions().encryptedFieldConfig);
 
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "source collection " << fromNss.toStringForErrorMsg()
-                          << " is currently in a drop-pending state.",
-            !fromNss.isDropPendingNamespace());
-
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "cloneCollectionAsCapped failed - destination collection "
                           << toNss.toStringForErrorMsg() << " already exists. source collection: "

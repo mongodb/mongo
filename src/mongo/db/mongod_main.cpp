@@ -147,7 +147,6 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 #include "mongo/db/repl/base_cloner.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/initial_syncer_factory.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -1414,10 +1413,6 @@ void setUpReplication(ServiceContext* serviceContext) {
             storageInterface, std::move(consistencyMarkers), std::move(recovery)));
     auto replicationProcess = repl::ReplicationProcess::get(serviceContext);
 
-    repl::DropPendingCollectionReaper::set(
-        serviceContext, std::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
-    auto dropPendingCollectionReaper = repl::DropPendingCollectionReaper::get(serviceContext);
-
     repl::TopologyCoordinator::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
     topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
@@ -1426,7 +1421,7 @@ void setUpReplication(ServiceContext* serviceContext) {
         serviceContext,
         getGlobalReplSettings(),
         std::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
-            serviceContext, dropPendingCollectionReaper, storageInterface, replicationProcess),
+            serviceContext, storageInterface, replicationProcess),
         makeReplicationExecutor(serviceContext),
         std::make_unique<repl::TopologyCoordinator>(topoCoordOptions),
         replicationProcess,

@@ -64,7 +64,6 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -320,15 +319,9 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         }
     }
 
-    // It's possible for the given collection to be drop pending after obtaining the locks again, if
-    // that is the case, then the collection is already registered to be dropped. Return early.
-    const NamespaceString resolvedNss = coll->ns();
-    if (resolvedNss.isDropPendingNamespace()) {
-        return Status::OK();
-    }
-
     // Serialize the drop with refreshes to prevent dropping a collection and creating the same
     // nss as a view while refreshing.
+    const NamespaceString resolvedNss = coll->ns();
     CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, resolvedNss)
         ->checkShardVersionOrThrow(opCtx);
 
@@ -657,30 +650,18 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
     });
 }
 
-void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
-                                                const DatabaseName& dbName) {
+void checkForIdIndexes(OperationContext* opCtx, const DatabaseName& dbName) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
 
     if (dbName == DatabaseName::kLocal) {
         // Collections in the local database are not replicated, so we do not need an _id index on
-        // any collection. For the same reason, it is not possible for the local database to contain
-        // any drop-pending collections (drops are effective immediately).
+        // any collection.
         return;
     }
 
     auto catalog = CollectionCatalog::get(opCtx);
 
     for (const auto& nss : catalog->getAllCollectionNamesFromDb(opCtx, dbName)) {
-        if (nss.isDropPendingNamespace()) {
-            auto dropOpTime = fassert(40459, nss.getDropPendingNamespaceOpTime());
-            LOGV2(20321,
-                  "Found drop-pending namespace",
-                  logAttrs(nss),
-                  "dropOpTime"_attr = dropOpTime);
-            repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(
-                opCtx, dropOpTime, nss);
-        }
-
         if (nss.isSystem())
             continue;
 

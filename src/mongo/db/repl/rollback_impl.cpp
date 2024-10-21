@@ -75,7 +75,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -720,9 +719,7 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     _rollbackStats.truncateTimestamp = truncatePoint;
     _listener->onSetOplogTruncateAfterPoint(truncatePoint);
 
-    // Align the drop pending reaper state with what's on disk. Oplog recovery depends on those
-    // being consistent.
-    _resetDropPendingState(opCtx);
+    _checkForAllIdIndexes(opCtx);
 
     // Run the recovery process.
     _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
@@ -1416,17 +1413,12 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
     }
 }
 
-void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
-    // TODO(SERVER-38671): Remove this line when drop-pending idents are always supported with this
-    // rolback method. Until then, we should assume that pending drops can be handled by either the
-    // replication subsystem or the storage engine.
-    DropPendingCollectionReaper::get(opCtx)->clearDropPendingState();
-
+void RollbackImpl::_checkForAllIdIndexes(OperationContext* opCtx) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
     for (const auto& dbName : dbNames) {
         Lock::DBLock dbLock(opCtx, dbName, MODE_X);
-        checkForIdIndexesAndDropPendingCollections(opCtx, dbName);
+        checkForIdIndexes(opCtx, dbName);
     }
 }
 

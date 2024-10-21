@@ -68,7 +68,6 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_mock.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
@@ -115,9 +114,6 @@ void DatabaseTest::setUp() {
     _opCtx = cc().makeOperationContext();
 
     repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
-    repl::DropPendingCollectionReaper::set(
-        service,
-        std::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 
     // Set up ReplicationCoordinator and create oplog.
     repl::ReplicationCoordinator::set(service,
@@ -143,7 +139,6 @@ void DatabaseTest::tearDown() {
     _opCtx = {};
 
     auto service = getServiceContext();
-    repl::DropPendingCollectionReaper::set(service, {});
     repl::StorageInterface::set(service, {});
 
     ServiceContextMongoDTest::tearDown();

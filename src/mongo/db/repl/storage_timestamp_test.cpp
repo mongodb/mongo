@@ -106,7 +106,6 @@
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/apply_ops.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
@@ -1861,11 +1860,6 @@ private:
 
 public:
     void run(bool simulatePrimary) {
-        auto storageInterface = repl::StorageInterface::get(_opCtx);
-        repl::DropPendingCollectionReaper::set(
-            _opCtx->getServiceContext(),
-            std::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
-
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto durableCatalog = storageEngine->getCatalog();
 

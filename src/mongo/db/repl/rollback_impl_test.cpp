@@ -61,7 +61,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -1267,50 +1266,6 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenCollectionIsRenamed) {
     const auto& deletedObjsNewColl = _rollback->docsDeletedForNamespace_forTest(uuidAfterRename);
     ASSERT_EQ(deletedObjsNewColl.size(), 1UL);
     ASSERT_BSONOBJ_EQ(deletedObjsNewColl.front(), objInNewCollection);
-}
-
-TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenInsertsAndDropOfCollectionAreRolledBack) {
-    const auto commonOp = makeOpAndRecordId(1);
-    _remoteOplog->setOperations({commonOp});
-    ASSERT_OK(_insertOplogEntry(commonOp.first));
-    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
-
-    // Create the collection, but as a drop-pending collection.
-    const auto dropOpTime = OpTime(Timestamp(200, 200), 200L);
-    const auto nss = NamespaceString::createNamespaceString_forTest("db.people")
-                         .makeDropPendingNamespace(dropOpTime);
-    const auto uuid = UUID::gen();
-    const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    DropPendingCollectionReaper::get(_opCtx.get())
-        ->addDropPendingNamespace(_opCtx.get(), dropOpTime, nss);
-
-    // Insert documents into the collection. We'll write them out even though the collection is
-    // later dropped.
-    const auto obj1 = BSON("_id"
-                           << "kyle");
-    const auto obj2 = BSON("_id"
-                           << "glenn");
-    _insertDocAndGenerateOplogEntry(obj1, uuid, nss);
-    _insertDocAndGenerateOplogEntry(obj2, uuid, nss);
-
-    // Create an oplog entry for the collection drop.
-    const auto oplogEntry =
-        BSON("ts" << dropOpTime.getTimestamp() << "t" << dropOpTime.getTerm() << "op"
-                  << "c"
-                  << "wall" << Date_t() << "o" << BSON("drop" << nss.coll()) << "ns"
-                  << nss.ns_forTest() << "ui" << uuid);
-    ASSERT_OK(_insertOplogEntry(oplogEntry));
-
-    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
-
-    const auto& deletedObjs = _rollback->docsDeletedForNamespace_forTest(uuid);
-    ASSERT_EQ(deletedObjs.size(), 2UL);
-    std::vector<BSONObj> expectedObjs({obj1, obj2});
-    ASSERT(std::is_permutation(deletedObjs.begin(),
-                               deletedObjs.end(),
-                               expectedObjs.begin(),
-                               expectedObjs.end(),
-                               SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
 TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenCreateCollAndInsertsAreRolledBack) {

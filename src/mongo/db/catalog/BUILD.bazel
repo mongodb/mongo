@@ -653,7 +653,6 @@ mongo_cc_library(
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/write_ops",
-        "//src/mongo/db/repl:drop_pending_collection_reaper",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/db/storage:record_store_base",

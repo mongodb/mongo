@@ -70,7 +70,6 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -427,12 +426,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, nss);
     if (dropOpTime.isNull() && isOplogDisabledForNamespace) {
         _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection(opCtx));
-        opObserver->onDropCollection(opCtx,
-                                     nss,
-                                     uuid,
-                                     numRecords,
-                                     OpObserver::CollectionDropType::kOnePhase,
-                                     markFromMigrate);
+        opObserver->onDropCollection(opCtx, nss, uuid, numRecords, markFromMigrate);
         return _finishDropCollection(opCtx, nss, collection.getWritableCollection(opCtx));
     }
 
@@ -453,76 +447,18 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
           "commitTimestamp"_attr = commitTimestamp);
     if (dropOpTime.isNull()) {
         // Log oplog entry for collection drop and remove the UUID.
-        dropOpTime = opObserver->onDropCollection(opCtx,
-                                                  nss,
-                                                  uuid,
-                                                  numRecords,
-                                                  OpObserver::CollectionDropType::kOnePhase,
-                                                  markFromMigrate);
+        dropOpTime = opObserver->onDropCollection(opCtx, nss, uuid, numRecords, markFromMigrate);
         invariant(!dropOpTime.isNull());
     } else {
         // If we are provided with a valid 'dropOpTime', it means we are dropping this
         // collection in the context of applying an oplog entry on a secondary.
-        auto opTime = opObserver->onDropCollection(opCtx,
-                                                   nss,
-                                                   uuid,
-                                                   numRecords,
-                                                   OpObserver::CollectionDropType::kOnePhase,
-                                                   markFromMigrate);
+        auto opTime = opObserver->onDropCollection(opCtx, nss, uuid, numRecords, markFromMigrate);
         // OpObserver::onDropCollection should not be writing to the oplog on the secondary.
         invariant(opTime.isNull(),
                   str::stream() << "OpTime is not null. OpTime: " << opTime.toString());
     }
 
     return _finishDropCollection(opCtx, nss, collection.getWritableCollection(opCtx));
-
-    // Old two-phase drop: Replicated collections will be renamed with a special drop-pending
-    // namespace and dropped when the replica set optime reaches the drop optime.
-
-    if (dropOpTime.isNull()) {
-        // Log oplog entry for collection drop.
-        dropOpTime = opObserver->onDropCollection(opCtx,
-                                                  nss,
-                                                  uuid,
-                                                  numRecords,
-                                                  OpObserver::CollectionDropType::kTwoPhase,
-                                                  markFromMigrate);
-        invariant(!dropOpTime.isNull());
-    } else {
-        // If we are provided with a valid 'dropOpTime', it means we are dropping this
-        // collection in the context of applying an oplog entry on a secondary.
-        auto opTime = opObserver->onDropCollection(opCtx,
-                                                   nss,
-                                                   uuid,
-                                                   numRecords,
-                                                   OpObserver::CollectionDropType::kTwoPhase,
-                                                   markFromMigrate);
-        // OpObserver::onDropCollection should not be writing to the oplog on the secondary.
-        invariant(opTime.isNull());
-    }
-
-    // Rename collection using drop-pending namespace generated from drop optime.
-    auto dpns = nss.makeDropPendingNamespace(dropOpTime);
-    const bool stayTemp = true;
-    LOGV2(20315,
-          "dropCollection: renaming to drop-pending collection",
-          logAttrs(nss),
-          "uuid"_attr = uuid,
-          "dropPendingName"_attr = dpns,
-          "dropOpTime"_attr = dropOpTime);
-    {
-        // This is a uniquely generated drop-pending namespace that no other operations are using.
-        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
-            shard_role_details::getLocker(opCtx));
-        Lock::CollectionLock collLk(opCtx, dpns, MODE_X);
-        fassert(40464, renameCollection(opCtx, nss, dpns, stayTemp));
-    }
-
-    // Register this drop-pending namespace with DropPendingCollectionReaper to remove when the
-    // committed optime reaches the drop optime.
-    repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(opCtx, dropOpTime, dpns);
-
-    return Status::OK();
 }
 
 void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,

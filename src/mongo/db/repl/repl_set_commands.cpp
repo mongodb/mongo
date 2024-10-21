@@ -69,7 +69,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_command.h"
@@ -402,11 +401,9 @@ public:
                 21577,
                 "Initiate: no configuration specified. Using a default configuration for the set");
 
-            ReplicationCoordinatorExternalStateImpl externalState(
-                opCtx->getServiceContext(),
-                DropPendingCollectionReaper::get(opCtx),
-                StorageInterface::get(opCtx),
-                ReplicationProcess::get(opCtx));
+            ReplicationCoordinatorExternalStateImpl externalState(opCtx->getServiceContext(),
+                                                                  StorageInterface::get(opCtx),
+                                                                  ReplicationProcess::get(opCtx));
             std::string name;
             std::vector<HostAndPort> seeds;
             parseReplSetSeedList(&externalState, replSetString, &name, &seeds);  // may throw...

@@ -891,8 +891,8 @@ void startupRecovery(OperationContext* opCtx,
             ensureCollectionProperties(opCtx, dbName, EnsureIndexPolicy::kBuildMissing));
 
         if (usingReplication) {
-            // We only care about _id indexes and drop-pending collections if we are in a replset.
-            checkForIdIndexesAndDropPendingCollections(opCtx, dbName);
+            // We only care about _id indexes if we are in a replset.
+            checkForIdIndexes(opCtx, dbName);
             // Ensure oplog is capped (mongodb does not guarantee order of inserts on noncapped
             // collections)
             if (dbName == DatabaseName::kLocal) {

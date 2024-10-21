@@ -204,7 +204,6 @@ repl::OpTime UserWriteBlockModeOpObserver::onDropCollection(OperationContext* op
                                                             const NamespaceString& collectionName,
                                                             const UUID& uuid,
                                                             std::uint64_t numRecords,
-                                                            CollectionDropType dropType,
                                                             bool markFromMigrate) {
     _checkWriteAllowed(opCtx, collectionName);
     return repl::OpTime();
