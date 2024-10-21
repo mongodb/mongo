@@ -16,7 +16,9 @@ export const $config = (function() {
         function write(db, collName) {
             const coll = db[collName];
             const i = Random.randInt(499) * 2;
-            assert.writeOK(coll.update({i: i}, {$set: {i: 2000}}, {multi: true}));
+            retryOnRetryableError(() => {
+                assert.writeOK(coll.update({i: i}, {$set: {i: 2000}}, {multi: true}));
+            }, 100, undefined, TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : []);
             assert.writeOK(coll.remove({i: 2000}));
             assert.writeOK(coll.save({i: i}));
         }
