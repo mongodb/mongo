@@ -30,7 +30,7 @@ const rst = new ReplSetTest({
     nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}}
 });
 const nodes = rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapshotReadConcern) {
     // Only snapshotting storage engines require correct timestamping of index builds.

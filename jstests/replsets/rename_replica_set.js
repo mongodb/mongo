@@ -12,7 +12,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({name: 'testSet', nodes: 2});
 let nodes = replTest.startSet();
-replTest.initiate();
+replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 let primary = replTest.getPrimary();
 

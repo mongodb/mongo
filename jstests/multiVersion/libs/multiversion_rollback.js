@@ -85,7 +85,7 @@ export function testMultiversionRollbackLatestFromDowngrading(testName, upgradeI
         {name: testName, nodes: 3, useBridge: true, settings: {chainingAllowed: false}});
 
     replSet.startSet();
-    replSet.initiateWithHighElectionTimeout();
+    replSet.initiate();
 
     const config = replSet.getReplSetConfigFromNode();
     config.members[1].priority = 0;
@@ -189,7 +189,7 @@ export function testMultiversionRollbackDowngradingFromLastLTS(testName) {
         {name: testName, nodes: 3, useBridge: true, settings: {chainingAllowed: false}});
 
     replSet.startSet();
-    replSet.initiateWithHighElectionTimeout();
+    replSet.initiate();
 
     const config = replSet.getReplSetConfigFromNode();
     config.members[1].priority = 0;
@@ -307,7 +307,7 @@ export function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion
     var rst = new ReplSetTest(
         {name: testName, nodes: initialNodes, useBridge: true, settings: {chainingAllowed: false}});
     rst.startSet();
-    rst.initiateWithHighElectionTimeout();
+    rst.initiate();
 
     // Wait for both nodes to be up.
     waitForState(rst.nodes[0], ReplSetTest.State.PRIMARY);

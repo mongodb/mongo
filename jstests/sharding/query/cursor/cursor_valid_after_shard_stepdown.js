@@ -1,6 +1,14 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1, rs: {nodes: 2}});
+var st = new ShardingTest({
+    shards: 1,
+    rs: {nodes: 2},
+    // By default, our test infrastructure sets the election timeout to a very high value (24
+    // hours). For this test, we need a shorter election timeout because it relies on nodes running
+    // an election when they do not detect an active primary. Therefore, we are setting the
+    // electionTimeoutMillis to its default value.
+    initiateWithDefaultElectionTimeout: true
+});
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: 'TestDB'}));
 assert.commandWorked(st.s0.adminCommand({shardcollection: 'TestDB.TestColl', key: {x: 1}}));

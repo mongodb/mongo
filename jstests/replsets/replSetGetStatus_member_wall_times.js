@@ -64,7 +64,7 @@ const name = jsTestName();
 const rst = new ReplSetTest({name: name, nodes: 3, settings: {chainingAllowed: false}});
 
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 rst.awaitReplication();
 
 const primary = rst.getPrimary();                                   // node 0

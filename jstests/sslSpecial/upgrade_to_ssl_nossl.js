@@ -21,7 +21,7 @@ var rst = new ReplSetTest({
     }
 });
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 var rstConn1 = rst.getPrimary();
 rstConn1.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"});

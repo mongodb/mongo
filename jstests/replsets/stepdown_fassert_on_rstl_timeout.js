@@ -34,7 +34,9 @@ replSet.initiate({
         {"_id": 1, "host": nodes[1]},
         {"_id": 2, "host": nodes[2], "priority": 0}
     ]
-});
+},
+                 null,
+                 {initiateWithDefaultElectionTimeout: true});
 
 replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 

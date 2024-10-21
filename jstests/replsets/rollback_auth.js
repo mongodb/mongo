@@ -39,7 +39,9 @@ replTest.initiate({
         {"_id": 1, "host": nodes[1]},
         {"_id": 2, "host": nodes[2], arbiterOnly: true}
     ]
-});
+},
+                  null,
+                  {initiateWithDefaultElectionTimeout: true});
 
 // Make sure we have a primary
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);

@@ -27,7 +27,7 @@ const startParams = {
 };
 const nodes = rst.startSet({setParameter: startParams});
 let restoreNode = nodes[1];
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 const primary = rst.getPrimary();
 const db = primary.getDB(dbName);
 const collName = "testcoll";

@@ -24,7 +24,7 @@ nodes.forEach(node => {
         node.adminCommand({configureFailPoint: 'setSmallOplogGetMoreMaxTimeMS', mode: 'alwaysOn'}));
 });
 
-replTest.initiateWithHighElectionTimeout();
+replTest.initiate();
 var primary = replTest.getPrimary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.

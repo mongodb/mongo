@@ -106,7 +106,7 @@ function runStandaloneTest(oldBinVersion, oldFCVVersion) {
 function runReplicaSetTest(oldBinVersion, oldFCVVersion) {
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: oldBinVersion}});
     rst.startSet();
-    rst.initiate();
+    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
     const connStringOpts = extractReplicaSetNameAndHosts(rst.getPrimary());
     const connString = makeReplicaSetConnectionString(

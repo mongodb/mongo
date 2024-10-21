@@ -15,7 +15,7 @@ let replTest = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0, votes: 0}}],
 });
 replTest.startSet();
-replTest.initiateWithHighElectionTimeout();
+replTest.initiate();
 
 let primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();

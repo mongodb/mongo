@@ -17,7 +17,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 2, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
+    rs: {nodes: 2, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}},
+    // By default, our test infrastructure sets the election timeout to a very high value (24
+    // hours). For this test, we need a shorter election timeout because it relies on nodes running
+    // an election when they do not detect an active primary. Therefore, we are setting the
+    // electionTimeoutMillis to its default value.
+    initiateWithDefaultElectionTimeout: true
 });
 
 const sDB = st.s.getDB("test");

@@ -15,7 +15,7 @@ import {
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 let primary = rst.getPrimary();
 
 const dbName = "testDb";

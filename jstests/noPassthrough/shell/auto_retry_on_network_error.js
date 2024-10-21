@@ -35,8 +35,7 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 
 // awaitLastStableRecoveryTimestamp runs an 'appendOplogNote' command which is not retryable.
-rst.initiateWithAnyNodeAsPrimary(
-    null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
+rst.initiate(null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
 // We require the 'setParameter' command to initialize a replica set, and the command will fail
 // due to the override below. As a result, we must initiate our replica set before we load these

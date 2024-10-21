@@ -12,7 +12,7 @@ rst.startSet();
 
 // Make sure there are no election timeouts firing for the duration of the test. This helps
 // ensure that the test will only pass if the election succeeds.
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const originalPrimary = rst.getPrimary();
 const newPrimary = rst.getSecondaries()[0];

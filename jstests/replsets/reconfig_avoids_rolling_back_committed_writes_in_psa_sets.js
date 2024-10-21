@@ -27,7 +27,7 @@ const rst = new ReplSetTest({
     nodes: [{}, {}, {rsConfig: {arbiterOnly: true}}],
 });
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const collName = jsTestName();
 const primary = rst.getPrimary();

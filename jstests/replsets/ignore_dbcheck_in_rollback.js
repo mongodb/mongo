@@ -31,7 +31,7 @@ const replSet = new ReplSetTest({
     settings: {chainingAllowed: false}
 });
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 let primary = replSet.getPrimary();
 let primaryDB = primary.getDB(dbName);

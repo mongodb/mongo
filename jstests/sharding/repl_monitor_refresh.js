@@ -12,7 +12,14 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
 var NODE_COUNT = 3;
-var st = new ShardingTest({shards: {rs0: {nodes: NODE_COUNT, oplogSize: 10}}});
+var st = new ShardingTest({
+    shards: {rs0: {nodes: NODE_COUNT, oplogSize: 10}},
+    // By default, our test infrastructure sets the election timeout to a very high value (24
+    // hours). For this test, we need a shorter election timeout because it relies on nodes running
+    // an election when they do not detect an active primary. Therefore, we are setting the
+    // electionTimeoutMillis to its default value.
+    initiateWithDefaultElectionTimeout: true
+});
 var replTest = st.rs0;
 var mongos = st.s;
 

@@ -17,7 +17,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // check does a primary only command against the shards using _connections and can fail.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-let st = new ShardingTest({shards: {rs0: {nodes: 2}}});
+let st = new ShardingTest({
+    shards: {rs0: {nodes: 2}},
+    // By default, our test infrastructure sets the election timeout to a very high value (24
+    // hours). This test restarts the router, and if the router is embedded, it will also restart
+    // the config shard. In this case, we need a shorter election timeout because the test relies on
+    // nodes running an election when they don't detect an active primary. Therefore, we are setting
+    // the electionTimeoutMillis to its default value.
+    initiateWithDefaultElectionTimeout: jsTestOptions().embeddedRouter
+});
 
 // Verify after startup there is a new key in admin.system.keys.
 jsTestLog("Verify the admin.system.keys collection after startup.");

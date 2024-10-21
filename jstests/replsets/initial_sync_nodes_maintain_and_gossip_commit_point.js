@@ -19,7 +19,7 @@ const rst = new ReplSetTest({
     useBridge: true
 });
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");

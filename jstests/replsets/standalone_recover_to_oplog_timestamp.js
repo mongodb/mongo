@@ -16,7 +16,7 @@ const collName = jsTestName();
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
 

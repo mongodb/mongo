@@ -22,7 +22,7 @@ replSetTest.startSet({
         multitenancySupport: true,
     }
 });
-replSetTest.initiate();
+replSetTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Used to set security token on primary and secondary node. Run this when you want to change the
 // tenant that can interact with the repl set

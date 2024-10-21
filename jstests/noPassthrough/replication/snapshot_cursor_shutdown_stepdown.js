@@ -13,7 +13,7 @@ const collName = "coll";
 
 let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 let primaryDB = rst.getPrimary().getDB(dbName);
 
@@ -43,7 +43,7 @@ rst.stopSet(signal, forRestart, {skipValidation: true});
 function testStepdown(stepdownFunc) {
     rst = new ReplSetTest({nodes: 2});
     rst.startSet();
-    rst.initiate();
+    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
     const primary = rst.getPrimary();
     const primaryDB = primary.getDB(dbName);

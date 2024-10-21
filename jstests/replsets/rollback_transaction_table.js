@@ -59,7 +59,7 @@ let replTest = new ReplSetTest({
     useBridge: true,
 });
 let nodes = replTest.startSet();
-replTest.initiate();
+replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(replTest.getPrimary().adminCommand(

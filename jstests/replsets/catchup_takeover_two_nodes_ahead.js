@@ -24,7 +24,7 @@ var config = replSet.getReplSetConfig();
 config.settings = {
     chainingAllowed: false
 };
-replSet.initiateWithHighElectionTimeout(config);
+replSet.initiate(config);
 replSet.awaitReplication();
 
 // Write something so that nodes 0 and 1 are ahead.

@@ -23,7 +23,7 @@ export function basicReplsetTest(signal, ssl_options1, ssl_options2, ssl_name) {
 
     // Call initiate() to send the replSetInitiate command
     // This will wait for initiation
-    replTest.initiate();
+    replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
     // Call getPrimary to return a reference to the node that's been
     // elected primary.

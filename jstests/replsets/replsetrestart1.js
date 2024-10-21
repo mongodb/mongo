@@ -30,7 +30,7 @@ replTest.startSet();
 
 // Call initiate() to send the replSetInitiate command
 // This will wait for initiation
-replTest.initiate();
+replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Wait for at least one heartbeat to reach everyone, so that we will properly mark nodes as
 // DOWN, later.

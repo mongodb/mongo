@@ -14,7 +14,7 @@ TestData.skipCheckDBHashes = true;
 // Start a single node replica set.
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const dbName = jsTest.name();
 const primary = rst.getPrimary();

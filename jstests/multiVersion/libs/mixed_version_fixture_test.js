@@ -21,7 +21,7 @@ export function testPerformUpgradeDowngradeReplSet({
         ],
     });
     rst.startSet();
-    rst.initiate();
+    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
     let primaryConnection = rst.getPrimary();
     const getAdminDB = () => primaryConnection.getDB("admin");

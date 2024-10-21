@@ -26,7 +26,7 @@ var x509requireTLS =
 
 var rst = new ReplSetTest({name: 'noauthSet', nodes: 3, nodeOptions: transitionToX509allowTLS});
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 var rstConn1 = rst.getPrimary();
 var testDB = rstConn1.getDB(dbName);

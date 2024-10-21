@@ -323,7 +323,14 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
 }
 
 {
-    const st = new ShardingTest({shards: {rs0: {nodes: 2}}});
+    const st = new ShardingTest({
+        shards: {rs0: {nodes: 2}},
+        // By default, our test infrastructure sets the election timeout to a very high value (24
+        // hours). For this test, we need a shorter election timeout because it relies on nodes
+        // running an election when they do not detect an active primary. Therefore, we are setting
+        // the electionTimeoutMillis to its default value.
+        initiateWithDefaultElectionTimeout: true
+    });
     runTest(st, false /* alwaysCreateFeatureFlagEnabled */);
     st.stop();
 }
@@ -335,7 +342,12 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
             rs: {nodes: 2},
             rsOptions:
                 {setParameter: "featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp=true"}
-        }
+        },
+        // By default, our test infrastructure sets the election timeout to a very high value (24
+        // hours). For this test, we need a shorter election timeout because it relies on nodes
+        // running an election when they do not detect an active primary. Therefore, we are setting
+        // the electionTimeoutMillis to its default value.
+        initiateWithDefaultElectionTimeout: true
     });
 
     // Sanity check the feature flag was enabled.

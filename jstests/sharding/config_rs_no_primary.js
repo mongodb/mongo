@@ -22,7 +22,12 @@ var st = new ShardingTest({
         c0: {},  // Make sure 1st config server is primary
         c1: {rsConfig: {priority: 0}},
         c2: {rsConfig: {priority: 0}}
-    }
+    },
+    // By default, our test infrastructure sets the election timeout to a very high value (24
+    // hours). For this test, we need a shorter election timeout because it relies on nodes running
+    // an election when they do not detect an active primary. Therefore, we are setting the
+    // electionTimeoutMillis to its default value.
+    initiateWithDefaultElectionTimeout: true
 });
 
 assert.eq(st.config0, st.configRS.getPrimary());

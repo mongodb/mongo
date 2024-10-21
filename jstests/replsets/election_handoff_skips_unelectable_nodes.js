@@ -10,7 +10,7 @@ rst.startSet();
 
 // Make sure there are no election timeouts firing for the duration of the test. This helps
 // ensure that the test will only pass if the election handoff succeeds.
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 // Freeze one of the secondaries so that it cannot be elected. As a result, the other secondary
 // should always be chosen to run for primary via election handoff.

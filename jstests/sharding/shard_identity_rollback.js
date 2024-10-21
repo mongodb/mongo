@@ -15,7 +15,7 @@ var st = new ShardingTest({shards: 1});
 
 var replTest = new ReplSetTest({nodes: 3});
 replTest.startSet({shardsvr: ''});
-replTest.initiate();
+replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(st.s.adminCommand(

@@ -114,7 +114,12 @@ function runTest(featureFlagReshardingSkipCloningAndApplying) {
                 featureFlagReshardingSkipCloningAndApplyingIfApplicable:
                     featureFlagReshardingSkipCloningAndApplying
             }
-        }
+        },
+        // By default, our test infrastructure sets the election timeout to a very high value (24
+        // hours). For this test, we need a shorter election timeout because it relies on nodes
+        // running an election when they do not detect an active primary. Therefore, we are setting
+        // the electionTimeoutMillis to its default value.
+        initiateWithDefaultElectionTimeout: true
     });
 
     // Create an unsharded collection on shard0 (primary shard) and move the collection from

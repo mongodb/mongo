@@ -82,7 +82,7 @@ const latestLastLTSReplSet = new ReplSetTest({
 });
 
 latestLastLTSReplSet.startSet();
-latestLastLTSReplSet.initiateWithHighElectionTimeout();
+latestLastLTSReplSet.initiate();
 latestLastLTSReplSet.awaitSecondaryNodes();
 
 testDbCheckStartStopEntries(latestLastLTSReplSet);

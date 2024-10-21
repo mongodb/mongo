@@ -65,7 +65,7 @@ let logPrefix = "While the shard is not part of a sharded cluster: ";
 let shardServer = new ReplSetTest(
     {name: "shardServer", nodes: 1, nodeOptions: {shardsvr: ""}, useHostName: true});
 shardServer.startSet();
-shardServer.initiateWithHighElectionTimeout();
+shardServer.initiate();
 
 jsTestLog(logPrefix + "Adding an arbiter node that will change IDWC to (w:1) should succeed.");
 let arbiter = shardServer.add({shardsvr: ""});
@@ -85,9 +85,17 @@ logPrefix = "While the shard is part of a sharded cluster: ";
 shardServer = new ReplSetTest(
     {name: "shardServer", nodes: 1, nodeOptions: {shardsvr: ""}, useHostName: true});
 shardServer.startSet();
-shardServer.initiateWithHighElectionTimeout();
+shardServer.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
-const st = new ShardingTest({shards: TestData.configShard ? 1 : 0, mongos: 1});
+const st = new ShardingTest({
+    shards: TestData.configShard ? 1 : 0,
+    mongos: 1,
+    // By default, our test infrastructure sets the election timeout to a very high value (24
+    // hours). For this test, we need a shorter election timeout because it relies on nodes running
+    // an election when they do not detect an active primary. Therefore, we are setting the
+    // electionTimeoutMillis to its default value.
+    initiateWithDefaultElectionTimeout: true
+});
 var admin = st.getDB('admin');
 
 jsTestLog("Adding the shard to the cluster should succeed.");

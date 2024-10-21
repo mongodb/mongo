@@ -14,7 +14,7 @@ const collNss = dbName + '.' + collName;
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {arbiter: true}]});
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 let primary;
 let secondary;

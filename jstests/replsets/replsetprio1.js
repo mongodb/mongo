@@ -6,14 +6,16 @@ var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 var nodenames = replTest.nodeList();
 
 var nodes = replTest.startSet();
-replTest.initiateWithAnyNodeAsPrimary({
+replTest.initiate({
     "_id": "testSet",
     "members": [
         {"_id": 0, "host": nodenames[0], "priority": 1},
         {"_id": 1, "host": nodenames[1], "priority": 2},
         {"_id": 2, "host": nodenames[2], "priority": 3}
     ]
-});
+},
+                  null,
+                  {initiateWithDefaultElectionTimeout: true});
 
 // 2 should be primary (give this a while to happen, as other nodes might first be elected)
 replTest.awaitNodesAgreeOnPrimary(replTest.kDefaultTimeoutMS, nodes, nodes[2]);

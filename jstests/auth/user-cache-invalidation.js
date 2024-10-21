@@ -219,7 +219,7 @@ function runTest(writeNode, readNode, awaitReplication) {
     for (let i = 0; i < cfg.members.length; ++i) {
         cfg.members[i].priority = i ? 0 : 1;
     }
-    rst.initiateWithHighElectionTimeout(cfg);
+    rst.initiate(cfg);
     rst.awaitSecondaryNodes();
 
     // Freeze secondaries to avoid surprise stepdowns.

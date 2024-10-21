@@ -296,7 +296,7 @@ let checkDDLCommands = function(testDB) {
 jsTest.log("Creating replica set.");
 let rst0 = new ReplSetTest({name: 'rs0', nodes: 2});
 rst0.startSet();
-rst0.initiate();
+rst0.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 waitForAllMembers(rst0.getPrimary().getDB(dbName));
 
 let coll = rst0.getPrimary().getDB(dbName).getCollection(collName);

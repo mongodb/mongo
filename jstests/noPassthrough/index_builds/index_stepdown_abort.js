@@ -23,7 +23,7 @@ const rst = new ReplSetTest({
     ]
 });
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB('test');

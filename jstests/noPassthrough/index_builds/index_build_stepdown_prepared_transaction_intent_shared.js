@@ -31,7 +31,7 @@ const collName = "coll";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);

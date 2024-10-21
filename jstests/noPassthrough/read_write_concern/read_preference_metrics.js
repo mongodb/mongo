@@ -84,7 +84,7 @@ MongoRunner.stopMongod(standalone);
 // Test that replica set nodes tracks metrics around read preference.
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 jsTestLog("Testing against replica set");
 runTest(rst);

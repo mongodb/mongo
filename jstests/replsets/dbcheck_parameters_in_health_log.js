@@ -18,7 +18,7 @@ const replSet = new ReplSetTest({
     nodes: 2,
 });
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 const primary = replSet.getPrimary();
 const secondary = replSet.getSecondary();

@@ -12,7 +12,7 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const dbName = 'test';
 const collName = 'coll';

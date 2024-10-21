@@ -115,7 +115,7 @@ const rst = new ReplSetTest({
     serverless: true,
 });
 rst.startSet(baseOptions);
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 for (let syncMethod of ["logical", "fileCopyBased"]) {
     jsTest.log("Testing initial sync w/ method = " + syncMethod);

@@ -5,7 +5,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const name = "printSecondaryReplicationInfo";
 const replSet = new ReplSetTest({name: name, nodes: 2});
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 const primary = replSet.getPrimary();
 primary.getDB('test').foo.insert({a: 1});

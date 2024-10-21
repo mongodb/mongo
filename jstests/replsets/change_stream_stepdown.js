@@ -8,7 +8,7 @@ const name = "change_stream_stepdown";
 const replTest = new ReplSetTest({name: name, nodes: [{}, {}]});
 replTest.startSet();
 // Initiate with high election timeout to prevent any election races.
-replTest.initiateWithHighElectionTimeout();
+replTest.initiate();
 
 function stepUp(replTest, conn) {
     assert.commandWorked(conn.adminCommand({replSetFreeze: 0}));

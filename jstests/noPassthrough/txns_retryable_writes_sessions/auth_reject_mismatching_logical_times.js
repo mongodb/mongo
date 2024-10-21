@@ -43,8 +43,7 @@ st.s.getDB("admin").auth("foo", "bar");
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
 
-rst.initiateWithAnyNodeAsPrimary(
-    null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
+rst.initiate(null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
 
 const testDB = st.s.getDB("test");
