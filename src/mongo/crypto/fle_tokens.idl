@@ -28,20 +28,154 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/crypto/fle_crypto.h"
-        - "mongo/crypto/fle_crypto_types.h"
+        - "mongo/crypto/fle_tokens.h"
 
 imports:
     - "mongo/db/basic_types.idl"
 
 types:
+    CollectionsLevel1Token:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'CollectionsLevel1Token'
+        cpp_type: "CollectionsLevel1Token"
+        serializer: 'toCDR'
+        deserializer: '::mongo::CollectionsLevel1Token::parse'
+        is_view: false
+
+    ServerDataEncryptionLevel1Token:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ServerDataEncryptionLevel1Token'
+        cpp_type: "ServerDataEncryptionLevel1Token"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ServerDataEncryptionLevel1Token::parse'
+        is_view: false
+
+    EDCToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'EDCToken'
+        cpp_type: "EDCToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::EDCToken::parse'
+        is_view: false
+
+    ESCToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ESCToken'
+        cpp_type: "ESCToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ESCToken::parse'
+        is_view: false
+
     ECOCToken:
         bson_serialization_type: bindata
         bindata_subtype: generic
         description: 'ECOCToken'
         cpp_type: "ECOCToken"
         serializer: 'toCDR'
-        deserializer: '::mongo::FLETokenFromCDR<ECOCToken>'
+        deserializer: '::mongo::ECOCToken::parse'
+        is_view: false
+
+    EDCDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'EDCDerivedFromDataToken'
+        cpp_type: "EDCDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::EDCDerivedFromDataToken::parse'
+        is_view: false
+
+    ESCDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ESCDerivedFromDataToken'
+        cpp_type: "ESCDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ESCDerivedFromDataToken::parse'
+        is_view: false
+
+    EDCDerivedFromDataTokenAndContentionFactorToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'EDCDerivedFromDataTokenAndContentionFactorToken'
+        cpp_type: "EDCDerivedFromDataTokenAndContentionFactorToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::EDCDerivedFromDataTokenAndContentionFactorToken::parse'
+        is_view: false
+
+    ESCDerivedFromDataTokenAndContentionFactorToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ESCDerivedFromDataTokenAndContentionFactorToken'
+        cpp_type: "ESCDerivedFromDataTokenAndContentionFactorToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ESCDerivedFromDataTokenAndContentionFactorToken::parse'
+        is_view: false
+
+    EDCTwiceDerivedToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'EDCTwiceDerivedToken'
+        cpp_type: "EDCTwiceDerivedToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::EDCTwiceDerivedToken::parse'
+        is_view: false
+
+    ESCTwiceDerivedTagToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ESCTwiceDerivedTagToken'
+        cpp_type: "ESCTwiceDerivedTagToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ESCTwiceDerivedTagToken::parse'
+        is_view: false
+
+    ESCTwiceDerivedValueToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ESCTwiceDerivedValueToken'
+        cpp_type: "ESCTwiceDerivedValueToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ESCTwiceDerivedValueToken::parse'
+        is_view: false
+
+    ServerTokenDerivationLevel1Token:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ServerTokenDerivationLevel1Token'
+        cpp_type: "ServerTokenDerivationLevel1Token"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ServerTokenDerivationLevel1Token::parse'
+        is_view: false
+
+    ServerDerivedFromDataToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ServerDerivedFromDataToken'
+        cpp_type: "ServerDerivedFromDataToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ServerDerivedFromDataToken::parse'
+        is_view: false
+
+    ServerCountAndContentionFactorEncryptionToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ServerCountAndContentionFactorEncryptionToken'
+        cpp_type: "ServerCountAndContentionFactorEncryptionToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ServerCountAndContentionFactorEncryptionToken::parse'
+        is_view: false
+
+    ServerZerosEncryptionToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'ServerZerosEncryptionToken'
+        cpp_type: "ServerZerosEncryptionToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::ServerZerosEncryptionToken::parse'
         is_view: false
 
     AnchorPaddingRootToken:
@@ -50,7 +184,25 @@ types:
         description: 'AnchorPaddingRootToken'
         cpp_type: "AnchorPaddingRootToken"
         serializer: 'toCDR'
-        deserializer: '::mongo::FLETokenFromCDR<AnchorPaddingRootToken>'
+        deserializer: '::mongo::AnchorPaddingRootToken::parse'
+        is_view: false
+
+    AnchorPaddingKeyToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'AnchorPaddingKeyToken'
+        cpp_type: "AnchorPaddingKeyToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::AnchorPaddingKeyToken::parse'
+        is_view: false
+
+    AnchorPaddingValueToken:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'AnchorPaddingValueToken'
+        cpp_type: "AnchorPaddingValueToken"
+        serializer: 'toCDR'
+        deserializer: '::mongo::AnchorPaddingValueToken::parse'
         is_view: false
 
 structs:

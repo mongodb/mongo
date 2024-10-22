@@ -27,6 +27,10 @@ mongo_cc_library(
 idl_generator(
     name = "encryption_fields_gen",
     src = "encryption_fields.idl",
+    hdrs = [
+        "encryption_fields_validation.h",
+        "//src/mongo/db/exec/document_value:value.h",
+    ],
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
@@ -62,6 +66,7 @@ mongo_cc_library(
     ],
     deps = [
         ":encrypted_field_config",
+        ":fle_tokens",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
     ],
 )
@@ -91,11 +96,12 @@ mongo_cc_library(
         "fle_stats.cpp",
         "fle_stats_gen",
         "fle_tags.cpp",
-        "fle_tokens_gen",
     ],
     hdrs = [
         "encryption_fields_util.h",
         "fle_crypto.h",
+        "fle_crypto_predicate.h",
+        "fle_crypto_types.h",
         "fle_stats.h",
         "fle_tags.h",
     ],
@@ -115,6 +121,7 @@ mongo_cc_library(
         "//src/third_party/libmongocrypt:mongocrypt",
         ":aead_encryption",
         ":encrypted_field_config",
+        ":fle_tokens",
         ":fle_fields",
         ":mongocryptutil",
         ":sha_block",
@@ -140,16 +147,34 @@ idl_generator(
 idl_generator(
     name = "fle_tokens_gen",
     src = "fle_tokens.idl",
+    hdrs = [
+        "fle_tokens.h",
+    ],
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "fle_tokens",
+    srcs = [
+        ":fle_tokens_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
     ],
 )
 
 idl_generator(
     name = "fle_field_schema_gen",
     src = "fle_field_schema.idl",
+    hdrs = [
+        "fle_fields_util.h",
+    ],
     deps = [
         ":encryption_fields_gen",
+        ":fle_tokens_gen",
         "//src/mongo/db:basic_types_gen",
     ],
 )

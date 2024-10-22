@@ -2457,6 +2457,7 @@ mongo_cc_library(
         ":vector_clock",  # TODO(SERVER-93876): Remove.
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/crypto:fle_crypto",
+        "//src/mongo/crypto:fle_tokens",
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/fts:fts_query_noop",

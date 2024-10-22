@@ -276,7 +276,6 @@ mongo_cc_library(
         "//src/mongo/client:hedging_mode_gen",
         "//src/mongo/client:read_preference_gen",
         "//src/mongo/crypto:encryption_fields_gen",
-        "//src/mongo/crypto:fle_field_schema_gen",
         "//src/mongo/crypto:fle_stats_gen",
         "//src/mongo/db:api_parameters_gen",
         "//src/mongo/db:basic_types_gen",
@@ -334,6 +333,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:duplicate_key_error_info",
     ],
     deps = [
+        "//src/mongo/crypto:fle_fields",
         "//src/mongo/db:server_base",
         "//src/mongo/db/storage:storage_options",
     ],

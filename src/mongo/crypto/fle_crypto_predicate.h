@@ -29,25 +29,13 @@
 
 #pragma once
 
-#include <array>
+#include <functional>
 #include <vector>
 
 #include "mongo/base/data_range.h"
-#include "mongo/base/data_type_validated.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/crypto/fle_tokens.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 
