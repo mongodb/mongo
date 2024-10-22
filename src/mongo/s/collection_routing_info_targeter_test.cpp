@@ -126,10 +126,6 @@ protected:
     void testTargetDeleteWithRangePrefixHashedShardKey();
     void testTargetDeleteWithHashedPrefixHashedShardKey();
     void testTargetDeleteWithExactId();
-
-    // The tests using this fixture expects that a write without shard key is not allowed.
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithoutShardKey", false};
 };
 
 class CollectionRoutingInfoTargeterWithChunkRangesTest : public CollectionRoutingInfoTargeterTest {
@@ -543,12 +539,15 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
                                         nullptr /* useTwoPhaseWriteProtocol */,
                                         nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
                                         checkChunkRanges ? &chunkRanges : nullptr);
-    ASSERT_EQUALS(res.size(), 1);
-    ASSERT_EQUALS(res[0].shardName, "2");
+    ASSERT_EQUALS(res.size(), 2);
+    ASSERT_EQUALS(res[0].shardName, "3");
+    ASSERT_EQUALS(res[1].shardName, "4");
     if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << -100 << "c.d" << MINKEY));
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << 0 << "c.d" << MINKEY));
+        ASSERT_EQUALS(chunkRanges.size(), 2);
+        ASSERT_TRUE(chunkRanges.contains(
+            {BSON("a.b" << 0 << "c.d" << MINKEY), BSON("a.b" << 100 << "c.d" << MINKEY)}));
+        ASSERT_TRUE(chunkRanges.contains(
+            {BSON("a.b" << 100 << "c.d" << MINKEY), BSON("a.b" << MAXKEY << "c.d" << MAXKEY)}));
         chunkRanges.clear();
     }
 
@@ -636,21 +635,25 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
         chunkRanges.clear();
     }
 
-    // Upsert requires full shard key in query, even if the query can target a single shard.
-    auto requestFullKey = buildUpdate(kNss,
-                                      fromjson("{'a.b':  100, 'c.d' : {$exists: false}}}"),
-                                      fromjson("{a: {b: -111}}"),
-                                      true);
-    ASSERT_THROWS_CODE(
+    // Upsert without full shard key.
+    auto requestFullKey =
+        buildUpdate(kNss, fromjson("{'a.b':  100}"), fromjson("{a: {b: -111}}"), true);
+    auto resUpsert =
         criTargeter.targetUpdate(operationContext(),
                                  BatchItemRef(&requestFullKey, 0),
                                  nullptr /* useTwoPhaseWriteProtocol */,
                                  nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                 checkChunkRanges ? &chunkRanges : nullptr),
-        DBException,
-        ErrorCodes::ShardKeyNotFound);
+                                 checkChunkRanges ? &chunkRanges : nullptr);
+    ASSERT_EQUALS(resUpsert.size(), 1);
+    ASSERT_EQUALS(resUpsert[0].shardName, "4");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 1);
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), BSON("a.b" << 100 << "c.d" << MINKEY));
+        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), BSON("a.b" << MAXKEY << "c.d" << MAXKEY));
+        chunkRanges.clear();
+    }
 
-    // Upsert success case.
+    // Upsert with full shard key.
     auto requestSuccess =
         buildUpdate(kNss, fromjson("{'a.b': 100, 'c.d': 'val'}"), fromjson("{a: {b: -111}}"), true);
     res = criTargeter.targetUpdate(operationContext(),
@@ -715,8 +718,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithHashedPrefixHashedSh
         }
     }
 
-    // Range queries on hashed field cannot be used for targeting. In this case, update will be
-    // targeted based on update document.
+    // Range queries will be able to target using the two phase write protocol.
     std::set<ChunkRange> chunkRanges;
     const auto updateObj = fromjson("{a: {b: -1}}");
     auto requestUpdate = buildUpdate(kNss, fromjson("{'a.b': {$gt : 101}}"), updateObj, false);
@@ -725,25 +727,11 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithHashedPrefixHashedSh
                                         nullptr /* useTwoPhaseWriteProtocol */,
                                         nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
                                         checkChunkRanges ? &chunkRanges : nullptr);
-    ASSERT_EQUALS(res.size(), 1);
-    auto chunk = findChunk(updateObj["a"]["b"]);
-    ASSERT_EQUALS(res[0].shardName, chunk.getShardId());
+    ASSERT_EQUALS(res.size(), 4);
     if (checkChunkRanges) {
-        ASSERT_EQUALS(chunkRanges.size(), 1);
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMin(), chunk.getMin());
-        ASSERT_BSONOBJ_EQ(chunkRanges.cbegin()->getMax(), chunk.getMax());
+        ASSERT_EQUALS(chunkRanges.size(), 4);
         chunkRanges.clear();
     }
-    auto requestErr =
-        buildUpdate(kNss, fromjson("{'a.b': {$gt : 101}}"), fromjson("{$set: {p: 1}}"), false);
-    ASSERT_THROWS_CODE(
-        criTargeter.targetUpdate(operationContext(),
-                                 BatchItemRef(&requestErr, 0),
-                                 nullptr /* useTwoPhaseWriteProtocol */,
-                                 nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                 checkChunkRanges ? &chunkRanges : nullptr),
-        DBException,
-        ErrorCodes::InvalidOptions);
 }
 
 TEST_F(CollectionRoutingInfoTargeterTest, TargetDeleteWithExactId) {
@@ -823,27 +811,39 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithRangePrefixHashedSha
         chunkRanges.clear();
     }
 
-    // Cannot delete with partial shard key in the query if the query targets multiple shards.
+    // Test delete with range query.
     auto requestPartialKey2 = buildDelete(kNss, fromjson("{'a.b': {$gt: 0}}"));
-    ASSERT_THROWS_CODE(
+    auto resMultipleShards =
         criTargeter.targetDelete(operationContext(),
                                  BatchItemRef(&requestPartialKey2, 0),
                                  nullptr /* useTwoPhaseWriteProtocol */,
                                  nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                 checkChunkRanges ? &chunkRanges : nullptr),
-        DBException,
-        ErrorCodes::ShardKeyNotFound);
+                                 checkChunkRanges ? &chunkRanges : nullptr);
+    ASSERT_EQUALS(resMultipleShards.size(), 2);
+    ASSERT_EQUALS(resMultipleShards[0].shardName, "3");
+    ASSERT_EQUALS(resMultipleShards[1].shardName, "4");
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 2);
+        ASSERT_TRUE(chunkRanges.contains(
+            {BSON("a.b" << 0 << "c.d" << MINKEY), BSON("a.b" << 100 << "c.d" << MINKEY)}));
+        ASSERT_TRUE(chunkRanges.contains(
+            {BSON("a.b" << 100 << "c.d" << MINKEY), BSON("a.b" << MAXKEY << "c.d" << MAXKEY)}));
+        chunkRanges.clear();
+    }
 
-    // Cannot delete without at least a partial shard key.
+    // Test delete with no shard key.
     auto requestNoShardKey = buildDelete(kNss, fromjson("{'k': 0}"));
-    ASSERT_THROWS_CODE(
+    auto resNoShardKey =
         criTargeter.targetDelete(operationContext(),
                                  BatchItemRef(&requestNoShardKey, 0),
                                  nullptr /* useTwoPhaseWriteProtocol */,
                                  nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                 checkChunkRanges ? &chunkRanges : nullptr),
-        DBException,
-        ErrorCodes::ShardKeyNotFound);
+                                 checkChunkRanges ? &chunkRanges : nullptr);
+    ASSERT_EQUALS(resNoShardKey.size(), 5);
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 5);
+        chunkRanges.clear();
+    }
 
     // Delete targeted correctly with full shard key in query.
     auto requestFullKey = buildDelete(kNss, fromjson("{'a.b': -101, 'c.d': 5}"));
@@ -944,16 +944,19 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithHashedPrefixHashedSh
         }
     }
 
-    // Range queries on hashed field cannot be used for targeting.
+    // Range queries on hashed field can target using the two phase write protocol.
     auto request = buildDelete(kNss, fromjson("{'a.b': {$gt : 101}}"));
-    ASSERT_THROWS_CODE(
+    auto resRangeQuery =
         criTargeter.targetDelete(operationContext(),
                                  BatchItemRef(&request, 0),
                                  nullptr /* useTwoPhaseWriteProtocol */,
                                  nullptr /* isNonTargetedWriteWithoutShardKeyWithExactId */,
-                                 checkChunkRanges ? &chunkRanges : nullptr),
-        DBException,
-        ErrorCodes::ShardKeyNotFound);
+                                 checkChunkRanges ? &chunkRanges : nullptr);
+    ASSERT_EQUALS(resRangeQuery.size(), 4);
+    if (checkChunkRanges) {
+        ASSERT_EQUALS(chunkRanges.size(), 4);
+        chunkRanges.clear();
+    }
 }
 
 TEST(CollectionRoutingInfoTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocument) {

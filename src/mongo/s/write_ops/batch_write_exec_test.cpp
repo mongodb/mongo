@@ -445,11 +445,6 @@ public:
                        boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << MAXKEY))}};
-
-private:
-    // The tests using this fixture expects that a write without shard key is not allowed.
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithoutShardKey", false};
 };
 
 //
@@ -4367,11 +4362,6 @@ public:
     }
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
-
-private:
-    // The tests using this fixture expects that a write without shard key is not allowed.
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithoutShardKey", false};
 };
 
 TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {

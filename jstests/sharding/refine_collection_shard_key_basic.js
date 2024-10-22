@@ -9,9 +9,6 @@ import {
     flushRoutersAndRefreshShardMetadata
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -106,43 +103,23 @@ function validateCRUDAfterRefine() {
     assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: -1, b: -1, c: -1, d: -1}));
 
     // This enables the feature allows writes to omit the shard key in their queries.
-    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDB)) {
-        assert.commandWorked(
-            sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1}, {$set: {x: 2}}));
-        assert.commandWorked(
-            sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}));
-        assert.commandWorked(sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1},
-                                                                       {$set: {b: 4}}));
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1}, {$set: {x: 2}}));
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}));
+    assert.commandWorked(
+        sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1}, {$set: {b: 4}}));
 
-        assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).x);
-        assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
-        assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
+    assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).x);
+    assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
+    assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
 
-        // Versioned reads against secondaries should work as expected.
-        mongos.setReadPref("secondary");
-        assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).x);
-        assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
-        assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
-        mongos.setReadPref(null);
-    } else {
-        // The full shard key is not required in the resulting document when updating. The full
-        // shard key is still required in the query, however.
-        assert.commandFailedWithCode(
-            sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1}, {$set: {b: 2}}), 31025);
-        assert.commandWorked(
-            sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}));
-        assert.commandWorked(sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1},
-                                                                       {$set: {b: 4}}));
-
-        assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
-        assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
-
-        // Versioned reads against secondaries should work as expected.
-        mongos.setReadPref("secondary");
-        assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
-        assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
-        mongos.setReadPref(null);
-    }
+    // Versioned reads against secondaries should work as expected.
+    mongos.setReadPref("secondary");
+    assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).x);
+    assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
+    assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
+    mongos.setReadPref(null);
 
     assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 1, b: 1}, true));
     assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: -1, b: -1}, true));

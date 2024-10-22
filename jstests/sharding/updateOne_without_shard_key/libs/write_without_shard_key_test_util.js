@@ -2,8 +2,6 @@
  * Utilities for performing writes without shard key under various test configurations.
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 export var WriteWithoutShardKeyTestUtil = (function() {
     const Configurations = {
         noSession: "Running without a session",
@@ -273,22 +271,12 @@ export var WriteWithoutShardKeyTestUtil = (function() {
         }
     }
 
-    /*
-     * Checks if the write without shard key feature is enabled.
-     */
-    function isWriteWithoutShardKeyFeatureEnabled(conn) {
-        // The feature flag spans 6.2 and current master, while the actual logic only exists
-        // on 6.3 and later.
-        return FeatureFlagUtil.isPresentAndEnabled(conn, "UpdateOneWithoutShardKey");
-    }
-
     return {
         setupShardedCollection,
         getClusterConnection,
         runTestWithConfig,
         insertDocsAndRunCommand,
         Configurations,
-        OperationType,
-        isWriteWithoutShardKeyFeatureEnabled
+        OperationType
     };
 })();

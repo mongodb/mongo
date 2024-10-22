@@ -99,11 +99,9 @@ assertBucketsAreCompressed(db, bucketsColl);
 
 // Delete one record from the compressed bucket.
 prepareCompressedBucket();
-if (FeatureFlagUtil.isPresentAndEnabled(db, "UpdateOneWithoutShardKey")) {
-    result = assert.commandWorked(coll.deleteOne({f: {$lt: 100}}));
-    assert.eq(1, result.deletedCount);
-    assert.eq(coll.countDocuments({f: {$lt: 100}}),
-              100 - 1,
-              "Expected exactly one record matching the filter to be deleted.");
-    assertBucketsAreCompressed(db, bucketsColl);
-}
+result = assert.commandWorked(coll.deleteOne({f: {$lt: 100}}));
+assert.eq(1, result.deletedCount);
+assert.eq(coll.countDocuments({f: {$lt: 100}}),
+          100 - 1,
+          "Expected exactly one record matching the filter to be deleted.");
+assertBucketsAreCompressed(db, bucketsColl);

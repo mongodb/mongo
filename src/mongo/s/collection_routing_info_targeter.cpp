@@ -48,7 +48,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/canonical_query.h"
@@ -235,9 +234,6 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(OperationContext* o
     _isUpdateOneWithIdWithoutShardKeyEnabled =
         feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    _isUpdateOneWithoutShardKeyEnabled =
-        feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceString& nss,
@@ -246,9 +242,6 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceStri
     invariant(!cri.cm.hasRoutingTable() || cri.cm.getNss() == nss);
     _isUpdateOneWithIdWithoutShardKeyEnabled =
         feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    _isUpdateOneWithoutShardKeyEnabled =
-        feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
@@ -463,10 +456,6 @@ bool CollectionRoutingInfoTargeter::isUpdateOneWithIdWithoutShardKeyEnabled() co
     return _isUpdateOneWithIdWithoutShardKeyEnabled;
 }
 
-bool CollectionRoutingInfoTargeter::isUpdateOneWithoutShardKeyEnabled() const {
-    return _isUpdateOneWithoutShardKeyEnabled;
-}
-
 bool isRetryableWrite(OperationContext* opCtx) {
     return opCtx->getTxnNumber() && !opCtx->inMultiDocumentTransaction();
 }
@@ -571,11 +560,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         uassertStatusOKWithContext(_canonicalize(opCtx, expCtx, _nss, query, collation, _cri.cm),
                                    str::stream() << "Could not parse update query " << query);
 
-    // With the introduction of PM-1632, we can use the two phase write protocol to successfully
-    // target an upsert without the full shard key. Else, the query must contain an exact match
-    // on the shard key. If we were to target based on the replacement doc, it could result in an
-    // insertion even if a document matching the query exists on another shard.
-    if ((!isUpdateOneWithoutShardKeyEnabled() || updateOp.getMulti()) && isUpsert) {
+    if (updateOp.getMulti() && isUpsert) {
         return targetByShardKey(extractShardKeyFromQuery(shardKeyPattern, *cq),
                                 "Failed to target upsert by query");
     }
@@ -603,10 +588,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         return endPoints;
     }
 
-    // Targeting by replacement document is no longer necessary when an updateOne without shard key
-    // is allowed, since we're able to decisively select a document to modify with the two phase
-    // write without shard key protocol.
-    if (!isUpdateOneWithoutShardKeyEnabled() || isExactId) {
+    if (isExactId) {
         // Replacement-style updates must always target a single shard. If we were unable to do so
         // using the query, we attempt to extract the shard key from the replacement and target
         // based on it.
@@ -618,23 +600,6 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                                     "Failed to target update by replacement document");
         }
     }
-
-    // If we are here then this is an op-style update, and we were not able to target a single
-    // shard. Non-multi updates must target a single shard or an exact _id. Time-series single
-    // updates must target a single shard.
-    uassert(
-        ErrorCodes::InvalidOptions,
-        fmt::format("A {{multi:false}} update on a sharded {} contain the shard key (and have the "
-                    "simple collation), but this update targeted {} shards. Update request: {}, "
-                    "shard key pattern: {}",
-                    _isRequestOnTimeseriesViewNamespace
-                        ? "time-series collection must"
-                        : "collection must contain an exact match on _id (and have the "
-                          "collection default collation) or",
-                    endPoints.size(),
-                    updateOp.toBSON().toString(),
-                    shardKeyPattern.toString()),
-        isMulti || isExactId || isUpdateOneWithoutShardKeyEnabled());
 
     if (!isMulti) {
         // If the request is {multi:false} and it's not a write without shard key, then this is a
@@ -737,21 +702,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
         return endpoints;
     }
 
-    // We failed to target a single shard.
-
-    // Regular single deletes must target a single shard or be exact-ID.
-    // Time-series single deletes must target a single shard.
     auto isExactId = _isExactIdQuery(*cq, _cri.cm) && !_isRequestOnTimeseriesViewNamespace;
-    uassert(ErrorCodes::ShardKeyNotFound,
-            fmt::format("A single delete on a sharded {} contain the shard key (and have the "
-                        "simple collation). Delete request: {}, shard key pattern: {}",
-                        _isRequestOnTimeseriesViewNamespace
-                            ? "time-series collection must"
-                            : "collection must contain an exact match on _id (and have the "
-                              "collection default collation) or",
-                        deleteOp.toBSON().toString(),
-                        _cri.cm.getShardKeyPattern().toString()),
-            isMulti || isExactId || isUpdateOneWithoutShardKeyEnabled());
 
     if (!isMulti) {
         deleteOneNonTargetedShardedCount.increment(1);

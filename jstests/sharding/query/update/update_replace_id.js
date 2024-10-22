@@ -21,9 +21,6 @@ import {
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // Test deliberately inserts orphans outside of migrations.
 TestData.skipCheckOrphans = true;
@@ -183,18 +180,6 @@ function runReplacementUpdateTestsForCompoundShardKey() {
         profileDB: shard1DB,
         filter: {op: "update", "command.u.msg": "update_extracted_id_from_query"}
     });
-
-    // An upsert whose query doesn't have full shard key will fail if updateOneWithoutShardKey
-    // feature flag is not enabled.
-    if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(mongosColl.getDB())) {
-        assert.commandFailedWithCode(
-            mongosColl.update(
-                {_id: 101}, {a: 101, msg: "upsert_extracted_id_from_query"}, {upsert: true}),
-            ErrorCodes.ShardKeyNotFound);
-    }
-
-    // Verify that the document did not perform any writes.
-    assert.eq(0, mongosColl.find({_id: 101}).itcount());
 
     // Verify that an update whose query contains an exact match on _id but whose replacement
     // doc does not contain all other shard key fields will be targeted as if the missing shard

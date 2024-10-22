@@ -46,7 +46,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -80,7 +79,6 @@
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -90,8 +88,6 @@
 namespace mongo {
 namespace write_without_shard_key {
 namespace {
-
-MONGO_FAIL_POINT_DEFINE(skipUseTwoPhaseWriteProtocolCheck);
 
 constexpr auto kIdFieldName = "_id"_sd;
 const FieldRef idFieldRef(kIdFieldName);
@@ -212,14 +208,6 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                          const boost::optional<BSONObj>& let,
                          const boost::optional<LegacyRuntimeConstants>& legacyRuntimeConstants,
                          bool isTimeseriesViewRequest) {
-    // For existing unittests that do not expect sharding utilities to be initialized, we can set
-    // this failpoint if we know the test will not use the two phase write protocol.
-    if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-        MONGO_unlikely(skipUseTwoPhaseWriteProtocolCheck.shouldFail())) {
-        return false;
-    }
-
     auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 

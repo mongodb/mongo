@@ -11,9 +11,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     enableCoordinateCommitReturnImmediatelyAfterPersistingDecision
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const s = new ShardingTest({name: "auto1", shards: 2, mongos: 1});
 
@@ -95,33 +92,13 @@ for (let i = 0; i < 2; i++) {
 
     // Run the two phase broadcast write protocol for multi: false writes without a proper _id or
     // shard key to target by.
-    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDb)) {
-        assert.commandWorked(coll.update({}, {$set: {x: 1}}, {multi: false}));
-        assert.commandWorked(coll.update({_id: {$gt: ObjectId()}}, {$set: {x: 1}}, {multi: false}));
-        assert.commandWorked(coll.update(
-            {$or: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
-        assert.commandWorked(coll.update(
-            {$and: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
-        assert.commandWorked(coll.update({'_id.x': ObjectId()}, {$set: {x: 1}}, {multi: false}));
-    } else {
-        // Invalid extraction of exact _id from query
-        assert.commandFailedWithCode(coll.update({}, {$set: {x: 1}}, {multi: false}),
-                                     ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(
-            coll.update({_id: {$gt: ObjectId()}}, {$set: {x: 1}}, {multi: false}),
-            ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(
-            coll.update(
-                {$or: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}),
-            ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(
-            coll.update(
-                {$and: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}),
-            ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(
-            coll.update({'_id.x': ObjectId()}, {$set: {x: 1}}, {multi: false}),
-            ErrorCodes.InvalidOptions);
-    }
+    assert.commandWorked(coll.update({}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({_id: {$gt: ObjectId()}}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(
+        coll.update({$or: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update(
+        {$and: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({'_id.x': ObjectId()}, {$set: {x: 1}}, {multi: false}));
 
     // Make sure we can extract exact shard key from certain queries
     assert.commandWorked(coll.update({key: ObjectId()}, {$set: {x: 1}}, {multi: false}));
@@ -133,33 +110,13 @@ for (let i = 0; i < 2; i++) {
 
     // Run the two phase broadcast write protocol for multi: false writes without a proper _id or
     // shard key to target by.
-    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDb)) {
-        assert.commandWorked(coll.update({}, {$set: {x: 1}}, {multi: false}));
-        assert.commandWorked(coll.update({'key.x': ObjectId()}, {$set: {x: 1}}, {multi: false}));
-    } else {
-        // Invalid extraction of exact key from query
-        assert.commandFailedWithCode(coll.update({}, {$set: {x: 1}}, {multi: false}),
-                                     ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(
-            coll.update({'key.x': ObjectId()}, {$set: {x: 1}}, {multi: false}),
-            ErrorCodes.InvalidOptions);
-    }
+    assert.commandWorked(coll.update({}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(coll.update({'key.x': ObjectId()}, {$set: {x: 1}}, {multi: false}));
 
     // Run the two phase broadcast write protocol for multi: false writes without a proper _id or
     // shard key to target by.
-    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDb)) {
-        assert.commandWorked(coll.update({key: {$gt: 0}}, {$set: {x: 1}}, {multi: false}));
-    } else {
-        // Inexact queries may target a single shard. Range queries may target a single shard as
-        // long as the collection is not hashed.
-        if (hashedKey) {
-            assert.commandFailedWithCode(
-                coll.update({key: {$gt: 0}}, {$set: {x: 1}}, {multi: false}),
-                ErrorCodes.InvalidOptions);
-        } else {
-            assert.commandWorked(coll.update({key: {$gt: 0}}, {$set: {x: 1}}, {multi: false}));
-        }
-    }
+    assert.commandWorked(coll.update({key: {$gt: 0}}, {$set: {x: 1}}, {multi: false}));
+
     // Note: {key:-1} and {key:-2} fall on shard0 for both hashed and ascending shardkeys.
     assert.commandWorked(
         coll.update({$or: [{key: -1}, {key: -2}]}, {$set: {x: 1}}, {multi: false}));
@@ -168,19 +125,9 @@ for (let i = 0; i < 2; i++) {
 
     // Run the two phase broadcast write protocol for multi: false writes without a proper _id or
     // shard key to target by.
-    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDb)) {
-        assert.commandWorked(coll.update({key: {$gt: MinKey}}, {$set: {x: 1}}, {multi: false}));
-        assert.commandWorked(
-            coll.update({$or: [{key: -10}, {key: 10}]}, {$set: {x: 1}}, {multi: false}));
-    } else {
-        // In cases where an inexact query does target multiple shards, single update is rejected.
-        assert.commandFailedWithCode(
-            coll.update({key: {$gt: MinKey}}, {$set: {x: 1}}, {multi: false}),
-            ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(
-            coll.update({$or: [{key: -10}, {key: 10}]}, {$set: {x: 1}}, {multi: false}),
-            ErrorCodes.InvalidOptions);
-    }
+    assert.commandWorked(coll.update({key: {$gt: MinKey}}, {$set: {x: 1}}, {multi: false}));
+    assert.commandWorked(
+        coll.update({$or: [{key: -10}, {key: 10}]}, {$set: {x: 1}}, {multi: false}));
 
     // Make sure failed shard key or _id extraction doesn't affect the other
     assert.commandWorked(

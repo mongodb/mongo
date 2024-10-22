@@ -184,8 +184,6 @@ public:
 
     bool isUpdateOneWithIdWithoutShardKeyEnabled() const override;
 
-    bool isUpdateOneWithoutShardKeyEnabled() const override;
-
     bool timeseriesNamespaceNeedsRewrite(const NamespaceString& nss) const;
 
     const CollectionRoutingInfo& getRoutingInfo() const;
@@ -277,8 +275,6 @@ private:
     CollectionRoutingInfo _cri;
 
     bool _isUpdateOneWithIdWithoutShardKeyEnabled = false;
-
-    bool _isUpdateOneWithoutShardKeyEnabled = false;
 };
 
 }  // namespace mongo

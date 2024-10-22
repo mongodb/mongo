@@ -280,9 +280,6 @@ export const authCommandsLib = {
               stmtId: NumberInt(1)
           },
           skipUnlessSharded: true,
-          skipTest: (conn) => {
-              return !TestData.setParameters.featureFlagUpdateOneWithoutShardKey;
-          },
           testcases: [
               {
                   runOnDb: adminDbName,
@@ -308,9 +305,6 @@ export const authCommandsLib = {
           testname: "_clusterWriteWithoutShardKey",
           command: {_clusterWriteWithoutShardKey: 1, writeCmd: {}, shardId: "", targetDocId: {}},
           skipUnlessSharded: true,
-          skipTest: (conn) => {
-              return !TestData.setParameters.featureFlagUpdateOneWithoutShardKey;
-          },
           testcases: [
               {
                   runOnDb: adminDbName,
@@ -7497,7 +7491,7 @@ export const authCommandsLib = {
               },
             ]
         },
-        { 
+        {
           testname: "aggregate_$_internalChangeStreamUnwindTransaction",
           command: {
               aggregate: 1,
@@ -8357,9 +8351,9 @@ export const authCommandsLib = {
                 [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}]
           },
         ]
-      }, 
+      },
     ],
-    
+
     /************* SHARED TEST LOGIC ****************/
 
     /**

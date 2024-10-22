@@ -1,9 +1,6 @@
 // Test shard targeting for queries with collation.
 // @tags: [requires_scripting]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const caseInsensitive = {
     locale: "en_US",
@@ -186,26 +183,15 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Sharded findAndModify that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
-    let res =
-        coll.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
-    assert(res.a === "foo" || res.a === "FOO");
+let res =
+    coll.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
+assert(res.a === "foo" || res.a === "FOO");
 
-    explain = coll.explain().findAndModify(
-        {query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
-    assert.commandWorked(explain);
-    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
-} else {
-    // Sharded findAndModify on strings with non-simple collation should fail, because findAndModify
-    // must target a single shard.
-    assert.throws(function() {
-        coll.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
-    });
-    assert.throws(function() {
-        coll.explain().findAndModify(
-            {query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
-    });
-}
+explain = coll.explain().findAndModify(
+    {query: {a: "foo"}, update: {$set: {b: 1}}, collation: caseInsensitive});
+assert.commandWorked(explain);
+assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
+
 // Sharded findAndModify on strings with simple collation should succeed. This should be
 // single-shard.
 assert.eq("foo", coll.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}}).a);
@@ -311,39 +297,19 @@ assert.commandWorked(coll.insert(a_100));
 
 // Sharded deleteOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
-    let beforeNumDocsMatch = coll.find({a: "foo"}).collation(caseInsensitive).count();
-    writeRes =
-        assert.commandWorked(coll.remove({a: "foo"}, {justOne: true, collation: caseInsensitive}));
-    assert.eq(1, writeRes.nRemoved);
-    let afterNumDocsMatch = coll.find({a: "foo"}).collation(caseInsensitive).count();
-    assert.eq(beforeNumDocsMatch - 1, afterNumDocsMatch);
+let beforeNumDocsMatch = coll.find({a: "foo"}).collation(caseInsensitive).count();
+writeRes =
+    assert.commandWorked(coll.remove({a: "foo"}, {justOne: true, collation: caseInsensitive}));
+assert.eq(1, writeRes.nRemoved);
+let afterNumDocsMatch = coll.find({a: "foo"}).collation(caseInsensitive).count();
+assert.eq(beforeNumDocsMatch - 1, afterNumDocsMatch);
 
-    explain = coll.explain().remove({a: "foo"}, {justOne: true, collation: caseInsensitive});
-    assert.commandWorked(explain);
-    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
+explain = coll.explain().remove({a: "foo"}, {justOne: true, collation: caseInsensitive});
+assert.commandWorked(explain);
+assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
-    coll.insert(a_foo);
-    coll.insert(a_FOO);
-} else {
-    // A single remove (justOne: true) must be single-shard or an exact-ID query. A query is
-    // exact-ID if it contains an equality on _id and either has the collection default collation or
-    // _id is not a string/object/array.
-
-    // Single remove on string shard key with non-simple collation should fail, because it is not
-    // single-shard.
-    assert.writeError(coll.remove({a: "foo"}, {justOne: true, collation: caseInsensitive}));
-
-    // Single remove on string shard key with simple collation should succeed, because it is
-    // single-shard.
-    writeRes = coll.remove({a: "foo"}, {justOne: true});
-    assert.commandWorked(writeRes);
-    assert.eq(1, writeRes.nRemoved);
-    explain = coll.explain().remove({a: "foo"}, {justOne: true});
-    assert.commandWorked(explain);
-    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
-    assert.commandWorked(coll.insert(a_foo));
-}
+coll.insert(a_foo);
+coll.insert(a_FOO);
 
 // Single remove on number shard key with non-simple collation should succeed, because it is
 // single-shard.
@@ -357,18 +323,12 @@ assert.commandWorked(coll.insert(a_100));
 
 // Sharded deleteOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
-    assert.commandWorked(coll.insert({_id: "foo", a: "bar"}));
-    writeRes = assert.commandWorked(
-        coll.remove({_id: "foo"}, {justOne: true, collation: caseInsensitive}));
-    let countDocMatch = coll.find({_id: "foo"}).collation(caseInsensitive).count();
-    assert.eq(1, writeRes.nRemoved);
-    assert.eq(0, countDocMatch);
-} else {
-    // Single remove on string _id with non-collection-default collation should fail, because it is
-    // not an exact-ID query.
-    assert.writeError(coll.remove({_id: "foo"}, {justOne: true, collation: caseInsensitive}));
-}
+assert.commandWorked(coll.insert({_id: "foo", a: "bar"}));
+writeRes =
+    assert.commandWorked(coll.remove({_id: "foo"}, {justOne: true, collation: caseInsensitive}));
+let countDocMatch = coll.find({_id: "foo"}).collation(caseInsensitive).count();
+assert.eq(1, writeRes.nRemoved);
+assert.eq(0, countDocMatch);
 
 // Single remove on string _id with collection-default collation should succeed, because it is
 // an exact-ID query.
@@ -421,22 +381,12 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Sharded updateOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
-    writeRes =
-        assert.commandWorked(coll.update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
-    assert.eq(1, writeRes.nMatched);
-    explain = coll.explain().update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive});
-    assert.commandWorked(explain);
-    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
-} else {
-    // A single (non-multi) update must be single-shard or an exact-ID query. A query is exact-ID if
-    // it contains an equality on _id and either has the collection default collation or _id is not
-    // a string/object/array.
-
-    // Single update on string shard key with non-simple collation should fail, because it is not
-    // single-shard.
-    assert.writeError(coll.update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
-}
+writeRes =
+    assert.commandWorked(coll.update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
+assert.eq(1, writeRes.nMatched);
+explain = coll.explain().update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive});
+assert.commandWorked(explain);
+assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Single update on string shard key with simple collation should succeed, because it is
 // single-shard.
@@ -458,19 +408,11 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Sharded updateOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
-    assert.commandWorked(coll.insert({_id: "foo", a: "bar"}));
-    writeRes = assert.commandWorked(
-        coll.update({_id: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
-    assert.eq(1, writeRes.nMatched);
-    assert.commandWorked(coll.remove({_id: "foo"}, {justOne: true}));
-} else {
-    // Single update on string _id with non-collection-default collation should fail, because it is
-    // not an exact-ID query.
-    assert.commandWorked(coll.insert({_id: "foo", a: "bar"}));
-    assert.writeError(coll.update({_id: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
-    assert.commandWorked(coll.remove({_id: "foo"}, {justOne: true}));
-}
+assert.commandWorked(coll.insert({_id: "foo", a: "bar"}));
+writeRes =
+    assert.commandWorked(coll.update({_id: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
+assert.eq(1, writeRes.nMatched);
+assert.commandWorked(coll.remove({_id: "foo"}, {justOne: true}));
 
 // Single update on string _id with collection-default collation should succeed, because it is
 // an exact-ID query.
@@ -496,19 +438,11 @@ assert.eq(1, writeRes.nMatched);
 
 // Sharded upsert that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
-    writeRes = coll.update(
-        {a: "filter"}, {$set: {b: 1}}, {multi: false, upsert: true, collation: caseInsensitive});
-    assert.commandWorked(writeRes);
-    assert.eq(1, writeRes.nUpserted);
-    assert.commandWorked(coll.remove({a: "filter"}, {justOne: true}));
-} else {
-    // Upsert must always be single-shard.
-
-    // Upsert on strings with non-simple collation should fail, because it is not single-shard.
-    assert.writeError(coll.update(
-        {a: "foo"}, {$set: {b: 1}}, {multi: true, upsert: true, collation: caseInsensitive}));
-}
+writeRes = coll.update(
+    {a: "filter"}, {$set: {b: 1}}, {multi: false, upsert: true, collation: caseInsensitive});
+assert.commandWorked(writeRes);
+assert.eq(1, writeRes.nUpserted);
+assert.commandWorked(coll.remove({a: "filter"}, {justOne: true}));
 
 // Upsert on strings with simple collation should succeed, because it is single-shard.
 writeRes = coll.update({a: "foo"}, {$set: {b: 1}}, {multi: true, upsert: true});

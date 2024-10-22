@@ -300,9 +300,7 @@ void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     // document shard key in a retryable write or transaction, mongos only sets
     // $_allowShardKeyUpdatesWithoutFullShardKeyInQuery to true if the client executed write was a
     // retryable write or in a transaction.
-    if (_params.allowShardKeyUpdatesWithoutFullShardKeyInQuery &&
-        feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (_params.allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
         bool isInternalThreadOrClient = !cc().session() || cc().isInternalClient();
         uassert(ErrorCodes::InvalidOptions,
                 "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",

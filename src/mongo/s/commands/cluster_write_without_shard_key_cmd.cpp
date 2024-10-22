@@ -54,9 +54,7 @@
 #include "mongo/db/commands/query_cmd/explain_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
@@ -561,9 +559,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(ClusterWriteWithoutShardKeyCmd)
-    .forRouter()
-    .requiresFeatureFlag(&feature_flags::gFeatureFlagUpdateOneWithoutShardKey);
+MONGO_REGISTER_COMMAND(ClusterWriteWithoutShardKeyCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -2007,10 +2007,6 @@ protected:
         updateOp.setCollation(collation);
         return ReadWriteDistributionTest::makeSampledBulkWriteUpdateQueryDocument({updateOp});
     }
-
-private:
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithoutShardKey", true};
 };
 
 TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsert) {

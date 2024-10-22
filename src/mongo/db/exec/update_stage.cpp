@@ -718,15 +718,9 @@ void ShardingChecksForUpdate::_checkRestrictionsOnUpdatingShardKeyAreNotViolated
             "Multi-update operations are not allowed when updating the shard key field.",
             !_isMulti);
 
-    // With the introduction of PM-1632, we allow updating a document shard key without
-    // providing a full shard key if the update is executed in a retryable write or transaction.
-    // PM-1632 uses an internal transaction to execute these updates, so to make sure that we can
-    // only update the document shard key in a retryable write or transaction, mongos only sets
-    // $_allowShardKeyUpdatesWithoutFullShardKeyInQuery to true if the client executed write was a
-    // retryable write or in a transaction.
-    if (_allowShardKeyUpdatesWithoutFullShardKeyInQuery.has_value() &&
-        feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (_allowShardKeyUpdatesWithoutFullShardKeyInQuery.has_value()) {
+        // $_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter, used
+        // exclusively by the two-phase write protocol for updateOne without shard key.
         bool isInternalThreadOrClient =
             !Client::getCurrent()->session() || Client::getCurrent()->isInternalClient();
         uassert(ErrorCodes::InvalidOptions,

@@ -46,7 +46,6 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
@@ -167,8 +166,6 @@ private:
 };
 
 TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryContainingFullShardKeyCanTargetSingleDocument) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -196,8 +193,6 @@ TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryContainingFullShardKeyCanTargetSi
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryContainingFullShardKeyCanTargetSingleDocument) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -225,8 +220,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryContainingPartialShardKeyCannotTargetSingleDocument) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -254,8 +247,6 @@ TEST_F(WriteWithoutShardKeyUtilTest,
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryContainingPartialShardKeyCannotTargetSingleDocument) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -283,8 +274,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        UpdateAndDeleteQueryContainingUnderscoreIdCanTargetSingleDocument) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -300,8 +289,6 @@ TEST_F(WriteWithoutShardKeyUtilTest,
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        UpdateAndDeleteQueryContainingUnderscoreIdCannotTargetSingleDocument) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -317,8 +304,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithoutShardKeyOrUnderscoreIdCannotTargetSingleDocument) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -346,8 +331,6 @@ TEST_F(WriteWithoutShardKeyUtilTest,
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryWithoutShardKeyOrUnderscoreIdCannotTargetSingleDocument) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -374,8 +357,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
 }
 
 TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithOnlyIdMustUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -392,8 +373,6 @@ TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithOnlyIdMustUseTwoPhase
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        FindAndModifyQueryWithOnlyIdMustUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -409,8 +388,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
 }
 
 TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithoutShardKeyMustUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -426,8 +403,6 @@ TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithoutShardKeyMustUseTwo
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        FindAndModifyQueryWithoutShardKeyMustUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -441,43 +416,7 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
-TEST_F(WriteWithoutShardKeyUtilTest, QueryWithFeatureFlagDisabledDoesNotUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", false);
-    auto useTwoPhaseProtocol =
-        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
-                                                     ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
-                                                     BSON("x" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
-    ASSERT_EQ(useTwoPhaseProtocol, false);
-}
-
-TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
-       QueryWithFeatureFlagDisabledDoesNotUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", false);
-    auto useTwoPhaseProtocol =
-        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
-                                                     ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
-                                                     BSON("x" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
-    ASSERT_EQ(useTwoPhaseProtocol, false);
-}
-
 TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
-
     auto future = scheduleRoutingInfoUnforcedRefresh(ns());
     expectGetDatabase(ns());
 
@@ -511,9 +450,6 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
 }
 
 TEST_F(TimeseriesUnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
-
     auto future = scheduleRoutingInfoUnforcedRefresh(ns());
     expectGetDatabase(ns());
 
@@ -548,8 +484,6 @@ TEST_F(TimeseriesUnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseP
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithFullShardKeyAndCollationWithCollatableTypesUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -569,8 +503,6 @@ TEST_F(WriteWithoutShardKeyUtilTest,
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryWithFullShardKeyAndCollationWithCollatableTypesUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -590,8 +522,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithFullShardKeyAndCollationWithoutCollatableTypesDoesNotUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -608,8 +538,6 @@ TEST_F(WriteWithoutShardKeyUtilTest,
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryWithFullShardKeyAndCollationWithoutCollatableTypesDoesNotUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -626,8 +554,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithOnlyIdAndCollationWithCollatableTypeUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -645,8 +571,6 @@ TEST_F(WriteWithoutShardKeyUtilTest,
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryWithOnlyIdAndCollationWithCollatableTypeUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -664,8 +588,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithOnlyIdAndCollationWithoutCollatableTypeDoesNotUseTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -682,8 +604,6 @@ TEST_F(WriteWithoutShardKeyUtilTest,
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryWithOnlyIdAndCollationWithoutCollatableTypeDoesUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -699,8 +619,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
 }
 
 TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryWithOnlyIdAndUpsertUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -715,8 +633,6 @@ TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryWithOnlyIdAndUpsertUsesTwoPhasePr
 }
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest, WriteQueryWithOnlyIdAndUpsertUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -732,8 +648,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest, WriteQueryWithOnlyIdAndUpsertUses
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryContainingPartialShardKeyAndIdPerformingAnUpsertUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -749,8 +663,6 @@ TEST_F(WriteWithoutShardKeyUtilTest,
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryContainingPartialShardKeyAndIdPerformingAnUpsertUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -766,8 +678,6 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithOnlyIdThatIsNotADirectEqualityUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
@@ -783,8 +693,6 @@ TEST_F(WriteWithoutShardKeyUtilTest,
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryWithOnlyIdThatIsNotADirectEqualityUsesTwoPhaseProtocol) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),

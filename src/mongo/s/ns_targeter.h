@@ -74,8 +74,6 @@ public:
 
     virtual bool isUpdateOneWithIdWithoutShardKeyEnabled() const = 0;
 
-    virtual bool isUpdateOneWithoutShardKeyEnabled() const = 0;
-
     /**
      * Returns a ShardEndpoint for a single document write or throws ShardKeyNotFound if 'doc' is
      * malformed with respect to the shard key pattern of the collection.

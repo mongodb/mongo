@@ -10,9 +10,6 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
@@ -163,27 +160,17 @@ const session = st.s.startSession({retryWrites: true});
 const sessionDB = session.getDatabase(kDbName);
 const sessionColl = sessionDB[kCollName];
 
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    assert.commandWorked(sessionColl.update({d: 1}, {b: 1, c: 4, d: 1}));
+assert.commandWorked(sessionColl.update({d: 1}, {b: 1, c: 4, d: 1}));
 
-    let res = assert.commandWorked(
-        mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}));
-    assert.eq(0, res.nMatched);
-    assert.eq(1, res.nUpserted);
-    docsArr = mongos.getCollection(kNsName).find({b: 2}).toArray();
-    assert.eq(1, docsArr.length);
-
-} else {
-    // When the updateOneWithoutShardKey feature flag is not enabled, upsert operations require the
-    // entire shard key to be specified in the query.
-    assert.commandFailedWithCode(sessionColl.update({d: 1}, {b: 1, c: 4, d: 1}), 31025);
-    assert.writeErrorWithCode(
-        mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}),
-        ErrorCodes.ShardKeyNotFound);
-}
+let res = assert.commandWorked(
+    mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}));
+assert.eq(0, res.nMatched);
+assert.eq(1, res.nUpserted);
+docsArr = mongos.getCollection(kNsName).find({b: 2}).toArray();
+assert.eq(1, docsArr.length);
 
 assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
-let res = assert.commandWorked(sessionDB.runCommand(
+res = assert.commandWorked(sessionDB.runCommand(
     {findAndModify: kCollName, query: {a: 2}, update: {$set: {updated: true}}, upsert: true}));
 assert.eq(1, res.lastErrorObject.n);
 assert.eq(0, res.lastErrorObject.updatedExisting);

@@ -9,9 +9,6 @@
 //   embedded_router_incompatible,
 // ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 var st = new ShardingTest({shards: 2, mongos: 3, other: {rsOptions: {verbose: 2}}});
 
@@ -54,13 +51,6 @@ st.shardColl(coll, {c: 1}, {c: 0}, {c: 1}, coll.getDB(), true);
 // Make sure we can successfully upsert, even though we have stale state
 assert.commandWorked(staleCollA.update({c: "c"}, {c: "c"}, true));
 
-if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB())) {
-    // When updateOneWithoutShardKey feature flag is disabled, make sure we unsuccessfully upsert
-    // with old info.
-    assert.commandFailedWithCode(staleCollB.update({b: "b"}, {b: "b"}, true),
-                                 ErrorCodes.ShardKeyNotFound);
-}
-
 // Change the collection sharding state
 coll.drop();
 coll.createIndex({d: 1});
@@ -71,13 +61,6 @@ assert.commandWorked(coll.insert({d: "d"}));
 
 assert.commandWorked(staleCollA.update({d: "d"}, {$set: {x: "x"}}, false, false));
 assert.eq(staleCollA.findOne().x, "x");
-
-if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB())) {
-    // When updateOneWithoutShardKey feature flag is disabled, make sure we unsuccessfully update
-    // with old info.
-    assert.commandFailedWithCode(staleCollB.update({c: "c"}, {$set: {x: "y"}}, false, false),
-                                 ErrorCodes.InvalidOptions);
-}
 
 assert.eq(staleCollB.findOne().x, "x");
 
@@ -92,11 +75,5 @@ assert.commandWorked(coll.insert({e: "e"}));
 
 assert.commandWorked(staleCollA.remove({e: "e"}, true));
 assert.eq(null, staleCollA.findOne());
-
-if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB())) {
-    // When updateOneWithoutShardKey feature flag is disabled, make sure we unsuccessfully delete
-    // with old info.
-    assert.commandFailedWithCode(staleCollB.remove({d: "d"}, true), ErrorCodes.ShardKeyNotFound);
-}
 
 st.stop();

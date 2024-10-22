@@ -197,79 +197,71 @@ function testDeleteExplain({
     });
 })();
 
-if (FeatureFlagUtil.isPresentAndEnabled(db, "UpdateOneWithoutShardKey")) {
-    (function testDeleteOneWithEmptyBucketFilter() {
-        testDeleteExplain({
-            singleDeleteOp: {
-                // The non-meta field filter leads to a COLLSCAN below the TS_MODIFY stage and so
-                // 'expectedNumUnpacked' is 2.
-                q: {_id: 3},
-                limit: 1,
-            },
-            expectedDeleteStageName: "TS_MODIFY",
-            expectedOpType: "deleteOne",
-            expectedBucketFilter: {
-                $and: [
-                    closedBucketFilter,
-                    {
-                        $and: [
-                            {"control.min._id": {$_internalExprLte: 3}},
-                            {"control.max._id": {$_internalExprGte: 3}}
-                        ]
-                    }
-                ]
-            },
-            expectedResidualFilter: {_id: {$eq: 3}},
-            expectedNumDeleted: 1,
-            expectedNumUnpacked: 1
-        });
-    })();
+(function testDeleteOneWithEmptyBucketFilter() {
+    testDeleteExplain({
+        singleDeleteOp: {
+            // The non-meta field filter leads to a COLLSCAN below the TS_MODIFY stage and so
+            // 'expectedNumUnpacked' is 2.
+            q: {_id: 3},
+            limit: 1,
+        },
+        expectedDeleteStageName: "TS_MODIFY",
+        expectedOpType: "deleteOne",
+        expectedBucketFilter: {
+            $and: [
+                closedBucketFilter,
+                {
+                    $and: [
+                        {"control.min._id": {$_internalExprLte: 3}},
+                        {"control.max._id": {$_internalExprGte: 3}}
+                    ]
+                }
+            ]
+        },
+        expectedResidualFilter: {_id: {$eq: 3}},
+        expectedNumDeleted: 1,
+        expectedNumUnpacked: 1
+    });
+})();
 
-    (function testDeleteOneWithBucketFilter() {
-        testDeleteExplain({
-            singleDeleteOp: {
-                // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
-                // 'expectedNumUnpacked' is exactly 1.
-                q: {[metaFieldName]: 2, _id: {$gte: 1}},
-                limit: 1,
-            },
-            expectedDeleteStageName: "TS_MODIFY",
-            expectedOpType: "deleteOne",
-            expectedBucketFilter: {
-                $and: [
-                    closedBucketFilter,
-                    {meta: {$eq: 2}},
-                    {"control.max._id": {$_internalExprGte: 1}}
-                ]
-            },
-            expectedResidualFilter: {_id: {$gte: 1}},
-            expectedNumDeleted: 1,
-            expectedNumUnpacked: 1
-        });
-    })();
+(function testDeleteOneWithBucketFilter() {
+    testDeleteExplain({
+        singleDeleteOp: {
+            // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
+            // 'expectedNumUnpacked' is exactly 1.
+            q: {[metaFieldName]: 2, _id: {$gte: 1}},
+            limit: 1,
+        },
+        expectedDeleteStageName: "TS_MODIFY",
+        expectedOpType: "deleteOne",
+        expectedBucketFilter: {
+            $and:
+                [closedBucketFilter, {meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}]
+        },
+        expectedResidualFilter: {_id: {$gte: 1}},
+        expectedNumDeleted: 1,
+        expectedNumUnpacked: 1
+    });
+})();
 
-    (function testDeleteOneWithBucketFilterAndIndexHint() {
-        testDeleteExplain({
-            singleDeleteOp: {
-                // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
-                // 'expectedNumUnpacked' is exactly 1.
-                q: {[metaFieldName]: 2, _id: {$gte: 1}},
-                limit: 1,
-                hint: {[metaFieldName]: 1}
-            },
-            expectedDeleteStageName: "TS_MODIFY",
-            expectedOpType: "deleteOne",
-            expectedBucketFilter: {
-                $and: [
-                    closedBucketFilter,
-                    {meta: {$eq: 2}},
-                    {"control.max._id": {$_internalExprGte: 1}}
-                ]
-            },
-            expectedResidualFilter: {_id: {$gte: 1}},
-            expectedNumDeleted: 1,
-            expectedNumUnpacked: 1,
-            expectedUsedIndexName: metaFieldName + "_1"
-        });
-    })();
-}
+(function testDeleteOneWithBucketFilterAndIndexHint() {
+    testDeleteExplain({
+        singleDeleteOp: {
+            // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
+            // 'expectedNumUnpacked' is exactly 1.
+            q: {[metaFieldName]: 2, _id: {$gte: 1}},
+            limit: 1,
+            hint: {[metaFieldName]: 1}
+        },
+        expectedDeleteStageName: "TS_MODIFY",
+        expectedOpType: "deleteOne",
+        expectedBucketFilter: {
+            $and:
+                [closedBucketFilter, {meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}]
+        },
+        expectedResidualFilter: {_id: {$gte: 1}},
+        expectedNumDeleted: 1,
+        expectedNumUnpacked: 1,
+        expectedUsedIndexName: metaFieldName + "_1"
+    });
+})();

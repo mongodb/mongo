@@ -26,7 +26,6 @@ selector:
     - jstests/sharding/resharding_replicate_updates_as_insert_delete.js
     - jstests/sharding/retryable_write_error_labels.js
     - jstests/sharding/session_info_in_oplog.js
-    - jstests/sharding/transactions_targeting_errors.js
     # TODO SERVER-75496: Uncomment once ticket is complete.
     # - jstests/sharding/transactions_writes_not_retryable.js
     - jstests/sharding/transient_txn_error_labels.js

@@ -22,9 +22,6 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // Create a new sharded collection with numDocs documents, with two docs sharing each shard key
 // (used for testing *multi* removes to a *specific* shard key).
@@ -174,17 +171,7 @@ function checkAllUpdateQueries(makeMongosStaleFunc) {
 
     function assertUpdateIsValidIfAllChunksOnSingleShard(
         query, update, multiOption, makeMongosStaleFunc) {
-        if (makeMongosStaleFunc == makeStaleMongosTargetOneShardWhenChunksAreOnMultipleShards) {
-            // Sharded updateOnes that do not directly target a shard can now use the two phase
-            // write protocol to execute.
-            if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-                doUpdate(query, update, multiOption, makeMongosStaleFunc);
-            } else {
-                assertUpdateIsInvalid(query, update, multiOption, makeMongosStaleFunc);
-            }
-        } else {
-            doUpdate(query, update, multiOption, makeMongosStaleFunc);
-        }
+        doUpdate(query, update, multiOption, makeMongosStaleFunc);
     }
 
     // Note on the tests below: single-doc updates are able to succeed even in cases where the

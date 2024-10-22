@@ -16,9 +16,6 @@ import {
 import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();
@@ -271,14 +268,8 @@ verifyProfilerEntryOnCorrectShard(0, profileFilter);
 
 // Sharded updateOnes that do not directly target a shard can now use the two phase write
 // protocol to execute.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    res = assert.commandWorked(coll.update({a: {$lt: 1}}, updateObj));
-    assert.eq(res.nMatched, 1, res);
-} else {
-    // Op-style update with range query on hashed field, cannot route to single shard and hence
-    // should fail.
-    assert.commandFailedWithCode(coll.update({a: {$lt: 1}}, updateObj), ErrorCodes.InvalidOptions);
-}
+res = assert.commandWorked(coll.update({a: {$lt: 1}}, updateObj));
+assert.eq(res.nMatched, 1, res);
 
 // Test to verify that delete with full shard key in the query can be routed correctly.
 res = assert.commandWorked(coll.deleteOne({a: 1, b: {subObj: "str_1"}, c: 1}));
@@ -293,14 +284,7 @@ verifyProfilerEntryOnCorrectShard(1, profileFilter);
 
 // Sharded deleteOnes that do not directly target a shard can now use the two phase write
 // protocol to execute.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    assert.commandWorked(coll.runCommand(
-        {delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}], ordered: false}));
-} else {
-    // Test to verify that delete with limit:1, without full shard key in query fails.
-    assert.commandFailedWithCode(
-        coll.runCommand({delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}], ordered: false}),
-        ErrorCodes.ShardKeyNotFound);
-}
+assert.commandWorked(
+    coll.runCommand({delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}], ordered: false}));
 
 st.stop();

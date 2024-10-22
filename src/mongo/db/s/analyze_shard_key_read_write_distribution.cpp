@@ -37,7 +37,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -266,12 +265,9 @@ void WriteDistributionMetricsCalculator::_addUpdateQuery(
                 opCtx, ns, filter, collation, _getChunkManager());
         };
 
-        // Currently, targeting by replacement document is only done when an updateOne without
-        // shard key is not supported or when the query targets an exact id value.
-        if (isReplacementUpdate &&
-            (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-             isExactIdQuery())) {
+        // Currently, targeting by replacement document is only done when the query targets an exact
+        // id value.
+        if (isReplacementUpdate && isExactIdQuery()) {
             auto filter =
                 _getShardKeyPattern().extractShardKeyFromDoc(updateMod.getUpdateReplacement());
             info = _getTargetingInfoForQuery(

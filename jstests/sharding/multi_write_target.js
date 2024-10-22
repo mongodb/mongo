@@ -3,9 +3,6 @@
 //
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 var st = new ShardingTest({shards: 3, mongos: 2});
 
@@ -32,13 +29,7 @@ assert.commandWorked(st.s0.getCollection(coll.toString()).insert({_id: 0, skey: 
 
 // Sharded updateOnes that do not directly target a shard can now use the two phase write
 // protocol to execute.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    assert.commandWorked(coll.update({x: 1}, {$set: {updated: true}}, {multi: false}));
-} else {
-    // Non-multi-update doesn't work without shard key
-    assert.commandFailedWithCode(coll.update({x: 1}, {$set: {updated: true}}, {multi: false}),
-                                 ErrorCodes.InvalidOptions);
-}
+assert.commandWorked(coll.update({x: 1}, {$set: {updated: true}}, {multi: false}));
 
 assert.commandWorked(coll.update({x: 1}, {$set: {updated: true}}, {multi: true}));
 
@@ -59,12 +50,7 @@ jsTest.log("Testing multi-delete...");
 
 // Sharded deleteOnes that do not directly target a shard can now use the two phase write
 // protocol to execute.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    assert.commandWorked(coll.remove({x: 1}, {justOne: true}));
-} else {
-    // non-multi-delete doesn't work without shard key
-    assert.commandFailedWithCode(coll.remove({x: 1}, {justOne: true}), ErrorCodes.ShardKeyNotFound);
-}
+assert.commandWorked(coll.remove({x: 1}, {justOne: true}));
 
 assert.commandWorked(coll.remove({x: 1}, {justOne: false}));
 
