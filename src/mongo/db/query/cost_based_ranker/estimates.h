@@ -264,7 +264,7 @@ using CostCoefficientType = StrongDouble<CostCoefficientTag>;
 class EstimateBase {
 public:
     EstimateBase() = delete;
-    constexpr EstimateBase(EstimationSource s) : _source(s){};
+    EstimateBase(EstimationSource s) : _source(s){};
 
     /**
      * Merge this estimate with another one - used in operators that combine two estimates.
@@ -286,8 +286,7 @@ class OptimizerEstimate : public EstimateBase {
 public:
     OptimizerEstimate() = delete;
 
-    constexpr OptimizerEstimate(EstimateType e, EstimationSource s)
-        : EstimateBase(s), _estimate(e) {}
+    OptimizerEstimate(EstimateType e, EstimationSource s) : EstimateBase(s), _estimate(e) {}
 
     void assertValid() const {
         _estimate.assertValid();
@@ -403,8 +402,7 @@ class CardinalityEstimate : public OptimizerEstimate<CardinalityType> {
 public:
     CardinalityEstimate() = delete;
 
-    constexpr CardinalityEstimate(CardinalityType ce, EstimationSource src)
-        : OptimizerEstimate(ce, src) {}
+    CardinalityEstimate(CardinalityType ce, EstimationSource src) : OptimizerEstimate(ce, src) {}
 
     CardinalityType cardinality() const {
         return _estimate;
@@ -468,26 +466,11 @@ class SelectivityEstimate : public OptimizerEstimate<SelectivityType> {
 public:
     SelectivityEstimate() = delete;
 
-    constexpr SelectivityEstimate(SelectivityType sel, EstimationSource src)
-        : OptimizerEstimate(sel, src) {}
+    SelectivityEstimate(SelectivityType sel, EstimationSource src) : OptimizerEstimate(sel, src) {}
 
     SelectivityEstimate operator*(const SelectivityEstimate s) {
         SelectivityEstimate result(*this);
         result._estimate._v *= s._estimate._v;
-        assertValid();
-        return result;
-    }
-
-    SelectivityEstimate pow(double exp) const {
-        SelectivityEstimate result(*this);
-        result._estimate._v = std::pow(result._estimate._v, exp);
-        assertValid();
-        return result;
-    }
-
-    SelectivityEstimate negate() const {
-        SelectivityEstimate result(*this);
-        result._estimate._v = 1 - result._estimate._v;
         assertValid();
         return result;
     }
@@ -513,12 +496,8 @@ CardinalityEstimate operator*(const SelectivityEstimate& s, const CardinalityEst
 CardinalityEstimate operator*(const CardinalityEstimate& ce, const SelectivityEstimate& s);
 
 // Predefined constants
-inline const CardinalityEstimate zeroCE{CardinalityType{0.0}, EstimationSource::Code};
-inline const CardinalityEstimate oneCE{CardinalityType{1}, EstimationSource::Code};
-inline const CardinalityEstimate minCE{CardinalityType::minValue(), EstimationSource::Code};
-inline const CardinalityEstimate maxCE{CardinalityType::maxValue(), EstimationSource::Code};
-
-inline const SelectivityEstimate zeroSel{SelectivityType{0.0}, EstimationSource::Code};
-inline const SelectivityEstimate oneSel{SelectivityType{1.0}, EstimationSource::Code};
+inline const CardinalityEstimate zeroCE(CardinalityType{0.0}, EstimationSource::Code);
+inline const CardinalityEstimate minCE(CardinalityType::minValue(), EstimationSource::Code);
+inline const CardinalityEstimate maxCE(CardinalityType::maxValue(), EstimationSource::Code);
 
 }  // namespace mongo::cost_based_ranker
