@@ -456,6 +456,23 @@ files = [
 ]
 
 [[package]]
+name = "colorlog"
+version = "6.8.2"
+description = "Add colours to the output of Python's logging module."
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "colorlog-6.8.2-py3-none-any.whl", hash = "sha256:4dcbb62368e2800cb3c5abd348da7e53f6c362dda502ec27c560b2e58a66bd33"},
+    {file = "colorlog-6.8.2.tar.gz", hash = "sha256:3e3e079a41feb5a1b64f978b5ea4f46040a94f11f0e8bbb8261e3dbbeca64d44"},
+]
+
+[package.dependencies]
+colorama = {version = "*", markers = "sys_platform == \"win32\""}
+
+[package.extras]
+development = ["black", "flake8", "mypy", "pytest", "types-colorama"]
+
+[[package]]
 name = "constantly"
 version = "23.10.4"
 description = "Symbolic constants in Python"
@@ -944,6 +961,24 @@ files = [
 
 [package.dependencies]
 Flask = ">=0.9"
+
+[[package]]
+name = "gcovr"
+version = "7.2"
+description = "Generate C/C++ code coverage reports with gcov"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "gcovr-7.2-py2.py3-none-any.whl", hash = "sha256:fd5cc432c9df863983c530dbd5077937c730b6589117916c188577681469b395"},
+    {file = "gcovr-7.2.tar.gz", hash = "sha256:e3e95cb56ca88dbbe741cb5d69aa2be494eb2fc2a09ee4f651644a670ee5aeb3"},
+]
+
+[package.dependencies]
+colorlog = "*"
+jinja2 = "*"
+lxml = "*"
+pygments = ">=2.13.0"
+tomli = {version = ">=1.1.0", markers = "python_version < \"3.11\""}
 
 [[package]]
 name = "gdbmongo"
@@ -1484,7 +1519,7 @@ Twisted = "*"
 name = "lxml"
 version = "5.2.2"
 description = "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API."
-optional = true
+optional = false
 python-versions = ">=3.6"
 files = [
     {file = "lxml-5.2.2-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:364d03207f3e603922d0d3932ef363d55bbf48e3647395765f9bfcbdf6d23632"},
@@ -4399,4 +4434,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "85b3d757dae015ed1f645a9875e1a39b36b518d4ef9a0ec8e4b2d1588a6b0248"
+content-hash = "335083cea95a20dce8e4ecc60f448e0b6c28bea66a3b77e327140219ee54bd65"
