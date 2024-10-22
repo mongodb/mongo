@@ -54,7 +54,6 @@ const sharding_config = {
         configOptions: configOptions,
         mongosOptions: mongosOptions,
         rsOptions: configOptions,
-        shardOptions: configOptions,
     }
 };
 

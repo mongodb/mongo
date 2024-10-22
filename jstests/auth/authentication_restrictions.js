@@ -215,7 +215,7 @@ const st = new ShardingTest({
     other: {
         mongosOptions: {bind_ip_all: "", auth: null},
         configOptions: {auth: null},
-        shardOptions: {auth: null}
+        rsOptions: {auth: null}
     }
 });
 testConnection(st.s0,

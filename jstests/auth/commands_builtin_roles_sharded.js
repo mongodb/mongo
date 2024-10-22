@@ -30,7 +30,7 @@ const conn = new ShardingTest({
     config: 1,
     keyFile: "jstests/libs/key1",
     other: {
-        shardOptions: opts,
+        rsOptions: opts,
         // We have to set the mongotHost parameter for the $search-related tests to pass
         // configuration checks.
         mongosOptions:

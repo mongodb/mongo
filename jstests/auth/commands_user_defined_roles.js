@@ -263,7 +263,7 @@ const impls = {
         keyFile: "jstests/libs/key1",
         // We have to set the mongotHost parameter for the $search-related tests to pass
         // configuration checks.
-        other: {shardOptions: opts, mongosOptions: {setParameter: {mongotHost: "localhost:27017"}}}
+        other: {rsOptions: opts, mongosOptions: {setParameter: {mongotHost: "localhost:27017"}}}
     });
     conn.sidechannel = new Mongo(conn.s0.host);
     authCommandsLib.runTests(conn, impls);

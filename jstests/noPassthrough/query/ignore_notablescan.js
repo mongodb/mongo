@@ -39,7 +39,7 @@ function Sharding() {
         shards: 2,
         config: 1,
         other: {
-            shardOptions: {setParameter: {notablescan: true}},
+            rsOptions: {setParameter: {notablescan: true}},
             configOptions: {setParameter: {notablescan: true}}
         }
     });

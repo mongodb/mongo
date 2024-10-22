@@ -24,7 +24,6 @@ const sharding_config = {
         configOptions: ocsp_options,
         mongosOptions: ocsp_options,
         rsOptions: ocsp_options,
-        shardOptions: ocsp_options,
     }
 };
 

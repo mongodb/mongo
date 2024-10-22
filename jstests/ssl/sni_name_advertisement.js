@@ -55,7 +55,7 @@ function getSNISharded(params) {
         shards: 2,
         useHostname: true,
         host: params.bind_ip,
-        other: {configOptions: params, mongosOptions: params, shardOptions: params}
+        other: {configOptions: params, mongosOptions: params, rsOptions: params}
     });
     let db = s.getDB("admin");
 

@@ -6,8 +6,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 var st = new ShardingTest({
     shards: 2,
     other: {
-        shardOptions:
-            {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: 32 * 1024 * 1024}}
+        rsOptions: {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: 32 * 1024 * 1024}}
     }
 });
 assert.commandWorked(

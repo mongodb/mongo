@@ -921,7 +921,7 @@ function runMongosTest(opts) {
         config: 1,
         keyFile: "jstests/libs/key1",
         other: {
-            shardOptions: opts,
+            rsOptions: opts,
             // We have to set the mongotHost parameter for the $search-related tests to pass
             // configuration checks.
             mongosOptions:
@@ -947,7 +947,7 @@ function runShardedServerTest(opts) {
         keyFile: "jstests/libs/key1",
         useHostname: false,
         other: {
-            shardOptions: opts,
+            rsOptions: opts,
             // We have to set the mongotHost parameter for the $search-related tests to pass
             // configuration checks.
             mongosOptions:
@@ -978,7 +978,7 @@ function runConfigServer(opts) {
         config: 1,
         keyFile: "jstests/libs/key1",
         other: {
-            shardOptions: opts,
+            rsOptions: opts,
             // We have to set the mongotHost parameter for the $search-related tests to pass
             // configuration checks.
             mongosOptions:

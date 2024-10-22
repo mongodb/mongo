@@ -136,6 +136,6 @@ MongoRunner.stopMongod(mongod);
 
 // Run the test on a sharded cluster.
 const cluster = new ShardingTest(
-    {shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: {auth: ""}}});
+    {shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {rsOptions: {auth: ""}}});
 runTest(cluster);
 cluster.stop();

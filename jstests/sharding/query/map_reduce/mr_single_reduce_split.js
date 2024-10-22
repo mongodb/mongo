@@ -13,7 +13,7 @@ const st = new ShardingTest({
     mongos: 1,
     other: {
         mongosOptions: {setParameter: {mrEnableSingleReduceOptimization: true}},
-        shardOptions: {setParameter: {mrEnableSingleReduceOptimization: true}},
+        rsOptions: {setParameter: {mrEnableSingleReduceOptimization: true}},
     }
 });
 

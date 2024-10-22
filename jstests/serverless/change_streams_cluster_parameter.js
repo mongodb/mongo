@@ -97,7 +97,7 @@ function testWithoutAdminDB(conn) {
         config: 1,
         other: {
             mongosOptions: {setParameter: {internalChangeStreamUseTenantIdForTesting: true}},
-            shardOptions: {setParameter: {internalChangeStreamUseTenantIdForTesting: true}},
+            rsOptions: {setParameter: {internalChangeStreamUseTenantIdForTesting: true}},
             configOptions: {setParameter: {internalChangeStreamUseTenantIdForTesting: true}}
         }
     });

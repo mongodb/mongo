@@ -114,7 +114,7 @@ function runMongosTest(desc, func) {
             keyFile: 'jstests/libs/key1',
             configOptions: mongodOptions,
             mongosOptions: mongosOptions,
-            shardOptions: x509_options,
+            rsOptions: x509_options,
             useHostname: false
         }
     });
@@ -135,7 +135,7 @@ function runMongosFailTest(desc, options) {
             keyFile: 'jstests/libs/key1',
             configOptions: mongodOptions,
             mongosOptions: mongosOptions,
-            shardOptions: x509_options,
+            rsOptions: x509_options,
             useHostname: false
         }
     });

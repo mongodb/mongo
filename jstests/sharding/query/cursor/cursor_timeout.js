@@ -43,7 +43,7 @@ const cursorMonitorFrequencySecs = 1;
 const st = new ShardingTest({
     shards: 2,
     other: {
-        shardOptions: {
+        rsOptions: {
             verbose: 1,
             setParameter: {
                 cursorTimeoutMillis: mongodCursorTimeoutMs,

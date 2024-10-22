@@ -14,7 +14,7 @@ const timeseriesCollName = "timeseriesColl";
 const bucketCollName = "system.buckets." + timeseriesCollName;
 const pass = "password";
 
-const st = new ShardingTest({keyFile: "jstests/libs/key1", other: {shardOptions: {auth: ""}}});
+const st = new ShardingTest({keyFile: "jstests/libs/key1", other: {rsOptions: {auth: ""}}});
 
 // Create the admin user.
 st.admin.createUser({user: "root", pwd: pass, roles: ["userAdminAnyDatabase"]});

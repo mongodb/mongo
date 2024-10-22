@@ -38,8 +38,7 @@ function runTest(checkMongos,
         var st = new ShardingTest({
             shards: 1,
             mongos: 1,
-            other:
-                {configOptions: opts, mongosOptions: opts, shardOptions: opts, useHostname: false}
+            other: {configOptions: opts, mongosOptions: opts, rsOptions: opts, useHostname: false}
         });
         mongo = st.s;
     } else {

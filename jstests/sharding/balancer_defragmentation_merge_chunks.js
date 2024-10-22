@@ -35,7 +35,7 @@ const st = new ShardingTest({
                 balancerMigrationsThrottlingMs: 200
             }
         },
-        shardOptions: {
+        rsOptions: {
             setParameter: {
                 reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000 /* 1 day */
             }

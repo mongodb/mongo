@@ -8,7 +8,7 @@ const keyfile = 'jstests/libs/key1';
 const st = new ShardingTest({
     mongos: 1,
     keyFile: keyfile,
-    other: {mongosOptions: {auth: null}, configOptions: {auth: null}, shardOptions: {auth: null}}
+    other: {mongosOptions: {auth: null}, configOptions: {auth: null}, rsOptions: {auth: null}}
 });
 
 const admin = st.s.getDB('admin');

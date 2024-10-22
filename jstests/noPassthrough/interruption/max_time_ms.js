@@ -490,7 +490,7 @@ const enableTestCmd = {
 (function runSharded() {
     const enableTestCmd = {setParameter: {enableTestCommands: 1}};
     const st = new ShardingTest(
-        {shards: 2, other: {shardOptions: enableTestCmd, mongosOptions: enableTestCmd}});
+        {shards: 2, other: {rsOptions: enableTestCmd, mongosOptions: enableTestCmd}});
     try {
         executeTest(st.s.getDB("test"), true);
     } finally {

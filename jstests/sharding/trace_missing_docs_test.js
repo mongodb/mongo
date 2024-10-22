@@ -3,11 +3,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {traceMissingDoc} from "jstests/libs/trace_missing_docs.js";
 
 var testDocMissing = function(useReplicaSet) {
-    var options = {
-        rs: useReplicaSet,
-        shardOptions: {oplogSize: 10},
-        rsOptions: {nodes: 1, oplogSize: 10}
-    };
+    var options = {rs: useReplicaSet, rsOptions: {nodes: 1, oplogSize: 10}};
 
     var st = new ShardingTest({shards: 2, mongos: 1, other: options});
 

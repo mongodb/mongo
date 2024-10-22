@@ -303,10 +303,9 @@ function makeShardingTestWithContinuousPrimaryStepdown(stepdownOptions, verbosit
             }
 
             if (stepdownOptions.shardStepdown) {
-                params.other.shardOptions = params.other.shardOptions || {};
-                params.other.shardOptions.setParameter =
-                    params.other.shardOptions.setParameter || {};
-                params.other.shardOptions.setParameter.logComponentVerbosity = verbositySetting;
+                params.other.rsOptions = params.other.rsOptions || {};
+                params.other.rsOptions.setParameter = params.other.rsOptions.setParameter || {};
+                params.other.rsOptions.setParameter.logComponentVerbosity = verbositySetting;
             }
 
             // Construct the original object.

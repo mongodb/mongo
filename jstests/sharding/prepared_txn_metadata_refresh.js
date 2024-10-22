@@ -8,7 +8,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var staticMongod = MongoRunner.runMongod({});
 
-let st = new ShardingTest({shards: 2, other: {shardOptions: {verbose: 1}}});
+let st = new ShardingTest({shards: 2, other: {rsOptions: {verbose: 1}}});
 
 assert.commandWorked(
     st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));

@@ -191,7 +191,7 @@ function runShardingTest() {
         mongos: 1,
         config: 1,
         // Shards should ignore the defaultStartupFCV parameter.
-        shardOptions: {binVersion: latest, setParameter: {defaultStartupFCV: latestFCV}},
+        rsOptions: {binVersion: latest, setParameter: {defaultStartupFCV: latestFCV}},
         configOptions: {binVersion: latest, setParameter: {defaultStartupFCV: lastLTSFCV}}
     });
     let configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");

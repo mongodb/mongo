@@ -16,7 +16,7 @@ const st = new ShardingTest({
     shards: 2,
     other: {
         mongosOptions: {setParameter: {searchIndexManagementHostAndPort: mockConn.host}},
-        shardOptions: {setParameter: {searchIndexManagementHostAndPort: mockConn.host}},
+        rsOptions: {setParameter: {searchIndexManagementHostAndPort: mockConn.host}},
     }
 });
 

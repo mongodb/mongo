@@ -28,8 +28,6 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
         other: {
             mongosOptions: {binVersion: oldVersion},
             configOptions: {binVersion: oldVersion},
-            shardOptions: {binVersion: oldVersion},
-
             rsOptions: {binVersion: oldVersion},
             rs: true,
         },

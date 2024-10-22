@@ -36,7 +36,7 @@ MongoRunner.stopMongod(conn);
 const maxDriftValue = 100;
 const st = new ShardingTest({
     shards: 1,
-    shardOptions: {setParameter: {maxAcceptableLogicalClockDriftSecs: maxDriftValue}},
+    rsOptions: {setParameter: {maxAcceptableLogicalClockDriftSecs: maxDriftValue}},
     mongosOptions: {setParameter: {maxAcceptableLogicalClockDriftSecs: maxDriftValue}}
 });
 let testDB = st.s.getDB("test");

@@ -120,7 +120,7 @@ jsTestLog("Sharding: Testing rename timeseries collection");
         mongos: 1,
         config: 1,
         keyFile: "jstests/libs/key1",
-        other: {shardOptions: {auth: ""}}
+        other: {rsOptions: {auth: ""}}
     });
 
     runTest(st.s);

@@ -919,7 +919,6 @@ export class ShardingTest {
      * Checks for bin versions via:
      *     jsTestOptions().mongosBinVersion,
      *     otherParams.configOptions.binVersion,
-     *     otherParams.shardOptions.binVersion,
      *     otherParams.mongosOptions.binVersion
      */
     getClusterVersionInfo() {
@@ -977,7 +976,6 @@ export class ShardingTest {
      * @property {Object} [rs] Same `rs` parameter to ShardingTest constructor
      * @property {number} [chunkSize] Same as chunkSize parameter to ShardingTest constructor
      * @property {string} [keyFile] The location of the keyFile
-     * @property {Object} [shardOptions] Same as the `shards` parameter to ShardingTest constructor.
      * Can be used to specify options that are common all shards.
      * @property {Object} [configOptions] Same as the `config` parameter to ShardingTest
      * constructor. Can be used to specify options that are common all config servers.
@@ -993,10 +991,10 @@ export class ShardingTest {
      * replica set nodes should be created with the 'causal consistency' flag enabled, which means
      * they will gossip the cluster time and add readConcern afterClusterTime where applicable.
      * @property {Object} [bridgeOptions={}] Options to apply to all mongobridge processes.
-     *
-     * // replica Set only:
      * @property {Object} [rsOptions] Same as the `rs` parameter to ShardingTest constructor. Can be
      * used to specify options that are common all replica members.
+     *
+     * // replica Set only:
      * @property {boolean} [useHostname] if true, use hostname of machine, otherwise use localhost
      * @property {number} [numReplicas]
      * @property {boolean} [configShard] Add the config server as a shard if true.
@@ -1044,7 +1042,7 @@ export class ShardingTest {
      *     (*) There are two ways For multiple configuration objects.
      *       (1) Using the object format. Example:
      *           { d0: { verbose: 5 }, d1: { auth: '' }, rs2: { oplogsize: 10 }}
-     *           In this format, d = mongod, s = mongos & c = config servers
+     *           In this format, d0 = shard0, s = mongos & c = config servers
      *
      *       (2) Using the array format. Example:
      *           [{ verbose: 5 }, { auth: '' }]
@@ -1349,23 +1347,20 @@ export class ShardingTest {
                     rsDefaults.shardsvr = '';
                 }
 
-                if (otherParams.rs || otherParams["rs" + i]) {
+                if (otherParams.rs || otherParams["rs" + i] || otherParams.rsOptions) {
                     if (otherParams.rs) {
                         rsDefaults = Object.merge(rsDefaults, otherParams.rs);
                     }
                     if (otherParams["rs" + i]) {
                         rsDefaults = Object.merge(rsDefaults, otherParams["rs" + i]);
                     }
-                    rsDefaults = Object.merge(rsDefaults, otherParams.rsOptions);
-                    rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas;
-                } else {
-                    if (otherParams.shardOptions && otherParams.shardOptions.binVersion) {
-                        otherParams.shardOptions.binVersion =
-                            MongoRunner.versionIterator(otherParams.shardOptions.binVersion);
+                    if (otherParams.rsOptions) {
+                        rsDefaults = Object.merge(rsDefaults, otherParams.rsOptions);
                     }
 
+                    rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas;
+                } else {
                     rsDefaults = Object.merge(rsDefaults, otherParams["d" + i]);
-                    rsDefaults = Object.merge(rsDefaults, otherParams.shardOptions);
                 }
 
                 rsDefaults.setParameter = rsDefaults.setParameter || {};
@@ -2301,11 +2296,6 @@ function clusterHasBinVersion(st, version) {
         if (hasBinVersionInParams(st._otherParams['c' + i])) {
             return true;
         }
-    }
-
-    // Check for mongod servers.
-    if (hasBinVersionInParams(st._otherParams.shardOptions)) {
-        return true;
     }
 
     if (hasBinVersionInParams(st._otherParams.rs)) {

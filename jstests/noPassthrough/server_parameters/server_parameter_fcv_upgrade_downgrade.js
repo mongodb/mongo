@@ -166,7 +166,7 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, isStandalone, verifyStat
         shards: 3,
         mongosOptions: options,
         configOptions: options,
-        shardOptions: options
+        rsOptions: options
     });
     function verifyParameterState(sp, expectExists) {
         for (let node of [s.configRS.getPrimary(), s.rs0.getPrimary()]) {

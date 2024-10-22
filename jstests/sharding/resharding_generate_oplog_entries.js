@@ -10,7 +10,7 @@ import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uu
 const st = new ShardingTest({
     mongos: 1,
     shards: 2,
-    shardOptions: {setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 2}}
+    rsOptions: {setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 2}}
 });
 const dbName = 'test';
 const collName = 'foo';

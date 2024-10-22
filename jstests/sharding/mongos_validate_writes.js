@@ -13,7 +13,7 @@ import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
-var st = new ShardingTest({shards: 2, mongos: 3, other: {shardOptions: {verbose: 2}}});
+var st = new ShardingTest({shards: 2, mongos: 3, other: {rsOptions: {verbose: 2}}});
 
 var mongos = st.s0;
 var staleMongosA = st.s1;

@@ -32,7 +32,7 @@ const runTestCase = function(fn, isSharded = false) {
             mongos: 1,
             config: 1,
             other: {
-                shardOptions: {setParameter: {ttlMonitorSleepSecs: 1}},
+                rsOptions: {setParameter: {ttlMonitorSleepSecs: 1}},
             }
         });
         const conn = st.s0;

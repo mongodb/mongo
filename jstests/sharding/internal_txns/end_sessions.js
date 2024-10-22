@@ -12,7 +12,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.disableImplicitSessions = true;
 
 const st = new ShardingTest(
-    {shards: 1, shardOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: 0}}});
+    {shards: 1, rsOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: 0}}});
 
 const shard0Rst = st.rs0;
 const shard0Primary = shard0Rst.getPrimary();

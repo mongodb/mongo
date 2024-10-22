@@ -52,7 +52,7 @@ const st = new ShardingTest({
     shards: 3,
     mongos: 1,
     config: 1,
-    other: {configOptions: options, mongosOptions: mongosOptions, shardOptions: options}
+    other: {configOptions: options, mongosOptions: mongosOptions, rsOptions: options}
 });
 
 runTest(st.s0);

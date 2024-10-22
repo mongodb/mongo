@@ -44,7 +44,6 @@ const stWithMock = new ShardingTestWithMongotMock({
     other: {
         rsOptions: nodeOptions,
         mongosOptions: nodeOptions,
-        shardOptions: nodeOptions,
     }
 });
 stWithMock.start();

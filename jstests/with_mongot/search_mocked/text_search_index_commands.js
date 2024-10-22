@@ -160,8 +160,7 @@ let unavailableHostAndPort;
         other: {
             mongosOptions:
                 {setParameter: {searchIndexManagementHostAndPort: unavailableHostAndPort}},
-            shardOptions:
-                {setParameter: {searchIndexManagementHostAndPort: unavailableHostAndPort}},
+            rsOptions: {setParameter: {searchIndexManagementHostAndPort: unavailableHostAndPort}},
         }
     });
     const mongos = st.s;

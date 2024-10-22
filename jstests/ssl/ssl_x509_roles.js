@@ -115,7 +115,7 @@ print("3. Testing x.509 auth to mongos");
             keyFile: 'jstests/libs/key1',
             configOptions: x509_options,
             mongosOptions: x509_options,
-            shardOptions: x509_options,
+            rsOptions: x509_options,
             useHostname: false
         }
     });
@@ -136,7 +136,7 @@ print("4. Testing x.509 auth to mongos with x509 roles disabled");
             keyFile: 'jstests/libs/key1',
             configOptions: localOptions,
             mongosOptions: localOptions,
-            shardOptions: localOptions,
+            rsOptions: localOptions,
             useHostname: false
         }
     });

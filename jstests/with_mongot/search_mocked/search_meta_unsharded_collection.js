@@ -23,7 +23,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     shards: {rs0: {nodes: 1}},
     config: 1,
     mongos: 1,
-    other: {rsOptions: nodeOptions, mongosOptions: nodeOptions, shardOptions: nodeOptions}
+    other: {rsOptions: nodeOptions, mongosOptions: nodeOptions}
 });
 
 stWithMock.start();

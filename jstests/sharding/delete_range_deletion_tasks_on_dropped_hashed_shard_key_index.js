@@ -16,7 +16,7 @@ const rangeDeleterBatchSize = 50;
 const st = new ShardingTest({
     other: {
         enableBalancer: false,
-        shardOptions: {setParameter: {rangeDeleterBatchSize: rangeDeleterBatchSize}},
+        rsOptions: {setParameter: {rangeDeleterBatchSize: rangeDeleterBatchSize}},
     }
 });
 

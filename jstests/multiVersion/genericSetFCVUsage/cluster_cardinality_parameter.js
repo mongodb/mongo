@@ -23,8 +23,6 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
             other: {
                 mongosOptions: {binVersion: oldVersion},
                 configOptions: {binVersion: oldVersion},
-                shardOptions: {binVersion: oldVersion},
-
                 rsOptions: {binVersion: oldVersion},
                 rs: true,
             },

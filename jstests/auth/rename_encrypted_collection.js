@@ -115,7 +115,7 @@ jsTestLog("Sharding: Testing fle2 collection rename");
         mongos: 1,
         config: 1,
         keyFile: "jstests/libs/key1",
-        other: {shardOptions: {auth: ""}}
+        other: {rsOptions: {auth: ""}}
     });
 
     runTest(st.s);

@@ -98,7 +98,7 @@ const st = new ShardingTest({
     mongos: 1,
     config: 1,
     other: {
-        shardOptions:
+        rsOptions:
             {setParameter: {minSnapshotHistoryWindowInSeconds: kMinSnapshotHistoryWindowInSeconds}}
     }
 });
