@@ -96,6 +96,7 @@ extern "C" {
 #include "mongo/crypto/fle_fields_util.h"
 #include "mongo/crypto/fle_numeric.h"
 #include "mongo/crypto/fle_tokens_gen.h"
+#include "mongo/crypto/mongocryptbuffer.h"
 #include "mongo/crypto/mongocryptstatus.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/basic_types.h"
@@ -284,52 +285,6 @@ private:
 
 private:
     mongocrypt_binary_t* _binary;
-};
-
-/**
- * C++ friendly wrapper around libmongocrypt's private _mongocrypt_buffer_t and its associated
- * functions.
- *
- * This class may or may not own data.
- */
-class MongoCryptBuffer {
-public:
-    MongoCryptBuffer() {
-        _mongocrypt_buffer_init(&_buffer);
-    }
-
-    MongoCryptBuffer(ConstDataRange cdr) {
-        _mongocrypt_buffer_init(&_buffer);
-
-        _buffer.data = const_cast<uint8_t*>(cdr.data<uint8_t>());
-        _buffer.len = cdr.length();
-    }
-
-    ~MongoCryptBuffer() {
-        _mongocrypt_buffer_cleanup(&_buffer);
-    }
-
-    MongoCryptBuffer(MongoCryptBuffer&) = delete;
-    MongoCryptBuffer(MongoCryptBuffer&&) = delete;
-
-    uint32_t length() {
-        return _buffer.len;
-    }
-
-    uint8_t* data() {
-        return _buffer.data;
-    }
-
-    bool empty() {
-        return _mongocrypt_buffer_empty(&_buffer);
-    }
-
-    ConstDataRange toCDR() {
-        return ConstDataRange(data(), length());
-    }
-
-private:
-    _mongocrypt_buffer_t _buffer;
 };
 
 using UUIDBuf = std::array<uint8_t, UUID::kNumBytes>;

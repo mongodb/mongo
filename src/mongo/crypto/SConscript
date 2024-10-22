@@ -22,6 +22,7 @@ env.CppUnitTest(
         "fle_crypto_test_vectors.cpp",
         "fle_stats_test.cpp",
         "mechanism_scram_test.cpp",
+        "mongocryptbuffer_test.cpp",
         "sha1_block_test.cpp",
         "sha256_block_test.cpp",
         "sha512_block_test.cpp",
@@ -41,6 +42,7 @@ env.CppUnitTest(
         "encrypted_field_config",
         "fle_crypto",
         "jwt",
+        "mongocryptutil",
         "sha_block",
     ],
 )
