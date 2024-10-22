@@ -1072,51 +1072,52 @@ def generate(env: SCons.Environment.Environment) -> None:
         if not validate_remote_execution_certs(env):
             sys.exit(1)
 
-        try:
-            docker_detected = (
-                subprocess.run(["docker", "info"], capture_output=True).returncode == 0
-            )
-        except Exception:
-            docker_detected = False
-        try:
-            podman_detected = (
-                subprocess.run(["podman", "--help"], capture_output=True).returncode == 0
-            )
-        except Exception:
-            podman_detected = False
+        if env.GetOption("bazel-dynamic-execution") == True:
+            try:
+                docker_detected = (
+                    subprocess.run(["docker", "info"], capture_output=True).returncode == 0
+                )
+            except Exception:
+                docker_detected = False
+            try:
+                podman_detected = (
+                    subprocess.run(["podman", "--help"], capture_output=True).returncode == 0
+                )
+            except Exception:
+                podman_detected = False
 
-        if not docker_detected:
-            print("Not using dynamic scheduling because docker not detected ('docker info').")
-        elif docker_detected and podman_detected:
-            print(
-                "Docker and podman detected, disabling dynamic scheduling due to uncertainty in docker setup."
-            )
-        else:
-            # TODO: SERVER-95737 fix docker issues on ubuntu24
-            if distro_or_os == "ubuntu24":
-                print("Ubuntu24 is not supported to with dynamic scheduling. See SERVER-95737")
+            if not docker_detected:
+                print("Not using dynamic scheduling because docker not detected ('docker info').")
+            elif docker_detected and podman_detected:
+                print(
+                    "Docker and podman detected, disabling dynamic scheduling due to uncertainty in docker setup."
+                )
             else:
-                remote_execution_containers = {}
-                container_file_path = "bazel/platforms/remote_execution_containers.bzl"
-                with open(container_file_path, "r") as f:
-                    code = compile(f.read(), container_file_path, "exec")
-                    exec(code, {}, remote_execution_containers)
+                # TODO: SERVER-95737 fix docker issues on ubuntu24
+                if distro_or_os == "ubuntu24":
+                    print("Ubuntu24 is not supported to with dynamic scheduling. See SERVER-95737")
+                else:
+                    remote_execution_containers = {}
+                    container_file_path = "bazel/platforms/remote_execution_containers.bzl"
+                    with open(container_file_path, "r") as f:
+                        code = compile(f.read(), container_file_path, "exec")
+                        exec(code, {}, remote_execution_containers)
 
-                docker_image = remote_execution_containers["REMOTE_EXECUTION_CONTAINERS"][
-                    f"{distro_or_os}"
-                ]["container-url"]
+                    docker_image = remote_execution_containers["REMOTE_EXECUTION_CONTAINERS"][
+                        f"{distro_or_os}"
+                    ]["container-url"]
 
-                jobs = int(psutil.cpu_count() * 2) if os.environ.get("CI") else 400
+                    jobs = int(psutil.cpu_count() * 2) if os.environ.get("CI") else 400
 
-                bazel_internal_flags += [
-                    "--experimental_enable_docker_sandbox",
-                    f"--experimental_docker_image={docker_image}",
-                    "--experimental_docker_use_customized_images",
-                    "--internal_spawn_scheduler",
-                    "--dynamic_local_strategy=docker",
-                    "--spawn_strategy=dynamic",
-                    f"--jobs={jobs}",
-                ]
+                    bazel_internal_flags += [
+                        "--experimental_enable_docker_sandbox",
+                        f"--experimental_docker_image={docker_image}",
+                        "--experimental_docker_use_customized_images",
+                        "--internal_spawn_scheduler",
+                        "--dynamic_local_strategy=docker",
+                        "--spawn_strategy=dynamic",
+                        f"--jobs={jobs}",
+                    ]
 
     Globals.bazel_base_build_command = (
         [

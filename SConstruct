@@ -823,6 +823,13 @@ add_option(
     help="Bypass link-model=dynamic check for macos versions <12.",
 )
 
+add_option(
+    "bazel-dynamic-execution",
+    default=False,
+    action="store_true",
+    help="use bazel dynamic execution experimental feature",
+)
+
 
 # --build-mongot is a compile flag used by the evergreen build variants that run end-to-end search
 # suites, as it downloads the necessary mongot binary.
