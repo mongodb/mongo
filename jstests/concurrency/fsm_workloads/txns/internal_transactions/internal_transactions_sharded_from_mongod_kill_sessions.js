@@ -30,6 +30,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // get interrupted by the killSession state.
     $config.data.insertInitialDocsOnSetUp = true;
 
+    // The transaction API does not abort internal transactions that are interrupted after they
+    // have started to commit. The first retry of that transaction will abort the open transaction,
+    // but will block if it happens again on that retry, so we lower the
+    // transactionLifetimeLimitSeconds so subsequent retries do not block indefinitely (24 hours).
+    $config.data.lowerTransactionLifetimeLimitSeconds = true;
+
     $config.data.expectDirtyDocs = {
         // The client is either not using a session or is using a session without retryable writes
         // enabled. Therefore, when a write is interrupted, they cannot retry the write to verify if
