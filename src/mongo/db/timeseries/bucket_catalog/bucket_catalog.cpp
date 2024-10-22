@@ -65,7 +65,6 @@
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
-MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationAfterStart);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeFinish);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningBucket);
@@ -681,7 +680,6 @@ void directWriteStart(BucketStateRegistry& registry, const BucketId& bucketId) {
 
     // We cannot perform direct writes on prepared buckets.
     invariant(isBucketStatePrepared(state));
-    hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
     throwWriteConflictException("Prepared bucket can no longer be inserted into.");
 }
 

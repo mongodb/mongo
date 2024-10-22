@@ -412,6 +412,111 @@ TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
     }
 }
 
+// It is possible that a collection is dropped after an insert starts but before it finishes. In
+// those cases, since time-series inserts do not implicitly create the collection, the insert should
+// fail. BatchInsertMissingCollection, PerformTimeseriesWritesNoCollection, and
+// PerformTimeseriesUpdatesNoCollection test paths where the collection can be removed out from
+// under an insert in progress.
+
+// TODO SERVER-95114: insertBatchAndHandleErrors(), performTimeseriesWrites(), and performUpdates()
+// (as well other functions in write_ops_exec.h) should be unit tested in a broader set of
+// scenarios. This is ticketed out to clarify that these tests are not exhaustive.
+
+TEST_F(WriteOpsExecTest, BatchInsertMissingCollection) {
+    auto opCtx = operationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        "db_write_ops_exec_test", "system.buckets.batch_insert_missing");
+    auto insertStatements =
+        std::vector<InsertStatement>{InsertStatement{fromjson("{_id: 0, foo: 1}")}};
+    auto fixer = write_ops_exec::LastOpFixer(opCtx);
+    write_ops_exec::WriteResult result;
+    auto shouldInsertMore =
+        write_ops_exec::insertBatchAndHandleErrors(opCtx,
+                                                   nss,
+                                                   boost::none,
+                                                   true,
+                                                   insertStatements,
+                                                   OperationSource::kTimeseriesInsert,
+                                                   &fixer,
+                                                   &result);
+    ASSERT_FALSE(shouldInsertMore);
+    ASSERT_EQ(1, result.results.size());
+    ASSERT_EQ(ErrorCodes::NamespaceNotFound, result.results[0].getStatus());
+
+    result.results.clear();
+    insertStatements.push_back(InsertStatement{fromjson("{_id: 1, foo: 2}")});
+    insertStatements.push_back(InsertStatement{fromjson("{_id: 2, foo: 3}")});
+
+    shouldInsertMore =
+        write_ops_exec::insertBatchAndHandleErrors(opCtx,
+                                                   nss,
+                                                   boost::none,
+                                                   true,
+                                                   insertStatements,
+                                                   OperationSource::kTimeseriesInsert,
+                                                   &fixer,
+                                                   &result);
+    ASSERT_FALSE(shouldInsertMore);
+    ASSERT_EQ(1, result.results.size());
+    ASSERT_EQ(ErrorCodes::NamespaceNotFound, result.results[0].getStatus());
+}
+
+TEST_F(WriteOpsExecTest, PerformInsertsNoCollection) {
+    auto opCtx = operationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        "db_write_ops_exec_test", "system.buckets.perform_inserts_no_collection");
+    write_ops::InsertCommandRequest request(nss);
+    request.setDocuments({fromjson("{_id: 0, foo: 1}")});
+    auto source = OperationSource::kTimeseriesInsert;
+    auto writeResult = write_ops_exec::performInserts(opCtx, request, source);
+    ASSERT_FALSE(writeResult.canContinue);
+    ASSERT_EQ(1, writeResult.results.size());
+    ASSERT_EQ(ErrorCodes::NamespaceNotFound, writeResult.results[0].getStatus());
+}
+
+TEST_F(WriteOpsExecTest, PerformTimeseriesUpdatesNoCollection) {
+    auto opCtx = operationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        "db_write_ops_exec_test", "system.buckets.perform_timeseries_updates_no_collection");
+    write_ops::UpdateCommandRequest request(nss);
+    request.setUpdates(
+        {write_ops::UpdateOpEntry(BSON("_id" << 0), write_ops::UpdateModification())});
+    auto source = OperationSource::kTimeseriesUpdate;
+    auto writeResult = write_ops_exec::performUpdates(opCtx, request, source);
+    ASSERT_FALSE(writeResult.canContinue);
+    ASSERT_EQ(1, writeResult.results.size());
+    ASSERT_EQ(ErrorCodes::NamespaceNotFound, writeResult.results[0].getStatus());
+}
+
+TEST_F(WriteOpsExecTest, PerformTimeseriesDeletesNoCollection) {
+    auto opCtx = operationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        "db_write_ops_exec_test", "system.buckets.perform_timeseries_deletes_no_collection");
+    write_ops::DeleteCommandRequest request(nss);
+    request.setDeletes(
+        {write_ops::DeleteOpEntry(BSON("_id" << 0), false /* multi */, boost::none)});
+    auto source = OperationSource::kTimeseriesDelete;
+    auto writeResult = write_ops_exec::performDeletes(opCtx, request, source);
+    ASSERT_FALSE(writeResult.canContinue);
+    ASSERT_EQ(1, writeResult.results.size());
+    ASSERT_EQ(8555700, writeResult.results[0].getStatus().code());
+}
+
+TEST_F(WriteOpsExecTest, PerformTimeseriesWritesNoCollection) {
+    auto opCtx = operationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        "db_write_ops_exec_test", "system.buckets.perform_timeseries_writes_no_collection");
+    write_ops::InsertCommandRequest request(nss);
+    ASSERT_THROWS_CODE(
+        write_ops_exec::performTimeseriesWrites(opCtx, request), DBException, 8555700);
+
+    write_ops::InsertCommandRequest requestUnordered(nss);
+    requestUnordered.setOrdered(false);
+
+    ASSERT_THROWS_CODE(
+        write_ops_exec::performTimeseriesWrites(opCtx, request), DBException, 8555700);
+}
+
 class OpObserverMock : public OpObserverNoop {
 public:
     ~OpObserverMock() override {

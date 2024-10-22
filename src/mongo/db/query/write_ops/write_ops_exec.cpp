@@ -208,7 +208,6 @@ MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchUpdate);
 MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchRemove);
 MONGO_FAIL_POINT_DEFINE(failAtomicTimeseriesWrites);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
-MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
 MONGO_FAIL_POINT_DEFINE(failUnorderedTimeseriesInsert);
 
 /**
@@ -2676,8 +2675,6 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
         return true;
     }
 
-    hangTimeseriesInsertBeforeWrite.pauseWhileSet();
-
     const auto docId = batch->bucketId.oid;
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
     if (performInsert) {
@@ -2799,8 +2796,6 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                                          &insertOps,
                                          &updateOps);
         }
-
-        hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 
         auto result = write_ops_exec::performAtomicTimeseriesWrites(opCtx, insertOps, updateOps);
         if (!result.isOK()) {

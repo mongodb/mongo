@@ -2475,5 +2475,65 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
     ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(nextBucketId));
 }
 
+TEST_F(BucketCatalogTest, WriteConflictIfPrepareCommitOnClearedBucket) {
+    auto time = Date_t::now();
+    // Set up an insert to create a bucket.
+    auto result = _insertOneHelper(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "A"));
+    ASSERT_OK(result.getStatus());
+    auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(batch);
+
+    directWriteStart(_bucketCatalog->bucketStateRegistry, batch->bucketId);
+    directWriteFinish(_bucketCatalog->bucketStateRegistry, batch->bucketId);
+
+    // Preparing fails on a cleared bucket and aborts the batch.
+    auto status = prepareCommit(*_bucketCatalog, batch);
+    ASSERT_EQ(status.code(), ErrorCodes::TimeseriesBucketCleared);
+}
+
+TEST_F(BucketCatalogTest, WriteConflictIfDirectWriteOnPreparedBucket) {
+    auto time = Date_t::now();
+
+    auto result = _insertOneHelper(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "A"));
+    ASSERT_OK(result.getStatus());
+    auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    ASSERT(claimWriteBatchCommitRights(*batch));
+    ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
+
+    // A direct write on a prepared bucket will throw a write conflict.
+    ASSERT_THROWS_CODE(directWriteStart(_bucketCatalog->bucketStateRegistry, batch->bucketId),
+                       DBException,
+                       ErrorCodes::WriteConflict);
+}
+
+TEST_F(BucketCatalogTest, DirectWritesCanStack) {
+    auto time = Date_t::now();
+    auto result = _insertOneHelper(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "A"));
+    ASSERT_OK(result.getStatus());
+
+    // The batch can be used for both, as it is only used to obtain the bucketId.
+    auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+    directWriteStart(_bucketCatalog->bucketStateRegistry, batch->bucketId);
+    directWriteStart(_bucketCatalog->bucketStateRegistry, batch->bucketId);
+
+    // The status of the bucket will reflect both writes.
+    auto bucketState = getBucketState(_bucketCatalog->bucketStateRegistry, batch->bucketId);
+    ASSERT(bucketState);
+    ASSERT(std::holds_alternative<int>(*bucketState));
+    ASSERT_EQ(std::get<int>(*bucketState), 2);
+
+    directWriteFinish(_bucketCatalog->bucketStateRegistry, batch->bucketId);
+    directWriteFinish(_bucketCatalog->bucketStateRegistry, batch->bucketId);
+
+    // Once both direct writes are finished, the bucket will transition to kCleared normally.
+    bucketState = getBucketState(_bucketCatalog->bucketStateRegistry, batch->bucketId);
+    ASSERT(bucketState);
+    ASSERT(std::holds_alternative<BucketState>(*bucketState));
+    ASSERT_EQ(std::get<BucketState>(*bucketState), BucketState::kCleared);
+}
+
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog
