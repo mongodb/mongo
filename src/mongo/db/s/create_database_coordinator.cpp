@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #include "mongo/db/s/create_database_coordinator.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 
 namespace mongo {
 
@@ -34,10 +35,19 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then([] {
-            uasserted(ErrorCodes::NotImplemented,
-                      "The createDatabase coordinator is still incomplete.");
-        })
+        .then(_buildPhaseHandler(Phase::kCommitOnShardingCatalog,
+                                 [this, executor = executor, anchor = shared_from_this()] {
+                                     auto opCtxHolder = cc().makeOperationContext();
+                                     auto* opCtx = opCtxHolder.get();
+                                     const auto dbName = nss().dbName();
+                                     auto db = ShardingCatalogManager::get(opCtx)->createDatabase(
+                                         opCtx,
+                                         dbName,
+                                         _request.getPrimaryShardId(),
+                                         _request.getSerializationContext(),
+                                         /*createDatabaseCoordinator=*/true);
+                                     _result = ConfigsvrCreateDatabaseResponse(db.getVersion());
+                                 }))
         .onError([](const Status& status) { return status; });
 }
 

@@ -43,7 +43,8 @@ public:
     using Phase = CreateDatabaseCoordinatorPhaseEnum;
 
     CreateDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
-        : RecoverableShardingDDLCoordinator(service, "CreateDatabaseCoordinator", initialState) {}
+        : RecoverableShardingDDLCoordinator(service, "CreateDatabaseCoordinator", initialState),
+          _request(_doc.getConfigsvrCreateDatabaseRequest()) {}
 
     ~CreateDatabaseCoordinator() override = default;
 
@@ -58,6 +59,8 @@ private:
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
+
+    const mongo::ConfigsvrCreateDatabaseRequest _request;
 
     // Set on successful completion of the coordinator.
     boost::optional<ConfigsvrCreateDatabaseResponse> _result;

@@ -469,7 +469,8 @@ public:
     DatabaseType createDatabase(OperationContext* opCtx,
                                 const DatabaseName& dbName,
                                 const boost::optional<ShardId>& optPrimaryShard,
-                                const SerializationContext& serializationContext);
+                                const SerializationContext& serializationContext,
+                                bool createDatabaseCoordinator = false);
 
     /**
      * Updates the metadata in config.databases collection with the new primary shard for the given

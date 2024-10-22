@@ -74,6 +74,18 @@ enums:
 
 structs:
 
+    ConfigsvrCreateDatabaseRequest:
+        description: "All the parameters sent by the router."
+        generate_comparison_operators: false
+        strict: false
+        fields:
+            primaryShardId:
+                type: shard_id
+                description: "If set, indicates to the system which shard should be used as the
+                              primary for the database (if not already created). Otherwise, the
+                              system will use the balancer in order to select a primary."
+                optional: true
+
     ConfigsvrCreateDatabaseResponse:
         description: "Response for the create database command"
         strict: false
@@ -632,13 +644,8 @@ commands:
         type: string
         reply_type: ConfigsvrCreateDatabaseResponse
         strict: false
-        fields:
-            primaryShardId:
-                type: shard_id
-                description: "If set, indicates to the system which shard should be used as the
-                              primary for the database (if not already created). Otherwise, the
-                              system will use the balancer in order to select a primary."
-                optional: true
+        chained_structs:
+            ConfigsvrCreateDatabaseRequest: ConfigsvrCreateDatabaseRequest
 
     _shardsvrCollMod:
         command_name: _shardsvrCollMod

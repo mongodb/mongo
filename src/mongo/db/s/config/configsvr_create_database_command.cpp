@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-
-#include <memory>
 #include <string>
 
 #include <boost/move/utility_core.hpp>
@@ -40,17 +38,20 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/create_database_coordinator.h"
+#include "mongo/db/s/create_database_coordinator_document_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -94,14 +95,43 @@ public:
 
             audit::logEnableSharding(opCtx->getClient(), dbname);
 
-            auto dbt = ShardingCatalogManager::get(opCtx)->createDatabase(
-                opCtx,
-                DatabaseNameUtil::deserialize(
-                    boost::none, dbname, request().getSerializationContext()),
-                request().getPrimaryShardId(),
-                request().getSerializationContext());
+            std::function<Response()> getCreateDatabaseResponse;
+            {
+                FixedFCVRegion fixedFcvRegion{opCtx};
+                bool createDatabaseDDLCoordinatorFeatureFlagEnabled =
+                    feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(
+                        (*fixedFcvRegion).acquireFCVSnapshot());
 
-            return {dbt.getVersion()};
+                if (!createDatabaseDDLCoordinatorFeatureFlagEnabled) {
+                    getCreateDatabaseResponse = [&]() {
+                        auto dbt = ShardingCatalogManager::get(opCtx)->createDatabase(
+                            opCtx,
+                            DatabaseNameUtil::deserialize(
+                                boost::none, dbname, request().getSerializationContext()),
+                            request().getPrimaryShardId(),
+                            request().getSerializationContext());
+
+                        return Response(dbt.getVersion());
+                    };
+                } else {
+                    CreateDatabaseCoordinatorDocument coordinatorDoc;
+                    coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                        {{NamespaceString(DatabaseNameUtil::deserialize(
+                              boost::none, dbname, request().getSerializationContext())),
+                          DDLCoordinatorTypeEnum::kCreateDatabase}});
+                    coordinatorDoc.setConfigsvrCreateDatabaseRequest(
+                        request().getConfigsvrCreateDatabaseRequest());
+                    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                    auto createDatabaseCoordinator =
+                        checked_pointer_cast<CreateDatabaseCoordinator>(
+                            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+                    getCreateDatabaseResponse = [opCtx,
+                                                 coord = std::move(createDatabaseCoordinator)]() {
+                        return coord->getResult(opCtx);
+                    };
+                }
+            }
+            return getCreateDatabaseResponse();
         }
 
     private:

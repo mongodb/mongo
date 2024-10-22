@@ -265,15 +265,30 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireAllLocksAsync(
         const bool isDbOnly = lockNss.coll().empty();
 
         // Acquiring the database DDL lock
-        if (lastDb != lockNss.dbName()) {
+        const auto normalizedDbName = [&] {
+            if (_coordId.getOperationType() != DDLCoordinatorTypeEnum::kCreateDatabase) {
+                // Already existing databases are not allowed to have their names differ just on
+                // case. Uses the requested database name directly.
+                return lockNss.dbName();
+            }
+            const auto dbNameStr =
+                DatabaseNameUtil::serialize(lockNss.dbName(), SerializationContext::stateDefault());
+            return DatabaseNameUtil::deserialize(
+                boost::none, str::toLower(dbNameStr), SerializationContext::stateDefault());
+        }();
+        if (lastDb != normalizedDbName) {
             const auto lockMode = (isDbOnly ? MODE_X : MODE_IX);
-            const auto& dbName = lockNss.dbName();
-            futureChain =
-                std::move(futureChain)
-                    .then([this, executor, token, dbName, lockMode, anchor = shared_from_this()] {
-                        return _acquireLockAsync<DatabaseName>(executor, token, dbName, lockMode);
-                    });
-            lastDb = dbName;
+            futureChain = std::move(futureChain)
+                              .then([this,
+                                     executor,
+                                     token,
+                                     normalizedDbName,
+                                     lockMode,
+                                     anchor = shared_from_this()] {
+                                  return _acquireLockAsync<DatabaseName>(
+                                      executor, token, normalizedDbName, lockMode);
+                              });
+            lastDb = normalizedDbName;
         }
 
         // Acquiring the collection DDL lock
@@ -351,7 +366,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             return _acquireAllLocksAsync(opCtx, executor, token);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
-            if (!originalNss().isConfigDB() && !originalNss().isAdminDB() && !_recoveredFromDisk) {
+            if (!originalNss().isConfigDB() && !originalNss().isAdminDB() && !_recoveredFromDisk &&
+                operationType() != DDLCoordinatorTypeEnum::kCreateDatabase) {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 invariant(metadata().getDatabaseVersion());

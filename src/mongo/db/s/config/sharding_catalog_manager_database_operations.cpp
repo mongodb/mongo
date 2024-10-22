@@ -86,6 +86,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -112,7 +113,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const boost::optional<ShardId>& optPrimaryShard,
-    const SerializationContext& serializationContext) {
+    const SerializationContext& serializationContext,
+    bool createDatabaseCoordinator) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     if (dbName.isConfigDB()) {
@@ -173,7 +175,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
             return DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj);
         }
 
-        if (dbLock) {
+        // Skips the DDL lock acquisition logic if already run with a DDL coordinator.
+        if (dbLock || createDatabaseCoordinator) {
             break;
         }
 

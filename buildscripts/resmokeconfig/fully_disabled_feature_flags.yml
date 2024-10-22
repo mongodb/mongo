@@ -14,4 +14,3 @@
 - featureFlagGRPC
 - featureFlagCreateCollectionInPreparedTransactions
 - featureFlagSearchInSbe
-- featureFlagCreateDatabaseDDLCoordinator

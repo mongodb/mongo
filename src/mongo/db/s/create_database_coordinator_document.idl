@@ -32,6 +32,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/s/sharding_ddl_coordinator.idl"
+    - "mongo/s/request_types/sharded_ddl_commands.idl"
 
 enums:
     CreateDatabaseCoordinatorPhase:
@@ -48,6 +49,7 @@ structs:
         strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            ConfigsvrCreateDatabaseRequest: ConfigsvrCreateDatabaseRequest
         fields:
             phase:
                 type: CreateDatabaseCoordinatorPhase
