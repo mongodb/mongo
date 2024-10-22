@@ -51,7 +51,6 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/util/assert_util.h"
@@ -73,7 +72,7 @@ void ConfigServerOpObserver::onDelete(OperationContext* opCtx,
                                       const DocumentKey& documentKey,
                                       const OplogDeleteEntryArgs& args,
                                       OpStateAccumulator* opAccumulator) {
-    if (coll->ns() == VersionType::ConfigNS) {
+    if (coll->ns() == NamespaceString::kConfigVersionNamespace) {
         if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
             uasserted(40302, "cannot delete config.version document while in --configsvr mode");
         }
@@ -85,7 +84,7 @@ repl::OpTime ConfigServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                       const UUID& uuid,
                                                       std::uint64_t numRecords,
                                                       bool markFromMigrate) {
-    if (collectionName == VersionType::ConfigNS) {
+    if (collectionName == NamespaceString::kConfigVersionNamespace) {
         if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
             uasserted(40303, "cannot drop config.version document while in --configsvr mode");
         }

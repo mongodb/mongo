@@ -82,7 +82,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_collection_gen.h"
-#include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/catalog/type_config_version_gen.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_remove_shard_event_gen.h"
@@ -907,13 +907,14 @@ StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContex
 
 StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
-    auto findStatus = _getConfigShard(opCtx)->exhaustiveFindOnConfig(opCtx,
-                                                                     getConfigReadPreference(opCtx),
-                                                                     readConcern,
-                                                                     VersionType::ConfigNS,
-                                                                     BSONObj(),
-                                                                     BSONObj(),
-                                                                     boost::none /* no limit */);
+    auto findStatus =
+        _getConfigShard(opCtx)->exhaustiveFindOnConfig(opCtx,
+                                                       getConfigReadPreference(opCtx),
+                                                       readConcern,
+                                                       NamespaceString::kConfigVersionNamespace,
+                                                       BSONObj(),
+                                                       BSONObj(),
+                                                       boost::none /* no limit */);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -923,29 +924,21 @@ StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     if (queryResults.size() > 1) {
         return {ErrorCodes::TooManyMatchingDocuments,
                 str::stream() << "should only have 1 document in "
-                              << VersionType::ConfigNS.toStringForErrorMsg()};
+                              << NamespaceString::kConfigVersionNamespace.toStringForErrorMsg()};
     }
 
     if (queryResults.empty()) {
         return {ErrorCodes::NoMatchingDocument,
                 str::stream() << "No documents found in "
-                              << VersionType::ConfigNS.toStringForErrorMsg()};
+                              << NamespaceString::kConfigVersionNamespace.toStringForErrorMsg()};
     }
 
-    BSONObj versionDoc = queryResults.front();
-    auto versionTypeResult = VersionType::fromBSON(versionDoc);
-    if (!versionTypeResult.isOK()) {
-        return versionTypeResult.getStatus().withContext(
-            str::stream() << "Unable to parse config.version document " << versionDoc);
+    try {
+        return VersionType::parseOwned(IDLParserContext("VersionType"),
+                                       std::move(queryResults.front()));
+    } catch (const DBException& e) {
+        return e.toStatus().withContext(str::stream() << "Unable to parse config.version document");
     }
-
-    auto validationStatus = versionTypeResult.getValue().validate();
-    if (!validationStatus.isOK()) {
-        return Status(validationStatus.withContext(
-            str::stream() << "Unable to validate config.version document " << versionDoc));
-    }
-
-    return versionTypeResult.getValue();
 }
 
 StatusWith<std::vector<DatabaseName>> ShardingCatalogClientImpl::getDatabasesForShard(

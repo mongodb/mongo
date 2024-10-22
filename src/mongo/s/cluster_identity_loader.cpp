@@ -39,7 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/catalog/type_config_version_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 

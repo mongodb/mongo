@@ -83,7 +83,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/catalog/type_config_version_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -200,11 +200,11 @@ private:
 TEST_F(ConfigInitializationTest, InitClusterMultipleVersionDocs) {
     VersionType version;
     version.setClusterId(OID::gen());
-    ASSERT_OK(
-        insertToConfigCollection(operationContext(), VersionType::ConfigNS, version.toBSON()));
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kConfigVersionNamespace, version.toBSON()));
 
     ASSERT_OK(insertToConfigCollection(operationContext(),
-                                       VersionType::ConfigNS,
+                                       NamespaceString::kConfigVersionNamespace,
                                        BSON("_id"
                                             << "a second document")));
 
@@ -218,7 +218,8 @@ TEST_F(ConfigInitializationTest, InitInvalidConfigVersionDoc) {
                     _id: 1,
                     clusterId: "should be an ID"
                 })"));
-    ASSERT_OK(insertToConfigCollection(operationContext(), VersionType::ConfigNS, versionDoc));
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kConfigVersionNamespace, versionDoc));
 
     ASSERT_EQ(ErrorCodes::TypeMismatch,
               ShardingCatalogManager::get(operationContext())
@@ -229,15 +230,16 @@ TEST_F(ConfigInitializationTest, InitInvalidConfigVersionDoc) {
 TEST_F(ConfigInitializationTest, InitNoVersionDocEmptyConfig) {
     // Make sure there is no existing document
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
-                  findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
+                  findOneOnConfigCollection(
+                      operationContext(), NamespaceString::kConfigVersionNamespace, BSONObj()));
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto versionDoc =
-        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
+    auto versionDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), NamespaceString::kConfigVersionNamespace, BSONObj()));
 
-    VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
+    VersionType foundVersion = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
 
     ASSERT_TRUE(foundVersion.getClusterId().isSet());
 }
@@ -246,10 +248,10 @@ TEST_F(ConfigInitializationTest, OnlyRunsOnce) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto versionDoc =
-        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
+    auto versionDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), NamespaceString::kConfigVersionNamespace, BSONObj()));
 
-    VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
+    VersionType foundVersion = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
 
     ASSERT_TRUE(foundVersion.getClusterId().isSet());
 
@@ -262,10 +264,10 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto versionDoc =
-        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
+    auto versionDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), NamespaceString::kConfigVersionNamespace, BSONObj()));
 
-    VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
+    VersionType foundVersion = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
 
     ASSERT_TRUE(foundVersion.getClusterId().isSet());
 
@@ -278,7 +280,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         ASSERT_OK(replicationCoordinator()->setFollowerMode(repl::MemberState::RS_ROLLBACK));
         auto opCtx = operationContext();
         repl::UnreplicatedWritesBlock uwb(opCtx);
-        auto nss = VersionType::ConfigNS;
+        auto nss = NamespaceString::kConfigVersionNamespace;
         writeConflictRetry(opCtx, "removeConfigDocuments", nss, [&] {
             AutoGetCollection coll(opCtx, nss, MODE_IX);
             ASSERT_TRUE(coll);
@@ -299,7 +301,8 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
 
     // Verify the document was actually removed.
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
-                  findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
+                  findOneOnConfigCollection(
+                      operationContext(), NamespaceString::kConfigVersionNamespace, BSONObj()));
 
     // Throw out cached information.
     ShardingCatalogManager::get(operationContext())
@@ -309,10 +312,11 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto newVersionDoc =
-        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
+    auto newVersionDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), NamespaceString::kConfigVersionNamespace, BSONObj()));
 
-    VersionType newFoundVersion = assertGet(VersionType::fromBSON(newVersionDoc));
+    VersionType newFoundVersion =
+        VersionType::parse(IDLParserContext("VersionType"), newVersionDoc);
 
     ASSERT_TRUE(newFoundVersion.getClusterId().isSet());
     ASSERT_NOT_EQUALS(newFoundVersion.getClusterId(), foundVersion.getClusterId());

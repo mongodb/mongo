@@ -109,7 +109,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_collection_gen.h"
-#include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/catalog/type_config_version_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -774,7 +774,7 @@ Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
     newVersion.setClusterId(OID::gen());
 
     auto insertStatus = _localCatalogClient->insertConfigDocument(
-        opCtx, VersionType::ConfigNS, newVersion.toBSON(), kNoWaitWriteConcern);
+        opCtx, NamespaceString::kConfigVersionNamespace, newVersion.toBSON(), kNoWaitWriteConcern);
     return insertStatus;
 }
 

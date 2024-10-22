@@ -65,6 +65,14 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "type_config_version_gen",
+    src = "type_config_version.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "sharding_catalog_client",
     srcs = [

@@ -115,7 +115,6 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/clock_source.h"
@@ -1005,7 +1004,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
                           "Shard identity document rollback detected",
                           "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
         } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-                   opNss == VersionType::ConfigNS) {
+                   opNss == NamespaceString::kConfigVersionNamespace) {
             // Check if the creation of the config server config version document is being rolled
             // back.
             _observerInfo.configServerConfigVersionRolledBack = true;

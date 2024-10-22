@@ -51,7 +51,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/catalog/type_config_version_gen.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/assert.h"

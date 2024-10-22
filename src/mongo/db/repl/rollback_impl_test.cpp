@@ -87,7 +87,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -2533,7 +2532,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsConfigVersionRollback) {
     serverGlobalParams.clusterRole = {
         ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
     const auto uuid = UUID::gen();
-    const auto nss = VersionType::ConfigNS;
+    const auto nss = NamespaceString::kConfigVersionNamespace;
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
     auto insertOp = makeCRUDOp(OpTypeEnum::kInsert,
                                Timestamp(2, 2),
@@ -2551,7 +2550,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsConfigVersionRollback) {
 TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackForShardServer) {
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
     const auto uuid = UUID::gen();
-    const auto nss = VersionType::ConfigNS;
+    const auto nss = NamespaceString::kConfigVersionNamespace;
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
     auto insertOp = makeCRUDOp(OpTypeEnum::kInsert,
                                Timestamp(2, 2),
@@ -2569,7 +2568,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackFo
     serverGlobalParams.clusterRole = {
         ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
     const auto uuid = UUID::gen();
-    const auto nss = VersionType::ConfigNS;
+    const auto nss = NamespaceString::kConfigVersionNamespace;
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
     auto deleteOp = makeCRUDOp(OpTypeEnum::kDelete,
                                Timestamp(2, 2),

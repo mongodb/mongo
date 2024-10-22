@@ -31,7 +31,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/catalog/type_config_version_gen.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -50,8 +50,8 @@ TEST(Validity, Empty) {
     //
 
     BSONObj emptyObj = BSONObj();
-    auto versionResult = VersionType::fromBSON(emptyObj);
-    ASSERT_NOT_OK(versionResult.getStatus());
+    ASSERT_THROWS(VersionType::parse(IDLParserContext("VersionType"), emptyObj),
+                  AssertionException);
 }
 
 TEST(Validity, NewVersion) {
@@ -61,19 +61,11 @@ TEST(Validity, NewVersion) {
 
     OID clusterId = OID::gen();
 
-    BSONObjBuilder bob;
-    bob << VersionType::clusterId(clusterId);
+    auto versionDoc = BSON(VersionType::kClusterIdFieldName << clusterId);
 
-    BSONObj versionDoc = bob.obj();
+    auto versionResult = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
 
-    auto versionResult = VersionType::fromBSON(versionDoc);
-    ASSERT_OK(versionResult.getStatus());
-
-    VersionType& versionInfo = versionResult.getValue();
-
-    ASSERT_EQUALS(versionInfo.getClusterId(), clusterId);
-
-    ASSERT_OK(versionInfo.validate());
+    ASSERT_EQUALS(versionResult.getClusterId(), clusterId);
 }
 
 TEST(Validity, NewVersionRoundTrip) {
@@ -83,19 +75,17 @@ TEST(Validity, NewVersionRoundTrip) {
 
     OID clusterId = OID::gen();
 
-    BSONObjBuilder bob;
-    bob << VersionType::clusterId(clusterId);
+    auto versionDoc = BSON(VersionType::kClusterIdFieldName << clusterId);
 
-    BSONObj versionDoc = bob.obj();
+    auto versionResult = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
 
-    auto versionResult = VersionType::fromBSON(versionDoc);
-    ASSERT_OK(versionResult.getStatus());
+    ASSERT_EQUALS(versionResult.getClusterId(), clusterId);
 
-    VersionType& versionInfo = versionResult.getValue();
+    auto newVersionDoc = versionResult.toBSON();
 
-    ASSERT_EQUALS(versionInfo.getClusterId(), clusterId);
+    auto newVersionResult = VersionType::parse(IDLParserContext("VersionType"), newVersionDoc);
 
-    ASSERT_OK(versionInfo.validate());
+    ASSERT_EQUALS(newVersionResult.getClusterId(), clusterId);
 }
 
 TEST(Validity, NewVersionNoClusterId) {
@@ -103,11 +93,37 @@ TEST(Validity, NewVersionNoClusterId) {
     // Tests error on parsing new format with no clusterId
     //
 
-    BSONObjBuilder bob;
-    BSONObj versionDoc = bob.obj();
+    auto versionDoc = BSON("test"
+                           << "test_value");
 
-    auto versionResult = VersionType::fromBSON(versionDoc);
-    ASSERT_EQ(ErrorCodes::NoSuchKey, versionResult.getStatus());
+    ASSERT_THROWS(VersionType::parse(IDLParserContext("VersionType"), versionDoc),
+                  AssertionException);
 }
 
+TEST(Validity, NewVersionWrongClusterId) {
+    //
+    // Tests error on parsing new format with wrong type of clusterId
+    //
+
+    auto versionDoc = BSON(VersionType::kClusterIdFieldName << "not really OID");
+
+    ASSERT_THROWS(VersionType::parse(IDLParserContext("VersionType"), versionDoc),
+                  AssertionException);
+}
+
+TEST(Validity, NewVersionWithId) {
+    //
+    // Tests parsing a new-style config version with _id field
+    //
+
+    OID clusterId = OID::gen();
+
+    BSONObjBuilder bob;
+    bob.append("clusterId", clusterId);
+    bob.append("_id", 1);
+    BSONObj versionDoc = bob.obj();
+    auto versionResult = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
+
+    ASSERT_EQUALS(versionResult.getClusterId(), clusterId);
+}
 }  // unnamed namespace
