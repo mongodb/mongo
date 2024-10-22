@@ -75,26 +75,3 @@ Ex: `buildscripts/pylinters.py lint`
 | Linter | Configuration File(s) | Help Command  | Documentation                                                |
 | ------ | --------------------- | ------------- | ------------------------------------------------------------ |
 | `ruff` | `pyproject.toml`      | `ruff --help` | [https://docs.astral.sh/ruff/](https://docs.astral.sh/ruff/) |
-
-### SCons Linters
-
-`buildscripts/pylinters.py` lints over the SCons code automatically.
-
-## Using SCons for linting
-
-You can use SCons to run most of the linters listed above via their corresponding Python wrapper
-script. SCons also provides the ability to run multiple linters in a single command. At this time,
-SCons does not support `clang-tidy` or `buildscripts/yamllinters.sh`
-
-Here are some examples:
-
-| SCons Target        | Linter(s)                                                                                       | Example                                   |
-| ------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `lint`              | `clang-format` `errorcodes.py` `quickmongolint.py` `eslint` `pylint` `mypy` `pydocstyle` `yapf` | `buildscripts/scons.py lint`              |
-| `lint-fast`         | `clang-format` `errorcodes.py` `eslint` `pylint` `mypy` `pydocstyle` `yapf`                     | `buildscripts/scons.py lint-fast`         |
-| `lint-clang-format` | `clang-format`                                                                                  | `buildscripts/scons.py lint-clang-format` |
-| `lint-errorcodes`   | `errorcodes.py`                                                                                 | `buildscripts/scons.py lint-errorcodes`   |
-| `lint-lint.py`      | `quickmongolint.py`                                                                             | `buildscripts/scons.py lint-lint.py`      |
-| `lint-eslint`       | `eslint`                                                                                        | `buildscripts/scons.py lint-eslint`       |
-| `lint-pylinters`    | `pylint` `mypy` `pydocstyle` `yapf`                                                             | `buildscripts/scons.py lint-pylinters`    |
-| `lint-sconslinters` | `yapf`                                                                                          | `buildscripts/scons.py lint-sconslinters` |

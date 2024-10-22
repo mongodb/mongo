@@ -773,10 +773,15 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "upload pip requirements"
-      - func: "get engflow creds"
-      - func: "scons lint"
-        vars:
-          targets: lint-clang-format
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "lint-clang-format"
+            - "buildscripts/clang_format.py"
+            - "lint-all"
 
   - name: lint_cpplint
     tags:
@@ -798,10 +803,15 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "upload pip requirements"
-      - func: "get engflow creds"
-      - func: "scons lint"
-        vars:
-          targets: lint-lint.py
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "lint_cpplint"
+            - "buildscripts/quickmongolint.py"
+            - "lint"
 
   - name: lint_errorcodes
     tags:
@@ -818,10 +828,15 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "upload pip requirements"
-      - func: "get engflow creds"
-      - func: "scons lint"
-        vars:
-          targets: lint-errorcodes
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "lint-errorcodes"
+            - "buildscripts/errorcodes.py"
+            - "--quiet"
 
   - name: lint_eslint
     tags:
@@ -843,10 +858,18 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "upload pip requirements"
-      - func: "get engflow creds"
-      - func: "scons lint"
-        vars:
-          targets: lint-eslint
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "lint-eslint"
+            - "buildscripts/eslint.py"
+            - "--dirmode"
+            - "lint"
+            - "jstests/"
+            - "src/mongo"
 
   # Check that the mutational fuzzer can parse all JS filess.
   - name: lint_fuzzer_sanity_all
@@ -1014,10 +1037,15 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "upload pip requirements"
-      - func: "get engflow creds"
-      - func: "scons lint"
-        vars:
-          targets: lint-pylinters
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "lint-pylinters"
+            - "buildscripts/pylinters.py"
+            - "lint"
 
   - name: lint_shellscripts
     tags:

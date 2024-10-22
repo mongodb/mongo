@@ -1223,16 +1223,6 @@ functions:
     - *check_run_tests_infrastructure_failure
     - *check_resmoke_failure
 
-  "scons lint":
-    - *f_expansions_write
-    - command: subprocess.exec
-      display_name: "scons lint sh"
-      type: test
-      params:
-        binary: bash
-        args:
-          - "src/evergreen/scons_lint.sh"
-
   "scons splunk": &scons_splunk
     command: subprocess.exec
     display_name: "scons splunk"
