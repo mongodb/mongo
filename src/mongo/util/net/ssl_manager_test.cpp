@@ -36,14 +36,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
-#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session_manager.h"
-#include "mongo/transport/session_manager_common_gen.h"
-#include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/net/sock_test_utils.h"
 #include "mongo/util/net/ssl/context.hpp"
 #include "mongo/util/net/ssl/stream.hpp"
@@ -703,6 +698,27 @@ TEST(SSLManager, BadDNParsing) {
     }
 }
 
+TEST(SSLManager, RotateCertificatesFromFile) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    // Server is required to have the sslPEMKeyFile.
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslClusterFile = "jstests/libs/client.pem";
+
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(params, true /* isSSLServer */);
+
+    auto options = [] {
+        ServerGlobalParams params;
+        params.noUnixSocket = true;
+        transport::AsioTransportLayer::Options opts(&params);
+        return opts;
+    }();
+    transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
+    uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
+}
+
 TEST(SSLManager, InitContextFromFileShouldFail) {
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
@@ -718,6 +734,26 @@ TEST(SSLManager, InitContextFromFileShouldFail) {
         DBException,
         ErrorCodes::InvalidSSLConfiguration);
 #endif
+}
+
+TEST(SSLManager, RotateClusterCertificatesFromFile) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    // Client doesn't need params.sslPEMKeyFile.
+    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslClusterFile = "jstests/libs/client.pem";
+
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(params, false /* isSSLServer */);
+
+    auto options = [] {
+        ServerGlobalParams params;
+        params.noUnixSocket = true;
+        transport::AsioTransportLayer::Options opts(&params);
+        return opts;
+    }();
+    transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
+    uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
 }
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
@@ -1040,7 +1076,8 @@ public:
                    bool ingressIsServer = true,
                    bool egressIsServer = true,
                    const boost::optional<TransientSSLParams>& transientSSLParams = boost::none) {
-        setGlobalServiceContext(ServiceContext::make());
+        auto serviceContext = ServiceContext::make();
+        setGlobalServiceContext(std::move(serviceContext));
 
         // SSLManagerWindows uses this global boolean to decide whether to
         // use unique key container names when setting up the crypto context.
@@ -1061,9 +1098,6 @@ public:
             clientSSLManager->initSSLContext(clientSSLContext->native_handle(),
                                              egressParams,
                                              SSLManagerInterface::ConnectionDirection::kOutgoing));
-    }
-    ~SSLTestFixture() {
-        setGlobalServiceContext(nullptr);
     }
 
     void doHandshake() {
@@ -1760,219 +1794,6 @@ TEST(SSLManager, revocationWithCRLsIntermediateTests) {
 }
 
 #endif  // MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_APPLE
-
-class SSLRotationTestFixture : public ServiceContextTest {
-public:
-    // Sets up the global service context & transport layer. This fixture then
-    // acts as a server which can be used to test certificate rotation.
-    void setUp() override {
-        ServiceContextTest::setUp();
-        auto* svcCtx = getServiceContext();
-
-        isSSLServer = true;
-
-        transport::AsioTransportLayer::Options options;
-        options.ipList.emplace_back("127.0.0.1");
-#ifndef _WIN32
-        options.useUnixSockets = false;
-#endif
-        auto sm = std::make_unique<transport::AsioSessionManager>(svcCtx);
-        auto tl = std::make_unique<transport::AsioTransportLayer>(options, std::move(sm));
-        svcCtx->setTransportLayerManager(
-            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
-
-        transport::ServiceExecutor::startupAll(svcCtx);
-
-        svcCtx->getService()->setServiceEntryPoint(std::make_unique<SSLRotationTestFixtureSEP>());
-        uassertStatusOK(svcCtx->getTransportLayerManager()->setup());
-        uassertStatusOK(svcCtx->getTransportLayerManager()->start());
-    }
-
-    // Tears down the transport layer & resets sslGlobalParams.
-    void tearDown() override {
-        getServiceContext()->getTransportLayerManager()->endAllSessions(Client::kEmptyTagMask);
-        getServiceContext()->getTransportLayerManager()->shutdown();
-        sslGlobalParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_disabled);
-        sslGlobalParams.sslPEMKeyFile.clear();
-        sslGlobalParams.sslClusterFile.clear();
-        sslGlobalParams.sslCAFile.clear();
-        sslGlobalParams.sslClusterCAFile.clear();
-        sslGlobalParams.sslAllowInvalidHostnames = false;
-        ServiceContextTest::tearDown();
-    }
-
-    // Does the initial rotation of the global SSLManagerCoordinator with the given
-    // initial SSL parameters. This should be called in the beginning of all test cases
-    // that require TLS.
-    void setUpServerTLS(const SSLParams& initialParams) {
-        sslGlobalParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-        sslGlobalParams.sslPEMKeyFile = initialParams.sslPEMKeyFile;
-        sslGlobalParams.sslClusterFile = initialParams.sslClusterFile;
-        sslGlobalParams.sslCAFile = initialParams.sslCAFile;
-        sslGlobalParams.sslClusterCAFile = initialParams.sslClusterCAFile;
-        sslGlobalParams.sslAllowInvalidHostnames = initialParams.sslAllowInvalidHostnames;
-        rotate();
-    }
-
-    // Invokes rotate in the global SSLManagerCoordinator
-    void rotate() {
-        auto smc = SSLManagerCoordinator::get();
-        smc->rotate();
-    }
-
-    // Try connecting to this fixture with a client using the given TLS egress parameters.
-    // This throws an error if the socket connection or TLS handshake fails. Otherwise,
-    // returns true if a TLS session is successfully established, or false if the server
-    // fails to validate the client TLS credentials.
-    bool tryConnect(const SSLParams& egressParams) {
-        transport::AsioTransportLayer::Options options;
-        options.mode = transport::AsioTransportLayer::Options::kEgress;
-#ifndef _WIN32
-        options.useUnixSockets = false;
-#endif
-        transport::AsioTransportLayer tl(options, nullptr);
-
-        TLSCredentials tlsCredentials;
-        tlsCredentials.tlsPEMKeyFile = egressParams.sslPEMKeyFile;
-        tlsCredentials.tlsCAFile = egressParams.sslCAFile;
-        tlsCredentials.tlsAllowInvalidHostnames = egressParams.sslAllowInvalidHostnames;
-        TransientSSLParams transientSSLParams(tlsCredentials);
-
-        auto session = uassertStatusOK(tl.connect(HostAndPort("127.0.0.1", -1),
-                                                  transport::ConnectSSLMode::kEnableSSL,
-                                                  Seconds(10),
-                                                  transientSSLParams));
-        auto msg = [] {
-            OpMsg op;
-            op.body = BSON("id" << 1);
-            return op.serialize();
-        }();
-        if (!session->sinkMessage(msg).isOK()) {
-            return false;
-        }
-        auto swResponse = session->sourceMessage();
-        if (!swResponse.isOK()) {
-            return false;
-        }
-        return true;
-    }
-
-private:
-    class SSLRotationTestFixtureSEP : public ServiceEntryPoint {
-    public:
-        SSLRotationTestFixtureSEP() = default;
-        Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                         const Message& request) noexcept override {
-            return Future<DbResponse>::makeReady({request});  // echo the request back
-        };
-    };
-};
-
-// Verifies the SSLManagerCoordinator successfully rotates the server keys
-TEST_F(SSLRotationTestFixture, basicKeyFileRotationTest) {
-    // Make a temp copy of ca.pem. This is the filename we'll rotate on.
-    auto keyPath = combinePEMFiles({{serverKeyFile, true}});
-    auto clusterKeyPath = combinePEMFiles({{clientKeyFile, true}});
-
-    auto smc = SSLManagerCoordinator::get();
-    auto sslConfig = smc->getSSLManager()->getSSLConfiguration();
-    auto sslInfoToLog = smc->getSSLManager()->getSSLInformationToLog();
-
-    ASSERT(sslConfig.serverSubjectName().empty());
-    ASSERT(sslConfig.clientSubjectName.empty());
-    ASSERT(sslInfoToLog.server.subject.empty());
-    ASSERT_FALSE(sslInfoToLog.cluster.has_value());
-    ASSERT_FALSE(sslInfoToLog.crl.has_value());
-
-    SSLParams serverParams;
-    serverParams.sslCAFile = caFile;
-    serverParams.sslPEMKeyFile = keyPath;
-    serverParams.sslClusterFile = clusterKeyPath;
-    serverParams.sslAllowInvalidHostnames = true;
-    setUpServerTLS(serverParams);
-
-    sslConfig = smc->getSSLManager()->getSSLConfiguration();
-    sslInfoToLog = smc->getSSLManager()->getSSLInformationToLog();
-
-    ASSERT_NE(sslInfoToLog.server.subject.toString().find("CN=server"), std::string::npos);
-    ASSERT(sslInfoToLog.cluster.has_value());
-    ASSERT_NE(sslInfoToLog.cluster->subject.toString().find("CN=client"), std::string::npos);
-
-    // Copy trusted-ca.pem onto the temp file, then rotate server
-    ASSERT(boost::filesystem::copy_file(
-        trustedServerKeyFile, keyPath, boost::filesystem::copy_option::overwrite_if_exists));
-    ASSERT(boost::filesystem::copy_file(
-        trustedClientKeyFile, clusterKeyPath, boost::filesystem::copy_option::overwrite_if_exists));
-    rotate();
-
-    sslConfig = smc->getSSLManager()->getSSLConfiguration();
-    sslInfoToLog = smc->getSSLManager()->getSSLInformationToLog();
-
-    ASSERT_NE(sslInfoToLog.server.subject.toString().find("CN=Trusted Kernel Test Server"),
-              std::string::npos);
-    ASSERT_NE(sslInfoToLog.cluster->subject.toString().find("CN=Trusted Kernel Test Client"),
-              std::string::npos);
-}
-
-// Verifies the SSLManagerCoordinator successfully rotates the global CA trust store
-TEST_F(SSLRotationTestFixture, basicCAFileRotationTest) {
-    // Make a temp copy of ca.pem. This is the filename we'll rotate on.
-    auto caFilePath = combinePEMFiles({{caFile}});
-
-    SSLParams serverParams;
-    serverParams.sslCAFile = caFilePath;
-    serverParams.sslPEMKeyFile = serverKeyFile;
-    serverParams.sslAllowInvalidHostnames = true;
-    setUpServerTLS(serverParams);
-
-    SSLParams clientParams;
-    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    clientParams.sslCAFile = caFile;
-    clientParams.sslPEMKeyFile = clientKeyFile;
-    clientParams.sslAllowInvalidHostnames = true;
-
-    // Pre-rotate, client can connect with client.pem, but not with trusted-client.pem
-    ASSERT(tryConnect(clientParams));
-    clientParams.sslPEMKeyFile = trustedClientKeyFile;
-    ASSERT_FALSE(tryConnect(clientParams));
-
-    // Copy trusted-ca.pem onto the temp file, then rotate server
-    ASSERT(boost::filesystem::copy_file(
-        trustedCaFile, caFilePath, boost::filesystem::copy_option::overwrite_if_exists));
-    rotate();
-
-    // Post-rotate, client can no longer connect with client.pem, but can with trusted-client.pem
-    ASSERT(tryConnect(clientParams));
-    clientParams.sslPEMKeyFile = clientKeyFile;
-    ASSERT_FALSE(tryConnect(clientParams));
-}
-
-TEST_F(SSLRotationTestFixture, invalidCAFileRotationTest) {
-    // Make a temp copy of ca.pem. This is the filename we'll rotate on.
-    auto caFilePath = combinePEMFiles({{caFile}});
-
-    SSLParams serverParams;
-    serverParams.sslCAFile = caFilePath;
-    serverParams.sslPEMKeyFile = serverKeyFile;
-    serverParams.sslAllowInvalidHostnames = true;
-    setUpServerTLS(serverParams);
-
-    SSLParams clientParams;
-    clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    clientParams.sslCAFile = caFile;
-    clientParams.sslPEMKeyFile = clientKeyFile;
-    clientParams.sslAllowInvalidHostnames = true;
-
-    ASSERT(tryConnect(clientParams));
-
-    // Copy invalid PEM onto the temp file, then rotate server
-    ASSERT(boost::filesystem::copy_file(
-        emptyCRL, caFilePath, boost::filesystem::copy_option::overwrite_if_exists));
-    ASSERT_THROWS_CODE(rotate(), DBException, ErrorCodes::InvalidSSLConfiguration);
-
-    // client still able to connect with client.pem
-    ASSERT(tryConnect(clientParams));
-}
 
 #endif  // MONGO_CONFIG_SSL
 }  // namespace
