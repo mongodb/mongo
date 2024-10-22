@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/search/search_helper.h"
 
+#include <boost/optional/optional.hpp>
 #include <list>
 #include <set>
 #include <string>
@@ -298,7 +299,7 @@ void setResolvedNamespaceForSearch(const NamespaceString& origNss,
         {origNss.coll().toString(),
          {resolvedView.getNamespace(), resolvedView.getPipeline(), uuid}}};
     expCtx->setResolvedNamespaces(resolvedNamespaces);
-    expCtx->viewNS = origNss;
+    expCtx->viewNS = boost::make_optional(origNss);
 }
 
 bool isMongotPipeline(const Pipeline* pipeline) {
@@ -329,7 +330,8 @@ bool isMongotStage(DocumentSource* stage) {
         (dynamic_cast<mongo::DocumentSourceSearch*>(stage) ||
          dynamic_cast<mongo::DocumentSourceInternalSearchMongotRemote*>(stage) ||
          dynamic_cast<mongo::DocumentSourceVectorSearch*>(stage) ||
-         dynamic_cast<mongo::DocumentSourceListSearchIndexes*>(stage));
+         dynamic_cast<mongo::DocumentSourceListSearchIndexes*>(stage) ||
+         dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage));
 }
 
 void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,

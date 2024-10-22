@@ -17,10 +17,12 @@ description: |
 selector:
   roots:
     - jstests/with_mongot/e2e/*.js
-    - jstests/with_mongot/e2e_infrastructure_tests/createSearchIndex_shell_command.js
+    - jstests/with_mongot/e2e_infrastructure_tests/*.js
     - jstests/with_mongot/e2e/views/*.js
     - jstests/with_mongot/e2e/lib/*_test.js
     - jstests/with_mongot/e2e/explain_execution_stats/*.js
+  exclude_files:
+    - jstests/with_mongot/e2e_infrastructure_tests/verify_coll_is_sharded.js
 
 executor:
   config:
