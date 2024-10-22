@@ -308,7 +308,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/query/**/change_stream*.js @10gen/query-execution @svc-auto-approve-bot
 /jstests/libs/query/**/geo*.js @10gen/query-integration @svc-auto-approve-bot
 /jstests/libs/query/**/group_to_distinct_scan_utils.js @10gen/query-integration @svc-auto-approve-bot
-/jstests/libs/query/**/optimizer_utils.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/query/**/query_settings*.js @10gen/query-execution @svc-auto-approve-bot
 /jstests/libs/query/**/sbe*.js @10gen/query-execution @svc-auto-approve-bot
 /jstests/libs/query/**/wildcard_index_helpers.js @10gen/query-optimization @svc-auto-approve-bot

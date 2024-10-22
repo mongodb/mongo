@@ -20,6 +20,7 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
@@ -28,8 +29,8 @@ import {
     getWinningPlan,
     isExpress
 } from "jstests/libs/query/analyze_plan.js";
-import {runWithParamsAllNodes} from "jstests/libs/query/optimizer_utils.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = db.getCollection('express_coll');
 
@@ -49,6 +50,35 @@ function runExpressTest(
         usesExpress,
         isExpress(db, explain),
         "Expected the query to " + (usesExpress ? "" : "not ") + "use express: " + tojson(explain));
+}
+
+function runWithParamsAllNodes(db, keyValPairs, fn) {
+    let prevVals = [];
+
+    try {
+        for (let i = 0; i < keyValPairs.length; i++) {
+            const flag = keyValPairs[i].key;
+            const valIn = keyValPairs[i].value;
+            const val = (typeof valIn === 'object') ? JSON.stringify(valIn) : valIn;
+
+            let getParamObj = {};
+            getParamObj["getParameter"] = 1;
+            getParamObj[flag] = 1;
+            const prevVal = db.adminCommand(getParamObj);
+            prevVals.push(prevVal[flag]);
+
+            setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), flag, val);
+        }
+
+        return fn();
+    } finally {
+        for (let i = 0; i < keyValPairs.length; i++) {
+            const flag = keyValPairs[i].key;
+
+            setParameterOnAllHosts(
+                DiscoverTopology.findNonConfigNodes(db.getMongo()), flag, prevVals[i]);
+        }
+    }
 }
 
 const docs = [

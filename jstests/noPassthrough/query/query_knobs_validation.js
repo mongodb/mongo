@@ -7,7 +7,7 @@
 
 import {
     getExpectedPipelineLimit,
-} from "jstests/libs/query/optimizer_utils.js";
+} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("admin");

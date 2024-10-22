@@ -30,3 +30,14 @@ export function executeAggregationTestCase(collection, testCase) {
         assert.commandFailedWithCode(error, testCase.expectedErrorCode);
     }
 }
+
+/**
+ * Parameter 'internalPipelineLengthLimit' depends on the platform and the build type.
+ */
+export function getExpectedPipelineLimit(database) {
+    const buildInfo = assert.commandWorked(database.adminCommand("buildInfo"));
+    const isDebug = buildInfo.debug;
+    const isS390X =
+        "buildEnvironment" in buildInfo ? buildInfo.buildEnvironment.distarch == "s390x" : false;
+    return isDebug ? 200 : (isS390X ? 700 : 1000);
+}

@@ -40,7 +40,7 @@ namespace mongo {
  */
 constexpr int defaultInternalPipelineLengthLimit() {
     // If you change this function please update the 'getExpectedPipelineLimit()' function in
-    // optimizer_utils.js accordingly.
+    // aggregation_pipeline_utils.js accordingly.
     if constexpr (kDebugBuild) {
         return 200;
     }
