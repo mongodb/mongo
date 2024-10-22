@@ -5,8 +5,6 @@
 //   not_allowed_with_signed_security_token,
 //   uses_multiple_connections,
 //   docker_incompatible,
-//   # TODO SERVER-84471 - Enable this test, as runMongoProgram will add on the --gRPC option.
-//   grpc_incompatible,
 // ]
 
 const mongod = new MongoURI(db.getMongo().host).servers[0];
