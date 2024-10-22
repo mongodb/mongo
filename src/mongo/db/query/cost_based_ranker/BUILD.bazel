@@ -39,3 +39,40 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "heuristic_estimator",
+    srcs = [
+        "heuristic_estimator.cpp",
+    ],
+    hdrs = [
+        "heuristic_estimator.h",
+        "//src/mongo/db/matcher:expression.h",
+        "//src/mongo/db/matcher:expression_visitor.h",
+        "//src/mongo/db/matcher:match_details.h",
+        "//src/mongo/db/matcher:matchable.h",
+        "//src/mongo/db/matcher:path.h",
+        "//src/mongo/db/pipeline:dependencies.h",
+        "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
+        "//src/mongo/db/pipeline:variables.h",
+    ],
+    deps = [
+        "ce_utils",
+        "estimates",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:query_index_bounds",
+    ],
+)
+
+mongo_cc_library(
+    name = "ce_utils",
+    srcs = [
+        "ce_utils.cpp",
+    ],
+    hdrs = [
+        "ce_utils.h",
+    ],
+    deps = [
+        "estimates",
+    ],
+)
