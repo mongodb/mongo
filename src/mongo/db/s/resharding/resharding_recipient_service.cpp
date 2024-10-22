@@ -1018,18 +1018,6 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                    if (shardKeyIndexSpec) {
                        indexSpecs.push_back(*shardKeyIndexSpec);
                    }
-                   if (resharding::gFeatureFlagReshardingSpuriousDuplicateKeyErrors.isEnabled(
-                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                       // Store the names of all indexes with {unique: true}.
-                       std::vector<std::string> uniqueIndexes;
-                       for (auto& i : indexSpecs) {
-                           if (i.getBoolField("unique")) {
-                               uniqueIndexes.push_back(i.getStringField("name").toString());
-                           }
-                       }
-                       // Add the list of {unique: true} indexes into the RecipientShardContext.
-                       _recipientCtx.setNamesOfUniqueIndexes(uniqueIndexes);
-                   }
                    // Build all the indexes.
                    auto buildUUID = UUID::gen();
                    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
@@ -1037,8 +1025,8 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                    auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(
                        opCtx.get(),
                        _metadata.getTempReshardingNss().dbName(),
-                       // When we create the collection we use the metadata resharding UUID as
-                       // the collection UUID.
+                       // When we create the collection we use the metadata resharding UUID as the
+                       // collection UUID.
                        _metadata.getReshardingUUID(),
                        indexSpecs,
                        buildUUID,

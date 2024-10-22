@@ -249,10 +249,6 @@ structs:
                 type: long
                 description: "Number of indexes on this recipient shard for the resharded collection."
                 optional: true
-            namesOfUniqueIndexes:
-                type: array<string>
-                description: "List of names of indexes with unique: true."
-                optional: true
 
     ReshardingApproxCopySize:
         description: "Not meant to be used directly. Only use internal fields."

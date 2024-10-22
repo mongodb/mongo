@@ -119,34 +119,6 @@ const ShardId recipientShardId{"myShardId"};
 const long approxBytesToCopy = 10000;
 const long approxDocumentsToCopy = 100;
 
-// Singleton class to allow for insertion of donor index data into external state.
-class SourceCollectionMock {
-public:
-    SourceCollectionMock(const SourceCollectionMock& obj) = delete;
-    void operator=(const SourceCollectionMock&) = delete;
-    // Return an instance of the singleton if one exists, otherwise create one.
-    static SourceCollectionMock* getInstance() {
-        if (_instanceptr == nullptr) {
-            _instanceptr = new SourceCollectionMock();
-            return _instanceptr;
-        } else {
-            return _instanceptr;
-        }
-    }
-    void setIndexData(std::vector<BSONObj> newIndexData) {
-        _indexData = newIndexData;
-    }
-    std::vector<BSONObj> getIndexData() {
-        return _indexData;
-    }
-
-private:
-    SourceCollectionMock() {}
-    static SourceCollectionMock* _instanceptr;
-    std::vector<BSONObj> _indexData = {};
-};
-SourceCollectionMock* SourceCollectionMock::_instanceptr = nullptr;
-
 class ExternalStateForTest : public ReshardingRecipientService::RecipientStateMachineExternalState {
 public:
     ShardId myShardId(ServiceContext* serviceContext) const override {
@@ -211,7 +183,7 @@ public:
         Timestamp afterClusterTime,
         StringData reason) override {
         invariant(nss == _sourceNss);
-        return {SourceCollectionMock::getInstance()->getIndexData(), BSONObj()};
+        return {std::vector<BSONObj>{}, BSONObj()};
     }
 
     boost::optional<ShardingIndexesCatalogCache> getCollectionIndexInfoWithRefresh(
@@ -558,97 +530,6 @@ TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion
             removeRecipientDocFailpoint->setMode(FailPoint::off);
             ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
             checkStateDocumentRemoved(opCtx.get());
-        }
-    }
-}
-
-TEST_F(ReshardingRecipientServiceTest, PersistsUniqueTrueIndexes) {
-    RAIIServerParameterControllerForTest controller(
-        "featureFlagReshardingSpuriousDuplicateKeyErrors", true);
-    std::vector<std::vector<BSONObj>> inputs;
-    std::vector<std::vector<BSONObj>> outputs;
-    // Create test indexes.
-    BSONObj index1 = fromjson(
-        "{ v: 2, key: { oldKey: 1.0, newKey: 1.0}, name: \"oldKey_1_newKey_1\", unique: true}");
-    BSONObj index2 = fromjson("{ v: 2, key: { oldKey: 1.0}, name: \"oldKey_1\", unique: false}");
-    BSONObj index3 = fromjson("{ v: 2, key: {newKey: 1.0}, name: \"newKey_1\", unique: true}");
-    BSONObj index4 = fromjson("{ v: 2, key: {x: 1.0}, name: \"x_1\"}");
-    std::vector<BSONObj> baseinput;
-    std::vector<BSONObj> baseoutput;
-
-    // Test case with 1 {unique: true} index and 1 {unique: false} index.
-    baseinput.assign({index1, index2});
-    baseoutput.assign({index1});
-    inputs.push_back(baseinput);
-    outputs.push_back(baseoutput);
-
-    // Test case with no indexes.
-    baseinput.assign({});
-    baseoutput.assign({});
-    inputs.push_back(baseinput);
-    outputs.push_back(baseoutput);
-
-    // Test case with 2 {unique: true}, 1 {unique: false}, and 1 undefined unique.
-    baseinput.assign({index1, index2, index3, index4});
-    baseoutput.assign({index1, index3});
-    inputs.push_back(baseinput);
-    outputs.push_back(baseoutput);
-
-    // Test case with 1 {unique: true} index.
-    baseinput.assign({index1});
-    baseoutput.assign({index1});
-    inputs.push_back(baseinput);
-    outputs.push_back(baseoutput);
-
-    // Test case with 1 {unique: false} index.
-    baseinput.assign({index2});
-    baseoutput.assign({});
-    inputs.push_back(baseinput);
-    outputs.push_back(baseoutput);
-
-    for (bool isAlsoDonor : {false, true}) {
-        for (bool skipCloningAndApplying : {false, true}) {
-            LOGV2(5551111,
-                  "Running case",
-                  "test"_attr = _agent.getTestName(),
-                  "isAlsoDonor"_attr = isAlsoDonor,
-                  "skipCloningAndApplying"_attr = skipCloningAndApplying);
-
-            for (int ind = 0; ind < int(inputs.size()); ind++) {
-                auto input = inputs[ind];
-                auto output = outputs[ind];
-                auto removeRecipientDocFailpoint =
-                    globalFailPointRegistry().find("removeRecipientDocFailpoint");
-                auto timesEnteredFailPoint =
-                    removeRecipientDocFailpoint->setMode(FailPoint::alwaysOn);
-                auto doc = makeStateDocument(isAlsoDonor, skipCloningAndApplying);
-                auto opCtx = makeOperationContext();
-                RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
-                auto recipient =
-                    RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-                // Create test indexData.
-                SourceCollectionMock* sourceCollectionMockInstance =
-                    SourceCollectionMock::getInstance();
-                sourceCollectionMockInstance->setIndexData(input);
-                notifyToStartCloning(opCtx.get(), *recipient, doc);
-
-                notifyReshardingCommitting(opCtx.get(), *recipient, doc);
-
-                removeRecipientDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
-
-                auto persistedRecipientDocument = getStateDoc(opCtx.get());
-
-                boost::optional<std::vector<StringData>> uniqueIndexes =
-                    persistedRecipientDocument.getMutableState().getNamesOfUniqueIndexes();
-                LOGV2(9208115, "retrieved value", "index"_attr = uniqueIndexes);
-                ASSERT_EQ(uniqueIndexes->size(), output.size());
-                for (int i = 0; i < int(output.size()); i++) {
-                    ASSERT_EQ(uniqueIndexes->at(i), output.at(i).getStringField("name"));
-                }
-                removeRecipientDocFailpoint->setMode(FailPoint::off);
-                ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
-                checkStateDocumentRemoved(opCtx.get());
-            }
         }
     }
 }

@@ -60,11 +60,6 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingForTimeseries
         default: false
         shouldBeFCVGated: true
-    featureFlagReshardingSpuriousDuplicateKeyErrors:
-        description: "Feature flag to prevent unique: true indexes from falsely creating a duplicate key error during resharding"
-        cpp_varname: gFeatureFlagReshardingSpuriousDuplicateKeyErrors
-        default: false
-        shouldBeFCVGated: true
     featureFlagRelaxedMode:
         description: "Feature flag for implmenting relaxed resharding mode."
         cpp_varname: gFeatureFlagReshardingRelaxedMode
