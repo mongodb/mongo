@@ -1,6 +1,7 @@
 import {createUsers, roles, runOneTest} from "jstests/auth/lib/commands_builtin_roles.js";
 import {authCommandsLib} from "jstests/auth/lib/commands_lib.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 function isPrimaryNode(conn) {
     return (conn.adminCommand({hello: 1}).isWritablePrimary);
@@ -32,14 +33,22 @@ function runAllCommandsBuiltinRoles(rst) {
     authCommandsLib.runTests(conn, testFunctionImpls);
 }
 
+let mongotmock;
+let mongotHost = "localhost:27017";
+if (!_isWindows()) {
+    mongotmock = new MongotMock();
+    mongotmock.start();
+    mongotHost = mongotmock.getConnection().host;
+}
+
 const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles_replset/");
 mkdir(dbPath);
 const opts = {
     auth: "",
     setParameter: {
         trafficRecordingDirectory: dbPath,
-        mongotHost: "localhost:27017",  // We have to set the mongotHost parameter for the
-                                        // $search-relatead tests to pass configuration checks.
+        mongotHost,   // We have to set the mongotHost parameter for the
+                      // $search-relatead tests to pass configuration checks.
         syncdelay: 0  // Disable checkpoints as this can cause some commands to fail transiently.
     }
 };
@@ -57,3 +66,7 @@ rst.awaitSecondaryNodes();
 
 runAllCommandsBuiltinRoles(rst);
 rst.stopSet();
+
+if (mongotmock) {
+    mongotmock.stop();
+}
