@@ -102,12 +102,13 @@ class CoreAnalyzerPlugin(PluginInterface):
         subcommand: str,
         parser: argparse.ArgumentParser,
         parsed_args: argparse.Namespace,
+        should_configure_otel=True,
         **kwargs,
     ) -> Optional[Subcommand]:
         """Parse command-line options."""
         if subcommand == "core-analyzer":
             configure_resmoke.detect_evergreen_config(parsed_args)
-            configure_resmoke.validate_and_update_config(parser, parsed_args)
+            configure_resmoke.validate_and_update_config(parser, parsed_args, should_configure_otel)
             return CoreAnalyzer(parsed_args)
         return None
 

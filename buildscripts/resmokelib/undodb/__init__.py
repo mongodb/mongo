@@ -54,7 +54,7 @@ class UndoDbPlugin(PluginInterface):
         )
         parser.add_argument("args", nargs="*")
 
-    def parse(self, subcommand, parser, parsed_args, **kwargs):
+    def parse(self, subcommand, parser, parsed_args, should_configure_otel=True, **kwargs):
         """
         Return UndoDb if command is one we recognize.
 

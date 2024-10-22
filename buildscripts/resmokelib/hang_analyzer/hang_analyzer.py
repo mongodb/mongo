@@ -301,7 +301,7 @@ class HangAnalyzer(Subcommand):
 class HangAnalyzerPlugin(PluginInterface):
     """Integration-point for hang-analyzer."""
 
-    def parse(self, subcommand, parser, parsed_args, **kwargs):
+    def parse(self, subcommand, parser, parsed_args, should_configure_otel=True, **kwargs):
         """Parse command-line options."""
         if subcommand == "hang-analyzer":
             return HangAnalyzer(parsed_args, task_id=parsed_args.task_id, **kwargs)

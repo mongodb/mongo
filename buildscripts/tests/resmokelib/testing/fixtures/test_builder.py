@@ -38,7 +38,7 @@ class TestBuildShardedCluster(unittest.TestCase):
         network.PortAllocator.reset()
 
     def test_build_sharded_cluster_simple(self):
-        parser.set_run_options()
+        parser.set_run_options(should_configure_otel=False)
         fixture_config = {"mongod_options": {SET_PARAMS: {"enableTestCommands": 1}}}
         sharded_cluster = under_test.make_fixture(
             self.fixture_class_name, self.mock_logger, self.job_num, **fixture_config
@@ -54,7 +54,7 @@ class TestBuildShardedCluster(unittest.TestCase):
 
     def test_build_sharded_cluster_with_feature_flags(self):
         ff_name = "featureFlagDummy"
-        parser.set_run_options(f"--additionalFeatureFlags={ff_name}")
+        parser.set_run_options(f"--additionalFeatureFlags={ff_name}", False)
         fixture_config = {"mongod_options": {SET_PARAMS: {"enableTestCommands": 1}}}
         sharded_cluster = under_test.make_fixture(
             self.fixture_class_name, self.mock_logger, self.job_num, **fixture_config
@@ -76,7 +76,7 @@ class TestBuildShardedCluster(unittest.TestCase):
         self.assertTrue(sharded_cluster.mongos[0].mongos_options[SET_PARAMS][ff_name])
 
     def test_build_sharded_cluster_multiversion(self):
-        parser.set_run_options()
+        parser.set_run_options(should_configure_otel=False)
         fixture_config = {
             "mongod_options": {SET_PARAMS: {"enableTestCommands": 1}},
             "configsvr_options": {"num_nodes": 2},
@@ -130,7 +130,7 @@ class TestBuildShardedCluster(unittest.TestCase):
 
     def test_build_sharded_cluster_multiversion_with_feature_flags(self):
         ff_name = "featureFlagDummy"
-        parser.set_run_options(f"--additionalFeatureFlags={ff_name}")
+        parser.set_run_options(f"--additionalFeatureFlags={ff_name}", False)
         fixture_config = {
             "mongod_options": {SET_PARAMS: {"enableTestCommands": 1}},
             "configsvr_options": {"num_nodes": 2},

@@ -114,7 +114,9 @@ class DiscoveryPlugin(PluginInterface):
         )
         parser.add_argument("--suite", metavar="SUITE", help="Suite to run against.")
 
-    def parse(self, subcommand, parser, parsed_args, **kwargs) -> Optional[Subcommand]:
+    def parse(
+        self, subcommand, parser, parsed_args, should_configure_otel=True, **kwargs
+    ) -> Optional[Subcommand]:
         """
         Resolve command-line options to a Subcommand or None.
 
@@ -124,9 +126,10 @@ class DiscoveryPlugin(PluginInterface):
         :param kwargs: additional args.
         :return: None or a Subcommand.
         """
-        configure_resmoke.validate_and_update_config(parser, parsed_args)
         if subcommand == TEST_DISCOVERY_SUBCOMMAND:
+            configure_resmoke.validate_and_update_config(parser, parsed_args, should_configure_otel)
             return TestDiscoverySubcommand(parsed_args.suite)
         if subcommand == SUITECONFIG_SUBCOMMAND:
+            configure_resmoke.validate_and_update_config(parser, parsed_args, should_configure_otel)
             return SuiteConfigSubcommand(parsed_args.suite)
         return None

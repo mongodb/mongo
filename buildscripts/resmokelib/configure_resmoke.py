@@ -35,10 +35,11 @@ from buildscripts.util.read_config import read_config_file
 BASE_16_TO_INT = 16
 
 
-def validate_and_update_config(parser, args):
+def validate_and_update_config(parser, args, should_configure_otel=True):
     """Validate inputs and update config module."""
+
     _validate_options(parser, args)
-    _update_config_vars(parser, args)
+    _update_config_vars(parser, args, should_configure_otel)
     _update_symbolizer_secrets()
     _validate_config(parser)
     _set_logging_config()
@@ -265,7 +266,7 @@ def _set_up_tracing(
     return success
 
 
-def _update_config_vars(parser, values):
+def _update_config_vars(parser, values, should_configure_otel=True):
     """Update the variables of the config module."""
 
     config = _config.DEFAULTS.copy()
@@ -578,33 +579,40 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.OTEL_PARENT_ID = config.pop("otel_parent_id")
     _config.OTEL_COLLECTOR_DIR = config.pop("otel_collector_dir")
 
-    try:
-        setup_success = _set_up_tracing(
-            _config.OTEL_COLLECTOR_DIR,
-            _config.OTEL_TRACE_ID,
-            _config.OTEL_PARENT_ID,
-            extra_context={
-                "evergreen.build.id": _config.EVERGREEN_BUILD_ID,
-                "evergreen.distro.id": _config.EVERGREEN_DISTRO_ID,
-                "evergreen.project.identifier": _config.EVERGREEN_PROJECT_NAME,
-                "evergreen.task.execution": _config.EVERGREEN_EXECUTION,
-                "evergreen.task.id": _config.EVERGREEN_TASK_ID,
-                "evergreen.task.name": _config.EVERGREEN_TASK_NAME,
-                "evergreen.variant.name": _config.EVERGREEN_VARIANT_NAME,
-                "evergreen.revision": _config.EVERGREEN_REVISION,
-                "evergreen.patch_build": _config.EVERGREEN_PATCH_BUILD,
-            },
-        )
-        if not setup_success:
-            print("Failed to create file to send otel metrics to. Continuing.")
-    except (KeyboardInterrupt, SystemExit):
-        raise
-    except:
-        # We want this as a catch all exception
-        # If there is some problem setting up metrics we don't want resmoke to fail
-        # We would rather just swallow the error
-        traceback.print_exc()
-        print("Failed to set up otel metrics. Continuing.")
+    # flag for testing purposes only, should_configure_otel should always be true outside tests
+    # remove flag when reset_for_test() is available for opentelemetry python
+    if should_configure_otel:
+        # if this assertion failed, it is likely because validate_and_update_config
+        # has been called >1 times
+        assert trace._TRACER_PROVIDER is None
+
+        try:
+            setup_success = _set_up_tracing(
+                _config.OTEL_COLLECTOR_DIR,
+                _config.OTEL_TRACE_ID,
+                _config.OTEL_PARENT_ID,
+                extra_context={
+                    "evergreen.build.id": _config.EVERGREEN_BUILD_ID,
+                    "evergreen.distro.id": _config.EVERGREEN_DISTRO_ID,
+                    "evergreen.project.identifier": _config.EVERGREEN_PROJECT_NAME,
+                    "evergreen.task.execution": _config.EVERGREEN_EXECUTION,
+                    "evergreen.task.id": _config.EVERGREEN_TASK_ID,
+                    "evergreen.task.name": _config.EVERGREEN_TASK_NAME,
+                    "evergreen.variant.name": _config.EVERGREEN_VARIANT_NAME,
+                    "evergreen.revision": _config.EVERGREEN_REVISION,
+                    "evergreen.patch_build": _config.EVERGREEN_PATCH_BUILD,
+                },
+            )
+            if not setup_success:
+                print("Failed to create file to send otel metrics to. Continuing.")
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except:
+            # We want this as a catch all exception
+            # If there is some problem setting up metrics we don't want resmoke to fail
+            # We would rather just swallow the error
+            traceback.print_exc()
+            print("Failed to set up otel metrics. Continuing.")
 
     # Force invalid suite config
     _config.FORCE_EXCLUDED_TESTS = config.pop("force_excluded_tests")

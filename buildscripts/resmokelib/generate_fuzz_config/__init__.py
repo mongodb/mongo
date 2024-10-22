@@ -147,7 +147,7 @@ class GenerateFuzzConfigPlugin(PluginInterface):
             help="Disables the fuzzing that sometimes enables the encrypted storage engine.",
         )
 
-    def parse(self, subcommand, parser, parsed_args, **kwargs):
+    def parse(self, subcommand, parser, parsed_args, should_configure_otel=True, **kwargs):
         """
         Return the GenerateFuzzConfig subcommand for execution.
 

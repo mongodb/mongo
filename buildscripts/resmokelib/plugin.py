@@ -22,7 +22,7 @@ class PluginInterface(abc.ABC):
         """
         raise NotImplementedError()
 
-    def parse(self, subcommand, parser, parsed_args, **kwargs):
+    def parse(self, subcommand, parser, parsed_args, should_configure_otel=True, **kwargs):
         """
         Resolve command-line options to a Subcommand or None.
 

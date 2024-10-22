@@ -46,7 +46,7 @@ class GenerateFCVConstantsPlugin(PluginInterface):
         # Can't hide this subcommand due to a Python bug. https://bugs.python.org/issue22848.
         subparsers.add_parser(_COMMAND, help=argparse.SUPPRESS)
 
-    def parse(self, subcommand, parser, parsed_args, **kwargs):
+    def parse(self, subcommand, parser, parsed_args, should_configure_otel=True, **kwargs):
         """
         Return the FCV constants subcommand for execution.
 
@@ -56,8 +56,8 @@ class GenerateFCVConstantsPlugin(PluginInterface):
         :param kwargs: additional args
         :return: None or a Subcommand
         """
-        configure_resmoke.validate_and_update_config(parser, parsed_args)
         if subcommand != _COMMAND:
             return None
 
+        configure_resmoke.validate_and_update_config(parser, parsed_args, should_configure_otel)
         return GenerateFCVConstants()

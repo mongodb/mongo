@@ -101,6 +101,7 @@ class MultiversionPlugin(PluginInterface):
         subcommand: str,
         parser: argparse.ArgumentParser,
         parsed_args: argparse.Namespace,
+        should_configure_otel=True,
         **kwargs,
     ) -> Optional[Subcommand]:
         """
@@ -114,6 +115,6 @@ class MultiversionPlugin(PluginInterface):
         """
         if subcommand == MULTIVERSION_SUBCOMMAND:
             configure_resmoke.detect_evergreen_config(parsed_args)
-            configure_resmoke.validate_and_update_config(parser, parsed_args)
+            configure_resmoke.validate_and_update_config(parser, parsed_args, should_configure_otel)
             return MultiversionConfigSubcommand(parsed_args)
         return None
