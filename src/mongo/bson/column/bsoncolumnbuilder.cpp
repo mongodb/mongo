@@ -2074,6 +2074,7 @@ EncodingState<Allocator>::Encoder64::_tryRescalePending(int64_t encoded,
         possible = false;
     };
     Simple8bBuilder<uint64_t, Allocator> builder{allocator};
+    builder.initializeRLEFrom(simple8bBuilder);
 
     // Iterate over our pending values, decode them back into double, rescale and append to our new
     // Simple8b builder
