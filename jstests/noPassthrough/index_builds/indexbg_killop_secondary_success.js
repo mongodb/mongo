@@ -73,7 +73,7 @@ assert.commandWorked(secondaryDB.killOp(opId));
 if (!gracefulIndexBuildFlag) {
     // We expect this to crash the secondary because this error is not recoverable
     assert.soon(function() {
-        return rawMongoProgramOutput().search(/Fatal assertion.*(51101)/) >= 0;
+        return rawMongoProgramOutput(".*").search(/Fatal assertion.*(51101)/) >= 0;
     });
 
     // After restarting the secondary, expect that the index build completes successfully.

@@ -22,8 +22,8 @@ assert.eq(res.internalValidateFeaturesAsMaster, false);
 let joinShell = startParallelShell(
     "db.adminCommand({getParameter: 1, internalValidateFeaturesAsMaster: 1});", conn.port);
 joinShell();
-assert(rawMongoProgramOutput().match(
-    "\"Use of deprecated server parameter name\",\"attr\":{\"deprecatedName\":\"internalValidateFeaturesAsMaster\""));
+assert(rawMongoProgramOutput("Use of deprecated server parameter name")
+           .match("\"attr\":{\"deprecatedName\":\"internalValidateFeaturesAsMaster\""));
 MongoRunner.stopMongod(conn);
 
 // internalValidateFeaturesAsMaster can be set via startup parameter.
@@ -59,7 +59,7 @@ joinShell = startParallelShell(() => {
             {replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=0"}));
 }, conn.port);
 joinShell();
-let joinShellOutput = rawMongoProgramOutput();
+let joinShellOutput = rawMongoProgramOutput("Cannot specify both .* and replication.replSet");
 assert(joinShellOutput.match(
     "Cannot specify both internalValidateFeaturesAsPrimary and replication.replSet"));
 assert(!joinShellOutput.match(
@@ -72,7 +72,7 @@ joinShell = startParallelShell(() => {
             {replSet: "replSetName", setParameter: "internalValidateFeaturesAsMaster=0"}));
 }, conn.port);
 joinShell();
-joinShellOutput = rawMongoProgramOutput();
+joinShellOutput = rawMongoProgramOutput("Cannot specify both .* and replication.replSet");
 assert(joinShellOutput.match(
     "Cannot specify both internalValidateFeaturesAsMaster and replication.replSet"));
 assert(!joinShellOutput.match(

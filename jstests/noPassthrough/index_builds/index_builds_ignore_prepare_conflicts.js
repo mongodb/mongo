@@ -77,8 +77,8 @@ let runTest = function(conn) {
     // Unpause the index build from the first failpoint so that it can resume and pause at the
     // next failpoint.
     IndexBuildTest.resumeIndexBuilds(conn);
-    assert.soon(() =>
-                    rawMongoProgramOutput().indexOf("Hanging after index build first drain") >= 0);
+    assert.soon(
+        () => rawMongoProgramOutput(".*").indexOf("Hanging after index build first drain") >= 0);
 
     // Right before the index build completes, ensure no prepare conflicts were hit.
     IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {

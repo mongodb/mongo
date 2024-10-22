@@ -167,7 +167,7 @@ while (numUncleanShutdowns < kNumUncleanShutdowns) {
     }, primary.port);
 
     assert.soon(() => {
-        const logContents = rawMongoProgramOutput();
+        const logContents = rawMongoProgramOutput(".*");
         return logContents.indexOf("close_ckpt") > 0;
     });
 

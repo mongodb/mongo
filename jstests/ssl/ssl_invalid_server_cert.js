@@ -14,7 +14,7 @@ function runTest(name, config, expect) {
     }
     assert.eq(null, mongod, 'Mongod started unexpectedly');
 
-    const output = rawMongoProgramOutput();
+    const output = rawMongoProgramOutput(".*");
     assert.eq(
         true, output.includes(expect), "Server failure message did not include '" + expect + "'");
 }

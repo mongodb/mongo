@@ -35,7 +35,7 @@ if (HOST_TYPE == "linux") {
     clearRawMongoProgramOutput();
     assert.eq(
         0, runProgram("openssl", "x509", "-hash", "-noout", "-in", "jstests/libs/trusted-ca.pem"));
-    let hash = rawMongoProgramOutput();
+    let hash = rawMongoProgramOutput(".*");
     jsTestLog(hash);  // has form: "|sh<pid> <hash>\n"
     hash = hash.trim().split(" ")[1];
     copyCertificateFile("jstests/libs/trusted-ca.pem", `${certDir}/${hash}.0`);

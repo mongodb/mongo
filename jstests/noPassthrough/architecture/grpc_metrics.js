@@ -120,7 +120,7 @@ function runTest(conn) {
     evalCmd(uri, `print("Kill Test\\n"); sleep(${kShellShutdownDelay});`, false, function(pid) {
         // Wait for the output from the eval string so that we know prefix ops have completed,
         // then kill the shell so that the stream shuts down unsuccessfully.
-        assert.soon(() => rawMongoProgramOutput().includes("Kill Test"),
+        assert.soon(() => rawMongoProgramOutput("Kill Test").includes("Kill Test"),
                     "Shell start failure",
                     kShellStartTimeout,
                     kShellStartInterval);

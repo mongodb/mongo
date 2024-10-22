@@ -16,7 +16,7 @@ function runTest(bindIP, expectOk) {
 
         // We use assert.soonNoExcept() here because the mongod may not be logging yet.
         assert.soonNoExcept(() => {
-            const logContents = rawMongoProgramOutput();
+            const logContents = rawMongoProgramOutput("\"id\":(7401305|23016)");
             let found;
             if (jsTestOptions().shellGRPC) {
                 found = logContents.match(
@@ -47,7 +47,7 @@ function runTest(bindIP, expectOk) {
         const ec = waitProgram(pid);
         assert.eq(ec, MongoRunner.EXIT_NET_ERROR);
         assert.soonNoExcept(() => {
-            const logContents = rawMongoProgramOutput();
+            const logContents = rawMongoProgramOutput("ephemeral port");
             const found = logContents.match(
                 /Port 0 \(ephemeral port\) is not allowed when listening on multiple IP interfaces/);
             return (found !== null);

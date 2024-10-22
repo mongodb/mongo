@@ -17,7 +17,7 @@ assert.throws(function() {
     rstWithBadStartupOptions.startSet();
 });
 
-assert(rawMongoProgramOutput().match("Bad value for parameter \"rollbackTimeLimitSecs\""),
+assert(rawMongoProgramOutput("Bad value for parameter").match("\"rollbackTimeLimitSecs\""),
        "failed to reject bad value for parameter");
 
 // Now initialize the same parameter correctly on startup.

@@ -115,7 +115,7 @@ export class MockOCSPServer {
 
         assert.soon(function() {
             // Change this line if the OCSP endpoint changes
-            return rawMongoProgramOutput().search("Launching debugserver on port 8100") !== -1;
+            return rawMongoProgramOutput(".*").search("Launching debugserver on port 8100") !== -1;
         });
 
         sleep(2000);

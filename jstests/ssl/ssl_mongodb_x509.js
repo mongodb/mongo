@@ -86,5 +86,6 @@ assert.throws(() => MongoRunner.runMongos({
 }),
               [],
               "mongos started with x509 clusterAuthMode but no CA file");
-assert.neq(-1, rawMongoProgramOutput().search("No TLS certificate validation can be performed"));
+assert.neq(-1,
+           rawMongoProgramOutput(".*").search("No TLS certificate validation can be performed"));
 configRS.stopSet();

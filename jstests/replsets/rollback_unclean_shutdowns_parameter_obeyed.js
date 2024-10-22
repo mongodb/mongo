@@ -30,6 +30,7 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 rollbackTest.transitionToSteadyStateOperations();
 
 // Make sure no unclean shutdowns occurred.
-assert.eq(rawMongoProgramOutput().search(/Detected unclean shutdown/), -1);
+const subStr = "Detected unclean shutdown";
+assert.eq(rawMongoProgramOutput(subStr).search(subStr), -1);
 
 rollbackTest.stop();

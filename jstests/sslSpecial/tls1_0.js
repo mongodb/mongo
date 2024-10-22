@@ -77,7 +77,7 @@ function test(serverDP, clientDP, shouldSucceed) {
         didSucceed, shouldSucceed, "Running with " + tojson(serverDP) + "/" + tojson(clientDP));
 
     assert.eq(expectLogMessage,
-              rawMongoProgramOutput().search('Automatically disabling TLS 1.0') >= 0,
+              rawMongoProgramOutput(".*").search('Automatically disabling TLS 1.0') >= 0,
               "TLS 1.0 was/wasn't automatically disabled");
 }
 

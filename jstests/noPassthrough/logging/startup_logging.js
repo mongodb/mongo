@@ -9,7 +9,7 @@ function makeRegExMatchFn(pattern) {
 }
 
 function testStartupLogging(launcher, matchFn, expectedExitCode) {
-    assert(matchFn(rawMongoProgramOutput()));
+    assert(matchFn(rawMongoProgramOutput(".*")));
 }
 
 function validateWaitingMessage(launcher) {

@@ -24,7 +24,7 @@ requireSSLProvider('apple', function() {
         // criteria. In this case, we use -c, matching common name, and -Z, which includes SHA-1 and
         // SHA-256 thumbprints in the output.
         assert.eq(0, runNonMongoProgram("security", "find-certificate", "-c", subject, "-Z"));
-        const out = rawMongoProgramOutput();
+        const out = rawMongoProgramOutput(".*");
 
         const kSearchStr = "SHA-1 hash: ";
         const kHashHexitLen = 40;
@@ -85,7 +85,7 @@ requireSSLProvider('apple', function() {
         const mongod = MongoRunner.runMongod(opts);
 
         assert.soon(function() {
-            const log = rawMongoProgramOutput();
+            const log = rawMongoProgramOutput(".*");
             if ((cert.name === null) || (cluster.name === null)) {
                 // Invalid search criteria should fail.
                 return log.search('Certificate selector returned no results') >= 0;

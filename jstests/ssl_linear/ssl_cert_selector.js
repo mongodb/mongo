@@ -87,12 +87,12 @@ function testServerSelectorKeyUsage(testCase) {
 
     assert.soon(
         () => {
-            const log = rawMongoProgramOutput();
+            const log = rawMongoProgramOutput(".*");
             return log.search(testCase.expectIngressKeyUsed) !== -1;
         },
         `logfile did not contain expected peer certificate info: ${
             testCase.expectIngressKeyUsed}.\n` +
-            "Log File Contents\n==============================\n" + rawMongoProgramOutput() +
+            "Log File Contents\n==============================\n" + rawMongoProgramOutput(".*") +
             "\n==============================\n");
 
     jsTestLog("Testing server uses correct key on egress");

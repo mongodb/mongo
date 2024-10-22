@@ -14,7 +14,7 @@ requireSSLProvider('apple', function() {
 
     assert.throws(() => MongoRunner.runMongod(config), [], "MongoD unexpectedly started up");
 
-    assert.eq(rawMongoProgramOutput().includes(
+    assert.eq(rawMongoProgramOutput(".*").includes(
                   "Using encrypted PKCS#1/PKCS#8 PEM files is not supported on this platform"),
               true);
 });

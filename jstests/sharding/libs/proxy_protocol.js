@@ -79,7 +79,7 @@ export class ProxyProtocolServer {
 
         // Wait for the web server to start
         assert.soon(function() {
-            return rawMongoProgramOutput().search("Starting proxy protocol server...") !== -1;
+            return rawMongoProgramOutput(".*").search("Starting proxy protocol server...") !== -1;
         });
 
         print("Proxy Protocol Server sucessfully started.");

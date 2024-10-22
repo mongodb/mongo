@@ -61,7 +61,7 @@ MongoRunner.stopMongod(conn);
 // a certificate is revoked.
 if (determineSSLProvider() === "apple") {
     const APPLE_OCSP_ERROR_CODE = "CSSMERR_TP_CERT_REVOKED";
-    let output = rawMongoProgramOutput();
+    let output = rawMongoProgramOutput(".*");
     assert(output.search(APPLE_OCSP_ERROR_CODE));
     quit();
 }

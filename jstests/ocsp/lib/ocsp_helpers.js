@@ -90,7 +90,7 @@ export const OCSP_REVOKED = "OCSPCertificateStatusRevoked";
 export var assertClientConnectFails = function(conn, reason) {
     clearRawMongoProgramOutput();
     assert.neq(clientConnect(conn), 0);
-    const errmsg = rawMongoProgramOutput();
+    const errmsg = rawMongoProgramOutput(".*");
     if (typeof reason === 'string' || reason instanceof RegExp) {
         assert.neq(errmsg.search(reason), -1);
     }

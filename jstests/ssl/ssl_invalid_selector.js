@@ -40,7 +40,7 @@ function testStartupFails(testCase) {
     assert.throws(() => {
         MongoRunner.runMongod(opts);
     });
-    assert(rawMongoProgramOutput().includes(testCase.error));
+    assert(rawMongoProgramOutput(".*").includes(testCase.error));
 }
 
 requireSSLProvider('windows', function() {

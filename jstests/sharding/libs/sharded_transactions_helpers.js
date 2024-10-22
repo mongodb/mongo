@@ -100,7 +100,7 @@ export function waitForFailpoint(hitFailpointStr, numTimes, timeout) {
     assert.soon(
         function() {
             const re = new RegExp(hitFailpointStr, 'g' /* find all occurrences */);
-            return (rawMongoProgramOutput().match(re) || []).length == numTimes;
+            return (rawMongoProgramOutput(hitFailpointStr).match(re) || []).length == numTimes;
         },
         'Failed to find "' + hitFailpointStr + '" logged ' + numTimes + ' times',
         timeout,

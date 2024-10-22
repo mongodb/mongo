@@ -40,6 +40,7 @@
 #include <iterator>
 #include <map>
 #include <memory>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <system_error>
@@ -144,19 +145,49 @@ void retryWithBackOff(std::function<void(void)> func) {
 }
 #endif
 
+// Filters lines that match the regex pattern
+std::string filterLinesWithRegex(const std::string& input, const std::regex& pattern) {
+    std::stringstream ss(input);
+    std::string line;
+    std::ostringstream result;
+    while (std::getline(ss, line)) {
+        if (std::regex_search(line, pattern)) {
+            result << line << std::endl;
+        }
+    }
+
+    return result.str();
+}
+
 }  // namespace
 
-// Output up to BSONObjMaxUserSize characters of the most recent log output in order to
-// avoid hitting the 16MB size limit of a BSONObject.
+// Output up to BSONObjMaxUserSize characters of the most recent log output.
+//
+// Users must send a regex as the only argument, which will be passed as a string.
+// It is mandatory to provide this argument.
+//
+// The function will only return logs that match the specified regex.
+// If the resulting logs exceed BSONObjMaxUserSize, the function will raise an exception.
+// Ensure the provided regex is well-picked to filter only the desired logs and avoid exceeding the
+// size limit.
 BSONObj RawMongoProgramOutput(const BSONObj& args, void* data) {
     auto programOutputLogger =
         ProgramRegistry::get(getGlobalServiceContext())->getProgramOutputMultiplexer();
     std::string programLog = programOutputLogger->str();
+    uassert(ErrorCodes::BadValue,
+            "A regex pattern must be provided as the only argument. Please ensure you pass a valid "
+            "regex string to filter the logs.",
+            !singleArg(args).isNaN());
+    std::string regex = singleArg(args).String();
+    std::regex pattern(regex);
+    programLog = filterLinesWithRegex(programLog, pattern);
     std::size_t sz = programLog.size();
-    const string& outputStr =
-        sz > BSONObjMaxUserSize ? programLog.substr(sz - BSONObjMaxUserSize) : programLog;
+    uassert(ErrorCodes::BadValue,
+            "The filtered logs exceed the BSONObjMaxUserSize limit of 16MB. Please use a more "
+            "constrained regex pattern to reduce the size of the returned logs.",
+            sz <= BSONObjMaxUserSize);
 
-    return BSON("" << outputStr);
+    return BSON("" << programLog);
 }
 
 BSONObj ClearRawMongoProgramOutput(const BSONObj& args, void* data) {

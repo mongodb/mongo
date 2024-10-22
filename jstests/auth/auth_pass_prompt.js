@@ -18,7 +18,7 @@ if (!_isWindows()) {
         binshell, '-c', `echo password | ${mongo} --host ${host} --port ${port} --eval ${auth}`);
 
     assert.soon(() => {
-        const output = rawMongoProgramOutput();
+        const output = rawMongoProgramOutput("(Enter password:|Successfully authenticated)");
         return output.includes("Enter password:") && output.includes("Successfully authenticated");
     });
 

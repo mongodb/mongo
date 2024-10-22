@@ -9,7 +9,7 @@ function runTest(config, opt, expectStar, expectLocalhost) {
     const mongod =
         runMongoProgram('mongod', '--port', port, '--config', config, opt, '--outputConfig');
     assert.eq(mongod, 0);
-    const output = rawMongoProgramOutput();
+    const output = rawMongoProgramOutput("bindIp");
     assert.eq(output.search(/bindIp: "\*"/) >= 0, expectStar, output);
     assert.eq(output.search(/bindIp: localhost/) >= 0, expectLocalhost, output);
     assert.eq(output.search(/bindIpAll:/) >= 0, false, output);

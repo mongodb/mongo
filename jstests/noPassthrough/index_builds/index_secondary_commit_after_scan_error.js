@@ -77,7 +77,7 @@ assert.soon(function() {
 
 // Secondary should crash on receiving the unexpected commitIndexBuild oplog entry.
 assert.eq(MongoRunner.EXIT_ABORT, res.exitCode);
-assert(rawMongoProgramOutput().match('Fatal assertion.*4698902'),
+assert(rawMongoProgramOutput(".*").match('Fatal assertion.*4698902'),
        'Index build should have aborted secondary due to unexpected commitIndexBuild oplog entry.');
 
 // Check indexes on primary.

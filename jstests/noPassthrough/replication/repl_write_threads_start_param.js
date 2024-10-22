@@ -7,24 +7,22 @@
 // too low a count
 clearRawMongoProgramOutput();
 assert.throws(() => MongoRunner.runMongod({setParameter: 'replWriterThreadCount=0'}));
-assert(
-    rawMongoProgramOutput().match(
-        "Invalid value for parameter replWriterThreadCount: 0 is not greater than or equal to 1"),
-    "mongod started with too low a value for replWriterThreadCount");
+assert(rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount: ")
+           .match("0 is not greater than or equal to 1"),
+       "mongod started with too low a value for replWriterThreadCount");
 
 // too high a count
 clearRawMongoProgramOutput();
 assert.throws(() => MongoRunner.runMongod({setParameter: 'replWriterThreadCount=257'}));
-assert(
-    rawMongoProgramOutput().match(
-        "Invalid value for parameter replWriterThreadCount: 257 is not less than or equal to 256"),
-    "mongod started with too high a value for replWriterThreadCount");
+assert(rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount: ")
+           .match("257 is not less than or equal to 256"),
+       "mongod started with too high a value for replWriterThreadCount");
 
 // proper count
 clearRawMongoProgramOutput();
 let mongo = MongoRunner.runMongod({setParameter: 'replWriterThreadCount=24'});
 assert.neq(null, mongo, "mongod failed to start with a suitable replWriterThreadCount value");
-assert(!rawMongoProgramOutput().match("Invalid value for parameter replWriterThreadCount"),
+assert(rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount").length == 0,
        "despite accepting the replWriterThreadCount value, mongod logged an error");
 
 // getParameter to confirm the value was set

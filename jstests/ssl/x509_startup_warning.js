@@ -22,7 +22,7 @@ function runTest(checkMongos, opts, expectWarningCertifcates, expectWarningHostn
     }
 
     assert.soon(function() {
-        const output = rawMongoProgramOutput();
+        const output = rawMongoProgramOutput(".*");
         return (
             expectWarningCertifcates ==
                 output.includes(

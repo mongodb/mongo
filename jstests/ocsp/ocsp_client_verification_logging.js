@@ -59,7 +59,7 @@ let runTest = (options) => {
         1);
     runParallelShellSuccess();
 
-    const successOutput = rawMongoProgramOutput();
+    const successOutput = rawMongoProgramOutput(".*");
     let failOutput;
 
     if (ocspFaultType != "") {
@@ -88,7 +88,7 @@ let runTest = (options) => {
             "--verbose",
             1));
 
-        failOutput = rawMongoProgramOutput();
+        failOutput = rawMongoProgramOutput(".*");
     }
 
     if (ocspFaultType == FAULT_REVOKED) {

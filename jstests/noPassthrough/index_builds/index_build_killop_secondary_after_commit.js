@@ -70,14 +70,14 @@ const gracefulIndexBuildFlag = FeatureFlagUtil.isEnabled(testDB, "IndexBuildGrac
 if (!gracefulIndexBuildFlag) {
     // We expect this to crash the secondary because this error is not recoverable
     assert.soon(function() {
-        return rawMongoProgramOutput().search(/Fatal assertion.*(51101)/) >= 0;
+        return rawMongoProgramOutput(".*").search(/Fatal assertion.*(51101)/) >= 0;
     });
 } else {
     // Expect the secondary to crash. Depending on timing, this can be either because the secondary
     // was waiting for a primary abort when a 'commitIndexBuild' is applied, or because the build
     // fails and tries to request an abort while a 'commitIndexBuild' is being applied.
     assert.soon(function() {
-        return rawMongoProgramOutput().search(/Fatal assertion.*(7329403|7329407)/) >= 0;
+        return rawMongoProgramOutput(".*").search(/Fatal assertion.*(7329403|7329407)/) >= 0;
     });
 }
 

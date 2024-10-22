@@ -85,7 +85,7 @@ tests.forEach(function(t) {
         clearRawMongoProgramOutput();
         assert.throws(startParallelShell(
             code + ";\nrecurser(0," + depth + "," + tojson(t.callback) + ");", false, true));
-        let output = rawMongoProgramOutput();
+        let output = rawMongoProgramOutput(".*");
         let lines = output.split(/\s*\n|\\n/);
         let matchShellExp = false;
         while (lines.length > 0 & matchShellExp !== true) {

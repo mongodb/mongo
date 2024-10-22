@@ -9,7 +9,6 @@ assert.throws(function() {
     rsTest.startSet({auth: "", oplogSize: 10});
 });
 
-const mongoOutput = rawMongoProgramOutput();
-assert(mongoOutput.indexOf(
-           "security.keyFile is required when authorization is enabled with replica sets") >= 0,
-       "Expected error message about missing keyFile on startup");
+const subStr = "security.keyFile is required when authorization is enabled with replica sets";
+const mongoOutput = rawMongoProgramOutput(subStr);
+assert(mongoOutput.indexOf(subStr) >= 0, "Expected error message about missing keyFile on startup");

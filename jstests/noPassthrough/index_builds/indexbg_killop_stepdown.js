@@ -75,7 +75,7 @@ const gracefulIndexBuildFlag = FeatureFlagUtil.isEnabled(testDB, "IndexBuildGrac
 if (!gracefulIndexBuildFlag) {
     // We expect the node to crash without this feature enabled.
     assert.soon(function() {
-        return rawMongoProgramOutput().search(/Fatal assertion.*51101/) >= 0;
+        return rawMongoProgramOutput(".*").search(/Fatal assertion.*51101/) >= 0;
     });
 
     // After restarting the old primary, we expect that the index build completes successfully.

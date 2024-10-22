@@ -90,8 +90,8 @@ function checkNumBatchesAndSnapshots(
                 ((expectedNumBatches - 1) * snapshotsPerBatch) + lastBatchSnapshots;
         }
         const actualNumSnapshots =
-            rawMongoProgramOutput()
-                .split(/7844808.*Catalog snapshot for reverse lookup check ending/)
+            rawMongoProgramOutput("Catalog snapshot for reverse lookup check ending")
+                .split(/7844808/)
                 .length -
             1;
         assert.eq(actualNumSnapshots,

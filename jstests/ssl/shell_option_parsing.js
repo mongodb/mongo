@@ -53,7 +53,7 @@ function testConnect(expectPasswordPrompt, expectSuccess, ...args) {
     var clientPID = _startMongoProgram({args: command});
 
     assert.soon(function() {
-        const output = rawMongoProgramOutput();
+        const output = rawMongoProgramOutput(".*");
         if (expectPasswordPrompt) {
             if (output.includes("Enter password:")) {
                 stopMongoProgramByPid(clientPID);

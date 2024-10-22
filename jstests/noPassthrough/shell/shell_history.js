@@ -94,7 +94,7 @@ if (!_isWindows()) {
     var rc = runProgram("ls", "-l", file.name);
     assert.eq(rc, 0);
 
-    var output = rawMongoProgramOutput();
+    var output = rawMongoProgramOutput(".*");
     var fields = output.split(" ");
     // First field is the prefix, second field is the `ls -l` permissions.
     assert.eq(fields[1].substr(0, 10), "-rw-------", targetFile + " has bad permissions");

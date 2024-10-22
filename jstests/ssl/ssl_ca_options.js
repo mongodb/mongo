@@ -8,7 +8,7 @@ var opts = {
 assert.throws(() => MongoRunner.runMongod(opts),
               [],
               "MongoD started successfully with neither tlsCAFile nor tlsUseSystemCA");
-assert(rawMongoProgramOutput().includes(
+assert(rawMongoProgramOutput(".*").includes(
     "The use of TLS without specifying a chain of trust is no longer supported"));
 clearRawMongoProgramOutput();
 
@@ -22,7 +22,7 @@ opts = {
 assert.throws(() => MongoRunner.runMongod(opts),
               [],
               "MongoD started successfully with both tlsCAFile and tlsUseSystemCA");
-assert(rawMongoProgramOutput().includes(
+assert(rawMongoProgramOutput(".*").includes(
     "The use of both a CA File and the System Certificate store is not supported"));
 clearRawMongoProgramOutput();
 
@@ -37,7 +37,7 @@ opts = {
 assert.throws(() => MongoRunner.runMongod(opts),
               [],
               "MongoD started successfully with both tlsCAFile and tlsUseSystemCA");
-assert(rawMongoProgramOutput().includes(
+assert(rawMongoProgramOutput(".*").includes(
     "The use of both a CA File and the System Certificate store is not supported"));
 clearRawMongoProgramOutput();
 
@@ -50,7 +50,7 @@ opts = {
 assert.throws(() => MongoRunner.runMongod(opts),
               [],
               "MongoD started successfully with tlsClusterCAFile without tlsCAFile");
-assert(rawMongoProgramOutput().includes(
+assert(rawMongoProgramOutput(".*").includes(
     "Specifying a tlsClusterCAFile requires a tlsCAFile also be specified"));
 clearRawMongoProgramOutput();
 
@@ -64,5 +64,5 @@ opts = {
 assert.throws(() => MongoRunner.runMongod(opts),
               [],
               "MongoD started successfully with tlsClusterCAFile without tlsCAFile");
-assert(rawMongoProgramOutput().includes(
+assert(rawMongoProgramOutput(".*").includes(
     "Specifying a tlsClusterCAFile requires a tlsCAFile also be specified"));

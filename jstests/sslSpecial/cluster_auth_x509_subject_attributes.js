@@ -49,7 +49,7 @@ const serverCAFile = 'jstests/libs/ca.pem';
 function assertNoStart(opts, errmsg) {
     clearRawMongoProgramOutput();
     assert.throws(() => MongoRunner.runMongod(opts));
-    assert(rawMongoProgramOutput().includes(errmsg));
+    assert(rawMongoProgramOutput(".*").includes(errmsg));
 }
 
 function checkInvalidConfigurations() {

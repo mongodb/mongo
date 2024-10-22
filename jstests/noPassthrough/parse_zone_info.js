@@ -4,7 +4,7 @@ assert.throws(
     () => MongoRunner.runMongod({timeZoneInfo: "jstests/libs/config_files/bad_timezone_info"}),
     [],
     "expected launching mongod with bad timezone rules to fail");
-assert.neq(-1, rawMongoProgramOutput().search(/Fatal assertion.*40475/));
+assert.neq(-1, rawMongoProgramOutput(".*").search(/Fatal assertion.*40475/));
 
 // Test that a non-existent directory causes startup to fail.
 assert.throws(
@@ -13,8 +13,8 @@ assert.throws(
     "expected launching mongod with bad timezone rules to fail");
 
 // Look for either old or new error message
-assert(rawMongoProgramOutput().includes("Error creating service context") ||
-       rawMongoProgramOutput().includes("Failed to create service context"));
+assert(rawMongoProgramOutput(".*").includes("Error creating service context") ||
+       rawMongoProgramOutput(".*").includes("Failed to create service context"));
 
 function testWithGoodTimeZoneDir(tz_good_path) {
     let conn = MongoRunner.runMongod({timeZoneInfo: tz_good_path});

@@ -53,7 +53,7 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
                         ...clientOptions,
                         "--tlsDisabledProtocols",
                         clientDisabledProtos);
-        mongoOutput = rawMongoProgramOutput();
+        mongoOutput = rawMongoProgramOutput(".*");
         return mongoOutput.match(expectedRegex);
     }, "Mongo shell output was as follows:\n" + mongoOutput + "\n************", 60 * 1000);
 

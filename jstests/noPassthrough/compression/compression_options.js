@@ -14,7 +14,7 @@ var runTest = function(optionValue, expected) {
                               "--networkMessageCompressors=snappy"),
               0);
 
-    var output = rawMongoProgramOutput()
+    var output = rawMongoProgramOutput(".*")
                      .split("\n")
                      .map(function(str) {
                          str = str.replace(/^sh[0-9]+\| /, "");

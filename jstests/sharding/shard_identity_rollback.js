@@ -92,7 +92,7 @@ jsTest.log("Waiting for original primary to rollback and shut down");
 // Wait until the node shuts itself down during the rollback. We will hit the first assertion if
 // we rollback using 'recoverToStableTimestamp'.
 assert.soon(() => {
-    return (rawMongoProgramOutput().search(/Fatal assertion.*(40498|50712)/) !== -1);
+    return (rawMongoProgramOutput(".*").search(/Fatal assertion.*(40498|50712)/) !== -1);
 });
 
 // Restart the original primary again.  This time, the shardIdentity document should already be

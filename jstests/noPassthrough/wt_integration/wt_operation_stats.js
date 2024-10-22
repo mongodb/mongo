@@ -12,7 +12,7 @@ const readStatRegx = /"storage":{"data":{"bytesRead":([0-9]+)/;
 
 let checkLogStats = function() {
     // Check if the log output contains the expected statistics.
-    let mongodLogs = rawMongoProgramOutput();
+    let mongodLogs = rawMongoProgramOutput(".*");
     let lines = mongodLogs.split('\n');
     let match;
     let logLineCount = 0;

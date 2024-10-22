@@ -16,7 +16,7 @@ const testVersionOutput = (exePath) => {
 
     runNonMongoProgram(exePath, "--version");
 
-    const out = rawMongoProgramOutput().split('\n');
+    const out = rawMongoProgramOutput(".*").split('\n');
 
     assert.neq(out[0].match(dbVersionMatch), null);
     assert.neq(out[1].match(buildInfoMatch), null);

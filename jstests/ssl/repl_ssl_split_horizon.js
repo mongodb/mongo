@@ -30,7 +30,7 @@ if (rc != 0) {
     }
 
     // Output is of the format: 'glibc x.yz'
-    var output = rawMongoProgramOutput();
+    var output = rawMongoProgramOutput(".*");
     clearRawMongoProgramOutput();
 
     jsTestLog(`getconf GNU_LIBC_VERSION\n${output}`);
@@ -45,7 +45,7 @@ if (rc != 0) {
         quit();
     }
 
-    var osRelease = rawMongoProgramOutput();
+    var osRelease = rawMongoProgramOutput(".*");
     clearRawMongoProgramOutput();
 
     jsTestLog(`cat /etc/os-release\n${osRelease}`);

@@ -11,7 +11,7 @@ var echoTest = function() {
     // This will produce `numLines` + 1 lines of output because echo isn't being called with
     // `-n`. This will block until the program exits.
     var exitCode = runProgram("echo", lineContents);
-    var output = rawMongoProgramOutput();
+    var output = rawMongoProgramOutput(".*");
 
     assert.eq(0, exitCode);
 

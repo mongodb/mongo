@@ -8,7 +8,7 @@ const regexMatch = /\{.+"id":4777800.+"nodes":\[(.+)\].+\}/;
 const getInitializerOrderForSeed = (seed) => {
     clearRawMongoProgramOutput();
     const conn = MongoRunner.runMongod({verbose: 2, initializerShuffleSeed: seed});
-    const logContents = rawMongoProgramOutput();
+    const logContents = rawMongoProgramOutput(".*");
     const match = logContents.match(regexMatch);
     assert(match.length > 0);
     MongoRunner.stopMongod(conn);

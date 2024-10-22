@@ -87,7 +87,7 @@ assert.eq(MongoRunner.EXIT_ABORT, res.exitCode);
 // Expect the secondary to crash. Depending on timing, this can be either because the secondary was
 // waiting for a primary abort when a 'commitIndexBuild' is applied, or because the build fails and
 // tries to request an abort while a 'commitIndexBuild' is being applied.
-assert(rawMongoProgramOutput().match('Fatal assertion.*(7329403|7329407)'),
+assert(rawMongoProgramOutput(".*").match('Fatal assertion.*(7329403|7329407)'),
        'Receiving a commit from the primary for a failing index build should crash the secondary');
 
 createIdx();

@@ -25,7 +25,7 @@ const mongo = runMongoProgram('mongo',
                               ';',
                               '--tlsAllowInvalidHostnames');
 assert.neq(mongo, 0, "Shell connected when it should have failed");
-assert(rawMongoProgramOutput().includes(' would have matched, but was overridden by SAN'),
+assert(rawMongoProgramOutput(".*").includes(' would have matched, but was overridden by SAN'),
        'Expected detail warning not seen');
 
 // On OpenSSL only, start without `tlsAllowInvalidHostnames`
@@ -35,7 +35,7 @@ if (determineSSLProvider() === 'openssl') {
     const mongo = runMongoProgram(
         'mongo', '--tls', '--tlsCAFile', CA, 'localhost:' + mongod.port, '--eval', ';');
     assert.neq(mongo, 0, "Shell connected when it should have failed");
-    assert(rawMongoProgramOutput().includes(
+    assert(rawMongoProgramOutput(".*").includes(
                'CN: localhost would have matched, but was overridden by SAN'),
            'Expected detail warning not seen');
 }

@@ -43,7 +43,7 @@ let conn = MongoRunner.runMongod({
 });
 assert(conn);
 MongoRunner.stopMongod(conn);
-verifyOplogCapMaintainerThreadNotStarted(rawMongoProgramOutput());
+verifyOplogCapMaintainerThreadNotStarted(rawMongoProgramOutput(".*"));
 
 jsTestLog("Testing recoverFromOplogAsStandalone mode");
 clearRawMongoProgramOutput();
@@ -54,7 +54,7 @@ conn = MongoRunner.runMongod({
 });
 assert(conn);
 MongoRunner.stopMongod(conn);
-verifyOplogCapMaintainerThreadNotStarted(rawMongoProgramOutput());
+verifyOplogCapMaintainerThreadNotStarted(rawMongoProgramOutput(".*"));
 
 jsTestLog("Testing repair mode");
 clearRawMongoProgramOutput();
@@ -65,4 +65,4 @@ conn = MongoRunner.runMongod({
     setParameter: {logComponentVerbosity: tojson({storage: 1})},
 });
 assert(!conn);
-verifyOplogCapMaintainerThreadNotStarted(rawMongoProgramOutput());
+verifyOplogCapMaintainerThreadNotStarted(rawMongoProgramOutput(".*"));

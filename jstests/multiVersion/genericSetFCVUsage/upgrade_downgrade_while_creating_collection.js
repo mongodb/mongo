@@ -40,8 +40,8 @@ function runTest(downgradeFCV) {
             }, primary.port);
 
             assert.soon(function() {
-                return rawMongoProgramOutput().match(
-                    /\"id\":20320.*test.mycoll/);  // Create Collection log
+                return rawMongoProgramOutput("\"id\":20320")
+                    .match(/\"id\":20320.*test.mycoll/);  // Create Collection log
             });
 
             awaitUpgradeFCV = startParallelShell(

@@ -51,7 +51,7 @@ let port;
         startMongodOnExistingPath(dbPath);
     });
 
-    assert(rawMongoProgramOutput().match("Fatal assertion.*28782"),
+    assert(rawMongoProgramOutput("Fatal assertion").match("28782"),
            "Mongod should have aborted due to an invalid index descriptor.");
     jsTestLog("Exiting restartAndVerifyMongodCrashes.");
 })();

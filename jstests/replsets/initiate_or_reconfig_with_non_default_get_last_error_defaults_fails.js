@@ -28,7 +28,7 @@ function testInitiate(gleDefaults) {
 
     assert.soon(
         function() {
-            return rawMongoProgramOutput().search(/Fatal assertion.*5624101/) >= 0;
+            return rawMongoProgramOutput("Fatal assertion").search(/5624101/) >= 0;
         },
         "Node should have fasserted when initiating with a non-default getLastErrorDefaults field",
         ReplSetTest.kDefaultTimeoutMS);

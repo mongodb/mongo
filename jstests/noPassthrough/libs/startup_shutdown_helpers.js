@@ -123,7 +123,7 @@ function forkThenShutdownMongoProgram(program, args) {
 
     clearRawMongoProgramOutput();
     assert.eq(0, runMongoProgram.apply(this, arrOpts));
-    const rawOutput = rawMongoProgramOutput();
+    const rawOutput = rawMongoProgramOutput(".*");
     const pid = getPidFromRawProgramOutput(rawOutput);
     assert.neq(null, pid, "Failed to parse forked process pid");
 

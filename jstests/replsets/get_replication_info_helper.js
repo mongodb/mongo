@@ -28,15 +28,16 @@ failPointBeforeFinish.wait();
 const callPrintSecondaryReplInfo = startParallelShell(
     "db.getSiblingDB('admin').printSecondaryReplicationInfo();", syncTarget.port);
 callPrintSecondaryReplInfo();
-assert(rawMongoProgramOutput().match("InitialSyncSyncSource: " + primary.name));
-assert(rawMongoProgramOutput().match("InitialSyncRemainingEstimatedDuration: "));
+assert(rawMongoProgramOutput("InitialSyncSyncSource: ").match(primary.name));
+let subStr = "InitialSyncRemainingEstimatedDuration: ";
+assert(rawMongoProgramOutput(subStr).match(subStr));
 clearRawMongoProgramOutput();
 
 const callPrintSlaveReplInfo =
     startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", syncTarget.port);
 callPrintSlaveReplInfo();
-assert(rawMongoProgramOutput().match("InitialSyncSyncSource: " + primary.name));
-assert(rawMongoProgramOutput().match("InitialSyncRemainingEstimatedDuration: "));
+assert(rawMongoProgramOutput("InitialSyncSyncSource: ").match(primary.name));
+assert(rawMongoProgramOutput(subStr).match(subStr));
 clearRawMongoProgramOutput();
 failPointBeforeFinish.off();
 replSet.awaitSecondaryNodes();
@@ -63,7 +64,8 @@ assert(replInfo.now, replInfoString);
 var mongo =
     startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
 mongo();
-assert(rawMongoProgramOutput().match("behind the primary"));
+subStr = "behind the primary";
+assert(rawMongoProgramOutput(subStr).match(subStr));
 
 // get to a primaryless state
 for (i in replSet.getSecondaries()) {
@@ -76,15 +78,16 @@ assert.commandWorked(primary.getDB('admin').runCommand({replSetStepDown: 120, fo
 // it still works for backwards compatibility.
 mongo = startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
 mongo();
-assert(rawMongoProgramOutput().match("behind the freshest"));
+subStr = "behind the freshest";
+assert(rawMongoProgramOutput(subStr).match(subStr));
 
 clearRawMongoProgramOutput();
-assert.eq(rawMongoProgramOutput().match("behind the freshest"), null);
+assert.eq(rawMongoProgramOutput(subStr).match(subStr), null);
 
 // Ensure that the new helper, printSecondaryReplicationInfo works the same.
 mongo =
     startParallelShell("db.getSiblingDB('admin').printSecondaryReplicationInfo();", primary.port);
 mongo();
-assert(rawMongoProgramOutput().match("behind the freshest"));
+assert(rawMongoProgramOutput(subStr).match(subStr));
 
 replSet.stopSet();

@@ -68,7 +68,7 @@ export class ConfigExpandRestServer {
 
         // Wait for the web server to start
         assert.soon(function() {
-            return rawMongoProgramOutput().search("Mock Web Server Listening") !== -1;
+            return rawMongoProgramOutput(".*").search("Mock Web Server Listening") !== -1;
         });
 
         print("Mock HTTP Server sucessfully started.");
@@ -194,7 +194,7 @@ export function configExpandFailure(config, test = null, opts = {}) {
     const mongod = _startMongoProgram({args: args});
 
     assert.soon(function() {
-        return rawMongoProgramOutput().match(test);
+        return rawMongoProgramOutput(".*").match(test);
     });
     if (mongod) {
         stopMongoProgramByPid(mongod);

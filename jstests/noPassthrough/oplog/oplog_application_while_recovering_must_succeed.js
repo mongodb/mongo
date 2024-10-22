@@ -108,7 +108,7 @@ function runTest(op, result) {
         assert.eq(exitCode, MongoRunner.EXIT_ABORT);
         assert.soon(
             function() {
-                return rawMongoProgramOutput().search(/Fatal assertion.*5415000/) >= 0;
+                return rawMongoProgramOutput("Fatal assertion").search(/5415000/) >= 0;
             },
             "Node should have fasserted upon encountering a fatal error during startup",
             ReplSetTest.kDefaultTimeoutMS);

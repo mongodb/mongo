@@ -29,7 +29,7 @@ let doDuringFailpoint = function(
 
     hitFailpointFunc();
 
-    assert.soon(() => structuredLogRegEx.test(rawMongoProgramOutput()));
+    assert.soon(() => structuredLogRegEx.test(rawMongoProgramOutput(".*")));
 
     duringFailpointFunc();
 

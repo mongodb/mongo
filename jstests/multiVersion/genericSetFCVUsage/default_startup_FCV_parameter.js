@@ -45,7 +45,7 @@ function runStandaloneTest() {
     adminDB = conn.getDB("admin");
     // The FCV should still be the original FCV, not the provided defaultStartupFCV.
     checkFCV(adminDB, lastContinuousFCV);
-    assert(rawMongoProgramOutput().includes(
+    assert(rawMongoProgramOutput(".*").includes(
         "Ignoring the provided defaultStartupFCV parameter since the FCV already exists"));
     MongoRunner.stopMongod(conn);
 
@@ -63,7 +63,8 @@ function runStandaloneTest() {
     assert.neq(null, conn);
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
-    assert(rawMongoProgramOutput().includes("The provided 'defaultStartupFCV' is not a valid FCV"));
+    assert(rawMongoProgramOutput(".*").includes(
+        "The provided 'defaultStartupFCV' is not a valid FCV"));
     MongoRunner.stopMongod(conn);
 
     clearRawMongoProgramOutput();
@@ -72,7 +73,8 @@ function runStandaloneTest() {
     assert.neq(null, conn);
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
-    assert(rawMongoProgramOutput().includes("The provided 'defaultStartupFCV' is not a valid FCV"));
+    assert(rawMongoProgramOutput(".*").includes(
+        "The provided 'defaultStartupFCV' is not a valid FCV"));
     MongoRunner.stopMongod(conn);
 }
 
@@ -166,7 +168,8 @@ function runReplicaSetTest() {
     secondaryAdminDB = rst.getSecondary().getDB("admin");
     checkFCV(primaryAdminDB, latestFCV);
     checkFCV(secondaryAdminDB, latestFCV);
-    assert(rawMongoProgramOutput().includes("The provided 'defaultStartupFCV' is not a valid FCV"));
+    assert(rawMongoProgramOutput(".*").includes(
+        "The provided 'defaultStartupFCV' is not a valid FCV"));
     rst.stopSet();
 
     clearRawMongoProgramOutput();
@@ -180,7 +183,8 @@ function runReplicaSetTest() {
     secondaryAdminDB = rst.getSecondary().getDB("admin");
     checkFCV(primaryAdminDB, latestFCV);
     checkFCV(secondaryAdminDB, latestFCV);
-    assert(rawMongoProgramOutput().includes("The provided 'defaultStartupFCV' is not a valid FCV"));
+    assert(rawMongoProgramOutput(".*").includes(
+        "The provided 'defaultStartupFCV' is not a valid FCV"));
     rst.stopSet();
 }
 

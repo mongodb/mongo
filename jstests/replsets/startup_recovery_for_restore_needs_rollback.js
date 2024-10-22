@@ -150,7 +150,8 @@ assert.commandWorked(restoreNode.adminCommand(
     {'configureFailPoint': 'hangBeforeUnrecoverableRollbackError', 'mode': 'off'}));
 
 // This node should not come back up, because it has no stable timestamp to recover to.
-assert.soon(() => (rawMongoProgramOutput().search("UnrecoverableRollbackError") >= 0));
+const subStr = "UnrecoverableRollbackError";
+assert.soon(() => (rawMongoProgramOutput(subStr).search(subStr) >= 0));
 // Hide the exit code from stopSet.
 waitMongoProgram(parseInt(restoreNode.port));
 

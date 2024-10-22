@@ -566,7 +566,7 @@ export const ResumableIndexBuildTest = class {
 
         // Ensure that the resumable index build state was written to disk upon clean shutdown.
         for (const buildUUID of buildUUIDs) {
-            assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput()));
+            assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput(".*")));
         }
 
         if (runBeforeStartup)
@@ -833,7 +833,7 @@ export const ResumableIndexBuildTest = class {
 
         clearRawMongoProgramOutput();
         rst.stop(resumeNode);
-        assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput()));
+        assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput(".*")));
 
         rst.start(resumeNode, {noCleanData: true});
         otherNodeFp.off();

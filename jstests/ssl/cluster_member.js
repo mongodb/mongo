@@ -18,13 +18,13 @@ if (determineSSLProvider() !== "openssl") {
     jsTest.log('No clusterAuthMode set');
     clearRawMongoProgramOutput();
     assert.throws(() => MongoRunner.runMongod(opts));
-    assert(rawMongoProgramOutput().includes(errmsg));
+    assert(rawMongoProgramOutput(".*").includes(errmsg));
 
     jsTest.log('clusterAuthMode == keyFile');
     clearRawMongoProgramOutput();
     opts.clusterAuthMode = 'keyFile';
     assert.throws(() => MongoRunner.runMongod(opts));
-    assert(rawMongoProgramOutput().includes(errmsg));
+    assert(rawMongoProgramOutput(".*").includes(errmsg));
 }
 
 function authAndDo(port, cert, cmd = ';') {

@@ -12,7 +12,7 @@ function testConnect(outputLog, ...args) {
     const clientPID = _startMongoProgram({args: command});
 
     assert.soon(function() {
-        const output = rawMongoProgramOutput();
+        const output = rawMongoProgramOutput(".*");
         if (output.includes(outputLog)) {
             stopMongoProgramByPid(clientPID);
             return true;

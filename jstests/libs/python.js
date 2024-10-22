@@ -5,7 +5,7 @@ export function getPython3Binary() {
     // or else we will pick up a python that is not in our venv
     clearRawMongoProgramOutput();
     assert.eq(runNonMongoProgram("python", "--version"), 0);
-    const pythonVersion = rawMongoProgramOutput();  // Will look like "Python 3.10.4\n"
+    const pythonVersion = rawMongoProgramOutput("Python");  // Will look like "Python 3.10.4\n"
     const usingPython310 = /Python 3\.10/.exec(pythonVersion);
     if (usingPython310) {
         print(

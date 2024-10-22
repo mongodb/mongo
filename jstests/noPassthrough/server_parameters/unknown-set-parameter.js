@@ -17,21 +17,21 @@ function tryRun(arg) {
 clearRawMongoProgramOutput();
 const valid = tryRun('enableTestCommands=1');
 assert.eq(valid, 0);
-const validOutput = rawMongoProgramOutput();
+const validOutput = rawMongoProgramOutput(".*");
 assert.gte(validOutput.search(/enableTestCommands: 1/), 0, validOutput);
 
 // Negative case, invalid setparam.
 clearRawMongoProgramOutput();
 const foo = tryRun('foo=bar');
 assert.neq(foo, 0);
-const fooOutput = rawMongoProgramOutput();
+const fooOutput = rawMongoProgramOutput(".*");
 assert.gte(fooOutput.search(/Unknown --setParameter 'foo'/), 0, fooOutput);
 
 // Negative case, valid but unavailable setparam.
 clearRawMongoProgramOutput();
 const graph = tryRun('roleGraphInvalidationIsFatal=true');
 assert.neq(graph, 0);
-const graphOutput = rawMongoProgramOutput();
+const graphOutput = rawMongoProgramOutput(".*");
 assert.gte(
     graphOutput.search(
         /--setParameter 'roleGraphInvalidationIsFatal' only available when used with 'enableTestCommands'/),

@@ -67,7 +67,7 @@ testDB = mongod.getDB(dbName);
 assert.throws(() => {
     assert.commandWorked(testDB.getCollection("a").insert({}));
 });
-assert.gte(rawMongoProgramOutput().search("Fatal assertion.*50883"), 0);
+assert.gte(rawMongoProgramOutput("Fatal assertion").search("50883"), 0);
 
 // Perform a startup, drop collection "a" and shutdown.
 mongod = startMongodOnExistingPath(dbpath);

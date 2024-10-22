@@ -53,7 +53,7 @@ function runValidateHook(testCase) {
     // will return all of their output.
     testCase.teardown();
 
-    return rawMongoProgramOutput();
+    return rawMongoProgramOutput(".*");
 }
 
 function testStandalone(additionalSetupFn, {

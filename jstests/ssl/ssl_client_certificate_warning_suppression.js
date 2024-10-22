@@ -37,15 +37,15 @@ function test(suppress) {
     // logged before it.
     assert.soon(
         () => {
-            const log = rawMongoProgramOutput();
+            const log = rawMongoProgramOutput(".*");
             return log.search('client metadata') !== -1;
         },
         "logfile should contain 'client metadata'.\n" +
-            "Log File Contents\n==============================\n" + rawMongoProgramOutput() +
+            "Log File Contents\n==============================\n" + rawMongoProgramOutput(".*") +
             "\n==============================\n");
 
     // Now check for the message
-    const log = rawMongoProgramOutput();
+    const log = rawMongoProgramOutput(".*");
     assert.eq(suppress, log.match(/[N,n]o SSL certificate provided by peer/) === null);
 
     try {

@@ -74,7 +74,7 @@ export function SecondaryReadsTest(name = "secondary_reads_test") {
 
         return function() {
             assert.soon(function() {
-                return rawMongoProgramOutput().match(failPoint + " fail point enabled");
+                return rawMongoProgramOutput("fail point enabled").match(failPoint);
             });
         };
     };

@@ -26,7 +26,7 @@ import {
 // logged at an earlier wall clock time.
 function waitForLog(logLine, times) {
     assert.soon(function() {
-        const matches = rawMongoProgramOutput().match(new RegExp(logLine, "g")) || [];
+        const matches = rawMongoProgramOutput(".*").match(new RegExp(logLine, "g")) || [];
         return matches.length === times;
     }, 'Failed to find "' + logLine + '" logged ' + times + ' times');
 }

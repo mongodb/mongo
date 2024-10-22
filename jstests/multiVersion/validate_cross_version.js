@@ -56,7 +56,7 @@ function testVersion(binVersion, fcv, shouldCorrupt) {
 
     MongoRunner.runMongod({port: port, dbpath: dbpath, validate: "", noCleanData: true});
 
-    let validateLogs = rawMongoProgramOutput()
+    let validateLogs = rawMongoProgramOutput("(9437301|9437303|9437304)")
                            .split("\n")
                            .filter(line => line.trim() !== "")
                            .map(line => JSON.parse(line.split("|").slice(1).join("|")));

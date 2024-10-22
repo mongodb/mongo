@@ -28,7 +28,7 @@ function testShutdownLogging(launcher, crashFn, matchFn, expectedExitCode) {
     var conn = launcher.start({});
 
     function checkOutput() {
-        var logContents = rawMongoProgramOutput();
+        var logContents = rawMongoProgramOutput(".*");
         function printLog() {
             // We can't just return a string because it will be well over the max
             // line length.

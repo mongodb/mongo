@@ -12,7 +12,7 @@ clearRawMongoProgramOutput();
 // dbpath.
 assert.throws(() => MongoRunner.runMongod({dbpath: dbPath, noCleanData: true}));
 
-var logContents = rawMongoProgramOutput();
+var logContents = rawMongoProgramOutput(".*");
 assert(logContents.indexOf("Unable to lock the lock file") > 0 ||
        // Windows error message is different.
        logContents.indexOf("Unable to create/open the lock file") > 0);
