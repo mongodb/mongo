@@ -179,7 +179,7 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
 
         // 2dsphere indexes on measurements are allowed, but need to be re-written to
         // point to the data field and use the special 2dsphere_bucket index type.
-        if (elem.valueStringData() == IndexNames::GEO_2DSPHERE) {
+        if (elem.valueStringDataSafe() == IndexNames::GEO_2DSPHERE) {
             builder.append(str::stream() << timeseries::kBucketDataFieldName << "."
                                          << elem.fieldNameStringData(),
                            IndexNames::GEO_2DSPHERE_BUCKET);
@@ -285,7 +285,7 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
         }
 
         if (elem.fieldNameStringData().startsWith(timeseries::kBucketDataFieldName + ".") &&
-            elem.valueStringData() == IndexNames::GEO_2DSPHERE_BUCKET) {
+            elem.valueStringDataSafe() == IndexNames::GEO_2DSPHERE_BUCKET) {
             builder.append(
                 elem.fieldNameStringData().substr(timeseries::kBucketDataFieldName.size() + 1),
                 IndexNames::GEO_2DSPHERE);
