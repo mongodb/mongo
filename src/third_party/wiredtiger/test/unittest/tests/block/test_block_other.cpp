@@ -25,23 +25,17 @@ test_block_header_byteswap_copy(WT_BLOCK_HEADER *from, WT_BLOCK_HEADER *to)
     prev_from.disk_size = from->disk_size;
     prev_from.checksum = from->checksum;
 
-#ifdef WORDS_BIGENDIAN
     __wt_block_header_byteswap_copy(from, to);
+
+#ifdef WORDS_BIGENDIAN
     REQUIRE(to->checksum == __wt_bswap32(prev_from.checksum));
     REQUIRE(to->disk_size == __wt_bswap32(prev_from.disk_size));
-#else
-    // Test that the byte orderings remain the same in both block headers.
-    WT_BLOCK_HEADER prev_to;
-    prev_to.disk_size = to->disk_size;
-    prev_to.checksum = to->checksum;
-
-    REQUIRE(from->disk_size == prev_from.disk_size);
-    REQUIRE(from->checksum == prev_from.checksum);
-    REQUIRE(to->disk_size == prev_to.disk_size);
-    REQUIRE(to->checksum == prev_to.checksum);
 #endif
 
-    // Test that the block header we are copying from is not changed.
+    /*
+     * Test that the block header we are copying from is not changed. The byte swap function is
+     * allowed to swap blocks in-place, so only check this when we copy into a different block.
+     */
     if (from != to) {
         REQUIRE(from->disk_size == prev_from.disk_size);
         REQUIRE(from->checksum == prev_from.checksum);
@@ -68,6 +62,10 @@ TEST_CASE("Block manager: header byteswap copy", "[block_other]")
         // 24358 (26 5F 00 00) -> 643760128 (00 00 5F 26).
         REQUIRE(to.disk_size == 1496252416);
         REQUIRE(to.checksum == 643760128);
+#else
+        // The byte contents are unchanged
+        REQUIRE(to.disk_size == from.disk_size);
+        REQUIRE(to.checksum == from.checksum);
 #endif
     }
 
@@ -83,6 +81,10 @@ TEST_CASE("Block manager: header byteswap copy", "[block_other]")
 #ifdef WORDS_BIGENDIAN
         REQUIRE(to.disk_size == 0);
         REQUIRE(to.checksum == 0);
+#else
+        // The byte contents are unchanged
+        REQUIRE(to.disk_size == from.disk_size);
+        REQUIRE(to.checksum == from.checksum);
 #endif
     }
 
@@ -102,6 +104,10 @@ TEST_CASE("Block manager: header byteswap copy", "[block_other]")
         // 66666 (00 01 04 6A) -> 1778647296 (6A 04 01 00).
         REQUIRE(to.disk_size == 469762048);
         REQUIRE(to.checksum == 1778647296);
+#else
+        // The byte contents are unchanged
+        REQUIRE(to.disk_size == from.disk_size);
+        REQUIRE(to.checksum == from.checksum);
 #endif
     }
 
@@ -121,6 +127,10 @@ TEST_CASE("Block manager: header byteswap copy", "[block_other]")
         // 2024418449 (78 AA 2C 91) -> 2435623544 (91 2C AA 78).
         REQUIRE(to.disk_size == 1531067418);
         REQUIRE(to.checksum == 2435623544);
+#else
+        // The byte contents are unchanged
+        REQUIRE(to.disk_size == from.disk_size);
+        REQUIRE(to.checksum == from.checksum);
 #endif
     }
 }
@@ -144,6 +154,10 @@ TEST_CASE("Block manager: block header byteswap", "[block_other]")
     // 24358 (26 5F 00 00) -> 643760128 (00 00 5F 26).
     REQUIRE(to.disk_size == 1496252416);
     REQUIRE(to.checksum == 643760128);
+#else
+    // The byte contents are unchanged
+    REQUIRE(to.disk_size == 12121);
+    REQUIRE(to.checksum == 24358);
 #endif
 }
 

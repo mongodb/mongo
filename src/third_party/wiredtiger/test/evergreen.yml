@@ -251,6 +251,7 @@ functions:
           ${CODE_COVERAGE_FLAGS} \
           ${NON_BARRIER_DIAGNOSTIC_YIELDS|} \
           ${HAVE_DIAGNOSTIC|} \
+          ${WORDS_BIGENDIAN|} \
           ${GNU_C_VERSION|} \
           ${GNU_CXX_VERSION|} \
           ${CLANG_C_VERSION|} \
@@ -1455,12 +1456,6 @@ tasks:
         vars:
           GNU_C_VERSION: -DGNU_C_VERSION=9
           GNU_CXX_VERSION: -DGNU_CXX_VERSION=9
-      # Check that WiredTiger will compile for code coverage, as this may switch to alternative
-      # implementations of some code which may generate different compiler errors to a 'normal' build
-      - func: "compile wiredtiger"
-        vars:
-          CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Coverage
-          CODE_COVERAGE_FLAGS: -DCODE_COVERAGE_MEASUREMENT=1 -DINLINE_FUNCTIONS_INSTEAD_OF_MACROS=1
 
   - name: compile-clang
     tags: ["pull_request", "pull_request_compilers"]
@@ -1486,6 +1481,30 @@ tasks:
         vars:
           CLANG_C_VERSION: -DCLANG_C_VERSION=8
           CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=8
+
+  # Compile WiredTiger with uncommon build flags to make sure we compile code that
+  # is often pre-processed out.
+  - name: compile-uncommon-build-flags
+    tags: ["pull_request", "pull_request_compilers"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+
+      # Check that WiredTiger will compile for code coverage, as this may switch to alternative
+      # implementations of some code which may generate different compiler errors to a 'normal' build
+      - func: "compile wiredtiger"
+        vars:
+          CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Coverage
+          CODE_COVERAGE_FLAGS: -DCODE_COVERAGE_MEASUREMENT=1 -DINLINE_FUNCTIONS_INSTEAD_OF_MACROS=1
+
+      # Check that WiredTiger compiles when building for big endian systems.
+      # This doesn't need to run on a big endian machine, we're just checking
+      # that the code inside #ifdef WORDS_BIGENDIAN paths will compile.
+      - func: "compile wiredtiger"
+        vars:
+          WORDS_BIGENDIAN: -DWORDS_BIGENDIAN=1
+          # The catch2 unit tests make use of WORDS_BIGENDIAN. Make sure they're compiled
+          HAVE_UNITTEST: -DHAVE_UNITTEST=1
 
   - name: make-check-test
     commands:

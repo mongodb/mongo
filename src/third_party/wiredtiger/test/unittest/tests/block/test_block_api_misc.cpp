@@ -246,7 +246,7 @@ TEST_CASE("Block manager: size and stat", "[block_api_misc]")
         WT_ITEM buf;
         WT_CLEAR(buf);
         std::string test_string("test123");
-        create_write_buffer(&bm, session, test_string, &buf, 0);
+        create_write_buffer(&bm, session, test_string, &buf, 0, std::stoi(ALLOCATION_SIZE));
         uint8_t addr[WT_ADDR_MAX_COOKIE];
         size_t addr_size;
         wt_off_t bm_size, prev_size;

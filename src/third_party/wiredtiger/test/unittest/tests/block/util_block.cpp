@@ -96,11 +96,11 @@ free_size_block(WT_SIZE *size)
  */
 void
 create_write_buffer(WT_BM *bm, std::shared_ptr<mock_session> session, std::string contents,
-  WT_ITEM *buf, size_t buf_memsize)
+  WT_ITEM *buf, size_t buf_memsize, size_t allocation_size)
 {
     // Fetch write buffer size from block manager.
     REQUIRE(bm->write_size(bm, session->get_wt_session_impl(), &buf_memsize) == 0);
-    test_and_validate_write_size(bm, session, buf_memsize);
+    test_and_validate_write_size(bm, session, buf_memsize, allocation_size);
 
     // Initialize the buffer with aligned size.
     F_SET(buf, WT_ITEM_ALIGNED);
@@ -151,4 +151,20 @@ setup_bm(std::shared_ptr<mock_session> &session, WT_BM *bm, const std::string &f
 
     // Initialize the extent lists inside the block handle.
     REQUIRE(__wti_block_ckpt_init(session->get_wt_session_impl(), &bm->block->live, nullptr) == 0);
+}
+
+/*
+ * Test and validate the bm->write_size() function.
+ */
+void
+test_and_validate_write_size(
+  WT_BM *bm, const std::shared_ptr<mock_session> &session, size_t size, size_t allocation_size)
+{
+    size_t ret_size = size;
+    // This function internally reads and changes the variable.
+    REQUIRE(bm->write_size(bm, session->get_wt_session_impl(), &ret_size) == 0);
+    // It is expected that the size is a modulo of the allocation size and is aligned to the nearest
+    // greater allocation size.
+    CHECK(ret_size % allocation_size == 0);
+    CHECK(ret_size == ((size / allocation_size) + 1) * allocation_size);
 }
