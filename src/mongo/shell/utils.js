@@ -453,7 +453,6 @@ jsTestOptions = function() {
             mongosBinVersion: TestData.mongosBinVersion || "",
             mixedBinVersions: TestData.mixedBinVersions || false,
             networkMessageCompressors: TestData.networkMessageCompressors,
-            replSetFeatureCompatibilityVersion: TestData.replSetFeatureCompatibilityVersion,
             skipRetryOnNetworkError: TestData.skipRetryOnNetworkError,
             skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
             forceValidationWithFeatureCompatibilityVersion:
