@@ -1,6 +1,9 @@
 // Test that write size estimation in mongos respects 'hint' field.
 // @tags: [
-//   requires_sharding,
+//      requires_sharding,
+//      # TODO (SPM-2077): remove "balancer off" tag once the project is over: migration can cause
+//      # an index to be created before a dropIndex commits causing the metadata validation to fail.
+//      assumes_balancer_off,
 // ]
 const coll = db.update_with_large_hint;
 coll.drop();
