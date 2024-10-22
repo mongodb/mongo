@@ -37,19 +37,22 @@ def main():
             if not os.path.isfile(binary_path):
                 continue
 
+            cmd = [
+                "/usr/bin/codesign",
+                "-s",
+                "-",
+                "-f",
+                "--entitlements",
+                entitlements_file,
+                binary_path,
+            ]
+
             print(f"Signing {binary}")
-            subprocess.run(
-                [
-                    "/usr/bin/codesign",
-                    "-s",
-                    "-",
-                    "-f",
-                    "--entitlements",
-                    entitlements_file,
-                    binary_path,
-                ],
-                check=True,
-            )
+            try:
+                subprocess.run(cmd, check=True)
+            except subprocess.CalledProcessError:
+                print(f"Signing {binary} retry")
+                subprocess.run(cmd, check=True)
 
 
 if __name__ == "__main__":
