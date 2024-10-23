@@ -201,16 +201,6 @@ WriteResult performDeletes(OperationContext* opCtx,
                            const write_ops::DeleteCommandRequest& op,
                            OperationSource source = OperationSource::kStandard);
 
-Status performAtomicTimeseriesWrites(OperationContext* opCtx,
-                                     const std::vector<write_ops::InsertCommandRequest>& insertOps,
-                                     const std::vector<write_ops::UpdateCommandRequest>& updateOps);
-
-/**
- * Runs a time-series update command in a transaction and collects the write result from each
- * statement.
- *
- * Assumes the update command is a retryable write and targeted on the time-series view namespace.
- */
 void runTimeseriesRetryableUpdates(OperationContext* opCtx,
                                    const NamespaceString& bucketNs,
                                    const write_ops::UpdateCommandRequest& wholeOp,
@@ -229,15 +219,6 @@ void recordUpdateResultInOpDebug(const UpdateResult& updateResult, OpDebug* opDe
 bool shouldRetryDuplicateKeyException(const UpdateRequest& updateRequest,
                                       const CanonicalQuery& cq,
                                       const DuplicateKeyErrorInfo& errorInfo);
-
-/**
- * Returns an InsertCommandReply if the timeseries writes succeeded.
- */
-write_ops::InsertCommandReply performTimeseriesWrites(
-    OperationContext* opCtx, const write_ops::InsertCommandRequest& request);
-
-write_ops::InsertCommandReply performTimeseriesWrites(
-    OperationContext* opCtx, const write_ops::InsertCommandRequest& request, CurOp* curOp);
 
 /*
  * Populates 'result' with the explain information for the write requests.

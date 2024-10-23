@@ -61,8 +61,8 @@ namespace mongo::timeseries {
 /**
  * Constructs an update request using a single update statement at position `opIndex`.
  */
-write_ops::UpdateCommandRequest buildSingleUpdateOp(const write_ops::UpdateCommandRequest& wholeOp,
-                                                    size_t opIndex);
+mongo::write_ops::UpdateCommandRequest buildSingleUpdateOp(
+    const mongo::write_ops::UpdateCommandRequest& wholeOp, size_t opIndex);
 
 
 /**
@@ -134,8 +134,10 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
  * Returns an update request to the bucket when the 'measurements' is non-empty. Otherwise, returns
  * a delete request to the bucket.
  */
-std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
-    const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements);
+std::variant<mongo::write_ops::UpdateCommandRequest, mongo::write_ops::DeleteCommandRequest>
+makeModificationOp(const OID& bucketId,
+                   const CollectionPtr& coll,
+                   const std::vector<BSONObj>& measurements);
 
 using TimeseriesBatches = std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>;
 using TimeseriesStmtIds = stdx::unordered_map<bucket_catalog::WriteBatch*, std::vector<StmtId>>;
@@ -143,10 +145,10 @@ using TimeseriesStmtIds = stdx::unordered_map<bucket_catalog::WriteBatch*, std::
 /**
  * Builds the transform update oplog entry with a transform function.
  */
-write_ops::UpdateOpEntry makeTimeseriesTransformationOpEntry(
+mongo::write_ops::UpdateOpEntry makeTimeseriesTransformationOpEntry(
     OperationContext* opCtx,
     const OID& bucketId,
-    write_ops::UpdateModification::TransformFunc transformationFunc);
+    mongo::write_ops::UpdateModification::TransformFunc transformationFunc);
 
 /**
  * Retrieves the opTime and electionId according to the current replication mode.
@@ -158,7 +160,7 @@ void getOpTimeAndElectionId(OperationContext* opCtx,
 /**
  * Builds the insert command request from a time-series insert write batch.
  */
-write_ops::InsertCommandRequest makeTimeseriesInsertOp(
+mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
     const NamespaceString& bucketsNs,
     const BSONObj& metadata,
@@ -167,7 +169,7 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
 /**
  * Builds the update command request from a time-series insert write batch.
  */
-write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
+mongo::write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     OperationContext* opCtx,
     std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
     const NamespaceString& bucketsNs,
@@ -178,7 +180,7 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
  * Builds the DocDiff update command request from a time-series insert write batch.
  * Assumes min/max in WriteBatch have already been updated to reflect new measurements in batch.
  */
-write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
+mongo::write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     OperationContext* opCtx,
     std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
     const NamespaceString& bucketsNs,
@@ -241,8 +243,8 @@ void makeWriteRequest(OperationContext* opCtx,
                       const BSONObj& metadata,
                       TimeseriesStmtIds& stmtIds,
                       const NamespaceString& bucketsNs,
-                      std::vector<write_ops::InsertCommandRequest>* insertOps,
-                      std::vector<write_ops::UpdateCommandRequest>* updateOps);
+                      std::vector<mongo::write_ops::InsertCommandRequest>* insertOps,
+                      std::vector<mongo::write_ops::UpdateCommandRequest>* updateOps);
 
 /**
  * Performs modifications atomically for a user command on a time-series collection.
@@ -256,10 +258,10 @@ void performAtomicWrites(
     OperationContext* opCtx,
     const CollectionPtr& coll,
     const RecordId& recordId,
-    const boost::optional<std::variant<write_ops::UpdateCommandRequest,
-                                       write_ops::DeleteCommandRequest>>& modificationOp,
-    const std::vector<write_ops::InsertCommandRequest>& insertOps,
-    const std::vector<write_ops::UpdateCommandRequest>& updateOps,
+    const boost::optional<std::variant<mongo::write_ops::UpdateCommandRequest,
+                                       mongo::write_ops::DeleteCommandRequest>>& modificationOp,
+    const std::vector<mongo::write_ops::InsertCommandRequest>& insertOps,
+    const std::vector<mongo::write_ops::UpdateCommandRequest>& updateOps,
     bool fromMigrate,
     StmtId stmtId);
 

@@ -272,6 +272,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries/write_ops:timeseries_write_ops",
         "//src/mongo/db/transaction",
         "//src/mongo/logv2:logv2_options",
         "//src/mongo/s:grid",

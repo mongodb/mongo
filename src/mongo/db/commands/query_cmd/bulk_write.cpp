@@ -127,6 +127,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_resources.h"
@@ -683,7 +684,7 @@ void handleGroupedTimeseriesInserts(OperationContext* opCtx,
                                     write_ops_exec::WriteResult& out) {
     size_t numOps = docs.size();
     auto request = getConsecutiveInsertRequest(req, firstOpIdx, docs, nsInfoEntry);
-    auto insertReply = write_ops_exec::performTimeseriesWrites(opCtx, request, curOp);
+    auto insertReply = timeseries::write_ops::performTimeseriesWrites(opCtx, request, curOp);
     populateWriteResultWithInsertReply(numOps, req.getOrdered(), insertReply, out);
 }
 

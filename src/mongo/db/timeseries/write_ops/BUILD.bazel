@@ -1,0 +1,39 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    [
+        "timeseries_write_ops.cpp",
+        "timeseries_write_ops.h",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_write_ops",
+    srcs = [
+        "timeseries_write_ops.cpp",
+    ],
+    hdrs = [
+        "timeseries_write_ops.h",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/catalog:document_validation",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands:mongod_fcv",
+        "//src/mongo/db/query/write_ops:write_ops_exec_util",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
+        "//src/mongo/db/timeseries:bucket_compression_failure",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries:timeseries_write_util",
+        "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/db/transaction",
+        "//src/mongo/db/update:update_common",
+    ],
+)

@@ -290,6 +290,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:backup_cursor_hooks",
         "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/timeseries/write_ops:timeseries_write_ops",
         "//src/mongo/db/transaction",
         "//src/mongo/s:query_analysis_sampler",
         "//src/mongo/s:sharding_router_api",
