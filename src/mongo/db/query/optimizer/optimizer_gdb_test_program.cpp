@@ -52,36 +52,22 @@ using namespace mongo::optimizer;
 using namespace mongo::optimizer::unit_test_abt_literals;
 
 int clang_optnone main(int argc, char** argv) {
-    ABT testABT = NodeBuilder{}
-                      .root("root")
-                      .filter(_evalf(_composem(_get("a", _cmp("Eq", "1"_cint64)),
-                                               _get("b", _cmp("Eq", "1"_cint64))),
-                                     "root"_var))
-                      .finish(_scan("root", "coll"));
+    ABT testABT =
+        _binary("And", _binary("Lt", "0"_cint32, "1"_cint32), _binary("Lt", "1"_cint32, "2"_cint32))
+            ._n;
 
     auto prefixId = PrefixId::createForTests();
 
     // Verify output as a sanity check, the real test is in the gdb test file.
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{root}]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [root]\n"
-        "|   PathComposeM []\n"
-        "|   |   PathGet [b]\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [1]\n"
-        "|   PathGet [a]\n"
-        "|   PathCompare [Eq]\n"
+        "BinaryOp [And]\n"
+        "|   BinaryOp [Lt]\n"
+        "|   |   Const [2]\n"
         "|   Const [1]\n"
-        "Scan [coll, {root}]\n",
+        "BinaryOp [Lt]\n"
+        "|   Const [1]\n"
+        "Const [0]\n",
         testABT);
-
-    [[maybe_unused]] mongo::optimizer::FieldProjectionMap emptyProjectionMap;
-    [[maybe_unused]] mongo::optimizer::FieldProjectionMap testProjectionMap;
-    testProjectionMap._rootProjection = "test";
-    testProjectionMap._fieldProjections.emplace("a", "b");
-    testProjectionMap._fieldProjections.emplace("c", "d");
 
     mongo::breakpoint();
 

@@ -38,28 +38,15 @@ if __name__ == "__main__":
         # case inspects a local variable by invoking the appropriate pretty printer and comparing
         # to the expected output.
 
-        # Test ABT containing a conjunction over the fields 'a' and 'b'.
         assertPrintedOutput(
             "testABT",
-            '\nRoot["root"]\n'
-            + "Filter\n"
-            + "|   EvalFilter\n"
-            + '|   |   Variable["root"], \n'
-            + "|   PathComposeM\n"
-            + '|   |   PathGet["b"]\n'
-            + "|   |   PathCompare[Eq]\n"
-            + '|   |   Constant["1"], \n'
-            + '|   PathGet["a"]\n'
-            + "|   PathCompare[Eq]\n"
+            "BinaryOp[And]\n"
+            + "|   BinaryOp[Lt]\n"
+            + '|   |   Constant["2"], \n'
             + '|   Constant["1"], \n'
-            + 'Scan["coll", "root"]\n',
-        )
-
-        assertPrintedOutput("emptyProjectionMap", "{std::map with 0 elements}\n")
-
-        assertPrintedOutput(
-            "testProjectionMap",
-            '{<root>: "test", std::map with 2 elements : (["a"] : "b", ["c"] : "d")}',
+            + "BinaryOp[Lt]\n"
+            + '|   Constant["1"], \n'
+            + 'Constant["0"]\n',
         )
 
         gdb.write("TEST PASSED\n")
