@@ -51,7 +51,6 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/stacktrace_libunwind_test_functions.h"
-#include "mongo/util/stacktrace_test_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -101,6 +100,21 @@ std::string trace() {
     return out;
 }
 
+struct Context {
+    std::vector<std::function<void(Context&)>> plan;
+    std::string s;
+};
+
+template <int N>
+void callNext(Context& ctx) {
+    if constexpr (N == 0) {
+        ctx.s = trace();
+    } else {
+        ctx.plan[N - 1](ctx);
+    }
+    asm volatile("");  // NOLINT
+}
+
 void assertAndRemovePrefix(std::string_view& v, std::string_view prefix) {
     auto pos = v.find(prefix);
     ASSERT(pos != v.npos) << "expected to find '{}' in '{}'"_format(prefix, v);
@@ -114,24 +128,31 @@ void assertAndRemoveSuffix(std::string_view& v, std::string_view suffix) {
 }
 
 TEST(Unwind, Demangled) {
-    std::string stacktrace;
-    stacktrace_test::executeUnderCallstack<6>([&] { stacktrace = trace(); });
-
+    // Trickery with std::vector<std::function> is to hide from the optimizer.
+    Context ctx{{
+        callNext<0>,
+        callNext<1>,
+        callNext<2>,
+        callNext<3>,
+        callNext<4>,
+        callNext<5>,
+    }};
+    ctx.plan.back()(ctx);
     // Check that these function names appear in the trace, in order.
     // There will of course be characters between them but ignore that.
     const std::string frames[] = {
-        "void mongo::stacktrace_test::callNext<0>(mongo::stacktrace_test::Context&)",
-        "void mongo::stacktrace_test::callNext<1>(mongo::stacktrace_test::Context&)",
-        "void mongo::stacktrace_test::callNext<2>(mongo::stacktrace_test::Context&)",
-        "void mongo::stacktrace_test::callNext<3>(mongo::stacktrace_test::Context&)",
-        "void mongo::stacktrace_test::callNext<4>(mongo::stacktrace_test::Context&)",
-        "void mongo::stacktrace_test::callNext<5>(mongo::stacktrace_test::Context&)",
+        "void mongo::unwind_test_detail::callNext<0>(mongo::unwind_test_detail::Context&)",
+        "void mongo::unwind_test_detail::callNext<1>(mongo::unwind_test_detail::Context&)",
+        "void mongo::unwind_test_detail::callNext<2>(mongo::unwind_test_detail::Context&)",
+        "void mongo::unwind_test_detail::callNext<3>(mongo::unwind_test_detail::Context&)",
+        "void mongo::unwind_test_detail::callNext<4>(mongo::unwind_test_detail::Context&)",
+        "void mongo::unwind_test_detail::callNext<5>(mongo::unwind_test_detail::Context&)",
         "main",
     };
     size_t pos = 0;
     for (const auto& expected : frames) {
-        pos = stacktrace.find(expected, pos);
-        ASSERT_NE(pos, stacktrace.npos) << stacktrace;
+        pos = ctx.s.find(expected, pos);
+        ASSERT_NE(pos, ctx.s.npos) << ctx.s;
     }
 }
 

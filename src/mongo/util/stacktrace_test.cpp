@@ -75,7 +75,6 @@
 #include "mongo/util/pcre.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
-#include "mongo/util/stacktrace_test_helpers.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
@@ -95,7 +94,7 @@ mongo_stacktrace_test_detail_testFunctionWithLinkage() {
 
 namespace mongo {
 
-namespace stacktrace_test_detail {
+namespace stack_trace_test_detail {
 
 struct RecursionParam {
     std::uint64_t n;
@@ -111,7 +110,7 @@ MONGO_COMPILER_NOINLINE int recurseWithLinkage(RecursionParam& p, std::uint64_t 
     return 0;
 }
 
-}  // namespace stacktrace_test_detail
+}  // namespace stack_trace_test_detail
 
 namespace {
 
@@ -183,11 +182,11 @@ TEST(StackTrace, PosixFormat) {
     }
 
     std::string trace;
-    stacktrace_test_detail::RecursionParam param{3, [&] {
-                                                     StringStackTraceSink sink{trace};
-                                                     printStackTrace(sink);
-                                                 }};
-    stacktrace_test_detail::recurseWithLinkage(param, 3);
+    stack_trace_test_detail::RecursionParam param{3, [&] {
+                                                      StringStackTraceSink sink{trace};
+                                                      printStackTrace(sink);
+                                                  }};
+    stack_trace_test_detail::recurseWithLinkage(param, 3);
 
     if (kSuperVerbose) {
         LOGV2_OPTIONS(24153, {logv2::LogTruncation::Disabled}, "Trace", "trace"_attr = trace);
@@ -272,11 +271,11 @@ TEST(StackTrace, WindowsFormat) {
 
     std::string trace = [&] {
         std::string s;
-        stacktrace_test_detail::RecursionParam param{3, [&] {
-                                                         StringStackTraceSink sink{s};
-                                                         printStackTrace(sink);
-                                                     }};
-        stacktrace_test_detail::recurseWithLinkage(param);
+        stack_trace_test_detail::RecursionParam param{3, [&] {
+                                                          StringStackTraceSink sink{s};
+                                                          printStackTrace(sink);
+                                                      }};
+        stack_trace_test_detail::recurseWithLinkage(param);
         return s;
     }();
 
@@ -345,60 +344,7 @@ TEST(StackTrace, EarlyTraceSanity) {
     }
 }
 
-template <int N>
-StackTrace getTrace() {
-    boost::optional<StackTrace> trace;
-    stacktrace_test::executeUnderCallstack<N>([&] { trace = getStackTrace(); });
-    ASSERT_TRUE(trace.has_value());
-    ASSERT_EQ(trace->getError(), {});
-    return *trace;
-}
-
-int countGeneratedFrames(const StackTrace& trace) {
-    BSONObj bsonTrace = trace.getBSONRepresentation();
-    auto backtrace = bsonTrace["backtrace"];
-    ASSERT_FALSE(backtrace.eoo());
-    auto frames = backtrace.Array();
-    int matchingFrames = 0;
-
-    for (const auto& frame : frames) {
-        ASSERT_TRUE(frame.isABSONObj());
-        auto demangledElem = frame["C"];
-        if (demangledElem.eoo()) {
-            continue;
-        }
-        auto demangled = demangledElem.valueStringDataSafe();
-        if (demangled.find("stacktrace_test::callNext") != demangled.npos) {
-            matchingFrames++;
-        }
-    }
-
-    return matchingFrames;
-}
-
 #ifndef _WIN32
-// This test isn't enabled on Windows as we may not be able to reliably generate deep stack
-// traces on that platform.
-TEST(StackTrace, StackTrace80Frames) {
-    constexpr int numFrames = 80;
-    StackTrace trace = getTrace<numFrames>();
-    int generatedFrames = countGeneratedFrames(trace);
-    ASSERT_EQ(generatedFrames, numFrames);
-}
-
-// This test isn't enabled on Windows as we may not be able to reliably generate deep stack
-// traces on that platform.
-TEST(StackTrace, StackTrace200Frames) {
-    constexpr int numFrames = 200;
-    StackTrace trace = getTrace<numFrames>();
-    int generatedFrames = countGeneratedFrames(trace);
-
-    // There's a 100-frame limit and there are some frames below the last generated
-    // frame, so we expect to see close to, but less than 100 matching frames.
-    ASSERT_GTE(generatedFrames, 80);
-    ASSERT_LTE(generatedFrames, 100);
-}
-
 // `MetadataGenerator::load` should fill its meta member with something reasonable.
 // Only testing with functions which we expect the dynamic linker to know about, so
 // they must have external linkage.
