@@ -488,23 +488,30 @@ export class ReplSetTest {
     awaitSecondaryNodes(timeout, secondaries, retryIntervalMS, waitForNewlyAddedRemoval) {
         timeout = timeout || this.kDefaultTimeoutMS;
         retryIntervalMS = retryIntervalMS || 200;
+        let awaitingSecondaries;
+        try {
+            assert.soonNoExcept(() => {
+                awaitingSecondaries = [];
+                // Reload who the current secondaries are
+                this.getPrimary(timeout);
 
-        assert.soonNoExcept(() => {
-            // Reload who the current secondaries are
-            this.getPrimary(timeout);
+                var secondariesToCheck = secondaries || this._secondaries;
+                var len = secondariesToCheck.length;
+                for (var i = 0; i < len; i++) {
+                    var hello = secondariesToCheck[i].getDB('admin')._helloOrLegacyHello();
+                    var arbiter = (hello.arbiterOnly === undefined ? false : hello.arbiterOnly);
+                    if (!hello.secondary && !arbiter) {
+                        awaitingSecondaries.push(secondariesToCheck[i]);
+                    }
+                }
 
-            var secondariesToCheck = secondaries || this._secondaries;
-            var len = secondariesToCheck.length;
-            var ready = true;
-
-            for (var i = 0; i < len; i++) {
-                var hello = secondariesToCheck[i].getDB('admin')._helloOrLegacyHello();
-                var arbiter = (hello.arbiterOnly === undefined ? false : hello.arbiterOnly);
-                ready = ready && (hello.secondary || arbiter);
-            }
-
-            return ready;
-        }, "Awaiting secondaries", timeout, retryIntervalMS);
+                return awaitingSecondaries.length == 0;
+            }, "Awaiting secondaries: awaitingSecondariesPlaceholder", timeout, retryIntervalMS);
+        } catch (e) {
+            e.message = e.message.replace('awaitingSecondariesPlaceholder',
+                                          tojson(awaitingSecondaries.map((n) => n.name)));
+            throw e;
+        }
 
         // We can only wait for newlyAdded field removal if test commands are enabled.
         if (waitForNewlyAddedRemoval && jsTest.options().enableTestCommands) {
