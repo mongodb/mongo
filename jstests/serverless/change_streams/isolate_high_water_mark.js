@@ -7,8 +7,6 @@
  *     requires_fcv_71
  * ]
  */
-// TODO SERVER-76309: re-purpose this test to show that the resume token does advance with the
-// global oplog, or remove the test in favour of existing coverage elsewhere.
 import {
     ChangeStreamMultitenantReplicaSetTest
 } from "jstests/serverless/libs/change_collection_util.js";
