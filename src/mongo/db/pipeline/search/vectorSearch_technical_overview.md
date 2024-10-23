@@ -47,7 +47,7 @@ Results are returned in descending score order from `mongot`. A metadata field w
 
 ### Sharding
 
-In a sharded environment, results are merged and [sorted in descending order](https://github.com/mongodb/mongo/blob/636d0c1ce26d905cc508a73ada598950e16860b5/src/mongo/db/pipeline/search/document_source_vector_search.h#L62) on the `$vectorSearchScore` metadata field. Additionally, the `limit` parameter specified in `$vectorSearch` is applied after merging by [inserting an additional `$limit` stage]() into the merging pipeline.
+In a sharded environment, results are merged and [sorted in descending order](https://github.com/mongodb/mongo/blob/636d0c1ce26d905cc508a73ada598950e16860b5/src/mongo/db/pipeline/search/document_source_vector_search.h#L62) on the `$vectorSearchScore` metadata field. Additionally, the `limit` parameter specified in `$vectorSearch` is applied after merging by inserting an additional `$limit` stage into the merging pipeline.
 
 If a user-specified `$limit` exists in the pipeline following `$vectorSearch` that is smaller than the `$vectorSearch` limit value, this is pushed down to the shards as well, although it is not sent to `mongot`.
 
