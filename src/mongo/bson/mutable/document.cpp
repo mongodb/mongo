@@ -42,6 +42,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/str_basic.h"
 
 namespace mongo {
 namespace mutablebson {
@@ -1076,6 +1077,7 @@ private:
     // Insert the given field name into the field name heap, and return an ID for this
     // field name.
     int32_t insertFieldName(StringData fieldName) {
+        str::uassertNoEmbeddedNulBytes(fieldName);
         const uint32_t id = _fieldNames.size();
         if (!fieldName.empty())
             _fieldNames.insert(

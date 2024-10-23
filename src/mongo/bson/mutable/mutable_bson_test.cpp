@@ -2722,6 +2722,27 @@ TEST(TypeSupport, EncodingEquivalenceMaxKey) {
     ASSERT_TRUE(identical(b.getValue(), c.getValue()));
 }
 
+
+TEST(InputValidation, IllegalFieldName) {
+    // Test that using field names with null characters throw an assertion.
+    mmb::Document doc;
+    std::string embeddedNullStr("st\0r", 4);
+
+    ASSERT_THROWS_CODE(doc.makeElementObject(embeddedNullStr), DBException, 9527900);
+    ASSERT_THROWS_CODE(doc.makeElementArray(embeddedNullStr), DBException, 9527900);
+    ASSERT_THROWS_CODE(doc.makeElementDouble(embeddedNullStr, 1.0), DBException, 9527900);
+    ASSERT_THROWS_CODE(doc.makeElementBool(embeddedNullStr, true), DBException, 9527900);
+    ASSERT_THROWS_CODE(
+        doc.makeElementDecimal(embeddedNullStr, Decimal128(3)), DBException, 9527900);
+
+    mmb::Element subObj = doc.makeElementObject("subObj");
+    ASSERT_OK(doc.root().pushBack(subObj));
+
+    ASSERT_THROWS_CODE(
+        subObj.getDocument().makeElementObject(embeddedNullStr), DBException, 9527900);
+    ASSERT_THROWS_CODE(subObj.rename(embeddedNullStr), DBException, 9527900);
+}
+
 TEST(Document, ManipulateComplexObjInLeafHeap) {
     // Test that an object with complex substructure that lives in the leaf builder can be
     // manipulated in the same way as an object with complex substructure that lives
