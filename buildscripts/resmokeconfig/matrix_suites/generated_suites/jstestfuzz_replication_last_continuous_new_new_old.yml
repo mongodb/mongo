@@ -28,6 +28,7 @@ executor:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
         internalQueryStatsRateLimit: -1
+        notablescan: false
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
       verbose: ""

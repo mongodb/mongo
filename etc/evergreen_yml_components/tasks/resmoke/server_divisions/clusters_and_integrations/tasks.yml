@@ -2628,9 +2628,9 @@ tasks:
           suite: jstestfuzz_sharded
           resmoke_args: --numClientsPerFixture=10
 
-  ## jstestfuzz concurrent sharded cluster with logical session ##
+  ## jstestfuzz concurrent sharded cluster with notablescan parameter enabled ##
   - <<: *jstestfuzz_template
-    name: jstestfuzz_concurrent_sharded_session_gen
+    name: jstestfuzz_concurrent_sharded_notablescan_gen
     # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
@@ -2638,7 +2638,6 @@ tasks:
         "incompatible_debug_mode",
         "jstestfuzz",
         "non_deterministic",
-        "session",
         "require_npm",
         "random_name",
       ]
@@ -2649,7 +2648,7 @@ tasks:
           num_files: ${jstestfuzz_concurrent_num_files|10}
           num_tasks: 5
           jstestfuzz_vars: --jsTestsDir ../jstests
-          suite: jstestfuzz_sharded_session
+          suite: jstestfuzz_sharded_notablescan
           resmoke_args: --numClientsPerFixture=10
 
   ## jstestfuzz sharded cluster causal consistency ##
@@ -2748,9 +2747,9 @@ tasks:
           npm_command: jstestfuzz
           run_no_feature_flag_tests: "true"
 
-  ## jstestfuzz sharded cluster with logical session ##
+  ## jstestfuzz sharded cluster with notablescan param enabled ##
   - <<: *jstestfuzz_template
-    name: jstestfuzz_sharded_session_gen
+    name: jstestfuzz_sharded_notablescan_gen
     # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
@@ -2758,7 +2757,6 @@ tasks:
         "incompatible_debug_mode",
         "jstestfuzz",
         "non_deterministic",
-        "session",
         "require_npm",
         "random_name",
       ]
@@ -2767,7 +2765,7 @@ tasks:
         vars:
           <<: *jstestfuzz_config_vars
           jstestfuzz_vars: --jsTestsDir ../jstests
-          suite: jstestfuzz_sharded_session
+          suite: jstestfuzz_sharded_notablescan
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
   ## jstestfuzz sharded cluster with replica set endpoint ##

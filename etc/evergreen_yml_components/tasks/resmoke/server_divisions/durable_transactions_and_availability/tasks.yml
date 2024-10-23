@@ -701,9 +701,9 @@ tasks:
           suite: jstestfuzz_replication
           resmoke_args: --numClientsPerFixture=10
 
-  ## jstestfuzz concurrent replica set with logical session ##
+  ## jstestfuzz concurrent replica set with notablescan enabled ##
   - <<: *jstestfuzz_template
-    name: jstestfuzz_concurrent_replication_session_gen
+    name: jstestfuzz_concurrent_replication_notablescan_gen
     # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
@@ -711,7 +711,6 @@ tasks:
         "incompatible_debug_mode",
         "jstestfuzz",
         "non_deterministic",
-        "session",
         "require_npm",
         "random_name",
       ]
@@ -722,7 +721,7 @@ tasks:
           num_files: ${jstestfuzz_concurrent_num_files|10}
           num_tasks: 5
           jstestfuzz_vars: --jsTestsDir ../jstests
-          suite: jstestfuzz_replication_session
+          suite: jstestfuzz_replication_notablescan
           resmoke_args: --numClientsPerFixture=10
 
   # jstestfuzz concurrent conflict #
@@ -852,9 +851,9 @@ tasks:
           npm_command: jstestfuzz
           run_no_feature_flag_tests: "true"
 
-  ## jstestfuzz replica set with logical session ##
+  ## jstestfuzz replica set with notablescan enabled ##
   - <<: *jstestfuzz_template
-    name: jstestfuzz_replication_session_gen
+    name: jstestfuzz_replication_notablescan_gen
     # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
@@ -862,7 +861,6 @@ tasks:
         "incompatible_debug_mode",
         "jstestfuzz",
         "non_deterministic",
-        "session",
         "require_npm",
         "random_name",
       ]
@@ -871,7 +869,7 @@ tasks:
         vars:
           <<: *jstestfuzz_config_vars
           jstestfuzz_vars: --jsTestsDir ../jstests
-          suite: jstestfuzz_replication_session
+          suite: jstestfuzz_replication_notablescan
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
   ## jstestfuzz replica set endpoint ##

@@ -174,7 +174,7 @@ buildvariants:
       - name: jstestfuzz_sharded_causal_consistency_gen
       - name: jstestfuzz_sharded_gen
       - name: jstestfuzz_sharded_kill_terminate_stepdown_gen
-      - name: jstestfuzz_sharded_session_gen
+      - name: jstestfuzz_sharded_notablescan_gen
       - name: sharded_causally_consistent_jscore_passthrough_gen
       - name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
       - name: sharding_auth_gen

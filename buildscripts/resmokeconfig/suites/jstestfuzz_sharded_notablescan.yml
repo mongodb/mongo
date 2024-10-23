@@ -12,10 +12,15 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: await import("jstests/libs/override_methods/enable_sessions.js")
+      global_vars:
+        TestData:
+          # Other fuzzers test commands against sharded clusters with logical session ids.
+          disableImplicitSessions: true
       crashOnInvalidBSONError: ""
       objcheck: ""
   hooks:
+    - class: RunQueryStats
+      allow_feature_not_supported: true
     - class: FuzzerRestoreSettings
     - class: CheckReplDBHash
       shell_options:
@@ -38,6 +43,8 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsErrorsAreCommandFatal: true
       verbose: ""
     mongod_options:
       set_parameters:
@@ -45,6 +52,9 @@ executor:
         enableTestCommands: 1
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsErrorsAreCommandFatal: true
+        notablescan: true
       verbose: ""
     num_rs_nodes_per_shard: 1
     num_shards: 2
