@@ -134,6 +134,9 @@ Status ServiceExecutorReserved::_startWorker() {
                     LOGV2_WARNING(22981,
                                   "Could not start new reserve worker thread",
                                   "error"_attr = threadStartStatus);
+                    lk.lock();
+                    _numStartingThreads--;
+                    lk.unlock();
                 }
             }
 
