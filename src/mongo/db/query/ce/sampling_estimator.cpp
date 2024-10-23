@@ -29,23 +29,19 @@
 
 #include "mongo/db/query/ce/sampling_estimator.h"
 
-#include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/exec/sbe/stages/limit_skip.h"
+#include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/platform/basic.h"
 
-namespace mongo {
-
-namespace {
-
-/*
- * This helper creates a CanonicalQuery for the sampling plan.
- */
-std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
-                                                   OperationContext* opCtx,
-                                                   const size_t sampleSize) {
+namespace mongo::ce {
+std::unique_ptr<CanonicalQuery> SamplingEstimator::makeCanonicalQuery(const NamespaceString& nss,
+                                                                      OperationContext* opCtx,
+                                                                      size_t sampleSize) {
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
     findCommand->setLimit(sampleSize);
 
@@ -57,9 +53,7 @@ std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
 
     return std::move(statusWithCQ.getValue());
 }
-}  // namespace
 
-namespace optimizer::ce {
 /*
  * The sample size is calculated based on the confidence level and margin of error required.
  */
@@ -68,13 +62,99 @@ size_t SamplingEstimator::calculateSampleSize() {
     return 500;
 }
 
+std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
+SamplingEstimator::generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolicy) {
+    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
+    sbe::value::SlotIdGenerator ids;
+    staticData->resultSlot = ids.generate();
+    const CollectionPtr& collection = _collections.getMainCollection();
+    auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                            collection->ns().dbName(),
+                                            staticData->resultSlot,
+                                            boost::none /* recordIdSlot */,
+                                            boost::none /* snapshotIdSlot */,
+                                            boost::none /* indexIdentSlot */,
+                                            boost::none /* indexKeySlot */,
+                                            boost::none /* keyPatternSlot */,
+                                            boost::none /* oplogTsSlot */,
+                                            std::vector<std::string>{} /* scanFieldNames */,
+                                            sbe::value::SlotVector{} /* scanFieldSlots */,
+                                            boost::none /* seekRecordIdSlot */,
+                                            boost::none /* minRecordIdSlot */,
+                                            boost::none /* maxRecordIdSlot */,
+                                            true /* forward */,
+                                            sbeYieldPolicy,
+                                            0 /* nodeId */,
+                                            sbe::ScanCallbacks{},
+                                            false /* lowPriority */,
+                                            true /* useRandomCursor */);
+
+    stage = sbe::makeS<sbe::LimitSkipStage>(
+        std::move(stage),
+        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                   sbe::value::bitcastFrom<int64_t>(_sampleSize)),
+        nullptr /* skip */,
+        0 /* nodeId */);
+
+    stage_builder::PlanStageData data{
+        stage_builder::Environment{std::make_unique<sbe::RuntimeEnvironment>()},
+        std::move(staticData)};
+
+    return {std::move(stage), std::move(data)};
+}
+
+void SamplingEstimator::generateRandomSample(size_t sampleSize) {
+    // Create a CanonicalQuery for the sampling plan.
+    auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, sampleSize);
+    _sampleSize = sampleSize;
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(
+        _opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, _collections, cq->nss());
+
+    auto plan = generateRandomSamplingPlan(sbeYieldPolicy.get());
+
+    // Prepare the SBE plan for execution.
+    prepareSlotBasedExecutableTree(_opCtx,
+                                   plan.first.get(),
+                                   &plan.second,
+                                   *cq,
+                                   _collections,
+                                   sbeYieldPolicy.get(),
+                                   false /* preparingFromCache */);
+
+    // Create a PlanExecutor for the execution of the sampling plan.
+    auto exec = std::move(mongo::plan_executor_factory::make(_opCtx,
+                                                             std::move(cq),
+                                                             nullptr /*solution*/,
+                                                             std::move(plan),
+                                                             QueryPlannerParams::DEFAULT,
+                                                             _collections.getMainCollection()->ns(),
+                                                             std::move(sbeYieldPolicy),
+                                                             false /* isFromPlanCache */,
+                                                             false /* cachedPlanHash */)
+                              .getValue());
+
+    // This function call could be a re-sample request, so the previous sample should be cleared.
+    _sample.clear();
+    BSONObj obj;
+    // Execute the plan, exhaust results and cache the sample.
+    while (PlanExecutor::ADVANCED == exec->getNext(&obj, nullptr)) {
+        _sample.push_back(obj);
+    }
+    return;
+}
+
 void SamplingEstimator::generateRandomSample() {
-    // TODO SERVER-93728: Build a sampling SBE plan to randomly draw samples.
+    generateRandomSample(_sampleSize);
+    return;
+}
+
+void SamplingEstimator::generateChunkSample(size_t sampleSize) {
+    // TODO SERVER-93729: Implement chunk-based sampling CE approach.
     return;
 }
 
 void SamplingEstimator::generateChunkSample() {
-    // TODO SERVER-93729: Implement chunk-based sampling CE approach.
+    generateChunkSample(_sampleSize);
     return;
 }
 
@@ -90,14 +170,11 @@ std::vector<Cardinality> SamplingEstimator::estimateCardinality(
 }
 
 SamplingEstimator::SamplingEstimator(OperationContext* opCtx,
-                                     const NamespaceString& nss,
                                      const MultipleCollectionAccessor& collections,
+                                     size_t sampleSize,
                                      SamplingStyle samplingStyle)
-    : _opCtx(opCtx), _collections(collections) {
-    _sampleSize = calculateSampleSize();
+    : _opCtx(opCtx), _collections(collections), _sampleSize(sampleSize) {
 
-    // Create a CanonicalQuery for the sampling plan.
-    _cq = makeCanonicalQuery(nss, _opCtx, _sampleSize);
     if (samplingStyle == SamplingStyle::kRandom) {
         generateRandomSample();
     } else {
@@ -105,7 +182,11 @@ SamplingEstimator::SamplingEstimator(OperationContext* opCtx,
     }
 }
 
+SamplingEstimator::SamplingEstimator(OperationContext* opCtx,
+                                     const MultipleCollectionAccessor& collections,
+                                     SamplingStyle samplingStyle)
+    : SamplingEstimator(opCtx, collections, calculateSampleSize(), samplingStyle) {}
+
 SamplingEstimator::~SamplingEstimator() {}
 
-}  // namespace optimizer::ce
-}  // namespace mongo
+}  // namespace mongo::ce
