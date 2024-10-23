@@ -68,6 +68,7 @@ executor:
     - class: ValidateCollectionsInBackground
     - class: CheckReplDBHash
     - class: ValidateCollections
+      use_legacy_validate: true
     # TODO SERVER-87536 The suite was disabled because this pymongo hook doesn't support security token.
     # Upgrade pymongo and propagate security token to make the teset pass.
     - class: CleanupConcurrencyWorkloads
