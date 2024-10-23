@@ -5,18 +5,21 @@ import subprocess
 
 
 def run_prettier(prettier: pathlib.Path, check: bool) -> int:
-    # Explicitly ignore anything in the output directories to prevent bad symlinks from failing the run,
-    # see https://github.com/prettier/prettier/issues/11568 as to why it the paths being present in
-    # .prettierignore isn't sufficient
-    force_exclude_dirs = [
+    # Explicitly ignore anything in the output directories or any symlinks in the root of the repository
+    # to prevent bad symlinks from failing the run, see https://github.com/prettier/prettier/issues/11568 as
+    # to why it the paths being present in .prettierignore isn't sufficient
+    force_exclude_dirs = {
         "!./build",
         "!./bazel-bin",
         "!./bazel-out",
         "!./bazel-mongo",
         "!./external",
-    ]
+    }
+    for path in pathlib.Path(".").iterdir():
+        if path.is_symlink():
+            force_exclude_dirs.add(f"!./{path}")
     try:
-        command = [prettier, "."] + force_exclude_dirs
+        command = [prettier, "."] + list(force_exclude_dirs)
         if check:
             command.append("--check")
         else:
