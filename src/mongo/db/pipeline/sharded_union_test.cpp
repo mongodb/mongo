@@ -151,7 +151,7 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
 
     auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
 
-    expCtx()->opCtx->setDeadlineAfterNowBy(Milliseconds(15), ErrorCodes::MaxTimeMSExpired);
+    expCtx()->opCtx->setDeadlineAfterNowBy(Seconds(15), ErrorCodes::MaxTimeMSExpired);
 
     auto future = launchAsync([&] {
         // Expect one result from each host.
