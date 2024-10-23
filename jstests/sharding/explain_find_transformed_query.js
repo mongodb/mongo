@@ -23,9 +23,7 @@ import {
     getPlanCacheKeyFromExplain,
     getPlanCacheShapeHashFromExplain,
     getPlanCacheShapeHashFromObject,
-    getQueryPlanner,
-    getWinningPlan,
-    getWinningSBEPlan
+    getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -62,15 +60,16 @@ assert.eq(getPlanCacheShapeHashFromObject(planCacheEntry),
 
 // Assert that the top stage of the winning plan in the explain is the same as the top stage
 // in the executed cached plan.
-const queryPlanner = getQueryPlanner(explain);
 const engine = getEngine(explain);
 switch (engine) {
     case "classic": {
-        assert.eq(getWinningPlan(queryPlanner).stage, planCacheEntry.cachedPlan.stage);
+        assert.eq(getWinningPlanFromExplain(explain, false /*isSBEPlan*/).stage,
+                  planCacheEntry.cachedPlan.stage);
         break;
     }
     case "sbe": {
-        assert.eq(getWinningSBEPlan(queryPlanner).stages, planCacheEntry.cachedPlan.stages);
+        assert.eq(getWinningPlanFromExplain(explain, true /*isSBEPlan*/).stages,
+                  planCacheEntry.cachedPlan.stages);
         break;
     }
     default: {
