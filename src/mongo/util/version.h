@@ -146,19 +146,6 @@ public:
     std::string makeVersionString(StringData binaryName) const;
 
     /**
-     * Appends the fields "version" and "versionArray" to the result.
-     */
-    void appendVersionInfoOnly(BSONObjBuilder* result) const;
-
-    /**
-     * Appends several fields of build information to the `result`. One of them is
-     * "buildEnvironment", mapped to a subobject containing most of the information associated
-     * with 'buildInfo', above, but with the elements for which inBuildInfo == false
-     * removed.
-     */
-    void appendBuildInfo(BSONObjBuilder* result) const;
-
-    /**
      * Logs the result of 'targetMinOS', above.
      */
     void logTargetMinOS() const;

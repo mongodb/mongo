@@ -35,6 +35,10 @@ mongo_cc_library(
 idl_generator(
     name = "buildinfo_common_gen",
     src = "buildinfo_common.idl",
+    deps = [
+        "//src/mongo/idl:generic_argument_gen",
+        "//src/mongo/util:buildinfo_gen",
+    ],
 )
 
 mongo_cc_library(
@@ -49,6 +53,8 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth",
+        "//src/mongo/executor:async_request_executor",
+        "//src/mongo/util:buildinfo",
     ],
 )
 

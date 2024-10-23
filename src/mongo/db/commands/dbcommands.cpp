@@ -108,6 +108,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/buildinfo.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -116,7 +117,6 @@
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
-#include "mongo/util/version.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -768,56 +768,55 @@ public:
 };
 MONGO_REGISTER_COMMAND(CmdDbStats).forShard();
 
+BuildInfo getShardBuildInfo(OperationContext* opCtx) {
+    // Critical to observability and diagnosability, categorize as immediate priority.
+    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+        opCtx, AdmissionContext::Priority::kExempt);
+
+    auto reply = getBuildInfo();
+    reply.setStorageEngines(getStorageEngineNames(opCtx->getServiceContext()));
+    return reply;
+}
+
 // Provides the means to asynchronously run `buildinfo` commands.
-class BuildInfoExecutor final : public AsyncRequestExecutor {
+class ShardBuildInfoExecutor final : public AsyncRequestExecutor {
 public:
-    BuildInfoExecutor() : AsyncRequestExecutor("BuildInfoExecutor") {}
+    ShardBuildInfoExecutor() : AsyncRequestExecutor("BuildInfoExecutor") {}
 
     Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) override {
-        // Critical to observability and diagnosability, categorize as immediate priority.
-        ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
-            rec->getOpCtx(), AdmissionContext::Priority::kExempt);
-
         auto result = rec->getReplyBuilder()->getBodyBuilder();
-        VersionInfoInterface::instance().appendBuildInfo(&result);
-        appendStorageEngineList(rec->getOpCtx()->getServiceContext(), &result);
+        getShardBuildInfo(rec->getOpCtx()).serialize(&result);
         return Status::OK();
     }
 
-    static BuildInfoExecutor* get(ServiceContext* svc);
+    static ShardBuildInfoExecutor* get(ServiceContext* svc);
 };
 
-const auto getBuildInfoExecutor = ServiceContext::declareDecoration<BuildInfoExecutor>();
-BuildInfoExecutor* BuildInfoExecutor::get(ServiceContext* svc) {
-    return const_cast<BuildInfoExecutor*>(&getBuildInfoExecutor(svc));
+const auto getShardBuildInfoExecutor = ServiceContext::declareDecoration<ShardBuildInfoExecutor>();
+ShardBuildInfoExecutor* ShardBuildInfoExecutor::get(ServiceContext* svc) {
+    return const_cast<ShardBuildInfoExecutor*>(&getShardBuildInfoExecutor(svc));
 }
 
-const auto buildInfoExecutorRegisterer = ServiceContext::ConstructorActionRegisterer{
-    "BuildInfoExecutor",
-    [](ServiceContext* ctx) { getBuildInfoExecutor(ctx).start(); },
+const auto shardBuildInfoExecutorRegisterer = ServiceContext::ConstructorActionRegisterer{
+    "ShardBuildInfoExecutor",
+    [](ServiceContext* ctx) { getShardBuildInfoExecutor(ctx).start(); },
     [](ServiceContext* ctx) {
-        getBuildInfoExecutor(ctx).stop();
+        getShardBuildInfoExecutor(ctx).stop();
     }};
 
-class CmdBuildInfo : public CmdBuildInfoBase {
+class CmdBuildInfoShard : public CmdBuildInfoCommon {
 public:
-    using CmdBuildInfoBase::CmdBuildInfoBase;
+    using CmdBuildInfoCommon::CmdBuildInfoCommon;
 
-    void generateBuildInfo(OperationContext* opCtx, BSONObjBuilder& result) final {
-        // Critical to monitoring and observability,
-        // categorize the command as immediate priority.
-        ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
-            opCtx, AdmissionContext::Priority::kExempt);
-        VersionInfoInterface::instance().appendBuildInfo(&result);
-        appendStorageEngineList(opCtx->getServiceContext(), &result);
+    BuildInfo generateBuildInfo(OperationContext* opCtx) const final {
+        return getShardBuildInfo(opCtx);
     }
 
-    Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, const DatabaseName&) final {
-        auto opCtx = rec->getOpCtx();
-        return BuildInfoExecutor::get(opCtx->getServiceContext())->schedule(std::move(rec));
+    AsyncRequestExecutor* getAsyncRequestExecutor(ServiceContext* svcCtx) const final {
+        return ShardBuildInfoExecutor::get(svcCtx);
     }
 };
-MONGO_REGISTER_COMMAND(CmdBuildInfo).forShard();
+MONGO_REGISTER_COMMAND(CmdBuildInfoShard).forShard();
 
 }  // namespace
 }  // namespace mongo

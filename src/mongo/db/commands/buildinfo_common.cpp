@@ -31,13 +31,37 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands/buildinfo_common_gen.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/util/version.h"
+#include "mongo/util/buildinfo.h"
 
 namespace mongo {
 namespace {
 Atomic<BuildInfoAuthModeEnum> gBuildInfoAuthMode{BuildInfoAuthModeEnum::kRequiresAuth};
+
+class BuildInfoExecutor final : public AsyncRequestExecutor {
+public:
+    BuildInfoExecutor() : AsyncRequestExecutor("BuildInfoExecutor") {}
+
+    Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) override {
+        auto result = rec->getReplyBuilder()->getBodyBuilder();
+        getBuildInfo().serialize(&result);
+        return Status::OK();
+    }
+
+    static BuildInfoExecutor* get(ServiceContext* svc);
+};
+
+const auto getBuildInfoExecutor = ServiceContext::declareDecoration<BuildInfoExecutor>();
+BuildInfoExecutor* BuildInfoExecutor::get(ServiceContext* svc) {
+    return const_cast<BuildInfoExecutor*>(&getBuildInfoExecutor(svc));
+}
+
+const auto buildInfoExecutorRegisterer = ServiceContext::ConstructorActionRegisterer{
+    "BuildInfoExecutor",
+    [](ServiceContext* ctx) { getBuildInfoExecutor(ctx).start(); },
+    [](ServiceContext* ctx) {
+        getBuildInfoExecutor(ctx).stop();
+    }};
 }  // namespace
 
 void BuildInfoAuthModeServerParameter::append(OperationContext*,
@@ -56,19 +80,20 @@ Status BuildInfoAuthModeServerParameter::setFromString(StringData strMode,
     return ex.toStatus().withContext("Invalid value for Server Parameter: 'buildInfoAuthMode'");
 }
 
-bool CmdBuildInfoBase::requiresAuth() const {
+bool CmdBuildInfoCommon::requiresAuth() const {
     return gBuildInfoAuthMode.load() == BuildInfoAuthModeEnum::kRequiresAuth;
 }
 
-bool CmdBuildInfoBase::run(OperationContext* opCtx,
-                           const DatabaseName&,
-                           const BSONObj&,
-                           BSONObjBuilder& result) {
+BuildInfo CmdBuildInfoCommon::generateBuildInfo(OperationContext*) const {
+    return getBuildInfo();
+}
+
+BuildInfo CmdBuildInfoCommon::Invocation::typedRun(OperationContext* opCtx) {
     const auto mode = gBuildInfoAuthMode.load();
+
     if (mode == BuildInfoAuthModeEnum::kAllowedPreAuth) {
         // Full buildinfo always allowed pre or post-auth.
-        generateBuildInfo(opCtx, result);
-        return true;
+        return checked_cast<const CmdBuildInfoCommon*>(definition())->generateBuildInfo(opCtx);
     }
 
     const bool isAuthenticated = [&] {
@@ -87,8 +112,7 @@ bool CmdBuildInfoBase::run(OperationContext* opCtx,
     }();
 
     if (isAuthenticated) {
-        generateBuildInfo(opCtx, result);
-        return true;
+        return checked_cast<const CmdBuildInfoCommon*>(definition())->generateBuildInfo(opCtx);
     }
 
     // In practice we should never actually trigger this uassert,
@@ -101,8 +125,19 @@ bool CmdBuildInfoBase::run(OperationContext* opCtx,
     invariant(mode == BuildInfoAuthModeEnum::kVersionOnlyIfPreAuth);
 
     // Limited response required for certain legacy drivers.
-    VersionInfoInterface::instance().appendVersionInfoOnly(&result);
-    return true;
+    return getBuildInfoVersionOnly();
+}
+
+Future<void> CmdBuildInfoCommon::Invocation::runAsync(
+    std::shared_ptr<RequestExecutionContext> rec) {
+    auto* svcCtx = rec->getOpCtx()->getServiceContext();
+    auto* executor =
+        checked_cast<const CmdBuildInfoCommon*>(definition())->getAsyncRequestExecutor(svcCtx);
+    return executor->schedule(std::move(rec));
+}
+
+AsyncRequestExecutor* CmdBuildInfoCommon::getAsyncRequestExecutor(ServiceContext* svcCtx) const {
+    return BuildInfoExecutor::get(svcCtx);
 }
 
 }  // namespace mongo

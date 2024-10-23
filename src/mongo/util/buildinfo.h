@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,12 +27,21 @@
  *    it in the license file.
  */
 
+#pragma once
 
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/buildinfo_common.h"
+#include "mongo/util/buildinfo_gen.h"
 
 namespace mongo {
-namespace {
-MONGO_REGISTER_COMMAND(CmdBuildInfoCommon).forRouter();
-}  // namespace
+
+/**
+ * Populate standard buildInfo content.
+ * Note that this does not include the 'storageEngines' field which is specific to Shard roles.
+ */
+BuildInfo getBuildInfo();
+
+/**
+ * Populate just the 'version' and 'versionArray' fields of buildInfo content.
+ */
+BuildInfo getBuildInfoVersionOnly();
+
 }  // namespace mongo
