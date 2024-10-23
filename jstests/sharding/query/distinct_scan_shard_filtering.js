@@ -6,8 +6,9 @@
  *   featureFlagShardFilteringDistinctScan,
  *   do_not_wrap_aggregations_in_facets,
  *   not_allowed_with_signed_security_token,
- *   # TODO SERVER-95934: Remove tsan_incompatible.
+ *   # TODO SERVER-95934: Remove tsan_incompatible and aubsan_incompatible.
  *   tsan_incompatible,
+ *   incompatible_aubsan
  * ]
  */
 
