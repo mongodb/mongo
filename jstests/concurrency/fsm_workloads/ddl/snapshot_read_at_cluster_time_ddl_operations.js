@@ -8,6 +8,8 @@
  *   requires_majority_read_concern,
  *   requires_replication,
  *   does_not_support_transactions,
+ *   # Relies on minSnapshotHistoryWindowInSeconds which can be fuzzed.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
