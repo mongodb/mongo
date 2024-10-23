@@ -23,13 +23,18 @@ sys.stdout = orig_stdout
 sys.stderr = orig_stderr
 
 
+subprocess.run([bazel_executable, "--output_user_root=/data/bazel_cache", "clean", "--expunge"])
+
 cmd = (
     [
         sys.executable,
         "./buildscripts/scons.py",
     ]
     + sys.argv
-    + ["BAZEL_INTEGRATION_DEBUG=1", "\\$BUILD_ROOT/scons/\\$VARIANT_DIR/sconf_temp"]
+    + [
+        "BAZEL_INTEGRATION_DEBUG=1",
+        "\\$BUILD_ROOT/scons/\\$VARIANT_DIR/sconf_temp",
+    ]
 )
 
 # Run a lightwieght scons build to generate the bazel command.
@@ -67,15 +72,16 @@ for line in proc.stdout.splitlines():
     if line.startswith("  Target: "):
         targets.add(line.split()[-1])
 
-coverity_dir = os.path.dirname(__file__)
-analysis_dir = os.path.join(coverity_dir, "analysis")
-os.makedirs(analysis_dir, exist_ok=True)
 
-with open(os.path.join(coverity_dir, "analysis", "BUILD.bazel"), "w") as buildfile:
+enterprise_coverity_dir = os.path.join("src", "mongo", "db", "modules", "enterprise", "coverity")
+os.makedirs(enterprise_coverity_dir, exist_ok=True)
+with open(os.path.join(enterprise_coverity_dir, "BUILD.bazel"), "w") as buildfile:
     buildfile.write("""\
 load("@rules_coverity//coverity:defs.bzl", "cov_gen_script")
 cov_gen_script(
-    name="coverity_build", 
+    name="enterprise_coverity_build",
+    testonly=True,
+    tags=["coverity"],
     deps=[
 """)
     for target in targets:
@@ -93,6 +99,8 @@ cov_gen_script(
 
 print(
     " ".join(
-        [bazel_executable, "build"] + bazel_cmd_args + ["//bazel/coverity/analysis:coverity_build"]
+        [bazel_executable, "--output_user_root=/data/bazel_cache", "build"]
+        + bazel_cmd_args
+        + ["//src/mongo/db/modules/enterprise/coverity:enterprise_coverity_build"]
     )
 )
