@@ -841,7 +841,13 @@ def write_workstation_bazelrc():
             with open(workstation_file) as f:
                 existing_hash = hashlib.md5(f.read().encode()).hexdigest()
 
-        repo = git.Repo()
+        try:
+            repo = git.Repo()
+        except Exception:
+            print(
+                "Unable to setup git repo, skipping workstation file generation. This will result in incomplete telemetry data being uploaded."
+            )
+            return
 
         try:
             status = "clean" if repo.head.commit.diff(None) is None else "modified"
