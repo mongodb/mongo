@@ -12,7 +12,6 @@
 import {authCommandsLib} from "jstests/auth/lib/commands_lib.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 const tests = authCommandsLib.tests;
 
@@ -81,18 +80,10 @@ const impls = {
     }
 };
 
-let mongotmock;
-let mongotHost = "localhost:27017";
-if (!_isWindows()) {
-    mongotmock = new MongotMock();
-    mongotmock.start();
-    mongotHost = mongotmock.getConnection().host;
-}
-
 // We have to set the mongotHost parameter for the $search-relatead tests to pass configuration
 // checks.
 const opts = {
-    setParameter: {mongotHost}
+    setParameter: {mongotHost: "localhost:27017"}
 };
 let conn = MongoRunner.runMongod(opts);
 
@@ -107,7 +98,3 @@ conn = new ShardingTest({shards: 1, mongos: 2, other: {rsOptions: opts, mongosOp
 runTests(tests, conn, impls, {shard0name: conn.shard0.shardName});
 
 conn.stop();
-
-if (mongotmock) {
-    mongotmock.stop();
-}
