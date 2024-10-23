@@ -45,7 +45,6 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"

@@ -124,18 +124,9 @@ TEST(Optimizer, Tracker4) {
     }
 }
 
-TEST(Optimizer, RefExplain) {
+TEST(Optimizer, Ref) {
     ABT scanNode = make<ScanNode>("ptest", "test");
-    ASSERT_EXPLAIN_AUTO(           // NOLINT (test auto-update)
-        "Scan [test, {ptest}]\n",  // NOLINT (test auto-update)
-        scanNode);
-
-    // Now repeat for the reference type.
     auto ref = scanNode.ref();
-    ASSERT_EXPLAIN_AUTO(           // NOLINT (test auto-update)
-        "Scan [test, {ptest}]\n",  // NOLINT (test auto-update)
-        ref);
-
     ASSERT_EQ(scanNode.tagOf(), ref.tagOf());
 }
 
@@ -145,18 +136,10 @@ TEST(Optimizer, CoScan) {
 
     VariableEnvironment venv = VariableEnvironment::build(limitNode);
     ASSERT_TRUE(!venv.hasFreeVariables());
-
-    ASSERT_EXPLAIN_AUTO(
-        "LimitSkip [limit: 1, skip: 0]\n"
-        "  CoScan []\n",
-        limitNode);
 }
 
 TEST(Optimizer, Basic) {
     ABT scanNode = make<ScanNode>("ptest", "test");
-    ASSERT_EXPLAIN_AUTO(           // NOLINT (test auto-update)
-        "Scan [test, {ptest}]\n",  // NOLINT (test auto-update)
-        scanNode);
 
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(make<PathConstant>(make<UnaryOp>(Operations::Neg, Constant::int64(1))),
@@ -168,40 +151,6 @@ TEST(Optimizer, Basic) {
         std::move(filterNode));
 
     ABT rootNode = make<RootNode>(ProjectionNameVector{"P1", "ptest"}, std::move(evalNode));
-
-    ASSERT_EXPLAIN_AUTO(
-        "Root [{P1, ptest}]\n"
-        "  Evaluation [{P1}]\n"
-        "    EvalPath []\n"
-        "      PathConstant []\n"
-        "        Const [2]\n"
-        "      Variable [ptest]\n"
-        "    Filter []\n"
-        "      EvalFilter []\n"
-        "        PathConstant []\n"
-        "          UnaryOp [Neg]\n"
-        "            Const [1]\n"
-        "        Variable [ptest]\n"
-        "      Scan [test, {ptest}]\n",
-        rootNode);
-
-
-    ABT clonedNode = rootNode;
-    ASSERT_EXPLAIN_AUTO(
-        "Root [{P1, ptest}]\n"
-        "  Evaluation [{P1}]\n"
-        "    EvalPath []\n"
-        "      PathConstant []\n"
-        "        Const [2]\n"
-        "      Variable [ptest]\n"
-        "    Filter []\n"
-        "      EvalFilter []\n"
-        "        PathConstant []\n"
-        "          UnaryOp [Neg]\n"
-        "            Const [1]\n"
-        "        Variable [ptest]\n"
-        "      Scan [test, {ptest}]\n",
-        clonedNode);
 
     auto env = VariableEnvironment::build(rootNode);
     ProjectionNameSet set = env.topLevelProjections();
@@ -233,20 +182,6 @@ TEST(Optimizer, GroupBy) {
 
     ABT rootNode =
         make<RootNode>(ProjectionNameVector{"p1", "p2", "a1", "a2"}, std::move(groupByNode));
-
-    ASSERT_EXPLAIN_AUTO(
-        "Root [{a1, a2, p1, p2}]\n"
-        "  GroupBy [{p1, p2}]\n"
-        "    aggregations: \n"
-        "      [a1]\n"
-        "        Const [10]\n"
-        "      [a2]\n"
-        "        Const [11]\n"
-        "    Evaluation [{p3} = Const [3]]\n"
-        "      Evaluation [{p2} = Const [2]]\n"
-        "        Evaluation [{p1} = Const [1]]\n"
-        "          Scan [test, {ptest}]\n",
-        rootNode);
 
     {
         auto env = VariableEnvironment::build(rootNode);
@@ -282,22 +217,6 @@ TEST(Optimizer, Union) {
         ASSERT(expSet == projSet);
         ASSERT(!env.hasFreeVariables());
     }
-
-    ASSERT_EXPLAIN_AUTO(
-        "Root [{B, ptest}]\n"
-        "  Union [{B, ptest}]\n"
-        "    Evaluation [{B} = Const [3]]\n"
-        "      Scan [test, {ptest}]\n"
-        "    Evaluation [{B} = Const [4]]\n"
-        "      Scan [test, {ptest}]\n"
-        "    Evaluation [{B} = Const [5]]\n"
-        "      Evaluation [{ptest}]\n"
-        "        EvalPath []\n"
-        "          PathConstant []\n"
-        "            Const [2]\n"
-        "          Variable [ptest1]\n"
-        "        Scan [test, {ptest1}]\n",
-        rootNode);
 }
 
 TEST(Optimizer, UnionReferences) {
@@ -335,17 +254,6 @@ TEST(Optimizer, Unwind) {
         ASSERT(expSet == projSet);
         ASSERT(!env.hasFreeVariables());
     }
-
-    ASSERT_EXPLAIN_AUTO(
-        "Root [{p1, p2, p2pid}]\n"
-        "  Unwind [{p2, p2pid}, retainNonArrays]\n"
-        "    Evaluation [{p2}]\n"
-        "      EvalPath []\n"
-        "        PathConstant []\n"
-        "          Const [2]\n"
-        "        Variable [p1]\n"
-        "      Scan [test, {p1}]\n",
-        rootNode);
 }
 
 TEST(Optimizer, Collation) {
@@ -365,16 +273,6 @@ TEST(Optimizer, Collation) {
         ASSERT(expSet == projSet);
         ASSERT(!env.hasFreeVariables());
     }
-
-    ASSERT_EXPLAIN_AUTO(
-        "Collation [{a: Ascending, b: Clustered}]\n"
-        "  Evaluation [{b}]\n"
-        "    EvalPath []\n"
-        "      PathConstant []\n"
-        "        Const [2]\n"
-        "      Variable [a]\n"
-        "    Scan [test, {a}]\n",
-        collationNode);
 }
 
 TEST(Optimizer, LimitSkip) {
@@ -392,41 +290,6 @@ TEST(Optimizer, LimitSkip) {
         ASSERT(expSet == projSet);
         ASSERT(!env.hasFreeVariables());
     }
-
-    ASSERT_EXPLAIN_AUTO(
-        "LimitSkip [limit: 10, skip: 20]\n"
-        "  Evaluation [{b}]\n"
-        "    EvalPath []\n"
-        "      PathConstant []\n"
-        "        Const [2]\n"
-        "      Variable [a]\n"
-        "    Scan [test, {a}]\n",
-        limitSkipNode);
-}
-
-TEST(Optimizer, Distribution) {
-    ABT scanNode = make<ScanNode>("a", "test");
-    ABT evalNode = make<EvaluationNode>(
-        "b",
-        make<EvalPath>(make<PathConstant>(Constant::int64(2)), make<Variable>("a")),
-        std::move(scanNode));
-
-    ABT exchangeNode = make<ExchangeNode>(
-        DistributionRequirement({DistributionType::HashPartitioning, {"b"}}), std::move(evalNode));
-
-    ASSERT_EXPLAIN_AUTO(
-        "Exchange []\n"
-        "  distribution: \n"
-        "    type: HashPartitioning\n"
-        "      projections: \n"
-        "        b\n"
-        "  Evaluation [{b}]\n"
-        "    EvalPath []\n"
-        "      PathConstant []\n"
-        "        Const [2]\n"
-        "      Variable [a]\n"
-        "    Scan [test, {a}]\n",
-        exchangeNode);
 }
 
 TEST(Properties, Basic) {
@@ -436,30 +299,6 @@ TEST(Properties, Basic) {
         {{"p1", CollationOp::Ascending}, {"p2", CollationOp::Clustered}});
     ASSERT_TRUE(collationsCompatible(collation1, collation2));
     ASSERT_FALSE(collationsCompatible(collation2, collation1));
-}
-
-TEST(Explain, ExplainV2Compact) {
-    ABT pathNode =
-        make<PathGet>("a",
-                      make<PathTraverse>(
-                          PathTraverse::kSingleLevel,
-                          make<PathComposeM>(
-                              make<PathCompare>(Operations::Gte,
-                                                make<UnaryOp>(Operations::Neg, Constant::int64(2))),
-                              make<PathCompare>(Operations::Lt, Constant::int64(7)))));
-    ABT scanNode = make<ScanNode>("x1", "test");
-    ABT evalNode = make<EvaluationNode>(
-        "x2", make<EvalPath>(pathNode, make<Variable>("a")), std::move(scanNode));
-
-    ASSERT_EXPLAIN_V2Compact_AUTO(
-        "Evaluation [{x2}]\n"
-        "|   EvalPath []\n"
-        "|   |   Variable [a]\n"
-        "|   PathGet [a] PathTraverse [1] PathComposeM []\n"
-        "|   |   PathCompare [Lt] Const [7]\n"
-        "|   PathCompare [Gte] UnaryOp [Neg] Const [2]\n"
-        "Scan [test, {x1}]\n",
-        evalNode);
 }
 
 TEST(Explain, ExplainBsonForConstant) {

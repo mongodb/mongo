@@ -49,54 +49,12 @@ static constexpr bool kDebugAsserts = false;
 
 void maybePrintABT(const ABT::reference_type abt) {
     // Always print using the supported versions to make sure we don't crash.
-    const std::string strV1 = ExplainGenerator::explain(abt);
     const std::string strV2 = ExplainGenerator::explainV2(abt);
-    const std::string strV2Compact = ExplainGenerator::explainV2Compact(abt);
     const std::string strBSON = ExplainGenerator::explainBSONStr(abt);
 
     if constexpr (kDebugAsserts) {
-        std::cout << "V1: " << strV1 << "\n";
         std::cout << "V2: " << strV2 << "\n";
-        std::cout << "V2Compact: " << strV2Compact << "\n";
         std::cout << "BSON: " << strBSON << "\n";
     }
-}
-
-ABT makeIndexPath(FieldPathType fieldPath, bool isMultiKey) {
-    ABT result = make<PathIdentity>();
-
-    for (size_t i = fieldPath.size(); i-- > 0;) {
-        if (isMultiKey) {
-            result = make<PathTraverse>(PathTraverse::kSingleLevel, std::move(result));
-        }
-        result = make<PathGet>(std::move(fieldPath.at(i)), std::move(result));
-    }
-
-    return result;
-}
-
-ABT makeIndexPath(FieldNameType fieldName) {
-    return makeIndexPath(FieldPathType{std::move(fieldName)});
-}
-
-ABT makeNonMultikeyIndexPath(FieldNameType fieldName) {
-    return makeIndexPath(FieldPathType{std::move(fieldName)}, false /*isMultiKey*/);
-}
-
-bool planComparator(const PlanAndProps& e1, const PlanAndProps& e2) {
-    // Sort plans by estimated cost. If costs are equal, sort lexicographically by plan explain.
-    // This allows us to break ties if costs are equal.
-    const auto c1 = e1.getRootAnnotation()._cost;
-    const auto c2 = e2.getRootAnnotation()._cost;
-    if (c1 < c2) {
-        return true;
-    }
-    if (c2 < c1) {
-        return false;
-    }
-
-    const auto explain1 = ExplainGenerator::explainV2(e1._node);
-    const auto explain2 = ExplainGenerator::explainV2(e2._node);
-    return explain1 < explain2;
 }
 }  // namespace mongo::optimizer

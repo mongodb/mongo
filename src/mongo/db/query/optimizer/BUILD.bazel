@@ -32,7 +32,6 @@ mongo_cc_library(
         "reference_tracker.h",
         "//src/mongo/db/query/optimizer:comparison_op.h",
         "//src/mongo/db/query/optimizer:containers.h",
-        "//src/mongo/db/query/optimizer:explain_interface.h",
         "//src/mongo/db/query/optimizer:node_defs.h",
         "//src/mongo/db/query/optimizer/syntax:expr.h",
         "//src/mongo/db/query/optimizer/syntax:path.h",

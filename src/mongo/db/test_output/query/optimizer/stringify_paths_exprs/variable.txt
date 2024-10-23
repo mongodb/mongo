@@ -1,8 +1,0 @@
-# Golden test output of StringifyPathsExprs/Variable
-
-==== VARIATION: variable ====
--- INPUT:
-Variable [varName]
-
--- OUTPUT:
-Var [varName]

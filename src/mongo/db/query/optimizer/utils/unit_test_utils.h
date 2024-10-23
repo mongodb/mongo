@@ -46,26 +46,7 @@
 
 namespace mongo::optimizer {
 
-// Default selectivity of predicates used by HintedCE to force certain plans.
-constexpr SelectivityType kDefaultSelectivity{0.1};
-
 void maybePrintABT(ABT::reference_type abt);
-
-#define ASSERT_EXPLAIN(expected, abt) \
-    maybePrintABT(abt);               \
-    ASSERT_EQ(expected, ExplainGenerator::explain(abt))
-
-#define ASSERT_EXPLAIN_AUTO(expected, abt) \
-    maybePrintABT(abt);                    \
-    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explain(abt))
-
-/**
- * The macros named *INITIAL_AUTO are used for an initial adding of tests without plans.
- * When the test is run with the --autoUpdateAsserts flag, the macro is substituted for the
- * corresponding *AUTO macro with the actual plan.
- */
-#define ASSERT_EXPLAIN_INITIAL_AUTO(abt) \
-    ::mongo::unittest::expandActualPlan(MONGO_SOURCE_LOCATION(), ExplainGenerator::explain(abt))
 
 #define ASSERT_EXPLAIN_V2(expected, abt) \
     maybePrintABT(abt);                  \
@@ -75,21 +56,6 @@ void maybePrintABT(ABT::reference_type abt);
     maybePrintABT(abt);                       \
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainV2(abt))
 
-#define ASSERT_EXPLAIN_V2_INITIAL_AUTO(abt) \
-    ::mongo::unittest::expandActualPlan(MONGO_SOURCE_LOCATION(), ExplainGenerator::explainV2(abt))
-
-#define ASSERT_EXPLAIN_V2Compact(expected, abt) \
-    maybePrintABT(abt);                         \
-    ASSERT_EQ(expected, ExplainGenerator::explainV2Compact(abt))
-
-#define ASSERT_EXPLAIN_V2Compact_AUTO(expected, abt) \
-    maybePrintABT(abt);                              \
-    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainV2Compact(abt))
-
-#define ASSERT_EXPLAIN_V2Compact_INITIAL_AUTO(abt)               \
-    ::mongo::unittest::expandActualPlan(MONGO_SOURCE_LOCATION(), \
-                                        ExplainGenerator::explainV2Compact(abt))
-
 #define ASSERT_EXPLAIN_BSON(expected, abt) \
     maybePrintABT(abt);                    \
     ASSERT_EQ(expected, ExplainGenerator::explainBSONStr(abt))
@@ -98,24 +64,6 @@ void maybePrintABT(ABT::reference_type abt);
 #define ASSERT_EXPLAIN_BSON_AUTO(expected, abt) \
     maybePrintABT(abt);                         \
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainBSONStr(abt))
-
-
-#define ASSERT_EXPLAIN_PROPS_V2(expected, phaseManager) \
-    ASSERT_EQ(expected, getPropsStrForExplain(phaseManager))
-
-#define ASSERT_EXPLAIN_PROPS_V2_AUTO(expected, phaseManager) \
-    ASSERT_STR_EQ_AUTO(expected, getPropsStrForExplain(phaseManager))
-
-
-#define ASSERT_EXPLAIN_MEMO(expected, memo) ASSERT_EQ(expected, ExplainGenerator::explainMemo(memo))
-
-#define ASSERT_EXPLAIN_MEMO_AUTO(expected, memo) \
-    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainMemo(memo))
-
-#define ASSERT_BSON_PATH(expected, bson, path)                      \
-    ASSERT_EQ(expected,                                             \
-              dotted_path_support::extractElementAtPath(bson, path) \
-                  .toString(false /*includeFieldName*/));
 
 #define ASSERT_BETWEEN(a, b, value) \
     ASSERT_LTE(a, value);           \
@@ -135,19 +83,4 @@ void maybePrintABT(ABT::reference_type abt);
                                   false));                                  \
     }
 
-struct TestIndexField {
-    FieldNameType fieldName;
-    CollationOp op;
-    bool isMultiKey;
-};
-
-ABT makeIndexPath(FieldPathType fieldPath, bool isMultiKey = true);
-
-ABT makeIndexPath(FieldNameType fieldName);
-ABT makeNonMultikeyIndexPath(FieldNameType fieldName);
-
-/**
- * Compares plans to allow sorting plans in a deterministic way.
- */
-bool planComparator(const PlanAndProps& e1, const PlanAndProps& e2);
 }  // namespace mongo::optimizer

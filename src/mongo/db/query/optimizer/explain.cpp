@@ -91,73 +91,6 @@ ABT::reference_type getTrivialExprPtr(const ABT& n) {
 
 }  // namespace
 
-ABTPrinter::ABTPrinter(PlanAndProps planAndProps,
-                       const ExplainVersion explainVersion,
-                       QueryParameterMap qpMap)
-    : _planAndProps(std::move(planAndProps)),
-      _explainVersion(explainVersion),
-      _queryParameters(std::move(qpMap)) {}
-
-BSONObj ABTPrinter::explainBSON() const {
-    const auto explainPlanStr = [&](const std::string& planStr) {
-        BSONObjBuilder builder;
-        builder.append("plan", planStr);
-        return builder.done().getOwned();
-    };
-
-    switch (_explainVersion) {
-        case ExplainVersion::V1:
-            return explainPlanStr(ExplainGenerator::explain(_planAndProps._node));
-
-        case ExplainVersion::V2:
-            return explainPlanStr(ExplainGenerator::explainV2(_planAndProps._node));
-
-        case ExplainVersion::V2Compact:
-            return explainPlanStr(ExplainGenerator::explainV2Compact(_planAndProps._node));
-
-        case ExplainVersion::V3:
-            return ExplainGenerator::explainBSONObj(
-                _planAndProps._node, true /*displayProperties*/, _planAndProps._map);
-
-        case ExplainVersion::UserFacingExplain: {
-            UserFacingExplain ex(_planAndProps._map);
-            return ex.explain(_planAndProps._node);
-        }
-        case ExplainVersion::Vmax:
-            // Should not be seeing this value here.
-            break;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
-BSONObj ABTPrinter::getQueryParameters() const {
-    // To obtain consistent explain results, we display the parameters in the order of their sorted
-    // ids.
-    std::vector<int32_t> paramIds;
-    for (const auto& elem : _queryParameters) {
-        paramIds.push_back(elem.first);
-    }
-    std::sort(paramIds.begin(), paramIds.end());
-
-    BSONObjBuilder result;
-    for (const auto& paramId : paramIds) {
-        std::stringstream idStream;
-        idStream << paramId;
-        BSONObjBuilder paramBuilder(result.subobjStart(idStream.str()));
-        const auto& constant = _queryParameters.at(paramId).get();
-        paramBuilder.append("value", sbe::value::print(constant));
-
-        std::stringstream typeStream;
-        typeStream << constant.first;
-        paramBuilder.append("type", typeStream.str());
-
-        paramBuilder.doneFast();
-    }
-
-    return result.obj();
-}
-
 bool constexpr operator<(const ExplainVersion v1, const ExplainVersion v2) {
     return static_cast<int>(v1) < static_cast<int>(v2);
 }
@@ -171,7 +104,7 @@ bool constexpr operator>=(const ExplainVersion v1, const ExplainVersion v2) {
     return static_cast<int>(v1) >= static_cast<int>(v2);
 }
 
-static constexpr ExplainVersion kDefaultExplainVersion = ExplainVersion::V1;
+static constexpr ExplainVersion kDefaultExplainVersion = ExplainVersion::V2;
 
 enum class CommandType { Indent, Unindent, AddLine };
 
@@ -284,16 +217,6 @@ public:
     }
 
     ExplainPrinterImpl& setChildCount(const size_t childCount, const bool noInline = false) {
-        if (version == ExplainVersion::V1) {
-            return *this;
-        }
-
-        if (!noInline && version == ExplainVersion::V2Compact && childCount == 1) {
-            _inlineNextChild = true;
-            _childrenRemaining = childCount;
-            return *this;
-        }
-
         _childrenRemaining = childCount;
         indent("");
         for (int i = 0; i < _childrenRemaining - 1; i++) {
@@ -303,14 +226,12 @@ public:
     }
 
     ExplainPrinterImpl& maybeReverse() {
-        if (version > ExplainVersion::V1) {
-            _cmdInsertPos = _cmd.size();
-        }
+        _cmdInsertPos = _cmd.size();
         return *this;
     }
 
     ExplainPrinterImpl& fieldName(const std::string& name,
-                                  const ExplainVersion minVersion = ExplainVersion::V1,
+                                  const ExplainVersion minVersion = ExplainVersion::V2,
                                   const ExplainVersion maxVersion = ExplainVersion::Vmax) {
         if (minVersion <= version && maxVersion >= version) {
             print(name);
@@ -343,7 +264,7 @@ public:
                 case CommandType::AddLine: {
                     for (const std::string& element : linePrefix) {
                         if (!element.empty()) {
-                            os << element << ((version == ExplainVersion::V1) ? " " : "   ");
+                            os << element << "   ";
                         }
                     }
                     os << cmd._str << "\n";
@@ -623,14 +544,14 @@ public:
 
     template <size_t N>
     ExplainPrinterImpl& fieldName(const char (&name)[N],
-                                  const ExplainVersion minVersion = ExplainVersion::V1,
+                                  const ExplainVersion minVersion = ExplainVersion::V2,
                                   const ExplainVersion maxVersion = ExplainVersion::Vmax) {
         fieldNameInternal(name, minVersion, maxVersion);
         return *this;
     }
 
     ExplainPrinterImpl& fieldName(const std::string& name,
-                                  const ExplainVersion minVersion = ExplainVersion::V1,
+                                  const ExplainVersion minVersion = ExplainVersion::V2,
                                   const ExplainVersion maxVersion = ExplainVersion::Vmax) {
         fieldNameInternal(name, minVersion, maxVersion);
         return *this;
@@ -638,7 +559,7 @@ public:
 
     template <class TagType>
     ExplainPrinterImpl& fieldName(const StrongStringAlias<TagType>& name,
-                                  const ExplainVersion minVersion = ExplainVersion::V1,
+                                  const ExplainVersion minVersion = ExplainVersion::V2,
                                   const ExplainVersion maxVersion = ExplainVersion::Vmax) {
         fieldNameInternal(name.value().toString(), minVersion, maxVersion);
         return *this;
@@ -749,70 +670,6 @@ template <const ExplainVersion version = kDefaultExplainVersion>
 class ExplainGeneratorTransporter {
 public:
     using ExplainPrinter = ExplainPrinterImpl<version>;
-
-    ExplainGeneratorTransporter(bool displayProperties = false,
-                                const NodeToGroupPropsMap& nodeMap = {},
-                                const boost::optional<const NodeCEMap&>& nodeCEMap = boost::none)
-        : _displayProperties(displayProperties), _nodeMap(nodeMap), _nodeCEMap(nodeCEMap) {
-        uassert(6624005,
-                "Displaying properties not supported, in the process of being deleted",
-                !_displayProperties);
-    }
-
-    /**
-     * Helper function that appends the logical and physical properties of 'node' nested under a new
-     * field named 'properties'. Only applicable for BSON explain, for other versions this is a
-     * no-op.
-     */
-    void maybePrintProps(ExplainPrinter& nodePrinter, const Node& node) {
-        tassert(6701800,
-                "Cannot have both _displayProperties and _nodeCEMap set.",
-                !(_displayProperties && _nodeCEMap));
-        if (_nodeCEMap || !_displayProperties || _nodeMap.empty()) {
-            return;
-        }
-        auto it = _nodeMap.find(&node);
-        uassert(6624006, "Failed to find node properties", it != _nodeMap.end());
-
-        const NodeProps& props = it->second;
-
-        ExplainPrinter propsPrinter;
-        propsPrinter.fieldName("cost")
-            .print(props._cost.getCost())
-            .separator(", ")
-            .fieldName("localCost")
-            .print(props._localCost.getCost())
-            .separator(", ")
-            .fieldName("adjustedCE")
-            .print(props._adjustedCE)
-            .separator(", ")
-            .fieldName("planNodeID")
-            .print(props._planNodeId)
-            .separator(", ");
-        ExplainPrinter res;
-        res.fieldName("properties").print(propsPrinter);
-        nodePrinter.printAppend(res);
-    }
-
-    void nodeCEPropsPrint(ExplainPrinter& nodePrinter,
-                          const ABT::reference_type n,
-                          const Node& node) {
-        tassert(6701801,
-                "Cannot have both _displayProperties and _nodeCEMap set.",
-                !(_displayProperties && _nodeCEMap));
-        // Only allow in V2 and V3 explain. No point in printing CE when we have a delegator
-        // node.
-        if (!_nodeCEMap || version == ExplainVersion::V1) {
-            return;
-        }
-        auto it = _nodeCEMap->find(&node);
-        uassert(6701802, "Failed to find node ce", it != _nodeCEMap->end());
-        const CEType ce = it->second;
-
-        ExplainPrinter propsPrinter;
-        propsPrinter.fieldName("ce").print(ce);
-        nodePrinter.printAppend(propsPrinter);
-    }
 
     static void printBooleanFlag(ExplainPrinter& printer,
                                  const std::string& name,
@@ -967,7 +824,6 @@ public:
                              const ScanNode& node,
                              ExplainPrinter bindResult) {
         ExplainPrinter printer("Scan");
-        maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("scanDefName", ExplainVersion::V3)
             .print(node.getScanDefName());
@@ -977,7 +833,6 @@ public:
             printProjection(printer, node.getProjectionName());
         }
         printer.separator("]");
-        nodeCEPropsPrint(printer, n, node);
         printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
         return printer;
     }
@@ -986,7 +841,6 @@ public:
                              const PhysicalScanNode& node,
                              ExplainPrinter bindResult) {
         ExplainPrinter printer("PhysicalScan");
-        maybePrintProps(printer, node);
         printer.separator(" [{");
         printFieldProjectionMap(printer, node.getFieldProjectionMap());
         printer.separator("}, ")
@@ -1002,7 +856,6 @@ public:
         }
 
         printer.separator("]");
-        nodeCEPropsPrint(printer, n, node);
         printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
         return printer;
     }
@@ -1015,11 +868,9 @@ public:
         // Specifically not printing optional logical properties here. They can be displayed with
         // the properties explain.
         ExplainPrinter printer("ValueScan");
-        maybePrintProps(printer, node);
         printer.separator(" [");
         printBooleanFlag(printer, "hasRID", node.getHasRID());
         printer.fieldName("arraySize").print(node.getArraySize()).separator("]");
-        nodeCEPropsPrint(printer, n, node);
         printer.fieldName("values", ExplainVersion::V3)
             .print(valuePrinter)
             .fieldName("bindings", ExplainVersion::V3)
@@ -1029,9 +880,7 @@ public:
 
     ExplainPrinter transport(const ABT::reference_type n, const CoScanNode& node) {
         ExplainPrinter printer("CoScan");
-        maybePrintProps(printer, node);
         printer.separator(" []");
-        nodeCEPropsPrint(printer, n, node);
         return printer;
     }
 
@@ -1039,7 +888,6 @@ public:
                              const IndexScanNode& node,
                              ExplainPrinter bindResult) {
         ExplainPrinter printer("IndexScan");
-        maybePrintProps(printer, node);
         printer.separator(" [{");
         printFieldProjectionMap(printer, node.getFieldProjectionMap());
         printer.separator("}, ");
@@ -1054,7 +902,6 @@ public:
         printBooleanFlag(printer, "reversed", node.isIndexReverseOrder());
 
         printer.separator("]");
-        nodeCEPropsPrint(printer, n, node);
         printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
         return printer;
     }
@@ -1064,7 +911,6 @@ public:
                              ExplainPrinter bindResult,
                              ExplainPrinter refsResult) {
         ExplainPrinter printer("Seek");
-        maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("ridProjection")
             .print(node.getRIDProjectionName())
@@ -1074,7 +920,6 @@ public:
             .fieldName("scanDefName", ExplainVersion::V3)
             .print(node.getScanDefName())
             .separator("]");
-        nodeCEPropsPrint(printer, n, node);
 
         printer.setChildCount(2)
             .fieldName("bindings", ExplainVersion::V3)
@@ -1090,9 +935,7 @@ public:
                              ExplainPrinter childResult,
                              ExplainPrinter filterResult) {
         ExplainPrinter printer("Filter");
-        maybePrintProps(printer, node);
         printer.separator(" []");
-        nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(2)
             .fieldName("filter", ExplainVersion::V3)
             .print(filterResult)
@@ -1106,7 +949,6 @@ public:
                              ExplainPrinter childResult,
                              ExplainPrinter projectionResult) {
         ExplainPrinter printer("Evaluation");
-        maybePrintProps(printer, node);
 
         if constexpr (version < ExplainVersion::V3) {
             const ABT& expr = node.getProjection();
@@ -1120,19 +962,16 @@ public:
                 ExplainPrinter local = generate(ref);
                 printer.separator(" = ").printSingleLevel(local).separator("]");
 
-                nodeCEPropsPrint(printer, n, node);
                 printer.setChildCount(1, true /*noInline*/);
             } else {
                 printer.separator("]");
 
-                nodeCEPropsPrint(printer, n, node);
                 printer.setChildCount(2);
 
                 auto pathPrinter = generate(expr);
                 printer.print(pathPrinter);
             }
         } else if constexpr (version == ExplainVersion::V3) {
-            nodeCEPropsPrint(printer, n, node);
             printer.fieldName("projection").print(projectionResult);
         } else {
             MONGO_UNREACHABLE;
@@ -1147,13 +986,11 @@ public:
                              ExplainPrinter leftChildResult,
                              ExplainPrinter rightChildResult) {
         ExplainPrinter printer("RIDIntersect");
-        maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("scanProjectionName", ExplainVersion::V3)
             .print(node.getScanProjectionName());
 
         printer.separator("]");
-        nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(2)
             .maybeReverse()
             .fieldName("leftChild", ExplainVersion::V3)
@@ -1170,13 +1007,11 @@ public:
                              ExplainPrinter bindResult,
                              ExplainPrinter /*refsResult*/) {
         ExplainPrinter printer("RIDUnion");
-        maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("scanProjectionName", ExplainVersion::V3)
             .print(node.getScanProjectionName());
 
         printer.separator("]");
-        nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(3)
             .fieldName("bindings", ExplainVersion::V3)
             .print(bindResult)
@@ -1194,7 +1029,6 @@ public:
                              ExplainPrinter rightChildResult,
                              ExplainPrinter filterResult) {
         ExplainPrinter printer("BinaryJoin");
-        maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("joinType")
             .print(toStringData(node.getJoinType()))
@@ -1203,7 +1037,6 @@ public:
         printCorrelatedProjections(printer, node.getCorrelatedProjectionNames());
 
         printer.separator("]");
-        nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(3)
             .fieldName("expression", ExplainVersion::V3)
             .print(filterResult)
@@ -1247,12 +1080,10 @@ public:
                              ExplainPrinter rightChildResult,
                              ExplainPrinter /*refsResult*/) {
         ExplainPrinter printer("HashJoin");
-        maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("joinType")
             .print(toStringData(node.getJoinType()))
             .separator("]");
-        nodeCEPropsPrint(printer, n, node);
 
         ExplainPrinter joinConditionPrinter;
         printEqualityJoinCondition(joinConditionPrinter, node.getLeftKeys(), node.getRightKeys());
@@ -1274,9 +1105,7 @@ public:
                              ExplainPrinter rightChildResult,
                              ExplainPrinter /*refsResult*/) {
         ExplainPrinter printer("MergeJoin");
-        maybePrintProps(printer, node);
         printer.separator(" []");
-        nodeCEPropsPrint(printer, n, node);
 
         ExplainPrinter joinConditionPrinter;
         printEqualityJoinCondition(joinConditionPrinter, node.getLeftKeys(), node.getRightKeys());
@@ -1320,9 +1149,7 @@ public:
                              ExplainPrinter bindResult,
                              ExplainPrinter /*refsResult*/) {
         ExplainPrinter printer("SortedMerge");
-        maybePrintProps(printer, node);
         printer.separator(" []");
-        nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(childResults.size() + 2);
         printCollationProperty(printer, node.getCollationSpec(), false /*directToParent*/);
         printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
@@ -1336,7 +1163,6 @@ public:
                              ExplainPrinter rightChildResult,
                              ExplainPrinter filterResult) {
         ExplainPrinter printer("NestedLoopJoin");
-        maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("joinType")
             .print(toStringData(node.getJoinType()))
@@ -1345,7 +1171,6 @@ public:
         printCorrelatedProjections(printer, node.getCorrelatedProjectionNames());
 
         printer.separator("]");
-        nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(3)
             .fieldName("expression", ExplainVersion::V3)
             .print(filterResult)
@@ -1363,13 +1188,11 @@ public:
                              ExplainPrinter bindResult,
                              ExplainPrinter /*refsResult*/) {
         ExplainPrinter printer("Union");
-        maybePrintProps(printer, node);
         if constexpr (version < ExplainVersion::V3) {
             printer.separator(" [");
             printProjectionsOrdered(printer, node.binder().names());
             printer.separator("]");
         }
-        nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(childResults.size() + 1)
             .fieldName("bindings", ExplainVersion::V3)
             .print(bindResult)
@@ -1393,7 +1216,6 @@ public:
         }
 
         ExplainPrinter printer("GroupBy");
-        maybePrintProps(printer, node);
         printer.separator(" [");
 
         const auto printTypeFn = [&]() {
@@ -1417,7 +1239,6 @@ public:
         }
 
         printer.separator("]");
-        nodeCEPropsPrint(printer, n, node);
 
         std::vector<ExplainPrinter> aggPrinters;
         for (const auto& [projectionName, index] : ordered) {
@@ -1453,7 +1274,6 @@ public:
                              ExplainPrinter bindResult,
                              ExplainPrinter refsResult) {
         ExplainPrinter printer("Unwind");
-        maybePrintProps(printer, node);
         printer.separator(" [");
 
         if constexpr (version < ExplainVersion::V3) {
@@ -1464,7 +1284,6 @@ public:
 
         printBooleanFlag(printer, "retainNonArrays", node.getRetainNonArrays(), true /*addComma*/);
         printer.separator("]");
-        nodeCEPropsPrint(printer, n, node);
 
         printer.setChildCount(2)
             .fieldName("bind", ExplainVersion::V3)
@@ -1498,17 +1317,14 @@ public:
                              ExplainPrinter childResult,
                              ExplainPrinter /*refsResult*/) {
         ExplainPrinter printer("Unique");
-        maybePrintProps(printer, node);
 
         if constexpr (version < ExplainVersion::V3) {
             printer.separator(" [");
             printProjectionsOrdered(printer, node.getProjections());
             printer.separator("]");
 
-            nodeCEPropsPrint(printer, n, node);
             printer.setChildCount(1, true /*noInline*/);
         } else if constexpr (version == ExplainVersion::V3) {
-            nodeCEPropsPrint(printer, n, node);
             printPropertyProjections(printer, node.getProjections(), false /*directToParent*/);
         } else {
             MONGO_UNREACHABLE;
@@ -1525,7 +1341,6 @@ public:
                              ExplainPrinter bindResult,
                              ExplainPrinter refsResult) {
         ExplainPrinter printer("SpoolProducer");
-        maybePrintProps(printer, node);
 
         printer.separator(" [")
             .fieldName("type", ExplainVersion::V3)
@@ -1539,7 +1354,6 @@ public:
         }
         printer.separator("]");
 
-        nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(3);
         printer.fieldName("filter", ExplainVersion::V3).print(filterResult);
         printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
@@ -1552,7 +1366,6 @@ public:
                              const SpoolConsumerNode& node,
                              ExplainPrinter bindResult) {
         ExplainPrinter printer("SpoolConsumer");
-        maybePrintProps(printer, node);
 
         printer.separator(" [")
             .fieldName("type", ExplainVersion::V3)
@@ -1566,7 +1379,6 @@ public:
         }
         printer.separator("]");
 
-        nodeCEPropsPrint(printer, n, node);
         printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
 
         return printer;
@@ -1577,7 +1389,6 @@ public:
                              ExplainPrinter childResult,
                              ExplainPrinter refsResult) {
         ExplainPrinter printer("Collation");
-        maybePrintProps(printer, node);
 
         if constexpr (version < ExplainVersion::V3) {
             printer.separator(" [{");
@@ -1592,10 +1403,8 @@ public:
             }
             printer.separator("}]");
 
-            nodeCEPropsPrint(printer, n, node);
             printer.setChildCount(1, true /*noInline*/);
         } else if constexpr (version == ExplainVersion::V3) {
-            nodeCEPropsPrint(printer, n, node);
             printCollationProperty(printer, node.getCollationSpec(), false /*directToParent*/);
             printer.fieldName("references", ExplainVersion::V3).print(refsResult);
         } else {
@@ -1610,7 +1419,6 @@ public:
                              const LimitSkipNode& node,
                              ExplainPrinter childResult) {
         ExplainPrinter printer("LimitSkip");
-        maybePrintProps(printer, node);
         printer.separator(" [");
 
         // If we have version < V3, inline the limit skip.
@@ -1623,12 +1431,10 @@ public:
                 printer.print(limit);
             }
             printer.separator(", ").fieldName("skip").print(node.getSkip()).separator("]");
-            nodeCEPropsPrint(printer, n, node);
             // Do not inline LimitSkip, since it's not a path.
             printer.setChildCount(1, true /*noInline*/);
         } else if (version == ExplainVersion::V3) {
             printer.separator("]");
-            nodeCEPropsPrint(printer, n, node);
             printer.setChildCount(2);
             printer.fieldName("limit");
             auto limit = node.getLimit();
@@ -1703,9 +1509,7 @@ public:
                              ExplainPrinter childResult,
                              ExplainPrinter refsResult) {
         ExplainPrinter printer("Exchange");
-        maybePrintProps(printer, node);
         printer.separator(" []");
-        nodeCEPropsPrint(printer, n, node);
 
         printer.setChildCount(3);
         printDistributionProperty(printer, node.getProperty(), false /*directToParent*/);
@@ -1744,16 +1548,13 @@ public:
                              ExplainPrinter childResult,
                              ExplainPrinter refsResult) {
         ExplainPrinter printer("Root");
-        maybePrintProps(printer, node);
 
         if constexpr (version < ExplainVersion::V3) {
             printer.separator(" [");
             printProjectionsOrdered(printer, node.getProjections().getVector());
             printer.separator("]");
-            nodeCEPropsPrint(printer, n, node);
             printer.setChildCount(1, true /*noInline*/);
         } else if constexpr (version == ExplainVersion::V3) {
-            nodeCEPropsPrint(printer, n, node);
             printer.setChildCount(3);
             printProjectionRequirementProperty(
                 printer, node.getProjections(), false /*directToParent*/);
@@ -2144,69 +1945,20 @@ public:
     ExplainPrinter generate(const ABT::reference_type node) {
         return algebra::transport<true>(node, *this);
     }
-
-private:
-    const bool _displayProperties;
-
-    // We don't own this.
-    const NodeToGroupPropsMap& _nodeMap;
-    boost::optional<const NodeCEMap&> _nodeCEMap;
 };
 
-using ExplainGeneratorV1 = ExplainGeneratorTransporter<ExplainVersion::V1>;
 using ExplainGeneratorV2 = ExplainGeneratorTransporter<ExplainVersion::V2>;
-using ExplainGeneratorV2Compact = ExplainGeneratorTransporter<ExplainVersion::V2Compact>;
 using ExplainGeneratorV3 = ExplainGeneratorTransporter<ExplainVersion::V3>;
 
-std::string ExplainGenerator::explain(const ABT::reference_type node,
-                                      const bool displayProperties,
-                                      const NodeToGroupPropsMap& nodeMap) {
-    ExplainGeneratorV1 gen(displayProperties, nodeMap);
+std::string ExplainGenerator::explainV2(const ABT::reference_type node) {
+    ExplainGeneratorV2 gen;
     return gen.generate(node).str();
-}
-
-std::string ExplainGenerator::explainV2(const ABT::reference_type node,
-                                        const bool displayProperties,
-                                        const NodeToGroupPropsMap& nodeMap) {
-    ExplainGeneratorV2 gen(displayProperties, nodeMap);
-    return gen.generate(node).str();
-}
-
-std::string ExplainGenerator::explainV2Compact(const ABT::reference_type node,
-                                               const bool displayProperties,
-                                               const NodeToGroupPropsMap& nodeMap) {
-    ExplainGeneratorV2Compact gen(displayProperties, nodeMap);
-    return gen.generate(node).str();
-}
-
-std::string ExplainGenerator::explainNode(const ABT::reference_type node) {
-    if (node.empty()) {
-        return "Empty\n";
-    }
-    return explainV2(node);
 }
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> ExplainGenerator::explainBSON(
-    const ABT::reference_type node,
-    const bool displayProperties,
-    const NodeToGroupPropsMap& nodeMap) {
-    ExplainGeneratorV3 gen(displayProperties, nodeMap);
+    const ABT::reference_type node) {
+    ExplainGeneratorV3 gen;
     return gen.generate(node).moveValue();
-}
-
-BSONObj convertSbeValToBSONObj(const std::pair<sbe::value::TypeTags, sbe::value::Value> val) {
-    uassert(6624070, "Expected an object", val.first == sbe::value::TypeTags::Object);
-    sbe::value::ValueGuard vg(val.first, val.second);
-
-    BSONObjBuilder builder;
-    sbe::bson::convertToBsonObj(builder, sbe::value::getObjectView(val.second));
-    return builder.done().getOwned();
-}
-
-BSONObj ExplainGenerator::explainBSONObj(const ABT::reference_type node,
-                                         const bool displayProperties,
-                                         const NodeToGroupPropsMap& nodeMap) {
-    return convertSbeValToBSONObj(explainBSON(node, displayProperties, nodeMap));
 }
 
 template <class PrinterType>
@@ -2257,385 +2009,11 @@ static void printBSONstr(PrinterType& printer,
     }
 }
 
-std::string ExplainGenerator::explainBSONStr(const ABT::reference_type node,
-                                             bool displayProperties,
-                                             const NodeToGroupPropsMap& nodeMap) {
-    const auto [tag, val] = explainBSON(node, displayProperties, nodeMap);
+std::string ExplainGenerator::explainBSONStr(const ABT::reference_type node) {
+    const auto [tag, val] = explainBSON(node);
     sbe::value::ValueGuard vg(tag, val);
     ExplainPrinterImpl<ExplainVersion::V2> printer;
     printBSONstr(printer, tag, val);
     return printer.str();
-}
-
-class ShortPlanSummaryTransport {
-public:
-    void transport(const PhysicalScanNode& node, const ABT&) {
-        ss << "COLLSCAN";
-    }
-
-    void transport(const IndexScanNode& node, const ABT&) {
-        std::string idxCombined = getIndexDetails(node);
-        if (ss.str().find(idxCombined) == std::string::npos) {
-            if (ss.tellp() != 0) {
-                ss << ", ";
-            }
-            ss << idxCombined;
-        }
-    }
-
-    std::string getIndexDetails(const IndexScanNode& node) {
-        std::stringstream idxDetails;
-        idxDetails << "IXSCAN { " << node.getIndexDefName() << " }";
-        return idxDetails.str();
-    }
-
-    template <typename T, typename... Ts>
-    void transport(const T& node, Ts&&...) {
-        static_assert(
-            (!std::is_base_of_v<PhysicalScanNode, T>)&&(!std::is_base_of_v<IndexScanNode, T>));
-    }
-
-    std::string getPlanSummary(const ABT& n) {
-        if (isEOFPlan(n)) {
-            return "EOF";
-        }
-
-        algebra::transport<false>(n, *this);
-        return ss.str();
-    }
-
-    std::stringstream ss;
-};
-
-std::string ABTPrinter::getPlanSummary() const {
-    return ShortPlanSummaryTransport().getPlanSummary(_planAndProps._node);
-}
-
-bool isEOFPlan(const ABT::reference_type node) {
-    // This function expects the full ABT to be the argument. So we must have a RootNode.
-    auto root = node.cast<RootNode>();
-    if (!root->getChild().is<EvaluationNode>()) {
-        // An EOF plan will have an EvaluationNode as the child of the RootNode.
-        return false;
-    }
-
-    auto eval = root->getChild().cast<EvaluationNode>();
-    if (eval->getProjection() != Constant::nothing()) {
-        // The EvaluationNode of an EOF plan will have Nothing as the projection.
-        return false;
-    }
-
-    // This is the rest of an EOF plan.
-    ABT eofChild = make<LimitSkipNode>(0, 0, make<CoScanNode>());
-    return eval->getChild() == eofChild;
-}
-
-class StringifyPathsAndExprsTransporter {
-public:
-    template <typename T, typename... Ts>
-    void walk(const T&, StringBuilder* sb, Ts&&...) {
-        tasserted(8075801,
-                  str::stream() << "Trying to stringify an unsupported operator for explain: "
-                                << boost::core::demangle(typeid(T).name()));
-    }
-
-    // Helpers
-    std::string prettyPrintPathProjs(const FieldNameOrderedSet& names) {
-        StringBuilder result;
-        bool first = true;
-        for (const FieldNameType& s : names) {
-            if (first) {
-                first = false;
-            } else {
-                result.append(", ");
-            }
-            result.append(s.value());
-        }
-        return result.str();
-    }
-
-    void generateStringForLeafNode(StringBuilder* sb,
-                                   StringData name,
-                                   boost::optional<StringData> property) {
-        sb->append(std::move(name));
-
-        if (property) {
-            sb->append(" [");
-            sb->append(std::move(property.get()));
-            sb->append("]");
-        }
-    }
-
-    void generateStringForOneChildNode(StringBuilder* sb,
-                                       StringData name,
-                                       boost::optional<StringData> property,
-                                       const ABT& child,
-                                       bool addParensAroundChild = false) {
-        sb->append(std::move(name));
-
-        if (property) {
-            sb->append(" [");
-            sb->append(std::move(property.get()));
-            sb->append("] ");
-        } else {
-            sb->append(" ");
-        }
-
-        if (addParensAroundChild) {
-            sb->append("(");
-        }
-
-        generateString(child, sb);
-
-
-        if (addParensAroundChild) {
-            sb->append(")");
-        }
-    }
-
-    void generateStringForTwoChildNode(StringBuilder* sb,
-                                       StringData name,
-                                       const ABT& childOne,
-                                       const ABT& childTwo) {
-        sb->append(std::move(name));
-
-        sb->append(" (");
-        generateString(childOne, sb);
-        sb->append(")");
-
-        sb->append(" (");
-        generateString(childTwo, sb);
-        sb->append(")");
-    }
-
-    /**
-     * Paths
-     */
-    void walk(const PathConstant& path, StringBuilder* sb, const ABT& child) {
-        generateStringForOneChildNode(sb, "Constant" /* name */, boost::none /* property */, child);
-    }
-
-    void walk(const PathLambda& path, StringBuilder* sb, const ABT& child) {
-        generateStringForOneChildNode(sb, "Lambda" /* name */, boost::none /* property */, child);
-    }
-
-    void walk(const PathIdentity& path, StringBuilder* sb) {
-        generateStringForLeafNode(sb, "Identity" /* name */, boost::none /* property */);
-    }
-
-    void walk(const PathDefault& path, StringBuilder* sb, const ABT& child) {
-        generateStringForOneChildNode(sb, "Default" /* name */, boost::none /* property */, child);
-    }
-
-    void walk(const PathCompare& path, StringBuilder* sb, const ABT& child) {
-        std::string name;
-        switch (path.op()) {
-            case Operations::Eq:
-                name = "=";
-                break;
-            case Operations::EqMember:
-                name = "eqMember";
-                break;
-            case Operations::Neq:
-                name = "!=";
-                break;
-            case Operations::Gt:
-                name = ">";
-                break;
-            case Operations::Gte:
-                name = ">=";
-                break;
-            case Operations::Lt:
-                name = "<";
-                break;
-            case Operations::Lte:
-                name = "<=";
-                break;
-            case Operations::Cmp3w:
-                name = "<=>";
-                break;
-            default:
-                // Instead of reaching this case, we'd first hit error code 6684500 when the
-                // PathCompare was created with a non-comparison operator.
-                MONGO_UNREACHABLE;
-        }
-
-        generateStringForOneChildNode(sb, name, boost::none /* property */, child);
-    }
-
-    void walk(const PathDrop& path, StringBuilder* sb) {
-        generateStringForLeafNode(
-            sb, "Drop" /* name */, StringData(prettyPrintPathProjs(path.getNames())));
-    }
-
-    void walk(const PathKeep& path, StringBuilder* sb) {
-        generateStringForLeafNode(
-            sb, "Keep" /* name */, StringData(prettyPrintPathProjs(path.getNames())));
-    }
-
-    void walk(const PathObj& path, StringBuilder* sb) {
-        generateStringForLeafNode(sb, "Obj" /* name */, boost::none /* property */);
-    }
-
-    void walk(const PathArr& path, StringBuilder* sb) {
-        generateStringForLeafNode(sb, "Arr" /* name */, boost::none /* property */);
-    }
-
-    void walk(const PathTraverse& path, StringBuilder* sb, const ABT& child) {
-        std::string property;
-        if (path.getMaxDepth() == PathTraverse::kUnlimited) {
-            property = "inf";
-        } else {
-            // The string 'property' will own the result of ss.str() below, so it will hold the
-            // value of the PathTraverse's max depth after the stringstream goes out of scope.
-            std::stringstream ss;
-            ss << path.getMaxDepth();
-            property = ss.str();
-        }
-        generateStringForOneChildNode(sb, "Traverse" /* name */, StringData(property), child);
-    }
-
-    void walk(const PathField& path, StringBuilder* sb, const ABT& child) {
-        generateStringForOneChildNode(sb, "Field" /* name */, path.name().value(), child);
-    }
-
-    void walk(const PathGet& path, StringBuilder* sb, const ABT& child) {
-        generateStringForOneChildNode(sb, "Get" /* name */, path.name().value(), child);
-    }
-
-    void walk(const PathComposeM& path,
-              StringBuilder* sb,
-              const ABT& leftChild,
-              const ABT& rightChild) {
-        generateStringForTwoChildNode(sb, "ComposeM" /* name */, leftChild, rightChild);
-    }
-
-    void walk(const PathComposeA& path,
-              StringBuilder* sb,
-              const ABT& leftChild,
-              const ABT& rightChild) {
-        generateStringForTwoChildNode(sb, "ComposeA" /* name */, leftChild, rightChild);
-    }
-
-    /**
-     * Expressions
-     */
-    void walk(const Constant& expr, StringBuilder* sb) {
-        generateStringForLeafNode(
-            sb, "Const" /* name */, StringData(sbe::value::print(expr.get())));
-    }
-
-    void walk(const Variable& expr, StringBuilder* sb) {
-        generateStringForLeafNode(sb, "Var" /* name */, expr.name().value());
-    }
-
-    void walk(const UnaryOp& expr, StringBuilder* sb, const ABT& child) {
-        generateStringForOneChildNode(sb,
-                                      toStringData(expr.op()),
-                                      boost::none /* property */,
-                                      child,
-                                      true /* addParensAroundChild */);
-    }
-
-    void walk(const BinaryOp& expr,
-              StringBuilder* sb,
-              const ABT& leftChild,
-              const ABT& rightChild) {
-        generateStringForTwoChildNode(sb, toStringData(expr.op()), leftChild, rightChild);
-    }
-
-    void walk(const If& expr,
-              StringBuilder* sb,
-              const ABT& condChild,
-              const ABT& thenChild,
-              const ABT& elseChild) {
-        sb->append("if");
-        sb->append(" (");
-        generateString(condChild, sb);
-        sb->append(") ");
-
-        sb->append("then");
-        sb->append(" (");
-        generateString(thenChild, sb);
-        sb->append(") ");
-
-        sb->append("else");
-        sb->append(" (");
-        generateString(elseChild, sb);
-        sb->append(")");
-    }
-
-    void walk(const Let& expr, StringBuilder* sb, const ABT& bind, const ABT& in) {
-        sb->append("let ");
-        sb->append(expr.varName().value());
-
-        sb->append(" = (");
-        generateString(bind, sb);
-        sb->append(") ");
-
-        sb->append("in (");
-        generateString(in, sb);
-        sb->append(")");
-    }
-
-    void walk(const LambdaAbstraction& expr, StringBuilder* sb, const ABT& body) {
-        generateStringForOneChildNode(sb,
-                                      "LambdaAbstraction" /* name */,
-                                      expr.varName().value(),
-                                      body,
-                                      true /* addParensAroundChild */);
-    }
-
-    void walk(const LambdaApplication& expr,
-              StringBuilder* sb,
-              const ABT& lambda,
-              const ABT& argument) {
-        generateStringForTwoChildNode(sb, "LambdaApplication" /* name */, lambda, argument);
-    }
-
-    void walk(const FunctionCall& expr, StringBuilder* sb, const std::vector<ABT>& args) {
-        sb->append(expr.name());
-        sb->append("(");
-
-        // TODO SERVER-83824: Remvoe the special case for getParam - just include the body of the
-        // else here.
-        if (expr.name() == "getParam") {
-            //  The getParam FunctionCall node has two children, one is the parameter id and the
-            //  other is an enum/int representation of the constant's sbe type tag. For explain
-            //  purposes, we want this function call to look like "getParam(<id>)" so we extract and
-            //  display only the first child.
-            generateString(args.at(0), sb);
-        } else {
-            bool first = true;
-            for (const auto& arg : args) {
-                if (first) {
-                    first = false;
-                } else {
-                    sb->append(", ");
-                }
-                generateString(arg, sb);
-            }
-        }
-
-        sb->append(")");
-    }
-
-    void walk(const EvalPath& expr, StringBuilder* sb, const ABT& path, const ABT& input) {
-        generateStringForTwoChildNode(sb, "EvalPath" /* name */, path, input);
-    }
-
-    void walk(const EvalFilter& expr, StringBuilder* sb, const ABT& path, const ABT& input) {
-        generateStringForTwoChildNode(sb, "EvalFilter" /* name */, path, input);
-    }
-
-    void generateString(const ABT::reference_type n, StringBuilder* sb) {
-        algebra::walk<false>(n, *this, sb);
-    }
-};
-
-std::string StringifyPathsAndExprs::stringify(const ABT::reference_type node) {
-    StringBuilder result;
-    StringifyPathsAndExprsTransporter().generateString(node, &result);
-    return result.str();
 }
 }  // namespace mongo::optimizer

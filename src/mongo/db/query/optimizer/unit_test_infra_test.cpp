@@ -75,18 +75,9 @@ TEST(TestInfra, AutoUpdateExplain) {
         "Variable [short name]\n",
         tree1);
 
-    ASSERT_EXPLAIN_AUTO(  // NOLINT
-        "Variable [short name]\n",
-        tree1);
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
         "Variable [short name]\n",
         tree1);
-    ASSERT_EXPLAIN_V2Compact_AUTO(  // NOLINT
-        "BinaryOp [Add]\n"
-        "|   Variable [very very very very very very very very very very very very long variable "
-        "name with \"quotes\"]\n"
-        "Const [1]\n",
-        tree);
 
     // Exercise auto-updating behavior for numbers.
     double number = 0.5;
