@@ -490,7 +490,6 @@ export const tenantId2 = ObjectId();
 // Tests valid usages of set/getClusterParameter on a serverless replica set and verifies that the
 // expected values are returned.
 export function testValidServerlessClusterParameterCommands(conn) {
-    // TODO SERVER-69663 Add serverless sharded cluster tests once supported.
     assert(conn instanceof ReplSetTest);
     assert(
         !considerParameter("changeStreamOptions", conn.getPrimary()),
