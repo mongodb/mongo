@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/implicit_validator.h"
+#include "mongo/db/query/fle/implicit_validator.h"
 
 #include <algorithm>
 #include <memory>

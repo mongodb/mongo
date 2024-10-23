@@ -777,7 +777,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/matcher/**/* @10gen/query @svc-auto-approve-bot
 /src/mongo/db/matcher/**/doc_validation* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_parser* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/matcher/**/implicit_validator* @10gen/query-integration-fle @svc-auto-approve-bot
 /src/mongo/db/matcher/**/rewrite_expr* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_geo* @10gen/query-integration-geo @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_text* @10gen/query-integration-staff-leads @svc-auto-approve-bot

@@ -11,10 +11,6 @@ filters:
   - "expression_parser*":
     approvers:
       - 10gen/query-optimization
-  # These files are related to field level encryption, which is owned by QI.
-  - "implicit_validator*":
-    approvers:
-      - 10gen/query-integration-fle
   - "rewrite_expr*":
     approvers:
       - 10gen/query-optimization

@@ -796,6 +796,7 @@ if wiredtiger:
             "fle_crud_test.cpp",
             "query/fle/encrypted_predicate_test_fixtures.cpp",
             "query/fle/equality_predicate_test.cpp",
+            "query/fle/implicit_validator_test.cpp",
             "query/fle/query_rewriter_test.cpp",
             "query/fle/range_predicate_test.cpp",
             "query/fle/range_validator_test.cpp",
