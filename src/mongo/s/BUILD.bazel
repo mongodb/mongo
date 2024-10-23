@@ -69,6 +69,22 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "sharding_helpers",
+    srcs = [
+        "shard_targeting_helpers.cpp",
+    ],
+    hdrs = [
+        "shard_key_pattern.h",
+        "shard_targeting_helpers.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+        "//src/mongo/db/query/collation:collator_interface",
+    ],
+)
+
+mongo_cc_library(
     name = "sharding_router_api",
     srcs = [
         "cluster_commands_helpers.cpp",
@@ -100,6 +116,7 @@ mongo_cc_library(
         ":grid",
         ":query_analysis_sampler",
         ":resource_yielders",
+        ":sharding_helpers",
         "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:shared_request_handling",
@@ -518,6 +535,7 @@ mongo_cc_library(
         "//src/mongo/rpc:command_status",
         "//src/mongo/db:server_feature_flags",
         ":analyze_shard_key_common",
+        ":sharding_helpers",
 
         # TODO(SERVER-93876): Remove.
         "//src/mongo/client:read_preference",

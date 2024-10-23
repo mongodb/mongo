@@ -111,6 +111,8 @@ public:
 
     bool isHashedPattern() const;
 
+    bool isHashedOnField(StringData fieldName) const;
+
     bool hasHashedPrefix() const;
 
     BSONElement getHashedField() const {

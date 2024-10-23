@@ -151,20 +151,16 @@ function runTests(collection, isSimpleCollation) {
     // Same queries as above, just testing a query that should be affected by collation.
     // Since the collation is case-insensitive, we should be able to find the document whose
     // '_id' field is 'str' by querying for 'STR'.
-    // TODO SERVER-SERVER-94315: Uncomment these 6 cases. In the sharded collection passthroughs,
-    // the shard key does not have the same collation as the collection's default so these queries
-    // may return duplicate docs if a chunk migration happens right before and the orphans haven't
-    // yet been cleaned up.
-    // assertUsesExpress(collection, {_id: "STR"}, isSimpleCollation ? [] : [docs[1]]);
-    // assertUsesExpress(collection, {_id: {$eq: "STR"}}, isSimpleCollation ? [] : [docs[1]]);
-    // assertUsesExpress(collection, {_id: {$in: ["STR"]}}, isSimpleCollation ? [] : [docs[1]]);
+    assertUsesExpress(collection, {_id: "STR"}, isSimpleCollation ? [] : [docs[1]]);
+    assertUsesExpress(collection, {_id: {$eq: "STR"}}, isSimpleCollation ? [] : [docs[1]]);
+    assertUsesExpress(collection, {_id: {$in: ["STR"]}}, isSimpleCollation ? [] : [docs[1]]);
 
-    // assertUsesIdHack(
-    //     collection, {_id: "STR"}, {_id: 1, "foo.bar": 0}, isSimpleCollation ? [] : [docs[1]]);
-    // assertUsesIdHack(
-    //     collection, {_id: {$eq: "STR"}}, complexProj, isSimpleCollation ? [] : [docs[1]]);
-    // assertUsesIdHack(
-    //     collection, {_id: {$in: ["STR"]}}, complexProj, isSimpleCollation ? [] : [docs[1]]);
+    assertUsesIdHack(
+        collection, {_id: "STR"}, {_id: 1, "foo.bar": 0}, isSimpleCollation ? [] : [docs[1]]);
+    assertUsesIdHack(
+        collection, {_id: {$eq: "STR"}}, complexProj, isSimpleCollation ? [] : [docs[1]]);
+    assertUsesIdHack(
+        collection, {_id: {$in: ["STR"]}}, complexProj, isSimpleCollation ? [] : [docs[1]]);
 
     // Assert that equality to null does not use express because 'null' isn't an exact bounds
     // generating type.

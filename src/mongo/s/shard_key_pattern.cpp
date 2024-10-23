@@ -212,6 +212,10 @@ bool ShardKeyPattern::isHashedPattern() const {
     return !_hashedField.eoo();
 }
 
+bool ShardKeyPattern::isHashedOnField(StringData fieldName) const {
+    return !_hashedField.eoo() && _hashedField.fieldNameStringData() == fieldName;
+}
+
 bool ShardKeyPattern::isValidHashedValue(const BSONElement& el) {
     switch (el.type()) {
         case MinKey:
