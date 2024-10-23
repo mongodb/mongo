@@ -304,7 +304,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 {"getClusterParameter": self.set_cluster_parameter["parameter"]}
             )
 
-    # TODO SERVER-76343 remove the join_migrations parameter and the if clause depending on it.
     def stop_balancer(self, timeout_ms=300000, join_migrations=True):
         """Stop the balancer."""
         client = interface.build_client(self, self.auth_options)
