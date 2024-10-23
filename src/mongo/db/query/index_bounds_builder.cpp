@@ -403,9 +403,16 @@ void buildBoundsForQueryElementForLT(BSONElement dataElt,
         bob->appendMinForType("", dataElt.type());
     } else {
         // If the type of the element is greater than the type of the array, the bounds have to
-        // include that element. Otherwise the array type, and therefore `dataElt` is
-        // sufficiently large to include all relevant keys.
-        if (canonicalizeBSONType(eltArr[0].type()) > canonicalizeBSONType(BSONType::Array)) {
+        // include that element. If it is an array itself, then we should use the larger of the
+        // two. Otherwise the array type, and therefore `dataElt` is sufficiently large to include
+        // all relevant keys.
+        int firstElementCanonicalType = canonicalizeBSONType(eltArr[0].type());
+        int arrayCanonicalType = canonicalizeBSONType(BSONType::Array);
+        if (firstElementCanonicalType > arrayCanonicalType ||
+            (firstElementCanonicalType == arrayCanonicalType &&
+             BSONElement::compareElements(
+                 eltArr[0], dataElt, BSONElement::ComparisonRules::kConsiderFieldName, collator) >=
+                 0)) {
             CollationIndexKey::collationAwareIndexKeyAppend(eltArr[0], collator, bob);
         } else {
             CollationIndexKey::collationAwareIndexKeyAppend(dataElt, collator, bob);
@@ -425,9 +432,17 @@ void buildBoundsForQueryElementForGT(BSONElement dataElt,
             bob->appendMinKey("");
         } else {
             // If the type of the element is smaller than the type of the array, the bounds need
-            // to extend to that element. Otherwise the array type, and therefore `dataElt` is
-            // sufficiently large include all relevant keys.
-            if (canonicalizeBSONType(eltArr[0].type()) < canonicalizeBSONType(BSONType::Array)) {
+            // to extend to that element. If it is an array itself then we need to use the smallest
+            // of the two. Otherwise the array type, and therefore `dataElt` is sufficiently small
+            // include all relevant keys.
+            int firstElementCanonicalType = canonicalizeBSONType(eltArr[0].type());
+            int arrayCanonicalType = canonicalizeBSONType(BSONType::Array);
+            if (firstElementCanonicalType < arrayCanonicalType ||
+                (firstElementCanonicalType == arrayCanonicalType &&
+                 BSONElement::compareElements(eltArr[0],
+                                              dataElt,
+                                              BSONElement::ComparisonRules::kConsiderFieldName,
+                                              collator) <= 0)) {
                 CollationIndexKey::collationAwareIndexKeyAppend(eltArr[0], collator, bob);
             } else {
                 CollationIndexKey::collationAwareIndexKeyAppend(dataElt, collator, bob);
@@ -440,8 +455,8 @@ void buildBoundsForQueryElementForGT(BSONElement dataElt,
     if (dataElt.isNumber()) {
         bob->appendNumber("", std::numeric_limits<double>::infinity());
         // For comparison to an array, we do lexicographic comparisons. In a multikey index, the
-        // index entries are the array elements themselves. We must therefore look at all types, and
-        // all values between the first element in the array and MaxKey.
+        // index entries are the array elements themselves. We must therefore look at all types,
+        // and all values between the first element in the array and MaxKey.
     } else if (dataElt.type() == BSONType::Array) {
         bob->appendMaxKey("");
     } else {

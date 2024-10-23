@@ -1189,7 +1189,7 @@ export function getNumberOfColumnScans(explain) {
  */
 export function isIxscanMultikey(winningPlan) {
     let ixscanStage = getPlanStage(winningPlan, "IXSCAN");
-    return ixscanStage.isMultiKey;
+    return ixscanStage && ixscanStage.isMultiKey;
 }
 
 /**

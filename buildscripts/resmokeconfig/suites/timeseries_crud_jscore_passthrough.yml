@@ -52,6 +52,7 @@ selector:
     - jstests/core/query/single_field_hashed_index.js
     # Indexed measurement field contains an array value
     - jstests/core/query/project/projection_semantics.js
+    - jstests/core/query/array/array_index_and_nonIndex_consistent.js
     # findAndModify sort.
     - jstests/core/query/natural_validation.js
     - jstests/core/write/crud_api.js
