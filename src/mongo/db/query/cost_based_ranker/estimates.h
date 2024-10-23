@@ -128,12 +128,6 @@ struct SelectivityTagParam {
 };
 
 struct CostCoefficientTagParam {
-    static constexpr double kMin = 0.0;
-    static constexpr double kMax = std::numeric_limits<double>::max();
-    static constexpr double kEpsilon = 1.0e-5;
-};
-
-struct CostTagParam {
     // The smallest cost coefficient is equal to the cost of the fastest QE
     // operation. This is typically the cost of a simple binary comparison of a
     // scalar value.
@@ -148,6 +142,12 @@ struct CostTagParam {
     //  model.
     static constexpr double kMax = 15000 * nsToMs;
     // TODO (SERVER-94981): Define this value based on cost model sensitivity.
+    static constexpr double kEpsilon = 1.0e-5;
+};
+
+struct CostTagParam {
+    static constexpr double kMin = 0.0;
+    static constexpr double kMax = std::numeric_limits<double>::max();
     static constexpr double kEpsilon = 1.0e-5;
 };
 
@@ -167,14 +167,14 @@ using CostTag = StrongDoubleTag<"Cost",
                                 // Cost has some abstract cost units.
                                 EstimationUnit::CostUnits,
                                 double,
-                                CostCoefficientTagParam>;
+                                CostTagParam>;
 
 using CostCoefficientTag =
     StrongDoubleTag<"Cost coefficient",
                     // Cost coefficients establish the cost of processing per one input document.
                     EstimationUnit::CostPerDataItem,
                     double,
-                    CostTagParam>;
+                    CostCoefficientTagParam>;
 
 template <typename T>
 class OptimizerEstimate;
