@@ -2181,9 +2181,12 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const BSONObj& minKey,
                                               boost::optional<int64_t> optMaxChunkSizeBytes) {
-    const auto [cm, _] = uassertStatusOK(
-        RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfoWithPlacementRefresh(
-            opCtx, nss));
+    const auto cm = uassertStatusOK(
+        RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' is not sharded",
+            cm.isSharded());
+
     auto chunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
 
     try {
@@ -2286,10 +2289,11 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     // migrations
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-    const auto cm =
-        uassertStatusOK(RoutingInformationCache::get(opCtx)
-                            ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss))
-            .cm;
+    const auto cm = uassertStatusOK(
+        RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' is not sharded",
+            cm.isSharded());
 
     uassert(ErrorCodes::InvalidUUID,
             str::stream() << "Collection uuid " << collectionUUID

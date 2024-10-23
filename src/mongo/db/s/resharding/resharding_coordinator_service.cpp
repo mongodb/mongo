@@ -2327,8 +2327,8 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
 
 ReshardingApproxCopySize computeApproxCopySize(OperationContext* opCtx,
                                                ReshardingCoordinatorDocument& coordinatorDoc) {
-    const auto [cm, _] = uassertStatusOK(
-        RoutingInformationCache::get(opCtx)->getTrackedCollectionRoutingInfoWithPlacementRefresh(
+    const auto cm =
+        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(
             opCtx, coordinatorDoc.getTempReshardingNss()));
     const auto numRecipientsToCopy = cm.getNShardsOwningChunks();
     iassert(ErrorCodes::BadValue,

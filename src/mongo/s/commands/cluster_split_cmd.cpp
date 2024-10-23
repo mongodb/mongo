@@ -64,6 +64,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
@@ -166,10 +167,7 @@ public:
                    BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        const auto cri = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                         nss));
-        const auto& cm = cri.cm;
+        const auto cri = getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, nss);
 
         const BSONField<BSONObj> findField("find", BSONObj());
         const BSONField<BSONArray> boundsField("bounds", BSONArray());
@@ -226,6 +224,8 @@ public:
         }
 
         boost::optional<Chunk> chunk;
+
+        const auto& cm = cri.cm;
 
         if (!find.isEmpty()) {
             // find

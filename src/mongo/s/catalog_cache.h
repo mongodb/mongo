@@ -240,49 +240,6 @@ public:
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Same as getCollectionRoutingInfo above, but throws NamespaceNotSharded error if the namespace
-     * is not sharded.
-     */
-    CollectionRoutingInfo getShardedCollectionRoutingInfo(OperationContext* opCtx,
-                                                          const NamespaceString& nss);
-
-    /**
-     * Same as getCollectionRoutingInfoWithRefresh above, but in addition returns a
-     * NamespaceNotSharded error if the collection is not sharded.
-     */
-    StatusWith<CollectionRoutingInfo> getShardedCollectionRoutingInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
-     * Same as getCollectionRoutingInfoWithPlacementRefresh above, but in addition returns a
-     * NamespaceNotSharded error if the collection is not sharded.
-     */
-    StatusWith<CollectionRoutingInfo> getShardedCollectionRoutingInfoWithPlacementRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
-
-
-    /**
-     * Same as getCollectionRoutingInfo above, but throws NamespaceNotFound error if the namespace
-     * is not tracked.
-     */
-    CollectionRoutingInfo getTrackedCollectionRoutingInfo(OperationContext* opCtx,
-                                                          const NamespaceString& nss);
-
-    /**
-     * Same as getCollectionRoutingInfoWithRefresh above, but in addition returns a
-     * NamespaceNotFound error if the collection is not tracked.
-     */
-    StatusWith<CollectionRoutingInfo> getTrackedCollectionRoutingInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
-     * Same as getCollectionRoutingInfoWithPlacementRefresh above, but in addition returns a
-     * NamespaceNotFound error if the collection is not tracked.
-     */
-    StatusWith<CollectionRoutingInfo> getTrackedCollectionRoutingInfoWithPlacementRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
      * Advances the version in the cache for the given database.
      *
      * To be called with the wantedVersion returned by a targeted node in case of a

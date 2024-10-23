@@ -142,9 +142,15 @@ void SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* 
             Grid::get(opCtx)->isShardingInitialized());
 
     // If the collection doesn't exist, fail. Only the config servers generate it.
-    const auto [cm, _] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
+    const auto cm =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
             opCtx, NamespaceString::kLogicalSessionsNamespace));
+
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Session collection '"
+                          << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
+                          << "' is not sharded",
+            cm.isSharded());
 }
 
 void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,

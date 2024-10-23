@@ -545,14 +545,17 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicy::selectChunksToM
 
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicy::_getSplitCandidatesForCollection(
     OperationContext* opCtx, const NamespaceString& nss, const ShardStatisticsVector& shardStats) {
-    auto routingInfoStatus =
-        RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfoWithPlacementRefresh(
-            opCtx, nss);
-    if (!routingInfoStatus.isOK()) {
-        return routingInfoStatus.getStatus();
+    const auto swCm =
+        RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss);
+    if (!swCm.isOK()) {
+        return swCm.getStatus();
     }
-
-    const auto& [cm, _] = routingInfoStatus.getValue();
+    const auto& cm = swCm.getValue();
+    if (!cm.isSharded()) {
+        return Status{ErrorCodes::NamespaceNotSharded,
+                      str::stream()
+                          << "Collection '" << nss.toStringForErrorMsg() << "' is not sharded"};
+    }
 
     auto swZoneInfo =
         ZoneInfo::getZonesForCollection(opCtx, nss, cm.getShardKeyPattern().getKeyPattern());
@@ -583,15 +586,18 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicy::_getMigrateCand
     const ShardStatisticsVector& shardStats,
     const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
     stdx::unordered_set<ShardId>* availableShards) {
-    auto routingInfoStatus =
-        RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfoWithPlacementRefresh(
-            opCtx, nss);
-    if (!routingInfoStatus.isOK()) {
-        return routingInfoStatus.getStatus();
+
+    const auto swCm =
+        RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss);
+    if (!swCm.isOK()) {
+        return swCm.getStatus();
     }
-
-    const auto& [cm, _] = routingInfoStatus.getValue();
-
+    const auto& cm = swCm.getValue();
+    if (!cm.isSharded()) {
+        return Status{ErrorCodes::NamespaceNotSharded,
+                      str::stream()
+                          << "Collection '" << nss.toStringForErrorMsg() << "' is not sharded"};
+    }
     const auto& shardKeyPattern = cm.getShardKeyPattern().getKeyPattern();
 
     const auto collInfoStatus = createCollectionDistributionStatus(opCtx, nss, shardStats, cm);

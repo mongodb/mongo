@@ -550,9 +550,8 @@ void ShardingCatalogManager::configureCollectionBalancing(
         // during refresh, so it is safe to release the chunk lock.
     }
 
-    const auto [cm, _] = uassertStatusOK(
-        RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfoWithPlacementRefresh(
-            opCtx, nss));
+    const auto cm = uassertStatusOK(
+        RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss));
     std::set<ShardId> shardsIds;
     cm.getAllShardIds(&shardsIds);
 

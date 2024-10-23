@@ -273,6 +273,24 @@ Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max) {
     return cm.findIntersectingChunkWithSimpleCollation(max);
 }
 
+StatusWith<ChunkManager> getPlacementInfoForShardedCollection(OperationContext* opCtx,
+                                                              const NamespaceString& nss) {
+    auto swCm =
+        RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss);
+
+    if (!swCm.isOK()) {
+        return swCm;
+    }
+
+    if (!swCm.getValue().isSharded()) {
+        return Status{ErrorCodes::NamespaceNotSharded,
+                      str::stream() << "Expected collection " << nss.toStringForErrorMsg()
+                                    << " to be sharded"};
+    }
+
+    return swCm;
+}
+
 Status processManualMigrationOutcome(OperationContext* opCtx,
                                      const boost::optional<BSONObj>& min,
                                      const boost::optional<BSONObj>& max,
@@ -289,13 +307,11 @@ Status processManualMigrationOutcome(OperationContext* opCtx,
         return outcome;
     }
 
-    auto swCM =
-        RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfoWithPlacementRefresh(
-            opCtx, nss);
-    if (!swCM.isOK()) {
-        return swCM.getStatus();
+    auto swCm = getPlacementInfoForShardedCollection(opCtx, nss);
+    if (!swCm.isOK()) {
+        return swCm.getStatus();
     }
-    const auto& cm = swCM.getValue().cm;
+    const auto& cm = swCm.getValue();
 
     const auto currentChunkInfo =
         min ? cm.findIntersectingChunkWithSimpleCollation(*min) : getChunkForMaxBound(cm, *max);
@@ -472,9 +488,8 @@ bool processRebalanceResponse(OperationContext* opCtx,
     }
 
     if (status == ErrorCodes::IndexNotFound) {
-        const auto [cm, _] = uassertStatusOK(
-            RoutingInformationCache::get(opCtx)->getCollectionRoutingInfoWithRefresh(
-                opCtx, migrateInfo.nss));
+        const auto cm =
+            uassertStatusOK(getPlacementInfoForShardedCollection(opCtx, migrateInfo.nss));
 
         if (cm.getShardKeyPattern().isHashedPattern()) {
             LOGV2(78252,
@@ -765,9 +780,7 @@ Status Balancer::moveRange(OperationContext* opCtx,
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
     const auto fromShardId = [&]() {
-        const auto [cm, _] =
-            uassertStatusOK(RoutingInformationCache::get(opCtx)
-                                ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
+        const auto cm = uassertStatusOK(getPlacementInfoForShardedCollection(opCtx, nss));
         if (request.getMin()) {
             const auto& chunk = cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
             return chunk.getShardId();
@@ -1359,14 +1372,11 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
     }
 
     for (const auto& splitInfo : chunksToSplitStatus.getValue()) {
-        auto routingInfoStatus =
-            RoutingInformationCache::get(opCtx)
-                ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, splitInfo.nss);
-        if (!routingInfoStatus.isOK()) {
-            return routingInfoStatus.getStatus();
+        const auto swCm = getPlacementInfoForShardedCollection(opCtx, splitInfo.nss);
+        if (!swCm.isOK()) {
+            return swCm.getStatus();
         }
-
-        const auto& [cm, _] = routingInfoStatus.getValue();
+        const auto cm = swCm.getValue();
 
         auto splitStatus = shardutil::splitChunkAtMultiplePoints(
             opCtx,

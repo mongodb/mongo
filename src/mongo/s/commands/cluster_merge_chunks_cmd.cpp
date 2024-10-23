@@ -59,6 +59,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
@@ -156,15 +157,7 @@ public:
             return false;
         }
 
-        auto const [cm, _] = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                         nss));
-
-        if (cm.isUnsplittable()) {
-            uasserted(ErrorCodes::NamespaceNotSharded,
-                      str::stream() << "Can't execute mergeChunks on unsharded collection "
-                                    << nss.toStringForErrorMsg());
-        }
+        const auto cm = getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, nss).cm;
 
         if (!cm.getShardKeyPattern().isShardKey(minKey) ||
             !cm.getShardKeyPattern().isShardKey(maxKey)) {

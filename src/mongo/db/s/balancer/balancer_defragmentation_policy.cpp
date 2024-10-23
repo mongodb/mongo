@@ -115,7 +115,12 @@ static constexpr int64_t kBigChunkMarker = std::numeric_limits<int64_t>::max();
 ShardVersion getShardVersion(OperationContext* opCtx,
                              const ShardId& shardId,
                              const NamespaceString& nss) {
-    auto cri = RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfo(opCtx, nss);
+    auto cri =
+        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx, nss));
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Expected collection " << nss.toStringForErrorMsg()
+                          << " to be sharded",
+            cri.cm.isSharded());
     return cri.getShardVersion(shardId);
 }
 

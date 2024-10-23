@@ -54,6 +54,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_commands_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -94,10 +95,8 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-            const auto [cm, _] = uassertStatusOK(
-                Grid::get(opCtx)
-                    ->catalogCache()
-                    ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, ns()));
+            const auto cm =
+                getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns()).cm;
 
             uassert(ErrorCodes::InvalidOptions,
                     "bounds can only have exactly 2 elements",

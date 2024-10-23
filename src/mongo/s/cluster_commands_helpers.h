@@ -458,6 +458,18 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationCon
                                                                     const NamespaceString& nss);
 
 /**
+ * Force a refresh of the routing cache and fetch the routing info for the given collection.
+ *
+ * Throw NamespaceNotSharded exception in case the collection is unsharded.
+ *
+ * WARNING: This function is DEPRECATED.
+ * Forcing a catalog refresh will cause subsequent cache lookups to wait until the refresh is
+ * completed. Moreover, the returned routing information could be stale. This is because the refresh
+ * is not causal-consistent with other DDL operations.
+ */
+CollectionRoutingInfo getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(
+    OperationContext* opCtx, const NamespaceString& nss);
+/**
  * Loads all of the indexes for the given namespace from the appropriate shard. For unsharded
  * collections will read from the primary shard and for sharded collections will read from the shard
  * that owns the chunk containing the minimum key for the collection's shard key.

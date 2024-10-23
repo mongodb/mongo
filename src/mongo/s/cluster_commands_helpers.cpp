@@ -915,6 +915,21 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationCon
     return catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks);
 }
 
+CollectionRoutingInfo getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    const auto& catalogCache = Grid::get(opCtx)->catalogCache();
+
+    catalogCache->onStaleCollectionVersion(nss, boost::none /* wantedVersion */);
+
+    auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Command not supported on unsharded collection "
+                          << nss.toStringForErrorMsg(),
+            cri.cm.isSharded());
+    return cri;
+};
+
 BSONObj forceReadConcernLocal(OperationContext* opCtx, BSONObj& cmd) {
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto atClusterTime = readConcernArgs.getArgsAtClusterTime();

@@ -64,6 +64,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_commands_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
@@ -129,13 +130,9 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
 
             Timer t;
-            const auto chunkManager =
-                uassertStatusOK(
-                    Grid::get(opCtx)
-                        ->catalogCache()
-                        ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, ns()))
-                    .cm;
 
+            const auto chunkManager =
+                getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns()).cm;
             uassert(ErrorCodes::NamespaceNotSharded,
                     str::stream() << "Can't execute " << Request::kCommandName
                                   << " on unsharded collection " << ns().toStringForErrorMsg(),
