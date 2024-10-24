@@ -340,24 +340,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "capped_visibility",
-    srcs = [
-        "capped_visibility.cpp",
-    ],
-    hdrs = [
-        "capped_visibility.cpp",
-    ],
-    header_deps = [
-        "//src/mongo/bson/mutable:mutable_bson",
-        "//src/mongo/db/commands:server_status_core",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db/storage:recovery_unit_base",
-    ],
-)
-
-mongo_cc_library(
     name = "index_build_entry_idl",
     srcs = [
         ":index_build_entry_gen",
@@ -596,7 +578,6 @@ mongo_cc_library(
     name = "catalog_helpers",
     srcs = [
         "backwards_compatible_collection_options_util.cpp",
-        "capped_utils.cpp",
         "coll_mod.cpp",
         "coll_mod_index.cpp",
         "collection_catalog_helper.cpp",
@@ -609,11 +590,11 @@ mongo_cc_library(
         "list_indexes.cpp",
         "rename_collection.cpp",
         "unique_collection_name.cpp",
+        "//src/mongo/db/collection_crud:capped_utils.cpp",
         "//src/mongo/db/op_observer:batched_write_policy.h",
     ],
     hdrs = [
         "backwards_compatible_collection_options_util.h",
-        "capped_utils.h",
         "coll_mod.h",
         "coll_mod_index.h",
         "collection_catalog_helper.h",
@@ -626,6 +607,7 @@ mongo_cc_library(
         "list_indexes.h",
         "rename_collection.h",
         "unique_collection_name.h",
+        "//src/mongo/db/collection_crud:capped_utils.h",
     ],
     deps = [
         ":cannot_convert_index_to_unique_info",
@@ -748,7 +730,6 @@ mongo_cc_library(
         "virtual_collection_impl.h",
     ],
     deps = [
-        "capped_visibility",
         "catalog_helpers",
         "catalog_stats",
         "collection_options",
@@ -775,6 +756,7 @@ mongo_cc_library(
         "//src/mongo/db:system_index",
         "//src/mongo/db:vector_clock",
         "//src/mongo/db/collection_crud",
+        "//src/mongo/db/collection_crud:capped_visibility",
         "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/op_observer",

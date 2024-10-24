@@ -30,7 +30,6 @@
 #include "mongo/db/catalog/collection_impl.h"
 
 #include <absl/container/flat_hash_map.h>
-#include <algorithm>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
@@ -41,7 +40,6 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
-#include <map>
 #include <mutex>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
@@ -62,7 +60,7 @@
 #include "mongo/db/catalog/storage_engine_collection_options_flags_parser.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cluster_role.h"
+#include "mongo/db/collection_crud/capped_visibility.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
@@ -84,7 +82,6 @@
 #include "mongo/db/query/fle/implicit_validator.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/capped_snapshots.h"
@@ -99,15 +96,12 @@
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage

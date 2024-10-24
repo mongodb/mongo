@@ -30,7 +30,7 @@
 
 #include "mongo/db/s/convert_to_capped_coordinator.h"
 
-#include "mongo/db/catalog/capped_utils.h"
+#include "mongo/db/collection_crud/capped_utils.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"

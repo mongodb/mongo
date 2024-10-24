@@ -1,0 +1,20 @@
+Import("env")
+Import("wiredtiger")
+
+env = env.Clone()
+
+if wiredtiger:
+    env.InjectThirdParty(libraries=["wiredtiger"])
+
+    env.CppUnitTest(
+        target="db_capped_test",
+        source=[
+            "capped_collection_test.cpp",
+            "capped_utils_test.cpp",
+            "capped_visibility_test.cpp",
+        ],
+        LIBDEPS=[
+            "$BUILD_DIR/mongo/db/collection_crud/capped_visibility",
+            "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
+        ],
+    )

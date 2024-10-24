@@ -1,8 +1,5 @@
 version: 1.0.0
 filters:
-  - "*capped*":
-    approvers:
-      - 10gen/server-storage-execution
   - "collection_compact*":
     approvers:
       - 10gen/server-rss-sydney

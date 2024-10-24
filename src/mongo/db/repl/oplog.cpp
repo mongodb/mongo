@@ -36,9 +36,6 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <cstdint>
-#include <memory>
-#include <set>
-#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -53,7 +50,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/backwards_compatible_collection_options_util.h"
-#include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -81,10 +77,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/collection_crud/capped_collection_maintenance.h"
+#include "mongo/db/collection_crud/capped_utils.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/create_gen.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"

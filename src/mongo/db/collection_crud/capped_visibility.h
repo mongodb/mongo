@@ -41,13 +41,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/record_id.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/basic.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

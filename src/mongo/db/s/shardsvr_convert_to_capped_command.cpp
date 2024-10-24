@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/capped_utils.h"
+#include "mongo/db/collection_crud/capped_utils.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/profile_settings.h"

@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/catalog/capped_visibility.h"
+#include "mongo/db/collection_crud/capped_visibility.h"
 
 #include <absl/container/flat_hash_map.h>
 #include <mutex>

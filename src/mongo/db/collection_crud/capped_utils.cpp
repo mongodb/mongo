@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/capped_utils.h"
+#include "mongo/db/collection_crud/capped_utils.h"
 
 #include <algorithm>
 #include <memory>

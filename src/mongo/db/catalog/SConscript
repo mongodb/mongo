@@ -64,9 +64,6 @@ if wiredtiger:
         target="db_catalog_test",
         source=[
             "backwards_compatible_collection_options_util_test.cpp",
-            "capped_collection_test.cpp",
-            "capped_visibility_test.cpp",
-            "capped_utils_test.cpp",
             "collection_catalog_test.cpp",
             "collection_options_test.cpp",
             "collection_test.cpp",
@@ -125,7 +122,6 @@ if wiredtiger:
             "$BUILD_DIR/mongo/util/clock_source_mock",
             "$BUILD_DIR/mongo/util/fail_point",
             "$BUILD_DIR/mongo/util/pcre_wrapper",
-            "capped_visibility",
             "catalog_control",
             "catalog_helpers",
             "catalog_impl",

@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/capped_visibility.h"
 #include "mongo/db/client.h"
+#include "mongo/db/collection_crud/capped_visibility.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
