@@ -129,6 +129,34 @@ functions:
       args:
         - "src/evergreen/gen_feature_flags.sh"
 
+  "generate github token": &generate_github_token
+    command: github.generate_token
+    params:
+      expansion_name: github_token
+      permissions:
+        metadata: read
+        contents: read
+
+  # this cannot use a script because the codebase is not yet cloned
+  "conditionally clone repo": &conditionally_clone_repo
+    command: subprocess.exec
+    params:
+      binary: "bash"
+      args:
+        - "-c"
+        - |
+          if [ -z "${gcov_tool}" ]; then
+            echo "Not a code coverage repo, skipping git clone."
+            exit 0
+          fi
+
+          git clone --branch=${branch_name} --depth=1500 https://x-access-token:${github_token}@github.com/10gen/mongo.git src
+          export dir=src
+          bash src/evergreen/restore_git_history_and_tags.sh
+
+          cd src
+          git reset --hard ${revision}
+
   "fetch artifacts": &fetch_artifacts
     command: s3.get
     display_name: "fetch artifacts"
@@ -137,7 +165,7 @@ functions:
       aws_secret: ${aws_secret}
       remote_file: ${mongo_artifacts}
       bucket: mciuploads
-      extract_to: src
+      extract_to: "./"
 
   "fetch venv": &fetch_venv
     command: s3.get
@@ -717,6 +745,8 @@ functions:
 
   "do setup":
     - *f_expansions_write
+    - *generate_github_token
+    - *conditionally_clone_repo
     - *fetch_artifacts
     - *kill_processes
     - *cleanup_environment

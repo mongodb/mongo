@@ -27,9 +27,16 @@ buildvariants:
       timeout_secs: 18000 # 5 hour idle timeout
       use_scons_cache: false
       gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
+      # The gcov instrumentation saves the path the .gcno files were created in as the default path
+      # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
+      # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
+      # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
+      gcov_environment: GCOV_PREFIX=$(pwd)/.. GCOV_PREFIX_STRIP=3
       num_scons_link_jobs_available: 0.99
       compile_variant: *AL2023-arm64-coverage
     tasks: &AL2023-arm64-coverage-tasks
+      # These are carefully and explicitly curated. Do not add more tests/tasks without consulting with DevProd.
+      # unittests
       - name: compile_and_package_serial_no_unittests_TG
         distros:
           - amazon2023.3-arm64-large
@@ -37,6 +44,18 @@ buildvariants:
         distros:
           - amazon2023.3-arm64-large
       - name: bazel_coverage
+      # jstests
+      - name: jsCore
+      - name: fle2
+      - name: aggregation
+      - name: change_streams
+      - name: replica_sets_jscore_passthrough_gen
+      - name: sharding_jscore_passthrough_gen
+      - name: sharded_collections_jscore_passthrough_gen
+      - name: aggregation_mongos_passthrough
+      - name: aggregation_sharded_collections_passthrough
+      - name: change_streams_mongos_sessions_passthrough
+      - name: fle2_sharding
 
   # Variant to support Code Coverage on amd64/x86_64
   - name: &rhel-93-64-bit-coverage rhel-93-64-bit-coverage
@@ -64,9 +83,16 @@ buildvariants:
       timeout_secs: 18000 # 5 hour idle timeout
       use_scons_cache: false
       gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
+      # The gcov instrumentation saves the path the .gcno files were created in as the default path
+      # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
+      # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
+      # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
+      gcov_environment: GCOV_PREFIX=$(pwd)/.. GCOV_PREFIX_STRIP=3
       num_scons_link_jobs_available: 0.99
       compile_variant: *rhel-93-64-bit-coverage
     tasks: &rhel-93-64-bit-coverage-tasks
+      # These are carefully and explicitly curated. Do not add more tests/tasks without consulting with DevProd.
+      # unittests
       - name: compile_and_package_serial_no_unittests_TG
         distros:
           - rhel93-large
@@ -74,3 +100,15 @@ buildvariants:
         distros:
           - rhel93-large
       - name: bazel_coverage
+      # jstests
+      - name: jsCore
+      - name: fle2
+      - name: aggregation
+      - name: change_streams
+      - name: replica_sets_jscore_passthrough_gen
+      - name: sharding_jscore_passthrough_gen
+      - name: sharded_collections_jscore_passthrough_gen
+      - name: aggregation_mongos_passthrough
+      - name: aggregation_sharded_collections_passthrough
+      - name: change_streams_mongos_sessions_passthrough
+      - name: fle2_sharding

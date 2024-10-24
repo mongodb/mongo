@@ -88,7 +88,6 @@ def main():
 
     workdir = expansions.get("workdir")
     bazelisk_path = os.path.join(workdir, "tmp", "bazelisk")
-    bazel_output_location = None
     if os.path.exists(bazelisk_path):
         print("Found bazel, looking for output path")
         proc = subprocess.run(
@@ -133,12 +132,20 @@ def main():
     else:
         has_scons_gcno = False
 
-    if bazel_output_location:
-        has_bazel_gcno = any(
-            True for _ in glob.iglob("./**/*.gcno", root_dir=bazel_output_location, recursive=True)
-        )
-    else:
-        has_bazel_gcno = False
+    # because of bazel symlink shenanigans, the bazel gcda and gcno files are put in different
+    # directories when the GCOV_PREFIX and GCOV_PREFIX_STRIP env vars are used. We manually
+    # put the gcno files where the gcda files are generated to fix this.
+    has_bazel_gcno = False
+    bazel_output_dir = os.path.join(workdir, "bazel-out")
+    for file in glob.iglob("./**/bazel-out/**/*.gcno", root_dir=workdir, recursive=True):
+        has_bazel_gcno = True
+        parts = file.split("bazel-out/")
+        assert len(parts) == 2, "Something went wrong, path was not split into 2 parts."
+        old_path = os.path.join(workdir, file)
+        new_path = os.path.join(bazel_output_dir, parts[1])
+        new_dir = os.path.dirname(new_path)
+        os.makedirs(new_dir, exist_ok=True)
+        os.rename(old_path, new_path)
 
     if not has_bazel_gcno and not has_bazel_gcno:
         print("No gcno files were found. Something went wrong.")
@@ -198,11 +205,12 @@ def main():
     ]
 
     if has_bazel_gcno:
-        args.append(bazel_output_location)
+        args.append(bazel_output_dir)
 
     if has_scons_gcno:
         args.append(scons_build_dir)
 
+    print("Running gcovr command")
     process = subprocess.run(
         args, env=my_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8"
     )
