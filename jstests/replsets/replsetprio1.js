@@ -18,7 +18,7 @@ replTest.initiate({
                   {initiateWithDefaultElectionTimeout: true});
 
 // 2 should be primary (give this a while to happen, as other nodes might first be elected)
-replTest.awaitNodesAgreeOnPrimary(replTest.kDefaultTimeoutMS, nodes, nodes[2]);
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, nodes, nodes[2]);
 
 // wait for 1 to not appear to be primary (we are about to make it primary and need a clean slate
 // here)
@@ -45,7 +45,7 @@ for (i = 0; i < 1000; i++) {
 
 // bring 2 back up, 2 should wait until caught up and then become primary
 replTest.restart(2);
-replTest.awaitNodesAgreeOnPrimary(replTest.kDefaultTimeoutMS, nodes, nodes[2]);
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, nodes, nodes[2]);
 
 // make sure nothing was rolled back
 primary = replTest.getPrimary();

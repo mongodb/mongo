@@ -50,8 +50,7 @@ function getColl(conn) {
 let coll = getColl(rst.getPrimary());
 
 // Create a collection and wait for the stable timestamp to exceed its creation on both nodes.
-assert.commandWorked(
-    coll.insert({}, {writeConcern: {w: "majority", wtimeout: rst.kDefaultTimeoutMS}}));
+assert.commandWorked(coll.insert({}, {writeConcern: {w: "majority", wtimeout: rst.timeoutMS}}));
 
 // Wait for the stable timestamp to match the latest oplog entry on both nodes.
 rst.awaitLastOpCommitted();

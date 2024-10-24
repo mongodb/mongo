@@ -30,7 +30,7 @@ replSet.awaitReplication();
 
 // Primary should step down long enough for election to occur on secondary.
 var config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
-assert.commandWorked(primary.adminCommand({replSetStepDown: replSet.kDefaultTimeoutMS / 1000}));
+assert.commandWorked(primary.adminCommand({replSetStepDown: replSet.timeoutMS / 1000}));
 
 // Step down primary and wait for node 1 to be promoted to primary.
 replSet.waitForState(replSet.nodes[1], ReplSetTest.State.PRIMARY);

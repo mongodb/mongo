@@ -51,7 +51,7 @@ var collNameToDrop = "collectionToDrop";
 // Create the collection that will be dropped and let it replicate.
 var collToDrop = dbToDrop.getCollection(collNameToDrop);
 assert.commandWorked(
-    collToDrop.insert({_id: 0}, {writeConcern: {w: 2, wtimeout: replTest.kDefaultTimeoutMS}}));
+    collToDrop.insert({_id: 0}, {writeConcern: {w: 2, wtimeout: replTest.timeoutMS}}));
 assert.eq(1, collToDrop.find().itcount());
 
 // Pause the oplog fetcher on secondary so that commit point doesn't advance, meaning that a dropped

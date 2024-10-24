@@ -164,13 +164,13 @@ export var TagsTest = function(options) {
 
             // Wait until nodes know about the new primary.
             replTest.awaitNodesAgreeOnPrimary(
-                replTest.kDefaultTimeoutMS, expectedNodesAgreeOnPrimary, nodeId);
+                replTest.timeoutMS, expectedNodesAgreeOnPrimary, nodeId);
             jsTestLog('ensurePrimary - Nodes ' + tojson(expectedNodesAgreeOnPrimary) +
                       ' agree that ' + nodeId + ' (' + replTest.nodes[nodeId].host +
                       ') should be primary.');
 
             var writeConcern = {
-                writeConcern: {w: expectedWritableNodesCount, wtimeout: replTest.kDefaultTimeoutMS}
+                writeConcern: {w: expectedWritableNodesCount, wtimeout: replTest.timeoutMS}
             };
             assert.commandWorked(primary.getDB('foo').bar.insert({x: 100}, writeConcern));
             jsTestLog('ensurePrimary - Successfully written a document to primary node (' +

@@ -77,8 +77,7 @@ export class ReplSetTest {
 
         // If opts.timeoutMS is present use that for the ReplSetTest instance, otherwise use global
         // value.
-        // TODO(SERVER-95853): Rename instance kDefaultTimeoutMS to timeoutMS.
-        this.kDefaultTimeoutMS = opts.timeoutMS || ReplSetTest.kDefaultTimeoutMS;
+        this.timeoutMS = opts.timeoutMS || ReplSetTest.kDefaultTimeoutMS;
 
         // If opts is passed in as a string, let it pass unmodified since strings are pass-by-value.
         // if it is an object, though, pass in a deep copy.
@@ -116,7 +115,7 @@ export class ReplSetTest {
      */
     _waitForIndicator(node, ind, states, timeout, reconnectNode) {
         node = resolveToConnection(this, node);
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
         if (reconnectNode === undefined) {
             reconnectNode = true;
         }
@@ -486,7 +485,7 @@ export class ReplSetTest {
      * fields to be removed by default.
      */
     awaitSecondaryNodes(timeout, secondaries, retryIntervalMS, waitForNewlyAddedRemoval) {
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
         retryIntervalMS = retryIntervalMS || 200;
         let awaitingSecondaries;
         try {
@@ -564,7 +563,7 @@ export class ReplSetTest {
      * Blocks until each node agrees that all other nodes have applied the most recent oplog entry.
      */
     awaitNodesAgreeOnAppliedOpTime(timeout, nodes) {
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
         nodes = nodes || this.nodes;
 
         assert.soon(function() {
@@ -657,7 +656,7 @@ export class ReplSetTest {
      * nodes tied for highest priority, waits until one of them is the primary.
      */
     awaitHighestPriorityNodeIsPrimary(timeout) {
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
 
         // First figure out the set of highest priority nodes.
         const config = asCluster(this, this.nodes, () => this.getReplSetConfigFromNode());
@@ -687,7 +686,7 @@ export class ReplSetTest {
      * Unlike awaitNodesAgreeOnPrimary, this does not require that all nodes are authenticated.
      */
     awaitNodesAgreeOnPrimaryNoAuth(timeout, nodes) {
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
         nodes = nodes || this.nodes;
 
         print("AwaitNodesAgreeOnPrimaryNoAuth: Waiting for nodes to agree on any primary.");
@@ -727,7 +726,7 @@ export class ReplSetTest {
      * identity of the primary.
      */
     awaitNodesAgreeOnPrimary(timeout, nodes, expectedPrimaryNode, runHangAnalyzerOnTimeout = true) {
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
         nodes = nodes || this.nodes;
         // indexOf will return the index of the expected node. If expectedPrimaryNode is undefined,
         // indexOf will return -1.
@@ -793,7 +792,7 @@ export class ReplSetTest {
      * Otherwise throws an exception.
      */
     getPrimary(timeout, retryIntervalMS) {
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
         retryIntervalMS = retryIntervalMS || 200;
         var primary = null;
 
@@ -807,7 +806,7 @@ export class ReplSetTest {
 
     awaitNoPrimary(msg, timeout) {
         msg = msg || "Timed out waiting for there to be no primary in replset: " + this.name;
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
 
         assert.soonNoExcept(() => {
             return _callHello(this) == false;
@@ -1010,7 +1009,7 @@ export class ReplSetTest {
      * the in-memory and on-disk configs to match.
      */
     waitForAllNewlyAddedRemovals(timeout) {
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
         print("waitForAllNewlyAddedRemovals: starting for set " + this.name);
         const primary = this.getPrimary();
 
@@ -1199,7 +1198,7 @@ export class ReplSetTest {
 
         // Blocks until there is a primary. We use a faster retry interval here since we expect the
         // primary to be ready very soon. We also turn the failpoint off once we have a primary.
-        this.getPrimary(this.kDefaultTimeoutMS, 25 /* retryIntervalMS */);
+        this.getPrimary(this.timeoutMS, 25 /* retryIntervalMS */);
         if (failPointsSupported) {
             clearFailPoint(this.nodes[0], "skipOplogBatcherWaitForData");
         }
@@ -1328,7 +1327,7 @@ export class ReplSetTest {
                     config.version = primaryMember.configVersion + 1;
 
                     config.members = originalMembers.slice(0, i);
-                    cmd = {replSetReconfig: config, maxTimeMS: this.kDefaultTimeoutMS};
+                    cmd = {replSetReconfig: config, maxTimeMS: this.timeoutMS};
                     print("Running reconfig command: " + tojsononeline(cmd));
                     const reconfigRes = primary.adminCommand(cmd);
                     const retryableReconfigCodes = [
@@ -1345,7 +1344,7 @@ export class ReplSetTest {
                     }
                     assert.commandWorked(reconfigRes);
                     return true;
-                }, "reconfig for fixture set up failed", this.kDefaultTimeoutMS, 1000);
+                }, "reconfig for fixture set up failed", this.timeoutMS, 1000);
             }
         }
 
@@ -1362,8 +1361,7 @@ export class ReplSetTest {
 
         // Wait for initial sync to complete on all nodes. Use a faster polling interval so we can
         // detect initial sync completion more quickly.
-        this.awaitSecondaryNodes(
-            this.kDefaultTimeoutMS, null /* secondaries */, 25 /* retryIntervalMS */);
+        this.awaitSecondaryNodes(this.timeoutMS, null /* secondaries */, 25 /* retryIntervalMS */);
 
         // If test commands are not enabled, we cannot wait for 'newlyAdded' removals. Tests that
         // disable test commands must ensure 'newlyAdded' removals mid-test are acceptable.
@@ -1716,14 +1714,14 @@ export class ReplSetTest {
 
         // Set a maxTimeMS so reconfig fails if it times out.
         assert.adminCommandWorkedAllowingNetworkError(
-            this.getPrimary(), {replSetReconfig: config, maxTimeMS: this.kDefaultTimeoutMS});
+            this.getPrimary(), {replSetReconfig: config, maxTimeMS: this.timeoutMS});
     }
 
     /**
      * Blocks until all nodes in the replica set have the same config version as the primary.
      **/
     awaitNodesAgreeOnConfigVersion(timeout) {
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
 
         assert.soonNoExcept(() => {
             var primaryVersion = this.getPrimary().getDB('admin')._helloOrLegacyHello().setVersion;
@@ -1855,37 +1853,33 @@ export class ReplSetTest {
 
         print("AwaitLastStableRecoveryTimestamp: Waiting for stable recovery timestamps for " + id);
 
-        assert.soonNoExcept(
-            function() {
-                for (let node of rst.nodes) {
-                    // The `lastStableRecoveryTimestamp` field contains a stable timestamp
-                    // guaranteed to exist on storage engine recovery to stable timestamp.
-                    let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+        assert.soonNoExcept(function() {
+            for (let node of rst.nodes) {
+                // The `lastStableRecoveryTimestamp` field contains a stable timestamp
+                // guaranteed to exist on storage engine recovery to stable timestamp.
+                let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
 
-                    // Continue if we're connected to an arbiter.
-                    if (res.myState === ReplSetTest.State.ARBITER) {
-                        continue;
-                    }
-
-                    // A missing `lastStableRecoveryTimestamp` field indicates that the storage
-                    // engine does not support `recover to a stable timestamp`.
-                    //
-                    // A null `lastStableRecoveryTimestamp` indicates that the storage engine
-                    // supports "recover to a stable timestamp", but does not have a stable recovery
-                    // timestamp yet.
-                    if (res.hasOwnProperty("lastStableRecoveryTimestamp") &&
-                        res.lastStableRecoveryTimestamp.getTime() === 0) {
-                        print("AwaitLastStableRecoveryTimestamp: " + node.host +
-                              " does not have a stable recovery timestamp yet.");
-                        return false;
-                    }
+                // Continue if we're connected to an arbiter.
+                if (res.myState === ReplSetTest.State.ARBITER) {
+                    continue;
                 }
 
-                return true;
-            },
-            "Not all members have a stable recovery timestamp",
-            this.kDefaultTimeoutMS,
-            retryIntervalMS);
+                // A missing `lastStableRecoveryTimestamp` field indicates that the storage
+                // engine does not support `recover to a stable timestamp`.
+                //
+                // A null `lastStableRecoveryTimestamp` indicates that the storage engine
+                // supports "recover to a stable timestamp", but does not have a stable recovery
+                // timestamp yet.
+                if (res.hasOwnProperty("lastStableRecoveryTimestamp") &&
+                    res.lastStableRecoveryTimestamp.getTime() === 0) {
+                    print("AwaitLastStableRecoveryTimestamp: " + node.host +
+                          " does not have a stable recovery timestamp yet.");
+                    return false;
+                }
+            }
+
+            return true;
+        }, "Not all members have a stable recovery timestamp", this.timeoutMS, retryIntervalMS);
 
         print("AwaitLastStableRecoveryTimestamp: A stable recovery timestamp has successfully " +
               "established on " + id);
@@ -1905,7 +1899,7 @@ export class ReplSetTest {
                 targetNode.host} instead of primary.`);
         }
 
-        timeout = timeout || this.kDefaultTimeoutMS;
+        timeout = timeout || this.timeoutMS;
         retryIntervalMS = retryIntervalMS || 200;
 
         secondaryOpTimeType = secondaryOpTimeType || ReplSetTest.OpTimeType.LAST_APPLIED;
@@ -2273,7 +2267,7 @@ export class ReplSetTest {
 
             print("checkDBHashesForReplSet waiting for secondaries to be ready: " +
                   tojson(secondaries));
-            this.awaitSecondaryNodes(rst.kDefaultTimeoutMS, secondaries);
+            this.awaitSecondaryNodes(rst.timeoutMS, secondaries);
 
             print("checkDBHashesForReplSet checking data hashes against primary: " + primary.host);
 
@@ -2772,7 +2766,7 @@ export class ReplSetTest {
 
                 throw e;
             }
-        }, `Failed to run replSetFreeze cmd on ${node.host}`, this.kDefaultTimeoutMS);
+        }, `Failed to run replSetFreeze cmd on ${node.host}`, this.timeoutMS);
     }
 
     /**
@@ -3629,7 +3623,7 @@ function checkOplogs(rst, msgPrefix = 'checkOplogs', secondaries) {
 
     print("checkOplogs starting oplog checks.");
     print("checkOplogs waiting for secondaries to be ready.");
-    rst.awaitSecondaryNodes(rst.kDefaultTimeoutMS, secondaries);
+    rst.awaitSecondaryNodes(rst.timeoutMS, secondaries);
     if (secondaries.length >= 1) {
         let readers = [];
         let smallestTS = new Timestamp(Math.pow(2, 32) - 1, Math.pow(2, 32) - 1);
@@ -3783,7 +3777,7 @@ function checkPreImageCollection(rst, msgPrefix = 'checkPreImageCollection', sec
 
     print(`${msgPrefix} -- starting preimage checks.`);
     print(`${msgPrefix} -- waiting for secondaries to be ready.`);
-    rst.awaitSecondaryNodes(rst.kDefaultTimeoutMS, secondaries);
+    rst.awaitSecondaryNodes(rst.timeoutMS, secondaries);
     if (secondaries.length >= 1) {
         let collectionsWithPreimages = {};
         const nodes = rst.nodes;
@@ -3995,7 +3989,7 @@ function checkChangeCollection(rst, msgPrefix = 'checkChangeCollection', seconda
 
     print(`${msgPrefix} -- starting change_collection checks.`);
     print(`${msgPrefix} -- waiting for secondaries to be ready.`);
-    rst.awaitSecondaryNodes(rst.kDefaultTimeoutMS, secondaries);
+    rst.awaitSecondaryNodes(rst.timeoutMS, secondaries);
 
     // Get all change_collections for all tenants.
     let dbs = rst.getPrimary().getDBs();

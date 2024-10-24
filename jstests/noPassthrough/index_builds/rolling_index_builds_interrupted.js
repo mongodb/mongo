@@ -55,8 +55,7 @@ IndexBuildTest.buildIndexOnNodeAsStandalone(
 IndexBuildTest.buildIndexOnNodeAsStandalone(
     replTest, secondaries[1], standalonePort, dbName, collName, {x: 1}, 'x_1');
 
-replTest.awaitNodesAgreeOnPrimary(
-    replTest.kDefaultTimeoutMS, replTest.nodes, replTest.getNodeId(primary));
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, replTest.nodes, replTest.getNodeId(primary));
 
 jsTestLog('Build index on the primary as part of the replica set: ' + primary.host);
 let createIdx = IndexBuildTest.startIndexBuild(

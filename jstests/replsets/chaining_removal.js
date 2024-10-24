@@ -20,7 +20,7 @@ replTest.initiate({
         {_id: 4, host: nodes[4].host, priority: 0},
     ],
 });
-replTest.awaitNodesAgreeOnPrimary(replTest.kDefaultTimeoutMS, nodes, nodes[0]);
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, nodes, nodes[0]);
 var primary = replTest.getPrimary();
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.

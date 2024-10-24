@@ -19,7 +19,7 @@ replTest.awaitReplication();
 // Insert a document and implicitly create the collection.
 let resetCollection = function(w) {
     assert.commandWorked(
-        testColl.insert({_id: 0}, {writeConcern: {w: w, wtimeout: replTest.kDefaultTimeoutMS}}));
+        testColl.insert({_id: 0}, {writeConcern: {w: w, wtimeout: replTest.timeoutMS}}));
     assert.eq(1, testColl.find().itcount());
 };
 

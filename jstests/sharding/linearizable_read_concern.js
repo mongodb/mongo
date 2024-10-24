@@ -51,7 +51,7 @@ var testDB = st.s.getDB(dbName);
 
 // Set high election timeout so that primary doesn't step down during linearizable read test.
 var cfg = shard0ReplTest.getReplSetConfigFromNode(0);
-cfg.settings.electionTimeoutMillis = shard0ReplTest.kDefaultTimeoutMS;
+cfg.settings.electionTimeoutMillis = shard0ReplTest.timeoutMS;
 reconfig(shard0ReplTest, cfg, true);
 
 // Set up sharded collection. Put 5 documents on each shard, with keys {x: 0...9}.
@@ -79,7 +79,7 @@ var res = assert.commandFailed(testDB.runReadCommand({
     find: collName,
     filter: dualShardQueryFilter,
     readConcern: {level: "linearizable"},
-    maxTimeMS: shard0ReplTest.kDefaultTimeoutMS
+    maxTimeMS: shard0ReplTest.timeoutMS
 }));
 assert.eq(res.code, ErrorCodes.doMongosRewrite(st.s, ErrorCodes.NotWritablePrimary));
 
@@ -92,7 +92,7 @@ var res = assert.commandWorked(testDB.runReadCommand({
     sort: {x: 1},
     filter: dualShardQueryFilter,
     readConcern: {level: "linearizable"},
-    maxTimeMS: shard0ReplTest.kDefaultTimeoutMS
+    maxTimeMS: shard0ReplTest.timeoutMS
 }));
 
 // Make sure data was returned from both shards correctly.

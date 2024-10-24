@@ -71,7 +71,7 @@ hangBeforeTermBumpFpNode1.wait();
 
 // Wait for all nodes to acknowledge that node1 has become primary.
 jsTestLog(`Waiting for all nodes to agree on ${nodes[1].host} being primary`);
-replSet.awaitNodesAgreeOnPrimary(replSet.kDefaultTimeoutMS, nodes, nodes[1]);
+replSet.awaitNodesAgreeOnPrimary(replSet.timeoutMS, nodes, nodes[1]);
 
 // Check that the failpoint worked and the config has not changed.
 assert(getNodeConfigAndCompare(nodes[1], initialConfig, '='));
@@ -119,7 +119,7 @@ assert(getNodeConfigAndCompare(nodes[2], initialConfig, '='));
 
 // Lift the failpoint on node2 and wait for all nodes to see node1 as the only primary.
 hangBeforeTermBumpFpNode2.off();
-replSet.awaitNodesAgreeOnPrimary(replSet.kDefaultTimeoutMS, nodes, nodes[1]);
+replSet.awaitNodesAgreeOnPrimary(replSet.timeoutMS, nodes, nodes[1]);
 
 // Check that election metrics has been updated with the new reason counter.
 const statusAfterTakeover =

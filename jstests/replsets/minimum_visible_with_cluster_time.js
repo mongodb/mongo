@@ -51,11 +51,9 @@ const clusterTimeBumper = startParallelShell(bumpClusterTime, primary.port);
 assert.soon(() => syncColl.find().itcount() === 2);
 
 function doMajorityRead(coll, expectedCount) {
-    const res = assert.commandWorked(coll.runCommand('find', {
-        'filter': {x: 7},
-        'readConcern': {'level': 'majority'},
-        'maxTimeMS': rst.kDefaultTimeoutMS
-    }));
+    const res = assert.commandWorked(coll.runCommand(
+        'find',
+        {'filter': {x: 7}, 'readConcern': {'level': 'majority'}, 'maxTimeMS': rst.timeoutMS}));
     // Exhaust the cursor to avoid leaking cursors on the server.
     assert.eq(expectedCount, new DBCommandCursor(coll.getDB(), res).itcount());
 }

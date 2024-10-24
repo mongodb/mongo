@@ -50,7 +50,7 @@ var primary = replSetTest.getPrimary();
 
 jsTestLog("add an admin user");
 primary.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
-                                  {w: 3, wtimeout: replSetTest.kDefaultTimeoutMS});
+                                  {w: 3, wtimeout: replSetTest.timeoutMS});
 
 jsTestLog("starting 1 and 2 with key file");
 replSetTest.stop(1);

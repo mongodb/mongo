@@ -42,7 +42,7 @@ rst.awaitReplication();
 
 // Wait for all data bearing nodes to get up to date.
 assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert(
-    {a: 1}, {writeConcern: {w: 3, wtimeout: rst.kDefaultTimeoutMS}}));
+    {a: 1}, {writeConcern: {w: 3, wtimeout: rst.timeoutMS}}));
 
 // Stop the secondaries from replicating.
 stopServerReplication(secondaries);
@@ -85,7 +85,7 @@ waitForPrimary(nodes[1]);
 
 jsTest.log("Do a write to the new primary");
 assert.commandWorked(nodes[1].getDB(dbName).getCollection(collName).insert(
-    {a: 3}, {writeConcern: {w: 2, wtimeout: rst.kDefaultTimeoutMS}}));
+    {a: 3}, {writeConcern: {w: 2, wtimeout: rst.timeoutMS}}));
 
 jsTest.log("Reconnect the old primary to the rest of the nodes");
 // Only allow the old primary to connect to the other nodes, not the other way around.

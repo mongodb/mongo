@@ -60,8 +60,7 @@ jsTestLog('Repeat the procedure for the remaining secondary: ' + secondaries[1].
 IndexBuildTest.buildIndexOnNodeAsStandalone(
     replTest, secondaries[1], standalonePort, dbName, collName, {b: 1}, 'rolling_index_b_1');
 
-replTest.awaitNodesAgreeOnPrimary(
-    replTest.kDefaultTimeoutMS, replTest.nodes, replTest.getNodeId(primary));
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, replTest.nodes, replTest.getNodeId(primary));
 
 jsTestLog('Build index on the primary: ' + primary.host);
 assert.commandWorked(primaryDB.adminCommand({replSetStepDown: 60}));

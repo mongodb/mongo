@@ -31,7 +31,7 @@ function testRS(opts, succeed) {
         const oldTimeout = ReplSetTest.kDefaultTimeoutMS;
         const shortTimeout = 2 * 60 * 1000;
         ReplSetTest.kDefaultTimeoutMS = shortTimeout;
-        rs.kDefaultTimeoutMS = shortTimeout;
+        rs.timeoutMS = shortTimeout;
         // The rs.initiate will fail in an assert.soon, which would ordinarily trigger the hang
         // analyzer.  We don't want that to happen, so we disable it here.
         MongoRunner.runHangAnalyzer.disable();

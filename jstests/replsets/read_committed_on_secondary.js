@@ -72,7 +72,7 @@ function doDirtyRead(lastOp) {
     log("doing dirty read for lastOp:" + tojson(lastOp));
     var res = collSecondary.runCommand('find', {
         "readConcern": {"level": "local", "afterOpTime": lastOp},
-        "maxTimeMS": replTest.kDefaultTimeoutMS
+        "maxTimeMS": replTest.timeoutMS
     });
     assert.commandWorked(res);
     log("done doing dirty read.");
@@ -83,7 +83,7 @@ function doCommittedRead(lastOp) {
     log("doing committed read for optime: " + tojson(lastOp));
     var res = collSecondary.runCommand('find', {
         "readConcern": {"level": "majority", "afterOpTime": lastOp},
-        "maxTimeMS": replTest.kDefaultTimeoutMS
+        "maxTimeMS": replTest.timeoutMS
     });
     assert.commandWorked(res);
     log("done doing committed read.");

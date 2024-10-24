@@ -32,7 +32,7 @@ replSet.initiate({
                  {initiateWithDefaultElectionTimeout: true});
 
 // Wait until node 2 becomes primary.
-replSet.waitForState(2, ReplSetTest.State.PRIMARY, replSet.kDefaultTimeoutMS);
+replSet.waitForState(2, ReplSetTest.State.PRIMARY, replSet.timeoutMS);
 jsTestLog('node 2 is now primary');
 // The default WC is majority and this test can't test catchup properly if it used majority writes.
 assert.commandWorked(replSet.getPrimary().adminCommand(
@@ -48,7 +48,7 @@ nodes[2].disconnect(nodes[0]);
 
 // Ensure that node 0 becomes primary.
 assert.commandWorked(nodes[0].adminCommand({replSetStepUp: 1}));
-replSet.awaitNodesAgreeOnPrimary(replSet.kDefaultTimeoutMS, nodes.slice(0, 2));
+replSet.awaitNodesAgreeOnPrimary(replSet.timeoutMS, nodes.slice(0, 2));
 assert.eq(ReplSetTest.State.PRIMARY,
           assert.commandWorked(nodes[0].adminCommand('replSetGetStatus')).myState,
           nodes[0].host + " was not primary after step-up");
@@ -59,13 +59,13 @@ jsTestLog('node 0 is now primary');
 sleep(3000);
 
 var primary = replSet.getPrimary();
-var writeConcern = {writeConcern: {w: 2, wtimeout: replSet.kDefaultTimeoutMS}};
+var writeConcern = {writeConcern: {w: 2, wtimeout: replSet.timeoutMS}};
 assert.commandWorked(primary.getDB(name).bar.insert({y: 100}, writeConcern));
 
 // Write something so that node 0 is ahead of node 1.
 stopServerReplication(nodes[1]);
 writeConcern = {
-    writeConcern: {w: 1, wtimeout: replSet.kDefaultTimeoutMS}
+    writeConcern: {w: 1, wtimeout: replSet.timeoutMS}
 };
 assert.commandWorked(primary.getDB(name).bar.insert({x: 100}, writeConcern));
 
@@ -77,7 +77,7 @@ replSet.waitForConfigReplication(nodes[1], [nodes[1], nodes[2]]);
 
 // Step up a lagged node.
 assert.commandWorked(nodes[1].adminCommand({replSetStepUp: 1}));
-replSet.awaitNodesAgreeOnPrimary(replSet.kDefaultTimeoutMS, nodes);
+replSet.awaitNodesAgreeOnPrimary(replSet.timeoutMS, nodes);
 assert.eq(ReplSetTest.State.PRIMARY,
           assert.commandWorked(nodes[1].adminCommand('replSetGetStatus')).myState,
           nodes[1].host + " was not primary after step-up");
@@ -85,7 +85,7 @@ jsTestLog('node 1 is now primary, but cannot accept writes');
 
 // Confirm that the most up-to-date node becomes primary
 // after the default catchup delay.
-replSet.waitForState(0, ReplSetTest.State.PRIMARY, replSet.kDefaultTimeoutMS);
+replSet.waitForState(0, ReplSetTest.State.PRIMARY, replSet.timeoutMS);
 jsTestLog('node 0 performed catchup takeover and is now primary');
 
 // Wait until the old primary steps down.
@@ -98,10 +98,10 @@ replSet.awaitReplication();
 
 // Confirm that the highest priority node becomes primary
 // after catching up.
-replSet.waitForState(2, ReplSetTest.State.PRIMARY, replSet.kDefaultTimeoutMS);
+replSet.waitForState(2, ReplSetTest.State.PRIMARY, replSet.timeoutMS);
 jsTestLog('node 2 performed priority takeover and is now primary');
 
 // Wait until the old primary steps down so the connections won't be closed during stopSet().
-replSet.waitForState(0, ReplSetTest.State.SECONDARY, replSet.kDefaultTimeoutMS);
+replSet.waitForState(0, ReplSetTest.State.SECONDARY, replSet.timeoutMS);
 
 replSet.stopSet();

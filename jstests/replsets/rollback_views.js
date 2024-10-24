@@ -103,7 +103,7 @@ replTest.awaitNoPrimary();
 nodeA.reconnect(arbiter);
 assert.soon(() => replTest.getPrimary() == nodeA, "nodeA did not become primary as expected");
 // Ensure that the arbiter recognizes nodeA as primary.
-replTest.awaitNodesAgreeOnPrimary(replTest.kDefaultTimeoutMS, [nodeA, arbiter], nodeA);
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, [nodeA, arbiter], nodeA);
 
 // A is now primary and will perform writes that must be copied by B after rollback.
 assert.eq(a1.coll.find().itcount(), 2, "expected two documents in test1.coll");

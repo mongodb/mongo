@@ -97,8 +97,7 @@ buildIndexOnNodeAsStandalone(secondaries[0]);
 jsTestLog("D. Repeat the procedure for the remaining secondary: " + secondaries[1].host);
 buildIndexOnNodeAsStandalone(secondaries[1]);
 
-replTest.awaitNodesAgreeOnPrimary(
-    replTest.kDefaultTimeoutMS, replTest.nodes, replTest.getNodeId(primary));
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, replTest.nodes, replTest.getNodeId(primary));
 
 // The primary does not perform the rolling index build procedure. Instead, the createIndex command
 // is issued against the replica set, where both the secondaries have already built the index.

@@ -47,7 +47,7 @@ rollbackFp.off();
 
 // Wait for node0 to step-up to avoid InterrupetedDueToReplStateChange errors in the inserts below.
 restartServerReplication([node1, node2]);
-rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, rst.nodes, node0);
+rst.awaitNodesAgreeOnPrimary(rst.timeoutMS, rst.nodes, node0);
 rst.awaitReplication();
 
 // Advance the lastApplied on node0.
@@ -58,7 +58,7 @@ rst.awaitReplication();
 // When node0 stepped down it will start syncing again from node2, and it shouldn't crash trying to
 // apply entries older than the lastApplied.
 rst.stepUp(node2);
-rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, rst.nodes, node2);
+rst.awaitNodesAgreeOnPrimary(rst.timeoutMS, rst.nodes, node2);
 rst.awaitReplication();
 
 // Verify node0 can replicate new writes.

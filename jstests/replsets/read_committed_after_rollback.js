@@ -123,12 +123,12 @@ restartServerReplication(pureSecondary);
 // Do a write to the new primary so that the old primary can establish a sync source to learn
 // about the new commit.
 assert.commandWorked(newPrimary.getDB(name).unrelatedCollection.insert(
-    {a: 1}, {writeConcern: {w: 'majority', wtimeout: replTest.kDefaultTimeoutMS}}));
+    {a: 1}, {writeConcern: {w: 'majority', wtimeout: replTest.timeoutMS}}));
 assert.eq(doCommittedRead(newPrimaryColl), 'new');
 // Do another write to the new primary so that the old primary can be sure to receive the
 // new committed optime.
 assert.commandWorked(newPrimary.getDB(name).unrelatedCollection.insert(
-    {a: 2}, {writeConcern: {w: 'majority', wtimeout: replTest.kDefaultTimeoutMS}}));
+    {a: 2}, {writeConcern: {w: 'majority', wtimeout: replTest.timeoutMS}}));
 assert.eq(doCommittedRead(oldPrimaryColl), 'new');
 
 // Verify data consistency between nodes.

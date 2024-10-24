@@ -30,13 +30,13 @@ replSet.awaitReplication();
 // Write something so that nodes 0 and 1 are ahead.
 stopServerReplication(nodes.slice(2, 5));
 const primary = replSet.getPrimary();
-var writeConcern = {writeConcern: {w: 2, wtimeout: replSet.kDefaultTimeoutMS}};
+var writeConcern = {writeConcern: {w: 2, wtimeout: replSet.timeoutMS}};
 assert.commandWorked(primary.getDB(name).bar.insert({x: 100}, writeConcern));
 
 // Write something so that node 0 is ahead of node 1.
 stopServerReplication(nodes[1]);
 writeConcern = {
-    writeConcern: {w: 1, wtimeout: replSet.kDefaultTimeoutMS}
+    writeConcern: {w: 1, wtimeout: replSet.timeoutMS}
 };
 assert.commandWorked(primary.getDB(name).bar.insert({y: 100}, writeConcern));
 
@@ -66,7 +66,7 @@ verifyServerStatusElectionReasonCounterChange(
     initialPrimaryStatus.electionMetrics, newPrimaryStatus.electionMetrics, "catchUpTakeover", 1);
 
 // Wait until the old primary steps down.
-replSet.waitForState(2, ReplSetTest.State.SECONDARY, replSet.kDefaultTimeoutMS);
+replSet.waitForState(2, ReplSetTest.State.SECONDARY, replSet.timeoutMS);
 
 // Check that the 'numCatchUpsFailedWithNewTerm' field has been incremented in serverStatus, and
 // that none of the other reasons for catchup concluding has been incremented.

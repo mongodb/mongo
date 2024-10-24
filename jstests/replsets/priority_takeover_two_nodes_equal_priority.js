@@ -30,8 +30,8 @@ assert.soon(
         return primaryIndex !== defaultPriorityNodeIndex;
     },
     'Neither of the high priority nodes was elected primary.',
-    replTest.kDefaultTimeoutMS,  // timeout
-    1000                         // interval
+    replTest.timeoutMS,  // timeout
+    1000                 // interval
 );
 
 jsTestLog("Stepping down the current primary.");

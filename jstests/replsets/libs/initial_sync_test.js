@@ -49,7 +49,7 @@ export function InitialSyncTest(
 
     assert.eq(2, replSet.nodes.length, "Replica set must contain exactly two nodes.");
 
-    let initialSyncTimeout = timeout || replSet.kDefaultTimeoutMS;
+    let initialSyncTimeout = timeout || replSet.timeoutMS;
 
     const primary = replSet.getPrimary();
     let secondary = replSet.getSecondary();
