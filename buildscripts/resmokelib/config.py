@@ -104,6 +104,7 @@ DEFAULTS = {
     "run_no_feature_flag_tests": False,
     "additional_feature_flags": None,
     "additional_feature_flags_file": None,
+    "disable_feature_flags": None,
     "seed": int(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "service_executor": None,
     "shell_conn_string": None,
@@ -460,6 +461,9 @@ RUN_NO_FEATURE_FLAG_TESTS = None
 
 # the path to a file containing feature flags
 ADDITIONAL_FEATURE_FLAGS_FILE = None
+
+# List of feature flags to disable
+DISABLE_FEATURE_FLAGS = None
 
 # List of enabled feature flags.
 ENABLED_FEATURE_FLAGS = []

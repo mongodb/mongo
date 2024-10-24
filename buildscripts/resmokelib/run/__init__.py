@@ -1607,6 +1607,14 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
+            "--disableFeatureFlags",
+            dest="disable_feature_flags",
+            action="append",
+            metavar="featureFlag1, featureFlag2, ...",
+            help="Disable tests with certain feature flags",
+        )
+
+        parser.add_argument(
             "--maxTestQueueSize", type=int, dest="max_test_queue_size", help=argparse.SUPPRESS
         )
 

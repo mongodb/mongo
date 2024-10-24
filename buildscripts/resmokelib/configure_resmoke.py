@@ -309,6 +309,7 @@ be invoked as either:
         _config.RUN_ALL_FEATURE_FLAG_TESTS = config.pop("run_all_feature_flag_tests")
         _config.RUN_NO_FEATURE_FLAG_TESTS = config.pop("run_no_feature_flag_tests")
         _config.ADDITIONAL_FEATURE_FLAGS_FILE = config.pop("additional_feature_flags_file")
+        _config.DISABLE_FEATURE_FLAGS = config.pop("disable_feature_flags")
 
         if values.command == "run":
             # These logging messages start with # becuase the output of this file must produce
@@ -333,6 +334,13 @@ be invoked as either:
         additional_feature_flags = _tags_from_list(config.pop("additional_feature_flags"))
         if additional_feature_flags is not None:
             enabled_feature_flags.extend(additional_feature_flags)
+
+        # Remove feature flags which enabled with other feature flags arguments
+        if _config.DISABLE_FEATURE_FLAGS:
+            disable_feature_flags = _tags_from_list(_config.DISABLE_FEATURE_FLAGS)
+            for flag in disable_feature_flags:
+                if flag in enabled_feature_flags:
+                    enabled_feature_flags.remove(flag)
 
         return enabled_feature_flags, all_ff
 
