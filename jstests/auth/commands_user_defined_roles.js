@@ -17,6 +17,7 @@ import {
 } from "jstests/auth/lib/commands_lib.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 // This test involves killing all sessions, which will not work as expected if the kill command is
 // sent with an implicit session.
@@ -230,17 +231,26 @@ function createUsers(conn) {
     assert(adminDb.auth(testUser, "password"));
 }
 
+let mongotmock;
+let mongotHost = "localhost:27017";
+if (!_isWindows()) {
+    mongotmock = new MongotMock();
+    mongotmock.start();
+    mongotHost = mongotmock.getConnection().host;
+}
+
 const opts = {
     auth: "",
     setParameter: {
-        mongotHost: "localhost:27017",  // We have to set the mongotHost parameter for the
-                                        // $search-related tests to pass configuration checks.
+        mongotHost,   // We have to set the mongotHost parameter for the
+                      // $search-related tests to pass configuration checks.
         syncdelay: 0  // Disable checkpoints as this can cause some commands to fail transiently.
     }
 };
 const impls = {
     createUsers: createUsers,
-    runOneTest: runOneTest
+    runOneTest: runOneTest,
+    getSideChannel: conn => conn.sidechannel,
 };
 
 // run all tests standalone
@@ -263,9 +273,13 @@ const impls = {
         keyFile: "jstests/libs/key1",
         // We have to set the mongotHost parameter for the $search-related tests to pass
         // configuration checks.
-        other: {rsOptions: opts, mongosOptions: {setParameter: {mongotHost: "localhost:27017"}}}
+        other: {rsOptions: opts, mongosOptions: {setParameter: {mongotHost}}}
     });
     conn.sidechannel = new Mongo(conn.s0.host);
     authCommandsLib.runTests(conn, impls);
     conn.stop();
+}
+
+if (mongotmock) {
+    mongotmock.stop();
 }
