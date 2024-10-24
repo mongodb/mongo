@@ -30,7 +30,6 @@ env.Library(
 env.CppUnitTest(
     target="optimizer_test",
     source=[
-        "optimizer_test.cpp",
         "reference_tracker_test.cpp",
         "unit_test_infra_test.cpp",
     ],

@@ -603,6 +603,12 @@ TEST(TreeCursorTest, CursorPostorder) {
               "AtLeastBinaryNode");
 }
 
+TEST(PolyValueTest, Ref) {
+    Tree leaf = Tree::make<Leaf>(1.0);
+    auto ref = leaf.ref();
+    ASSERT_EQ(leaf.tagOf(), ref.tagOf());
+}
+
 TEST(TreeCursorTest, CursorPreorder) {
     Tree demoTree = Tree::make<AtLeastBinaryNode>(
         std::vector<Tree>{
