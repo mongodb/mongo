@@ -1004,6 +1004,8 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--use_sasl_client={env.GetOption("use-sasl-client") is not None}',
         "--define",
         f"MONGO_VERSION={env['MONGO_VERSION']}",
+        "--define",
+        f"MONGO_DISTMOD={env['MONGO_DISTMOD']}",
         "--compilation_mode=dbg",  # always build this compilation mode as we always build with -g
     ]
 

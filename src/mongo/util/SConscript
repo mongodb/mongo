@@ -19,51 +19,6 @@ env = env.Clone()
 
 env.InjectThirdParty("asio")
 
-js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else "none"
-
-module_list = ",\n".join(['"{0}"_sd'.format(x) for x in env["MONGO_MODULES"]])
-
-
-# Render the MONGO_BUILDINFO_ENVIRONMENT_DATA dict into an initializer for a
-# `std::vector<VersionInfoInterface::BuildInfoField>`.
-def fmtBuildInfo(data):
-    def fmtBool(val):
-        return "true" if val else "false"
-
-    def fmtStr(val):
-        return 'R"({0})"_sd'.format(val.replace("\\", r"\\"))
-
-    def fmtObj(obj):
-        return "{{{}, {}, {}, {}}}".format(
-            fmtStr(obj["key"]),
-            fmtStr(env.subst(obj["value"])),
-            fmtBool(obj["inBuildInfo"]),
-            fmtBool(obj["inVersion"]),
-        )
-
-    return ",\n".join([fmtObj(obj) for _, obj in data.items()])
-
-
-buildInfoInitializer = fmtBuildInfo(env["MONGO_BUILDINFO_ENVIRONMENT_DATA"])
-
-generatedVersionFile = env.Substfile(
-    "version_constants.h.in",
-    SUBST_DICT=[
-        ("@mongo_version@", env["MONGO_VERSION"]),
-        ("@mongo_version_major@", version_parts[0]),
-        ("@mongo_version_minor@", version_parts[1]),
-        ("@mongo_version_patch@", version_parts[2]),
-        ("@mongo_version_extra@", version_parts[3]),
-        ("@mongo_version_extra_str@", version_extra),
-        ("@mongo_git_hash@", env["MONGO_GIT_HASH"]),
-        ("@buildinfo_js_engine@", js_engine_ver),
-        ("@buildinfo_allocator@", env["MONGO_ALLOCATOR"]),
-        ("@buildinfo_modules@", module_list),
-        ("@buildinfo_environment_data@", buildInfoInitializer),
-    ],
-)
-env.Alias("generated-sources", generatedVersionFile)
-
 if env.TargetOSIs("windows"):
     enterpriseEnv = env.Clone().InjectModule("enterprise")
     generatedResourceConstantFile = enterpriseEnv.Substfile(
@@ -92,16 +47,6 @@ env.SConscript(
         "env",
         "version_extra",
         "version_parts",
-    ],
-)
-
-env.Library(
-    target="version_impl",
-    source=[
-        "version_impl.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 

@@ -23,11 +23,30 @@ def generate_config_header_impl(ctx):
         action_name = ACTION_NAMES.cpp_compile,
         variables = compile_variables,
     )
+    link_flags = cc_common.get_memory_inefficient_command_line(
+        feature_configuration = feature_configuration,
+        action_name = ACTION_NAMES.cpp_link_executable,
+        variables = compile_variables,
+    )
     env_flags = cc_common.get_environment_variables(
         feature_configuration = feature_configuration,
         action_name = ACTION_NAMES.cpp_compile,
         variables = compile_variables,
     )
+
+    expanded_extra_definitions = {}
+    for key, val in ctx.attr.extra_definitions.items():
+        # Bazel throws an error if you try to call this on a location var
+        if "$(location" not in val:
+            expanded_extra_definitions |= {
+                key: ctx.expand_make_variables("generate_config_header_expand", val, ctx.var),
+            }
+
+    expanded_extra_definitions |= {
+        "compile_variables": " ".join(compiler_flags + ctx.attr.cpp_opts),
+        "linkflags": " ".join(link_flags + ctx.attr.cpp_linkflags),
+        "cpp_defines": " ".join(ctx.attr.cpp_defines),
+    }
 
     python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
     generator_script = ctx.attr.generator_script.files.to_list()[0].path
@@ -66,7 +85,7 @@ def generate_config_header_impl(ctx):
                         "--compiler-path",
                         compiler_bin,
                         "--extra-definitions",
-                        json.encode(ctx.attr.extra_definitions),
+                        json.encode(expanded_extra_definitions),
                     ] +
                     additional_inputs +
                     [
@@ -105,6 +124,15 @@ generate_config_header = rule(
         "additional_inputs": attr.label_list(
             doc = "Additional inputs to this rule.",
             allow_files = True,
+        ),
+        "cpp_linkflags": attr.string_list(
+            doc = "C++ linkflags.",
+        ),
+        "cpp_opts": attr.string_list(
+            doc = "C++ opts.",
+        ),
+        "cpp_defines": attr.string_list(
+            doc = "C++ defines.",
         ),
         "generator_script": attr.label(
             doc = "The python generator script to use.",

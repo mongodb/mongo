@@ -192,7 +192,10 @@ common --bes_upload_mode=fully_async
 # common --remote_download_outputs=toplevel
 
 # Default Mongo Version if a version is not specified.
-build --define=MONGO_VERSION=8.1.0
+build --define=MONGO_VERSION=8.1.0-alpha
+
+# Default distmod if not specified.
+build --define=MONGO_DISTMOD=""
 
 # try to import the bazelrc files if available
 try-import %workspace%/.bazelrc.local

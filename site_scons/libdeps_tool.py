@@ -1496,7 +1496,10 @@ def generate_libdeps_graph(env):
             graph_hash,
             [env.File("#SConstruct")]
             + glob.glob("**/SConscript", recursive=True)
-            + [os.path.abspath(__file__), env.File("$BUILD_DIR/mongo/util/version_constants.h")],
+            + [
+                os.path.abspath(__file__),
+                env.File("$BAZEL_OUT_DIR/src/mongo/util/version_constants.h"),
+            ],
         )
 
         graph_node = env.Command(

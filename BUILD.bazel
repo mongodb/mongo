@@ -7,7 +7,14 @@ exports_files([
     "pyproject.toml",
     "poetry.lock",
     "symbols.orderfile",
+    ".git/HEAD",
 ])
+
+# glob to allow this to be empty
+filegroup(
+    name = "git_head_optional",
+    srcs = glob([".git/HEAD"]),
+)
 
 npm_link_all_packages(name = "node_modules")
 

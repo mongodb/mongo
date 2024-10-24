@@ -54,3 +54,6 @@ filters:
   - "read_through_cache*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "version_constants_gen.py":
+    approvers:
+      - 10gen/devprod-build
