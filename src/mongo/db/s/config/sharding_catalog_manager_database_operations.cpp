@@ -32,12 +32,9 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
-#include <cstddef>
 #include <fmt/format.h>
 #include <memory>
 #include <string>
-#include <tuple>
-#include <utility>
 #include <vector>
 
 #include "mongo/base/error_codes.h"
@@ -58,7 +55,6 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -74,19 +70,16 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -107,16 +100,9 @@ namespace {
 
 using namespace fmt::literals;
 
-}  // namespace
-
-DatabaseType ShardingCatalogManager::createDatabase(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const boost::optional<ShardId>& optPrimaryShard,
-    const SerializationContext& serializationContext,
-    bool createDatabaseCoordinator) {
-    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
+// Returns an error if the requested dbName to be created violates the constraints.
+// If 'config' database is requested, simply return 'config' database on the config server.
+boost::optional<DatabaseType> _checkDbNameConstraints(const DatabaseName& dbName) {
     if (dbName.isConfigDB()) {
         return DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
@@ -135,41 +121,108 @@ DatabaseType ShardingCatalogManager::createDatabase(
             str::stream() << "Invalid db name specified: " << dbName.toStringForErrorMsg(),
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Disallow));
 
+    return boost::none;
+}
+
+// Resolves the shard against the received parameter (which may encode either a shard ID or a
+// connection string).
+boost::optional<ShardId> _resolvePrimaryShard(OperationContext* opCtx,
+                                              const boost::optional<ShardId>& optPrimaryShard) {
+    if (optPrimaryShard) {
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "invalid shard name: " << *optPrimaryShard,
+                optPrimaryShard->isValid());
+        return uassertStatusOK(shardRegistry->getShard(opCtx, *optPrimaryShard))->getId();
+    }
+    return boost::none;
+}
+
+BSONObj _constructDbMatchFilterExact(const std::string& dbNameStr,
+                                     const boost::optional<ShardId>& optResolvedPrimaryShard) {
+    BSONObjBuilder filterBuilder;
+    filterBuilder.append(DatabaseType::kDbNameFieldName, dbNameStr);
+    if (optResolvedPrimaryShard) {
+        filterBuilder.append(DatabaseType::kPrimaryFieldName, *optResolvedPrimaryShard);
+    }
+    return filterBuilder.obj();
+}
+
+BSONObj _constructDbMatchFilterCaseInsensitive(const std::string& dbNameStr) {
+    BSONObjBuilder filterBuilder;
+    filterBuilder.appendRegex(
+        DatabaseType::kDbNameFieldName, "^{}$"_format(pcre_util::quoteMeta(dbNameStr)), "i");
+    return filterBuilder.obj();
+}
+
+void _checkAgainstExistingDbDoc(const DatabaseType& existingDb,
+                                const BSONObj dbDoc,
+                                const DatabaseName& dbName,
+                                const boost::optional<ShardId>& optResolvedPrimaryShard) {
+    uassert(ErrorCodes::DatabaseDifferCase,
+            str::stream() << "can't have 2 databases that just differ on case "
+                          << " have: " << existingDb.getDbName().toStringForErrorMsg()
+                          << " want to add: " << dbName.toStringForErrorMsg(),
+            existingDb.getDbName() == dbName);
+
+    uassert(ErrorCodes::NamespaceExists,
+            str::stream() << "database already created on a primary which is different from "
+                          << optResolvedPrimaryShard,
+            !optResolvedPrimaryShard || *optResolvedPrimaryShard == existingDb.getPrimary());
+}
+
+ShardId getCandidatePrimaryShard(OperationContext* opCtx,
+                                 const boost::optional<ShardId>& optResolvedPrimaryShard) {
+    // If there was no explicit dbPrimary shard choosen by the caller, then select one here (the
+    // least loaded non-draining shard).
+    return optResolvedPrimaryShard ? *optResolvedPrimaryShard
+                                   : shardutil::selectLeastLoadedNonDrainingShard(opCtx);
+}
+
+void _refreshDbVersionOnPrimaryShard(OperationContext* opCtx,
+                                     const std::string& dbNameStr,
+                                     const ShardId& primaryShard) {
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    const auto primaryShardPtr = uassertStatusOK(shardRegistry->getShard(opCtx, primaryShard));
+    auto cmdResponse = uassertStatusOK(primaryShardPtr->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        DatabaseName::kAdmin,
+        BSON("_flushDatabaseCacheUpdates" << dbNameStr),
+        Shard::RetryPolicy::kIdempotent));
+    uassertStatusOK(cmdResponse.commandStatus);
+}
+
+}  // namespace
+
+DatabaseType ShardingCatalogManager::createDatabase(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const boost::optional<ShardId>& optPrimaryShard,
+    const SerializationContext& serializationContext,
+    bool createDatabaseCoordinator) {
+    if (const auto configDatabaseOpt = _checkDbNameConstraints(dbName)) {
+        return configDatabaseOpt.get();
+    }
+
     // Make sure to force update of any stale metadata
     ON_BLOCK_EXIT([&] { RoutingInformationCache::get(opCtx)->purgeDatabase(dbName); });
 
-    auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
-
-    DBDirectClient client(opCtx);
-
-    // Resolve the shard against the received parameter (which may encode either a shard ID or a
-    // connection string).
-    const boost::optional<ShardId> optResolvedPrimaryShard = [&]() -> boost::optional<ShardId> {
-        if (optPrimaryShard) {
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "invalid shard name: " << *optPrimaryShard,
-                    optPrimaryShard->isValid());
-            return uassertStatusOK(shardRegistry->getShard(opCtx, *optPrimaryShard))->getId();
-        }
-        return boost::none;
-    }();
+    const boost::optional<ShardId> optResolvedPrimaryShard =
+        _resolvePrimaryShard(opCtx, optPrimaryShard);
 
     const auto dbNameStr = DatabaseNameUtil::serialize(dbName, serializationContext);
-    const auto dbMatchFilter = [&] {
-        BSONObjBuilder filterBuilder;
-        filterBuilder.append(DatabaseType::kDbNameFieldName, dbNameStr);
-        if (optResolvedPrimaryShard) {
-            filterBuilder.append(DatabaseType::kPrimaryFieldName, *optResolvedPrimaryShard);
-        }
-        return filterBuilder.obj();
-    }();
+    const auto dbMatchFilterExact =
+        _constructDbMatchFilterExact(dbNameStr, optResolvedPrimaryShard);
 
+    auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+    DBDirectClient client(opCtx);
     boost::optional<DDLLockManager::ScopedBaseDDLLock> dbLock;
 
     // First perform an optimistic attempt without taking the lock to check if database exists.
     // If the database is not found take the lock and try again.
     while (true) {
-        auto dbObj = client.findOne(NamespaceString::kConfigDatabasesNamespace, dbMatchFilter);
+        auto dbObj = client.findOne(NamespaceString::kConfigDatabasesNamespace, dbMatchFilterExact);
         if (!dbObj.isEmpty()) {
             replClient.setLastOpToSystemLastOpTime(opCtx);
             return DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj);
@@ -195,26 +248,13 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
     // Check if a database already exists with the same name (case insensitive), and if so, return
     // the existing entry.
-    BSONObjBuilder queryBuilder;
-    queryBuilder.appendRegex(
-        DatabaseType::kDbNameFieldName, "^{}$"_format(pcre_util::quoteMeta(dbNameStr)), "i");
-
-    auto dbDoc = client.findOne(NamespaceString::kConfigDatabasesNamespace, queryBuilder.obj());
+    const auto dbMatchFilterCaseInsensitive = _constructDbMatchFilterCaseInsensitive(dbNameStr);
+    auto dbDoc =
+        client.findOne(NamespaceString::kConfigDatabasesNamespace, dbMatchFilterCaseInsensitive);
     auto returnDatabaseValue = [&] {
         if (!dbDoc.isEmpty()) {
             auto actualDb = DatabaseType::parse(IDLParserContext("DatabaseType"), dbDoc);
-
-            uassert(ErrorCodes::DatabaseDifferCase,
-                    str::stream() << "can't have 2 databases that just differ on case "
-                                  << " have: " << actualDb.getDbName().toStringForErrorMsg()
-                                  << " want to add: " << dbName.toStringForErrorMsg(),
-                    actualDb.getDbName() == dbName);
-
-            uassert(
-                ErrorCodes::NamespaceExists,
-                str::stream() << "database already created on a primary which is different from "
-                              << optResolvedPrimaryShard,
-                !optResolvedPrimaryShard || *optResolvedPrimaryShard == actualDb.getPrimary());
+            _checkAgainstExistingDbDoc(actualDb, dbDoc, dbName, optResolvedPrimaryShard);
 
             // We did a local read of the database entry above and found that the database already
             // exists. However, the data may not be majority committed (a previous createDatabase
@@ -226,11 +266,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
             return actualDb;
         } else {
             while (true) {
-                // If there was no explicit dbPrimary shard choosen by the caller, then select one
-                // here (the least loaded non-draining shard).
-                const ShardId candidatePrimaryShardId = optResolvedPrimaryShard
-                    ? *optResolvedPrimaryShard
-                    : shardutil::selectLeastLoadedNonDrainingShard(opCtx);
+                const auto candidatePrimaryShardId =
+                    getCandidatePrimaryShard(opCtx, optResolvedPrimaryShard);
 
                 auto retries = 10;
                 try {
@@ -278,16 +315,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
     // would fail with StaleDbVersion. Making the primary shard refresh here allows that first
     // transaction to succeed. This allows our transaction passthrough suites and transaction demos
     // to succeed without additional special logic.
-    const auto primaryShardPtr =
-        uassertStatusOK(shardRegistry->getShard(opCtx, returnDatabaseValue.getPrimary()));
-    auto cmdResponse = uassertStatusOK(primaryShardPtr->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        DatabaseName::kAdmin,
-        BSON("_flushDatabaseCacheUpdates"
-             << DatabaseNameUtil::serialize(dbName, serializationContext)),
-        Shard::RetryPolicy::kIdempotent));
-    uassertStatusOK(cmdResponse.commandStatus);
+    _refreshDbVersionOnPrimaryShard(opCtx, dbNameStr, returnDatabaseValue.getPrimary());
 
     return returnDatabaseValue;
 }
