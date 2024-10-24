@@ -253,5 +253,25 @@ int main(int argc, char* argv[]) {
         fillMaxSize(ob);
     });
 
+    // add a bunch of invalid null bytes in the middle of a string
+    genBSONObj([&](mongo::BSONObjBuilder& ob) -> void {
+        const std::array<mongo::StringData, 9> bunchOfStringsWithNulls = {
+            // Starts with null chars.
+            mongo::StringData{"\x00a", 2},
+            // Ends with null chars.
+            mongo::StringData{"a\x00", 2},
+            // All null chars.
+            mongo::StringData{"\x00", 1},
+            mongo::StringData{"\x00\x00\x00", 3},
+            // Null chars somewhere in the middle.
+            mongo::StringData{"a\x00\x01\x08a", 5},
+            mongo::StringData{"a\x00\x02\x08b", 5},
+            mongo::StringData{"a\x00\x01\x10", 4},
+            mongo::StringData{"a\x00\x01\xc0", 4},
+            mongo::StringData{"a\x00\x01\x03d\x00\xff\xff\xff\xff\x00\x08b", 13}};
+        std::string name = "String";
+        for (size_t i = 0; i < bunchOfStringsWithNulls.size(); ++i)
+            ob.append(name + std::to_string(i), bunchOfStringsWithNulls[i]);
+    });
     return 0;
 }

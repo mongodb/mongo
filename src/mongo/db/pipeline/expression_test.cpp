@@ -3747,6 +3747,28 @@ TEST(ExpressionSubtractTest, OverflowLong) {
     ASSERT_EQ(result.getDouble(), static_cast<double>(minLong) * -1);
 }
 
+TEST(ExpressionGetFieldTest, GetFieldTestNullByte) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    StringData str("fo\0o", 4);
+    BSONObjBuilder b;
+    b.append("$meta"_sd, str);
+    BSONObj expr{b.obj()};
+    auto expression = ExpressionGetField::parse(&expCtx, expr.firstElement(), vps);
+    BSONObj expr1 = fromjson("{$meta: \"foo\"}");
+    auto expression1 = ExpressionGetField::parse(&expCtx, expr1.firstElement(), vps);
+    auto value1 = expression->serialize();
+    auto value2 = expression1->serialize();
+    auto str1 = value1.toString();
+    auto str2 = value2.toString();
+    ASSERT(str1.size() == str2.size() + 1);
+    // find the first null byte and delete it in order to compare
+    str1.erase(std::find(str1.begin(), str1.end(), '\0'));
+    ASSERT(str1 == str2);
+    // the 2 values should be equivalent. Despite the null byte inserted in expr.
+    ASSERT((value1 == value2).type == Value::DeferredComparison::Type::kEQ);
+}
+
 TEST(ExpressionGetFieldTest, GetFieldSerializesStringArgumentCorrectly) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
@@ -4375,7 +4397,6 @@ TEST(ExpressionSetFieldTest, SetFieldSerializesCorrectly) {
 
 TEST(ExpressionSetFieldTest, SetFieldRejectsNullCharInFieldArgument) {
     auto expCtx = ExpressionContextForTest{};
-    VariablesParseState vps = expCtx.variablesParseState;
     auto fieldExpr = make_intrusive<ExpressionConstant>(&expCtx, Value("ab\0c"_sd));
     auto inputExpr = make_intrusive<ExpressionConstant>(&expCtx, Value(BSON("a" << 1)));
     auto valueExpr = make_intrusive<ExpressionConstant>(&expCtx, Value(true));
