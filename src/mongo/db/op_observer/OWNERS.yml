@@ -12,3 +12,6 @@ filters:
   - "fcv_op_observer*":
     approvers:
       - 10gen/server-replication
+  - "find_and_modify_images_op_observer*":
+    approvers:
+      - 10gen/server-replication

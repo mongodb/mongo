@@ -1,8 +1,11 @@
 version: 1.0.0
 filters:
-  - "capped*":
+  - "*capped*":
     approvers:
       - 10gen/server-storage-execution
+  - "collection_compact*":
+    approvers:
+      - 10gen/server-rss-sydney
   - "collection_validation*":
     approvers:
       - 10gen/server-storage-execution
@@ -10,6 +13,10 @@ filters:
   - "commit_quorum*":
     approvers:
       - 10gen/server-storage-execution
+  - "health_log*":
+    approvers:
+      - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
   - "import*":
     approvers:
       - 10gen/server-storage-execution
@@ -22,6 +29,13 @@ filters:
     approvers:
       - 10gen/server-storage-execution
       - 10gen/server-rss-sydney
+  - "index_key_validate*":
+    approvers:
+      - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
+  - "index_spec_validate*":
+    approvers:
+      - 10gen/server-storage-execution
   - "index_repair*":
     approvers:
       - 10gen/server-storage-execution
@@ -120,3 +134,6 @@ filters:
   - "virtual_collection*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "local_oplog_info*":
+    approvers:
+      - 10gen/server-replication

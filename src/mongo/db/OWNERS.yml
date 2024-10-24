@@ -57,6 +57,9 @@ filters:
   - "*change_stream*":
     approvers:
       - 10gen/query-execution
+  - "aggregated_index_usage_tracker*":
+    approvers:
+      - 10gen/query-execution
   - "collection_index_usage_tracker*":
     approvers:
       - 10gen/query-execution
@@ -133,3 +136,24 @@ filters:
   - "server_lifecycle_monitor*":
     approvers:
       - 10gen/server-programmability
+  - "prepare_conflict_tracker*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "rebuild_indexes*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "repl_set_member_in_standalone_mode*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "server_recovery*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "mongod_options_storage.idl":
+    approvers:
+      - 10gen/server-storage-execution
+  - "dbhelpers*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "dbcommands.idl":
+    approvers:
+      - 10gen/server-storage-execution

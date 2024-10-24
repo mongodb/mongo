@@ -1,5 +1,9 @@
 version: 1.0.0
 filters:
+  - "deferred_writer*":
+    approvers:
+      - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
   - "exception_util*": # note we also match the idl file with this rule
     approvers:
       - 10gen/server-programmability
@@ -9,6 +13,9 @@ filters:
   - "lock*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "replication_state_transition_lock_guard*":
+    approvers:
+      - 10gen/server-replication
   - "resource_catalog*":
     approvers:
       - 10gen/server-catalog-and-routing

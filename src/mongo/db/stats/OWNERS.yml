@@ -14,3 +14,6 @@ filters:
   - "latency_server_status_section.cpp":
     approvers:
       - 10gen/query-integration-observability
+  - "*resource_consumption*":
+    approvers:
+      - 10gen/server-storage-execution

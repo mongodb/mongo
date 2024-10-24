@@ -88,3 +88,28 @@ filters:
   - "validate_db_metadata*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "set_index_commit_quorum*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "dbcommands*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "collection_to_capped*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "resize_oplog*":
+    approvers:
+      - 10gen/server-storage-execution
+  - "apply_ops*":
+    approvers:
+      - 10gen/server-replication
+  - "set_feature_compatibility_version*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/server-replication
+  - "snapshot_management*":
+    approvers:
+      - 10gen/server-replication
+  - "*compact*":
+    approvers:
+      - 10gen/server-rss-sydney
