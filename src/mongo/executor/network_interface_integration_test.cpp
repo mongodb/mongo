@@ -1283,8 +1283,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
     auto opCtx = client->makeOperationContext();
     ASSERT(shutdownComplete.waitFor(opCtx.get(), Seconds(30)));
 
-    ASSERT(pf.future.isReady());
-    ASSERT_EQ(pf.future.get().status, ErrorCodes::ShutdownInProgress);
+    // Since shutdown has completed, this future should be ready very soon if not immediately.
+    ASSERT_EQ(getWithTimeout(pf.future, *opCtx, Seconds(1)).status, ErrorCodes::ShutdownInProgress);
 
     assertNumOps(1u, 0u, 0u, 0u);
 
@@ -1332,8 +1332,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownAfterSendRequest) {
     auto opCtx = client->makeOperationContext();
     ASSERT(shutdownComplete.waitFor(opCtx.get(), Seconds(30)));
 
-    ASSERT(pf.future.isReady());
-    ASSERT_EQ(pf.future.get().status, ErrorCodes::ShutdownInProgress);
+    // Since shutdown has completed, this future should be ready very soon if not immediately.
+    ASSERT_EQ(getWithTimeout(pf.future, *opCtx, Seconds(1)).status, ErrorCodes::ShutdownInProgress);
 
     assertNumOps(1u, 0u, 0u, 0u);
 

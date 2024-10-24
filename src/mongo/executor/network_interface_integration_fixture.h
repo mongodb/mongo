@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/baton.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/executor_integration_test_fixture.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -163,6 +164,13 @@ public:
     /** Returns an Interruptible appropriate for the Baton returned from baton(). */
     virtual Interruptible* interruptible() {
         return Interruptible::notInterruptible();
+    }
+
+    template <typename FutureType>
+    auto getWithTimeout(FutureType& future, Interruptible& interruptible, Milliseconds timeout) {
+        auto deadline = getGlobalServiceContext()->getFastClockSource()->now() + timeout;
+        auto guard = interruptible.makeDeadlineGuard(deadline, ErrorCodes::ExceededTimeLimit);
+        return future.get(&interruptible);
     }
 
 private:
