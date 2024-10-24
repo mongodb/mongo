@@ -131,6 +131,9 @@ Status ServiceExecutorReserved::_startWorker() {
             if (launchReplacement) {
                 auto threadStartStatus = _startWorker();
                 if (!threadStartStatus.isOK()) {
+                    lk.lock();
+                    _numStartingThreads--;
+                    lk.unlock();
                     LOGV2_WARNING(22981,
                                   "Could not start new reserve worker thread",
                                   "error"_attr = threadStartStatus);
