@@ -1966,7 +1966,7 @@
         "name": "Organization: github"
       },
       "name": "zlib",
-      "version": "v1.3",
+      "version": "v1.3.1",
       "licenses": [
         {
           "license": {
@@ -1974,7 +1974,7 @@
           }
         }
       ],
-      "purl": "pkg:github/madler/zlib@v1.3",
+      "purl": "pkg:github/madler/zlib@v1.3.1",
       "properties": [
         {
           "name": "internal:team_responsible",
