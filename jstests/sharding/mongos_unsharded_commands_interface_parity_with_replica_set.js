@@ -70,6 +70,20 @@ import {
     stopReplicationOnSecondariesOfAllShards
 } from "jstests/libs/write_concern_util.js";
 
+function joinFilteringMetadataRefresh(db, collName, mongoConfig) {
+    if (mongoConfig instanceof ShardingTest) {
+        const fullName = db.getName() + "." + collName;
+        // On a sharded environment we want to ensure that the filtering metadata refresh is
+        // finished before running our tests.
+        assert.soon(() => {
+            let shard = mongoConfig.getPrimaryShard(db.getName());
+            const shardVersion = assert.commandWorked(
+                shard.rs.getPrimary().adminCommand({getShardVersion: fullName}));
+            return shardVersion !== 'UNKNOWN';
+        });
+    }
+}
+
 const tests = [
 
     {
@@ -91,8 +105,9 @@ const tests = [
             },
             {
                 shortDescription: "Runs validate on an empty collection.",
-                testCaseSetup: function(db) {
+                testCaseSetup: function(db, mongoConfig) {
                     assert.commandWorked(db.createCollection("x"));
+                    joinFilteringMetadataRefresh(db, "x", mongoConfig);
                 },
                 command: {validate: "x"},
                 skipSetup: true,
@@ -255,8 +270,9 @@ const tests = [
             },
             {
                 shortDescription: "Runs createIndexes on an existing empty collection.",
-                testCaseSetup: function(db) {
+                testCaseSetup: function(db, mongoConfig) {
                     assert.commandWorked(db.createCollection("x"));
+                    joinFilteringMetadataRefresh(db, "x", mongoConfig);
                 },
                 command: {createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]},
             },
@@ -351,6 +367,9 @@ function collModParity(db, collModCommand) {
 }
 
 function collModParityTests(db) {
+    const isSharded = FixtureHelpers.isMongos(db);
+    jsTestLog(`collModParityTests: sharded=${isSharded}`);
+
     collModParity(db, {
         command: {
             collMod: "",  // Filled by collModParity
@@ -402,13 +421,17 @@ function runAndAssertTestCase(testCase, db) {
  * and returns the result.
  */
 function runTestCase(test, testCase, forceWriteConcernError, testFixture) {
+    const isSharded = testFixture.mongoConfig instanceof ShardingTest;
+    jsTestLog(`Test case: '${testCase.shortDescription}'` +
+              `\nEnv: sharded=${isSharded}, forceWriteConcernError=${forceWriteConcernError}`);
+
     var ctx;
     const db = testFixture.db;
     if (!testCase.skipSetup && test.setup) {
         ctx = test.setup(db);
     }
     if (testCase.testCaseSetup) {
-        testCase.testCaseSetup(db);
+        testCase.testCaseSetup(db, testFixture.mongoConfig);
     }
 
     let result;
