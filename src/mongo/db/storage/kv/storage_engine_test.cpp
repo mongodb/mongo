@@ -124,8 +124,9 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     ASSERT_TRUE(idents.find("_mdb_catalog") != idents.end());
 
     // Drop the `db.coll1` table, while leaving the DurableCatalog entry.
-    ASSERT_OK(
-        dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()), swCollInfo.getValue().ident));
+    ASSERT_OK(dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()),
+                        swCollInfo.getValue().ident,
+                        /*identHasSizeInfo=*/true));
     ASSERT_EQUALS(static_cast<const unsigned long>(1), getAllKVEngineIdents(opCtx.get()).size());
 
     // Reconciling this should result in an error.
@@ -141,8 +142,9 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(
-        dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()), swCollInfo.getValue().ident));
+    ASSERT_OK(dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()),
+                        swCollInfo.getValue().ident,
+                        /*identHasSizeInfo=*/true));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // After the catalog is reloaded, we expect that the collection has been dropped because the
@@ -510,8 +512,9 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(
-        dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()), swCollInfo.getValue().ident));
+    ASSERT_OK(dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()),
+                        swCollInfo.getValue().ident,
+                        /*identHasSizeInfo=*/true));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // Reconcile would normally return an error if a collection existed with a missing ident in the

@@ -190,7 +190,10 @@ void removeIndex(OperationContext* opCtx,
                 // Intentionally ignoring failure here. Since we've removed the metadata pointing to
                 // the collection, we should never see it again anyway.
                 storageEngine->getEngine()
-                    ->dropIdent(recoveryUnit, ident->getIdent(), std::move(onDrop))
+                    ->dropIdent(recoveryUnit,
+                                ident->getIdent(),
+                                /*identHasSizeInfo=*/false,
+                                std::move(onDrop))
                     .ignore();
             }
         });

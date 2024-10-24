@@ -290,6 +290,7 @@ public:
 
     Status dropIdent(RecoveryUnit* ru,
                      StringData ident,
+                     bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop = nullptr) override;
 
     void dropIdentForImport(Interruptible&, RecoveryUnit&, StringData ident) override;

@@ -222,8 +222,10 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
                   "ident"_attr = identName,
                   "dropTimestamp"_attr = dropTimestamp);
             WriteUnitOfWork wuow(opCtx);
-            auto status = _engine->dropIdent(
-                shard_role_details::getRecoveryUnit(opCtx), identName, identInfo->onDrop);
+            auto status = _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx),
+                                             identName,
+                                             ident::isCollectionIdent(identName),
+                                             identInfo->onDrop);
             if (!status.isOK()) {
                 if (status == ErrorCodes::ObjectIsBusy) {
                     LOGV2(6936300,

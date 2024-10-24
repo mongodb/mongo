@@ -389,7 +389,8 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
         engine->checkpoint();
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()), ident));
+        ASSERT_OK(engine->dropIdent(
+            shard_role_details::getRecoveryUnit(opCtx.get()), ident, /*identHasSizeInfo=*/true));
         wuow.commit();
     }
 }
@@ -1201,7 +1202,7 @@ TEST_F(DurableCatalogTest, Idx1) {
                                   CollectionOptions(),
                                   catalog.get());
         ASSERT_NOT_EQUALS("a.b", catalog->getEntry(catalogId).ident);
-        ASSERT_TRUE(DurableCatalog::isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(ident::isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1234,8 +1235,7 @@ TEST_F(DurableCatalogTest, Idx1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         ASSERT_EQUALS(idxIndent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
-        ASSERT_TRUE(
-            DurableCatalog::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+        ASSERT_TRUE(ident::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
     }
 
     {
@@ -1295,7 +1295,7 @@ TEST_F(DurableCatalogTest, DirectoryPerDb1) {
                                   CollectionOptions(),
                                   catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/");
-        ASSERT_TRUE(DurableCatalog::isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(ident::isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1315,8 +1315,7 @@ TEST_F(DurableCatalogTest, DirectoryPerDb1) {
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/");
-        ASSERT_TRUE(
-            DurableCatalog::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+        ASSERT_TRUE(ident::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }
@@ -1352,7 +1351,7 @@ TEST_F(DurableCatalogTest, Split1) {
                                   CollectionOptions(),
                                   catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "collection/");
-        ASSERT_TRUE(DurableCatalog::isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(ident::isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1372,8 +1371,7 @@ TEST_F(DurableCatalogTest, Split1) {
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "index/");
-        ASSERT_TRUE(
-            DurableCatalog::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+        ASSERT_TRUE(ident::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }
@@ -1409,7 +1407,7 @@ TEST_F(DurableCatalogTest, DirectoryPerAndSplit1) {
                                   CollectionOptions(),
                                   catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/collection/");
-        ASSERT_TRUE(DurableCatalog::isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(ident::isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
@@ -1429,8 +1427,7 @@ TEST_F(DurableCatalogTest, DirectoryPerAndSplit1) {
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/index/");
-        ASSERT_TRUE(
-            DurableCatalog::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+        ASSERT_TRUE(ident::isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }

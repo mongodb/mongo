@@ -252,7 +252,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         // 'local.orphan.xxxxx' for it. However, in a nonrepair context, the orphaned idents
         // will be dropped in reconcileCatalogAndIdents().
         for (const auto& ident : identsKnownToStorageEngine) {
-            if (DurableCatalog::isCollectionIdent(ident)) {
+            if (ident::isCollectionIdent(ident)) {
                 bool isOrphan = !std::any_of(catalogEntries.begin(),
                                              catalogEntries.end(),
                                              [this, &ident](DurableCatalog::EntryIdentifier entry) {
@@ -563,7 +563,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
                                              ReconcileResult* reconcileResult,
                                              std::set<std::string>* internalIdentsToKeep,
                                              std::set<std::string>* allInternalIdents) {
-    if (!DurableCatalog::isInternalIdent(ident)) {
+    if (!ident::isInternalIdent(ident)) {
         return false;
     }
 
@@ -575,7 +575,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
         return true;
     }
 
-    if (!DurableCatalog::isResumableIndexBuildIdent(ident)) {
+    if (!ident::isResumableIndexBuildIdent(ident)) {
         return false;
     }
 
@@ -695,13 +695,13 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             continue;
         }
 
-        if (!DurableCatalog::isUserDataIdent(it)) {
+        if (!ident::isUserDataIdent(it)) {
             continue;
         }
 
         // In repair context, any orphaned collection idents from the engine should already be
         // recovered in the catalog in loadCatalog().
-        invariant(!(DurableCatalog::isCollectionIdent(it) && _options.forRepair));
+        invariant(!(ident::isCollectionIdent(it) && _options.forRepair));
 
         // Leave drop-pending idents alone.
         // These idents have to be retained as long as the corresponding drops are not part of a
@@ -720,8 +720,9 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             addDropPendingIdent(identDropTs, std::make_shared<Ident>(toRemove), /*onDrop=*/nullptr);
         } else {
             WriteUnitOfWork wuow(opCtx);
-            Status status =
-                _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx), toRemove);
+            Status status = _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx),
+                                               toRemove,
+                                               ident::isCollectionIdent(toRemove));
             if (!status.isOK()) {
                 // A concurrent operation, such as a checkpoint could be holding an open data handle
                 // on the ident. Handoff the ident drop to the ident reaper to retry later.
@@ -837,8 +838,9 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                       logAttrs(md->nss),
                       "index"_attr = indexName);
                 // Ensure the `ident` is dropped while we have the `indexIdent` value.
-                Status status =
-                    _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx), indexIdent);
+                Status status = _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx),
+                                                   indexIdent,
+                                                   /*identHasSizeInfo=*/false);
                 if (!status.isOK()) {
                     // A concurrent operation, such as a checkpoint could be holding an open data
                     // handle on the ident. Handoff the ident drop to the ident reaper to retry
@@ -874,7 +876,8 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         }
         LOGV2(22257, "Dropping internal ident", "ident"_attr = temp);
         WriteUnitOfWork wuow(opCtx);
-        Status status = _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx), temp);
+        Status status = _engine->dropIdent(
+            shard_role_details::getRecoveryUnit(opCtx), temp, ident::isCollectionIdent(temp));
         if (!status.isOK()) {
             // A concurrent operation, such as a checkpoint could be holding an open data handle on
             // the ident. Handoff the ident drop to the ident reaper to retry later.

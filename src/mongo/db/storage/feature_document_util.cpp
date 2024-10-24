@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,22 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <string>
-
-#include "mongo/base/string_data.h"
+#include "mongo/db/storage/feature_document_util.h"
 
 namespace mongo {
 
-/**
- * Stores the storage catalog persisted identifier for a collection or index.
- */
-class Ident {
-public:
-    explicit Ident(StringData ident) : _ident(ident.toString()) {}
-    virtual ~Ident() = default;
+namespace {
+static constexpr auto kIsFeatureDocumentFieldName = "isFeatureDoc"_sd;
+}
 
-    const std::string& getIdent() const {
-        return _ident;
+namespace feature_document_util {
+bool isFeatureDocument(const BSONObj& obj) {
+    BSONElement firstElem = obj.firstElement();
+    if (firstElem.fieldNameStringData() == kIsFeatureDocumentFieldName) {
+        return firstElem.booleanSafe();
     }
-
-protected:
-    const std::string _ident;
-};
-
-namespace ident {
-bool isUserDataIdent(StringData ident);
-
-bool isInternalIdent(StringData ident);
-
-bool isResumableIndexBuildIdent(StringData ident);
-
-bool isCollectionIdent(StringData ident);
-
-StringData getInternalIdentPrefix();
-
-StringData getResumableIndexBuildIdentStem();
-}  // namespace ident
+    return false;
+}
+}  // namespace feature_document_util
 
 }  // namespace mongo

@@ -1345,8 +1345,8 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
     size_t attempt = 0;
     Timer timer;
     for (;;) {
-        Status status =
-            engine->getEngine()->dropIdent(shard_role_details::getRecoveryUnit(opCtx), ident);
+        Status status = engine->getEngine()->dropIdent(
+            shard_role_details::getRecoveryUnit(opCtx), ident, /*identHasSizeInfo=*/false);
         if (status.isOK()) {
             break;
         } else if (timer.millis() < kDropRetryTimeoutMillis) {

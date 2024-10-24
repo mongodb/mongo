@@ -44,7 +44,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
-#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -202,7 +202,7 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
 
         // Skip over the version document, which doesn't correspond to a namespace entry, for
         // backwards compatibility with older versions that have a written feature document.
-        if (DurableCatalog::isFeatureDocument(rawCatalogEntry)) {
+        if (feature_document_util::isFeatureDocument(rawCatalogEntry)) {
             continue;
         }
 

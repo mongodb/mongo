@@ -83,7 +83,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/backup_block.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/storage_file_util.h"
@@ -1827,6 +1826,7 @@ Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
 
 Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
                                      StringData ident,
+                                     bool identHasSizeInfo,
                                      const StorageEngine::DropIdentCallback& onDrop) {
     string uri = _uri(ident);
 
@@ -1848,7 +1848,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
                 str::stream() << "Failed to remove drop-pending ident " << ident};
     }
 
-    if (DurableCatalog::isCollectionIdent(ident)) {
+    if (identHasSizeInfo) {
         _sizeStorer->remove(uri);
     }
 

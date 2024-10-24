@@ -53,6 +53,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_data.h"
@@ -168,7 +169,7 @@ bool DurableCatalog::_hasEntryCollidingWithRand(WithLock) const {
 std::string DurableCatalog::_newInternalIdent(StringData identStem) {
     stdx::lock_guard<stdx::mutex> lk(_randLock);
     StringBuilder buf;
-    buf << _kInternalIdentPrefix;
+    buf << ident::getInternalIdentPrefix();
     buf << identStem;
     buf << _next++ << '-' << _rand;
     return buf.str();
@@ -206,7 +207,7 @@ void DurableCatalog::init(OperationContext* opCtx) {
         BSONObj obj = record->data.releaseToBson();
 
         // For backwards compatibility where older version have a written feature document
-        if (isFeatureDocument(obj)) {
+        if (feature_document_util::isFeatureDocument(obj)) {
             continue;
         }
 
@@ -231,7 +232,7 @@ std::vector<DurableCatalog::EntryIdentifier> DurableCatalog::getAllCatalogEntrie
     auto cursor = _rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
-        if (isFeatureDocument(obj)) {
+        if (feature_document_util::isFeatureDocument(obj)) {
             // Skip over the version document because it doesn't correspond to a collection.
             continue;
         }
@@ -251,7 +252,7 @@ boost::optional<DurableCatalogEntry> DurableCatalog::scanForCatalogEntryByNss(
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
 
-        if (isFeatureDocument(obj)) {
+        if (feature_document_util::isFeatureDocument(obj)) {
             // Skip over the version document because it doesn't correspond to a collection.
             continue;
         }
@@ -513,7 +514,7 @@ std::vector<std::string> DurableCatalog::getAllIdents(OperationContext* opCtx) c
     auto cursor = _rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
-        if (isFeatureDocument(obj)) {
+        if (feature_document_util::isFeatureDocument(obj)) {
             // Skip over the version document because it doesn't correspond to a namespace entry and
             // therefore doesn't refer to any idents.
             continue;
@@ -604,7 +605,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::cr
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [ru, catalog = this, ident = entry.ident](OperationContext*) {
             // Intentionally ignoring failure
-            catalog->_engine->getEngine()->dropIdent(ru, ident).ignore();
+            catalog->_engine->getEngine()->dropIdent(ru, ident, /*identHasSizeInfo=*/true).ignore();
         });
 
     auto rs = _engine->getEngine()->getRecordStore(opCtx, nss, entry.ident, options);
@@ -629,7 +630,7 @@ Status DurableCatalog::createIndex(OperationContext* opCtx,
                 OperationContext*) {
                 // Intentionally ignoring failure.
                 auto kvEngine = _engine->getEngine();
-                kvEngine->dropIdent(recoveryUnit, ident).ignore();
+                kvEngine->dropIdent(recoveryUnit, ident, /*identHasSizeInfo=*/false).ignore();
             });
     }
     return status;
@@ -859,7 +860,7 @@ boost::optional<DurableCatalogEntry> DurableCatalog::parseCatalogEntry(const Rec
 
     // For backwards compatibility where older version have a written feature document. This
     // document cannot be parsed into a DurableCatalogEntry. See SERVER-57125.
-    if (isFeatureDocument(obj)) {
+    if (feature_document_util::isFeatureDocument(obj)) {
         return boost::none;
     }
 

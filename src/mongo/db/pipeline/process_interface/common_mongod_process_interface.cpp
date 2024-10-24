@@ -93,6 +93,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -189,7 +190,7 @@ void listDurableCatalog(OperationContext* opCtx,
 
         // For backwards compatibility where older version have a written feature document.
         // See SERVER-57125.
-        if (DurableCatalog::isFeatureDocument(obj)) {
+        if (feature_document_util::isFeatureDocument(obj)) {
             continue;
         }
 

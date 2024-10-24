@@ -77,8 +77,6 @@ class DurableCatalog final {
     DurableCatalog& operator=(DurableCatalog&&) = delete;
 
 public:
-    static constexpr auto kIsFeatureDocumentFieldName = "isFeatureDoc"_sd;
-
     /**
      * `Entry` ties together the common identifiers of a single `_mdb_catalog` document.
      *
@@ -109,40 +107,6 @@ public:
 
     static DurableCatalog* get(OperationContext* opCtx) {
         return opCtx->getServiceContext()->getStorageEngine()->getCatalog();
-    }
-
-    /**
-     *  Allows featureDocuments to be checked with older versions.
-     */
-    static bool isFeatureDocument(const BSONObj& obj) {
-        BSONElement firstElem = obj.firstElement();
-        if (firstElem.fieldNameStringData() == kIsFeatureDocumentFieldName) {
-            return firstElem.booleanSafe();
-        }
-        return false;
-    }
-
-    static bool isUserDataIdent(StringData ident) {
-        // Indexes and collections are candidates for dropping when the storage engine's metadata
-        // does not align with the catalog metadata.
-        return ident.find("index-") != std::string::npos ||
-            ident.find("index/") != std::string::npos || isCollectionIdent(ident);
-    }
-
-    static bool isInternalIdent(StringData ident) {
-        return ident.find(_kInternalIdentPrefix) != std::string::npos;
-    }
-
-    static bool isResumableIndexBuildIdent(StringData ident) {
-        invariant(isInternalIdent(ident), ident.toString());
-        return ident.find(_kResumableIndexBuildIdentStem) != std::string::npos;
-    }
-
-    static bool isCollectionIdent(StringData ident) {
-        // Internal idents prefixed "internal-" should not be considered collections, because
-        // they are not eligible for orphan recovery through repair.
-        return ident.find("collection-") != std::string::npos ||
-            ident.find("collection/") != std::string::npos;
     }
 
     void init(OperationContext* opCtx);
@@ -245,7 +209,7 @@ public:
      * Generate an internal resumable index build ident name.
      */
     std::string newInternalResumableIndexBuildIdent() {
-        return _newInternalIdent(_kResumableIndexBuildIdentStem);
+        return _newInternalIdent(ident::getResumableIndexBuildIdentStem());
     }
 
     /**
@@ -348,9 +312,6 @@ public:
     }
 
 private:
-    static constexpr auto _kInternalIdentPrefix = "internal-"_sd;
-    static constexpr auto _kResumableIndexBuildIdentStem = "resumable-index-build-"_sd;
-
     class AddIdentChange;
 
     friend class StorageEngineImpl;

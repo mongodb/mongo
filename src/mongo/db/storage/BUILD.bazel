@@ -439,6 +439,8 @@ mongo_cc_library(
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
         "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/storage:feature_document_util",
+        "//src/mongo/db/storage:ident",
     ],
 )
 
@@ -658,5 +660,34 @@ mongo_cc_library(
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/catalog:index_catalog",
         "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
+    ],
+)
+
+mongo_cc_library(
+    name = "feature_document_util",
+    srcs = [
+        "feature_document_util.cpp",
+    ],
+    hdrs = [
+        "feature_document_util.h",
+        "//src/mongo/bson:bsonelement.h",
+        "//src/mongo/bson:bsonobj.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "ident",
+    srcs = [
+        "ident.cpp",
+    ],
+    hdrs = [
+        "ident.h",
+        "//src/mongo/base:string_data.h",
+    ],
+    deps = [
+        "//src/mongo:base",
     ],
 )

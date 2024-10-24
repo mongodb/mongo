@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,43 +26,26 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
-#include <string>
-
-#include "mongo/base/string_data.h"
-
-namespace mongo {
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 
 /**
- * Stores the storage catalog persisted identifier for a collection or index.
+   A light-weight util library that provides functionality to assess whether a document is a
+   feature document. Feature documents were documents with empty namespaces that we no longer
+   generate as of 5.1, but to allow for backwards compatibility we still need to be able to account
+   for them.
+*/
+namespace mongo {
+
+namespace feature_document_util {
+
+/**
+ *  Allows featureDocuments to be checked with older versions.
  */
-class Ident {
-public:
-    explicit Ident(StringData ident) : _ident(ident.toString()) {}
-    virtual ~Ident() = default;
+bool isFeatureDocument(const BSONObj& obj);
 
-    const std::string& getIdent() const {
-        return _ident;
-    }
-
-protected:
-    const std::string _ident;
-};
-
-namespace ident {
-bool isUserDataIdent(StringData ident);
-
-bool isInternalIdent(StringData ident);
-
-bool isResumableIndexBuildIdent(StringData ident);
-
-bool isCollectionIdent(StringData ident);
-
-StringData getInternalIdentPrefix();
-
-StringData getResumableIndexBuildIdentStem();
-}  // namespace ident
+}  // namespace feature_document_util
 
 }  // namespace mongo

@@ -110,11 +110,11 @@ public:
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)->getCatalogId();
         std::string indexIdent =
             _storageEngine->getCatalog()->getIndexIdent(opCtx, catalogId, indexName);
-        return dropIdent(shard_role_details::getRecoveryUnit(opCtx), indexIdent);
+        return dropIdent(shard_role_details::getRecoveryUnit(opCtx), indexIdent, false);
     }
 
-    Status dropIdent(RecoveryUnit* ru, StringData ident) {
-        return _storageEngine->getEngine()->dropIdent(ru, ident);
+    Status dropIdent(RecoveryUnit* ru, StringData ident, bool identHasSizeInfo) {
+        return _storageEngine->getEngine()->dropIdent(ru, ident, identHasSizeInfo);
     }
 
     StatusWith<StorageEngine::ReconcileResult> reconcile(OperationContext* opCtx) {

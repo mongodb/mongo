@@ -66,6 +66,7 @@ class KVEngineMock : public KVEngine {
 public:
     Status dropIdent(RecoveryUnit* ru,
                      StringData ident,
+                     bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop) override;
 
     void dropIdentForImport(Interruptible&, RecoveryUnit&, StringData ident) override {}
@@ -190,6 +191,7 @@ public:
 
 Status KVEngineMock::dropIdent(RecoveryUnit* ru,
                                StringData ident,
+                               bool identHasSizeInfo,
                                const StorageEngine::DropIdentCallback& onDrop) {
     auto status = dropIdentFn(ru, ident);
     if (status.isOK()) {

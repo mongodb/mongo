@@ -225,6 +225,7 @@ public:
      */
     virtual Status dropIdent(RecoveryUnit* ru,
                              StringData ident,
+                             bool identHasSizeInfo,
                              const StorageEngine::DropIdentCallback& onDrop = nullptr) = 0;
 
     /**
