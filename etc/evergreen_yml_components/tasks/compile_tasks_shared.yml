@@ -136,6 +136,7 @@ tasks:
     depends_on:
       - name: version_expansions_future_git_tag_multiversion_gen
 
+  # Sys-perf relies on the name of this task, please reach out before changing it.
   - &archive_dist_test
     name: archive_dist_test
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
@@ -171,6 +172,7 @@ tasks:
           bucket: mciuploads
           permissions: public-read
           content_type: application/gzip
+          # Sys-perf relies on this display name, please reach out before changing it.
           display_name: Binaries
 
       - func: "f_expansions_write"

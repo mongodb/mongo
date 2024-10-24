@@ -5,7 +5,6 @@ timeout_secs: &timeout_secs 7200
 
 include:
   - filename: etc/evergreen_yml_components/definitions.yml
-  - filename: etc/evergreen_yml_components/tasks/compile_tasks_shared.yml
   ### lint_yaml trim start ###
   #
   # The lines below are trimmed by yamllinters.sh so that `evergreen evaluate` works on this file.
@@ -124,8 +123,6 @@ modules:
 pre:
   - func: "f_other_pre_ops"
   - func: "f_dsi_pre_run"
-  - func: "get version expansions"
-  - func: "apply version expansions"
 post:
   - func: "f_dsi_post_run"
   - func: "f_other_post_ops"
@@ -349,19 +346,51 @@ functions:
         content_type: application/x-gzip
         display_name: supplementary-data.tgz
 
+  f_schedule_compile:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: ./dsi/run-dsi selftest scripts/schedule_compile.py
+        include_expansions_in_env:
+          - version_id
+          - evergreen_api_user
+          - evergreen_api_key
+          - compile_variant
+          - compile_task_name
+          - binary_artifact_name
+          - reuse_compile_from
+          - compile_project
+
 tasks:
-  - name: package_supplementary_data
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
+  - name: schedule_compile
     commands:
-      - command: manifest.load
       - command: git.get_project
         params:
           directory: src
           clone_depth: 1000
+      - func: f_schedule_compile
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/binary-url.txt
+          remote_file: ${project}/${version_id}/binary-urls/${compile_variant}-binary-url.txt
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/plain
+          display_name: binary-url.txt
+  - name: package_supplementary_data
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "restore git history and tags"
+      - func: "add git tag"
+      - func: "kill processes"
+      - func: "cleanup environment"
       - func: "set up venv"
-      - func: "get version expansions"
+      - func: "upload pip requirements"
+      - func: "generate version expansions"
       - func: "apply version expansions"
       - func: "download mongo tools"
       - func: "generate feature flag list"
@@ -373,142 +402,66 @@ tasks:
       - func: "upload supplementary data"
 
 buildvariants:
-  # Replacement for generate-tasks-for-version from
-  # evergreen_yml_components/variants/misc/task_generation.yml.
-  - name: generate-tasks-for-version
-    display_name: "~ Generate tasks for evergreen version"
-    activate: true
-    run_on:
-      - rhel8.8-medium
-    tasks:
-      - name: version_expansions_gen
-
-  - name: amazon2-x86-compile
-    display_name: "* Compile for Amazon Linux 2 x86"
+  - name: schedule-compile-amazon2-arm64
+    display_name: "* Schedule Compile for Amazon Linux 2 arm64"
     expansions:
-      <<: *shared_compile_expansions
-      compile_variant: amazon2-x86-compile
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    run_on:
-      - amazon2-xlarge
-    tasks:
-      - name: compile_and_package_serial_no_unittests_TG
-      - name: package_supplementary_data
-
-  - name: amazon2-arm64-compile
-    display_name: "* Compile for Amazon Linux 2 arm64"
-    expansions:
-      <<: *shared_compile_expansions
       compile_variant: amazon2-arm64-compile
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    run_on:
-      - amazon2-arm64-xlarge
-    tasks:
-      - name: compile_and_package_serial_no_unittests_TG
-      - name: package_supplementary_data
-
-  - name: amazon2-arm64-compile-pgo
-    display_name: "* Compile for Amazon Linux 2 arm64 PGO"
-    expansions:
-      platform: linux
-      project_dir: dsi
-      has_packages: false
-      use_scons_cache: false
-      pgo_profile_url: https://mciuploads.s3.amazonaws.com/dsi/perf-3-node-replSet.arm.aws.2024-05/b49fc707fb83a45727ad3f9f7cfa4c940a6805fe/sys_perf_perf_3_node_replSet.arm.aws.2024_05_ycsb.100read.2024_05_patch_b49fc707fb83a45727ad3f9f7cfa4c940a6805fe_66b035d75b27a40007f52c27_24_08_05_02_16_15/66b035d75b27a40007f52c27/logs/default.profdata.tgz
-      compile_variant: amazon2-arm64-compile-pgo
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2
-        BAZEL_FLAGS=--keep_going
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --thin-lto
-        --pgo
-        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-    run_on:
-      - amazon2-arm64-xlarge
-    tasks:
-      - name: compile_and_package_serial_no_unittests_TG
-      - name: package_supplementary_data
-
-  - name: amazon2-arm64-mongocrypt-shlib-compile
-    display_name: "* Compile mongo_crypt_v1.so for Amazon Linux 2 arm64"
+      compile_task_name: archive_dist_test
+      binary_artifact_name: Binaries
     modules: *modules
-    cron: "0 0 * * 4" # 00:00 on Thursday
-    tags: ["bazel_check"]
-    expansions:
-      <<: *shared_compile_expansions
-      compile_variant: amazon2-arm64-compile
-      use_scons_cache: true
-      compile_flags: >-
-        --separate-debug
-        MONGO_DISTMOD=amazon2
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --allocator=system
-        --enterprise-features=fle
-        --js-engine=none
-        --link-model=dynamic-sdk
-        --enable-http-client=off
-        --ssl=off
-        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
-        CCFLAGS="-fno-gnu-unique"
     run_on:
-      - amazon2-arm64-xlarge
+      - amazon2-arm64-latest-small
     tasks:
-      - name: .crypt
+      - name: schedule_compile
+      - name: package_supplementary_data
 
-  - name: amazon2-x86-streams-compile
+  - name: schedule-compile-amazon2-x86
+    display_name: "* Schedule Compile for Amazon Linux 2 x86"
+    expansions:
+      compile_variant: amazon2-x86-compile
+      compile_task_name: archive_dist_test
+      binary_artifact_name: Binaries
+    modules: *modules
+    run_on:
+      - amazon2-arm64-latest-small
+    tasks:
+      - name: schedule_compile
+      - name: package_supplementary_data
+
+  - name: schedule-compile-amazon2-arm64-pgo
+    display_name: "* Schedule Compile for Amazon Linux 2 arm64 PGO"
+    expansions:
+      compile_variant: amazon2-arm64-compile-pgo
+      compile_task_name: archive_dist_test
+      binary_artifact_name: Binaries
+    modules: *modules
+    run_on:
+      - amazon2-arm64-latest-small
+    tasks:
+      - name: schedule_compile
+      - name: package_supplementary_data
+
+  - name: schedule-compile-amazon2-arm64-mongocrypt-shlib
+    display_name: "* Schedule mongo_crypt_v1.so Compile for Amazon Linux 2 arm64"
+    expansions:
+      compile_variant: amazon2-arm64-mongocrypt-shlib-compile
+      compile_task_name: crypt_create_lib
+      binary_artifact_name: Mongo crypt Library
+    modules: *modules
+    run_on:
+      - amazon2-arm64-latest-small
+    tasks:
+      - name: schedule_compile
+
+  - name: schedule-compile-amazon2-x86-streams
     display_name: "* Compile Streams for Amazon Linux 2 x86"
     expansions:
-      <<: *shared_compile_expansions
       compile_variant: amazon2-x86-streams-compile
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --streams-release-build
+      compile_task_name: archive_dist_test
+      binary_artifact_name: Binaries
+    modules: *modules
     run_on:
-      - amazon2-xlarge
+      - amazon2-arm64-latest-small
     tasks:
-      - name: compile_and_package_serial_no_unittests_TG
+      - name: schedule_compile
       - name: package_supplementary_data
-
-  # This variant tests the reuse_compile_from feature
-  # by reusing compile artifacts from another compile
-  # in the same patch.
-  - name: test-reuse-compile-from
-    display_name: "~ Test reuse_compile_from"
-    cron: "0 0 * * *" # Every day at 00:00
-    expansions:
-      <<: *shared_compile_expansions
-      compile_variant: amazon2-arm64-compile
-      reuse_compile_from: ${version_id}
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    run_on:
-      - amazon2-arm64-xlarge
-    tasks:
-      - name: compile_and_package_serial_no_unittests_TG
-        depends_on:
-          - name: archive_dist_test
-            variant: amazon2-arm64-compile
-          - name: archive_dist_test_debug
-            variant: amazon2-arm64-compile
