@@ -84,6 +84,9 @@ extern const char *__wt_wiredtiger_error(int error)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern const char *__wti_cell_type_string(uint8_t type)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern double __wt_page_npos(WT_SESSION_IMPL *session, WT_REF *ref, double start, char *path_str,
+  size_t *path_str_offsetp, size_t path_str_sz_max)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx, WT_CURSOR *cur,
   WT_CURSOR_TABLE *ctable, int (*f)(WT_CURSOR *)) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_background_compact_end(WT_SESSION_IMPL *session)
@@ -850,6 +853,12 @@ extern int __wt_ovfl_remove(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNP
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint32_t alloc_entries,
   bool alloc_refs, WT_PAGE **pagep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_page_from_npos(WT_SESSION_IMPL *session, WT_REF **refp, double npos,
+  uint32_t read_flags, uint32_t walk_flags) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_page_from_npos_for_eviction(WT_SESSION_IMPL *session, WT_REF **refp, double npos,
+  uint32_t read_flags, uint32_t walk_flags) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_page_from_npos_for_read(WT_SESSION_IMPL *session, WT_REF **refp, double npos,
+  uint32_t read_flags, uint32_t walk_flags) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
   ,
@@ -2324,6 +2333,10 @@ static WT_INLINE void __wt_rec_incr(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size);
 static WT_INLINE void __wt_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session,
   WT_UPDATE_SELECT *upd_select, WT_CELL_UNPACK_KV *vpack, WT_RECONCILE *r);
+static WT_INLINE void __wt_ref_ascend(
+  WT_SESSION_IMPL *session, WT_REF **refp, WT_PAGE_INDEX **pindexp, uint32_t *slotp);
+static WT_INLINE void __wt_ref_index_slot(
+  WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp);
 static WT_INLINE void __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep);
 static WT_INLINE void __wt_ref_key_clear(WT_REF *ref);
 static WT_INLINE void __wt_ref_key_onpage_set(

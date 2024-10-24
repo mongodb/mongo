@@ -294,6 +294,7 @@ POS
 POSIX
 PPC
 PREFETCH
+PREV
 PRId
 PRIu
 PRNG
@@ -669,6 +670,7 @@ dT
 darwin
 data's
 datalen
+dataset
 datasource
 datastore
 dbar
@@ -1083,6 +1085,7 @@ notsup
 novalue
 nowait
 np
+npos
 nrecs
 nsec
 nset
@@ -1093,6 +1096,7 @@ numbare
 nvram
 objectid
 offpage
+offsetp
 ok
 oldv
 ondisk
@@ -1130,6 +1134,7 @@ pathnames
 perf
 pfx
 pid
+pindexp
 pmem
 poptable
 popthreads
@@ -1260,6 +1265,7 @@ skiplist
 skiplists
 skipp
 skippable
+slotp
 slvg
 sn
 snaplen

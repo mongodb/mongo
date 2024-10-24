@@ -100,6 +100,7 @@
 /* Min, max. */
 #define WT_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define WT_MAX(a, b) ((a) < (b) ? (b) : (a))
+#define WT_CLAMP(x, low, high) (WT_MIN(WT_MAX((x), (low)), (high)))
 
 /* Ceil for unsigned/positive real numbers. */
 #define WT_CEIL_POS(a) ((a) - (double)(uintmax_t)(a) > 0.0 ? (uintmax_t)(a) + 1 : (uintmax_t)(a))

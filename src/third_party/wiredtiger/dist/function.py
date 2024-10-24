@@ -5,6 +5,31 @@ import os, re, sys
 from dist import all_c_files, all_cpp_files, all_h_files, compare_srcfile, source_files
 from common_functions import filter_if_fast
 
+def check_function_comment(function_name, function_comment):
+    # Unit test functions don't have to have a comment.
+    if function_name.startswith('__ut_'):
+        return True
+
+    # No comment at all.
+    if not function_comment:
+        return False
+
+    # The first line is the function name
+    #    /*
+    #     * func_name --
+    if function_comment.startswith(f'/*\n * {function_name} --\n'):
+        return True
+
+    # Unformatted comment containing !!!
+    #    /*
+    #     * !!!
+    #     * func_name --
+    if function_comment.find('!!!') != -1 and \
+            function_comment.find(f'\n * {function_name} --\n') != -1:
+        return True
+
+    return False
+
 # Complain if a function comment is missing.
 def missing_comment():
     for f in filter_if_fast(all_c_files(), prefix="../"):
@@ -15,14 +40,10 @@ def missing_comment():
         if skip_re.search(s):
             continue
         for m in func_re.finditer(s):
-            if m.group(2).startswith('__ut_'):
-                # This is just re-exposing an internal function for unit
-                # tests, no comment needed in this case.
-                continue
-            if not m.group(1) or \
-               not m.group(1).startswith('/*\n * %s --\n' % m.group(2)):
-                   print("%s:%d: missing or malformed comment for %s" % \
-                           (f, s[:m.start(2)].count('\n'), m.group(2)))
+            function_name, function_comment = m.group(2), m.group(1)
+            if not check_function_comment(function_name, function_comment):
+                line_num = s[:m.start(2)].count('\n')
+                print(f"{f}:{line_num}: malformed comment for {function_name}")
 
 # Sort helper function, discard * operators so a pointer doesn't necessarily
 # sort before non-pointers, ignore const/static/volatile keywords.

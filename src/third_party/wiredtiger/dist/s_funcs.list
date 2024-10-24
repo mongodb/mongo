@@ -53,3 +53,5 @@ wiredtiger_unpack_item
 wiredtiger_unpack_start
 wiredtiger_unpack_str
 wiredtiger_unpack_uint
+__wt_page_from_npos
+__wt_page_from_npos_for_read

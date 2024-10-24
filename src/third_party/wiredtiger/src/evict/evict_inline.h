@@ -534,3 +534,14 @@ __wt_evict_app_assist_worker_check(
 
     return (__wti_evict_app_assist_worker(session, busy, readonly, pct_full));
 }
+
+/*
+ * __wt_evict_clear_npos --
+ *     Clear saved eviction walk position.
+ */
+static WT_INLINE void
+__wt_evict_clear_npos(WT_BTREE *btree)
+{
+    btree->evict_pos = WT_NPOS_INVALID;
+    btree->evict_saved_ref_check = 0;
+}

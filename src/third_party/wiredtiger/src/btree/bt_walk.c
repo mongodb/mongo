@@ -9,141 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * __ref_index_slot --
- *     Return the page's index and slot for a reference.
- */
-static WT_INLINE void
-__ref_index_slot(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
-{
-    WT_PAGE_INDEX *pindex;
-    WT_REF **p, **start, **stop, **t;
-    uint64_t sleep_usecs, yield_count;
-    uint32_t entries, slot;
-
-    /*
-     * If we don't find our reference, the page split and our home pointer references the wrong
-     * page. When internal pages split, their WT_REF structure home values are updated; yield and
-     * wait for that to happen.
-     */
-    for (sleep_usecs = yield_count = 0;;) {
-        /*
-         * Copy the parent page's index value: the page can split at any time, but the index's value
-         * is always valid, even if it's not up-to-date.
-         */
-        WT_INTL_INDEX_GET(session, ref->home, pindex);
-        entries = pindex->entries;
-
-        /*
-         * Use the page's reference hint: it should be correct unless there was a split or delete in
-         * the parent before our slot. If the hint is wrong, it can be either too big or too small,
-         * but often only by a small amount. Search up and down the index starting from the hint.
-         *
-         * It's not an error for the reference hint to be wrong, it just means the first retrieval
-         * (which sets the hint for subsequent retrievals), is slower.
-         */
-        slot = ref->pindex_hint;
-        if (slot >= entries)
-            slot = entries - 1;
-        if (pindex->index[slot] == ref)
-            goto found;
-        for (start = &pindex->index[0], stop = &pindex->index[entries - 1],
-            p = t = &pindex->index[slot];
-             p > start || t < stop;) {
-            if (p > start && *--p == ref) {
-                slot = (uint32_t)(p - start);
-                goto found;
-            }
-            if (t < stop && *++t == ref) {
-                slot = (uint32_t)(t - start);
-                goto found;
-            }
-        }
-        /*
-         * We failed to get the page index and slot reference, yield before retrying, and if we've
-         * yielded enough times, start sleeping so we don't burn CPU to no purpose.
-         */
-        __wt_spin_backoff(&yield_count, &sleep_usecs);
-        WT_STAT_CONN_INCRV(session, page_index_slot_ref_blocked, sleep_usecs);
-    }
-
-found:
-    WT_ASSERT(session, pindex->index[slot] == ref);
-    *pindexp = pindex;
-    *slotp = slot;
-}
-
-/*
- * __ref_ascend --
- *     Ascend the tree one level.
- */
-static WT_INLINE void
-__ref_ascend(WT_SESSION_IMPL *session, WT_REF **refp, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
-{
-    WT_REF *parent_ref, *ref;
-
-    /*
-     * Ref points to the first/last slot on an internal page from which we are ascending the tree,
-     * moving to the parent page. This is tricky because the internal page we're on may be splitting
-     * into its parent. Find a stable configuration where the page we start from and the page we're
-     * moving to are connected. The tree eventually stabilizes into that configuration, keep trying
-     * until we succeed.
-     */
-    for (ref = *refp;;) {
-        /*
-         * Find our parent slot on the next higher internal page, the slot from which we move to a
-         * next/prev slot, checking that we haven't reached the root.
-         */
-        parent_ref = ref->home->pg_intl_parent_ref;
-        if (__wt_ref_is_root(parent_ref))
-            break;
-        __ref_index_slot(session, parent_ref, pindexp, slotp);
-
-        /*
-         * There's a split race when a cursor moving forwards through
-         * the tree ascends the tree. If we're splitting an internal
-         * page into its parent, we move the WT_REF structures and
-         * then update the parent's page index before updating the split
-         * page's page index, and it's not an atomic update. A thread
-         * can read the split page's original page index and then read
-         * the parent page's replacement index.
-         *
-         * This can create a race for next-cursor movements.
-         *
-         * For example, imagine an internal page with 3 child pages,
-         * with the namespaces a-f, g-h and i-j; the first child page
-         * splits. The parent starts out with the following page-index:
-         *
-         *	| ... | a | g | i | ... |
-         *
-         * which changes to this:
-         *
-         *	| ... | a | c | e | g | i | ... |
-         *
-         * The split page starts out with the following page-index:
-         *
-         *	| a | b | c | d | e | f |
-         *
-         * Imagine a cursor finishing the 'f' part of the namespace that
-         * starts its ascent to the parent's 'a' slot. Then the page
-         * splits and the parent page's page index is replaced. If the
-         * cursor then searches the parent's replacement page index for
-         * the 'a' slot, it finds it and then increments to the slot
-         * after the 'a' slot, the 'c' slot, and then it incorrectly
-         * repeats its traversal of part of the namespace.
-         *
-         * This function takes a WT_REF argument which is the page from
-         * which we start our ascent. If the parent's slot we find in
-         * our search doesn't point to the same page as that initial
-         * WT_REF, there's a race and we start over again.
-         */
-        if (ref->home == parent_ref->page)
-            break;
-    }
-
-    *refp = parent_ref;
-}
-
-/*
  * __split_prev_race --
  *     Check for races when descending the tree during a previous-cursor walk.
  */
@@ -352,7 +217,7 @@ restart:
         goto done;
 
     /* Figure out the current slot in the WT_REF array. */
-    __ref_index_slot(session, ref, &pindex, &slot);
+    __wt_ref_index_slot(session, ref, &pindex, &slot);
 
     for (;;) {
         /*
@@ -361,7 +226,7 @@ restart:
          */
         while ((prev && slot == 0) || (!prev && slot == pindex->entries - 1)) {
             /* Ascend to the parent. */
-            __ref_ascend(session, &ref, &pindex, &slot);
+            __wt_ref_ascend(session, &ref, &pindex, &slot);
 
             /*
              * If at the root and returning internal pages, return the root page, otherwise we're

@@ -57,7 +57,7 @@ for line in sys.stdin:
         comment += line
         # Don't mess with generated comments.
         # Scripts in dist rely on them to figure out where to generate code.
-        if 'DO NOT EDIT' in comment:
+        if 'DO NOT EDIT' in comment or '!!!' in comment:
             block = False
         if multiline and not block:
             sys.stdout.write(comment)

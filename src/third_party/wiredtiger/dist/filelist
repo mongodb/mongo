@@ -29,6 +29,7 @@ src/btree/bt_discard.c
 src/btree/bt_handle.c
 src/btree/bt_import.c
 src/btree/bt_misc.c
+src/btree/bt_npos.c
 src/btree/bt_ovfl.c
 src/btree/bt_page.c
 src/btree/bt_prefetch.c
