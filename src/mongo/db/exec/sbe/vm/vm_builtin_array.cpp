@@ -219,6 +219,30 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(Ari
     return {true, resTag, resVal};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArraysCapped(
+    ArityType arity) {
+    auto [newElemTag, newElemVal] = moveOwnedFromStack(1);
+    // Note that we do not call 'reset()' on the guard below, as 'concatArraysAccumImpl' assumes
+    // that callers will manage the memory associated with 'newElemTag/Val'. See the comment on
+    // 'concatArraysAccumImpl' for more details.
+    value::ValueGuard newElemGuard{newElemTag, newElemVal};
+    auto [_, sizeCapTag, sizeCapVal] = getFromStack(2);
+    if (sizeCapTag != value::TypeTags::NumberInt32) {
+        auto [arrOwned, arrTag, arrVal] = getFromStack(0);
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {arrOwned, arrTag, arrVal};
+    }
+
+    auto [arrOwned, arrTag, arrVal] = getFromStack(0);
+    return concatArraysAccumImpl(newElemTag,
+                                 newElemVal,
+                                 value::bitcastTo<int32_t>(sizeCapVal),
+                                 arrOwned,
+                                 arrTag,
+                                 arrVal,
+                                 value::getApproximateSize(newElemTag, newElemVal));
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::isMemberImpl(value::TypeTags exprTag,
                                                                       value::Value exprVal,
                                                                       value::TypeTags arrTag,

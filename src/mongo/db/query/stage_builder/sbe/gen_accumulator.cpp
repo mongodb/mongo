@@ -721,6 +721,43 @@ SbExpr buildFinalizeCount(const AccumOp& acc,
     }
 }
 
+SbExpr::Vector buildAccumAggsConcatArraysHelper(SbExpr arg,
+                                                StringData funcName,
+                                                StageBuilderState& state) {
+    SbExprBuilder b(state);
+
+    auto frameId = state.frameId();
+    auto argValue = SbLocalVar{frameId, 0};
+    auto expr = b.makeIf(b.makeFunction("isArray", argValue),
+                         argValue,
+                         b.makeFail(ErrorCodes::TypeMismatch,
+                                    "Expected new value for $concatArrays to be an array"_sd));
+
+    auto argWithTypeCheck = b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(expr));
+
+    const int cap = internalQueryMaxConcatArraysBytes.load();
+
+    return SbExpr::makeSeq(
+        b.makeFunction(funcName, std::move(argWithTypeCheck), b.makeInt32Constant(cap)));
+}
+
+SbExpr::Vector buildAccumAggsConcatArrays(const AccumOp& acc,
+                                          std::unique_ptr<AddSingleInput> inputs,
+                                          StageBuilderState& state) {
+    return buildAccumAggsConcatArraysHelper(
+        std::move(inputs->inputExpr), "concatArraysCapped"_sd, state);
+}
+
+SbExpr::Vector buildCombineAggsConcatArrays(const AccumOp& acc,
+                                            StageBuilderState& state,
+                                            const SbSlotVector& inputSlots) {
+    tassert(9447000,
+            "partial agg combiner for $concatArrays should have exactly one input slot",
+            inputSlots.size() == 1);
+    auto arg = inputSlots[0];
+    return buildAccumAggsConcatArraysHelper(std::move(arg), "aggConcatArraysCapped"_sd, state);
+}
+
 SbExpr::Vector buildAccumAggsSetUnionHelper(SbExpr arg,
                                             StringData funcName,
                                             StringData funcNameWithCollator,
@@ -1773,6 +1810,12 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
                  .buildInit = makeBuildFn(&buildInitializeAccumN),
                  .buildFinalize = makeBuildFn(&buildFinalizeTopBottomN),
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
+
+    // ConcatArrays
+    {AccumulatorConcatArrays::kName,
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsConcatArrays),
+                 .buildFinalize = makeBuildFn(&buildFinalizeCappedAccumulator),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsConcatArrays)}},
 
     // Count
     {kAccumulatorCountName,

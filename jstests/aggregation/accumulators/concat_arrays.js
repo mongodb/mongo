@@ -118,3 +118,30 @@ assert.eq(result, [
             [["Ben Series 0 Book 0", "Ben Series 0 Book 1"], ["Ben Series 1 Book 0"], "Ben Book 4"]
     },
 ]);
+
+// $concatArrays dotted field.
+assert(coll.drop());
+assert.commandWorked(coll.insert(
+    [{_id: 1, a: {b: [1, 2, 3]}}, {_id: 2, a: {b: [4, 5, 6]}}, {_id: 3, a: {b: [7, 8, 9]}}]));
+result = coll.aggregate([
+                 {$sort: {_id: 1}},
+                 {$group: {_id: null, nums: {$concatArrays: '$a.b'}}},
+             ])
+             .toArray();
+assert.eq(result, [{_id: null, nums: [1, 2, 3, 4, 5, 6, 7, 8, 9]}]);
+assert(coll.drop());
+
+// $concatArrays dotted field, array halfway on path.
+assert(coll.drop());
+assert.commandWorked(coll.insert([
+    {_id: 1, a: [{b: [1, 2, 3]}, {b: [4, 5, 6]}]},
+    {_id: 2, a: [{b: [7, 8, 9]}, {b: [10, 11, 12]}]},
+    {_id: 3, a: [{b: [7, 8, 9]}]}
+]));
+result = coll.aggregate([
+                 {$sort: {_id: 1}},
+                 {$group: {_id: null, nums: {$concatArrays: '$a.b'}}},
+             ])
+             .toArray();
+assert.eq(result, [{_id: null, nums: [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12], [7, 8, 9]]}]);
+assert(coll.drop());

@@ -749,6 +749,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::setUnionCapped, true}},
     {"collSetUnionCapped",
      BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::collSetUnionCapped, true}},
+    {"concatArraysCapped",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::concatArraysCapped, true}},
     {"runJsPredicate",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::runJsPredicate, false}},
     {"regexCompile", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexCompile, false}},

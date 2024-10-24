@@ -862,6 +862,25 @@ private:
                                                                bool trimLeft,
                                                                bool trimRight);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggConcatArraysCapped(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinConcatArraysCapped(ArityType arity);
+
+    /**
+     * Given an array of new values via 'newElemVal' and an array accumulator via 'arrVal', add the
+     * new values into the array accumulator. Note that the accumulator is an array of two elements
+     * where the first element is the array of values in the accumulator and the second element is
+     * the size of the current accumulated values.
+     * IMPORTANT: this function does NOT create a ValueGuard over 'newElemTag' and 'newElemVal'. It
+     * is the responsibility of callers of this function to manage the memory associated with
+     * 'newElemTag/Val.
+     */
+    FastTuple<bool, value::TypeTags, value::Value> concatArraysAccumImpl(value::TypeTags newElemTag,
+                                                                         value::Value newElemVal,
+                                                                         int32_t sizeCap,
+                                                                         bool arrOwned,
+                                                                         value::TypeTags arrTag,
+                                                                         value::Value arrVal,
+                                                                         int64_t sizeOfNewElems);
+
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);
@@ -873,20 +892,20 @@ private:
         CollatorInterface* collator);
 
     /**
-     * Given an array of new values via 'valNewElem' and a set accumulator via 'valAcc', add the new
+     * Given an array of new values via 'newElemVal' and a set accumulator via 'accVal', add the new
      * values into the set accumulator. Note that the accumulator is an array of two elements where
      * the first element is the set of values in the accumulator and the second element is the size
      * of the current accumulated values.
-     * IMPORTANT: this function does NOT create a ValueGuard over 'tagNewElem' and 'valNewElem'. It
+     * IMPORTANT: this function does NOT create a ValueGuard over 'newElemTag' and 'newElemVal'. It
      * is the responsibility of callers of this function to manage the memory associated with
-     * 'tag/valNewElem'.
+     * 'newElemTag/Val'.
      */
-    FastTuple<bool, value::TypeTags, value::Value> setUnionAccumImpl(value::TypeTags tagNewElem,
-                                                                     value::Value valNewElem,
+    FastTuple<bool, value::TypeTags, value::Value> setUnionAccumImpl(value::TypeTags newElemTag,
+                                                                     value::Value newElemVal,
                                                                      int32_t sizeCap,
-                                                                     bool ownAcc,
-                                                                     value::TypeTags tagAcc,
-                                                                     value::Value valAcc,
+                                                                     bool accOwned,
+                                                                     value::TypeTags accTag,
+                                                                     value::Value accVal,
                                                                      CollatorInterface* collator);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);

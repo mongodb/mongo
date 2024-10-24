@@ -1282,26 +1282,27 @@ TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationWithCollation) {
 }
 
 /**
- * This helper allows the manual registration of the $setUnion accumulator to add it to the
- * parserMap without guarding it behind a feature flag (note the boost::none argument below). This
- * is required for some unit tests. Normally, accumulators are added at server startup time via
- * macros and the manual registration is not necessary. However, $setUnion is gated beind a feature
- * flag and does not get put into the map as the flag is off by default. Changing the value of the
- * feature flag with RAIIServerParameterControllerForTest() does not solve the issue because the
- * registration logic is not re-hit.
+ * This helper allows the manual registration of the $setUnion and $concatArrays accumulators to add
+ * them to the parserMap without guarding them behind a feature flag (note the boost::none argument
+ * below). This is required for some unit tests. Normally, accumulators are added at server startup
+ * time via macros and the manual registration is not necessary. However, $setUnion and
+ * $concatArrays are gated beind a feature flag and do not get put into the map as the flag is off
+ * by default. Changing the value of the feature flag with RAIIServerParameterControllerForTest()
+ * does not solve the issue because the registration logic is not re-hit.
  *
- * TODO SERVER-94575: delete this manual registration of the $setUnion accumulator and any
- * callers once the feature flag is enabled. Should also be able to delete the
- * SetUnionSbeStageBuilderGroupTest fixture and just use the SbeStageBuilderGroupTest fixture.
+ * TODO SERVER-94575: delete this manual registration of the $setUnion/$concatArrays accumulators
+ * and any callers once the feature flag is enabled. Should also be able to delete the
+ * ArrayAccumSbeStageBuilderGroupTest fixture and just use the SbeStageBuilderGroupTest fixture.
  *
- * TODO SERVER-93426: delete this manual registration of the $setUnion accumulator and any
- * callers. Should be able to use RAIIServerParameterControllerForTest as a private member of
- * SetUnionSbeStageBuilderGroupTest to enable the feature flag. Even if we unconditionally register
- * the accumulator, we currently cannot use RAIIServerParameterControllerForTest here because that
- * enables a different instance of the feature flag than the one that is found inside the parse map
- * (and the parse map instance is checked during parsing to see if the feature is allowed).
+ * TODO SERVER-93426: delete this manual registration of the $setUnion/$concatArrays accumulators
+ * and any callers. Should be able to use RAIIServerParameterControllerForTest as a private member
+ * of ArrayAccumSbeStageBuilderGroupTest to enable the feature flag. Even if we unconditionally
+ * register the accumulators, we currently cannot use RAIIServerParameterControllerForTest here
+ * because that enables a different instance of the feature flag than the one that is found inside
+ * the parse map (and the parse map instance is checked during parsing to see if the feature is
+ * allowed).
  */
-void registerSetUnionAccumulator() {
+void registerArrayAccumulators() {
     try {
         AccumulationStatement::registerAccumulator(
             "$setUnion",
@@ -1311,27 +1312,41 @@ void registerSetUnionAccumulator() {
             boost::none);
     } catch (...) {
         // registerAccumulator() will throw if a duplicate registration is attempted. We catch
-        // and ignore this here. This is so that we can add registerSetUnionAccumulator() to
+        // and ignore this here. This is so that we can add registerArrayAccumulators() to
+        // each test that could require it, so that we don't rely on the ordering of the tests
+        // to ensure the accumulator is registered.
+    }
+
+    try {
+        AccumulationStatement::registerAccumulator(
+            "$concatArrays",
+            genericParseSingleExpressionAccumulator<AccumulatorConcatArrays>,
+            AllowedWithApiStrict::kAlways,
+            AllowedWithClientType::kAny,
+            boost::none);
+    } catch (...) {
+        // registerAccumulator() will throw if a duplicate registration is attempted. We catch
+        // and ignore this here. This is so that we can add registerArrayAccumulators() to
         // each test that could require it, so that we don't rely on the ordering of the tests
         // to ensure the accumulator is registered.
     }
 }
 
-class SetUnionSbeStageBuilderGroupTest : public SbeStageBuilderGroupTest {
+class ArrayAccumSbeStageBuilderGroupTest : public SbeStageBuilderGroupTest {
 public:
     void setUp() override {
         SbeStageBuilderGroupTest::setUp();
-        registerSetUnionAccumulator();
+        registerArrayAccumulators();
     }
 };
 
-TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationSingleDoc) {
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationSingleDoc) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: [1, 2, 3], b: 1}"))};
     runArrayOutputAccumulatorTest(
         "{_id: null, x: {$setUnion: '$a'}}", docs, BSON_ARRAY(1 << 2 << 3));
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationBasic) {
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: [1, 2, 3]}")),
                                        BSON_ARRAY(fromjson("{a: [4, 5, 6]}")),
                                        BSON_ARRAY(fromjson("{a: [7, 8, 9]}"))};
@@ -1340,7 +1355,7 @@ TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationBasic) {
                                   BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9));
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationSubfield) {
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationSubfield) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: {b: [1, 2, 3]}}")),
                                        BSON_ARRAY(fromjson("{a: {b: [4, 5, 6]}}")),
                                        BSON_ARRAY(fromjson("{a: {b: [7, 8, 9]}}"))};
@@ -1349,7 +1364,7 @@ TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationSubfield)
                                   BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9));
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationArraySubfield) {
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationArraySubfield) {
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(fromjson("{a: [{b: [1, 2, 3]}, {b: [4, 5, 6]}, {b: [13, 14, 15]}]}")),
         BSON_ARRAY(fromjson("{a: [{b: [7, 8, 9]}, {b: [10, 11, 12]}]}"))};
@@ -1361,7 +1376,7 @@ TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationArraySubf
                    << BSON_ARRAY(7 << 8 << 9) << BSON_ARRAY(10 << 11 << 12)));
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupTest,
+TEST_F(ArrayAccumSbeStageBuilderGroupTest,
        SetUnionAccumulatorTranslationArrayNestedArraySubfieldWithDuplicate) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: {b: [[1, 2], [3, 4]]}}")),
                                        BSON_ARRAY(fromjson("{a: {b: [[1, 2], [5, 6], [7, 8]]}}"))};
@@ -1372,7 +1387,7 @@ TEST_F(SetUnionSbeStageBuilderGroupTest,
                                              << BSON_ARRAY(7 << 8)));
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationRepeatedValue) {
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationRepeatedValue) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: [1, 2, 3]}")),
                                        BSON_ARRAY(fromjson("{a: [1, 2, 3]}")),
                                        BSON_ARRAY(fromjson("{a: [3, 4, 5]}"))};
@@ -1380,7 +1395,7 @@ TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationRepeatedV
         "{_id: null, x: {$setUnion: '$a'}}", docs, BSON_ARRAY(1 << 2 << 3 << 4 << 5));
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationSomeMissingFields) {
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationSomeMissingFields) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{b: 1}")),
                                        BSON_ARRAY(fromjson("{a: [1, 2, 3]}")),
                                        BSON_ARRAY(fromjson("{b: 1}")),
@@ -1390,14 +1405,14 @@ TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationSomeMissi
         "{_id: null, x: {$setUnion: '$a'}}", docs, BSON_ARRAY(1 << 2 << 3 << 7 << 8 << 9));
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationAllMissingFields) {
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationAllMissingFields) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{b: 1}")),
                                        BSON_ARRAY(fromjson("{b: 1}")),
                                        BSON_ARRAY(fromjson("{b: 3}"))};
     runArrayOutputAccumulatorTest("{_id: null, x: {$setUnion: '$a'}}", docs, BSONArray{});
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationWithCollation) {
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationWithCollation) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: [\"l\", \"m\", \"n\"]}")),
                                        BSON_ARRAY(fromjson("{a: [\"o\", \"p\", \"q\"]}")),
                                        BSON_ARRAY(fromjson("{a: [\"r\", \"s\", \"t\"]}"))};
@@ -1406,6 +1421,111 @@ TEST_F(SetUnionSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationWithColla
         docs,
         BSON_ARRAY("l"),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual));
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, ConcatArraysAccumulatorTranslationSingleDoc) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: [1, 2, 3], b: 1}"))};
+    runArrayOutputAccumulatorTest(
+        "{_id: null, x: {$concatArrays: '$a'}}", docs, BSON_ARRAY(1 << 2 << 3));
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, ConcatArraysAccumulatorTranslationBasic) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: [1, 2, 3]}")),
+                                       BSON_ARRAY(fromjson("{a: [4, 5, 6]}")),
+                                       BSON_ARRAY(fromjson("{a: [7, 8, 9]}"))};
+    runArrayOutputAccumulatorTest("{_id: null, x: {$concatArrays: '$a'}}",
+                                  docs,
+                                  BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9));
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, ConcatArraysAccumulatorTranslationSubfield) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: {b: [1, 2, 3]}}")),
+                                       BSON_ARRAY(fromjson("{a: {b: [4, 5, 6]}}")),
+                                       BSON_ARRAY(fromjson("{a: {b: [7, 8, 9]}}"))};
+    runArrayOutputAccumulatorTest("{_id: null, x: {$concatArrays: '$a.b'}}",
+                                  docs,
+                                  BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9));
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, ConcatArraysAccumulatorTranslationArraySubfield) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(fromjson("{a: [{b: [1, 2, 3]}, {b: [4, 5, 6]}, {b: [13, 14, 15]}]}")),
+        BSON_ARRAY(fromjson("{a: [{b: [7, 8, 9]}, {b: [10, 11, 12]}]}"))};
+    runArrayOutputAccumulatorTest(
+        "{_id: null, x: {$concatArrays: '$a.b'}}",
+        docs,
+        BSON_ARRAY(BSON_ARRAY(1 << 2 << 3)
+                   << BSON_ARRAY(4 << 5 << 6) << BSON_ARRAY(13 << 14 << 15)
+                   << BSON_ARRAY(7 << 8 << 9) << BSON_ARRAY(10 << 11 << 12)));
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupTest,
+       ConcatArraysAccumulatorTranslationArrayNestedArraySubfieldWithDuplicate) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: {b: [[1, 2], [3, 4]]}}")),
+                                       BSON_ARRAY(fromjson("{a: {b: [[1, 2], [5, 6], [7, 8]]}}"))};
+    runArrayOutputAccumulatorTest("{_id: null, x: {$concatArrays: '$a.b'}}",
+                                  docs,
+                                  BSON_ARRAY(BSON_ARRAY(1 << 2)
+                                             << BSON_ARRAY(3 << 4) << BSON_ARRAY(1 << 2)
+                                             << BSON_ARRAY(5 << 6) << BSON_ARRAY(7 << 8)));
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, ConcatArraysAccumulatorTranslationRepeatedValue) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: [1, 2, 3]}")),
+                                       BSON_ARRAY(fromjson("{a: [1, 2, 3]}")),
+                                       BSON_ARRAY(fromjson("{a: [3, 4, 5]}"))};
+    runArrayOutputAccumulatorTest("{_id: null, x: {$concatArrays: '$a'}}",
+                                  docs,
+                                  BSON_ARRAY(1 << 2 << 3 << 1 << 2 << 3 << 3 << 4 << 5));
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, ConcatArraysAccumulatorTranslationSomeMissingFields) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{b: 1}")),
+                                       BSON_ARRAY(fromjson("{a: [1, 2, 3]}")),
+                                       BSON_ARRAY(fromjson("{b: 1}")),
+                                       BSON_ARRAY(fromjson("{a: [7, 8, 9]}")),
+                                       BSON_ARRAY(fromjson("{b: 1}"))};
+    runArrayOutputAccumulatorTest(
+        "{_id: null, x: {$concatArrays: '$a'}}", docs, BSON_ARRAY(1 << 2 << 3 << 7 << 8 << 9));
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, ConcatArraysAccumulatorTranslationAllMissingFields) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{b: 1}")),
+                                       BSON_ARRAY(fromjson("{b: 1}")),
+                                       BSON_ARRAY(fromjson("{b: 3}"))};
+    runArrayOutputAccumulatorTest("{_id: null, x: {$concatArrays: '$a'}}", docs, BSONArray{});
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, ConcatArraysAccumulatorTranslationWithCollation) {
+    // Collation should not affect the output of $concatArrays.
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: [\"l\", \"m\", \"n\"]}")),
+                                       BSON_ARRAY(fromjson("{a: [\"o\", \"p\", \"q\"]}")),
+                                       BSON_ARRAY(fromjson("{a: [\"r\", \"s\", \"t\"]}"))};
+    runArrayOutputAccumulatorTest("{_id: null, x: {$concatArrays: '$a'}}",
+                                  docs,
+                                  BSON_ARRAY("l"
+                                             << "m"
+                                             << "n"
+                                             << "o"
+                                             << "p"
+                                             << "q"
+                                             << "r"
+                                             << "s"
+                                             << "t"));
+
+    runArrayOutputAccumulatorTest("{_id: null, x: {$concatArrays: '$a'}}",
+                                  docs,
+                                  BSON_ARRAY("l"
+                                             << "m"
+                                             << "n"
+                                             << "o"
+                                             << "p"
+                                             << "q"
+                                             << "r"
+                                             << "s"
+                                             << "t"),
+                                  std::make_unique<CollatorInterfaceMock>(
+                                      CollatorInterfaceMock::MockType::kAlwaysEqual));
 }
 
 TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationNoDocs) {
@@ -2251,17 +2371,22 @@ TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
     runSbeGroupCompatibleFlagTest(groupSpecs, expCtx);
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
-    // TODO SERVER-94575: Move this test case to the generic SbeGroupCompatibleFlag test once we
-    // enable the feature flag by default and delete the SetUnionSbeStageBuilderGroupTest fixture.
-    auto testCase = R"(_id: null, agg: {$setUnion: "$arr"})";
+TEST_F(ArrayAccumSbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
+    // TODO SERVER-94575: Move these test cases to the generic SbeGroupCompatibleFlag test once we
+    // enable the feature flag by default and delete the ArrayAccumSbeStageBuilderGroupTest fixture.
+    auto testCaseSetUnion = R"(_id: null, agg: {$setUnion: "$arr"})";
 
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     std::vector<BSONObj> groupSpecs;
 
-    auto groupSpec = fromjson(fmt::sprintf("{%s}", testCase));
-    runSbeGroupCompatibleFlagTest({groupSpec}, expCtx);
-    groupSpecs.push_back(groupSpec);
+    auto groupSpecSetUnion = fromjson(fmt::sprintf("{%s}", testCaseSetUnion));
+    runSbeGroupCompatibleFlagTest({groupSpecSetUnion}, expCtx);
+    groupSpecs.push_back(groupSpecSetUnion);
+
+    auto testCaseConcatArrays = R"(_id: null, agg: {$concatArrays: "$arr"})";
+    auto groupSpecConcatArrays = fromjson(fmt::sprintf("{%s}", testCaseConcatArrays));
+    runSbeGroupCompatibleFlagTest({groupSpecConcatArrays}, expCtx);
+    groupSpecs.push_back(groupSpecConcatArrays);
 
     runSbeGroupCompatibleFlagTest(groupSpecs, expCtx);
 }
@@ -2925,15 +3050,15 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest,
         ErrorCodes::ExceededMemoryLimit);
 }
 
-class SetUnionSbeStageBuilderGroupAggCombinerTest : public SbeStageBuilderGroupAggCombinerTest {
+class ArrayAccumSbeStageBuilderGroupAggCombinerTest : public SbeStageBuilderGroupAggCombinerTest {
 public:
     void setUp() override {
         SbeStageBuilderGroupAggCombinerTest::setUp();
-        registerSetUnionAccumulator();
+        registerArrayAccumulators();
     }
 };
 
-TEST_F(SetUnionSbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSetUnion) {
+TEST_F(ArrayAccumSbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSetUnion) {
     auto accStatement = makeAccumulationStatement("$setUnion"_sd);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
@@ -2955,7 +3080,7 @@ TEST_F(SetUnionSbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSetUnion) 
         inputValuesTag, inputValuesVal, expectedTag, expectedVal, compiledExpr.get());
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSetUnionWithCollation) {
+TEST_F(ArrayAccumSbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSetUnionWithCollation) {
     auto accStatement = makeAccumulationStatement("$setUnion"_sd);
 
     CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
@@ -2993,7 +3118,7 @@ TEST_F(SetUnionSbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSetUnionWi
         inputValuesTag, inputValuesVal, expectedTag, expectedVal, compiledExpr.get());
 }
 
-TEST_F(SetUnionSbeStageBuilderGroupAggCombinerTest,
+TEST_F(ArrayAccumSbeStageBuilderGroupAggCombinerTest,
        CombinePartialAggsSetUnionThrowsWhenExceedingSizeLimit) {
     RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxSetUnionBytes", 50);
 
@@ -3011,6 +3136,50 @@ TEST_F(SetUnionSbeStageBuilderGroupAggCombinerTest,
                                      << BSON_ARRAY(BSON_ARRAY("unused") << -1)),
                           Accumulator::kAddToSet);
 
+    ASSERT_THROWS_CODE(
+        aggregateAndAssertResults(
+            input.first, input.second, expected.first, expected.second, compiledExpr.get()),
+        DBException,
+        ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupAggCombinerTest, CombinePartialAggsConcatArrays) {
+    auto accStatement = makeAccumulationStatement("$concatArrays"_sd);
+    auto compiledExpr = compileSingleInputNoCollator(accStatement);
+
+    auto [inputValuesTag, inputValuesVal] =
+        makeArrayAccumVal(BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 27)
+                                     << BSON_ARRAY(BSON_ARRAY(1 << 3 << 5 << 8) << 36)
+                                     << BSON_ARRAY(BSONArray{} << 0)),
+                          Accumulator::kPush);
+
+    auto [expectedTag, expectedVal] = makeArrayAccumVal(
+        BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 27)
+                   << BSON_ARRAY(BSON_ARRAY(3 << 4 << 5 << 1 << 3 << 5 << 8) << 63)
+                   << BSON_ARRAY(BSON_ARRAY(3 << 4 << 5 << 1 << 3 << 5 << 8) << 63)),
+        Accumulator::kPush);
+    aggregateAndAssertResults(
+        inputValuesTag, inputValuesVal, expectedTag, expectedVal, compiledExpr.get());
+}
+
+TEST_F(ArrayAccumSbeStageBuilderGroupAggCombinerTest,
+       CombinePartialAggsConcatArraysThrowsWhenExceedingSizeLimit) {
+    RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxConcatArraysBytes",
+                                                             50);
+
+    auto accStatement = makeAccumulationStatement("$concatArrays"_sd);
+    auto compiledExpr = compileSingleInputNoCollator(accStatement);
+
+    auto input = makeArrayAccumVal(BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(1 << 2) << 18)
+                                              << BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 27)
+                                              << BSON_ARRAY(BSON_ARRAY(6) << 9)),
+                                   Accumulator::kPush);
+
+    auto expected =
+        makeArrayAccumVal(BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(1 << 2) << 18)
+                                     << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3 << 4 << 5) << 45)
+                                     << BSON_ARRAY(BSON_ARRAY("unused") << -1)),
+                          Accumulator::kPush);
     ASSERT_THROWS_CODE(
         aggregateAndAssertResults(
             input.first, input.second, expected.first, expected.second, compiledExpr.get()),

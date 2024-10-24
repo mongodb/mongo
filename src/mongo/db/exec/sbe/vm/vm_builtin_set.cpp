@@ -132,59 +132,59 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSetCapp
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnionCapped(ArityType arity) {
-    auto [tagNewElem, valNewElem] = moveOwnedFromStack(1);
+    auto [newElemTag, newElemVal] = moveOwnedFromStack(1);
 
     // Note that we do not call 'reset()' on the guard below, as 'setUnionAccumImpl' assumes that
-    // callers will manage the memory associated with 'tag/valNewElem'. See the comment on
+    // callers will manage the memory associated with 'newElemTag/Val'. See the comment on
     // 'setUnionAccumImpl' for more details.
-    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
-    auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
+    value::ValueGuard newElemGuard{newElemTag, newElemVal};
+    auto [_, sizeCapTag, sizeCapVal] = getFromStack(2);
 
-    if (tagSizeCap != value::TypeTags::NumberInt32) {
-        auto [ownArr, tagArr, valArr] = getFromStack(0);
+    if (sizeCapTag != value::TypeTags::NumberInt32) {
+        auto [arrOwned, arrTag, arrVal] = getFromStack(0);
         topStack(false, value::TypeTags::Nothing, 0);
-        return {ownArr, tagArr, valArr};
+        return {arrOwned, arrTag, arrVal};
     }
 
-    auto [ownAcc, tagAcc, valAcc] = getFromStack(0);
+    auto [accOwned, accTag, accVal] = getFromStack(0);
 
-    return setUnionAccumImpl(tagNewElem,
-                             valNewElem,
-                             value::bitcastTo<int32_t>(valSizeCap),
-                             ownAcc,
-                             tagAcc,
-                             valAcc,
+    return setUnionAccumImpl(newElemTag,
+                             newElemVal,
+                             value::bitcastTo<int32_t>(sizeCapVal),
+                             accOwned,
+                             accTag,
+                             accVal,
                              nullptr /*collator*/);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnionCapped(
     ArityType arity) {
-    auto [_1, tagColl, valColl] = getFromStack(1);
-    auto [tagNewElem, valNewElem] = moveOwnedFromStack(2);
+    auto [_1, collTag, collVal] = getFromStack(1);
+    auto [newElemTag, newElemVal] = moveOwnedFromStack(2);
 
     // Note that we do not call 'reset()' on the guard below, as 'setUnionAccumImpl' assumes that
-    // callers will manage the memory associated with 'tag/valNewElem'. See the comment on
+    // callers will manage the memory associated with 'newElemTag/Val'. See the comment on
     // 'setUnionAccumImpl' for more details.
-    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
-    auto [_2, tagSizeCap, valSizeCap] = getFromStack(3);
+    value::ValueGuard newElemGuard{newElemTag, newElemVal};
+    auto [_2, sizeCapTag, sizeCapVal] = getFromStack(3);
 
     // If the collator is Nothing or if it's some unexpected type, don't push back the value and
     // just return the accumulator.
-    if (tagColl != value::TypeTags::collator || tagSizeCap != value::TypeTags::NumberInt32) {
-        auto [ownArr, tagArr, valArr] = getFromStack(0);
+    if (collTag != value::TypeTags::collator || sizeCapTag != value::TypeTags::NumberInt32) {
+        auto [arrOwned, arrTag, arrVal] = getFromStack(0);
         topStack(false, value::TypeTags::Nothing, 0);
-        return {ownArr, tagArr, valArr};
+        return {arrOwned, arrTag, arrVal};
     }
 
-    auto [ownAcc, tagAcc, valAcc] = getFromStack(0);
+    auto [accOwned, accTag, accVal] = getFromStack(0);
 
-    return setUnionAccumImpl(tagNewElem,
-                             valNewElem,
-                             value::bitcastTo<int32_t>(valSizeCap),
-                             ownAcc,
-                             tagAcc,
-                             valAcc,
-                             value::getCollatorView(valColl));
+    return setUnionAccumImpl(newElemTag,
+                             newElemVal,
+                             value::bitcastTo<int32_t>(sizeCapVal),
+                             accOwned,
+                             accTag,
+                             accVal,
+                             value::getCollatorView(collVal));
 }
 
 namespace {

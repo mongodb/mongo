@@ -2117,17 +2117,16 @@ TEST(Accumulators, SerializeWithRedaction) {
         actual);
 
     auto concatArrays = BSON("$concatArrays" << BSON_ARRAY(4 << 6));
-    actual = parseAndSerializeAccum(
-        concatArrays.firstElement(),
-        &genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorConcatArrays>);
+    actual =
+        parseAndSerializeAccum(concatArrays.firstElement(),
+                               &genericParseSingleExpressionAccumulator<AccumulatorConcatArrays>);
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({"$concatArrays": "?array<?number>"})",
         actual);
 
     auto setUnion = BSON("$setUnion" << BSON_ARRAY(4 << 6));
-    actual = parseAndSerializeAccum(
-        setUnion.firstElement(),
-        &genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorSetUnion>);
+    actual = parseAndSerializeAccum(setUnion.firstElement(),
+                                    &genericParseSingleExpressionAccumulator<AccumulatorSetUnion>);
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({"$setUnion": "?array<?number>"})",
         actual);
