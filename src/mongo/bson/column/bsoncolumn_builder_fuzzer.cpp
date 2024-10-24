@@ -595,21 +595,29 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     }
 
     // Verify decoding gives us original elements
-    BSONBinData binData = builder.finalize();
-    BSONObjBuilder obj;
-    obj.append(""_sd, binData);
-    BSONElement columnElement = obj.done().firstElement();
-    BSONColumn col(columnElement);
+    auto diff = builder.intermediate();
+    BSONColumn col(diff.data(), diff.size());
     auto it = col.begin();
     for (auto elem : generatedElements) {
         BSONElement other = *it;
         invariant(elem.binaryEqualValues(other),
-                  str::stream() << "Decoded element " << it->toString()
-                                << " does not match original " << elem.toString());
-        invariant(it.more(), "There were fewer decoded elements than original");
+                  str::stream() << "Decoded element: '" << it->toString()
+                                << "' does not match original: '" << elem.toString()
+                                << "'. Column: " << base64::encode(diff.data(), diff.size()));
+        invariant(it.more(),
+                  str::stream() << "There were fewer decoded elements than original. Column: "
+                                << base64::encode(diff.data(), diff.size()));
         ++it;
     }
-    invariant(!it.more(), "There were more decoded elements than original");
+    invariant(!it.more(),
+              str::stream() << "There were more decoded elements than original. Column: "
+                            << base64::encode(diff.data(), diff.size()));
+
+    // Verify binary reopen gives identical state as intermediate
+    BSONColumnBuilder reopen(diff.data(), diff.size());
+    invariant(builder.isInternalStateIdentical(reopen),
+              str::stream() << "Binary reopen does not yield equivalent state. Column: "
+                            << base64::encode(diff.data(), diff.size()));
 
     return 0;
 }
