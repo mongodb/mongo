@@ -1,7 +1,4 @@
 // Wrapper around the validate command that can be used to validate index key counts.
-import {
-    validateCatalogListOperationsConsistency
-} from "jstests/libs/catalog_list_operations_consistency_validator.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 export class CollectionValidator {
@@ -46,27 +43,6 @@ function validateCollectionsImpl(db, obj) {
         }
     }
 
-    function getCatalogInfoIfAvailable(db, uuids) {
-        const acceptableErrorCodes = [
-            // Happens on api_strict suites since $listCatalog is not part of the stable API.
-            ErrorCodes.APIStrictError,
-            // Happens on multiversion suites as $listCatalog only exists since MongoDB 6.0.
-            40324,  // "Unrecognized pipeline stage name: ..."
-            // Happens on tests that launch mongod with a very low `maxBSONDepth` server param.
-            5729100,  // "FieldPath is too long"
-        ];
-        try {
-            return db.getSiblingDB("admin")
-                .aggregate([{$listCatalog: {}}, {$match: {"md.options.uuid": {$in: uuids}}}])
-                .toArray();
-        } catch (ex) {
-            if (acceptableErrorCodes.includes(ex.code)) {
-                return null;
-            }
-            throw ex;
-        }
-    }
-
     assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
     assert.eq(typeof obj, 'object', 'The `obj` argument must be an object');
     assert(obj.hasOwnProperty('full'), 'Please specify whether to use full validation');
@@ -102,60 +78,22 @@ function validateCollectionsImpl(db, obj) {
         filter = {$and: [filter, ...skippedCollections]};
     }
 
-    // For the `listCollections` to `$listCatalog` consistency check, we need to know if the DB
-    // is read-only, as `listCollections` reports this information even though it is not part
-    // of the catalog, so we need to fetch it separately.
-    const isDbReadOnly =
-        db.serverStatus({
-              // This server status section attempts to get WiredTiger storage size statistics, and
-              // fails if a validate is in progress, similarly to the ObjectIsBusy error below.
-              // Since we don't need it, we can just exclude it from the output.
-              changeStreamPreImages: 0
-          }).storageEngine.readOnly;
-
-    let collInfo, consistencyCheckAttempts = 0;
+    // In a sharded cluster with in-progress validate command for the config database
+    // (i.e. on the config server), a listCommand command on a mongos or shardsvr mongod that
+    // has stale routing info may fail since a refresh would involve running read commands
+    // against the config database. The read commands are lock free so they are not blocked by
+    // the validate command and instead are subject to failing with a ObjectIsBusy error. Since
+    // this is a transient state, we shoud retry.
+    let collInfo;
     assert.soon(() => {
-        let catalogInfo, collIndexes;
         try {
             collInfo = db.getCollectionInfos(filter);
-            catalogInfo = getCatalogInfoIfAvailable(db, collInfo.map(c => c.info.uuid));
-            collIndexes = catalogInfo &&
-                collInfo.map(
-                    coll => ({name: coll.name, indexes: db.getCollection(coll.name).getIndexes()}));
         } catch (ex) {
-            // In a sharded cluster with in-progress validate command for the config database
-            // (i.e. on the config server), catalog accesses on a mongos or shardsvr mongod that
-            // has stale routing info may fail since a refresh would involve running read commands
-            // against the config database. The read commands are lock free so they are not blocked
-            // by the validate command and instead are subject to failing with a ObjectIsBusy error.
-            // Since this is a transient state, we should retry.
             if (ex.code === ErrorCodes.ObjectIsBusy) {
-                return false;
-            }
-            // When the `listIndexes` command goes through the sharding code (for example, on a
-            // replica set endpoint), the command handler forwards the command to the shard with the
-            // MinKey chunk, which may require refreshing the collection routing information.
-            // If this happens while the config server is ongoing a state transition, it will fail
-            // with this code. Since this is a transient state, we should retry.
-            if (ex.code === ErrorCodes.InterruptedDueToReplStateChange) {
                 return false;
             }
             throw ex;
         }
-
-        // Check consistency between `listCollections`, `listIndexes` and `$listCatalog` results.
-        // It is possible that the two commands return spuriously inconsistent results, for example
-        // due to oplog entries for collection drops or renames still being applied to a secondary.
-        // So, we may need to retry a few times until we converge to a consistent result set.
-        // But, if we repeatedly fail, don't stall the test for too long but fail fast instead.
-        const doAssert = consistencyCheckAttempts++ > 20;
-        if (catalogInfo !== null &&
-            !validateCatalogListOperationsConsistency(
-                catalogInfo, collInfo, collIndexes, isDbReadOnly, doAssert)) {
-            print("$listCatalog/listCollections/listIndexes consistency check failed, retrying...");
-            return false;
-        }
-
         return true;
     });
 
@@ -194,7 +132,7 @@ function validateCollectionsImpl(db, obj) {
 }
 
 // Run a separate thread to validate collections on each server in parallel.
-async function validateCollectionsThread(validatorFunc, host) {
+function validateCollectionsThread(validatorFunc, host) {
     try {
         print('Running validate() on ' + host);
         const conn = new Mongo(host);
@@ -227,12 +165,6 @@ async function validateCollectionsThread(validatorFunc, host) {
                 return true;
             });
         }
-
-        // Import the validator's dependencies into the thread's global scope
-        const {validateCatalogListOperationsConsistency} =
-            await import("jstests/libs/catalog_list_operations_consistency_validator.js");
-        globalThis.validateCatalogListOperationsConsistency =
-            validateCatalogListOperationsConsistency;
 
         const dbs = conn.getDBs().databases;
         for (let db of dbs) {

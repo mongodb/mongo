@@ -41,9 +41,6 @@ selector:
     - jstests/core/query/or/or_to_in.js
     # The following test fires a large query that takes too long with wildcard indexes.
     - jstests/core/query/query_settings/query_settings_size_limits.js
-    # TODO (SERVER-95786): Fails because this suite overrides DBCollection.prototype.getIndexes
-    # and re-implements it using $indexStats, which (by design) doesn't return clustered indexes
-    - jstests/core/catalog/catalog_list_operations_consistency.js
 
   exclude_with_any_tags:
     # This suite implicitly creates compound wildcard indexes.

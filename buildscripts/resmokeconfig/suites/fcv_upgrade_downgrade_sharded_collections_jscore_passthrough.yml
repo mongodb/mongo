@@ -231,10 +231,6 @@ selector:
     - jstests/core/timeseries/timeseries_lastpoint.js
     - jstests/core/timeseries/timeseries_reopened_bucket_insert.js
 
-    # TODO (SERVER-95788): This test creates a capped collection and fails because this suite is not
-    # compatible with them (they can't be sharded), but does not exclude the `requires_capped` tag.
-    - jstests/core/catalog/catalog_list_operations_consistency.js
-
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
