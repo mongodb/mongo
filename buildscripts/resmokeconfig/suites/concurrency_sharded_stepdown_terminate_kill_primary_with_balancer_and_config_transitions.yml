@@ -188,6 +188,10 @@ executor:
           data:
             comment: *movePrimaryComment
           mode: alwaysOn
+        # Orphan cleanup happening too quickly can cause intermittent test failures due to
+        # inconsistent secondary reads. Choose a setting lower than continuous stepdown interval to
+        # get around SERVER-90242.
+        orphanCleanupDelaySecs: 7
     num_rs_nodes_per_shard: 3
     # Use 3 shards so there's always at least two for workloads with manual migrations, etc.
     num_shards: 3
