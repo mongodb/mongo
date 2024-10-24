@@ -185,6 +185,18 @@ subSection("without preceding $sort, output shard key");
 outputAggregationPlanAndResults(coll, [{$group: {_id: "$shardKey", accum: {$first: "$shardKey"}}}]);
 outputAggregationPlanAndResults(coll, [{$group: {_id: "$shardKey", accum: {$last: "$shardKey"}}}]);
 
+subSection("with preceding $sort and intervening $match");
+outputAggregationPlanAndResults(coll, [
+    {$sort: {shardKey: 1, notShardKey: 1}},
+    {$match: {shardKey: {$gt: "chunk1_s0"}}},
+    {$group: {_id: "$shardKey", l1: {$first: "$shardKey"}, l2: {$first: "$notShardKey"}}}
+]);
+outputAggregationPlanAndResults(coll, [
+    {$sort: {shardKey: 1, notShardKey: 1}},
+    {$match: {shardKey: {$gt: "chunk1_s0"}}},
+    {$group: {_id: "$shardKey", l1: {$last: "$shardKey"}, l2: {$last: "$notShardKey"}}}
+]);
+
 // TODO SERVER-92459: Uncomment these tests and ensure we get DISTINCT_SCAN with
 // isShardFiltering=true and isFetching=true.
 //
@@ -196,5 +208,11 @@ outputAggregationPlanAndResults(coll, [{$group: {_id: "$shardKey", accum: {$last
 //                                 [{$group: {_id: "$shardKey", accum: {$first: "$notShardKey"}}}]);
 // outputAggregationPlanAndResults(coll,
 //                                 [{$group: {_id: "$shardKey", accum: {$last: "$notShardKey"}}}]);
+//
+// outputAggregationPlanAndResults(coll, [{$sort: {shardKey: 1, notShardKey:
+// 1}}, {$match: {shardKey: {$gt: "chunk1_s0"}}}, {$group: {_id: "$shardKey", r: {$first:
+// "$$ROOT"}}}]); outputAggregationPlanAndResults(coll, [{$sort: {shardKey: 1, notShardKey:
+// 1}}, {$match: {shardKey: {$gt: "chunk1_s0"}}}, {$group: {_id: "$shardKey", r: {$last:
+// "$$ROOT"}}}]);
 
 shardingTest.stop();

@@ -2314,6 +2314,9 @@
 		},
 		{
 			"direction" : "forward",
+			"filter" : {
+				
+			},
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -2654,6 +2657,164 @@
 						"multiKeyPaths" : {
 							"a" : [ ],
 							"b" : [ ]
+						},
+						"stage" : "IXSCAN"
+					}
+				]
+			}
+		},
+		{
+			"$group" : {
+				"_id" : "$a",
+				"accum" : {
+					"$top" : {
+						"output" : "$b",
+						"sortBy" : {
+							"a" : 1,
+							"b" : 1
+						}
+					}
+				}
+			}
+		}
+	]
+}
+```
+
+### Prefer FETCH + filter + IXSCAN for more selective predicate on b
+### Pipeline
+```json
+[
+	{
+		"$match" : {
+			"a" : {
+				"$gt" : 0
+			},
+			"b" : {
+				"$gt" : -18
+			}
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$top" : {
+					"sortBy" : {
+						"a" : 1,
+						"b" : 1
+					},
+					"output" : "$b"
+				}
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 1,  "accum" : -1 }
+{  "_id" : 10,  "accum" : -10 }
+{  "_id" : 11,  "accum" : -11 }
+{  "_id" : 12,  "accum" : -12 }
+{  "_id" : 13,  "accum" : -13 }
+{  "_id" : 14,  "accum" : -14 }
+{  "_id" : 15,  "accum" : -15 }
+{  "_id" : 16,  "accum" : -16 }
+{  "_id" : 17,  "accum" : -17 }
+{  "_id" : 2,  "accum" : -2 }
+{  "_id" : 3,  "accum" : -3 }
+{  "_id" : 4,  "accum" : -4 }
+{  "_id" : 5,  "accum" : -5 }
+{  "_id" : 6,  "accum" : -6 }
+{  "_id" : 7,  "accum" : -7 }
+{  "_id" : 8,  "accum" : -8 }
+{  "_id" : 9,  "accum" : -9 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1,
+								"b" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"(0.0, inf.0]"
+								],
+								"b" : [
+									"(-18.0, inf.0]"
+								]
+							},
+							"indexName" : "a_1_b_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					]
+				],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_SIMPLE",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
+					},
+					{
+						"filter" : {
+							"a" : {
+								"$gt" : 0
+							}
+						},
+						"stage" : "FETCH"
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"b" : [
+								"(-18.0, inf.0]"
+							],
+							"c" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "b_1_c_1",
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"b" : 1,
+							"c" : 1
+						},
+						"multiKeyPaths" : {
+							"b" : [ ],
+							"c" : [ ]
 						},
 						"stage" : "IXSCAN"
 					}
@@ -3244,6 +3405,9 @@
 		},
 		{
 			"direction" : "forward",
+			"filter" : {
+				
+			},
 			"stage" : "COLLSCAN"
 		}
 	]

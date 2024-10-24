@@ -50,7 +50,7 @@ coll.createIndex({x: 1, y: 1});
 coll.createIndex({y: 1, z: 1});
 outputDistinctPlanAndResults(coll, "x", {x: {$gt: -1}, y: {$lt: 250}});
 
-section("Prefer IXSCAN for no duplicate values in the collection");
+section("Prefer FETCH + filter + IXSCAN for more selective predicate on y");
 coll.drop();
 for (let i = 0; i < 100; ++i)
     coll.insert({x: i, y: i + 100, z: i + 200});

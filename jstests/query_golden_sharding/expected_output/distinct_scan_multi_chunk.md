@@ -4475,3 +4475,638 @@
 }
 ```
 
+### with preceding $sort and intervening $match
+### Pipeline
+```json
+[
+	{
+		"$sort" : {
+			"shardKey" : 1,
+			"notShardKey" : 1
+		}
+	},
+	{
+		"$match" : {
+			"shardKey" : {
+				"$gt" : "chunk1_s0"
+			}
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$shardKey",
+			"l1" : {
+				"$first" : "$shardKey"
+			},
+			"l2" : {
+				"$first" : "$notShardKey"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : "chunk1_s0_0",  "l1" : "chunk1_s0_0",  "l2" : "1notShardKey_chunk1_s0_0" }
+{  "_id" : "chunk1_s0_1",  "l1" : "chunk1_s0_1",  "l2" : "1notShardKey_chunk1_s0_1" }
+{  "_id" : "chunk1_s0_2",  "l1" : "chunk1_s0_2",  "l2" : "1notShardKey_chunk1_s0_2" }
+{  "_id" : "chunk1_s1_0",  "l1" : "chunk1_s1_0",  "l2" : "1notShardKey_chunk1_s1_0" }
+{  "_id" : "chunk1_s1_1",  "l1" : "chunk1_s1_1",  "l2" : "1notShardKey_chunk1_s1_1" }
+{  "_id" : "chunk1_s1_2",  "l1" : "chunk1_s1_2",  "l2" : "1notShardKey_chunk1_s1_2" }
+{  "_id" : "chunk2_s0_0",  "l1" : "chunk2_s0_0",  "l2" : "1notShardKey_chunk2_s0_0" }
+{  "_id" : "chunk2_s0_1",  "l1" : "chunk2_s0_1",  "l2" : "1notShardKey_chunk2_s0_1" }
+{  "_id" : "chunk2_s0_2",  "l1" : "chunk2_s0_2",  "l2" : "1notShardKey_chunk2_s0_2" }
+{  "_id" : "chunk2_s1_0",  "l1" : "chunk2_s1_0",  "l2" : "1notShardKey_chunk2_s1_0" }
+{  "_id" : "chunk2_s1_1",  "l1" : "chunk2_s1_1",  "l2" : "1notShardKey_chunk2_s1_1" }
+{  "_id" : "chunk2_s1_2",  "l1" : "chunk2_s1_2",  "l2" : "1notShardKey_chunk2_s1_2" }
+{  "_id" : "chunk3_s0_0",  "l1" : "chunk3_s0_0",  "l2" : "1notShardKey_chunk3_s0_0" }
+{  "_id" : "chunk3_s0_1",  "l1" : "chunk3_s0_1",  "l2" : "1notShardKey_chunk3_s0_1" }
+{  "_id" : "chunk3_s0_2",  "l1" : "chunk3_s0_2",  "l2" : "1notShardKey_chunk3_s0_2" }
+{  "_id" : "chunk3_s1_0",  "l1" : "chunk3_s1_0",  "l2" : "1notShardKey_chunk3_s1_0" }
+{  "_id" : "chunk3_s1_1",  "l1" : "chunk3_s1_1",  "l2" : "1notShardKey_chunk3_s1_1" }
+{  "_id" : "chunk3_s1_2",  "l1" : "chunk3_s1_2",  "l2" : "1notShardKey_chunk3_s1_2" }
+```
+### Summarized explain
+```json
+{
+	"distinct_scan_multi_chunk-rs0" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [
+					[
+						{
+							"memLimit" : 104857600,
+							"sortPattern" : {
+								"notShardKey" : 1,
+								"shardKey" : 1
+							},
+							"stage" : "SORT",
+							"type" : "simple"
+						},
+						{
+							"stage" : "PROJECTION_SIMPLE",
+							"transformBy" : {
+								"_id" : 0,
+								"notShardKey" : 1,
+								"shardKey" : 1
+							}
+						},
+						{
+							"stage" : "FETCH"
+						},
+						{
+							"stage" : "SHARDING_FILTER"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"shardKey" : [
+									"(\"chunk1_s0\", {})"
+								]
+							},
+							"indexName" : "shardKey_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"shardKey" : 1
+							},
+							"multiKeyPaths" : {
+								"shardKey" : [ ]
+							},
+							"stage" : "IXSCAN"
+						}
+					]
+				],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"notShardKey" : 1,
+							"shardKey" : 1
+						}
+					},
+					{
+						"stage" : "SORT_KEY_GENERATOR"
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"notShardKey" : [
+								"[MinKey, MaxKey]"
+							],
+							"shardKey" : [
+								"(\"chunk1_s0\", {})"
+							]
+						},
+						"indexName" : "shardKey_1_notShardKey_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : true,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"notShardKey" : 1,
+							"shardKey" : 1
+						},
+						"multiKeyPaths" : {
+							"notShardKey" : [ ],
+							"shardKey" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$group" : {
+				"_id" : "$shardKey",
+				"l1" : {
+					"$first" : "$shardKey"
+				},
+				"l2" : {
+					"$first" : "$notShardKey"
+				}
+			}
+		}
+	],
+	"distinct_scan_multi_chunk-rs1" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [
+					[
+						{
+							"memLimit" : 104857600,
+							"sortPattern" : {
+								"notShardKey" : 1,
+								"shardKey" : 1
+							},
+							"stage" : "SORT",
+							"type" : "simple"
+						},
+						{
+							"stage" : "PROJECTION_SIMPLE",
+							"transformBy" : {
+								"_id" : 0,
+								"notShardKey" : 1,
+								"shardKey" : 1
+							}
+						},
+						{
+							"stage" : "FETCH"
+						},
+						{
+							"stage" : "SHARDING_FILTER"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"shardKey" : [
+									"(\"chunk1_s0\", {})"
+								]
+							},
+							"indexName" : "shardKey_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"shardKey" : 1
+							},
+							"multiKeyPaths" : {
+								"shardKey" : [ ]
+							},
+							"stage" : "IXSCAN"
+						}
+					]
+				],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"notShardKey" : 1,
+							"shardKey" : 1
+						}
+					},
+					{
+						"stage" : "SORT_KEY_GENERATOR"
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"notShardKey" : [
+								"[MinKey, MaxKey]"
+							],
+							"shardKey" : [
+								"(\"chunk1_s0\", {})"
+							]
+						},
+						"indexName" : "shardKey_1_notShardKey_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : true,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"notShardKey" : 1,
+							"shardKey" : 1
+						},
+						"multiKeyPaths" : {
+							"notShardKey" : [ ],
+							"shardKey" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$group" : {
+				"_id" : "$shardKey",
+				"l1" : {
+					"$first" : "$shardKey"
+				},
+				"l2" : {
+					"$first" : "$notShardKey"
+				}
+			}
+		}
+	],
+	"mergeType" : "mongos",
+	"mergerPart" : [
+		{
+			"$mergeCursors" : {
+				"allowPartialResults" : false,
+				"compareWholeSortKey" : false,
+				"nss" : "test.distinct_scan_multi_chunk",
+				"recordRemoteOpWaitTime" : false,
+				"requestQueryStatsFromRemotes" : false,
+				"tailableMode" : "normal"
+			}
+		},
+		{
+			"$group" : {
+				"$doingMerge" : true,
+				"_id" : "$$ROOT._id",
+				"l1" : {
+					"$first" : "$$ROOT.l1"
+				},
+				"l2" : {
+					"$first" : "$$ROOT.l2"
+				}
+			}
+		}
+	],
+	"shardsPart" : [
+		{
+			"$match" : {
+				"shardKey" : {
+					"$gt" : "chunk1_s0"
+				}
+			}
+		},
+		{
+			"$sort" : {
+				"sortKey" : {
+					"notShardKey" : 1,
+					"shardKey" : 1
+				}
+			}
+		},
+		{
+			"$group" : {
+				"_id" : "$shardKey",
+				"l1" : {
+					"$first" : "$shardKey"
+				},
+				"l2" : {
+					"$first" : "$notShardKey"
+				}
+			}
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$sort" : {
+			"shardKey" : 1,
+			"notShardKey" : 1
+		}
+	},
+	{
+		"$match" : {
+			"shardKey" : {
+				"$gt" : "chunk1_s0"
+			}
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$shardKey",
+			"l1" : {
+				"$last" : "$shardKey"
+			},
+			"l2" : {
+				"$last" : "$notShardKey"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : "chunk1_s0_0",  "l1" : "chunk1_s0_0",  "l2" : "3notShardKey_chunk1_s0_0" }
+{  "_id" : "chunk1_s0_1",  "l1" : "chunk1_s0_1",  "l2" : "3notShardKey_chunk1_s0_1" }
+{  "_id" : "chunk1_s0_2",  "l1" : "chunk1_s0_2",  "l2" : "3notShardKey_chunk1_s0_2" }
+{  "_id" : "chunk1_s1_0",  "l1" : "chunk1_s1_0",  "l2" : "3notShardKey_chunk1_s1_0" }
+{  "_id" : "chunk1_s1_1",  "l1" : "chunk1_s1_1",  "l2" : "3notShardKey_chunk1_s1_1" }
+{  "_id" : "chunk1_s1_2",  "l1" : "chunk1_s1_2",  "l2" : "3notShardKey_chunk1_s1_2" }
+{  "_id" : "chunk2_s0_0",  "l1" : "chunk2_s0_0",  "l2" : "3notShardKey_chunk2_s0_0" }
+{  "_id" : "chunk2_s0_1",  "l1" : "chunk2_s0_1",  "l2" : "3notShardKey_chunk2_s0_1" }
+{  "_id" : "chunk2_s0_2",  "l1" : "chunk2_s0_2",  "l2" : "3notShardKey_chunk2_s0_2" }
+{  "_id" : "chunk2_s1_0",  "l1" : "chunk2_s1_0",  "l2" : "3notShardKey_chunk2_s1_0" }
+{  "_id" : "chunk2_s1_1",  "l1" : "chunk2_s1_1",  "l2" : "3notShardKey_chunk2_s1_1" }
+{  "_id" : "chunk2_s1_2",  "l1" : "chunk2_s1_2",  "l2" : "3notShardKey_chunk2_s1_2" }
+{  "_id" : "chunk3_s0_0",  "l1" : "chunk3_s0_0",  "l2" : "3notShardKey_chunk3_s0_0" }
+{  "_id" : "chunk3_s0_1",  "l1" : "chunk3_s0_1",  "l2" : "3notShardKey_chunk3_s0_1" }
+{  "_id" : "chunk3_s0_2",  "l1" : "chunk3_s0_2",  "l2" : "3notShardKey_chunk3_s0_2" }
+{  "_id" : "chunk3_s1_0",  "l1" : "chunk3_s1_0",  "l2" : "3notShardKey_chunk3_s1_0" }
+{  "_id" : "chunk3_s1_1",  "l1" : "chunk3_s1_1",  "l2" : "3notShardKey_chunk3_s1_1" }
+{  "_id" : "chunk3_s1_2",  "l1" : "chunk3_s1_2",  "l2" : "3notShardKey_chunk3_s1_2" }
+```
+### Summarized explain
+```json
+{
+	"distinct_scan_multi_chunk-rs0" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [
+					[
+						{
+							"memLimit" : 104857600,
+							"sortPattern" : {
+								"notShardKey" : 1,
+								"shardKey" : 1
+							},
+							"stage" : "SORT",
+							"type" : "simple"
+						},
+						{
+							"stage" : "PROJECTION_SIMPLE",
+							"transformBy" : {
+								"_id" : 0,
+								"notShardKey" : 1,
+								"shardKey" : 1
+							}
+						},
+						{
+							"stage" : "FETCH"
+						},
+						{
+							"stage" : "SHARDING_FILTER"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"shardKey" : [
+									"(\"chunk1_s0\", {})"
+								]
+							},
+							"indexName" : "shardKey_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"shardKey" : 1
+							},
+							"multiKeyPaths" : {
+								"shardKey" : [ ]
+							},
+							"stage" : "IXSCAN"
+						}
+					]
+				],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"notShardKey" : 1,
+							"shardKey" : 1
+						}
+					},
+					{
+						"stage" : "SORT_KEY_GENERATOR"
+					},
+					{
+						"direction" : "backward",
+						"indexBounds" : {
+							"notShardKey" : [
+								"[MaxKey, MinKey]"
+							],
+							"shardKey" : [
+								"({}, \"chunk1_s0\")"
+							]
+						},
+						"indexName" : "shardKey_1_notShardKey_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : true,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"notShardKey" : 1,
+							"shardKey" : 1
+						},
+						"multiKeyPaths" : {
+							"notShardKey" : [ ],
+							"shardKey" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$group" : {
+				"_id" : "$shardKey",
+				"l1" : {
+					"$last" : "$shardKey"
+				},
+				"l2" : {
+					"$last" : "$notShardKey"
+				}
+			}
+		}
+	],
+	"distinct_scan_multi_chunk-rs1" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [
+					[
+						{
+							"memLimit" : 104857600,
+							"sortPattern" : {
+								"notShardKey" : 1,
+								"shardKey" : 1
+							},
+							"stage" : "SORT",
+							"type" : "simple"
+						},
+						{
+							"stage" : "PROJECTION_SIMPLE",
+							"transformBy" : {
+								"_id" : 0,
+								"notShardKey" : 1,
+								"shardKey" : 1
+							}
+						},
+						{
+							"stage" : "FETCH"
+						},
+						{
+							"stage" : "SHARDING_FILTER"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"shardKey" : [
+									"(\"chunk1_s0\", {})"
+								]
+							},
+							"indexName" : "shardKey_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"shardKey" : 1
+							},
+							"multiKeyPaths" : {
+								"shardKey" : [ ]
+							},
+							"stage" : "IXSCAN"
+						}
+					]
+				],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"notShardKey" : 1,
+							"shardKey" : 1
+						}
+					},
+					{
+						"stage" : "SORT_KEY_GENERATOR"
+					},
+					{
+						"direction" : "backward",
+						"indexBounds" : {
+							"notShardKey" : [
+								"[MaxKey, MinKey]"
+							],
+							"shardKey" : [
+								"({}, \"chunk1_s0\")"
+							]
+						},
+						"indexName" : "shardKey_1_notShardKey_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : true,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"notShardKey" : 1,
+							"shardKey" : 1
+						},
+						"multiKeyPaths" : {
+							"notShardKey" : [ ],
+							"shardKey" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$group" : {
+				"_id" : "$shardKey",
+				"l1" : {
+					"$last" : "$shardKey"
+				},
+				"l2" : {
+					"$last" : "$notShardKey"
+				}
+			}
+		}
+	],
+	"mergeType" : "mongos",
+	"mergerPart" : [
+		{
+			"$mergeCursors" : {
+				"allowPartialResults" : false,
+				"compareWholeSortKey" : false,
+				"nss" : "test.distinct_scan_multi_chunk",
+				"recordRemoteOpWaitTime" : false,
+				"requestQueryStatsFromRemotes" : false,
+				"tailableMode" : "normal"
+			}
+		},
+		{
+			"$group" : {
+				"$doingMerge" : true,
+				"_id" : "$$ROOT._id",
+				"l1" : {
+					"$last" : "$$ROOT.l1"
+				},
+				"l2" : {
+					"$last" : "$$ROOT.l2"
+				}
+			}
+		}
+	],
+	"shardsPart" : [
+		{
+			"$match" : {
+				"shardKey" : {
+					"$gt" : "chunk1_s0"
+				}
+			}
+		},
+		{
+			"$sort" : {
+				"sortKey" : {
+					"notShardKey" : 1,
+					"shardKey" : 1
+				}
+			}
+		},
+		{
+			"$group" : {
+				"_id" : "$shardKey",
+				"l1" : {
+					"$last" : "$shardKey"
+				},
+				"l2" : {
+					"$last" : "$notShardKey"
+				}
+			}
+		}
+	]
+}
+```
+

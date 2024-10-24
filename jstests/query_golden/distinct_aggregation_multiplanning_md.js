@@ -117,6 +117,19 @@ outputAggregationPlanAndResults(coll2, [
     {$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$b"}}}}
 ]);
 
+subSection("Prefer FETCH + filter + IXSCAN for more selective predicate on b");
+const coll3 = db[jsTestName() + "-3"];
+coll3.drop();
+for (let i = 0; i < 20; i++) {
+    coll3.insertOne({a: i, b: -i, c: i % 5});
+}
+coll3.createIndex({a: 1, b: 1});
+coll3.createIndex({b: 1, c: 1});
+outputAggregationPlanAndResults(coll3, [
+    {$match: {a: {$gt: 0}, b: {$gt: -18}}},
+    {$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$b"}}}}
+]);
+
 section("No DISTINCT_SCAN candidates considered due to conflicting sort specs");
 // The $sort is incompatible with the 'sortBy', so a distinct scan can't provide both sorts.
 outputAggregationPlanAndResults(coll, [

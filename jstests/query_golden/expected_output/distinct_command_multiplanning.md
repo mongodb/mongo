@@ -10,6 +10,11 @@
 	"rejectedPlans" : [
 		[
 			{
+				"filter" : {
+					"z" : {
+						"$eq" : 5
+					}
+				},
 				"stage" : "FETCH"
 			},
 			{
@@ -36,6 +41,11 @@
 	],
 	"winningPlan" : [
 		{
+			"filter" : {
+				"x" : {
+					"$gt" : 3
+				}
+			},
 			"stage" : "FETCH"
 		},
 		{
@@ -206,6 +216,11 @@
 	"rejectedPlans" : [
 		[
 			{
+				"filter" : {
+					"y" : {
+						"$lt" : 250
+					}
+				},
 				"stage" : "FETCH"
 			},
 			{
@@ -231,6 +246,11 @@
 		],
 		[
 			{
+				"filter" : {
+					"x" : {
+						"$gt" : -1
+					}
+				},
 				"stage" : "FETCH"
 			},
 			{
@@ -299,7 +319,7 @@
 }
 ```
 
-## 4. Prefer IXSCAN for no duplicate values in the collection
+## 4. Prefer FETCH + filter + IXSCAN for more selective predicate on y
 ### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 105 } }
 ### Expected results
 `[ 0, 1, 2, 3, 4 ]`
@@ -347,6 +367,11 @@
 		],
 		[
 			{
+				"filter" : {
+					"y" : {
+						"$lt" : 105
+					}
+				},
 				"stage" : "FETCH"
 			},
 			{
@@ -373,6 +398,11 @@
 	],
 	"winningPlan" : [
 		{
+			"filter" : {
+				"x" : {
+					"$gt" : -1
+				}
+			},
 			"stage" : "FETCH"
 		},
 		{
@@ -465,6 +495,11 @@
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
+			"filter" : {
+				"y" : {
+					"$lt" : 250
+				}
+			},
 			"stage" : "FETCH"
 		},
 		{
@@ -504,6 +539,20 @@
 	"winningPlan" : [
 		{
 			"direction" : "forward",
+			"filter" : {
+				"$and" : [
+					{
+						"y" : {
+							"$lt" : 250
+						}
+					},
+					{
+						"x" : {
+							"$gt" : -1
+						}
+					}
+				]
+			},
 			"stage" : "COLLSCAN"
 		}
 	]

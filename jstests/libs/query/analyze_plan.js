@@ -191,7 +191,7 @@ export function flattenPlan(plan) {
     ];
 
     // Expand this array if you find new fields which are inconsistent across different test runs.
-    const ignoreFields = ["isCached", "indexVersion", "filter", "planNodeId"];
+    const ignoreFields = ["isCached", "indexVersion", "planNodeId"];
 
     // Iterates over the plan while ignoring the `ignoreFields`, to create flattened stages whenever
     // `childFields` are encountered.

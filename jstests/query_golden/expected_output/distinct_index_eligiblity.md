@@ -181,6 +181,9 @@
 		},
 		{
 			"direction" : "forward",
+			"filter" : {
+				
+			},
 			"stage" : "COLLSCAN"
 		}
 	]
@@ -380,6 +383,11 @@
 	"winningPlan" : [
 		{
 			"direction" : "forward",
+			"filter" : {
+				"a" : {
+					"$lt" : 3
+				}
+			},
 			"stage" : "COLLSCAN"
 		}
 	]
