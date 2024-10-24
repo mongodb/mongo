@@ -456,7 +456,7 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
         });
 
         const auto swCri =
-            _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+            _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
         ASSERT_OK(swCri.getStatus());
         future.default_timed_get();
 
@@ -486,8 +486,9 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
             });
         });
 
+        _catalogCache->onStaleCollectionVersion(coll.getNss(), boost::none /* wantedVersion */);
         const auto swCri =
-            _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+            _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
         ASSERT_OK(swCri.getStatus());
         future.default_timed_get();
 
@@ -512,8 +513,7 @@ TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
     const auto scopedChunksProv = scopedChunksProvider(StatusWith<std::vector<ChunkType>>(
         ErrorCodes::InvalidOptions, "Testing error with invalid options"));
 
-    const auto swCri =
-        _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+    const auto swCri = _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
 
     ASSERT_EQUALS(swCri.getStatus(), ErrorCodes::InvalidOptions);
 }

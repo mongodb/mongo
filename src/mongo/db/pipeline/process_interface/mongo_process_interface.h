@@ -588,16 +588,6 @@ public:
         const std::set<FieldPath>& fieldPaths) const = 0;
 
     /**
-     * Refreshes the CatalogCache entry for the namespace 'nss', and returns the epoch associated
-     * with that namespace, if any. Note that this refresh will not necessarily force a new
-     * request to be sent to the config servers. If another thread has already requested a refresh,
-     * it will instead wait for that response.
-     */
-    virtual boost::optional<ShardVersion> refreshAndGetCollectionVersion(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss) const = 0;
-
-    /**
      * Refreshes the CatalogCache entry for the database 'dbName', and returns the DatabaseVersion
      * associated with that database, if any. It returns boost::none when failed to get a database
      * by that name.

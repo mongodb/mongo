@@ -76,6 +76,7 @@ struct CollectionRoutingInfo {
     ChunkManager cm;
     boost::optional<ShardingIndexesCatalogCache> sii;
 
+    bool hasRoutingTable() const;
     ShardVersion getCollectionVersion() const;
     ShardVersion getShardVersion(const ShardId& shardId) const;
 };
@@ -220,12 +221,6 @@ public:
      */
     StatusWith<CachedDatabaseInfo> getDatabaseWithRefresh(OperationContext* opCtx,
                                                           const DatabaseName& dbName);
-
-    /**
-     * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed.
-     */
-    StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Blocking method to retrieve refreshed collection placement information (ChunkManager).

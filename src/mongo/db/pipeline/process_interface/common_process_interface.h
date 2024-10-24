@@ -181,10 +181,6 @@ public:
 
     void updateClientOperationTime(OperationContext* opCtx) const final;
 
-    boost::optional<ShardVersion> refreshAndGetCollectionVersion(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss) const override;
-
     boost::optional<mongo::DatabaseVersion> refreshAndGetDatabaseVersion(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DatabaseName& dbName) const override;

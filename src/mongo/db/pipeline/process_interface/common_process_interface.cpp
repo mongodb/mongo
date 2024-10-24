@@ -231,15 +231,6 @@ bool CommonProcessInterface::keyPatternNamesExactPaths(const BSONObj& keyPattern
     return nFieldsMatched == uniqueKeyPaths.size();
 }
 
-boost::optional<ShardVersion> CommonProcessInterface::refreshAndGetCollectionVersion(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) const {
-    const auto cri = uassertStatusOK(Grid::get(expCtx->opCtx)
-                                         ->catalogCache()
-                                         ->getCollectionRoutingInfoWithRefresh(expCtx->opCtx, nss));
-
-    return cri.cm.isSharded() ? boost::make_optional(cri.getCollectionVersion()) : boost::none;
-}
-
 boost::optional<mongo::DatabaseVersion> CommonProcessInterface::refreshAndGetDatabaseVersion(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const DatabaseName& dbName) const {
 

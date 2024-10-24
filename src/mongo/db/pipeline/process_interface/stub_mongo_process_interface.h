@@ -336,12 +336,6 @@ public:
         return SupportingUniqueIndex::Full;
     }
 
-    boost::optional<ShardVersion> refreshAndGetCollectionVersion(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss) const override {
-        return boost::none;
-    }
-
     boost::optional<mongo::DatabaseVersion> refreshAndGetDatabaseVersion(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DatabaseName& dbName) const override {

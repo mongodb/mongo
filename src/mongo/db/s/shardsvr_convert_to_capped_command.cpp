@@ -77,18 +77,6 @@ public:
 
             const auto& nss = ns();
 
-            {
-                // TODO SERVER-87119 remove this scope once v8.0 branches out
-                // Unsafe best effort check needed to prevent calling convertToCapped on sharded
-                // collections when mustUseCoordinator=false
-                const auto cri = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                          nss));
-                uassert(ErrorCodes::NamespaceCannotBeSharded,
-                        "Can't convert a sharded collection to a capped collection",
-                        !cri.cm.isSharded());
-            }
-
             boost::optional<SharedSemiFuture<void>> coordinatorCompletionFuture;
             {
                 FixedFCVRegion fixedFcvRegion{opCtx};

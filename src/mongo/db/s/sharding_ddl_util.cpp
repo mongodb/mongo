@@ -102,6 +102,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_allow_migrations_gen.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_cluster_parameters_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -466,9 +467,8 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithOpt
     const BSONObj& collation,
     bool unique,
     bool unsplittable) {
-    auto cri = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
-    const auto& cm = cri.cm;
+    auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
     if (!cm.hasRoutingTable()) {
         return boost::none;
@@ -490,7 +490,8 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithOpt
                 SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == collation) &&
                 cm.isUnique() == unique && cm.isUnsplittable() == unsplittable);
 
-    CreateCollectionResponse response(cri.getCollectionVersion());
+    CreateCollectionResponse response(
+        ShardVersionFactory::make(cm, boost::none /* index version */));
     response.setCollectionUUID(cm.getUUID());
     return response;
 }

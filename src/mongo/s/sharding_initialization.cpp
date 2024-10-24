@@ -309,13 +309,14 @@ void preCacheMongosRoutingInfo(OperationContext* opCtx) {
     auto allDbs = catalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
 
     for (auto& db : allDbs) {
-        for (auto& coll : catalogClient->getCollectionNamespacesForDb(
+        for (auto& nss : catalogClient->getCollectionNamespacesForDb(
                  opCtx, db.getDbName(), repl::ReadConcernLevel::kMajorityReadConcern)) {
-            auto resp = catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, coll);
+            catalogCache->onStaleCollectionVersion(nss, boost::none /* wantedVersion */);
+            auto resp = catalogCache->getCollectionRoutingInfo(opCtx, nss);
             if (!resp.isOK()) {
                 LOGV2_WARNING(6203600,
                               "Failed to warmup collection routing information",
-                              logAttrs(coll),
+                              logAttrs(nss),
                               "error"_attr = redact(resp.getStatus()));
             }
         }

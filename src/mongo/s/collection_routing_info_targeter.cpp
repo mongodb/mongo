@@ -261,9 +261,8 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
                 cluster::createDatabase(opCtx, nss.dbName());
 
                 if (refresh) {
-                    uassertStatusOK(
-                        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                              nss));
+                    Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(
+                        nss, boost::none /* wantedVersion */);
                 }
 
                 if (MONGO_unlikely(waitForDatabaseToBeDropped.shouldFail())) {

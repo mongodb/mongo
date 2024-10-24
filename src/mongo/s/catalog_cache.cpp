@@ -181,6 +181,10 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
 
 }  // namespace
 
+bool CollectionRoutingInfo::hasRoutingTable() const {
+    return cm.hasRoutingTable();
+}
+
 ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
     return ShardVersionFactory::make(
         cm, sii ? boost::make_optional(sii->getCollectionIndexes()) : boost::none);
@@ -497,14 +501,6 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(Operati
                                                                          bool allowLocks) {
     return _getCollectionRoutingInfoAt(opCtx, nss, boost::none /* atClusterTime */, allowLocks);
 }
-
-StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefresh(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    _triggerPlacementVersionRefresh(nss);
-    _triggerIndexVersionRefresh(nss);
-    return _getCollectionRoutingInfoAt(opCtx, nss, boost::none /* atClusterTime */);
-}
-
 
 boost::optional<ShardingIndexesCatalogCache> CatalogCache::_getCollectionIndexInfo(
     OperationContext* opCtx, const NamespaceString& nss, bool allowLocks) {

@@ -102,6 +102,7 @@
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -1205,11 +1206,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             _updateNewOptTrackedCollInfoFieldAfterBinaryUpgrade();
 
             // Retrieve the new collection version
-            const auto catalog = Grid::get(opCtx)->catalogCache();
-            const auto cri = uassertStatusOK(
-                catalog->getCollectionRoutingInfoWithRefresh(opCtx, _request.getTo()));
-            _response = RenameCollectionResponse(
-                cri.cm.hasRoutingTable() ? cri.getCollectionVersion() : ShardVersion::UNSHARDED());
+            const auto& cm = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
+                    opCtx, _request.getTo()));
+            auto placementVersion =
+                cm.hasRoutingTable() ? cm.getVersion() : ChunkVersion::UNSHARDED();
+            _response = RenameCollectionResponse(ShardVersionFactory::make(
+                std::move(placementVersion), boost::none /* IndexVersion */));
 
             ShardingLogging::get(opCtx)->logChange(
                 opCtx,

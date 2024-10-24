@@ -97,8 +97,8 @@ CoreCatalogCacheTestFixture::scheduleRoutingInfoForcedRefresh(const NamespaceStr
         auto client = getServiceContext()->getService()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
 
-        auto cri = uassertStatusOK(
-            catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), nss));
+        catalogCache->onStaleCollectionVersion(nss, boost::none /* wantedVersion */);
+        auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss));
         return boost::make_optional(cri);
     });
 }

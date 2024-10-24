@@ -695,13 +695,11 @@ void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
 void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
                                            const NamespaceString& targetNss,
                                            const ShardsvrCreateCollectionRequest& request,
-                                           const CollectionRoutingInfo& cri) {
+                                           const ChunkManager& cm) {
     if (request.getRegisterExistingCollectionInGlobalCatalog()) {
         // No need for checking the sharding catalog when tracking a collection for the first time
         return;
     }
-
-    const auto& cm = cri.cm;
 
     tassert(
         8119040, "Found empty routing info when checking collection options", cm.hasRoutingTable());
@@ -879,22 +877,33 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
     }
 
     // 3. Check if the collection already registered in the sharding catalog with same options
-    const auto cri = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, targetNss));
 
-    if (!cri.cm.hasRoutingTable()) {
+    // Force a refresh of the placement info and fetch it.
+    //
+    // Considering that:
+    //  - we are the database primary shard
+    //  - the configTime known by the database primary shard is guaranteed to be inclusive of all
+    //  previously executed DDL operation on the database.
+    //  - the refresh is performed on the config server using `afterClusterTime: configTime`
+    //
+    // We have the guaranteed that this placement information is causal-consistent with all the
+    // previously executed DDL operations.
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, targetNss));
+
+    if (!cm.hasRoutingTable()) {
         // The collection is not tracked in the sharding catalog. We either
         // need to register it or to shard it. Proceed with the coordinator.
         return boost::none;
     }
 
-    if (cri.cm.isUnsplittable() && isSharded(request)) {
+    if (cm.isUnsplittable() && isSharded(request)) {
         // The collection already exists but is unsplittable and we need to shard it.
         // Proceed with the coordinator
         return boost::none;
     }
 
-    checkShardingCatalogCollectionOptions(opCtx, targetNss, request, cri);
+    checkShardingCatalogCollectionOptions(opCtx, targetNss, request, cm);
 
     const bool isRequestForATimeseriesView =
         isTimeseries(request) && !originalNss.isTimeseriesBucketsCollection();
@@ -905,8 +914,9 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
     }
 
     // The collection already exists and match the requested options
-    CreateCollectionResponse response(cri.getCollectionVersion());
-    response.setCollectionUUID(cri.cm.getUUID());
+    CreateCollectionResponse response(
+        ShardVersionFactory::make(cm, boost::none /* indexVersion */));
+    response.setCollectionUUID(cm.getUUID());
     return response;
 }
 
@@ -1621,12 +1631,12 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                         // Legacy cleanup from when we were not committing the chunks and collection
                         // entry transactionally.
                         auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
-                        auto cri = uassertStatusOK(
-                            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
+                        auto cm = uassertStatusOK(
+                            Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
                                 opCtx, nss()));
                         // If the collection can be found locally but is not yet tracked on the
                         // config server, then we clean up the config.chunks collection.
-                        if (uuid && !cri.cm.hasRoutingTable()) {
+                        if (uuid && !cm.hasRoutingTable()) {
                             LOGV2_DEBUG(5458704,
                                         1,
                                         "Removing partial changes from previous run",
@@ -1861,10 +1871,10 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_cleanupOnAbort(
                 // yet tracked on the config server, then we clean up the config.chunks collection.
 
                 auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
-                auto cri = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                          nss()));
-                if (uuid && !cri.cm.hasRoutingTable()) {
+                auto cm = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx,
+                                                                                            nss()));
+                if (uuid && !cm.hasRoutingTable()) {
                     cleanupPartialChunksFromPreviousAttempt(opCtx, *uuid, getNewSession(opCtx));
                 }
             }
@@ -2049,11 +2059,12 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 // Recover metadata from the config server if the coordinator was resumed after
                 // releasing the critical section: a migration could potentially have committed
                 // changing the placement version.
-                auto cri = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                          nss()));
-                CreateCollectionResponse response{cri.getCollectionVersion()};
-                response.setCollectionUUID(cri.cm.getUUID());
+                auto cm = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx,
+                                                                                            nss()));
+                CreateCollectionResponse response{
+                    ShardVersionFactory::make(cm, boost::optional<CollectionIndexes>(boost::none))};
+                response.setCollectionUUID(cm.getUUID());
                 _result = std::move(response);
             }
 
@@ -2185,14 +2196,14 @@ void CreateCollectionCoordinator::_translateRequestParameters() {
     _doc.setTranslatedRequestParams(std::move(translatedRequestParams));
 
     const auto& originalDataShard = [&] {
-        auto cri = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss()));
-        if (!cri.cm.hasRoutingTable()) {
+        auto cm = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
+        if (!cm.hasRoutingTable()) {
             // It is still possible for the collection to exist but not be tracked.
             return ShardingState::get(opCtx)->shardId();
         }
         std::set<ShardId> allShards;
-        cri.cm.getAllShardIds(&allShards);
+        cm.getAllShardIds(&allShards);
         return *(allShards.begin());
     }();
     _doc.setOriginalDataShard(originalDataShard);
@@ -2556,10 +2567,9 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
 
         // Get the shards committed to the sharding catalog.
-        auto cri = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss()));
-        const auto& cm = cri.cm;
         std::set<ShardId> involvedShardIds;
+        const auto& cm = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
         cm.getAllShardIds(&involvedShardIds);
 
         // If there are less shards involved in the operation than the ones persisted in the

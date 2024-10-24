@@ -424,29 +424,35 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
         return {*fieldPaths, boost::none, supportingUniqueIndex};
     }
 
-    // In case there are multiple shards which will perform this stage in parallel, we need to
-    // figure out and attach the collection's shard version to ensure each shard is talking
-    // about the same version of the collection. This mongos will coordinate that. We force a
-    // catalog refresh to do so because there is no shard versioning protocol on this namespace
-    // and so we otherwise could not be sure this node is (or will become) at all recent. We
-    // will also figure out and attach the 'joinFields' to send to the shards.
+    auto placementVersion = [&]() -> boost::optional<ChunkVersion> {
+        const auto& catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
+        // In case there are multiple shards which will perform this stage in parallel, we need to
+        // figure out and attach the collection's shard version to ensure each shard is talking
+        // about the same version of the collection. This mongos will coordinate that. We force a
+        // catalog refresh to do so because there is no shard versioning protocol on this namespace
+        // and so we otherwise could not be sure this node is (or will become) at all recent. We
+        // will also figure out and attach the 'joinFields' to send to the shards.
 
-    // There are edge cases when the collection could be dropped or re-created during or near
-    // the time of the operation (for example, during aggregation). This is okay - we are mostly
-    // paranoid that this mongos is very stale and want to prevent returning an error if the
-    // collection was dropped a long time ago. Because of this, we are okay with piggy-backing
-    // off another thread's request to refresh the cache, simply waiting for that request to
-    // return instead of forcing another refresh.
-    boost::optional<ShardVersion> targetCollectionVersion =
-        refreshAndGetCollectionVersion(expCtx, outputNs);
-    targetCollectionPlacementVersion = targetCollectionVersion
-        ? boost::make_optional(targetCollectionVersion->placementVersion())
-        : boost::none;
+        // There are edge cases when the collection could be dropped or re-created during or near
+        // the time of the operation (for example, during aggregation). This is okay - we are mostly
+        // paranoid that this mongos is very stale and want to prevent returning an error if the
+        // collection was dropped a long time ago. Because of this, we are okay with piggy-backing
+        // off another thread's request to refresh the cache, simply waiting for that request to
+        // return instead of forcing another refresh.
+        catalogCache->onStaleCollectionVersion(outputNs, boost::none);
+        const auto& cri =
+            uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, outputNs));
+        if (!cri.cm.isSharded()) {
+            return boost::none;
+        }
+
+        return cri.getCollectionVersion().placementVersion();
+    }();
 
     auto docKeyPaths = collectDocumentKeyFieldsActingAsRouter(expCtx->opCtx, outputNs);
     return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
                                 std::make_move_iterator(docKeyPaths.end())),
-            targetCollectionPlacementVersion,
+            placementVersion,
             SupportingUniqueIndex::Full};
 }
 
