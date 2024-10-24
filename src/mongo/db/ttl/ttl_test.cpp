@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -182,6 +183,16 @@ public:
         _client.createCollection(nss);
     }
 
+    void createCollectionWithOptions(const NamespaceString& nss, const CollectionOptions& options) {
+        Lock::DBLock dbLk(_opCtx, nss.dbName(), LockMode::MODE_IX);
+        Lock::CollectionLock collLk(_opCtx, nss, LockMode::MODE_IX);
+        auto databaseHolder = DatabaseHolder::get(_opCtx);
+        auto db = databaseHolder->openDb(_opCtx, nss.dbName(), nullptr);
+        WriteUnitOfWork wuow(_opCtx);
+        db->createCollection(_opCtx, nss, options);
+        wuow.commit();
+    }
+
 private:
     DBDirectClient _client;
     OperationContext* _opCtx;
@@ -214,6 +225,234 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
 
     // All expired documents are removed.
     ASSERT_EQ(client.count(nss), 0);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    CollectionOptions options;
+    options.clusteredIndex =
+        ClusteredCollectionInfo(ClusteredIndexSpec(fromjson("{_id: 1}"), true), false);
+    options.expireAfterSeconds = 1;
+    client.createCollectionWithOptions(nss, options);
+
+    client.insertExpiredDocs(nss, "_id", 100);
+    ASSERT_EQ(client.count(nss), 100);
+
+    auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest();
+    });
+    thread.join();
+
+    // All expired documents are removed.
+    ASSERT_EQ(client.count(nss), 0);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    CollectionOptions options;
+    options.clusteredIndex =
+        ClusteredCollectionInfo(ClusteredIndexSpec(fromjson("{_id: 1}"), true), false);
+    options.expireAfterSeconds = 1;
+    client.createCollectionWithOptions(nss, options);
+    createIndex(nss, BSON("foo" << 1), "fooIndex", Seconds(1));
+
+    client.insertExpiredDocs(nss, "_id", 50);
+    client.insertExpiredDocs(nss, "foo", 50);
+    ASSERT_EQ(client.count(nss), 100);
+
+    auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest();
+    });
+    thread.join();
+
+    // All expired documents are removed.
+    ASSERT_EQ(client.count(nss), 0);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    client.createCollection(nss);
+    createIndex(nss, BSON("foo" << 1), "fooIndex", Seconds(1));
+
+    // enough to require more than ttlCollLowPrioritySubpassLimit passes and exercise
+    // the Priority::kNormal case
+    client.insertExpiredDocs(nss, "foo", 50000);
+    ASSERT_EQ(client.count(nss), 50000);
+
+    auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest();
+    });
+    thread.join();
+
+    // All expired documents are removed.
+    ASSERT_EQ(client.count(nss), 0);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassSingleTimeseriesCollection) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    CollectionOptions options;
+    options.timeseries = TimeseriesOptions(/*timeField=*/"t");
+    options.timeseries->setBucketMaxSpanSeconds(20);
+    client.createCollectionWithOptions(nss, options);
+    createIndex(nss, BSON("foo" << 1), "fooIndex", Seconds(1));
+
+    client.insertExpiredDocs(nss, "foo", 50);
+    ASSERT_EQ(client.count(nss), 50);
+
+    auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest();
+    });
+    thread.join();
+
+    // At least documents that were initially out of of window are removed
+    // (Likely exactly 20 remaining, but possibly more were removed depending on timing)
+    ASSERT_LTE(client.count(nss), 20);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    client.createCollection(nss);
+    AutoGetCollection collection(opCtx(), nss, MODE_X);
+    ASSERT(collection);
+    auto spec =
+        BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
+                 << "fooIndex");
+    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx());
+    auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
+    auto fromMigrate = false;
+    indexBuildsCoord->createIndex(opCtx(), collection->uuid(), spec, indexConstraints, fromMigrate);
+
+    // enough to require more than ttlCollLowPrioritySubpassLimit passes and exercise
+    // the Priority::kNormal case
+    client.insertExpiredDocs(nss, "foo", 100);
+    ASSERT_EQ(client.count(nss), 100);
+
+    auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest();
+    });
+    thread.join();
+
+    // No documents are removed.
+    ASSERT_EQ(client.count(nss), 100);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassCollectionInvalidExpiration) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    client.createCollection(nss);
+    AutoGetCollection collection(opCtx(), nss, MODE_X);
+    ASSERT(collection);
+    auto spec =
+        BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
+                 << "fooIndex"
+                 << "expireAfterSeconds"
+                 << "badvalue");
+    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx());
+    auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
+    auto fromMigrate = false;
+    indexBuildsCoord->createIndex(opCtx(), collection->uuid(), spec, indexConstraints, fromMigrate);
+
+    // enough to require more than ttlCollLowPrioritySubpassLimit passes and exercise
+    // the Priority::kNormal case
+    client.insertExpiredDocs(nss, "foo", 100);
+    ASSERT_EQ(client.count(nss), 100);
+
+    auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest();
+    });
+    thread.join();
+
+    // No documents are removed.
+    ASSERT_EQ(client.count(nss), 100);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassCollectionWithMultipleKeys) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    CollectionOptions options;
+    options.timeseries = TimeseriesOptions(/*timeField=*/"t");
+    options.timeseries->setBucketMaxSpanSeconds(20);
+    client.createCollectionWithOptions(nss, options);
+    createIndex(nss, BSON("foo" << 1 << "bar" << 1), "fooIndex", Seconds(1));
+
+    client.insertExpiredDocs(nss, "foo", 100);
+    ASSERT_EQ(client.count(nss), 100);
+
+    auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest();
+    });
+    thread.join();
+
+    // No documents are removed.
+    ASSERT_EQ(client.count(nss), 100);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
 
@@ -547,6 +786,41 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
 
     ASSERT_EQ(client.count(nss), 0);
     ASSERT_EQ(getTTLSubPasses(), 5 + nInitialSubPasses);
+}
+
+// Simple test using the ttlmonitor's internal thread to exercise the scheduling logic.
+// This involves manual sleeps; we will just test this way once and test the pass
+// function directly in all other tests of ttl logic.
+TEST_F(TTLTest, TTLRunMonitorThread) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    client.createCollection(nss);
+
+    createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
+
+    client.insertExpiredDocs(nss, "x", 100);
+    ASSERT_EQ(client.count(nss), 100);
+
+    // Let the monitor run a pass.
+    auto initTTLPasses = getTTLPasses();
+    TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
+    ttlMonitor->go();
+    ASSERT_OK(ttlMonitor->onUpdateTTLMonitorSleepSeconds(0));
+    stdx::this_thread::sleep_for(Milliseconds(1000).toSystemDuration());
+
+    // Shut down the monitor, we need to wait for the _shuttingDown
+    // flag to be processed.
+    shutdownTTLMonitor(getGlobalServiceContext());
+    ASSERT_OK(ttlMonitor->onUpdateTTLMonitorSleepSeconds(0));
+    stdx::this_thread::sleep_for(Milliseconds(1000).toSystemDuration());
+
+    // All expired documents are removed.
+    ASSERT_EQ(client.count(nss), 0);
+    ASSERT_GT(getTTLPasses(), initTTLPasses);  // More than one may have been run
 }
 
 }  // namespace
