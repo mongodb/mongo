@@ -91,38 +91,6 @@ public:
                                              : BSONValidateModeEnum::kExtended;
     }
 
-    bool isCollectionSchemaViolated() const {
-        return _collectionSchemaViolated;
-    }
-
-    void setCollectionSchemaViolated() {
-        _collectionSchemaViolated = true;
-    }
-
-    bool isTimeseriesDataInconsistent() const {
-        return _timeseriesDataInconsistency;
-    }
-
-    void setTimeseriesDataInconsistent() {
-        _timeseriesDataInconsistency = true;
-    }
-
-    bool isTimeseriesBucketingParametersChangedInconsistent() const {
-        return _timeseriesBucketingParametersChangedInconsistent;
-    }
-
-    void setTimeseriesBucketingParametersChangedInconsistent() {
-        _timeseriesBucketingParametersChangedInconsistent = true;
-    }
-
-    bool isBSONDataNonConformant() const {
-        return _BSONDataNonConformant;
-    }
-
-    void setBSONDataNonConformant() {
-        _BSONDataNonConformant = true;
-    }
-
     UUID uuid() const {
         invariant(_uuid);
         return *_uuid;
@@ -183,10 +151,6 @@ private:
     ValidateState() = delete;
 
     NamespaceString _nss;
-    bool _collectionSchemaViolated = false;
-    bool _timeseriesDataInconsistency = false;
-    bool _timeseriesBucketingParametersChangedInconsistent = false;
-    bool _BSONDataNonConformant = false;
     // To avoid racing with shutdown.
     boost::optional<Lock::GlobalLock> _globalLock;
 

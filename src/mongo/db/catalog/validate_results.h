@@ -32,7 +32,6 @@
 #include <cstdint>
 #include <iterator>
 #include <map>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -45,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/serialization_context.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -53,24 +53,34 @@ class ValidateResultsIf {
 public:
     // Whether validation has been passed
     virtual bool isValid() const = 0;
-    const std::vector<std::string>& getErrors() const {
+    const StringSet& getErrors() const {
         return _errors;
     }
-    std::vector<std::string>* getErrorsUnsafe() {
+    StringSet* getErrorsUnsafe() {
         return &_errors;
     }
-    const std::vector<std::string>& getWarnings() const {
+    const StringSet& getWarnings() const {
         return _warnings;
     }
-    void addError(std::string error, bool stopValidation = true) {
-        _errors.push_back(std::move(error));
+    StringSet* getWarningsUnsafe() {
+        return &_warnings;
+    }
+
+    // Returns true if and only if this was the first time |error| has been added to the set of
+    // errors.
+    bool addError(std::string error, bool stopValidation = true) {
         if (stopValidation) {
             _continueValidation = false;
         }
+        return _errors.insert(std::move(error)).second;
     }
-    void addWarning(std::string warning) {
-        _warnings.push_back(std::move(warning));
+
+    // Returns true if and only if this was the first time |warning| has been added to the set of
+    // warnings.
+    bool addWarning(std::string warning) {
+        return _warnings.insert(std::move(warning)).second;
     }
+
     // Returns true when the validation library should continue
     // running validation. May return true when isValid() returns false
     bool continueValidation() const {
@@ -80,8 +90,10 @@ public:
 protected:
     bool _continueValidation = true;
     bool _fatalError = false;
-    std::vector<std::string> _errors;
-    std::vector<std::string> _warnings;
+
+    // Errors and warnings are sets to avoid creating duplicate findings in validation output.
+    StringSet _errors;
+    StringSet _warnings;
 };
 
 // Per-index validate results.
@@ -89,9 +101,6 @@ class IndexValidateResults final : public ValidateResultsIf {
 public:
     bool isValid() const override {
         return _errors.empty();
-    }
-    std::vector<std::string>* getWarningsUnsafe() {
-        return &_warnings;
     }
 
     int64_t getKeysTraversed() const {
@@ -128,9 +137,6 @@ public:
             }
         }
         return true;
-    }
-    std::vector<std::string>* getWarningsUnsafe() {
-        return &_warnings;
     }
 
     void setNamespaceString(NamespaceString nss) {

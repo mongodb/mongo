@@ -119,6 +119,18 @@ static constexpr const char* kTimeseriesBucketingParametersChangedInconsistencyR
     "A time series bucketing parameter was changed in this collection but "
     "timeseriesBucketingParametersChanged is not true. For more info, see logs with log id "
     "9175400.";
+static constexpr char kMalformedMinMaxTimeseriesBucket[] =
+    "Detected a time-series bucket with malformed min/max values";
+static constexpr char kExpectedMixedSchemaTimeseriesWarning[] =
+    "Detected a time-series bucket with mixed schema data";
+static constexpr char kUnexpectedMixedSchemaTimeseriesError[] =
+    "Detected a time-series bucket with mixed schema data when "
+    "timeseriesBucketsMayHaveMixedSchemaData is false. You can run the collMod command to set this "
+    "flag";
+static constexpr char kOutOfOrderDocumentError[] = "Detected out-of-order documents. See logs.";
+static constexpr char kInvalidDocumentError[] = "Detected one or more invalid documents. See logs.";
+static constexpr char kNotEnoughSpaceToReportCorruptionWarning[] =
+    "Not all corrupted records are listed due to size limitations.";
 
 /**
  * Validate that for each record in a clustered RecordStore the record key (RecordId) matches the
@@ -148,50 +160,6 @@ void _validateClusteredCollectionRecordId(OperationContext* opCtx,
                           << " (RecordId KeyString='" << ksFromRid.toString()
                           << "', cluster key KeyString='" << ksFromBSON.toString() << "')");
         results->addCorruptRecord(rid);
-    }
-}
-
-void schemaValidationFailed(CollectionValidation::ValidateState* state,
-                            Collection::SchemaValidationResult result,
-                            ValidateResults* results) {
-    invariant(Collection::SchemaValidationResult::kPass != result);
-
-    if (state->isCollectionSchemaViolated()) {
-        // Only report the message once.
-        return;
-    }
-
-    state->setCollectionSchemaViolated();
-    results->addWarning(kSchemaValidationFailedReason);
-}
-
-
-void _timeseriesBucketingParametersChangedCheckFail(const CollectionPtr& coll,
-                                                    CollectionValidation::ValidateState* state,
-                                                    ValidateResults* results,
-                                                    bool isTimeseriesBucketingParameterChangedSet) {
-    if (state->isTimeseriesBucketingParametersChangedInconsistent()) {
-        // Only report the error message once.
-        return;
-    }
-    state->isTimeseriesBucketingParametersChangedInconsistent();
-
-    if (!isTimeseriesBucketingParameterChangedSet) {
-        // Get the original timeseries bucketing parameters.
-        auto originalTimeseriesOptions = coll->getTimeseriesOptions();
-        invariant(originalTimeseriesOptions != boost::none);
-        const auto options = originalTimeseriesOptions.get();
-        auto originalBucketMaxSpanSeconds = options.getBucketMaxSpanSeconds();
-        auto originalBucketRoundingSeconds = options.getBucketRoundingSeconds();
-        auto originalGranularity = options.getGranularity();
-
-        LOGV2_ERROR(9175400,
-                    "A time series bucketing parameter was changed",
-                    logAttrs(coll->ns()),
-                    "currentBucketMaxSpanSeconds"_attr = originalBucketMaxSpanSeconds,
-                    "currentBucketRoundingSeconds"_attr = originalBucketRoundingSeconds,
-                    "currentGranularity"_attr = originalGranularity);
-        results->addError(kTimeseriesBucketingParametersChangedInconsistencyReason);
     }
 }
 
@@ -300,7 +268,6 @@ Status _validateTimeseriesBucketingParametersChanged(const CollectionPtr& coll,
                                                      const BSONElement& controlMin,
                                                      const BSONElement& controlMax,
                                                      StringData fieldName,
-                                                     CollectionValidation::ValidateState* state,
                                                      ValidateResults* results,
                                                      int version,
                                                      bool shouldDecompressBSON) {
@@ -312,12 +279,8 @@ Status _validateTimeseriesBucketingParametersChanged(const CollectionPtr& coll,
         return Status::OK();
     }
 
-    auto timeseriesBucketingParametersHaveChanged =
-        coll->timeseriesBucketingParametersHaveChanged();
-    auto timeseriesBucketingParametersHaveChangedVal =
-        timeseriesBucketingParametersHaveChanged == boost::none
-        ? true
-        : timeseriesBucketingParametersHaveChanged.value();
+    bool timeseriesBucketingParametersHaveChanged =
+        coll->timeseriesBucketingParametersHaveChanged().value_or(true);
 
     auto min = minmax.min();
     auto max = minmax.max();
@@ -329,9 +292,22 @@ Status _validateTimeseriesBucketingParametersChanged(const CollectionPtr& coll,
         return roundedDownTimeStamp < controlMin.Date();
     };
 
-    if (checkTimeSeriesBucketingParametersChanged()) {
-        _timeseriesBucketingParametersChangedCheckFail(
-            coll, state, results, timeseriesBucketingParametersHaveChangedVal);
+    if (checkTimeSeriesBucketingParametersChanged() && !timeseriesBucketingParametersHaveChanged &&
+        results->addError(kTimeseriesBucketingParametersChangedInconsistencyReason)) {
+        // Get the original timeseries bucketing parameters.
+        auto originalTimeseriesOptions = coll->getTimeseriesOptions();
+        invariant(originalTimeseriesOptions != boost::none);
+        const auto& options = originalTimeseriesOptions.get();
+        auto originalBucketMaxSpanSeconds = options.getBucketMaxSpanSeconds();
+        auto originalBucketRoundingSeconds = options.getBucketRoundingSeconds();
+        auto originalGranularity = options.getGranularity();
+
+        LOGV2_ERROR(9175400,
+                    "A time series bucketing parameter was changed",
+                    logAttrs(coll->ns()),
+                    "currentBucketMaxSpanSeconds"_attr = originalBucketMaxSpanSeconds,
+                    "currentBucketRoundingSeconds"_attr = originalBucketRoundingSeconds,
+                    "currentGranularity"_attr = originalGranularity);
     }
 
     return Status::OK();
@@ -412,7 +388,6 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
                                         const BSONElement& controlMin,
                                         const BSONElement& controlMax,
                                         StringData fieldName,
-                                        CollectionValidation::ValidateState* state,
                                         ValidateResults* results,
                                         int version,
                                         int* bucketCount,
@@ -498,7 +473,6 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
                                                                       controlMin,
                                                                       controlMax,
                                                                       fieldName,
-                                                                      state,
                                                                       results,
                                                                       version,
                                                                       shouldDecompressBSON);
@@ -518,7 +492,6 @@ Status _validateTimeSeriesDataField(const CollectionPtr& coll,
                                     const BSONElement& controlMin,
                                     const BSONElement& controlMax,
                                     StringData fieldName,
-                                    CollectionValidation::ValidateState* state,
                                     ValidateResults* results,
                                     int version,
                                     int bucketCount,
@@ -582,7 +555,6 @@ Status _validateTimeSeriesDataField(const CollectionPtr& coll,
 
 Status _validateTimeSeriesDataFields(const CollectionPtr& coll,
                                      const BSONObj& recordBson,
-                                     CollectionValidation::ValidateState* state,
                                      ValidateResults* results,
                                      int bucketVersion,
                                      bool shouldDecompressBSON) {
@@ -632,7 +604,6 @@ Status _validateTimeSeriesDataFields(const CollectionPtr& coll,
                                                          controlMinFields[timeFieldName],
                                                          controlMaxFields[timeFieldName],
                                                          timeFieldName,
-                                                         state,
                                                          results,
                                                          bucketVersion,
                                                          &bucketCount,
@@ -661,7 +632,6 @@ Status _validateTimeSeriesDataFields(const CollectionPtr& coll,
                                                              controlMinFields[fieldName],
                                                              controlMaxFields[fieldName],
                                                              fieldName,
-                                                             state,
                                                              results,
                                                              bucketVersion,
                                                              bucketCount,
@@ -680,7 +650,6 @@ Status _validateTimeSeriesDataFields(const CollectionPtr& coll,
  */
 Status _validateTimeSeriesBucketRecord(const CollectionPtr& collection,
                                        const BSONObj& recordBson,
-                                       CollectionValidation::ValidateState* state,
                                        ValidateResults* results,
                                        bool shouldDecompressBSON) {
     int bucketVersion = recordBson.getField(timeseries::kBucketControlFieldName)
@@ -697,41 +666,12 @@ Status _validateTimeSeriesBucketRecord(const CollectionPtr& collection,
     }
 
     if (Status status = _validateTimeSeriesDataFields(
-            collection, recordBson, state, results, bucketVersion, shouldDecompressBSON);
+            collection, recordBson, results, bucketVersion, shouldDecompressBSON);
         !status.isOK()) {
         return status;
     }
 
     return Status::OK();
-}
-
-
-void _timeseriesValidationFailed(CollectionValidation::ValidateState* state,
-                                 ValidateResults* results) {
-    if (state->isTimeseriesDataInconsistent()) {
-        // Only report the warning message once.
-        return;
-    }
-    state->setTimeseriesDataInconsistent();
-
-    if (TestingProctor::instance().isEnabled()) {
-        // In testing this is a fatal error. Some time-series checks are vital to test correctness,
-        // such as the time field being out-of-order for v: 2 buckets.
-        results->addError(kTimeseriesValidationInconsistencyReason);
-    } else {
-        results->addWarning(kTimeseriesValidationInconsistencyReason);
-    }
-}
-
-void _BSONSpecValidationFailed(CollectionValidation::ValidateState* state,
-                               ValidateResults* results) {
-    if (state->isBSONDataNonConformant()) {
-        // Only report the warning message once.
-        return;
-    }
-    state->setBSONDataNonConformant();
-
-    results->addWarning(kBSONValidationNonConformantReason);
 }
 }  // namespace
 
@@ -753,7 +693,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                       "recordId"_attr = recordId,
                       "reason"_attr = status);
         (*nNonCompliantDocuments)++;
-        _BSONSpecValidationFailed(_validateState, results);
+        results->addWarning(kBSONValidationNonConformantReason);
     }
 
     BSONObj recordBson = record.toBson();
@@ -833,10 +773,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         return;
     }
 
-    bool bucketMixedSchemaDataError = false;
-    bool bucketMinMaxMalformedError = false;
-    bool bucketMixedSchemaDataWarning = false;
-    bool corruptRecordsSizeLimitWarning = false;
     const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
         _validateState->getTraverseRecordStoreCursor();
     for (auto record =
@@ -867,15 +803,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         // as well.
         if ((prevRecordId.isValid() && prevRecordId > record->id) ||
             MONGO_unlikely(failRecordStoreTraversal.shouldFail())) {
-            // TODO SERVER-78040: Clean this up once we can insert errors blindly into the list and
-            // not care about deduplication.
-            static constexpr auto kErrorMessage = "Detected out-of-order documents. See logs.";
-            if (results->isValid() ||
-                std::find(results->getErrors().begin(),
-                          results->getErrors().end(),
-                          kErrorMessage) == results->getErrors().end()) {
-                results->addError(kErrorMessage);
-            }
+            results->addError(kOutOfOrderDocumentError);
         }
 
         // validatedSize = dataSize is not a general requirement as some storage engines may use
@@ -905,24 +833,12 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 results->addNumRemovedCorruptRecords(1);
                 _numRecords--;
             } else {
-                // TODO SERVER-78040: Clean this up once we can insert errors blindly into the list
-                // and not care about deduplication.
-                static constexpr auto kErrorMessage =
-                    "Detected one or more invalid documents. See logs.";
-                if (results->isValid() ||
-                    std::find(results->getErrors().begin(),
-                              results->getErrors().end(),
-                              kErrorMessage) == results->getErrors().end()) {
-                    results->addError(kErrorMessage);
-                }
-
+                results->addError(kInvalidDocumentError);
                 numCorruptRecordsSizeBytes += record->id.memUsage();
                 if (numCorruptRecordsSizeBytes <= kMaxErrorSizeBytes) {
                     results->addCorruptRecord(record->id);
-                } else if (!corruptRecordsSizeLimitWarning) {
-                    results->addWarning(
-                        "Not all corrupted records are listed due to size limitations.");
-                    corruptRecordsSizeLimitWarning = true;
+                } else {
+                    results->addWarning(kNotEnoughSpaceToReportCorruptionWarning);
                 }
 
                 nInvalid++;
@@ -941,18 +857,14 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                               "reason"_attr = result.second);
 
                 nNonCompliantDocuments++;
-                schemaValidationFailed(_validateState, result.first, results);
+                results->addWarning(kSchemaValidationFailedReason);
             } else if (coll->getTimeseriesOptions()) {
                 BSONObj recordBson = record->data.toBson();
                 _enforceTimeseriesBucketsAreAlwaysCompressed(recordBson, results);
 
                 // Checks for time-series collection consistency.
-                Status bucketStatus =
-                    _validateTimeSeriesBucketRecord(coll,
-                                                    recordBson,
-                                                    _validateState,
-                                                    results,
-                                                    _validateState->isBSONConformanceValidation());
+                Status bucketStatus = _validateTimeSeriesBucketRecord(
+                    coll, recordBson, results, _validateState->isBSONConformanceValidation());
                 // This log id should be kept in sync with the associated warning messages that are
                 // returned to the client.
                 if (!bucketStatus.isOK()) {
@@ -962,46 +874,43 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                   "recordId"_attr = record->id,
                                   "reason"_attr = bucketStatus);
                     nNonCompliantDocuments++;
-                    _timeseriesValidationFailed(_validateState, results);
+                    if (TestingProctor::instance().isEnabled()) {
+                        // In testing this is a fatal error. Some time-series checks are vital to
+                        // test correctness, such as the time field being out-of-order for v: 2
+                        // buckets.
+                        results->addError(kTimeseriesValidationInconsistencyReason);
+                    } else {
+                        results->addWarning(kTimeseriesValidationInconsistencyReason);
+                    }
                 } else {
                     auto containsMixedSchemaDataResponse =
                         coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
-                    if (!containsMixedSchemaDataResponse.isOK() && !bucketMinMaxMalformedError) {
-                        bucketMinMaxMalformedError = true;
+                    if (!containsMixedSchemaDataResponse.isOK() &&
+                        results->addError(kMalformedMinMaxTimeseriesBucket)) {
                         LOGV2_WARNING(8469900,
-                                      "Detected a time-series bucket with malformed min/max values",
+                                      kMalformedMinMaxTimeseriesBucket,
                                       logAttrs(coll->ns()),
                                       "bucketId"_attr = record->id,
                                       "error"_attr = containsMixedSchemaDataResponse.getStatus());
-                        results->addError(
-                            str::stream()
-                            << "Detected a time-series bucket with malformed min/max values");
+                        ;
                     } else if (containsMixedSchemaDataResponse.isOK() &&
                                containsMixedSchemaDataResponse.getValue()) {
                         bool mixedSchemaAllowed =
                             coll->getTimeseriesBucketsMayHaveMixedSchemaData().get();
-                        if (mixedSchemaAllowed && !bucketMixedSchemaDataWarning) {
-                            bucketMixedSchemaDataWarning = true;
+                        if (mixedSchemaAllowed &&
+                            results->addWarning(kExpectedMixedSchemaTimeseriesWarning)) {
                             LOGV2_WARNING(8469901,
-                                          "Detected a time-series bucket with mixed schema data",
+                                          kExpectedMixedSchemaTimeseriesWarning,
                                           logAttrs(coll->ns()),
                                           "bucketId"_attr = record->id);
-                            results->addWarning(
-                                str::stream()
-                                << "Detected a time-series bucket with mixed schema data");
-                        } else if (!mixedSchemaAllowed && !bucketMixedSchemaDataError) {
-                            bucketMixedSchemaDataError = true;
+                            ;
+                        } else if (!mixedSchemaAllowed &&
+                                   results->addError(kUnexpectedMixedSchemaTimeseriesError)) {
                             LOGV2_WARNING(8469902,
-                                          "Detected a time-series bucket with mixed schema data "
-                                          "when timeseriesBucketsMayHaveMixedSchemaData is false. "
-                                          "You can run the collMod command to set this flag",
+                                          kUnexpectedMixedSchemaTimeseriesError,
                                           logAttrs(coll->ns()),
                                           "bucketId"_attr = record->id);
-                            results->addError(
-                                str::stream()
-                                << "Detected a time-series bucket with mixed schema data when "
-                                   "timeseriesBucketsMayHaveMixedSchemaData is false. You can run "
-                                   "the collMod command to set this flag");
+                            ;
                         }
                     }
                 }

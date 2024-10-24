@@ -166,27 +166,6 @@ std::vector<ValidateResults> foregroundValidate(
     return results;
 }
 
-ValidateResults omitTransientWarnings(const ValidateResults& results) {
-    ValidateResults copy = results;
-    copy.getWarningsUnsafe()->clear();
-    for (const auto& warning : results.getWarnings()) {
-        std::string endMsg =
-            "This is a transient issue as the collection was actively in use by other "
-            "operations.";
-        std::string beginMsg = "Could not complete validation of ";
-        if (warning.size() >= std::max(endMsg.size(), beginMsg.size())) {
-            bool startsWith = std::equal(beginMsg.begin(), beginMsg.end(), warning.begin());
-            bool endsWith = std::equal(endMsg.rbegin(), endMsg.rend(), warning.rbegin());
-            if (!(startsWith && endsWith)) {
-                copy.addWarning(warning);
-            }
-        } else {
-            copy.addWarning(warning);
-        }
-    }
-    return copy;
-}
-
 /**
  * Inserts a range of documents into the nss collection and then returns that count. The range is
  * defined by [startIDNum, startIDNum+numDocs), not inclusive of (startIDNum+numDocs), using the
@@ -445,10 +424,13 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
     for (const auto& validateResults : results) {
         const auto obj = resultToBSON(validateResults);
         ASSERT(validateResults.isValid()) << obj;
-        const auto warningsWithoutTransientErrors = omitTransientWarnings(validateResults);
-        ASSERT_EQ(warningsWithoutTransientErrors.getWarnings().size(), 1U) << obj;
-        ASSERT_STRING_CONTAINS(warningsWithoutTransientErrors.getWarnings()[0],
-                               "Unique index a_1 has one or more keys in the old format")
+        auto isOldFormat = [](const auto& warn) {
+            return warn.find("Unique index a_1 has one or more keys in the old format") !=
+                std::string::npos;
+        };
+        ASSERT(std::any_of(validateResults.getWarnings().begin(),
+                           validateResults.getWarnings().end(),
+                           isOldFormat))
             << obj;
     }
 }

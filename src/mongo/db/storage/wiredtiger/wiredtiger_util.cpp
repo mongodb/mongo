@@ -288,7 +288,7 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
         return {ErrorCodes::TypeMismatch, "'configString' must be a string."};
     }
 
-    std::vector<std::string> errors;
+    StringSet errors;
     ErrorAccumulator eventHandler(&errors);
 
     StringData config = configElem.valueStringData();
@@ -706,7 +706,7 @@ WT_EVENT_HANDLER* WiredTigerEventHandler::getWtEventHandler() {
     return ret;
 }
 
-WiredTigerUtil::ErrorAccumulator::ErrorAccumulator(std::vector<std::string>* errors)
+WiredTigerUtil::ErrorAccumulator::ErrorAccumulator(StringSet* errors)
     : WT_EVENT_HANDLER(defaultEventHandlers()),
       _errors(errors),
       _defaultErrorHandler(handle_error) {
@@ -722,7 +722,7 @@ int WiredTigerUtil::ErrorAccumulator::onError(WT_EVENT_HANDLER* handler,
                                               const char* message) {
     try {
         ErrorAccumulator* self = static_cast<ErrorAccumulator*>(handler);
-        self->_errors->push_back(message);
+        self->_errors->insert(message);
         return self->_defaultErrorHandler(handler, session, error, message);
     } catch (...) {
         std::terminate();
@@ -731,7 +731,7 @@ int WiredTigerUtil::ErrorAccumulator::onError(WT_EVENT_HANDLER* handler,
 
 int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
                                 const std::string& uri,
-                                std::vector<std::string>* errors) {
+                                StringSet* errors) {
     ErrorAccumulator eventHandler(errors);
 
     // Try to close as much as possible to avoid EBUSY errors.

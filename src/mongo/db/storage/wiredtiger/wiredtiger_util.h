@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -213,7 +214,7 @@ public:
 
     class ErrorAccumulator : public WT_EVENT_HANDLER {
     public:
-        ErrorAccumulator(std::vector<std::string>* errors);
+        explicit ErrorAccumulator(StringSet* errors);
 
     private:
         static int onError(WT_EVENT_HANDLER* handler,
@@ -223,7 +224,7 @@ public:
 
         using ErrorHandler = int (*)(WT_EVENT_HANDLER*, WT_SESSION*, int, const char*);
 
-        std::vector<std::string>* const _errors;
+        StringSet* const _errors;
         const ErrorHandler _defaultErrorHandler;
     };
 
@@ -235,7 +236,7 @@ public:
      */
     static int verifyTable(WiredTigerRecoveryUnit&,
                            const std::string& uri,
-                           std::vector<std::string>* errors = nullptr);
+                           StringSet* errors = nullptr);
 
     /**
      * Checks the table logging setting in the metadata for the given uri, comparing it against
