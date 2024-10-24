@@ -772,14 +772,14 @@ private:
             collValidationFunctions.emplace_back([](const Collection* collection) -> void {
                 const auto& encryptedFields =
                     collection->getCollectionOptions().encryptedFieldConfig;
-                if (encryptedFields) {
-                    uassert(ErrorCodes::CannotUpgrade,
-                            fmt::format("Collection {} has an encrypted field with query type "
-                                        "rangePreview, which is deprecated. Please drop this "
-                                        "collection before upgrading FCV.",
-                                        collection->ns().toStringForErrorMsg()),
-                            !hasQueryType(encryptedFields.get(),
-                                          QueryTypeEnum::RangePreviewDeprecated));
+                if (encryptedFields &&
+                    hasQueryType(encryptedFields.get(), QueryTypeEnum::RangePreviewDeprecated)) {
+                    LOGV2_WARNING(
+                        9576800,
+                        "There is a collection with an encrypted field with query type "
+                        "rangePreview, which is deprecated in 8.0. Please drop this collection "
+                        "after FCV upgrade and recreate it with query type range.",
+                        "collection"_attr = collection->ns().toStringForErrorMsg());
                 }
             });
         }

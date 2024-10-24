@@ -7,7 +7,8 @@ import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 
 const CRUDOnDeprecatedCollectionCode = 8575606;
 const CreateDeprecatedCollectionCode = 8575605;
-function testBinaryUpgradeWithRangePreviewCollection(upgradeConfig, fcvUpgradeShouldSucceed) {
+const CreateCollectionDisabledFFCode = 9576801;
+function testBinaryUpgradeWithRangePreviewCollection(upgradeConfig, isFeatureFlagEnabled) {
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: 'last-lts'}});
     rst.startSet();
     rst.initiate();
@@ -44,54 +45,167 @@ function testBinaryUpgradeWithRangePreviewCollection(upgradeConfig, fcvUpgradeSh
         }
     }));
 
-    // The upgradeSet should always succeed and we should be able to start up with the rangePreview
-    // collection.
+    // The binary upgrade should always succeed and we should be able to start up with the
+    // rangePreview collection with FCV last-lts.
     rst.upgradeSet(upgradeConfig);
     client = new EncryptedClient(rst.getPrimary(), "dbTest");
 
-    // After upgrading, we can't do any CRUD ops on the collection
+    // Latest binaries on last-LTS FCV shouldn't allow find/insert operations on rangePreview
+    // collections.
     assert.commandFailedWithCode(
         client.getDB().erunCommand({insert: "coll1", documents: [{_id: 1, field1: NumberInt(2)}]}),
         CRUDOnDeprecatedCollectionCode);
     assert.commandFailedWithCode(client.getDB().erunCommand({find: "coll1", filter: {}}),
                                  CRUDOnDeprecatedCollectionCode);
 
-    // We should be able to drop the collection
-    client.getDB().coll1.drop();
+    // However, drop should work.
+    assert(client.getDB().coll1.drop());
 
-    const res =
-        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true});
-    if (fcvUpgradeShouldSucceed) {
-        assert.commandWorked(res);
-    } else {
-        assert.commandFailedWithCode(res, ErrorCodes.CannotUpgrade);
-        client.getDB().coll2.drop();
-        // After dropping both rangePreview collections, we should be able to upgrade (once drops
-        // clear).
-        assert.soon(() => {
-            assert.commandWorked(rst.getPrimary().adminCommand(
-                {setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-            return true;
+    // FCV upgrade should not be impeded by the presence of a rangePreview collection.
+    assert.commandWorked(
+        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+
+    // The replica set should be able to restart on upgraded FCV even with the existence of the
+    // rangePreview collection.
+    rst.stopSet(null /* signal */, true /* forRestart */);
+    rst.startSet({restart: true});
+    client = new EncryptedClient(rst.getPrimary(), "dbTest");
+
+    // Find/insert operations on the rangePreview collections should continue to fail with the
+    // latest FCV.
+    assert.commandFailedWithCode(
+        client.getDB().erunCommand({insert: "coll2", documents: [{_id: 1, field1: NumberInt(2)}]}),
+        CRUDOnDeprecatedCollectionCode);
+    assert.commandFailedWithCode(client.getDB().erunCommand({find: "coll2", filter: {}}),
+                                 CRUDOnDeprecatedCollectionCode);
+
+    // Drop should still succeed.
+    assert(client.getDB().coll2.drop());
+
+    // If featureFlagQERangeV2 is enabled, we should be able to recreate coll2 using range rather
+    // than rangePreview and then run find/insert operations on it. We need to create a new
+    // EncryptedClient so that the old schema mapping for coll2 is removed.
+    client = new EncryptedClient(rst.getPrimary(), "dbTest");
+    if (isFeatureFlagEnabled) {
+        assert.commandWorked(client.createEncryptionCollection("coll2", {
+            encryptedFields: {
+                "fields": [{
+                    path: "field1",
+                    bsonType: "int",
+                    queries: [{
+                        queryType: "range",
+                        min: NumberInt(0),
+                        max: NumberInt(8),
+                        contention: NumberInt(0),
+                        sparsity: 1
+                    }]
+                }]
+            }
+        }));
+        assert.commandWorked(client.getDB().erunCommand(
+            {insert: "coll2", documents: [{_id: 0, field1: NumberInt(1), field2: NumberInt(2)}]}));
+        client.runEncryptionOperation(() => {
+            assert.eq(client.getDB().coll2.find({}, {__safeContent__: 0}).toArray(),
+                      [{_id: 0, field1: NumberInt(1), field2: NumberInt(2)}]);
         });
+    } else {
+        // Otherwise, we should still be unable to create collections with "range" encrypted fields.
+        assert.throwsWithCode(() => client.createEncryptionCollection("coll2", {
+            encryptedFields: {
+                "fields": [{
+                    path: "field1",
+                    bsonType: "int",
+                    queries: [{
+                        queryType: "range",
+                        min: NumberInt(0),
+                        max: NumberInt(8),
+                        contention: NumberInt(0),
+                        sparsity: 1
+                    }]
+                }]
+            }
+        }),
+                              CreateCollectionDisabledFFCode);
     }
+
     rst.stopSet();
 }
 
-// When we set feature flag off, upgrading FCV will succeed because rangePreview is allowed when
-// Range V2 is disabled
+// Upgrade should succeed regardless of whether the feature flag is turned on or off;
+// we simply are checking for the same behavior in both cases.
 testBinaryUpgradeWithRangePreviewCollection(
-    {binVersion: 'latest', setParameter: {featureFlagQERangeV2: false}}, true);
-// When we set it on, upgrading will fail
+    {binVersion: 'latest', setParameter: {featureFlagQERangeV2: false}},
+    false /* isFeatureFlagEnabled */);
 testBinaryUpgradeWithRangePreviewCollection(
-    {binVersion: 'latest', setParameter: {featureFlagQERangeV2: true}}, false);
+    {binVersion: 'latest', setParameter: {featureFlagQERangeV2: true}},
+    true /* isFeatureFlagEnabled */);
 
-function testDowngradeWithRangeCollection(config) {
+function testDowngradeWithRangeCollection(config, isFeatureFlagEnabled) {
     const rst = new ReplSetTest({nodes: 2, nodeOptions: config});
     rst.startSet();
     rst.initiate();
     let client = new EncryptedClient(rst.getPrimary(), "dbTest");
-    // Old version; creating a new "rangePreview" collection succeeds.
-    assert.commandWorked(client.createEncryptionCollection("coll", {
+    // New version; creating a new "range" collection succeeds if featureFlagQERangeV2 is enabled.
+    if (isFeatureFlagEnabled) {
+        assert.commandWorked(client.createEncryptionCollection("coll", {
+            encryptedFields: {
+                "fields": [{
+                    path: "field1",
+                    bsonType: "int",
+                    queries: [{
+                        queryType: "range",
+                        min: NumberInt(0),
+                        max: NumberInt(8),
+                        contention: NumberInt(0),
+                        sparsity: 1
+                    }]
+                }]
+            }
+        }));
+
+        // Finds and inserts should succeed on the "range" collection on FCV latest.
+        assert.commandWorked(client.getDB().erunCommand(
+            {insert: "coll", documents: [{_id: 0, field1: NumberInt(1), field2: NumberInt(2)}]}));
+        client.runEncryptionOperation(() => {
+            assert.eq(client.getDB().coll.find({}, {__safeContent__: 0}).toArray(),
+                      [{_id: 0, field1: NumberInt(1), field2: NumberInt(2)}]);
+        });
+
+        // FCV downgrade to lastLTS should fail while the range collection exists.
+        assert.commandFailedWithCode(
+            rst.getPrimary().adminCommand(
+                {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+            ErrorCodes.CannotDowngrade);
+
+        // Dropping the "range" collection should succeed.
+        assert(client.getDB().coll.drop());
+    } else {
+        // If the feature flag is disabled, then it should not be possible to create a "range"
+        // collection.
+        assert.throwsWithCode(() => client.createEncryptionCollection("coll", {
+            encryptedFields: {
+                "fields": [{
+                    path: "field1",
+                    bsonType: "int",
+                    queries: [{
+                        queryType: "range",
+                        min: NumberInt(0),
+                        max: NumberInt(8),
+                        contention: NumberInt(0),
+                        sparsity: 1
+                    }]
+                }]
+            }
+        }),
+                              CreateCollectionDisabledFFCode);
+    }
+
+    // FCV downgrade to lastLTS should succeed when there are no "range" collections.
+    assert.commandWorked(
+        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+
+    // Creating a "range" collection on the downgraded FCV should fail.
+    assert.throwsWithCode(() => client.createEncryptionCollection("coll", {
         encryptedFields: {
             "fields": [{
                 path: "field1",
@@ -105,29 +219,60 @@ function testDowngradeWithRangeCollection(config) {
                 }]
             }]
         }
+    }),
+                          CreateCollectionDisabledFFCode);
+
+    // Downgrade to lastLTS binaries.
+    rst.upgradeSet({binVersion: 'last-lts', setParameter: {}});
+
+    // Creating a "range" collection on last-LTS binaries should fail.
+    // We need to create a new EncryptedClient so that the old schema mapping for coll2 is removed.
+    client = new EncryptedClient(rst.getPrimary(), "dbTest");
+    assert.throwsWithCode(() => client.createEncryptionCollection("coll", {
+        encryptedFields: {
+            "fields": [{
+                path: "field1",
+                bsonType: "int",
+                queries: [{
+                    queryType: "range",
+                    min: NumberInt(0),
+                    max: NumberInt(8),
+                    contention: NumberInt(0),
+                    sparsity: 1
+                }]
+            }]
+        }
+    }),
+                          ErrorCodes.BadValue);
+
+    // We should be able to recreate "coll" with "rangePreview" instead of "range" and
+    // now that we are on last-lts binaries.
+    // We need to create a new EncryptedClient so that the old schema mapping for coll2 is removed.
+    client = new EncryptedClient(rst.getPrimary(), "dbTest");
+    assert.commandWorked(client.createEncryptionCollection("coll", {
+        encryptedFields: {
+            "fields": [{
+                path: "field1",
+                bsonType: "int",
+                queries: [{
+                    queryType: "rangePreview",
+                    min: NumberInt(0),
+                    max: NumberInt(8),
+                    contention: NumberInt(0),
+                    sparsity: 1
+                }]
+            }]
+        }
     }));
-
-    // Can't downgrade FCV to lastLTS with range collection, no matter if the feature flag is
-    // enabled.
-    assert.commandFailedWithCode(
-        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-        ErrorCodes.CannotDowngrade);
-
-    client.getDB().coll.drop();
-    // After dropping the collection, we should eventually be able to downgrade
-    assert.soon(() => {
-        assert.commandWorked(rst.getPrimary().adminCommand(
-            {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
-        return true;
-    });
 
     rst.stopSet();
 }
 
 testDowngradeWithRangeCollection(
-    {binVersion: 'latest', setParameter: {featureFlagQERangeV2: false}});
-testDowngradeWithRangeCollection(
-    {binVersion: 'latest', setParameter: {featureFlagQERangeV2: true}});
+    {binVersion: 'latest', setParameter: {featureFlagQERangeV2: false}},
+    false /* isFeatureFlagEnabled */);
+testDowngradeWithRangeCollection({binVersion: 'latest', setParameter: {featureFlagQERangeV2: true}},
+                                 true /* isFeatureFlagEnabled */);
 
 function testCreateCollection(config) {
     const rst = new ReplSetTest({nodes: 2, nodeConfig: config});

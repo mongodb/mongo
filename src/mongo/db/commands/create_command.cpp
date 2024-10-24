@@ -64,6 +64,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -356,6 +357,12 @@ public:
                         !hasQueryType(cmd.getEncryptedFields().get(),
                                       QueryTypeEnum::RangePreviewDeprecated));
 
+                uassert(9576801,
+                        "Cannot create a collection with an encrypted field with query "
+                        "type range when featureFlagQERangeV2 is disabled",
+                        !hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::Range) ||
+                            gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
+                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
                 FLEUtil::checkEFCForECC(cmd.getEncryptedFields().get());
             }
