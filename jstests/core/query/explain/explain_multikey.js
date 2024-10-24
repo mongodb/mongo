@@ -5,7 +5,11 @@
 // @tags: [
 //   assumes_unsharded_collection,
 // ]
-import {getPlanStage, getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getWinningPlanFromExplain,
+    planHasStage
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_multikey;
 const keyPattern = {
@@ -34,7 +38,7 @@ function createIndexAndRunExplain(testOptions) {
 
     const explain = db.runCommand({explain: testOptions.commandObj});
     assert.commandWorked(explain);
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
 
     assert(planHasStage(db, winningPlan, testOptions.stage),
            "expected stage to be present: " + tojson(explain));

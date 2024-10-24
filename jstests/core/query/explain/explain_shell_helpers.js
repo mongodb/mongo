@@ -19,7 +19,7 @@
 import {
     getPlanStage,
     getSingleNodeExplain,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isIxscan,
     planHasStage
 } from "jstests/libs/query/analyze_plan.js";
@@ -134,40 +134,40 @@ assert.commandWorked(explain);
 // .sort()
 explain = t.explain().find().sort({b: -1}).finish();
 assert.commandWorked(explain);
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "SORT"));
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "SORT"));
 explain = t.find().sort({b: -1}).explain();
 assert.commandWorked(explain);
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "SORT"));
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "SORT"));
 
 // .hint()
 explain = t.explain().find().hint({a: 1}).finish();
 assert.commandWorked(explain);
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 explain = t.explain().find().hint("a_1").finish();
 assert.commandWorked(explain);
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 explain = t.find().hint({a: 1}).explain();
 assert.commandWorked(explain);
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 explain = t.find().hint("a_1").explain();
 assert.commandWorked(explain);
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 
 // .min()
 explain = t.explain().find().min({a: 1}).hint({a: 1}).finish();
 assert.commandWorked(explain);
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 explain = t.find().min({a: 1}).hint({a: 1}).explain();
 assert.commandWorked(explain);
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 
 // .max()
 explain = t.explain().find().max({a: 1}).hint({a: 1}).finish();
 assert.commandWorked(explain);
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 explain = t.find().max({a: 1}).hint({a: 1}).explain();
 assert.commandWorked(explain);
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 
 // .allowDiskUse()
 explain = t.explain().find().allowDiskUse().finish();
@@ -265,7 +265,7 @@ assert("queryPlanner" in explain.stages[0].$cursor);
 explain = t.explain().count();
 assert.commandWorked(explain);
 explain = getSingleNodeExplain(explain);
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "RECORD_STORE_FAST_COUNT"));
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "RECORD_STORE_FAST_COUNT"));
 
 // Tests for applySkipLimit argument to .count. When we don't apply the skip, we
 // count one result. When we do apply the skip we count zero.
@@ -286,16 +286,16 @@ assert.eq(0, stage.nCounted);
 explain = t.explain().find({a: 3}).hint({a: 1}).count();
 assert.commandWorked(explain);
 explain = getSingleNodeExplain(explain);
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "COUNT"));
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "COUNT_SCAN"));
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "COUNT"));
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "COUNT_SCAN"));
 
 // Explainable count with hint.
 assert.commandWorked(t.createIndex({c: 1}, {sparse: true}));
 explain = t.explain().count({c: {$exists: false}}, {hint: "c_1"});
 assert.commandWorked(explain);
 explain = getSingleNodeExplain(explain);
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "IXSCAN"));
-assert.eq(getPlanStage(getWinningPlan(explain.queryPlanner), "IXSCAN").indexName, "c_1");
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "IXSCAN"));
+assert.eq(getPlanStage(getWinningPlanFromExplain(explain), "IXSCAN").indexName, "c_1");
 assert.commandWorked(t.dropIndex({c: 1}));
 
 //
@@ -304,17 +304,17 @@ assert.commandWorked(t.dropIndex({c: 1}));
 
 explain = t.explain().distinct('_id');
 assert.commandWorked(explain);
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "PROJECTION_COVERED"));
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "DISTINCT_SCAN"));
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "PROJECTION_COVERED"));
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "DISTINCT_SCAN"));
 
 explain = t.explain().distinct('a');
 assert.commandWorked(explain);
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "PROJECTION_COVERED"));
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "DISTINCT_SCAN"));
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "PROJECTION_COVERED"));
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "DISTINCT_SCAN"));
 
 explain = t.explain().distinct('b');
 assert.commandWorked(explain);
-assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "COLLSCAN"));
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "COLLSCAN"));
 
 //
 // .remove()

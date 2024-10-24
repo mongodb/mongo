@@ -10,7 +10,7 @@
  *   requires_non_retryable_writes,
  * ]
  */
-import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_sort_type;
 coll.drop();
@@ -37,7 +37,7 @@ assert.eq(
     ],
     coll.find().sort({b: 1, a: 1}).toArray());
 explain = coll.find().sort({b: 1, a: 1}).explain();
-let winningPlan = getWinningPlan(explain.queryPlanner);
+let winningPlan = getWinningPlanFromExplain(explain);
 sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(null, sortStage, explain);
 assert.eq("simple", sortStage.type, explain);
@@ -54,7 +54,7 @@ assert.eq(
     ],
     coll.find({}, {key: {$meta: "sortKey"}}).sort({b: 1, a: 1}).toArray());
 explain = coll.find({}, {key: {$meta: "sortKey"}}).sort({b: 1, a: 1}).explain();
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(null, sortStage, explain);
 assert.eq("simple", sortStage.type, explain);
@@ -65,7 +65,7 @@ assert.eq([{a: 1, b: 1}, {a: 2, b: 1}, {a: 1, b: 2}, {a: 2, b: 2}, {a: 1, b: 3},
           coll.find({a: {$gt: 0}}, {_id: 0, a: 1, b: 1}).sort({b: 1, a: 1}).toArray());
 explain = coll.find({a: {$gt: 0}}, {_id: 0, a: 1, b: 1}).sort({b: 1, a: 1}).explain();
 // Verify that the plan involves an IXSCAN but no fetch.
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 assert.neq(null, getPlanStage(winningPlan, "IXSCAN"), explain);
 assert.eq(null, getPlanStage(winningPlan, "FETCH"), explain);
 sortStage = getPlanStage(winningPlan, "SORT");
@@ -93,7 +93,7 @@ explain =
     coll.find({$text: {$search: "keyword"}}, {_id: 0, a: 1, b: 1, score: {$meta: "textScore"}})
         .sort({b: 1, a: 1})
         .explain();
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(null, sortStage, explain);
 assert.eq("default", sortStage.type, explain);

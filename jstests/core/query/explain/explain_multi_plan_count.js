@@ -13,7 +13,7 @@ import {
     assertExplainCount,
     getRejectedPlan,
     getRejectedPlans,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isIndexOnly,
     isIxscan,
 } from "jstests/libs/query/analyze_plan.js";
@@ -34,7 +34,7 @@ const explain =
 // and continues with the correct plan child below COUNT.
 
 assertExplainCount({explainResults: explain, expectedCount: 0});
-assert(isIndexOnly(db, getWinningPlan(explain.queryPlanner)));
+assert(isIndexOnly(db, getWinningPlanFromExplain(explain)));
 
 const rejectedPlans = getRejectedPlans(explain);
 for (let curRejectedPlan of rejectedPlans) {

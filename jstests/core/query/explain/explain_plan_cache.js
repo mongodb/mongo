@@ -22,7 +22,7 @@ import {
     getQueryPlanner,
     getRejectedPlan,
     getRejectedPlans,
-    getWinningPlan
+    getWinningPlanFromExplain
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -33,7 +33,7 @@ const coll = db.explain_plan_cache;
 // Assert the winning plan is cached and rejected are not.
 function assertWinningPlanCacheStatus(explain, status) {
     const winningPlan = shouldGenerateSbePlan ? getQueryPlanner(explain).winningPlan
-                                              : getWinningPlan(getQueryPlanner(explain));
+                                              : getWinningPlanFromExplain(explain);
     assert.eq(winningPlan.isCached, status, explain);
     for (let rejectedPlan of getRejectedPlans(explain)) {
         rejectedPlan = getRejectedPlan(rejectedPlan);
@@ -44,7 +44,7 @@ function assertWinningPlanCacheStatus(explain, status) {
 // Assert the winning plan is not cached and a rejected plan using the given name is cached.
 function assertRejectedPlanCached(explain, indexName) {
     const winningPlan = shouldGenerateSbePlan ? getQueryPlanner(explain).winningPlan
-                                              : getWinningPlan(getQueryPlanner(explain));
+                                              : getWinningPlanFromExplain(explain);
     assert(!winningPlan.isCached, explain);
     for (const rejectedPlan of getRejectedPlans(explain)) {
         const inputStage = getRejectedPlan(rejectedPlan).inputStage;

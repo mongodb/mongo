@@ -12,7 +12,7 @@
 import {
     getRejectedPlan,
     getRejectedPlans,
-    getWinningPlan
+    getWinningPlanFromExplain
 } from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_plan_scores;
@@ -22,7 +22,7 @@ coll.drop();
 // and not outputted with the winning plan stats in 'executionStats' at all verbosity levels.
 // Scores should only be outputted alongside each plan's trial stats in 'allPlansExecution'.
 function checkExplainOutput(explain, verbosity) {
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     assert(!winningPlan.hasOwnProperty("score"), explain);
 
     const rejectedPlans = getRejectedPlans(explain);

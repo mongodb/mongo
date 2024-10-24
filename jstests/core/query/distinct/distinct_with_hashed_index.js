@@ -10,7 +10,7 @@
  */
 import {
     getAggPlanStage,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isCollscan,
     isIndexOnly,
     isIxscan,
@@ -35,24 +35,24 @@ assert.commandWorked(coll.createIndex({a: -1, b: "hashed", c: 1}));
 // 'distinct' on non-hashed prefix fields can use DISTINCT_SCAN.
 assert.eq(100, coll.distinct("a").length);
 let plan = coll.explain("executionStats").distinct("a");
-let winningPlan = getWinningPlan(plan.queryPlanner);
+let winningPlan = getWinningPlanFromExplain(plan);
 assert(isIndexOnly(db, winningPlan), winningPlan);
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"), winningPlan);
 
 // 'distinct' on non-prefix fields cannot use index.
 assert.eq(26, coll.distinct("b").length);
 plan = coll.explain("executionStats").distinct("b");
-winningPlan = getWinningPlan(plan.queryPlanner);
+winningPlan = getWinningPlanFromExplain(plan);
 assert(isCollscan(db, winningPlan), winningPlan);
 assert.eq(10, coll.distinct("c").length);
 plan = coll.explain("executionStats").distinct("c");
-winningPlan = getWinningPlan(plan.queryPlanner);
+winningPlan = getWinningPlanFromExplain(plan);
 assert(isCollscan(db, winningPlan), winningPlan);
 
 // A 'distinct' command that cannot use 'DISTINCT_SCAN', can use index scan for the query part.
 assert.eq([2], coll.distinct("c", {a: 12, b: {subObj: "str_12"}}));
 plan = coll.explain("executionStats").distinct("c", {a: 12, b: {subObj: "str_12"}});
-winningPlan = getWinningPlan(plan.queryPlanner);
+winningPlan = getWinningPlanFromExplain(plan);
 assert(isIxscan(db, winningPlan), winningPlan);
 assert(!planHasStage(db, winningPlan, "DISTINCT_SCAN"), winningPlan);
 assert(planHasStage(db, winningPlan, "FETCH"), winningPlan);
@@ -60,7 +60,7 @@ assert(planHasStage(db, winningPlan, "FETCH"), winningPlan);
 // 'distinct' with query predicate on index field can get converted to DISTINCT_SCAN.
 assert.eq([2], coll.distinct("c", {a: 12}));
 plan = coll.explain("executionStats").distinct("c", {a: 12});
-winningPlan = getWinningPlan(plan.queryPlanner);
+winningPlan = getWinningPlanFromExplain(plan);
 assert(isIndexOnly(db, winningPlan), winningPlan);
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"), winningPlan);
 
@@ -70,7 +70,7 @@ assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"), winningPlan);
 // filter.
 assert.eq([], coll.distinct("c", {a: 12, b: 4}));
 plan = coll.explain("executionStats").distinct("c", {a: 12, b: 4});
-winningPlan = getWinningPlan(plan.queryPlanner);
+winningPlan = getWinningPlanFromExplain(plan);
 assert(isIxscan(db, winningPlan), winningPlan);
 assert(planHasStage(db, winningPlan, "FETCH"), winningPlan);
 assert(!planHasStage(db, winningPlan, "DISTINCT_SCAN"), winningPlan);
@@ -121,33 +121,33 @@ assert.commandWorked(coll.createIndex({b: "hashed", c: 1}));
 // different values as the same and return only the first one.
 assert.eq(26, coll.distinct("b").length);
 plan = coll.explain("executionStats").distinct("b");
-winningPlan = getWinningPlan(plan.queryPlanner);
+winningPlan = getWinningPlanFromExplain(plan);
 assert(isCollscan(db, winningPlan), winningPlan);
 
 // 'distinct' with query predicate can use index for the query part.
 assert.eq([1], coll.distinct("b", {b: 1}));
 plan = coll.explain("executionStats").distinct("b", {b: 1});
-winningPlan = getWinningPlan(plan.queryPlanner);
+winningPlan = getWinningPlanFromExplain(plan);
 assert(isIxscan(db, winningPlan), winningPlan);
 assert(planHasStage(db, winningPlan, "FETCH"), winningPlan);
 
 // 'distinct' with query predicate cannot use index when query cannot use index.
 assert.eq([5], coll.distinct("b", {b: {$lt: 6, $gt: 4}}));
 plan = coll.explain("executionStats").distinct("b", {b: {$lt: 6, $gt: 4}});
-winningPlan = getWinningPlan(plan.queryPlanner);
+winningPlan = getWinningPlanFromExplain(plan);
 assert(isCollscan(db, winningPlan), winningPlan);
 
 // 'distinct' with query predicate can use index for the query part.
 assert.eq([2], coll.distinct("c", {a: 12, b: 12}));
 plan = coll.explain("executionStats").distinct("c", {a: 12, b: 12});
-winningPlan = getWinningPlan(plan.queryPlanner);
+winningPlan = getWinningPlanFromExplain(plan);
 assert(isIxscan(db, winningPlan), winningPlan);
 assert(planHasStage(db, winningPlan, "FETCH"), winningPlan);
 
 // 'distinct' on non-prefix fields cannot use index.
 assert.sameMembers([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], coll.distinct("c"));
 plan = coll.explain("executionStats").distinct("c");
-winningPlan = getWinningPlan(plan.queryPlanner);
+winningPlan = getWinningPlanFromExplain(plan);
 assert(isCollscan(db, winningPlan), winningPlan);
 
 // Verify that simple $group on hashed field cannot use DISTINCT_SCAN.

@@ -6,7 +6,7 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.distinct_index1;
 coll.drop();
@@ -87,5 +87,5 @@ assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({a: "hashed"}));
 explain = getDistinctExplainWithExecutionStats("a", {$or: [{a: 3}, {a: 5}]});
 assert.eq(188, explain.executionStats.nReturned);
-const indexScanStage = getPlanStage(getWinningPlan(explain.queryPlanner), "IXSCAN");
+const indexScanStage = getPlanStage(getWinningPlanFromExplain(explain), "IXSCAN");
 assert.eq("hashed", indexScanStage.keyPattern.a);

@@ -11,7 +11,7 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getQueryPlanner, getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_verision_unstable_indexes";
@@ -32,7 +32,7 @@ assert.commandWorked(coll.createIndex({"views": 1}, {sparse: true}));
 if (!FixtureHelpers.isMongos(testDb) && !TestData.testingReplicaSetEndpoint) {
     const explainRes = assert.commandWorked(
         testDb.runCommand({explain: {"find": collName, "filter": {$text: {$search: "coffee"}}}}));
-    assert.eq(getWinningPlan(getQueryPlanner(explainRes)).indexName, "subject_text", explainRes);
+    assert.eq(getWinningPlanFromExplain(explainRes).indexName, "subject_text", explainRes);
 }
 
 // No "text" index can be used for $text search as the "text" index is excluded from API version 1.
@@ -56,6 +56,5 @@ assert.commandFailedWithCode(testDb.runCommand({
 if (!FixtureHelpers.isMongos(testDb) && !TestData.testingReplicaSetEndpoint) {
     const explainRes = assert.commandWorked(testDb.runCommand(
         {explain: {"find": collName, "filter": {views: 50}, "hint": {views: 1}}}));
-    assert.eq(
-        getWinningPlan(getQueryPlanner(explainRes)).inputStage.indexName, "views_1", explainRes);
+    assert.eq(getWinningPlanFromExplain(explainRes).inputStage.indexName, "views_1", explainRes);
 }

@@ -11,7 +11,7 @@
 import {
     getPlanStage,
     getPlanStages,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isCollscan,
     planHasStage
 } from "jstests/libs/query/analyze_plan.js";
@@ -39,7 +39,7 @@ coll.drop();
 // Collection doesn't exist.
 let explain = runDistinctExplain(coll, 'a', {});
 assert.commandWorked(explain);
-let winningPlan = getWinningPlan(explain.queryPlanner);
+let winningPlan = getWinningPlanFromExplain(explain);
 assert(planHasStage(db, winningPlan, "EOF"));
 const eofStages = getPlanStages(winningPlan, "EOF");
 eofStages.forEach(stage => assert.eq(stage.type, "nonExistentNamespace", explain));
@@ -63,7 +63,7 @@ assert.commandWorked(runDistinctExplain(coll, 'a'));
 assert.eq([1], coll.distinct('b'));
 explain = runDistinctExplain(coll, 'b', {});
 assert.commandWorked(explain);
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 assert.eq(20, explain.executionStats.nReturned);
 assert(isCollscan(db, winningPlan));
 
@@ -72,7 +72,7 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq([1, 2], coll.distinct('a'));
 explain = runDistinctExplain(coll, 'a', {});
 assert.commandWorked(explain);
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 assert.eq(2, explain.executionStats.nReturned);
 assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
@@ -93,7 +93,7 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 assert.eq([1], coll.distinct('a', {a: 1}));
 explain = runDistinctExplain(coll, 'a', {a: 1});
 assert.commandWorked(explain);
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 assert.eq(1, explain.executionStats.nReturned);
 assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
@@ -101,7 +101,7 @@ assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 assert.eq([1], coll.distinct('b', {a: 1}));
 explain = runDistinctExplain(coll, 'b', {a: 1});
 assert.commandWorked(explain);
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 assert.eq(1, explain.executionStats.nReturned);
 assert(!planHasStage(db, winningPlan, "FETCH"));
 assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
