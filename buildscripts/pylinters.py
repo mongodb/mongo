@@ -22,7 +22,6 @@ from buildscripts.linter import ruffchecker, ruffformatter, runner
 _LINTERS = [
     ruffchecker.RuffChecker(),
     ruffformatter.RuffFormatter(),
-    # TODO: pyright
 ]
 
 

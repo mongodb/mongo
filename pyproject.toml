@@ -28,6 +28,7 @@ gevent = { version = "*", optional = true }
 progressbar2 = { version = "*", optional = true }
 cxxfilt = { version = "*", optional = true }
 pympler = { version = "*", optional = true }
+pyright = "1.1.382"
 
 [tool.poetry.group.aws.dependencies]
 boto3 = "^1.34.156"
@@ -207,6 +208,67 @@ ignore = [
     "F821", # undefined-name
     "F822", # undefined-export
     ]
+
+[tool.pyright]
+include = [
+    "buildscripts",
+    "src"
+]
+exclude = [
+    "**/third_party/**",
+    "**/external/**"
+]
+pythonVersion  = "3.10"
+
+# These should be set to "error" for basic functionality
+reportInvalidTypeForm = "none"
+reportMissingImports = "none"
+reportUndefinedVariable = "none"
+reportAbstractUsage = "none"
+reportAssertTypeFailure = "none"
+reportInconsistentOverload = "none"
+reportInvalidTypeArguments = "none"
+reportNoOverloadImplementation = "none"
+reportOptionalCall = "none"
+reportOptionalContextManager = "none"
+reportRedeclaration = "none"
+reportUnboundVariable = "none"
+reportUnhashable = "none"
+reportUnusedCoroutine = "none"
+reportUnusedExcept = "none"
+
+# These should be set to "warning" or "error" for standard checks
+reportArgumentType = "none"
+reportAssignmentType = "none"
+reportAttributeAccessIssue = "none"
+reportCallIssue = "none"
+reportGeneralTypeIssues = "none"
+reportIndexIssue = "none"
+reportOperatorIssue = "none"
+reportOptionalSubscript = "none"
+reportOptionalMemberAccess = "none"
+reportOptionalIterable = "none"
+reportOptionalOperand = "none"
+reportReturnType = "none"
+reportTypedDictNotRequiredAccess = "none"
+reportPrivateImportUsage = "none"
+reportFunctionMemberAccess = "none"
+reportIncompatibleMethodOverride = "none"
+reportIncompatibleVariableOverride = "none"
+reportOverlappingOverload = "none"
+reportPossiblyUnboundVariable = "none"
+
+# These are additional checks for strict mode
+reportMissingTypeStubs = "none"
+reportAssertAlwaysTrue = "none"
+reportInvalidStringEscapeSequence = "none"
+reportInvalidTypeVarUse = "none"
+reportSelfClsParameterName = "none"
+reportUnsupportedDunderAll = "none"
+reportUnusedExpression = "none"
+reportWildcardImportFromLibrary = "none"
+reportConstantRedefinition = "none"
+
 
 [build-system]
 requires = ["poetry-core"]
