@@ -386,7 +386,9 @@ void createTransactionTable(OperationContext* opCtx) {
     // We cluster by _id for improved performance at the cost of increased index maintenance.
     // Because we only have one partial index on this collection, the performance benefit outweighs
     // that cost.
-    options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+    if (feature_flags::gFeatureFlagClusteredConfigTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
+        options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
     auto storageInterface = repl::StorageInterface::get(opCtx);
     auto createCollectionStatus = storageInterface->createCollection(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, options);

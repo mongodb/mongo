@@ -1,5 +1,6 @@
 /* Verifies behavior on replica sets and sharded clusters with inconsistent config.transactions
  * formats (clustered and non-clustered).
+ * TODO (SERVER-84073) eventually we should replace uses of setParameter with binary versions
  *
  * @tags: [
  *   requires_replication,
@@ -16,8 +17,6 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const storageEngine = jsTest.options().storageEngine || 'wiredTiger';
-const clusteredConfigTransactionsBinVersion = 'latest';
-const nonClusteredConfigTransactionsBinVersion = 'last-lts';
 
 // Verifies that config.transactions is of the format specified in options on all nodes. Only valid
 // values are {clustered: true} and {clustered: false}.
@@ -67,8 +66,8 @@ function testSecondaryReplicationOfConfigTxnsFormat() {
     const replSet = new ReplSetTest({
         name: jsTestName(),
         nodes: [
-            {binVersion: clusteredConfigTransactionsBinVersion},
-            {binVersion: nonClusteredConfigTransactionsBinVersion}
+            {setParameter: {featureFlagClusteredConfigTransactions: true}},
+            {setParameter: {featureFlagClusteredConfigTransactions: false}}
         ]
     });
     replSet.startSet();
@@ -96,28 +95,16 @@ function testSecondaryReplicationOfConfigTxnsFormat() {
     replSet.stopSet();
 }
 
-// Verify that restarting a secondary expecting a config.transactions format different from the
-// primary retains the primary-expected format and that transactions continue to work.
+// Verify that restarting a secondary expecting the opposite config.transactions format from the
+// primary works.
 function testRestartSecondaryWithDifferentExpectedConfigTxnsFormat() {
-    const testCases = [
-        {
-            primary: clusteredConfigTransactionsBinVersion,
-            secondary: nonClusteredConfigTransactionsBinVersion
-        },
-        {
-            primary: nonClusteredConfigTransactionsBinVersion,
-            secondary: clusteredConfigTransactionsBinVersion
-        }
-    ];
-    for (const binVersions of testCases) {
-        const primarySetting =
-            binVersions['primary'] == clusteredConfigTransactionsBinVersion ? true : false;
-
-        // Start nodes on the same binary version so that we can change the secondary to a different
-        // binary version when restarting it.
+    for (const primarySetting of [true, false]) {
         const replSet = new ReplSetTest({
             name: jsTestName(),
-            nodes: [{binVersion: binVersions['primary']}, {binVersion: binVersions['primary']}]
+            nodes: [
+                {setParameter: {featureFlagClusteredConfigTransactions: primarySetting}},
+                {setParameter: {featureFlagClusteredConfigTransactions: primarySetting}}
+            ]
         });
         replSet.startSet();
         replSet.initiate();
@@ -125,16 +112,10 @@ function testRestartSecondaryWithDifferentExpectedConfigTxnsFormat() {
         verifyConfigTxnsFormat(replSet, {clustered: primarySetting});
         let nextTxnNum = openAndCloseTransactions(replSet.getPrimary());
 
-        // If we're about to restart the secondary on a lower binary version, preemptively lower the
-        // FCV to accommodate it.
-        if (MongoRunner.compareBinVersions(binVersions['primary'], binVersions['secondary']) > 0) {
-            assert.commandWorked(replSet.getPrimary().getDB('admin').runCommand({
-                setFeatureCompatibilityVersion:
-                    MongoRunner.getBinVersionFor(binVersions['secondary']),
-                confirm: true
-            }));
-        }
-        replSet.restart(1, {startClean: false, binVersion: binVersions['secondary']});
+        replSet.restart(1, {
+            startClean: false,
+            setParameter: {featureFlagClusteredConfigTransactions: !primarySetting}
+        });
         replSet.awaitSecondaryNodes();
         replSet.reInitiate();
         replSet.awaitSecondaryNodes();
@@ -147,35 +128,21 @@ function testRestartSecondaryWithDifferentExpectedConfigTxnsFormat() {
     }
 }
 
-// Verify that initial syncing from a primary while expecting a different config.transactions
-// format from the primary retains the primary-expected format and that transactions continue to
-// work.
+// Verify that initial syncing from a primary while expecting the opposite config.transactions
+// format from the primary works.
 function testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat(params) {
-    params['setParameter'] = params['setParameter'] || {};
-    for (const binVersions of params['testCases']) {
-        const primarySetting =
-            binVersions['primary'] == clusteredConfigTransactionsBinVersion ? true : false;
-        const replSet = new ReplSetTest({
-            name: jsTestName(),
-            nodes: [{setParameter: params['setParameter'], binVersion: binVersions['primary']}]
-        });
+    for (const primarySetting of [true, false]) {
+        params = params || {};
+        params.featureFlagClusteredConfigTransactions = primarySetting;
+        const replSet = new ReplSetTest({name: jsTestName(), nodes: [{setParameter: params}]});
         replSet.startSet();
         replSet.initiate();
 
         verifyConfigTxnsFormat(replSet, {clustered: primarySetting});
         let nextTxnNum = openAndCloseTransactions(replSet.getPrimary());
 
-        // If we're about to start the secondary on a lower binary version, preemptively lower the
-        // FCV to accommodate it.
-        if (MongoRunner.compareBinVersions(binVersions['primary'], binVersions['secondary']) > 0) {
-            assert.commandWorked(replSet.getPrimary().getDB('admin').runCommand({
-                setFeatureCompatibilityVersion:
-                    MongoRunner.getBinVersionFor(binVersions['secondary']),
-                confirm: true
-            }));
-        }
-        const secondary = replSet.add(
-            {setParameter: params['setParameter'], binVersion: binVersions['secondary']});
+        params.featureFlagClusteredConfigTransactions = !primarySetting;
+        const secondary = replSet.add({setParameter: params});
         replSet.reInitiate();
         replSet.awaitSecondaryNodes();
 
@@ -191,13 +158,27 @@ function testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat(params)
 function testShardsWithDifferentConfigTxnsFormats() {
     const shardedCluster = new ShardingTest({
         name: jsTestName(),
-        config: [{binVersion: nonClusteredConfigTransactionsBinVersion}],
-        mongos: [{binVersion: nonClusteredConfigTransactionsBinVersion}],
+        mongos: 1,
         shards: {
-            rs0: {nodes: 1, binVersion: clusteredConfigTransactionsBinVersion},
-            rs1: {nodes: 1, binVersion: nonClusteredConfigTransactionsBinVersion}
+            rs0: {nodes: 1, setParameter: {featureFlagClusteredConfigTransactions: true}},
+            rs1: {nodes: 1, setParameter: {featureFlagClusteredConfigTransactions: false}}
         }
     });
+
+    // Replica set nodes in sharded clusters create config.transactions before upgrading to latest
+    // FCV, so the primary on shard 0 will create a nonclustered config.transactions even though the
+    // feature flag is set. We need to drop its config.transactions and step it down and up again so
+    // that it recreates config.transactions as a clustered collection.
+    ((shardedCluster) => {
+        const primary = shardedCluster.rs0.getPrimary();
+        const primaryConfig = primary.getDB('config');
+        assert.commandWorked(primaryConfig.runCommand({drop: 'transactions'}));
+        shardedCluster.rs0.awaitReplication();
+        assert.commandWorked(primary.adminCommand({replSetStepDown: 1, force: true}));
+        shardedCluster.rs0.awaitReplication();
+        assert.commandWorked(primary.adminCommand({replSetStepUp: 1}));
+        shardedCluster.rs0.awaitReplication();
+    })(shardedCluster);
 
     verifyConfigTxnsFormat(shardedCluster.rs0, {clustered: true});
     verifyConfigTxnsFormat(shardedCluster.rs1, {clustered: false});
@@ -227,31 +208,10 @@ function testShardsWithDifferentConfigTxnsFormats() {
 
 testSecondaryReplicationOfConfigTxnsFormat();
 testRestartSecondaryWithDifferentExpectedConfigTxnsFormat();
-// Logical initial sync.
-testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat({
-    testCases: [
-        {
-            primary: clusteredConfigTransactionsBinVersion,
-            secondary: nonClusteredConfigTransactionsBinVersion
-        },
-        {
-            primary: nonClusteredConfigTransactionsBinVersion,
-            secondary: clusteredConfigTransactionsBinVersion
-        }
-    ]
-});
+testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat();  // logical initial sync
 // File copy based sync requires the wired tiger storage engine; skip if using something else.
 if (storageEngine == 'wiredTiger') {
-    // File copy based initial sync doesn't support syncing from a higher wire version, so we
-    // neither can nor need to test the case where the primary has a clustered config.transactions
-    // (i.e. higher binary version) and the secondary expects a non-clustered config.transactions
-    // (i.e. lower binary version).
-    testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat({
-        setParameter: {initialSyncMethod: 'fileCopyBased'},
-        testCases: [{
-            primary: nonClusteredConfigTransactionsBinVersion,
-            secondary: clusteredConfigTransactionsBinVersion
-        }]
-    });
+    testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat(
+        {initialSyncMethod: 'fileCopyBased'});
 }
 testShardsWithDifferentConfigTxnsFormats();
