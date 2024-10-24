@@ -107,6 +107,7 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/text.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 using Parser = Expression::Parser;
@@ -143,10 +144,10 @@ Value ExpressionConstant::serializeConstant(const SerializationOptions& opts,
 namespace {
 
 void mapReduceFilterWaitBeforeLoop(OperationContext* opCtx) {
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(&mapReduceFilterPauseBeforeLoop,
-                                                     opCtx,
-                                                     "mapReduceFilterPauseBeforeLoop",
-                                                     []() { std::cout << "waiting\n"; });
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &mapReduceFilterPauseBeforeLoop, opCtx, "mapReduceFilterPauseBeforeLoop", []() {
+            LOGV2(9006800, "waiting due to 'mapReduceFilterPauseBeforeLoop' failpoint");
+        });
 }
 
 std::function<void()> getExpressionInterruptChecker(OperationContext* opCtx) {
@@ -3053,7 +3054,7 @@ Value ExpressionMap::evaluate(const Document& root, Variables* variables) const 
     size_t memUsed = 0;
     vector<Value> output;
     output.reserve(input.size());
-    size_t memLimit = internalQueryMaxMapFilterReduceBytes.load();
+    const size_t memLimit = internalQueryMaxMapFilterReduceBytes.load();
     for (size_t i = 0; i < input.size(); i++) {
         checkForInterrupt();
         variables->setValue(_varId, input[i]);

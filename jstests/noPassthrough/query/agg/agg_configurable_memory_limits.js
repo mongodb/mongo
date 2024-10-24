@@ -28,7 +28,7 @@ assert.commandWorked(bulk.execute());
     // Test that the default 100MB memory limit isn't reached with our data.
     assert.doesNotThrow(() => coll.aggregate([{$group: {_id: null, strings: {$push: "$y"}}}]));
 
-    // Now lower the limit to test that it's configuration is obeyed.
+    // Now lower the limit to test that its configuration is obeyed.
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryMaxPushBytes: memLimitArray}));
     assert.throwsWithCode(() => coll.aggregate([{$group: {_id: null, strings: {$push: "$y"}}}]),
@@ -139,6 +139,33 @@ assert.commandWorked(bulk.execute());
                 [{$group: {_id: "$k", p: {$percentile: {p: [0.9], input: "$x", method: meth}}}}]),
             ErrorCodes.ExceededMemoryLimit);
     }
+}());
+
+(function testInternalQueryMaxMapReduceExpressionBytesSetting() {
+    const str = "a".repeat(100);
+    const mapPipeline = [{$project: {a: {$map: {input: {$range: [0, 100]}, in : str}}}}];
+    const reducePipeline = [{$project: {a: {$reduce: {input: {$range: [0, 100]}, initialValue: [], in: {$concatArrays: ["$$value", [str]]}}}}}];
+
+    // Test that the default 100MB memory limit isn't reached with our data.
+    assert.doesNotThrow(() => coll.aggregate(mapPipeline));
+    assert.doesNotThrow(() => coll.aggregate(reducePipeline));
+
+    // Now lower the limit to test that its configuration is obeyed.
+    assert.commandWorked(db.adminCommand(
+        {setParameter: 1, internalQueryMaxMapReduceExpressionBytes: memLimitArray}));
+    assert.throwsWithCode(() => coll.aggregate(mapPipeline), ErrorCodes.ExceededMemoryLimit);
+    assert.throwsWithCode(() => coll.aggregate(reducePipeline), ErrorCodes.ExceededMemoryLimit);
+}());
+
+(function testInternalQueryMaxRangeBytesSetting() {
+    // Test that the default 100MB memory limit isn't reached with our data.
+    assert.doesNotThrow(() => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]));
+
+    // Now lower the limit to test that its configuration is obeyed.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxRangeBytes: memLimitArray}));
+    assert.throwsWithCode(() => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]),
+                          ErrorCodes.ExceededMemoryLimit);
 }());
 
 MongoRunner.stopMongod(conn);

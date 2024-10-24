@@ -485,13 +485,11 @@ server_parameters:
     redact: false
 
   internalQueryExpressionInterruptIterations:
-    description: "In some potentially long running expressions every n checks, we wake up and see if the query was killed"
+    description: "In some potentially long running expressions every n checks, we wake up and see if the query was killed."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryExpressionInterruptIterations"
     cpp_vartype: AtomicWord<int>
     default: 10
-    validator:
-      gte: 0
     redact: false
 
   internalQueryExpressionInterruptPeriodMS:
