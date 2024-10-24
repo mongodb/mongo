@@ -467,21 +467,6 @@ ConnectionString ReplicationCoordinatorMock::getConfigConnectionString() const {
     return _getConfigReturnValue.getConnectionString();
 }
 
-Milliseconds ReplicationCoordinatorMock::getConfigElectionTimeoutPeriod() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _getConfigReturnValue.getElectionTimeoutPeriod();
-}
-
-std::vector<MemberConfig> ReplicationCoordinatorMock::getConfigVotingMembers() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _getConfigReturnValue.votingMembers();
-}
-
-size_t ReplicationCoordinatorMock::getNumConfigVotingMembers() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _getConfigReturnValue.votingMembers().size();
-}
-
 std::int64_t ReplicationCoordinatorMock::getConfigTerm() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _getConfigReturnValue.getConfigTerm();
@@ -497,21 +482,6 @@ ConfigVersionAndTerm ReplicationCoordinatorMock::getConfigVersionAndTerm() const
     return _getConfigReturnValue.getConfigVersionAndTerm();
 }
 
-int ReplicationCoordinatorMock::getConfigNumMembers() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _getConfigReturnValue.getNumMembers();
-}
-
-Milliseconds ReplicationCoordinatorMock::getConfigHeartbeatTimeoutPeriodMillis() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _getConfigReturnValue.getHeartbeatTimeoutPeriodMillis();
-}
-
-BSONObj ReplicationCoordinatorMock::getConfigBSON() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _getConfigReturnValue.toBSON();
-}
-
 Status ReplicationCoordinatorMock::validateWriteConcern(
     const WriteConcernOptions& writeConcern) const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -523,16 +493,6 @@ boost::optional<MemberConfig> ReplicationCoordinatorMock::findConfigMemberByHost
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     const MemberConfig* result = _getConfigReturnValue.findMemberByHostAndPort(hap);
     return boost::make_optional(result, *result);
-}
-
-bool ReplicationCoordinatorMock::isConfigLocalHostAllowed() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _getConfigReturnValue.isLocalHostAllowed();
-}
-
-Milliseconds ReplicationCoordinatorMock::getConfigHeartbeatInterval() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _getConfigReturnValue.getHeartbeatInterval();
 }
 
 void ReplicationCoordinatorMock::setGetConfigReturnValue(ReplSetConfig returnValue) {

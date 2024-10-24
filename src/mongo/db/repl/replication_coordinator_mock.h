@@ -258,32 +258,16 @@ public:
 
     ConnectionString getConfigConnectionString() const override;
 
-    Milliseconds getConfigElectionTimeoutPeriod() const override;
-
-    std::vector<MemberConfig> getConfigVotingMembers() const override;
-
-    size_t getNumConfigVotingMembers() const override;
-
     std::int64_t getConfigTerm() const override;
 
     std::int64_t getConfigVersion() const override;
 
     ConfigVersionAndTerm getConfigVersionAndTerm() const override;
 
-    int getConfigNumMembers() const override;
-
-    Milliseconds getConfigHeartbeatTimeoutPeriodMillis() const override;
-
-    BSONObj getConfigBSON() const override;
-
     boost::optional<MemberConfig> findConfigMemberByHostAndPort_deprecated(
         const HostAndPort& hap) const override;
 
     Status validateWriteConcern(const WriteConcernOptions& writeConcern) const override;
-
-    bool isConfigLocalHostAllowed() const override;
-
-    Milliseconds getConfigHeartbeatInterval() const override;
 
     void processReplSetGetConfig(BSONObjBuilder* result,
                                  bool commitmentStatus = false,

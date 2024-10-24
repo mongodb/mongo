@@ -136,7 +136,7 @@ public:
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
-        auto validationStatus = parsedRequest.validate(replCoord->isConfigLocalHostAllowed());
+        auto validationStatus = parsedRequest.validate(replCoord->getConfig().isLocalHostAllowed());
         uassertStatusOK(validationStatus);
 
         audit::logAddShard(Client::getCurrent(),

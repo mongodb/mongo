@@ -567,7 +567,7 @@ void ReplCoordTest::disableSnapshots() {
 void ReplCoordTest::simulateCatchUpAbort() {
     NetworkInterfaceMock* net = getNet();
     auto heartbeatTimeoutWhen =
-        net->now() + getReplCoord()->getConfigHeartbeatTimeoutPeriodMillis();
+        net->now() + getReplCoord()->getConfig().getHeartbeatTimeoutPeriodMillis();
     bool hasRequest = false;
     net->enterNetwork();
     if (net->now() < heartbeatTimeoutWhen) {

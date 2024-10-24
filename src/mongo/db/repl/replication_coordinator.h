@@ -688,12 +688,7 @@ public:
     virtual void appendSecondaryInfoData(BSONObjBuilder* result) = 0;
 
     /**
-     * Returns a copy of the current ReplSetConfig.
-     *
-     * To avoid unnecessarily copying the ReplSetConfig through this method, please use the
-     * getConfig* methods below if you are only accessing a specific field of the ReplSetConfig,
-     * i.e. replCoord->getConfigNumMembers() instead of replCoord->getConfig().getNumMembers(). See
-     * SERVER-47828.
+     * Returns the current ReplSetConfig.
      */
     virtual ReplSetConfig getConfig() const = 0;
 
@@ -701,21 +696,6 @@ public:
      * Returns the current ReplSetConfig's connection string.
      */
     virtual ConnectionString getConfigConnectionString() const = 0;
-
-    /**
-     * Returns the current ReplSetConfig's election timeout period.
-     */
-    virtual Milliseconds getConfigElectionTimeoutPeriod() const = 0;
-
-    /**
-     * Returns the current ReplSetConfig's voting members.
-     */
-    virtual std::vector<MemberConfig> getConfigVotingMembers() const = 0;
-
-    /**
-     * Returns how many voting members there are for the current ReplSetConfig.
-     */
-    virtual size_t getNumConfigVotingMembers() const = 0;
 
     /**
      * Returns the current ReplSetConfig's term.
@@ -733,22 +713,6 @@ public:
     virtual ConfigVersionAndTerm getConfigVersionAndTerm() const = 0;
 
     /**
-     * Returns the number of members in the current ReplSetConfig.
-     */
-    virtual int getConfigNumMembers() const = 0;
-
-    /**
-     * Returns the amount of time to wait for a response to heartbeats sent to other
-     * nodes in the current ReplSetConfig.
-     */
-    virtual Milliseconds getConfigHeartbeatTimeoutPeriodMillis() const = 0;
-
-    /**
-     * Returns the BSON of the current ReplSetConfig.
-     */
-    virtual BSONObj getConfigBSON() const = 0;
-
-    /**
      * Validates the given WriteConcernOptions on the current ReplSetConfig.
      */
     virtual Status validateWriteConcern(const WriteConcernOptions& writeConcern) const = 0;
@@ -764,18 +728,6 @@ public:
      */
     virtual boost::optional<MemberConfig> findConfigMemberByHostAndPort_deprecated(
         const HostAndPort& hap) const = 0;
-
-    /**
-     * Returns whether all members of the current ReplSetConfig set have hostname localhost.
-     */
-    virtual bool isConfigLocalHostAllowed() const = 0;
-
-    /**
-     * Returns the interval between the time the last heartbeat from a node was received
-     * successfully, or the time when we gave up retrying, and when the next heartbeat should be
-     * sent to a target, for the current ReplSetConfig.
-     */
-    virtual Milliseconds getConfigHeartbeatInterval() const = 0;
 
     /**
      * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.

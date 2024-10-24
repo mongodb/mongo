@@ -224,30 +224,14 @@ public:
 
     ConnectionString getConfigConnectionString() const final;
 
-    Milliseconds getConfigElectionTimeoutPeriod() const final;
-
-    std::vector<MemberConfig> getConfigVotingMembers() const final;
-
-    size_t getNumConfigVotingMembers() const final;
-
     std::int64_t getConfigTerm() const final;
 
     std::int64_t getConfigVersion() const final;
 
     ConfigVersionAndTerm getConfigVersionAndTerm() const final;
 
-    int getConfigNumMembers() const final;
-
-    Milliseconds getConfigHeartbeatTimeoutPeriodMillis() const final;
-
-    BSONObj getConfigBSON() const final;
-
     boost::optional<MemberConfig> findConfigMemberByHostAndPort_deprecated(
         const HostAndPort& hap) const final;
-
-    bool isConfigLocalHostAllowed() const final;
-
-    Milliseconds getConfigHeartbeatInterval() const final;
 
     Status validateWriteConcern(const WriteConcernOptions& writeConcern) const final;
 

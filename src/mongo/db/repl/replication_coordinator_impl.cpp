@@ -3784,18 +3784,6 @@ ConnectionString ReplicationCoordinatorImpl::getConfigConnectionString() const {
     return _rsConfig.getConfig().getConnectionString();
 }
 
-Milliseconds ReplicationCoordinatorImpl::getConfigElectionTimeoutPeriod() const {
-    return _rsConfig.getConfig().getElectionTimeoutPeriod();
-}
-
-std::vector<MemberConfig> ReplicationCoordinatorImpl::getConfigVotingMembers() const {
-    return _rsConfig.getConfig().votingMembers();
-}
-
-size_t ReplicationCoordinatorImpl::getNumConfigVotingMembers() const {
-    return _rsConfig.getConfig().getCountOfVotingMembers();
-}
-
 std::int64_t ReplicationCoordinatorImpl::getConfigTerm() const {
     return _rsConfig.getConfig().getConfigTerm();
 }
@@ -3808,30 +3796,10 @@ ConfigVersionAndTerm ReplicationCoordinatorImpl::getConfigVersionAndTerm() const
     return _rsConfig.getConfig().getConfigVersionAndTerm();
 }
 
-int ReplicationCoordinatorImpl::getConfigNumMembers() const {
-    return _rsConfig.getConfig().getNumMembers();
-}
-
-Milliseconds ReplicationCoordinatorImpl::getConfigHeartbeatTimeoutPeriodMillis() const {
-    return _rsConfig.getConfig().getHeartbeatTimeoutPeriodMillis();
-}
-
-BSONObj ReplicationCoordinatorImpl::getConfigBSON() const {
-    return _rsConfig.getConfig().toBSON();
-}
-
 boost::optional<MemberConfig> ReplicationCoordinatorImpl::findConfigMemberByHostAndPort_deprecated(
     const HostAndPort& hap) const {
     const MemberConfig* result = _rsConfig.getConfig().findMemberByHostAndPort(hap);
     return result ? boost::make_optional(*result) : boost::none;
-}
-
-bool ReplicationCoordinatorImpl::isConfigLocalHostAllowed() const {
-    return _rsConfig.getConfig().isLocalHostAllowed();
-}
-
-Milliseconds ReplicationCoordinatorImpl::getConfigHeartbeatInterval() const {
-    return _rsConfig.getConfig().getHeartbeatInterval();
 }
 
 Status ReplicationCoordinatorImpl::validateWriteConcern(

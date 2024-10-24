@@ -64,7 +64,7 @@ Status stepDownForShutdown(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     // If this is a single node replica set, then we don't have to wait
     // for any secondaries. Ignore stepdown.
-    if (replCoord->getConfigNumMembers() != 1) {
+    if (replCoord->getConfig().getNumMembers() != 1) {
         try {
             if (MONGO_unlikely(hangInShutdownBeforeStepdown.shouldFail())) {
                 LOGV2(5436600, "hangInShutdownBeforeStepdown failpoint enabled");

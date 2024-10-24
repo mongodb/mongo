@@ -276,7 +276,7 @@ void WriteConcernResult::appendTo(BSONObjBuilder* result) const {
  */
 void waitForNoOplogHolesIfNeeded(OperationContext* opCtx) {
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getNumConfigVotingMembers() == 1) {
+    if (replCoord->getConfig().getCountOfVotingMembers() == 1) {
         // It is safe for secondaries in multi-node single voter replica sets to truncate writes if
         // there are oplog holes. They can catch up again.
         repl::StorageInterface::get(opCtx)->waitForAllEarlierOplogWritesToBeVisible(

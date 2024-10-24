@@ -1621,7 +1621,7 @@ protected:
 
     // Makes it so enough secondaries are caught up that a stepdown command can succeed.
     void catchUpSecondaries(const OpTime& desiredOpTime, Date_t desiredWallTime = Date_t()) {
-        auto heartbeatInterval = getReplCoord()->getConfigHeartbeatInterval();
+        auto heartbeatInterval = getReplCoord()->getConfig().getHeartbeatInterval();
         if (desiredWallTime == Date_t() && !desiredOpTime.isNull()) {
             desiredWallTime = Date_t() + Seconds(desiredOpTime.getSecs());
         }
@@ -5074,7 +5074,7 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnElectionTimeout) {
     ASSERT(getReplCoord()->getMemberState().primary());
 
     // Wait for a hello with deadline past the election timeout.
-    auto electionTimeout = getReplCoord()->getConfigElectionTimeoutPeriod();
+    auto electionTimeout = getReplCoord()->getConfig().getElectionTimeoutPeriod();
     auto maxAwaitTime = electionTimeout + Milliseconds(5000);
     auto deadline = getNet()->now() + maxAwaitTime;
     auto electionTimeoutDate = getNet()->now() + electionTimeout;
@@ -7139,7 +7139,7 @@ TEST_F(ReplCoordTest,
 
     getReplCoord()->cancelAndRescheduleElectionTimeout();
 
-    ASSERT_LESS_THAN_OR_EQUALS(until + replCoord->getConfigElectionTimeoutPeriod(),
+    ASSERT_LESS_THAN_OR_EQUALS(until + replCoord->getConfig().getElectionTimeoutPeriod(),
                                replCoord->getElectionTimeout_forTest());
 }
 
@@ -7294,7 +7294,7 @@ TEST_F(ReplCoordTest,
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
-    ASSERT_LESS_THAN_OR_EQUALS(heartbeatWhen + replCoord->getConfigElectionTimeoutPeriod(),
+    ASSERT_LESS_THAN_OR_EQUALS(heartbeatWhen + replCoord->getConfig().getElectionTimeoutPeriod(),
                                replCoord->getElectionTimeout_forTest());
 }
 
@@ -7344,7 +7344,7 @@ TEST_F(ReplCoordTest,
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
-    ASSERT_GREATER_THAN(heartbeatWhen + replCoord->getConfigElectionTimeoutPeriod(),
+    ASSERT_GREATER_THAN(heartbeatWhen + replCoord->getConfig().getElectionTimeoutPeriod(),
                         replCoord->getElectionTimeout_forTest());
 }
 
@@ -8912,8 +8912,7 @@ TEST_F(ReplCoordTest, IgnoreNonNullDurableOpTimeOrWallTimeForArbiterFromReplSetU
         << 1 << UpdatePositionArgs::kUpdateArrayFieldName
         << BSON_ARRAY(
                BSON(UpdatePositionArgs::kConfigVersionFieldName
-                    << repl->getConfig().getConfigVersion()
-                    << UpdatePositionArgs::kMemberIdFieldName << 2
+                    << repl->getConfigVersion() << UpdatePositionArgs::kMemberIdFieldName << 2
                     << UpdatePositionArgs::kWrittenOpTimeFieldName << opTime2.asOpTime().toBSON()
                     << UpdatePositionArgs::kWrittenWallTimeFieldName << wallTime2
                     << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
@@ -8921,8 +8920,7 @@ TEST_F(ReplCoordTest, IgnoreNonNullDurableOpTimeOrWallTimeForArbiterFromReplSetU
                     << UpdatePositionArgs::kDurableOpTimeFieldName << opTime2.asOpTime().toBSON()
                     << UpdatePositionArgs::kDurableWallTimeFieldName << wallTime2)
                << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                       << repl->getConfig().getConfigVersion()
-                       << UpdatePositionArgs::kMemberIdFieldName << 3
+                       << repl->getConfigVersion() << UpdatePositionArgs::kMemberIdFieldName << 3
                        << UpdatePositionArgs::kWrittenOpTimeFieldName << opTime2.asOpTime().toBSON()
                        << UpdatePositionArgs::kWrittenWallTimeFieldName << wallTime2
                        << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
