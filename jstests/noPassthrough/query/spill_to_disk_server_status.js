@@ -6,7 +6,11 @@
 // ]
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {getPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getQueryPlanner,
+    getWinningPlanFromExplain
+} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
@@ -101,7 +105,7 @@ function testSpillingMetrics({stage, expectedSpillingMetrics, expectedSbeSpillin
     jsTestLog(explain);
     const queryPlanner = getQueryPlanner(explain);
     const isSbe = queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan");
-    const isCollScan = getPlanStages(getWinningPlan(queryPlanner), "COLLSCAN").length > 0;
+    const isCollScan = getPlanStages(getWinningPlanFromExplain(explain), "COLLSCAN").length > 0;
 
     // Collect the serverStatus metrics before the aggregation runs.
     const stageName = Object.keys(stage)[0];

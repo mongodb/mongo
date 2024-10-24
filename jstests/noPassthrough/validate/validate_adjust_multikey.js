@@ -1,7 +1,7 @@
 /**
  * Tests foreground validation's ability to fix up allowable multikey metadata problems.
  */
-import {getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const dbName = jsTestName();
@@ -15,7 +15,7 @@ const assertValidate = (coll, assertFn) => {
 
 const assertIndexMultikey = (coll, hint, expectMultikey) => {
     const explain = coll.find().hint(hint).explain();
-    const plan = getWinningPlan(explain.queryPlanner);
+    const plan = getWinningPlanFromExplain(explain);
     assert.eq("FETCH", plan.stage, explain);
     assert.eq("IXSCAN", plan.inputStage.stage, explain);
     assert.eq(expectMultikey,

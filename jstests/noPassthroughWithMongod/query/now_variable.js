@@ -2,7 +2,7 @@
  * Tests for the $$NOW and $$CLUSTER_TIME system variable.
  */
 import "jstests/libs/query/sbe_assert_error_override.js";
-import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db[jsTest.name()];
@@ -209,7 +209,7 @@ if (checkSbeFullFeatureFlagEnabled(db)) {
         const explainResults =
             futureColl.find({$expr: {$lt: ["$timeField", {$subtract: ["$$NOW", 100]}]}})
                 .explain("queryPlanner");
-        const winningPlan = getWinningPlan(explainResults.queryPlanner);
+        const winningPlan = getWinningPlanFromExplain(explainResults);
         assert(isIxscan(db, winningPlan),
                `Expected winningPlan to be index scan plan: ${tojson(winningPlan)}`);
     }

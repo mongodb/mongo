@@ -2,7 +2,11 @@
  * Test projections with $and in cases where optimizations could be performed.
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getWinningPlan, isCollscan, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {
+    getWinningPlanFromExplain,
+    isCollscan,
+    isIndexOnly
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.projection_and;
 coll.drop();
@@ -22,9 +26,9 @@ let result = runFindWithProjection({
     expected: [{a: 1, b: false}]
 });
 // Query should be optimized and covered.
-const winningPlan = getWinningPlan(result.explain().queryPlanner);
+const winningPlan = getWinningPlanFromExplain(result.explain());
 assert(isIndexOnly(db, winningPlan), winningPlan);
 
 result = runFindWithProjection(
     {projection: {a: {$and: ['$a', true, 1]}}, expected: [{_id: 0, a: true}]});
-assert(isCollscan(db, getWinningPlan(result.explain().queryPlanner)));
+assert(isCollscan(db, getWinningPlanFromExplain(result.explain())));

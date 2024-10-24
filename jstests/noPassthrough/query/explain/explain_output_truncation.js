@@ -1,7 +1,11 @@
 /**
  * Test that explain output is correctly truncated when it grows too large.
  */
-import {getPlanStage, getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getWinningPlanFromExplain,
+    planHasStage
+} from "jstests/libs/query/analyze_plan.js";
 
 const dbName = "test";
 const collName = jsTestName();
@@ -18,7 +22,7 @@ assert.commandWorked(coll.createIndex({a: 1}));
 
 // Explain output should show a simple IXSCAN => FETCH => SORT plan with no truncation.
 let explain = coll.find({a: 1, b: 1}).sort({c: 1}).explain();
-let winningPlan = getWinningPlan(explain.queryPlanner);
+let winningPlan = getWinningPlanFromExplain(explain);
 let sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(sortStage, null, explain);
 let fetchStage = getPlanStage(sortStage, "FETCH");
@@ -38,7 +42,7 @@ assert.commandWorked(testDb.adminCommand({setParameter: 1, [explainSizeParam]: n
 
 explain = coll.find({a: 1, b: 1}).sort({c: 1}).explain();
 assert(planHasStage(testDb, explain, "SORT"), explain);
-fetchStage = getPlanStage(getWinningPlan(explain.queryPlanner), "FETCH");
+fetchStage = getPlanStage(getWinningPlanFromExplain(explain), "FETCH");
 assert.neq(fetchStage, null, explain);
 assert(fetchStage.hasOwnProperty("inputStage"), explain);
 assert(fetchStage.inputStage.hasOwnProperty("warning"), explain);

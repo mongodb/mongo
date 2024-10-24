@@ -4,7 +4,7 @@
  */
 import {
     getPlanCacheKeyFromShape,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isCollscan
 } from "jstests/libs/query/analyze_plan.js";
 
@@ -49,7 +49,7 @@ for (let [proj, sort] of [[{}, {}], [{_id: 0, a: 1}, {}], [{_id: 0, a: 1}, {a: 1
     // that it used a COLLSCAN rather than planning from the cache.
     const explainOutput =
         assert.commandWorked(coll.find({a: {$not: {$in: [34, /bar/]}}}).explain("executionStats"));
-    assert(isCollscan(coll.getDB(), getWinningPlan(explainOutput.queryPlanner)));
+    assert(isCollscan(coll.getDB(), getWinningPlanFromExplain(explainOutput)));
     assert.eq(1, explainOutput.executionStats.nReturned);
 
     // Flush the plan cache before the next iteration.

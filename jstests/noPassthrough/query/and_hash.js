@@ -1,6 +1,6 @@
 // Tests for whether the query solution correctly used an AND_HASH for index intersection.
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -47,7 +47,7 @@ function assertAndHashUsed({query, expectedResult, shouldUseAndHash} = {}) {
 
     assertArrayEq({actual: queryResult.toArray(), expected: expectedResult});
 
-    assert.eq(shouldUseAndHash, planHasStage(db, getWinningPlan(expl.queryPlanner), "AND_HASH"));
+    assert.eq(shouldUseAndHash, planHasStage(db, getWinningPlanFromExplain(expl), "AND_HASH"));
 }
 
 // Test basic index intersection where we expect AND_HASH to be used.

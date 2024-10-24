@@ -4,7 +4,7 @@
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isExpress,
     isIdhack,
     isIdhackOrExpress
@@ -44,7 +44,7 @@ assertNoFastPathCounterIncreased(() => {
     // idHack queries cannot be used with skip().
     jsTestLog("Testing with no idHack query");
     const explain = collection.find({_id: {a: 1}}).skip(1).explain();
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     assert(!isIdhackOrExpress(db, winningPlan), winningPlan);
 });
 
@@ -53,7 +53,7 @@ assertIdHackCounterIncreased(() => {
     jsTestLog("Testing with idHack find query");
     // Needs batchSize, otherwise this query would be resolved with express instead.
     const explain = collection.find({_id: {a: 1}}).batchSize(10).explain();
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     assert(isIdhack(db, winningPlan), winningPlan);
 });
 
@@ -62,7 +62,7 @@ assertExpressCounterIncreased(() => {
     jsTestLog("Testing with express update query");
     const explain = db.runCommand(
         {explain: {update: collName, updates: [{q: {_id: {a: 1}}, u: {$set: {a: 2}}}]}});
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     assert(isExpress(db, winningPlan), winningPlan);
 });
 
@@ -71,7 +71,7 @@ assertExpressCounterIncreased(() => {
     jsTestLog("Testing with express delete query");
     const explain =
         db.runCommand({explain: {delete: collName, deletes: [{q: {_id: {a: 1}}, limit: 0}]}});
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     assert(isExpress(db, winningPlan), winningPlan);
 });
 
@@ -79,7 +79,7 @@ assertExpressCounterIncreased(() => {
 assertExpressCounterIncreased(() => {
     jsTestLog("Testing with express find query");
     const explain = collection.find({_id: 1}).explain();
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     assert(isExpress(db, winningPlan), winningPlan);
 });
 

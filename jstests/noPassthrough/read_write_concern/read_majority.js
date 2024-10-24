@@ -19,7 +19,7 @@
  * ]
  */
 
-import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Tests the functionality for committed reads for the given read concern level.
