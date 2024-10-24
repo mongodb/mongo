@@ -48,7 +48,25 @@ export function assertViewAppliedCorrectly(explainStages, userPipeline, viewPipe
     }
     return assertToplevelAggContainsView(explainStages, viewPipeline);
 }
-
+/**
+ * This helper inspects explain.stages to ensure the view pipeline wasn't applied to the final
+ * execution pipeline.
+ */
+export function assertViewNotApplied(explainStages, viewPipeline) {
+    /**
+     * Assert that the view pipeline wasn't pushed down to $_internalSearchIdLookup by ensuring
+     * there is no $_internalSearchIdLookup stage.
+     */
+    assert(!explainStages[1].hasOwnProperty("$_internalSearchIdLookup"));
+    /**
+     * If a view pipeline isn't pushed down to idLookup, there is a risk it was appened to the user
+     * pipeline (as is the case for non-search queries on views). It's important to call out that
+     * this check investigates the most basic case for non-search queries on views, where the view
+     * pipeline isn't desugared and none of the view stages are pushed down or otherwise rearranged
+     * during optimization.
+     */
+    assert.neq(explainStages.slice(0, viewPipeline.length), viewPipeline);
+}
 /**
  * This function checks that the explain output for $search queries from an e2e test contains the
  * information that it should.

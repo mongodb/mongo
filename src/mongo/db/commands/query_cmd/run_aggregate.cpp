@@ -194,19 +194,27 @@ std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
         // same pattern here as other views
         return Pipeline::parse(aggExState.getRequest().getPipeline(), expCtx);
     }
-    // Search queries on views behave differently than non-search aggregations on views.
-    // When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
-    // view transforms as part of its subpipeline. In this way, the view stages will always
-    // be applied directly after $_internalSearchMongotRemote and before the remaining
-    // stages of the user pipeline. This is to ensure the stages following
-    // $search/$vectorSearch in the user pipeline will receive the modified documents: when
-    // storedSource is disabled, idLookup will retrieve full/unmodified documents during
-    // (from the _id values returned by mongot), apply the view's data transforms, and pass
-    // said transformed documents through the rest of the user pipeline.
+
     else if (search_helpers::isMongotPipeline(pipeline.get())) {
-        search_helpers::setResolvedNamespaceForSearch(
-            aggExState.getOriginalNss(), aggExState.getResolvedView().value(), expCtx, uuid);
-        return pipeline;
+        if (search_helpers::isStoredSource(pipeline.get())) {
+            // For returnStoredSource queries, the documents returned by mongot already include the
+            // fields transformed by the view pipeline. As such, mongod doesn't need to apply the
+            // view pipeline after idLookup.
+            return pipeline;
+        } else {
+            // Search queries on views behave differently than non-search aggregations on views.
+            // When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
+            // view transforms as part of its subpipeline. In this way, the view stages will always
+            // be applied directly after $_internalSearchMongotRemote and before the remaining
+            // stages of the user pipeline. This is to ensure the stages following
+            // $search/$vectorSearch in the user pipeline will receive the modified documents: when
+            // storedSource is disabled, idLookup will retrieve full/unmodified documents during
+            // (from the _id values returned by mongot), apply the view's data transforms, and pass
+            // said transformed documents through the rest of the user pipeline.
+            search_helpers::setResolvedNamespaceForSearch(
+                aggExState.getOriginalNss(), aggExState.getResolvedView().value(), expCtx, uuid);
+            return pipeline;
+        }
     }
     // Parse the view pipeline, then stitch the user pipeline and view pipeline together
     // to build the total aggregation pipeline.

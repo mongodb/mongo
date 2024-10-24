@@ -1,8 +1,6 @@
 /**
  * This test issues the search index management commands (createSearchIndex, updateSearchIndex) on
  * views.
- *
- * TODO SERVER-92919 add dropSearchIndex.
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {dropSearchIndex, updateSearchIndex} from "jstests/libs/search.js";
@@ -47,23 +45,5 @@ let results = addFieldsView.aggregate([{$listSearchIndexes: {name: "addFieldsInd
 assert(results.length == 1);
 // Make sure the index has the updated index definition.
 assert.eq(results[0].latestDefinition.storedSource, indexDef.storedSource);
-
-/**
- * TODO SERVER-92922 once returnStoredSource is supported on views, replace above the
- * listSearchIndexes query with the below query and make sure the results don't include
- * state_flower.
- */
-
-// let pipeline = [{
-//    $search: {
-//        index: "addFieldsIndex",
-//        wildcard: {
-//          query: "*", // This matches all documents
-//          path: "state",
-//          allowAnalyzedField: true,
-//        },
-//        returnStoredSource: true
-//    }}];
-// let results = addFieldsView.aggregate(pipeline).toArray();
 
 dropSearchIndex(addFieldsView, {name: "addFieldsIndex"});
