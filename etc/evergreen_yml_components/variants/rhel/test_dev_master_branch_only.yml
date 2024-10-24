@@ -471,7 +471,7 @@ buildvariants:
         MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --enterprise-features=hot_backups,magic_restore,ldap,sasl
+        --enterprise-features=hot_backups,magic_restore,ldap,sasl,encryptdb
         --link-model=dynamic
       compile_variant: *hot_backups-rhel-8-64-bit
       has_packages: false
