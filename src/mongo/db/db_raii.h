@@ -203,10 +203,6 @@ private:
                                         boost::optional<UUID> optUuid,
                                         bool hasSecondaryNamespaces);
 
-    // Used so that we can reset the read source back to the original read source when this instance
-    // of AutoGetCollectionForReadLockFree is destroyed.
-    RecoveryUnit::ReadSource _originalReadSource;
-
     // Whether or not this AutoGetCollectionForReadLockFree is being constructed while
     // there's already a lock-free read in progress.
     bool _isLockFreeReadSubOperation;

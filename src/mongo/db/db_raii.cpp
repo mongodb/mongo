@@ -848,8 +848,7 @@ const Collection* AutoGetCollectionForReadLockFree::_restoreFromYield(OperationC
 
 AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID, AutoGetCollection::Options options)
-    : _originalReadSource(shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
-      _isLockFreeReadSubOperation(opCtx->isLockFreeReadsOp()),  // This has to come before LFRBlock.
+    : _isLockFreeReadSubOperation(opCtx->isLockFreeReadsOp()),  // This has to come before LFRBlock.
       _lockFreeReadsBlock(opCtx),
       _globalLock(opCtx,
                   MODE_IS,
