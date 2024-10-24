@@ -4,7 +4,11 @@
 //   requires_non_retryable_writes,
 // ]
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isExpress, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
+import {
+    getWinningPlanFromExplain,
+    isExpress,
+    isIdhackOrExpress
+} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const t = db.idhack;
@@ -36,59 +40,59 @@ const query = {
 let explain = t.find(query).explain("allPlansExecution");
 assert.eq(1, explain.executionStats.nReturned, explain);
 assert.eq(1, explain.executionStats.totalKeysExamined, explain);
-let winningPlan = getWinningPlan(explain.queryPlanner);
+let winningPlan = getWinningPlanFromExplain(explain);
 assert(isIdhackOrExpress(db, winningPlan), winningPlan);
 
 // ID hack cannot be used with hint().
 t.createIndex({_id: 1, a: 1});
 explain = t.find(query).hint({_id: 1, a: 1}).explain();
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 assert(!isIdhackOrExpress(db, winningPlan), winningPlan);
 
 // ID hack cannot be used with skip().
 explain = t.find(query).skip(1).explain();
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 assert(!isIdhackOrExpress(db, winningPlan), winningPlan);
 
 // ID hack cannot be used with a regex predicate.
 assert.commandWorked(t.insert({_id: "abc"}));
 explain = t.find({_id: /abc/}).explain();
 assert.eq({_id: "abc"}, t.findOne({_id: /abc/}));
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 assert(!isIdhackOrExpress(db, winningPlan), winningPlan);
 
 // Express is an 8.0+ feature.
-const hasExpress = isExpress(db, getWinningPlan(t.find({_id: 1}).explain().queryPlanner));
+const hasExpress = isExpress(db, getWinningPlanFromExplain(t.find({_id: 1}).explain()));
 if (hasExpress) {
     // Express is used for simple _id queries.
     explain = t.find({_id: 1}).explain();
-    winningPlan = getWinningPlan(explain.queryPlanner);
+    winningPlan = getWinningPlanFromExplain(explain);
     assert(isExpress(db, winningPlan), winningPlan);
 
     // Express is used _id queries with simple projections.
     explain = t.find({_id: 1}, {_id: 1}).explain();
-    winningPlan = getWinningPlan(explain.queryPlanner);
+    winningPlan = getWinningPlanFromExplain(explain);
     assert(isExpress(db, winningPlan), winningPlan);
 
     explain = t.find({_id: 1}, {_id: 0}).explain();
-    winningPlan = getWinningPlan(explain.queryPlanner);
+    winningPlan = getWinningPlanFromExplain(explain);
     assert(isExpress(db, winningPlan), winningPlan);
 
     // Express is not supported with non-simple projections, Idhack is.
     explain = t.find({_id: 1}, {"foo.bar": 0}).explain();
-    winningPlan = getWinningPlan(explain.queryPlanner);
+    winningPlan = getWinningPlanFromExplain(explain);
     assert(!isExpress(db, winningPlan), winningPlan);
     assert(isIdhackOrExpress(db, winningPlan), winningPlan);
 
     // Express is not supported with batchSize, Idhack is.
     explain = t.find({_id: 1}).batchSize(10).explain();
-    winningPlan = getWinningPlan(explain.queryPlanner);
+    winningPlan = getWinningPlanFromExplain(explain);
     assert(!isExpress(db, winningPlan), winningPlan);
     assert(isIdhackOrExpress(db, winningPlan), winningPlan);
 
     // Express is not supported with returnKey, Idhack is.
     explain = t.find({_id: 1}).returnKey().explain();
-    winningPlan = getWinningPlan(explain.queryPlanner);
+    winningPlan = getWinningPlanFromExplain(explain);
     assert(!isExpress(db, winningPlan), winningPlan);
     assert(isIdhackOrExpress(db, winningPlan), winningPlan);
 }
@@ -96,7 +100,7 @@ if (hasExpress) {
 // Covered query returning _id field only can be handled by ID hack.
 const parentStage = checkSbeFullyEnabled(db) ? "PROJECTION_COVERED" : "FETCH";
 explain = t.find(query, {_id: 1}).explain();
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 assert(isIdhackOrExpress(db, winningPlan), winningPlan);
 
 // Check doc from covered ID hack query.
@@ -153,5 +157,5 @@ assert.eq(0, t.find({_id: 1}).hint({_id: 1}).max({_id: 0}).itcount());
 assert.eq(0, t.find({_id: 1}).hint({_id: 1}).min({_id: 2}).itcount());
 
 explain = t.find({_id: 2}).hint({_id: 1}).min({_id: 1}).max({_id: 3}).explain();
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 assert(!isIdhackOrExpress(db, winningPlan), winningPlan);

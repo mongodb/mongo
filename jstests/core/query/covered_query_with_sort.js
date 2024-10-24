@@ -7,7 +7,11 @@
 //   assumes_unsharded_collection,
 // ]
 
-import {getPlanStage, getWinningPlan, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getWinningPlanFromExplain,
+    isIndexOnly
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.covered_query_with_sort;
 coll.drop();
@@ -25,7 +29,7 @@ function buildQuery() {
 
 // Ensure that query is covered.
 const plan = buildQuery().explain();
-assert(isIndexOnly(db, getWinningPlan(plan.queryPlanner)), plan);
+assert(isIndexOnly(db, getWinningPlanFromExplain(plan)), plan);
 
 // Ensure that query plan has shape IXSCAN => SORT => PROJECTION_COVERED.
 const projectionCoveredStage = getPlanStage(plan, "PROJECTION_COVERED");

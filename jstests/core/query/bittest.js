@@ -4,13 +4,13 @@
  *   assumes_read_concern_local,
  * ]
  */
-import {getWinningPlan, isCollscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
 
 var coll = db.jstests_bitwise;
 
 function assertQueryCorrect(query, count) {
     var explain = coll.find(query).explain("executionStats");
-    assert(isCollscan(db, getWinningPlan(explain.queryPlanner)),
+    assert(isCollscan(db, getWinningPlanFromExplain(explain)),
            "expected bit test query plan to be COLLSCAN");
     assert.eq(
         count, explain.executionStats.nReturned, "bit test query not returning correct documents");

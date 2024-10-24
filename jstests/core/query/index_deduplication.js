@@ -19,7 +19,7 @@ import {
     getPlanStages,
     getQueryPlanner,
     getRejectedPlans,
-    getWinningPlan
+    getWinningPlanFromExplain
 } from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.index_deduplication;
@@ -105,7 +105,7 @@ const interestingScenarios = [
 ];
 
 function getIxscan(explain) {
-    return getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN");
+    return getPlanStages(getWinningPlanFromExplain(explain), "IXSCAN");
 }
 
 function getExplain(query, hint) {

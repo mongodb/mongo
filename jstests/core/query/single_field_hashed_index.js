@@ -7,7 +7,7 @@
  *   requires_fastcount,
  * ]
  */
-import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 const t = db.single_field_hashed_index;
 t.drop();
@@ -45,27 +45,27 @@ assert.eq(t.find({a: 3.1}).hint(indexSpec).toArray()[0].a, 3.1);
 
 // Make sure we're using the hashed index.
 let explain = t.find({a: 1}).explain();
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)), "not using hashed index");
+assert(isIxscan(db, getWinningPlanFromExplain(explain)), "not using hashed index");
 
 explain = t.find({c: 1}).explain();
-assert(!isIxscan(db, getWinningPlan(explain.queryPlanner)), "using irrelevant hashed index");
+assert(!isIxscan(db, getWinningPlanFromExplain(explain)), "using irrelevant hashed index");
 
 // Hash index used with a $in set membership predicate.
 explain = t.find({a: {$in: [1, 2]}}).explain();
 printjson(explain);
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)), "not using hashed index");
+assert(isIxscan(db, getWinningPlanFromExplain(explain)), "not using hashed index");
 
 // Hash index used with a singleton $and predicate conjunction.
 explain = t.find({$and: [{a: 1}]}).explain();
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)), "not using hashed index");
+assert(isIxscan(db, getWinningPlanFromExplain(explain)), "not using hashed index");
 
 // Hash index used with a non singleton $and predicate conjunction.
 explain = t.find({$and: [{a: {$in: [1, 2]}}, {a: {$gt: 1}}]}).explain();
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)), "not using hashed index");
+assert(isIxscan(db, getWinningPlanFromExplain(explain)), "not using hashed index");
 
 // Non-sparse hashed index can be used to satisfy {$exists: false}.
 explain = t.find({a: {$exists: false}}).explain();
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)), explain);
+assert(isIxscan(db, getWinningPlanFromExplain(explain)), explain);
 
 // Test creation of index based on hash of _id index.
 const indexSpec2 = {
@@ -88,7 +88,7 @@ assert.eq(t.getIndexes().length, 4, "sparse index didn't get created");
 
 // Sparse hashed indexes cannot be used to satisfy {$exists: false}.
 explain = t.find({b: {$exists: false}}).explain();
-assert(!isIxscan(db, getWinningPlan(explain.queryPlanner)), explain);
+assert(!isIxscan(db, getWinningPlanFromExplain(explain)), explain);
 
 // Test sparse index has smaller total items on after inserts.
 if (!TestData.isHintsToQuerySettingsSuite) {

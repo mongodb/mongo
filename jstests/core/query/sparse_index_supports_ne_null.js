@@ -11,14 +11,14 @@
  *   requires_fcv_80,
  * ]
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.sparse_index_supports_ne_null;
 coll.drop();
 
 function checkQuery({query, shouldUseIndex, nResultsExpected, indexKeyPattern}) {
     const explain = assert.commandWorked(coll.find(query).explain());
-    const ixScans = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN");
+    const ixScans = getPlanStages(getWinningPlanFromExplain(explain), "IXSCAN");
 
     if (shouldUseIndex) {
         assert.gte(ixScans.length, 1, explain);

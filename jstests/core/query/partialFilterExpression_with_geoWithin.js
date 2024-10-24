@@ -1,6 +1,6 @@
 // @tags: [requires_non_retryable_writes, requires_fcv_51]
 
-import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.partialFilterExpression_with_geoWithin;
 coll.drop();
@@ -48,7 +48,7 @@ assert.commandWorked(coll.createIndex(
 
 var explainResults =
     coll.find({a: 2, loc: {$geoWithin: {$geometry: bigPoly20Comp}}}).explain("queryPlanner");
-var winningPlan = getWinningPlan(explainResults.queryPlanner);
+var winningPlan = getWinningPlanFromExplain(explainResults);
 assert(isIxscan(db, winningPlan));
 coll.drop();
 
@@ -112,7 +112,7 @@ var command = coll.find({
     loc: {$geoWithin: {$geometry: texasPolygon}},
 });
 var explainResults = command.explain("queryPlanner");
-var winningPlan = getWinningPlan(explainResults.queryPlanner);
+var winningPlan = getWinningPlanFromExplain(explainResults);
 assert(isIxscan(db, winningPlan));
 var results = command.toArray();
 assert.eq(results.length, 3);
@@ -126,7 +126,7 @@ command = coll.find({
     loc: {$geoWithin: {$geometry: texasPolygon}},
 });
 explainResults = command.explain("queryPlanner");
-winningPlan = getWinningPlan(explainResults.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explainResults);
 assert(isIxscan(db, winningPlan));
 results = command.toArray();
 assert.eq(results.length, 3);
@@ -155,7 +155,7 @@ var uwsPolygon = {
 };
 command = coll.find({loc: {$geoWithin: {$geometry: uwsPolygon}}});
 explainResults = command.explain("queryPlanner");
-winningPlan = getWinningPlan(explainResults.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explainResults);
 assert(isIxscan(db, winningPlan));
 results = command.toArray();
 // We expect to only find one matching result because we only have one point in our collection

@@ -11,7 +11,7 @@
 // For making assertions about explain output.
 import {
     getPlanStage,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isCollscan,
     isIxscan,
     isIxscanMultikey,
@@ -27,7 +27,7 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 assert.eq(1, coll.find({a: 1, b: 2}, {_id: 0, a: 1}).itcount());
 assert.eq({a: 1}, coll.findOne({a: 1, b: 2}, {_id: 0, a: 1}));
 let explainRes = coll.explain("queryPlanner").find({a: 1, b: 2}, {_id: 0, a: 1}).finish();
-let winningPlan = getWinningPlan(explainRes.queryPlanner);
+let winningPlan = getWinningPlanFromExplain(explainRes);
 assert(isIxscan(db, winningPlan));
 assert(!planHasStage(db, winningPlan, "FETCH"));
 
@@ -44,7 +44,7 @@ explainRes = coll.explain("queryPlanner")
                  .find({a: 1, b: 1}, {_id: 0, c: 1, d: 1})
                  .sort({c: -1, d: -1})
                  .finish();
-winningPlan = getWinningPlan(explainRes.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explainRes);
 assert(!planHasStage(db, winningPlan, "FETCH"));
 
 // Verify that a query cannot be covered over a path which is multikey due to an empty array.
@@ -53,7 +53,7 @@ assert.commandWorked(coll.insert({a: []}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq({a: []}, coll.findOne({a: []}, {_id: 0, a: 1}));
 explainRes = coll.explain("queryPlanner").find({a: []}, {_id: 0, a: 1}).finish();
-winningPlan = getWinningPlan(explainRes.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explainRes);
 assert(isIxscan(db, winningPlan));
 assert(planHasStage(db, winningPlan, "FETCH"));
 assert(isIxscanMultikey(winningPlan));
@@ -65,7 +65,7 @@ assert.commandWorked(coll.insert({a: [2]}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq({a: [2]}, coll.findOne({a: 2}, {_id: 0, a: 1}));
 explainRes = coll.explain("queryPlanner").find({a: 2}, {_id: 0, a: 1}).finish();
-winningPlan = getWinningPlan(explainRes.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explainRes);
 assert(isIxscan(db, winningPlan));
 assert(planHasStage(db, winningPlan, "FETCH"));
 assert(isIxscanMultikey(winningPlan));
@@ -78,7 +78,7 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.update({}, {$set: {a: [2]}}));
 assert.eq({a: [2]}, coll.findOne({a: 2}, {_id: 0, a: 1}));
 explainRes = coll.explain("queryPlanner").find({a: 2}, {_id: 0, a: 1}).finish();
-winningPlan = getWinningPlan(explainRes.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explainRes);
 assert(isIxscan(db, winningPlan));
 assert(planHasStage(db, winningPlan, "FETCH"));
 assert(isIxscanMultikey(winningPlan));
@@ -88,13 +88,13 @@ assert(coll.drop());
 assert.commandWorked(coll.createIndex({"a.b": 1, c: "2dsphere"}));
 assert.commandWorked(coll.insert({a: {b: 1}, c: {type: "Point", coordinates: [0, 0]}}));
 explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
-winningPlan = getWinningPlan(explainRes.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explainRes);
 let ixscanStage = getPlanStage(winningPlan, "IXSCAN");
 assert.neq(null, ixscanStage);
 assert.eq(false, ixscanStage.isMultiKey);
 assert.commandWorked(coll.insert({a: {b: []}, c: {type: "Point", coordinates: [0, 0]}}));
 explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
-winningPlan = getWinningPlan(explainRes.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explainRes);
 assert(isIxscan(db, winningPlan));
 assert(isIxscanMultikey(winningPlan));
 
@@ -103,7 +103,7 @@ assert(coll.drop());
 assert.commandWorked(coll.createIndex({"a.b": 1, c: "2dsphere"}));
 assert.commandWorked(coll.insert({a: [], c: {type: "Point", coordinates: [0, 0]}}));
 explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
-winningPlan = getWinningPlan(explainRes.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explainRes);
 assert(isIxscan(db, winningPlan));
 assert(isIxscanMultikey(winningPlan));
 
@@ -112,6 +112,6 @@ assert(coll.drop());
 assert.commandWorked(coll.createIndex({"a.b": 1, c: "2dsphere"}));
 assert.commandWorked(coll.insert({a: {b: [3]}, c: {type: "Point", coordinates: [0, 0]}}));
 explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
-winningPlan = getWinningPlan(explainRes.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explainRes);
 assert(isIxscan(db, winningPlan));
 assert(isIxscanMultikey(winningPlan));
