@@ -1060,9 +1060,13 @@ def generate(env: SCons.Environment.Environment) -> None:
 
     public_release = False
     # Disable remote execution for public release builds.
-    if env.GetOption("release") == "on" and (
-        env.GetOption("cache-dir") is None
-        or env.GetOption("cache-dir") == "$BUILD_ROOT/scons/cache"
+    if (
+        env.GetOption("release") == "on"
+        and env.GetOption("remote-exec-release") == "off"
+        and (
+            env.GetOption("cache-dir") is None
+            or env.GetOption("cache-dir") == "$BUILD_ROOT/scons/cache"
+        )
     ):
         bazel_internal_flags.append("--config=public-release")
         public_release = True
