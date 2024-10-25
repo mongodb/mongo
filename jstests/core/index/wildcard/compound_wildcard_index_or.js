@@ -11,7 +11,11 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getQueryPlanner,
+    getWinningPlanFromExplain
+} from "jstests/libs/query/analyze_plan.js";
 
 const documentList = [
     {
@@ -66,7 +70,7 @@ let explain = assert.commandWorked(wild.explain('executionStats').aggregate(pipe
 //      1) {"str": -1, "obj.obj.obj.obj.obj": -1} for predicates including "obj.obj.obj.obj.obj".
 //      2) {"str": -1, "$_path": -1} for queries only on the prefix field 'str'.
 // The latter key pattern should be used for the predicate with {"str": {$regex: /^Chicken/}}.
-let winningPlan = getWinningPlan(getQueryPlanner(explain));
+let winningPlan = getWinningPlanFromExplain(explain);
 let planStages = getPlanStages(winningPlan, 'IXSCAN');
 
 let idxUsedCnt = 0;
@@ -111,7 +115,7 @@ assert.commandWorked(collTwoCWI.createIndexes([{num: 1, "sub.$**": 1}, {"sub.$**
 
 explain = assert.commandWorked(
     collTwoCWI.find({$or: [{num: {$gte: 1}}, {'sub.str': 'aa'}]}).explain("executionStats"));
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 planStages = getPlanStages(winningPlan, 'IXSCAN');
 
 idxUsedCnt = 0;
@@ -148,7 +152,7 @@ explain = assert.commandWorked(
     collTwoCWI
         .find({$or: [{$and: [{num: 1}, {"sub.num": {$gt: 4}}]}, {str: '1', "sub.num": {$lt: 10}}]})
         .explain("executionStats"));
-winningPlan = getWinningPlan(explain.queryPlanner);
+winningPlan = getWinningPlanFromExplain(explain);
 planStages = getPlanStages(winningPlan, 'IXSCAN');
 
 idxUsedCnt = 0;

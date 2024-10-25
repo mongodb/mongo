@@ -13,7 +13,11 @@
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getPlanStages, getWinningPlan, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    isIndexOnly
+} from "jstests/libs/query/analyze_plan.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 
@@ -28,7 +32,7 @@ function assertWildcardProvidesCoveredSolution(query, proj, shouldFailToCover = 
     // Obtain the explain output for the given query and projection. We run the explain with
     // 'executionStats' so that we can subsequently validate the number of documents examined.
     const explainOut = assert.commandWorked(coll.find(query, proj).explain("executionStats"));
-    const winningPlan = getWinningPlan(explainOut.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explainOut);
 
     // Verify that the $** index provided the winning solution for this query.
     const ixScans = getPlanStages(winningPlan, "IXSCAN");

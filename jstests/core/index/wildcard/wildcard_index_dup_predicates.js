@@ -6,7 +6,7 @@
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.wildcard_index_dup_predicates;
 coll.drop();
@@ -41,7 +41,7 @@ function assertExpectedDocAnswersWildcardIndexQuery(doc, query, match) {
         assert.eq(1, explain.executionStats.nReturned, explain);
 
         // Winning plan uses a wildcard index scan.
-        const winningPlan = getWinningPlan(explain.queryPlanner);
+        const winningPlan = getWinningPlanFromExplain(explain);
         const ixScans = getPlanStages(winningPlan, "IXSCAN");
         assert.gt(ixScans.length, 0, explain);
         ixScans.forEach((ixScan) => assert.eq(true, ixScan.indexName.includes("$**")));

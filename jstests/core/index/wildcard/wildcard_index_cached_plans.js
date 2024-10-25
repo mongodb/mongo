@@ -29,7 +29,7 @@ import {
     getPlanCacheKeyFromShape,
     getPlanStage,
     getPlanStages,
-    getWinningPlan,
+    getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -147,8 +147,7 @@ for (const indexSpec of wildcardIndexes) {
         // string bounds.
         const queryWithoutStringExplain =
             coll.explain().find({a: 5, b: 5}).collation({locale: "fr"}).finish();
-        let ixScans =
-            getPlanStages(getWinningPlan(queryWithoutStringExplain.queryPlanner), "IXSCAN");
+        let ixScans = getPlanStages(getWinningPlanFromExplain(queryWithoutStringExplain), "IXSCAN");
         assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
         assert.eq(ixScans[0].keyPattern, {$_path: 1, b: 1});
 
@@ -156,7 +155,7 @@ for (const indexSpec of wildcardIndexes) {
         // bounds.
         const queryWithStringExplain =
             coll.explain().find({a: 5, b: "a string"}).collation({locale: "fr"}).finish();
-        ixScans = getPlanStages(getWinningPlan(queryWithStringExplain.queryPlanner), "IXSCAN");
+        ixScans = getPlanStages(getWinningPlanFromExplain(queryWithStringExplain), "IXSCAN");
         assert.eq(ixScans.length, 0);
 
         // Check that the shapes are different since the query which matches on a string will not
@@ -173,13 +172,13 @@ for (const indexSpec of wildcardIndexes) {
 
         // Run a query for a value included by the partial filter expression.
         const queryIndexedExplain = coll.find({a: 4}).explain();
-        let ixScans = getPlanStages(getWinningPlan(queryIndexedExplain.queryPlanner), "IXSCAN");
+        let ixScans = getPlanStages(getWinningPlanFromExplain(queryIndexedExplain), "IXSCAN");
         assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
         assert.eq(ixScans[0].keyPattern, {$_path: 1, a: 1});
 
         // Run a query which tries to get a value not included by the partial filter expression.
         const queryUnindexedExplain = coll.find({a: 100}).explain();
-        ixScans = getPlanStages(getWinningPlan(queryUnindexedExplain.queryPlanner), "IXSCAN");
+        ixScans = getPlanStages(getWinningPlanFromExplain(queryUnindexedExplain), "IXSCAN");
         assert.eq(ixScans.length, 0);
 
         // Check that the shapes are different since the query which searches for a value not

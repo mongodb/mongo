@@ -9,7 +9,7 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {WildcardIndexHelpers} from "jstests/libs/query/wildcard_index_helpers.js";
 
 const coll = db.query_on_prefix_of_compound_wildcard_index;
@@ -47,7 +47,7 @@ for (let i = 0; i < 5; i++) {
 }
 
 function assertBlockingSort(explain, isBlocking) {
-    const plan = getWinningPlan(explain.queryPlanner);
+    const plan = getWinningPlanFromExplain(explain);
     const ixScans = getPlanStages(plan, "IXSCAN");
     const sorts = getPlanStages(plan, "SORT");
 

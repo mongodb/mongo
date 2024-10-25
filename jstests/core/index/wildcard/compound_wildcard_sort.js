@@ -16,7 +16,7 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.compound_wildcard_sort;
 coll.drop();
@@ -52,7 +52,7 @@ function getExplain({pred, sort, proj, natural}) {
 
 function validateExplain({pred, sort, proj, natural, blockingSort}) {
     const explain = getExplain({pred, sort, proj, natural});
-    const plan = getWinningPlan(explain.queryPlanner);
+    const plan = getWinningPlanFromExplain(explain);
     const ixScans = getPlanStages(plan, "IXSCAN");
     const collScans = getPlanStages(plan, "COLLSCAN");
     const sorts = getPlanStages(plan, "SORT");

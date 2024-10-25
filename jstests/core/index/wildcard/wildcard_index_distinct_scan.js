@@ -8,7 +8,11 @@
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStages, getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    planHasStage
+} from "jstests/libs/query/analyze_plan.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
@@ -51,7 +55,7 @@ function assertWildcardDistinctScan(
         assert.commandWorked(coll.dropIndexes());
 
         // Confirm that the distinct runs with a COLLSCAN.
-        let winningPlan = getWinningPlan(coll.explain().distinct(distinctKey, query).queryPlanner);
+        let winningPlan = getWinningPlanFromExplain(coll.explain().distinct(distinctKey, query));
         assert(planHasStage(coll.getDB(), winningPlan, "COLLSCAN"));
         // Run the distinct and confirm that it produces the expected results.
         assertArrayEq(coll.distinct(distinctKey, query), expectedResults);
@@ -81,7 +85,7 @@ function assertWildcardDistinctScan(
 
         // Explain the query, and determine whether an indexed solution is available. If
         // 'expectedPath' is null, then we do not expect the $** index to provide a plan.
-        winningPlan = getWinningPlan(coll.explain().distinct(distinctKey, query).queryPlanner);
+        winningPlan = getWinningPlanFromExplain(coll.explain().distinct(distinctKey, query));
         if (!expectedPath) {
             assert(planHasStage(coll.getDB(), winningPlan, "COLLSCAN"));
             assert.eq(expectedScanType, "COLLSCAN");

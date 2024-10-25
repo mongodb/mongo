@@ -19,7 +19,7 @@ import {
     getPlanStages,
     getRejectedPlan,
     getRejectedPlans,
-    getWinningPlan
+    getWinningPlanFromExplain
 } from "jstests/libs/query/analyze_plan.js";
 
 // Asserts that the given cursors produce identical result sets.
@@ -187,7 +187,7 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
 
             // Explain the query, and determine whether an indexed solution is available.
             const ixScans =
-                getPlanStages(getWinningPlan(coll.find(query).explain().queryPlanner), "IXSCAN");
+                getPlanStages(getWinningPlanFromExplain(coll.find(query).explain()), "IXSCAN");
 
             // If we expect the current path to have been excluded based on the $** keyPattern
             // and projection, or if the current operation is not supported by $** indexes,
@@ -227,7 +227,7 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
         const explainedOr = assert.commandWorked(coll.find({$or: multiFieldPreds}).explain());
 
         // Obtain the list of index bounds from each individual IXSCAN stage across all shards.
-        const ixScanBounds = getPlanStages(getWinningPlan(explainedOr.queryPlanner), "IXSCAN")
+        const ixScanBounds = getPlanStages(getWinningPlanFromExplain(explainedOr), "IXSCAN")
                                  .map(elem => elem.indexBounds);
 
         // We should find that each branch of the $or has used a separate $** sub-index. In the
@@ -246,7 +246,7 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
         // Perform an $and for this operation across all indexed fields; for instance:
         // {$and: [{a: {$gte: 50}}, {'b.c': {$gte: 50}}, {'b.d.e': {$gte: 50}}]}.
         const explainedAnd = coll.find({$and: multiFieldPreds}).explain();
-        const winningIxScan = getPlanStages(getWinningPlan(explainedAnd.queryPlanner), "IXSCAN");
+        const winningIxScan = getPlanStages(getWinningPlanFromExplain(explainedAnd), "IXSCAN");
 
         // Extract information about the rejected plans. We should have one IXSCAN for each $**
         // candidate that wasn't the winner. Before SERVER-36521 banned them for $** indexes, a
@@ -294,7 +294,7 @@ function runCompoundWildcardIndexTest(keyPattern, pathProjection) {
 
         // Explain the query, and determine whether an indexed solution is available.
         const explainRes = coll.find(op.query).explain();
-        const ixScans = getPlanStages(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+        const ixScans = getPlanStages(getWinningPlanFromExplain(explainRes), "IXSCAN");
 
         // If the current operation is not supported by $** indexes, confirm that no indexed
         // solution was found.

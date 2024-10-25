@@ -8,7 +8,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.compound_wildcard_index_unbounded;
 coll.drop();
@@ -28,7 +28,7 @@ const query = {
     a: {$exists: true}
 };
 const explain = coll.find(query).hint(keyPattern).explain('executionStats');
-const plan = getWinningPlan(explain.queryPlanner);
+const plan = getWinningPlanFromExplain(explain);
 const ixscans = getPlanStages(plan, "IXSCAN");
 // Asserting that we have unbounded index scans on $_path so that multikey metadata will also be
 // included in the scan.
