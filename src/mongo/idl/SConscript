@@ -69,6 +69,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils",
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
         "cluster_server_parameter",
+        "idl_parser",
     ],
 )
 

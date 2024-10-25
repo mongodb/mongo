@@ -1797,7 +1797,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         self._writer.write_line("default:")
         self._writer.indent()
         expected_types = [
-            bson.cpp_bson_type_name(t.bson_serialization_type[0]) for t in array_types
+            bson.cpp_bson_type_name(t.bson_serialization_type[0]) for t in scalar_types
         ]
         self._writer.write_line(
             f'ctxt.throwBadType({bson_element}, ' f'{_std_array_expr("BSONType", expected_types)});'

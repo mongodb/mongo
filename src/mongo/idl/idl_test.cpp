@@ -1149,6 +1149,17 @@ TEST(IDLVariantTests, TestChainedStructVariantStructInline) {
     }
 }
 
+TEST(IDLVariantTests, TestOneVariantTypeMismatch) {
+    const auto expected =
+        "BSON field 'root.value' is the wrong type "
+        "'object', expected types '[int, string]'";
+
+    ASSERT_THROWS_CODE_AND_WHAT(
+        One_variant::parse(IDLParserContext("root"), BSON("value" << BSONObj())),
+        AssertionException,
+        ErrorCodes::TypeMismatch,
+        expected);
+}
 /// Struct tests:
 // Positive: strict, 3 required fields
 // Negative: strict, ensure extra fields fail

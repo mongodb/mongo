@@ -232,7 +232,7 @@ void IDLParserContext::throwBadType(const BSONElement& element,
     uasserted(ErrorCodes::TypeMismatch,
               str::stream() << "BSON field '" << path << "' is the wrong type '"
                             << typeName(element.type()) << "', expected types '[" << type_str
-                            << "']");
+                            << "]'");
 }
 
 StringData IDLParserContext::checkAndAssertCollectionName(const BSONElement& element,
