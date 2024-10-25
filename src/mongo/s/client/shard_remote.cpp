@@ -349,16 +349,10 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         return readPrefToReturn;
     }();
 
-    repl::ReadConcernArgs readConcern = [&] {
-        if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
-            repl::OpTime configOpTime{configTime.asTimestamp(),
-                                      mongo::repl::OpTime::kUninitializedTerm};
-            return repl::ReadConcernArgs(configOpTime, readConcernLevel);
-        } else {
-            invariant(readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
-            return repl::ReadConcernArgs(configTime, readConcernLevel);
-        }
-    }();
+
+    invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
+              readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
+    repl::ReadConcernArgs readConcern{configTime /* afterClusterTime */, readConcernLevel};
 
     const Milliseconds maxTimeMS = getExhaustiveFindOnConfigMaxTimeMS(opCtx, nss);
 
