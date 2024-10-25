@@ -298,6 +298,7 @@ icuEnv.CppUnitTest(
         "out_of_line_executor_test.cpp",
         "overloaded_visitor_test.cpp",
         "packaged_task_test.cpp",
+        "parking_lot_test.cpp",
         "pcre_test.cpp",
         "pcre_util_test.cpp",
         "periodic_runner_impl_test.cpp",

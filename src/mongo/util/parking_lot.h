@@ -98,7 +98,7 @@ class ParkingLot {
 public:
     /**
      * Unpark one Notifiable from the ParkingLot. Returns true if something was unparked, otherwise
-     * false.
+     * false. Notifiables are dequeued in FIFO order.
      */
     bool unparkOne() noexcept {
         if (_notifiableCount.load()) {
