@@ -805,180 +805,180 @@ mongo_cc_library(
     ],
 )
 
-# mongo_cc_library(
-#     name = "mongos_initializers",
-#     srcs = [
-#         "cluster_cursor_stats.cpp",
-#     ],
-#     deps = [
-#         # NOTE: If you need to add a static or mongo initializer to mongos startup,
-#         # please add that library here, as a private library dependency.
-#         "//src/mongo/db:audit",
-#         "//src/mongo/db/auth:authserver",
-#         "//src/mongo/db/commands:server_status_core",
-#         "//src/mongo/db/commands:server_status_servers",
-#         "//src/mongo/db:dbdirectclient",
-#         "//src/mongo/db:default_max_time_ms_cluster_parameter",
-#         "//src/mongo/db:logical_time_metadata_hook",
-#         "//src/mongo/db/pipeline/process_interface:mongos_process_interface_factory",
-#         "//src/mongo/db/process_health:config_server_health_observer",
-#         "//src/mongo/db/process_health:fault_manager",
-#         "//src/mongo/db/query:plan_executor",
-#         "//src/mongo/db/query/query_stats",
-#         "//src/mongo/db:read_write_concern_defaults",
-#         "//src/mongo/db:server_options",
-#         "//src/mongo/db:server_options_base",
-#         "//src/mongo/db:service_context_non_d",
-#         "//src/mongo/db/session:session_catalog",
-#         "//src/mongo/db:startup_warnings_common",
-#         "//src/mongo/db/stats:counters",
-#         "//src/mongo/db/stats:latency_server_stats",
-#         "//src/mongo/db:vector_clock",
-#         "//src/mongo/executor:async_rpc_error_info",
-#         "//src/mongo/idl:cluster_server_parameter_server_status",
-#         "//src/mongo/transport:message_compressor_options_server",
-#         "//src/mongo/transport:session_manager",
-#         "//src/mongo/transport:transport_layer_manager",
-#         "//src/mongo/util:clock_sources",
-#         "//src/mongo/util:fail_point",
-#         "//src/mongo/util/net:http_client_impl",
-#         "//src/mongo/util:ntservice",
-#         "//src/mongo/util/options_parser",
-#         "//src/mongo/util/options_parser:options_parser_init",
-#         "//src/mongo/util:testing_options",
-#         "//src/mongo/util:version_impl",
-#         "//src/mongo/s/commands:cluster_commands",
-#         "//src/mongo/s/commands:cluster_commands_common",
-#         "//src/mongo/s/commands:sharded_cluster_commands",
-#         "//src/mongo/s/commands:sharded_cluster_sharding_commands",
-#         "mongos_server_parameters",
-#         "mongos_topology_coordinator",
-#         "//src/mongo/s/query/exec:cluster_cursor_cleanup_job",
-#         "sharding_initialization",
-#         "sharding_router_api",
-#     ] + select({
-#         "@platforms//os:windows": ["//src/mongo/db:windows_options"],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:build_grpc_enabled": ["//src/mongo/transport/grpc:grpc_transport_server_options"],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:ssl_enabled": ["//src/mongo/util/net:ssl_options_server"],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:tcmalloc_google_enabled": ["//src/mongo/util:tcmalloc_set_parameter"],
-#         "//bazel/config:tcmalloc_gperf_enabled": ["//src/mongo/util:tcmalloc_set_parameter"],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:use_tracing_profiler_enabled": ["//src/mongo/util/tracing_profiler"],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:enterprise_feature_audit_enabled": [
-#             "//src/mongo/db/modules/enterprise/src/audit:audit_configuration",
-#             "//src/mongo/db/modules/enterprise/src/audit:audit_mongos",
-#         ],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:enterprise_feature_encryptdb_enabled": [
-#             "//src/mongo/db/modules/enterprise/src/encryptdb:log_redact_options",
-#         ],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:enterprise_feature_fips_enabled": [
-#             "//src/mongo/db/modules/enterprise/src/fips:fips_mode_server",
-#         ],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:enterprise_feature_ldap_enabled": [
-#             "//src/mongo/db/modules/enterprise/src/ldap:ldap_health_observer",
-#             "//src/mongo/db/modules/enterprise/src/ldap:ldap_manager_init",
-#         ],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:enterprise_feature_sasl_enabled": [
-#             "//src/mongo/db/modules/enterprise/src/sasl:auth_delay",
-#             "//src/mongo/db/modules/enterprise/src/sasl:authz_manager_factory_enterprise",
-#             "//src/mongo/db/modules/enterprise/src/sasl:mongosaslservercommon",
-#         ],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:enterprise_feature_audit_or_encryptdb_enabled": [
-#             "//src/mongo/db/modules/enterprise:kmip_configuration",
-#         ],
-#         "//conditions:default": [],
-#     }),
-# )
+mongo_cc_library(
+    name = "mongos_initializers",
+    srcs = [
+        "cluster_cursor_stats.cpp",
+    ],
+    deps = [
+        # NOTE: If you need to add a static or mongo initializer to mongos startup,
+        # please add that library here, as a private library dependency.
+        "//src/mongo/db:audit",
+        "//src/mongo/db/auth:authserver",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands:server_status_servers",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:default_max_time_ms_cluster_parameter",
+        "//src/mongo/db:logical_time_metadata_hook",
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface_factory",
+        "//src/mongo/db/process_health:config_server_health_observer",
+        "//src/mongo/db/process_health:fault_manager",
+        "//src/mongo/db/query:plan_executor",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db:read_write_concern_defaults",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:server_options_base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/session:session_catalog",
+        "//src/mongo/db:startup_warnings_common",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/db/stats:latency_server_stats",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/executor:async_rpc_error_info",
+        "//src/mongo/idl:cluster_server_parameter_server_status",
+        "//src/mongo/transport:message_compressor_options_server",
+        "//src/mongo/transport:session_manager",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:clock_sources",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util/net:http_client_impl",
+        "//src/mongo/util:ntservice",
+        "//src/mongo/util/options_parser",
+        "//src/mongo/util/options_parser:options_parser_init",
+        "//src/mongo/util:testing_options",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/s/commands:cluster_commands",
+        "//src/mongo/s/commands:cluster_commands_common",
+        "//src/mongo/s/commands:sharded_cluster_commands",
+        "//src/mongo/s/commands:sharded_cluster_sharding_commands",
+        "mongos_server_parameters",
+        "mongos_topology_coordinator",
+        "//src/mongo/s/query/exec:cluster_cursor_cleanup_job",
+        "sharding_initialization",
+        "sharding_router_api",
+    ] + select({
+        "@platforms//os:windows": ["//src/mongo/db:windows_options"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:build_grpc_enabled": ["//src/mongo/transport/grpc:grpc_transport_server_options"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:ssl_enabled": ["//src/mongo/util/net:ssl_options_server"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:tcmalloc_google_enabled": ["//src/mongo/util:tcmalloc_set_parameter"],
+        "//bazel/config:tcmalloc_gperf_enabled": ["//src/mongo/util:tcmalloc_set_parameter"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:use_tracing_profiler_enabled": ["//src/mongo/util/tracing_profiler"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:enterprise_feature_audit_enabled": [
+            "//src/mongo/db/modules/enterprise/src/audit:audit_configuration",
+            "//src/mongo/db/modules/enterprise/src/audit:audit_mongos",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:enterprise_feature_encryptdb_enabled": [
+            "//src/mongo/db/modules/enterprise/src/encryptdb:log_redact_options",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:enterprise_feature_fips_enabled": [
+            "//src/mongo/db/modules/enterprise/src/fips:fips_mode_server",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:enterprise_feature_ldap_enabled": [
+            "//src/mongo/db/modules/enterprise/src/ldap:ldap_health_observer",
+            "//src/mongo/db/modules/enterprise/src/ldap:ldap_manager_init",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:enterprise_feature_sasl_enabled": [
+            "//src/mongo/db/modules/enterprise/src/sasl:auth_delay",
+            "//src/mongo/db/modules/enterprise/src/sasl:authz_manager_factory_enterprise",
+            "//src/mongo/db/modules/enterprise/src/sasl:mongosaslservercommon",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:enterprise_feature_audit_or_encryptdb_enabled": [
+            "//src/mongo/db/modules/enterprise:kmip_configuration",
+        ],
+        "//conditions:default": [],
+    }),
+)
 
-# # mongo_cc_library(
-#     name = "mongos_main",
-#     srcs = [
-#         "mongos_main.cpp",
-#         "mongos_main.h",
-#         "mongos_options.cpp",
-#         "mongos_options.h",
-#         "mongos_options_gen",
-#         "mongos_options_init.cpp",
-#         "read_write_concern_defaults_cache_lookup_mongos.cpp",
-#         "read_write_concern_defaults_cache_lookup_mongos.h",
-#         "version_mongos.cpp",
-#         "version_mongos.h",
-#     ],
-#     deps = [
-#         # NOTE: Do not add new libdeps (public or private) here unless
-#         # required by the linker to satisfy symbol dependencies from
-#         # the files listed above in `sources`. If you need to add a
-#         # library to inject a static or mongo initializer to mongos,
-#         # please add that library as a private libdep of
-#         # mongos_initializers.
-#         "//src/mongo/client:remote_command_targeter",
-#         "//src/mongo/db:audit",
-#         "//src/mongo/db/auth:authserver",
-#         "//src/mongo/db:change_stream_options_manager",
-#         "//src/mongo/db:change_streams_cluster_parameter",
-#         "//src/mongo/db/commands:profile_common",
-#         "//src/mongo/db/commands:rwc_defaults_commands",
-#         "//src/mongo/db/exec:scoped_timer",
-#         "//src/mongo/db/ftdc:ftdc_mongos",
-#         "//src/mongo/db/process_health:fault_manager",
-#         "//src/mongo/db/query/query_settings:manager",
-#         "//src/mongo/db:read_write_concern_defaults",
-#         "//src/mongo/db:serverinit",
-#         "//src/mongo/db/session:kill_sessions_remote",
-#         "//src/mongo/db/session:logical_session_cache_impl",
-#         "//src/mongo/db/session:session_catalog",
-#         "//src/mongo/db:startup_warnings_common",
-#         "//src/mongo/idl:cluster_server_parameter_refresher",
-#         "//src/mongo/transport:ingress_handshake_metrics",
-#         "//src/mongo/transport:service_executor",
-#         "//src/mongo/transport:session_manager",
-#         "//src/mongo/transport:transport_layer_manager",
-#         "//src/mongo/util:allocator_thread",
-#         "//src/mongo/util:periodic_runner_factory",
-#         "//src/mongo/util:signal_handlers",
-#         "//src/mongo/s/client:sharding_client",
-#         "//src/mongo/s/commands:cluster_commands",
-#         "//src/mongo/s/commands:cluster_commands_common",
-#         "load_balancer_support",
-#         "mongos_initializers",
-#         "mongos_topology_coordinator",
-#         "//src/mongo/s/query/exec:cluster_cursor_cleanup_job",
-#         "resource_yielders",
-#         "sessions_collection_sharded",
-#         "sharding_initialization",
-#         "sharding_router_api",
-#         "startup_initialization",
-#     ] + select({
-#         "//bazel/config:use_tracing_profiler_enabled": [
-#             "//src/mongo/util/tracing_profiler",
-#         ],
-#         "//conditions:default": [],
-#     }) + select({
-#         "//bazel/config:enterprise_feature_audit_enabled": [
-#             "//src/mongo/db/modules/enterprise/src/audit:audit_enterprise",
-#         ],
-#         "//conditions:default": [],
-#     }),
-# )
+mongo_cc_library(
+    name = "mongos_main",
+    srcs = [
+        "mongos_main.cpp",
+        "mongos_main.h",
+        "mongos_options.cpp",
+        "mongos_options.h",
+        "mongos_options_gen",
+        "mongos_options_init.cpp",
+        "read_write_concern_defaults_cache_lookup_mongos.cpp",
+        "read_write_concern_defaults_cache_lookup_mongos.h",
+        "version_mongos.cpp",
+        "version_mongos.h",
+    ],
+    deps = [
+        # NOTE: Do not add new libdeps (public or private) here unless
+        # required by the linker to satisfy symbol dependencies from
+        # the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongos,
+        # please add that library as a private libdep of
+        # mongos_initializers.
+        "//src/mongo/client:remote_command_targeter",
+        "//src/mongo/db:audit",
+        "//src/mongo/db/auth:authserver",
+        "//src/mongo/db:change_stream_options_manager",
+        "//src/mongo/db:change_streams_cluster_parameter",
+        "//src/mongo/db/commands:profile_common",
+        "//src/mongo/db/commands:rwc_defaults_commands",
+        "//src/mongo/db/exec:scoped_timer",
+        "//src/mongo/db/ftdc:ftdc_mongos",
+        "//src/mongo/db/process_health:fault_manager",
+        "//src/mongo/db/query/query_settings:manager",
+        "//src/mongo/db:read_write_concern_defaults",
+        "//src/mongo/db:serverinit",
+        "//src/mongo/db/session:kill_sessions_remote",
+        "//src/mongo/db/session:logical_session_cache_impl",
+        "//src/mongo/db/session:session_catalog",
+        "//src/mongo/db:startup_warnings_common",
+        "//src/mongo/idl:cluster_server_parameter_refresher",
+        "//src/mongo/transport:ingress_handshake_metrics",
+        "//src/mongo/transport:service_executor",
+        "//src/mongo/transport:session_manager",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:allocator_thread",
+        "//src/mongo/util:periodic_runner_factory",
+        "//src/mongo/util:signal_handlers",
+        "//src/mongo/s/client:sharding_client",
+        "//src/mongo/s/commands:cluster_commands",
+        "//src/mongo/s/commands:cluster_commands_common",
+        "load_balancer_support",
+        "mongos_initializers",
+        "mongos_topology_coordinator",
+        "//src/mongo/s/query/exec:cluster_cursor_cleanup_job",
+        "resource_yielders",
+        "sessions_collection_sharded",
+        "sharding_initialization",
+        "sharding_router_api",
+        "startup_initialization",
+    ] + select({
+        "//bazel/config:use_tracing_profiler_enabled": [
+            "//src/mongo/util/tracing_profiler",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:enterprise_feature_audit_enabled": [
+            "//src/mongo/db/modules/enterprise/src/audit:audit_enterprise",
+        ],
+        "//conditions:default": [],
+    }),
+)
 
 # mongo_cc_binary(
 #     name = "mongos",

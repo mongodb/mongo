@@ -24,96 +24,6 @@ if shouldBuildGRPC(env):
 
 
 if not has_option("noshell") and jsEngine:
-    env.Library(
-        target="mongo_initializers",
-        source=[
-            "shell_options_init.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            # NOTE: If you need to add a static or mongo initializer to mongo startup,
-            # please add that library here, as a private library dependency.
-            "$BUILD_DIR/mongo/client/clientdriver_network",
-            "$BUILD_DIR/mongo/client/connection_string",
-            "$BUILD_DIR/mongo/client/cyrus_sasl_client" if env["MONGO_BUILD_SASL_CLIENT"] else "",
-            "$BUILD_DIR/mongo/db/catalog/index_key_validate",
-            "$BUILD_DIR/mongo/db/modules/enterprise/src/fips/fips_mode_client"
-            if "fle" in env.get("MONGO_ENTERPRISE_FEATURES", [])
-            and get_option("js-engine") != "none"
-            else "",
-            "$BUILD_DIR/mongo/db/modules/enterprise/src/fle/shell/implicit_encrypted_dbclient"
-            if "fle" in env.get("MONGO_ENTERPRISE_FEATURES", [])
-            and get_option("js-engine") != "none"
-            else "",
-            "$BUILD_DIR/mongo/db/mongohasher",
-            "$BUILD_DIR/mongo/db/pipeline/change_stream_error_extra_info",
-            "$BUILD_DIR/mongo/db/query/command_request_response",
-            "$BUILD_DIR/mongo/db/query/query_request",
-            "$BUILD_DIR/mongo/db/server_base",
-            "$BUILD_DIR/mongo/db/service_context_non_d",
-            "$BUILD_DIR/mongo/db/session/logical_session_id_helpers",
-            "$BUILD_DIR/mongo/db/storage/duplicate_key_error_info",
-            "$BUILD_DIR/mongo/db/timeseries/bucket_compression_failure",
-            "$BUILD_DIR/mongo/db/traffic_reader",
-            "$BUILD_DIR/mongo/db/views/resolved_view",
-            "$BUILD_DIR/mongo/executor/async_rpc_error_info",
-            "$BUILD_DIR/mongo/executor/network_interface_factory",
-            "$BUILD_DIR/mongo/executor/network_interface_thread_pool",
-            "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-            "$BUILD_DIR/mongo/rpc/message",
-            "$BUILD_DIR/mongo/scripting/scripting",
-            "$BUILD_DIR/mongo/transport/message_compressor",
-            "$BUILD_DIR/mongo/transport/message_compressor_options_client",
-            "$BUILD_DIR/mongo/transport/transport_layer_manager",
-            "$BUILD_DIR/mongo/util/net/http_client_impl",
-            "$BUILD_DIR/mongo/util/net/network",
-            "$BUILD_DIR/mongo/util/net/ssl_options_client" if get_option("ssl") == "on" else "",
-            "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
-            "$BUILD_DIR/mongo/util/password",
-            "$BUILD_DIR/mongo/util/processinfo",
-            "$BUILD_DIR/mongo/util/signal_handlers",
-            "$BUILD_DIR/mongo/util/version_impl",
-            "benchrun",
-            "encrypted_dbclient" if get_option("ssl") == "on" else "",
-            "kms_shell" if get_option("ssl") == "on" else "",
-            "mongojs",
-            "shell_options_register",
-            "shell_utils",
-        ],
-        LIBDEPS=[
-            # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
-        ],
-    )
-
-    env.Library(
-        target="mongo_main",
-        source=[
-            "mongo_main.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            # NOTE: Do not add new libdeps (public or private) here unless
-            # required by the linker to satisfy symbol dependencies from
-            # the files listed above in `sources`. If you need to add a
-            # library to inject a static or mongo initializer to mongo,
-            # please add that library as a private libdep of
-            # mongo_initializers.
-            "$BUILD_DIR/mongo/s/grid",
-            "$BUILD_DIR/mongo/s/write_ops/batch_write_types",
-            "$BUILD_DIR/mongo/transport/transport_layer_manager",
-            "$BUILD_DIR/mongo/util/allocator_thread",
-            "$BUILD_DIR/mongo/util/net/ssl_manager",
-            "$BUILD_DIR/mongo/util/pcre_wrapper",
-            "$BUILD_DIR/mongo/util/periodic_runner_factory",
-            "$BUILD_DIR/mongo/util/signal_handlers",
-            "linenoise",
-            "mongo_initializers",
-            "program_runner",
-            "shell_utils",
-        ],
-        LIBDEPS=[
-            # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
-        ],
-    )
-
     shellEnv = env.Clone()
     if env.TargetOSIs("windows"):
         shellEnv.Append(LIBS=["winmm"])
@@ -163,9 +73,8 @@ if not has_option("noshell") and jsEngine:
             if http_client == "on"
             else []
         )
-        + ["sasl2"]
-        if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", [])
-        else [],
+        + (["sasl2"] if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) else [])
+        + (["synchronization"] if env.ToolchainIs("msvc") else []),
     )
 
 env.CppUnitTest(
