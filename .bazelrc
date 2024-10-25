@@ -28,15 +28,11 @@ build --experimental_reuse_sandbox_directories
 # targets have been converted (i.e. unittest binaries) and we can BWOB, remote linking should be faster
 # in those cases:
 build --strategy=CppLink=local
-build --modify_execution_info=CppLink=+no-remote-cache
 build --strategy=CppArchive=local
-build --modify_execution_info=CppArchive=+no-remote-cache
 build --strategy=SolibSymlink=local
-build --modify_execution_info=SolibSymlink=+no-remote-cache
-build --strategy=ExtractDebugInfo=local
-build --modify_execution_info=ExtractDebugInfo=+no-remote-cache
-build --strategy=StripDebugInfo=local
-build --modify_execution_info=StripDebugInfo=+no-remote-cache
+build --strategy=StripDebuginfo=local
+build --strategy=ExtractDebuginfo=local
+build --modify_execution_info=^(CppLink|CppArchive|SolibSymlink|ExtractDebuginfo|StripDebuginfo)$=+no-remote-cache
 
 # Aliases for config flags
 build --flag_alias=linkstatic=//bazel/config:linkstatic
