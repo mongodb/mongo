@@ -5,7 +5,8 @@
 import {
     canonicalizePlan,
     getRejectedPlans,
-    getWinningPlanFromExplain
+    getWinningPlanFromExplain,
+    isCollscan
 } from "jstests/libs/query/analyze_plan.js";
 
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -115,12 +116,24 @@ function checkRootedOr(query) {
     assert.neq(w0, w1);
 }
 
+function verifyCollectionCardinalityEstimate() {
+    const card = 1234;
+    coll.drop();
+    assert.commandWorked(coll.insertMany(Array.from({length: card}, () => ({a: 1}))));
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}));
+    const e1 = coll.find({non_indexed_field: 0}).explain();
+    const w1 = getWinningPlanFromExplain(e1);
+    assert(isCollscan(db, w1));
+    assert.eq(w1.cardinalityEstimate, card);
+}
+
 try {
     checkLastRejectedPlan(q1);
     checkLastRejectedPlan(q2);
     checkLastRejectedPlan(q3);
     checkRootedOr(q4);
     checkLastRejectedPlan(q5);
+    verifyCollectionCardinalityEstimate();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));

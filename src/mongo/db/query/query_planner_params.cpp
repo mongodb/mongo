@@ -487,11 +487,13 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     fillOutIndexEntries(opCtx, canonicalQuery, mainColl, mainCollectionInfo.indexes);
     applyQuerySettingsOrIndexFiltersForMainCollection(canonicalQuery, collections);
 
-    fillOutPlannerCollectionInfo(opCtx,
-                                 mainColl,
-                                 &mainCollectionInfo.stats,
-                                 // Only include the full size stats when there's a CSI.
-                                 false /* includeSizeStats */);
+    fillOutPlannerCollectionInfo(
+        opCtx,
+        mainColl,
+        &mainCollectionInfo.stats,
+        // Include collection statistics if cost-based ranker is enabled
+        canonicalQuery.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode() !=
+            QueryPlanRankerModeEnum::kMultiPlanning /* includeSizeStats */);
 }
 
 void QueryPlannerParams::setTargetSbeStageBuilder(OperationContext* opCtx,

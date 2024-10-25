@@ -36,10 +36,12 @@ Estimate::Estimate()
       cost(CostType{0}, EstimationSource::Code) {}
 
 namespace {
-void estimateQsn(const QuerySolutionNode* node, EstimateMap* res) {
+void estimateQsn(const QuerySolutionNode* node,
+                 CardinalityEstimate collectionCard,
+                 EstimateMap* res) {
     // Dummy implementation of estimation as a starting point to test explain.
     for (auto&& child : node->children) {
-        estimateQsn(child.get(), res);
+        estimateQsn(child.get(), collectionCard, res);
     }
     Estimate est;
     switch (node->getType()) {
@@ -51,6 +53,10 @@ void estimateQsn(const QuerySolutionNode* node, EstimateMap* res) {
             est.cardinalty = res->at(node->children[0].get()).cardinalty;
             est.cost = CostEstimate(CostType{20}, EstimationSource::Code);
             break;
+        case STAGE_COLLSCAN:
+            est.cardinalty = collectionCard;
+            est.cost = CostEstimate{CostType{50}, EstimationSource::Metadata};
+            break;
         default:
             est.cardinalty = CardinalityEstimate(CardinalityType{100}, EstimationSource::Code);
             est.cost = CostEstimate(CostType{100}, EstimationSource::Code);
@@ -60,8 +66,10 @@ void estimateQsn(const QuerySolutionNode* node, EstimateMap* res) {
 }
 }  // namespace
 
-void estimatePlanCost(const QuerySolution& plan, EstimateMap* res) {
-    estimateQsn(plan.root(), res);
+void estimatePlanCost(const QuerySolution& plan,
+                      CardinalityEstimate collectionCard,
+                      EstimateMap* res) {
+    estimateQsn(plan.root(), collectionCard, res);
 }
 
 }  // namespace mongo::cost_based_ranker

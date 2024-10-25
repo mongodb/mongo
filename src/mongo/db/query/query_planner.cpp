@@ -1619,6 +1619,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
 StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedRanking(
     const CanonicalQuery& query, const QueryPlannerParams& params) {
+    using namespace cost_based_ranker;
+
     auto statusWithMultiPlanSolns = QueryPlanner::plan(query, params);
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus();
@@ -1626,9 +1628,12 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
     // This is a temporary stub implementation of CBR which arbitrarily picks the last of the
     // enumerated plans.
 
-    cost_based_ranker::EstimateMap estimates;
+    CardinalityEstimate collCard{
+        CardinalityType{static_cast<double>(params.mainCollectionInfo.stats.noOfRecords)},
+        EstimationSource::Metadata};
+    EstimateMap estimates;
     for (auto&& soln : statusWithMultiPlanSolns.getValue()) {
-        cost_based_ranker::estimatePlanCost(*soln, &estimates);
+        estimatePlanCost(*soln, collCard, &estimates);
     }
 
     std::vector<std::unique_ptr<QuerySolution>> acceptedSoln;

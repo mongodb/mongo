@@ -53,6 +53,8 @@ using EstimateMap = absl::flat_hash_map<const QuerySolutionNode*, Estimate>;
  * Estimate the costs of the given QuerySolution tree. For every QuerySolutionNode in the tree,
  * insert an entry into the EstimateMap out-param.
  */
-void estimatePlanCost(const QuerySolution& plan, EstimateMap* res);
+void estimatePlanCost(const QuerySolution& plan,
+                      CardinalityEstimate collectionCard,
+                      EstimateMap* res);
 
 }  // namespace mongo::cost_based_ranker
