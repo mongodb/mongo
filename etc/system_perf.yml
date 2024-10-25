@@ -423,7 +423,7 @@ buildvariants:
       binary_artifact_name: Binaries
     modules: *modules
     run_on:
-      - amazon2-arm64-latest-small
+      - amazon2-latest-small
     tasks:
       - name: schedule_compile
       - name: package_supplementary_data
