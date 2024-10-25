@@ -98,10 +98,8 @@ executor:
         global_vars:
           TestData:
             skipEnforceFastCountOnValidate: true
-      use_legacy_validate: true
     - class: CleanEveryN
       n: 20
-      skip_database_deletion: true
 matrix_suite: true
 selector:
   exclude_files:

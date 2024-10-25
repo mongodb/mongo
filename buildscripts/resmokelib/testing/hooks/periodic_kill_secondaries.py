@@ -30,9 +30,7 @@ class PeriodicKillSecondaries(interface.Hook):
 
     DEFAULT_PERIOD_SECS = 30
 
-    def __init__(
-        self, hook_logger, rs_fixture, period_secs=DEFAULT_PERIOD_SECS, use_legacy_validate=False
-    ):
+    def __init__(self, hook_logger, rs_fixture, period_secs=DEFAULT_PERIOD_SECS):
         """Initialize PeriodicKillSecondaries."""
         if not isinstance(rs_fixture, replicaset.ReplicaSetFixture):
             raise TypeError(
@@ -55,7 +53,6 @@ class PeriodicKillSecondaries(interface.Hook):
         self._period_secs = period_secs
         self._start_time = None
         self._last_test = None
-        self.use_legacy_validate = use_legacy_validate
 
     def after_suite(self, test_report, teardown_flag=None):
         """Run after suite."""
@@ -154,7 +151,6 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             self, logger, test_name, description, base_test_name, hook
         )
         self._test_report = test_report
-        self.use_legacy_validate = hook.use_legacy_validate
 
     def run_test(self):
         """Run the test."""
@@ -276,7 +272,6 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             self._hook.logger,
             self.fixture,
             {"global_vars": {"TestData": {"skipEnforceFastCountOnValidate": True}}},
-            self.use_legacy_validate,
         )
         validate_test_case.before_suite(test_report)
         validate_test_case.before_test(self, test_report)

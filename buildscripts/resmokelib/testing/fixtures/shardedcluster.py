@@ -759,10 +759,6 @@ class _RouterView(interface.Fixture):
         """Return the driver connection URL."""
         return "mongodb://" + self.get_internal_connection_string()
 
-    def _all_mongo_d_s_t(self):
-        """Return the _RouterView instance."""
-        return [self]
-
 
 class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a mongos to connect to."""

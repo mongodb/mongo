@@ -165,8 +165,6 @@ executor:
         <<: *authOptions
     - class: CleanEveryN
       n: 20
-      shell_options:
-        <<: *authOptions
   fixture:
     class: ShardedClusterFixture
     mongos_options:

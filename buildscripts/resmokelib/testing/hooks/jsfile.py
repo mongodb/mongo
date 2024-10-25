@@ -67,7 +67,7 @@ class PerClusterDataConsistencyHook(DataConsistencyHook):
 
     def after_test(self, test, test_report):
         """After test execution."""
-        for cluster in self.fixture.get_independent_clusters():
+        for cluster in self.fixture.get_testable_clusters():
             self.logger.info(
                 "Running jsfile '%s' on '%s' with driver URL '%s'",
                 self._js_filename,

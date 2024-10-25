@@ -784,30 +784,3 @@ class TestCoreAnalyzerFunctions(unittest.TestCase):
         generated_task_name = get_generated_task_name(task_name, execution)
         self.assertEquals(matches_generated_task_pattern(task_name, generated_task_name), execution)
         self.assertIsNone(matches_generated_task_pattern("not_same_task", generated_task_name))
-
-
-class TestValidateCollections(unittest.TestCase):
-    def test_validate_collections_passing(self):
-        resmoke_args = [
-            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_validate_collections.yml",
-            "buildscripts/tests/resmoke_end2end/testfiles/validatecollections/test_pass.js",
-        ]
-
-        result = execute_resmoke(resmoke_args)
-
-        expected = "Collection validation passed on collection test_validate_passes"
-        # Both nodes in the replica set should be checked and pass
-        self.assertEqual(result.stdout.count(expected), 2)
-        self.assertEqual(result.returncode, 0)
-
-    def test_validate_collections_failing(self):
-        resmoke_args = [
-            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_validate_collections.yml",
-            "buildscripts/tests/resmoke_end2end/testfiles/validatecollections/test_fail.js",
-        ]
-
-        result = execute_resmoke(resmoke_args)
-
-        expected = "collection validation failed"
-        self.assertIn(expected, result.stdout)
-        self.assertNotEqual(result.returncode, 0)
