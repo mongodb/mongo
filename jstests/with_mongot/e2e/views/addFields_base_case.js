@@ -12,6 +12,7 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
@@ -34,8 +35,8 @@ let viewPipeline = [{"$addFields": {pop: {$ifNull: ['$pop', "unknown"]}}}];
 assert.commandWorked(testDb.createView(viewName, 'underlyingSourceCollection', viewPipeline));
 let addFieldsView = testDb[viewName];
 
-assert.commandWorked(addFieldsView.createSearchIndex(
-    {name: "populationAddFieldsIndex", definition: {"mappings": {"dynamic": true}}}));
+createSearchIndex(addFieldsView,
+                  {name: "populationAddFieldsIndex", definition: {"mappings": {"dynamic": true}}});
 
 // Test basic $search pipeline on the newly created view.
 let pipeline = [{
@@ -96,3 +97,4 @@ expectedResults = [
 ];
 results = addFieldsView.aggregate(pipeline).toArray();
 assertArrayEq({actual: results, expected: expectedResults});
+dropSearchIndex(addFieldsView, {name: "populationAddFieldsIndex"});

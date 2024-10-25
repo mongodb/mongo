@@ -6,6 +6,7 @@
  */
 
 import {getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {
     verifyE2ESearchMetaExplainOutput,
@@ -27,7 +28,7 @@ for (let i = 0; i < numDocs; i++) {
 }
 assert.commandWorked(coll.insertMany(docs));
 
-coll.createSearchIndex({
+createSearchIndex(coll, {
     name: "facet-index",
     definition: {
         "mappings": {
@@ -92,3 +93,4 @@ function runExplainTest(verbosity) {
 runExplainTest("queryPlanner");
 runExplainTest("executionStats");
 runExplainTest("allPlansExecution");
+dropSearchIndex(coll, {name: "facet-index"});

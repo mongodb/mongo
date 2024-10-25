@@ -5,6 +5,7 @@
  * requires_mongot_1_40
  * ]
  */
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 import {
     buildExpectedResults,
@@ -37,7 +38,7 @@ const vectorIndex = {
         }]
     }
 };
-addFieldsView.createSearchIndex(vectorIndex);
+createSearchIndex(addFieldsView, vectorIndex);
 
 // Query for similar documents.
 let pipeline = [{
@@ -54,3 +55,4 @@ const explainResults = addFieldsView.explain().aggregate(pipeline)["stages"];
 // the vectorSearch related stages (eg $_internalSearchMongotRemote, $_internalSearchIdLookup,
 // $vectorSearch)
 assertViewAppliedCorrectly(explainResults, pipeline, viewPipeline);
+dropSearchIndex(addFieldsView, {name: "vector_search_movie_block"});

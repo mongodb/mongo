@@ -18,6 +18,7 @@ selector:
   roots:
     - jstests/with_mongot/e2e/*.js
     - jstests/with_mongot/e2e_infrastructure_tests/*.js
+    - jstests/with_mongot/e2e/hybridSearch/*.js
     - jstests/with_mongot/e2e/views/*.js
     - jstests/with_mongot/e2e/lib/*_test.js
     - jstests/with_mongot/e2e/explain_execution_stats/*.js

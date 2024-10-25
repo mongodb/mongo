@@ -4,6 +4,8 @@
  * required.
  * @tags: [featureFlagSearchHybridScoringPrerequisites]
  */
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+
 const coll = db.sort_by_search_score;
 coll.drop();
 assert.commandWorked(coll.insert([
@@ -12,7 +14,7 @@ assert.commandWorked(coll.insert([
     {_id: 2, size: "large", mood: "very hungry hippo"}
 ]));
 
-coll.createSearchIndex({name: "test-dynamic", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(coll, {name: "test-dynamic", definition: {"mappings": {"dynamic": true}}});
 var searchIndexes = coll.aggregate([{"$listSearchIndexes": {}}]).toArray();
 assert.eq(searchIndexes.length, 1, searchIndexes);
 
@@ -91,3 +93,4 @@ const searchForHungryHippo = {
     assert.docEq(results[0], {_id: 1, size: "medium", mood: "content hippo", rank: 1});
     assert.docEq(results[1], {_id: 2, size: "large", mood: "very hungry hippo", rank: 1});
 }
+dropSearchIndex(coll, {name: "test-dynamic"});

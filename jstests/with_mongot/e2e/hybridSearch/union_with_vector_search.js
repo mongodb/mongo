@@ -4,6 +4,7 @@
  */
 
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     getMovieData,
     getPlotEmbeddingById
@@ -17,8 +18,8 @@ moviesColl.drop();
 assert.commandWorked(moviesColl.insertMany(getMovieData()));
 
 // Index is blocking by default so that the query is only run after index has been made.
-moviesColl.createSearchIndex(
-    {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(moviesColl,
+                  {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
 
 // Create vector search index on movie plot embeddings.
 const vectorIndex = {
@@ -33,7 +34,7 @@ const vectorIndex = {
         }]
     }
 };
-moviesColl.createSearchIndex(vectorIndex);
+createSearchIndex(moviesColl, vectorIndex);
 
 // Creating a basic collection to $unionWith with the vector search collection.
 const basicCollName = jsTestName() + "_basic";
@@ -155,8 +156,8 @@ const moviesCollBName = jsTestName() + "_movies_B";
 const moviesCollB = db.getCollection(moviesCollBName);
 moviesCollB.drop();
 assert.commandWorked(moviesCollB.insertMany(getMovieData()));
-moviesCollB.createSearchIndex(
-    {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(moviesCollB,
+                  {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
 
 // $vectorSearch on moviesColl $unionWith $vectorSearch on moviesCollB.
 var vsUnionWithVsCollB = getVSPipeline(2).concat([{
@@ -515,3 +516,7 @@ var unionWithMatchVS = [{
 }];
 assert.commandFailedWithCode(
     db.runCommand({aggregate: basicCollName, pipeline: unionWithMatchVS, cursor: {}}), 40602);
+
+dropSearchIndex(moviesColl, {name: "search_movie_block"});
+dropSearchIndex(moviesColl, {name: "vector_search_movie_block"});
+dropSearchIndex(moviesCollB, {name: "search_movie_block"});

@@ -5,6 +5,7 @@
  * @tags: [featureFlagSearchHybridScoringPrerequisites]
  */
 
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     buildExpectedResults,
     getMovieData,
@@ -20,10 +21,10 @@ coll.drop();
 assert.commandWorked(coll.insertMany(getMovieData()));
 
 // Index is blocking by default so that the query is only run after index has been made.
-coll.createSearchIndex({name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(coll, {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
 
 // Create vector search index on movie plot embeddings.
-coll.createSearchIndex(getVectorSearchIndexSpec());
+createSearchIndex(coll, getVectorSearchIndexSpec());
 
 const limit = 20;
 // Multiplication factor of limit for numCandidates in $vectorSearch.
@@ -243,3 +244,5 @@ runTestFlipped(expectedResultIdOrder, getSearchPipeline(), getVectorSearchPipeli
 runTestFlipped(expectedResultIdOrder,
                getSearchWithSetWindowFieldsPipeline(),
                getVectorSearchWithSetWindowFieldsPipeline());
+dropSearchIndex(coll, {name: "search_movie_block"});
+dropSearchIndex(coll, {name: getVectorSearchIndexSpec().name});

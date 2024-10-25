@@ -8,6 +8,7 @@
  */
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 
 const collName = "search_profiling";
 const coll = db[collName];
@@ -19,7 +20,7 @@ assert.commandWorked(coll.insert([
     {_id: 2, size: "large", mood: "very hungry hippo"}
 ]));
 
-coll.createSearchIndex({name: "test-dynamic", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(coll, {name: "test-dynamic", definition: {"mappings": {"dynamic": true}}});
 
 const searchForHungryHippo = {
     $search: {
@@ -98,3 +99,4 @@ function checkProfiler(comment, ndocs) {
 checkProfiler(queryComment, 2);
 checkProfiler(unionWithQueryComment, 4);
 checkProfiler(lookupQueryComment, 4);
+dropSearchIndex(coll, {name: "test-dynamic"});

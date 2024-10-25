@@ -2,8 +2,8 @@
  * Testing that the explain output for $vectorSearch includes a dummy value for "queryVector"
  * instead of the embeddings.
  */
-
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     getMovieData,
     getPlotEmbeddingById
@@ -28,7 +28,7 @@ const vectorIndex = {
         }]
     }
 };
-coll.createSearchIndex(vectorIndex);
+createSearchIndex(coll, vectorIndex);
 
 // Call explain and assert "queryVector" embeddings values not included.
 function testExplainVerbosity(verbosity) {
@@ -71,3 +71,4 @@ function testExplainVerbosity(verbosity) {
 }
 
 testExplainVerbosity("queryPlanner");  // Currently the only option.
+dropSearchIndex(coll, {name: "vector_search_movie_block"});

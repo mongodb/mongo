@@ -6,6 +6,7 @@
  */
 
 import {getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {
     generateRandomVectorEmbedding,
@@ -33,7 +34,7 @@ let index = {
         }]
     }
 };
-coll.createSearchIndex(index);
+createSearchIndex(coll, index);
 
 // Another collection for $unionWith.
 const collBase = db.base;
@@ -82,3 +83,4 @@ function runExplainTest(verbosity) {
 runExplainTest("queryPlanner");
 runExplainTest("executionStats");
 runExplainTest("allPlansExecution");
+dropSearchIndex(coll, {name: "vector_search"});

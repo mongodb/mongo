@@ -1,6 +1,7 @@
 /**
  * Tests the use of $searchMeta in a subpipeline--namely, in $lookup and in $unionWith.
  */
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -18,7 +19,7 @@ for (let i = 0; i < numDocs; i++) {
 }
 assert.commandWorked(coll.insertMany(docs));
 
-coll.createSearchIndex({
+createSearchIndex(coll, {
     name: "facet-index",
     definition: {
         "mappings": {
@@ -153,3 +154,4 @@ let expectedSuperNested = [
 ];
 let resultSuperNested = collBase.aggregate(superNestPipeline).toArray();
 assert.sameMembers(resultSuperNested, expectedSuperNested);
+dropSearchIndex(coll, {name: "facet-index"});

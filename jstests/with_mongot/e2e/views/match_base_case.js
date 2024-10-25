@@ -12,6 +12,7 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
@@ -35,8 +36,7 @@ let viewPipeline =
 assert.commandWorked(testDb.createView(viewName, 'underlyingSourceCollection', viewPipeline));
 let matchView = testDb[viewName];
 
-assert.commandWorked(
-    matchView.createSearchIndex({name: "matchIndex", definition: {"mappings": {"dynamic": true}}}));
+createSearchIndex(matchView, {name: "matchIndex", definition: {"mappings": {"dynamic": true}}});
 let userPipeline = [{
     $search: {
         index: "matchIndex",
@@ -81,3 +81,4 @@ explainResults = matchView.explain().aggregate(userPipeline)["command"]["pipelin
 // This utility function will validate that the user pipeline was appended to end of the view
 // pipeline eg view pipeline then user pipeline.
 assertViewAppliedCorrectly(explainResults, userPipeline, viewPipeline);
+dropSearchIndex(matchView, {name: "matchIndex"});

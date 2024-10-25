@@ -4,6 +4,7 @@
  * requires_fcv_81,
  * ]
  */
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     verifyE2ESearchExplainOutput,
 } from "jstests/with_mongot/e2e/lib/explain_utils.js";
@@ -21,7 +22,7 @@ for (let i = numFireDocs; i < numFireDocs + numWaterDocs; i++) {
 }
 assert.commandWorked(coll.insertMany(docs));
 
-coll.createSearchIndex({name: "search-index", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(coll, {name: "search-index", definition: {"mappings": {"dynamic": true}}});
 const fireSearchQuery = {
     $search: {
         index: "search-index",
@@ -101,3 +102,5 @@ function runExplainTest(verbosity) {
 runExplainTest("queryPlanner");
 runExplainTest("executionStats");
 runExplainTest("allPlansExecution");
+
+dropSearchIndex(coll, {name: "search-index"});

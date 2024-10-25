@@ -4,7 +4,7 @@
  * themselves. On an implementation level, $searchMeta doesn't desugar to $_internalSearchIdLookup
  * (which performs view transforms for other mongot operators).
  */
-import {dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
@@ -24,10 +24,10 @@ let viewPipeline = [{"$addFields": {totalPrice: {$add: ['$cleaningFee', "$roomFe
 assert.commandWorked(testDb.createView(viewName, 'hotelAccounting', viewPipeline));
 let totalPriceView = testDb[viewName];
 
-assert.commandWorked(totalPriceView.createSearchIndex({
+createSearchIndex(totalPriceView, {
     name: "totalPriceIndex",
     definition: {"mappings": {"dynamic": false, "fields": {"totalPrice": {"type": "numberFacet"}}}}
-}));
+});
 // This query creates three buckets for totalPrice field: [300-399], [400-499], [500-599]
 const facetQuery = [{
     $searchMeta: {

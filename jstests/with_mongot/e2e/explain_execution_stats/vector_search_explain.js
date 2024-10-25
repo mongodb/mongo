@@ -4,6 +4,7 @@
  * requires_fcv_81,
  * ]
  */
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     generateRandomVectorEmbedding,
     verifyE2EVectorSearchExplainOutput,
@@ -30,7 +31,7 @@ let index = {
         }]
     }
 };
-coll.createSearchIndex(index);
+createSearchIndex(coll, index);
 
 const highLimit = 1000;
 const lowLimit = 5;
@@ -80,3 +81,4 @@ function runExplainTest(verbosity) {
 runExplainTest("queryPlanner");
 runExplainTest("executionStats");
 runExplainTest("allPlansExecution");
+dropSearchIndex(coll, {name: "vector_search"});

@@ -6,6 +6,7 @@
  * Sigmoid and MinMaxScalar.
  */
 
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     buildExpectedResults,
     getMovieData,
@@ -20,7 +21,7 @@ coll.drop();
 assert.commandWorked(coll.insertMany(getMovieData()));
 
 // Index is blocking by default so that the query is only run after index has been made.
-coll.createSearchIndex({name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(coll, {name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
 
 // Create vector search index on movie plot embeddings.
 const vectorIndex = {
@@ -35,7 +36,7 @@ const vectorIndex = {
         }]
     }
 };
-coll.createSearchIndex(vectorIndex);
+createSearchIndex(coll, vectorIndex);
 
 function runQueryTest(query, expectedResults) {
     let results = coll.aggregate(query).toArray();
@@ -203,3 +204,6 @@ runQueryTest(
         ])
         .concat(mixVsFtsResultsPipeline),
     buildExpectedResults(/*expectedResultIds*/[6, 1, 4, 2, 8, 9, 10, 3, 12, 13, 5, 14, 11, 7, 15]));
+
+dropSearchIndex(coll, {name: "search_movie_block"});
+dropSearchIndex(coll, {name: "vector_search_movie_block"});

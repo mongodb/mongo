@@ -6,6 +6,7 @@
  */
 
 import {getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {
     verifyE2ESearchExplainOutput,
@@ -20,7 +21,7 @@ for (let i = 0; i < numFireDocs; i++) {
 }
 assert.commandWorked(coll.insertMany(docs));
 
-coll.createSearchIndex({name: "search-index", definition: {"mappings": {"dynamic": true}}});
+createSearchIndex(coll, {name: "search-index", definition: {"mappings": {"dynamic": true}}});
 const fireSearchQuery = {
     $search: {
         index: "search-index",
@@ -105,3 +106,4 @@ function runExplainTest(verbosity) {
 runExplainTest("queryPlanner");
 runExplainTest("executionStats");
 runExplainTest("allPlansExecution");
+dropSearchIndex(coll, {name: "search-index"});

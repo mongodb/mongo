@@ -3,7 +3,7 @@
  * views.
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {dropSearchIndex, updateSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex, updateSearchIndex} from "jstests/libs/search.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
@@ -31,8 +31,7 @@ assert.commandWorked(testDb.createView(viewName, 'underlyingSourceCollection', [
 let addFieldsView = testDb[viewName];
 
 let indexDef = {mappings: {dynamic: true}, storedSource: {exclude: ["facts.state_motto"]}};
-assert.commandWorked(
-    addFieldsView.createSearchIndex({name: "addFieldsIndex", definition: indexDef}));
+createSearchIndex(addFieldsView, {name: "addFieldsIndex", definition: indexDef});
 
 // Update the search index to exclude state_flower, instead of state_motto, from storage.
 indexDef.storedSource = {

@@ -8,6 +8,7 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
@@ -31,8 +32,7 @@ assert.commandWorked(testDb.createView("nestedView", viewName, nestedViewPipelin
 // Cannot create index as the view 'addFields' was deleted or its source collection has changed
 
 let nestedView = testDb["nestedView"];
-assert.commandWorked(
-    nestedView.createSearchIndex({name: "foo", definition: {"mappings": {"dynamic": true}}}));
+createSearchIndex(nestedView, {name: "foo", definition: {"mappings": {"dynamic": true}}});
 let pipeline = [{
     $search: {
         index: "foo",
@@ -56,3 +56,4 @@ let expectedResults = [
 ];
 
 assertArrayEq({actual: results, expected: expectedResults});
+dropSearchIndex(nestedView, {name: "foo"});

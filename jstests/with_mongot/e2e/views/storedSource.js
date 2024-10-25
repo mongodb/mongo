@@ -3,7 +3,7 @@
  * output and document results.
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {assertViewNotApplied} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
@@ -46,8 +46,7 @@ let addFieldsView = testDb[viewName];
 
 let indexDef = {mappings: {dynamic: true}, storedSource: {exclude: ["facts.state_flower"]}};
 
-assert.commandWorked(
-    addFieldsView.createSearchIndex({name: "storedSourceIx", definition: indexDef}));
+createSearchIndex(addFieldsView, {name: "storedSourceIx", definition: indexDef});
 
 /**
  * Ensure the follow returnStoredSource query doesn't include view stages in the explain output or

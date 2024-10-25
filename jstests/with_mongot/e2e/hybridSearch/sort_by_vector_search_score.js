@@ -4,6 +4,7 @@
  * required.
  * @tags: [featureFlagSearchHybridScoringPrerequisites]
  */
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     getMovieData,
     getPlotEmbeddingById,
@@ -18,7 +19,7 @@ const allSeedData = getMovieData();
 assert.commandWorked(coll.insertMany(allSeedData));
 
 // Create vector search index on movie plot embeddings.
-coll.createSearchIndex(getVectorSearchIndexSpec());
+createSearchIndex(coll, getVectorSearchIndexSpec());
 
 // Our main use case of interest: using the score to compute a rank, with no 'partitionBy'.
 const testRankingPipeline = [
@@ -97,3 +98,4 @@ const testRankingPipeline = [
         assert.eq(results[i].rank, i + 1);
     }
 }
+dropSearchIndex(coll, {name: getVectorSearchIndexSpec().name});

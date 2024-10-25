@@ -1,7 +1,7 @@
 /**
  * This test validates that dropSearchIndex works for standalone and sharded configurations.
  */
-import {dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
@@ -18,5 +18,5 @@ let expectedMessage = "Error: dropSearchIndex library helper only accepts a sear
 assert.eq(error, expectedMessage);
 
 let indexDef = {mappings: {dynamic: true}};
-assert.commandWorked(coll.createSearchIndex({name: "searchIndexToDrop", definition: indexDef}));
+createSearchIndex(coll, {name: "searchIndexToDrop", definition: indexDef});
 dropSearchIndex(coll, {name: "searchIndexToDrop"});

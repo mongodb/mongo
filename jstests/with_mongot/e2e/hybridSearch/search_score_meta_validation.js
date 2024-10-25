@@ -2,6 +2,7 @@
  * Tests the validation of using "searchScore" and "vectorSearchScore" metadata fields.
  * @tags: [featureFlagSearchHybridScoringPrerequisites]
  */
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     getMovieData,
     getPlotEmbeddingById,
@@ -13,7 +14,7 @@ const coll = db.search_score_meta_validation;
 coll.drop();
 
 assert.commandWorked(coll.insertMany(getMovieData()));
-assert.commandWorked(coll.createSearchIndex(getVectorSearchIndexSpec()));
+createSearchIndex(coll, getVectorSearchIndexSpec());
 
 function testInvalidDereference(metaType) {
     // TODO SERVER-93521 Should not be able to use 'searchScore' without a $search pipeline. These
@@ -42,3 +43,4 @@ testInvalidDereference("vectorSearchScore");
 //     },
 //     {$sort: {score: {$meta: "vectorSearchScore"}}}
 // ]));
+dropSearchIndex(coll, {name: getVectorSearchIndexSpec().name});

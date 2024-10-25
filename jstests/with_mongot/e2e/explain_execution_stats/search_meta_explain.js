@@ -4,6 +4,7 @@
  * requires_fcv_81,
  * ]
  */
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {verifyE2ESearchMetaExplainOutput} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 
 const coll = db[jsTestName()];
@@ -31,7 +32,7 @@ for (let i = 0; i < numDocs; i++) {
     docs.push({_id: i, index: i, released: time, genre: genre});
 }
 assert.commandWorked(coll.insertMany(docs));
-coll.createSearchIndex({
+createSearchIndex(coll, {
     name: "facet-index",
     definition: {
         "mappings": {
@@ -98,3 +99,4 @@ function runExplainTest(verbosity) {
 runExplainTest("queryPlanner");
 runExplainTest("executionStats");
 runExplainTest("allPlansExecution");
+dropSearchIndex(coll, {name: "facet-index"});
