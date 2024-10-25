@@ -35,19 +35,6 @@ const char* DocumentSourceInternalReplaceRoot::getSourceName() const {
     return kStageNameInternal.rawData();
 }
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReplaceRoot,
-                                  LiteParsedDocumentSourceInternal::parse,
-                                  DocumentSourceInternalReplaceRoot::createFromBson,
-                                  true);
-
-boost::intrusive_ptr<DocumentSource> DocumentSourceInternalReplaceRoot::createFromBson(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(8105802,
-            str::stream() << "$_internalReplaceRoot expects a sub-document but found: " << elem,
-            elem.type() == BSONType::Object);
-    return nullptr;
-}
-
 Pipeline::SourceContainer::iterator DocumentSourceInternalReplaceRoot::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);

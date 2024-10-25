@@ -7783,42 +7783,6 @@ export const authCommandsLib = {
           testcases: testcases_transformationOnly,
         },
         {
-          testname: "aggregate_$_internalProjection",
-          command: {
-              aggregate: "foo",
-              pipeline: [{$_internalProjection: {policies: "aggregate"}}],
-              cursor: {}
-          },
-          skipSharded: true, // Not available on mongos.
-          testcases: [{
-              runOnDb: firstDbName,
-              roles: {__system: 1},
-              privileges: [
-                  {resource: {db: firstDbName, collection: ""}, actions: ["find"]},
-                  {resource: {cluster: true}, actions: ["internal"]},
-              ],
-              expectFail: true
-          }],
-        },
-        {
-          testname: "aggregate_$_internalReplaceRoot",
-          command: {
-              aggregate: "foo",
-              pipeline: [{$_internalReplaceRoot: {}}],
-              cursor: {}
-          },
-          skipSharded: true, // Not available on mongos.
-          testcases: [{
-              runOnDb: firstDbName,
-              roles: {__system: 1},
-              privileges: [
-                  {resource: {db: firstDbName, collection: ""}, actions: ["find"]},
-                  {resource: {cluster: true}, actions: ["internal"]},
-              ],
-              expectFail: true
-          }],
-        },
-        {
           testname: "aggregate_$_internalReshardingIterateTransaction",
           command: {
               aggregate: "foo",

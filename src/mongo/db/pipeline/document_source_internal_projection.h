@@ -44,9 +44,6 @@ class DocumentSourceInternalProjection final : public DocumentSource {
 public:
     static constexpr StringData kStageNameInternal = "$_internalProjection"_sd;
 
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
     DocumentSourceInternalProjection(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                      DocumentSourceInternalProjectionSpec spec);
 

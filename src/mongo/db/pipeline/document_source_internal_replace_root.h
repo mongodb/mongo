@@ -41,9 +41,6 @@ class DocumentSourceInternalReplaceRoot final : public DocumentSource {
 public:
     static constexpr StringData kStageNameInternal = "$_internalReplaceRoot"_sd;
 
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
     DocumentSourceInternalReplaceRoot(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                       boost::intrusive_ptr<Expression> newRoot)
         : DocumentSource(kStageNameInternal, pExpCtx), _newRoot(newRoot) {}

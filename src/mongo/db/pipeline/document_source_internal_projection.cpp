@@ -59,23 +59,6 @@ const char* DocumentSourceInternalProjection::getSourceName() const {
     return kStageNameInternal.rawData();
 }
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalProjection,
-                                  LiteParsedDocumentSourceInternal::parse,
-                                  DocumentSourceInternalProjection::createFromBson,
-                                  true);
-
-boost::intrusive_ptr<DocumentSource> DocumentSourceInternalProjection::createFromBson(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(7824601,
-            str::stream() << "$_internalProjection expects a sub-document but found: " << elem,
-            elem.type() == BSONType::Object);
-
-    DocumentSourceInternalProjectionSpec spec = DocumentSourceInternalProjectionSpec::parse(
-        IDLParserContext(kStageNameInternal), elem.embeddedObject());
-
-    return make_intrusive<DocumentSourceInternalProjection>(expCtx, std::move(spec));
-}
-
 Pipeline::SourceContainer::iterator DocumentSourceInternalProjection::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
