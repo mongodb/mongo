@@ -67,6 +67,9 @@ using namespace mongo;
 namespace {
 
 ConnectionString fixtureConnectionString{};
+std::string testFilter;
+std::string fileNameFilter;
+std::vector<std::string> testSuites{};
 
 }  // namespace
 
@@ -94,7 +97,7 @@ int main(int argc, char** argv) {
     setTestCommandsEnabled(true);
     auto serviceContextHolder = ServiceContext::make();
     setGlobalServiceContext(std::move(serviceContextHolder));
-    quickExit(unittest::Suite::run(std::vector<std::string>(), "", "", 1));
+    quickExit(unittest::Suite::run(testSuites, testFilter, fileNameFilter, 1));
 }
 
 namespace {
@@ -131,6 +134,10 @@ MONGO_STARTUP_OPTIONS_STORE(IntegrationTestOptions)(InitializerContext*) {
     uassertStatusOK(storeBaseOptions(env));
 
     std::string connectionString = env["connectionString"].as<std::string>();
+
+    env.get("filter", &testFilter).ignore();
+    env.get("fileNameFilter", &fileNameFilter).ignore();
+    env.get("suite", &testSuites).ignore();
 
     auto swConnectionString = ConnectionString::parse(connectionString);
     uassertStatusOK(swConnectionString);

@@ -40,4 +40,12 @@ configs:
                      that this integration test should run against.
         arg_vartype: String
         default: 'localhost:27017'
-
+    suite:
+        description: 'Test suite name. Specify --suite more than once to run multiple suites.'
+        arg_vartype: StringVector
+    filter:
+        description: 'Test case name filter. Specify a regex partial-matching the test names.'
+        arg_vartype: String
+    fileNameFilter:
+        description: 'Filter test cases by source file name by partial-matching regex.'
+        arg_vartype: String
