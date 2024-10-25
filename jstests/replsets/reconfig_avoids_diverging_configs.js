@@ -97,4 +97,8 @@ assert.soon(() => isConfigCommitted(node1));
 rst.waitForConfigReplication(node1);
 rst.awaitNodesAgreeOnPrimary();
 parallelShell();
+// Node0 could have gone through a rollback after reconnecting with the Node1, the
+// new primary. Make sure all secondaries are out of a recovering state before
+// attempting to shutdown the replica set.
+rst.awaitSecondaryNodes();
 rst.stopSet();
