@@ -622,22 +622,15 @@ void BuilderBase<BufferT>::appendDiscriminator(const Discriminator discriminator
             _append(kGreater, false);
             break;
         case Discriminator::kInclusive:
+            _append(kEnd, false);
             break;  // No discriminator byte.
     }
 
-    // TODO (SERVER-43178): consider omitting kEnd when using a discriminator byte. It is not a
-    // storage format change since keystrings with discriminators are not allowed to be stored.
-    _appendEnd();
+    _transition(BuildState::kEndAdded);
 }
 // ----------------------------------------------------------------------
 // -----------   APPEND CODE  -------------------------------------------
 // ----------------------------------------------------------------------
-
-template <class BufferT>
-void BuilderBase<BufferT>::_appendEnd() {
-    _transition(BuildState::kEndAdded);
-    _append(kEnd, false);
-}
 
 template <class BufferT>
 void BuilderBase<BufferT>::_appendAllElementsForIndexing(const BSONObj& obj,
@@ -2841,9 +2834,12 @@ int32_t sizeWithoutDiscriminatorAtEnd(const void* bufferRaw, size_t bufSize) {
                     bufSize >= 2);  // smallest possible encoding of a RecordId.
     const char* ptr = static_cast<const char*>(bufferRaw) + bufSize - 1;
     uint8_t ctype = ConstDataView(ptr).read<uint8_t>();
-    tassert(8328700, "Expect keystring to have a kEnd byte at the end", ctype == kEnd);
-    ctype = ConstDataView(ptr - 1).read<uint8_t>();
-    return ctype == kLess || ctype == kGreater ? bufSize - 2 : bufSize - 1;
+    tassert(8328700,
+            fmt::format(
+                "Expect keystring to have a kEnd, kLess, or kGreater byte at the end. Found: {}",
+                ctype),
+            ctype == kEnd || ctype == kLess || ctype == kGreater);
+    return bufSize - 1;
 }
 
 RecordId decodeRecordIdLong(BufReader* reader) {
