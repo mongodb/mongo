@@ -15,7 +15,7 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.wildcard_index_filter;
 
@@ -48,7 +48,7 @@ function assertExpectedIndexAnswersQueryWithFilter(
         explain = assert.commandWorked(coll.find(query).hint(hint).explain('executionStats'));
     }
 
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     const planStages = getPlanStages(winningPlan, 'IXSCAN');
 
     if (FixtureHelpers.isMongos(db)) {

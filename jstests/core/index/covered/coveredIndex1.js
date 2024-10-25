@@ -12,7 +12,7 @@
  * ]
  */
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db["jstests_coveredIndex1"];
 coll.drop();
@@ -41,7 +41,7 @@ function assertIfQueryIsCovered(query, projection, isCovered, hint) {
 
     assert(explain.hasOwnProperty("queryPlanner"), tojson(explain));
     assert(explain.queryPlanner.hasOwnProperty("winningPlan"), tojson(explain));
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     if (isCovered) {
         assert(isIndexOnly(db, winningPlan),
                "Query " + tojson(query) + " with projection " + tojson(projection) +

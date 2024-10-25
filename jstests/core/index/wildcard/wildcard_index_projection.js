@@ -9,7 +9,7 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getQueryPlanner, getRejectedPlan, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -30,7 +30,7 @@ coll.insert({name: "Bernard", type: "Person", _id: 2});
 
 // Ensure we use the index for _id if we supply a hint.
 const hintExplainRes = coll.find({_id: {$eq: 1}}).hint("$**_1").explain();
-const winningPlan = getWinningPlan(getQueryPlanner(hintExplainRes));
+const winningPlan = getWinningPlanFromExplain(hintExplainRes);
 assert.eq(winningPlan.inputStage.stage, "IXSCAN", winningPlan.inputStage);
 assert.eq(winningPlan.inputStage.keyPattern, {$_path: 1, _id: 1}, winningPlan.inputStage);
 

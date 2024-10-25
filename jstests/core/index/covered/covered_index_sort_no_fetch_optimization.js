@@ -10,7 +10,11 @@
  * ]
  */
 import {exhaustFindCursorAndReturnResults} from "jstests/libs/find_cmd_util.js";
-import {getWinningPlan, isIndexOnly, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getWinningPlanFromExplain,
+    isIndexOnly,
+    planHasStage
+} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "covered_index_sort_no_fetch_optimization";
 const coll = db.getCollection(collName);
@@ -37,10 +41,9 @@ function assertExpectedResult(findCmd, expectedResult, isCovered, isBlockingSort
 
     const explainResult =
         assert.commandWorked(db.runCommand({explain: findCmd, verbosity: "executionStats"}));
-    assert.eq(
-        isCovered, isIndexOnly(db, getWinningPlan(explainResult.queryPlanner)), explainResult);
+    assert.eq(isCovered, isIndexOnly(db, getWinningPlanFromExplain(explainResult)), explainResult);
     assert.eq(isBlockingSort,
-              planHasStage(db, getWinningPlan(explainResult.queryPlanner), "SORT"),
+              planHasStage(db, getWinningPlanFromExplain(explainResult), "SORT"),
               explainResult);
 }
 

@@ -6,7 +6,7 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.wildcard_hint;
 coll.drop();
@@ -15,7 +15,7 @@ const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojso
 
 // Extracts the winning plan for the given query and hint from the explain output.
 const winningPlan = (query, hint) =>
-    getWinningPlan(assert.commandWorked(coll.find(query).hint(hint).explain()).queryPlanner);
+    getWinningPlanFromExplain(assert.commandWorked(coll.find(query).hint(hint).explain()));
 
 // Runs the given query and confirms that:
 // (1) the expected index was used to answer the query, and

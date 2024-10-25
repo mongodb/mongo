@@ -3,7 +3,7 @@
 //   assumes_read_concern_local,
 // ]
 
-import {getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 var t = db.getSiblingDB("test").getCollection("fts_projection");
 t.drop();
@@ -108,10 +108,10 @@ assert.neq(-1,
 let explainOutput = t.find({$text: {$search: "textual content -irrelevant"}}, {
                          score: {$meta: "textScore"}
                      }).explain();
-assert(planHasStage(db, getWinningPlan(explainOutput.queryPlanner), "TEXT_OR"), explainOutput);
+assert(planHasStage(db, getWinningPlanFromExplain(explainOutput), "TEXT_OR"), explainOutput);
 
 explainOutput = t.find({$text: {$search: "textual content -irrelevant"}}).explain();
-assert(!planHasStage(db, getWinningPlan(explainOutput.queryPlanner), "TEXT_OR"), explainOutput);
+assert(!planHasStage(db, getWinningPlanFromExplain(explainOutput), "TEXT_OR"), explainOutput);
 
 // Scores should exist.
 assert.eq(results.length, 2);
