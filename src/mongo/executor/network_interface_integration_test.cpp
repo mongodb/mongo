@@ -833,7 +833,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     auto stopWatch = serviceContext->getPreciseClockSource()->makeStopWatch();
     opCtx->setDeadlineByDate(stopWatch.start() + opCtxDeadline, ErrorCodes::ExceededTimeLimit);
 
-    auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
+    auto request = makeTestCommand(
+        requestTimeout, makeSleepCmdObj(), opCtx.get(), false, ErrorCodes::MaxTimeMSExpired);
 
     auto deferred = runCommand(cb, request);
     // The time returned in result.elapsed is measured from when the command started, which happens
@@ -851,7 +852,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
         return;
     }
 
-    ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
+    ASSERT_EQ(ErrorCodes::MaxTimeMSExpired, result.status);
     ASSERT(result.elapsed);
 
     // check that the request timeout uses the smaller of the operation context deadline and
