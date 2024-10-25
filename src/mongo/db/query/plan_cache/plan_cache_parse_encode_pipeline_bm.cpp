@@ -32,11 +32,11 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/bonsai_query_bm_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/plan_cache/plan_cache_bm_fixture.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -45,7 +45,7 @@ namespace {
 /**
  * Benchmarks parsing of BSON to CQ and encoding of Pipeline to SBE PlanCacheKey.
  */
-class PipelineParseAndEncodeSBE : public BonsaiQueryBenchmarkFixture {
+class PipelineParseAndEncodeSBE : public PlanCacheBenchmarkFixture {
 public:
     PipelineParseAndEncodeSBE() {}
 

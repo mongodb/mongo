@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/bonsai_query_bm_fixture.h"
+#include "mongo/db/query/plan_cache/plan_cache_bm_fixture.h"
 
 #include <cstddef>
 #include <string>
@@ -105,56 +105,56 @@ BSONObj buildNestedProjectSpec(int depth, bool isExclusion, int offset = 0) {
 }
 }  // namespace
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatch(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatch(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
-void BonsaiQueryBenchmarkFixture::benchmarkMatchTwoFields(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchTwoFields(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(2);
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchTwentyFields(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchTwentyFields(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(20);
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchDepthTwo(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchDepthTwo(benchmark::State& state) {
     auto match = buildNestedMatchSpec(2);
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchDepthTwenty(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchDepthTwenty(benchmark::State& state) {
     auto match = buildNestedMatchSpec(20);
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchGtLt(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchGtLt(benchmark::State& state) {
     auto match = fromjson("{a: {$gt: -12, $lt: 5}}");
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchIn(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchIn(benchmark::State& state) {
     auto match = BSON("a" << BSON("$in" << buildArray(10)));
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchInLarge(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchInLarge(benchmark::State& state) {
     auto match = BSON("a" << BSON("$in" << buildArray(1000)));
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchElemMatch(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchElemMatch(benchmark::State& state) {
     auto match = fromjson("{a: {$elemMatch: {b: {$eq: 2}, c: {$lt: 3}}}}");
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchSize(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchSize(benchmark::State& state) {
     auto match = BSON("a" << BSON("$size" << 2));
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchComplex(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchComplex(benchmark::State& state) {
     auto match = fromjson(
         "{$and: ["
         "{'a.b': {$not: {$eq: 2}}},"
@@ -171,81 +171,80 @@ void BonsaiQueryBenchmarkFixture::benchmarkMatchComplex(benchmark::State& state)
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkProjectExclude(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkProjectExclude(benchmark::State& state) {
     auto project = buildSimpleProjectSpec(1, true /*isExclusion*/);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkProjectInclude(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkProjectInclude(benchmark::State& state) {
     auto project = buildSimpleProjectSpec(1, false /*isExclusion*/);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkProjectIncludeTwoFields(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkProjectIncludeTwoFields(benchmark::State& state) {
     auto project = buildSimpleProjectSpec(2, false /*isExclusion*/);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkProjectIncludeTwentyFields(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkProjectIncludeTwentyFields(benchmark::State& state) {
     auto project = buildSimpleProjectSpec(20, false /*isExclusion*/);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkProjectIncludeDepthTwo(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkProjectIncludeDepthTwo(benchmark::State& state) {
     auto project = buildNestedProjectSpec(2, false /*isExclusion*/);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkProjectIncludeDepthTwenty(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkProjectIncludeDepthTwenty(benchmark::State& state) {
     auto project = buildNestedProjectSpec(20, false /*isExclusion*/);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchProjectExclude(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchProjectExclude(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
     auto project = buildSimpleProjectSpec(1, true /*isExclusion*/);
     benchmarkQueryMatchProject(state, match, project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchProjectInclude(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchProjectInclude(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
     auto project = buildSimpleProjectSpec(1, false /*isExclusion*/);
     benchmarkQueryMatchProject(state, match, project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchProjectIncludeTwoFields(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchProjectIncludeTwoFields(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
     auto project = buildSimpleProjectSpec(2, false /*isExclusion*/);
     benchmarkQueryMatchProject(state, match, project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchProjectIncludeTwentyFields(
-    benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchProjectIncludeTwentyFields(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
     auto project = buildSimpleProjectSpec(20, false /*isExclusion*/);
     benchmarkQueryMatchProject(state, match, project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchProjectIncludeDepthTwo(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchProjectIncludeDepthTwo(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
     auto project = buildNestedProjectSpec(2, false /*isExclusion*/);
     benchmarkQueryMatchProject(state, match, project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchProjectIncludeDepthTwenty(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkMatchProjectIncludeDepthTwenty(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
     auto project = buildNestedProjectSpec(20, false /*isExclusion*/);
     benchmarkQueryMatchProject(state, match, project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkOneStage(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkOneStage(benchmark::State& state) {
     // Builds a match on a simple field.
     std::vector<BSONObj> pipeline;
     pipeline.push_back(BSON("$match" << buildSimpleMatchSpec(1)));
     benchmarkPipeline(state, pipeline);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkTwoStages(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkTwoStages(benchmark::State& state) {
     // Builds a match on a nested field and then excludes that nested field.
     std::vector<BSONObj> pipeline;
     pipeline.push_back(BSON("$match" << buildNestedMatchSpec(3)));
@@ -253,7 +252,7 @@ void BonsaiQueryBenchmarkFixture::benchmarkTwoStages(benchmark::State& state) {
     benchmarkPipeline(state, pipeline);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkTwentyStages(benchmark::State& state) {
+void PlanCacheBenchmarkFixture::benchmarkTwentyStages(benchmark::State& state) {
     // Builds a sequence of alternating $match and $project stages which match on a nested field and
     // then exclude that field.
     std::vector<BSONObj> pipeline;
