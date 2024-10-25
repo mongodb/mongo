@@ -62,6 +62,13 @@ void logScopedDebugInfo() {
         "scopedDebugInfo"_attr = diagStack);
 }
 
+void logErrorBlock() {
+    // Logging in this order ensures that the stack trace is printed even if something goes wrong
+    // while printing ScopedDebugInfo.
+    printStackTrace();
+    logScopedDebugInfo();
+}
+
 /**
  * Rather than call std::abort directly, assertion and invariant failures that wish to abort the
  * process should call this function, which ensures that std::abort is invoked at most once per
@@ -96,8 +103,7 @@ void DBException::traceIfNeeded(const DBException& e) {
         (e.code() == ErrorCodes::WriteConflict && traceWriteConflictExceptions.load());
     if (traceNeeded) {
         LOGV2_WARNING(23075, "DBException thrown", "error"_attr = e);
-        logScopedDebugInfo();
-        printStackTrace();
+        logErrorBlock();
     }
 }
 
@@ -105,8 +111,7 @@ MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, const char* file, un
     assertionCount.condrollover(assertionCount.regular.addAndFetch(1));
     LOGV2_ERROR(
         23076, "Assertion failure", "expr"_attr = expr, "file"_attr = file, "line"_attr = line);
-    logScopedDebugInfo();
-    printStackTrace();
+    logErrorBlock();
     std::stringstream temp;
     temp << "assertion " << file << ":" << line;
 
@@ -281,8 +286,7 @@ void tassertFailed(const Status& status, SourceLocation loc) {
                 "Tripwire assertion",
                 "error"_attr = status,
                 "location"_attr = SourceLocationHolder(std::move(loc)));
-    logScopedDebugInfo();
-    printStackTrace();
+    logErrorBlock();
     breakpoint();
     error_details::throwExceptionForStatus(status);
 }
