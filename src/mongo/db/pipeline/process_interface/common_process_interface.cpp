@@ -234,8 +234,9 @@ bool CommonProcessInterface::keyPatternNamesExactPaths(const BSONObj& keyPattern
 boost::optional<mongo::DatabaseVersion> CommonProcessInterface::refreshAndGetDatabaseVersion(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const DatabaseName& dbName) const {
 
-    auto db =
-        Grid::get(expCtx->opCtx)->catalogCache()->getDatabaseWithRefresh(expCtx->opCtx, dbName);
+    const auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
+    catalogCache->onStaleDatabaseVersion(dbName, boost::none /* wantedVersion */);
+    auto db = catalogCache->getDatabase(expCtx->opCtx, dbName);
 
     return db.isOK() ? boost::make_optional(db.getValue()->getVersion()) : boost::none;
 }

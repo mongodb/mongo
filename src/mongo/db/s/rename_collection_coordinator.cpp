@@ -158,14 +158,12 @@ void checkDatabaseRestrictions(OperationContext* opCtx,
                                const boost::optional<CollectionType>& fromCollType,
                                const NamespaceString& toNss) {
     if (!fromCollType || fromCollType->getUnsplittable().value_or(false)) {
-        // TODO (SERVER-84243): Replace with the dedicated cache for filtering information and avoid
-        // to refresh.
-        const auto toDB = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, toNss.dbName()));
+        const auto toDB = Grid::get(opCtx)->catalogClient()->getDatabase(
+            opCtx, toNss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern);
 
         uassert(ErrorCodes::CommandFailed,
                 "Source and destination collections must be on same shard",
-                ShardingState::get(opCtx)->shardId() == toDB->getPrimary());
+                ShardingState::get(opCtx)->shardId() == toDB.getPrimary());
     } else {
         uassert(ErrorCodes::CommandFailed,
                 str::stream() << "Source and destination collections must be on "

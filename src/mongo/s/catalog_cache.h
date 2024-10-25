@@ -217,12 +217,6 @@ public:
                                                                        bool allowLocks = false);
 
     /**
-     * Same as getDatbase above, but in addition forces the database entry to be refreshed.
-     */
-    StatusWith<CachedDatabaseInfo> getDatabaseWithRefresh(OperationContext* opCtx,
-                                                          const DatabaseName& dbName);
-
-    /**
      * Blocking method to retrieve refreshed collection placement information (ChunkManager).
      */
     virtual StatusWith<ChunkManager> getCollectionPlacementInfoWithRefresh(

@@ -1205,10 +1205,12 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
 
     // The database primary must always be a recipient to ensure it ends up with consistent
     // collection metadata.
-    const auto dbPrimaryShard =
-        uassertStatusOK(RoutingInformationCache::get(opCtx)->getDatabaseWithRefresh(
-                            opCtx, coordinatorDoc.getSourceNss().dbName()))
-            ->getPrimary();
+    const auto dbPrimaryShard = Grid::get(opCtx)
+                                    ->catalogClient()
+                                    ->getDatabase(opCtx,
+                                                  coordinatorDoc.getSourceNss().dbName(),
+                                                  repl::ReadConcernLevel::kMajorityReadConcern)
+                                    .getPrimary();
 
     recipientShardIds.emplace(dbPrimaryShard);
 
@@ -2586,11 +2588,12 @@ void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
     ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kCollectionResharded,
                                                eventNotification.toBSON());
 
-    const auto dbPrimaryShard =
-        uassertStatusOK(
-            RoutingInformationCache::get(opCtx.get())
-                ->getDatabaseWithRefresh(opCtx.get(), _coordinatorDoc.getSourceNss().dbName()))
-            ->getPrimary();
+    const auto dbPrimaryShard = Grid::get(opCtx.get())
+                                    ->catalogClient()
+                                    ->getDatabase(opCtx.get(),
+                                                  _coordinatorDoc.getSourceNss().dbName(),
+                                                  repl::ReadConcernLevel::kMajorityReadConcern)
+                                    .getPrimary();
 
     // In case the recipient is running a legacy binary, swallow the error.
     try {

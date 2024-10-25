@@ -210,12 +210,18 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
 }
 
 bool isCurrentShardPrimary(OperationContext* opCtx, const NamespaceString& nss) {
-    // At this point of resharding execution, the coordinator is holding a DDL lock which means
-    // the DB primary is stable and we have gossiped-in the `configTime` which created that
-    // coordinator. Therefore the withRefresh call is guaranteed to see the most-up-to date DB
-    // primary.
-    auto dbInfo = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, nss.dbName()));
+    auto dbInfo = [&] {
+        // At this point of resharding execution, the coordinator is holding a DDL lock which means
+        // the DB primary is stable and we have gossiped-in the `configTime` which created that
+        // coordinator. Therefore if we force a routing cache refresh thorugh
+        // onStaleDatabaseVersion() we have the guarantee to fetch the most-up-to date DB info.
+        // primary.
+        //
+        // TODO SERVER-96115 Use the CatalogClient to fetch DB info and avoid this forced refresh
+        const auto& catalogCache = Grid::get(opCtx)->catalogCache();
+        catalogCache->onStaleDatabaseVersion(nss.dbName(), boost::none /* wantedVersion */);
+        return uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
+    }();
     return dbInfo->getPrimary() == ShardingState::get(opCtx)->shardId();
 }
 

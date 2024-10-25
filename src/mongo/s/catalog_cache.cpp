@@ -566,13 +566,6 @@ boost::optional<ShardingIndexesCatalogCache> CatalogCache::_getCollectionIndexIn
     }
 }
 
-StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationContext* opCtx,
-                                                                    const DatabaseName& dbName) {
-    _databaseCache.advanceTimeInStore(
-        dbName, ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh());
-    return getDatabase(opCtx, dbName);
-}
-
 void CatalogCache::_triggerPlacementVersionRefresh(const NamespaceString& nss) {
     _collectionCache.advanceTimeInStore(
         nss, ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh());
