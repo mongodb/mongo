@@ -1,14 +1,14 @@
 /**
  * Common utility functions for testing functionality of Wildcard Indexes.
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 export const WildcardIndexHelpers = (function() {
     /**
      * Asserts that the given explain contains the given expectedIndexName in the winningPlan.
      */
     function assertExpectedIndexIsUsed(explain, expectedIndexName) {
-        const winningPlan = getWinningPlan(explain.queryPlanner);
+        const winningPlan = getWinningPlanFromExplain(explain);
         const planStages = getPlanStages(winningPlan, 'IXSCAN');
 
         assert.neq(0, planStages.length, explain);
@@ -24,7 +24,7 @@ export const WildcardIndexHelpers = (function() {
      * winningPlan.
      */
     function assertExpectedIndexIsNotUsed(explain, expectedIndexName) {
-        const winningPlan = getWinningPlan(explain.queryPlanner);
+        const winningPlan = getWinningPlanFromExplain(explain);
         const planStages = getPlanStages(winningPlan, 'IXSCAN');
 
         // It is fine if no IXSCAN's were found for it is guarantee the index was not used.

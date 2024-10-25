@@ -17,7 +17,7 @@
 
 import {
     getPlanCacheKeyFromShape,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     planHasStage
 } from "jstests/libs/query/analyze_plan.js";
 
@@ -28,7 +28,7 @@ function getPlanCacheEntries(query, collection, db) {
 
 function assertRootedOrPlan(query, collection, db) {
     const explain = collection.find(query).explain();
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     assert(planHasStage(db, winningPlan, "OR"), explain);
 }
 

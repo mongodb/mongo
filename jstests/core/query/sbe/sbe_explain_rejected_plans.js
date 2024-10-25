@@ -12,7 +12,7 @@ import {
     getPlanStages,
     getRejectedPlan,
     getRejectedPlans,
-    getWinningPlan,
+    getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -39,7 +39,7 @@ const a1IndexName = "a_1";
 const b1IndexName = "b_1";
 const explain = coll.find({a: 7, b: 9}).explain("executionStats");
 
-let ixscans = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN");
+let ixscans = getPlanStages(getWinningPlanFromExplain(explain), "IXSCAN");
 assert.neq(ixscans.length, 0, explain);
 for (let ixscan of ixscans) {
     assert.eq(ixscan.indexName, a1b1IndexName, explain);

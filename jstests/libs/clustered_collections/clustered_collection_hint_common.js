@@ -2,7 +2,7 @@
  * Validate $hint on a clustered collection.
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
     const clusterKeyFieldName = Object.keys(clusterKey)[0];
@@ -375,7 +375,7 @@ export function validateClusteredCollectionHint(
     const explain = assert.commandWorked(coll.runCommand({explain: cmd}));
     assert.eq(explain.executionStats.nReturned, expectedNReturned, tojson(explain));
 
-    const actualWinningPlan = getWinningPlan(explain.queryPlanner);
+    const actualWinningPlan = getWinningPlanFromExplain(explain);
 
     if (!Array.isArray(expectedWinningPlanStats)) {
         expectedWinningPlanStats = [expectedWinningPlanStats];

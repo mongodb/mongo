@@ -6,7 +6,7 @@
 //   does_not_support_causal_consistency,
 // ]
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.jstests_ord;
 coll.drop();
@@ -30,7 +30,7 @@ for (let i = 0; i < 1000; ++i) {
 // preliminary check here, using explain. However, this does not guarantee the query below will use
 // an ixscan, because the chosen plan may not be the same.
 const explainRes = assert.commandWorked(coll.find({$or: [{a: 1}, {b: 1}]}).explain());
-const orStages = getPlanStages(getWinningPlan(explainRes.queryPlanner), "OR");
+const orStages = getPlanStages(getWinningPlanFromExplain(explainRes), "OR");
 assert(orStages.length > 0, "Expected to find OR stage in explain: " + tojson(explainRes));
 assert(orStages.every(orStage => (getPlanStages(orStage, "IXSCAN").length > 0)),
        "Expected the plan to be an OR which has (at least) one IXSCAN: " + tojson(explainRes));

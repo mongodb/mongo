@@ -28,7 +28,7 @@ import {
     getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject,
     getPlanStages,
-    getWinningPlan
+    getWinningPlanFromExplain
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -70,14 +70,14 @@ function getPlanForCacheEntryAgg(pipeline) {
 
 function assertIsExplodeForSort(query, sortSpec) {
     const explain = coll.find(query).sort(sortSpec).explain();
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     const sortMerges = getPlanStages(winningPlan, 'SORT_MERGE');
     assert.eq(sortMerges.length, 1, explain);
 }
 
 function assertIsNotExplodeForSort(query, sortSpec) {
     const explain = coll.find(query).sort(sortSpec).explain();
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain);
     const sortMerges = getPlanStages(winningPlan, 'SORT_MERGE');
     assert.eq(sortMerges.length, 0, explain);
 }

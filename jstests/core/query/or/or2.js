@@ -3,7 +3,7 @@
 // ]
 
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 const t = db.jstests_or2;
 t.drop();
@@ -51,7 +51,7 @@ function doTest(index) {
     checkArrs([{_id: 0, x: 0, a: 1}], a1);
     if (index) {
         const explain = t.find({x: 0, $or: [{a: 1}]}).explain();
-        assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+        assert(isIxscan(db, getWinningPlanFromExplain(explain)));
     }
 
     const a1b2 = t.find({x: 1, $or: [{a: 1}, {b: 2}]}).toArray();
@@ -59,7 +59,7 @@ function doTest(index) {
               a1b2);
     if (index) {
         const explain = t.find({x: 0, $or: [{a: 1}]}).explain();
-        assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+        assert(isIxscan(db, getWinningPlanFromExplain(explain)));
     }
 }
 

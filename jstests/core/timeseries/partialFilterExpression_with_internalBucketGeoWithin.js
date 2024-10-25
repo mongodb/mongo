@@ -12,7 +12,7 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const timeFieldName = "timestamp";
@@ -130,7 +130,7 @@ var findAndExplain = assert.commandWorked(bucketsColl
                                               })
                                               .explain());
 
-assert(isIxscan(db, getWinningPlan(findAndExplain.queryPlanner)));
+assert(isIxscan(db, getWinningPlanFromExplain(findAndExplain)));
 
 // Unlike the example above, this query provides a different argument for "field" than what we
 // indexed the collection on. In this case, we cannot use our index and expect to have to do a
@@ -148,7 +148,7 @@ findAndExplain = assert.commandWorked(bucketsColl
                                           })
                                           .explain());
 
-assert(isCollscan(db, getWinningPlan(findAndExplain.queryPlanner)));
+assert(isCollscan(db, getWinningPlanFromExplain(findAndExplain)));
 assert.commandWorked(bucketsColl.dropIndexes());
 
 // Create a smaller index and query for a larger region, resulting in a collection scan.
@@ -177,4 +177,4 @@ findAndExplain = assert.commandWorked(bucketsColl
                                               }
                                           })
                                           .explain());
-assert(isCollscan(db, getWinningPlan(findAndExplain.queryPlanner)));
+assert(isCollscan(db, getWinningPlanFromExplain(findAndExplain)));

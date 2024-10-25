@@ -17,7 +17,7 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     const testdb = db.getSiblingDB("timeseries_special_indexes_db");
@@ -177,7 +177,7 @@ TimeseriesTest.run((insert) => {
 
     const bucketsFindExplain =
         assert.commandWorked(bucketscoll.find().hint(multikeyBucketsIndexSpec).explain());
-    const planStage = getPlanStage(getWinningPlan(bucketsFindExplain.queryPlanner), "IXSCAN");
+    const planStage = getPlanStage(getWinningPlanFromExplain(bucketsFindExplain), "IXSCAN");
     assert.eq(true,
               planStage.isMultiKey,
               "Index should have been marked as multikey: " + tojson(planStage));
@@ -366,7 +366,7 @@ TimeseriesTest.run((insert) => {
     const wildcardFindExplain = assert.commandWorked(
         bucketscoll.find({'meta.d.zip': '01234'}).hint(wildcardBucketsIndexSpec).explain());
     const planWildcardStage =
-        getPlanStage(getWinningPlan(wildcardFindExplain.queryPlanner), "IXSCAN");
+        getPlanStage(getWinningPlanFromExplain(wildcardFindExplain), "IXSCAN");
     assert(planWildcardStage.isMultiKey,
            "Index should have been marked as multikey: " + tojson(planWildcardStage));
     assert(planWildcardStage.multiKeyPaths.hasOwnProperty("meta.d.zip"),
