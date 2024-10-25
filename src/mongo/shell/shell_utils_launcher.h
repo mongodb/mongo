@@ -54,7 +54,7 @@ struct MongoProgramScope {
     MongoProgramScope() {}  // Avoid 'unused variable' warning.
     ~MongoProgramScope();
 };
-int KillMongoProgramInstances();
+int KillMongoProgramInstances(int signal = SIGTERM);
 
 // Returns true if there are running child processes.
 std::vector<ProcessId> getRunningMongoChildProcessIds();

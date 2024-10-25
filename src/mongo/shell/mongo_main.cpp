@@ -136,6 +136,7 @@
 #include <io.h>
 #include <shlobj.h>
 
+#define SIGKILL 9
 #define isatty _isatty
 #define fileno _fileno
 #else
@@ -1005,6 +1006,7 @@ int mongo_main(int argc, char* argv[]) {
             if (!scope->execFile(shellGlobalParams.files[i], false, true)) {
                 std::cout << "failed to load: " << shellGlobalParams.files[i] << std::endl;
                 std::cout << "exiting with code " << static_cast<int>(kInputFileError) << std::endl;
+                mongo::shell_utils::KillMongoProgramInstances(SIGKILL);
                 return kInputFileError;
             }
 

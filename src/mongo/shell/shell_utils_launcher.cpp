@@ -520,10 +520,6 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt, bool waitPi
         return static_cast<int>(ExitCode::fail);
     }
 
-    if (signal == SIGKILL) {
-        sleepmillis(4000);  // allow operating system to reclaim resources
-    }
-
     return exitCode;
 }
 
@@ -606,14 +602,14 @@ BSONObj ConvertTrafficRecordingToBSON(const BSONObj& a, void* data) {
     return BSON("" << arr);
 }
 
-int KillMongoProgramInstances() {
+int KillMongoProgramInstances(int signal) {
     vector<ProcessId> pids;
     auto registry = ProgramRegistry::get(getGlobalServiceContext());
     registry->getRegisteredPids(pids);
     int returnCode = static_cast<int>(ExitCode::clean);
     for (auto&& pid : pids) {
         int port = registry->portForPid(pid);
-        int code = killDb(port != -1 ? port : 0, pid, SIGTERM);
+        int code = killDb(port != -1 ? port : 0, pid, signal);
         if (code != static_cast<int>(ExitCode::clean)) {
             LOGV2_INFO(
                 22823, "Process exited with error code", "pid"_attr = pid, "code"_attr = code);
