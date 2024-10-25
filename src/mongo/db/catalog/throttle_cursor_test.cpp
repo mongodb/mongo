@@ -40,7 +40,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/throttle_cursor.h"
-#include "mongo/db/catalog/validate_gen.h"
+#include "mongo/db/catalog/validate/validate_gen.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"

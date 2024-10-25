@@ -661,13 +661,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/catalog/**/health_log* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/import* @10gen/server-catalog-and-routing @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_build* @10gen/server-storage-execution @svc-auto-approve-bot
-/src/mongo/db/catalog/**/index_consistency* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_key_validate* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_spec_validate* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_repair* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/multi_index_block* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/throttle_cursor* @10gen/server-storage-execution @svc-auto-approve-bot
-/src/mongo/db/catalog/**/validate* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/create* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/database* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/drop* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -697,6 +695,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/catalog/**/views_for_database.* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/virtual_collection* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/local_oplog_info* @10gen/server-replication @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/catalog/validate/OWNERS.yml
+/src/mongo/db/catalog/validate/**/* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/collection_crud/OWNERS.yml
 /src/mongo/db/collection_crud/**/* @10gen/server-storage-execution @svc-auto-approve-bot

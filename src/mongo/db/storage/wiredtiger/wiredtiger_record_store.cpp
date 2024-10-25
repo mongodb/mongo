@@ -48,7 +48,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
-#include "mongo/db/catalog/validate_results.h"
+#include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

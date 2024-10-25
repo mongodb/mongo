@@ -32,7 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/validate_results.h"
+#include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {

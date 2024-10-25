@@ -1,0 +1,89 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "validate_idl",
+    srcs = [
+        ":validate_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "validate_state",
+    srcs = [
+        "validate_state.cpp",
+    ],
+    hdrs = [
+        "collection_validation.h",
+        "validate_state.h",
+    ],
+    deps = [
+        ":validate_idl",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/catalog:throttle_cursor",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/views",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+idl_generator(
+    name = "validate_gen",
+    src = "validate.idl",
+)
+
+mongo_cc_library(
+    name = "collection_validation",
+    srcs = [
+        "collection_validation.cpp",
+        "validate_adaptor.cpp",
+        "validate_results.cpp",
+    ],
+    hdrs = [
+        "collection_validation.h",
+        "validate_adaptor.h",
+        "validate_results.h",
+    ],
+    deps = [
+        "validate_state",
+        "//src/mongo/bson/column",
+        "//src/mongo/db:multi_key_path_tracker",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:catalog_impl",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/catalog:index_key_validate",
+        "//src/mongo/db/catalog:throttle_cursor",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/storage:execution_context",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/key_string",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/util:progress_meter",
+    ],
+)

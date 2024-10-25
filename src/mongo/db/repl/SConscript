@@ -267,7 +267,7 @@ if wiredtiger:
         ],
         LIBDEPS=[
             "$BUILD_DIR/mongo/db/auth/authmocks",
-            "$BUILD_DIR/mongo/db/catalog/collection_validation",
+            "$BUILD_DIR/mongo/db/catalog/validate/collection_validation",
             "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",
             "oplog_applier_impl_test_fixture",
             "oplog_entry_test_helpers",

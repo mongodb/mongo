@@ -166,7 +166,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:validated_tenancy_scope_factory.h",
         "//src/mongo/db/catalog:clustered_collection_options_gen",
         "//src/mongo/db/catalog:index_builds.h",
-        "//src/mongo/db/catalog:validate_results.h",
+        "//src/mongo/db/catalog/validate:validate_results.h",
         "//src/mongo/db/concurrency:cond_var_lock_grant_notification.h",
         "//src/mongo/db/concurrency:fast_map_noalloc.h",
         "//src/mongo/db/concurrency:flow_control_ticketholder.h",

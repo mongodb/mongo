@@ -48,7 +48,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/validate_results.h"
+#include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/collection_crud/capped_visibility.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

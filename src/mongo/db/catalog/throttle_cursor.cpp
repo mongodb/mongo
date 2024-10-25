@@ -36,7 +36,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/throttle_cursor.h"
-#include "mongo/db/catalog/validate_gen.h"
+#include "mongo/db/catalog/validate/validate_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/validate_results.h"
+#include "mongo/db/catalog/validate/validate_results.h"
 
 #include <cstddef>
 
