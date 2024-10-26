@@ -33,6 +33,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/crypto/encryption_fields.idl"
+    - "mongo/crypto/fle_tokens.idl"
 
 enums:
     EncryptedBinDataType:
@@ -193,20 +194,20 @@ structs:
         strict: true
         fields:
           d:
-            description: "EDCDerivedFromDataTokenAndCounter"
-            type: bindata_generic
+            description: "EDCDerivedFromDataTokenAndContentionFactorToken"
+            type: EDCDerivedFromDataTokenAndContentionFactorToken
             cpp_name: edcDerivedToken
           s:
-            description: "ESCDerivedFromDataTokenAndCounter"
-            type: bindata_generic
+            description: "ESCDerivedFromDataTokenAndContentionFactorToken"
+            type: ESCDerivedFromDataTokenAndContentionFactorToken
             cpp_name: escDerivedToken
           l:
             description: "ServerDerivedFromDataToken"
-            type: bindata_generic
+            type: ServerDerivedFromDataToken
             cpp_name: serverDerivedFromDataToken
           p:
             description: "Encrypted tokens"
-            type: bindata_generic
+            type: EncryptedStateCollectionTokensV2
             cpp_name: encryptedTokens
 
     FLE2InsertUpdatePayloadV2:
@@ -214,16 +215,16 @@ structs:
         strict: true
         fields:
           d:
-            description: "EDCDerivedFromDataAndContentionToken"
-            type: bindata_generic
+            description: "EDCDerivedFromDataTokenAndContentionFactorToken"
+            type: EDCDerivedFromDataTokenAndContentionFactorToken
             cpp_name: edcDerivedToken
           s:
-            description: "ESCDerivedFromDataAndContentionToken"
-            type: bindata_generic
+            description: "ESCDerivedFromDataTokenAndContentionFactorToken"
+            type: ESCDerivedFromDataTokenAndContentionFactorToken
             cpp_name: escDerivedToken
           p:
             description: "Encrypted tokens"
-            type: bindata_generic
+            type: EncryptedStateCollectionTokensV2
             cpp_name: encryptedTokens
           u:
             description: "Index KeyId"
@@ -239,11 +240,11 @@ structs:
             cpp_name: value
           e:
             description: "ServerDataEncryptionLevel1Token"
-            type: bindata_generic
+            type: ServerDataEncryptionLevel1Token
             cpp_name: serverEncryptionToken
           l:
             description: "ServerDerivedFromDataToken"
-            type: bindata_generic
+            type: ServerDerivedFromDataToken
             cpp_name: serverDerivedFromDataToken
           k:
             description: "Randomly sampled contention factor value"
@@ -290,15 +291,15 @@ structs:
         fields:
           d:
             description: "EDCDerivedFromDataToken"
-            type: bindata_generic
+            type: EDCDerivedFromDataToken
             cpp_name: edcDerivedToken
           s:
             description: "ESCDerivedFromDataToken"
-            type: bindata_generic
+            type: ESCDerivedFromDataToken
             cpp_name: escDerivedToken
           l:
             description: "ServerDerivedFromDataToken"
-            type: bindata_generic
+            type: ServerDerivedFromDataToken
             cpp_name: serverDerivedFromDataToken
           cm:
             description: "Queryable Encryption max counter"
@@ -312,15 +313,15 @@ structs:
         fields:
           d:
             description: "EDCDerivedFromDataToken"
-            type: bindata_generic
+            type: EDCDerivedFromDataToken
             cpp_name: edcDerivedToken
           s:
             description: "ESCDerivedFromDataToken"
-            type: bindata_generic
+            type: ESCDerivedFromDataToken
             cpp_name: escDerivedToken
           l:
             description: "ServerDerivedFromDataToken"
-            type: bindata_generic
+            type: ServerDerivedFromDataToken
             cpp_name: serverDerivedFromDataToken
 
     FLE2FindRangePayloadEdgesInfoV2:
@@ -416,7 +417,7 @@ structs:
             type: string
           value:
             description: "Encrypted value"
-            type: bindata_generic
+            type: EncryptedStateCollectionTokensV2
 
     FLE2RangeFindSpecEdgesInfo:
         description: "Edges Information for FLE2 Range Spec"

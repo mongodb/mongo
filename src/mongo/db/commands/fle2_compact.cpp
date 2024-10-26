@@ -351,7 +351,7 @@ stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocuments(
         stats.addReads(docs.size());
 
         for (auto& doc : docs) {
-            auto ecocDoc = ECOCCollection::parseAndDecryptV2(doc, compactionToken.token);
+            auto ecocDoc = ECOCCompactionDocumentV2::parseAndDecrypt(doc, compactionToken.token);
             uassert(
                 8574701,
                 "Compaction token for field '{}' is of type '{}', but ECOCDocument is of type '{}'"_format(

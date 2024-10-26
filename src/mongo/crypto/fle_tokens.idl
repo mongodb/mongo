@@ -205,6 +205,15 @@ types:
         deserializer: '::mongo::AnchorPaddingValueToken::parse'
         is_view: false
 
+    EncryptedStateCollectionTokensV2:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: 'EncryptedStateCollectionTokensV2'
+        cpp_type: "StateCollectionTokensV2::Encrypted"
+        serializer: 'toCDR'
+        deserializer: '::mongo::StateCollectionTokensV2::Encrypted::parse'
+        is_view: false
+
 structs:
     CompactionTokenDoc:
         description: "Compaction tokens for range fields as passed to compactStructuredEncryptionData"

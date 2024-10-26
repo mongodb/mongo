@@ -31,6 +31,7 @@
 
 #include <array>
 #include <cstdint>
+#include <fmt/format.h>
 #include <vector>
 
 #include "mongo/base/secure_allocator.h"

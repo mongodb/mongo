@@ -1725,16 +1725,15 @@ TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
             generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDatakey, counter);
 
     FLE2InsertUpdatePayloadV2 iupayload;
-    iupayload.setEdcDerivedToken(edcDatakey.toCDR());
-    iupayload.setEscDerivedToken(escDatakey.toCDR());
-    iupayload.setServerEncryptionToken(serverEncryptToken.toCDR());
-    iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken.toCDR());
+    iupayload.setEdcDerivedToken(edcDataCounterkey);
+    iupayload.setEscDerivedToken(escDataCounterkey);
+    iupayload.setServerEncryptionToken(serverEncryptToken);
+    iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken);
 
-    auto swEncryptedTokens =
-        EncryptedStateCollectionTokensV2(escDataCounterkey, boost::none).serialize(ecocToken);
-    uassertStatusOK(swEncryptedTokens);
-    ASSERT_EQ(swEncryptedTokens.getValue().size(), crypto::aesCTRIVSize + sizeof(PrfBlock));
-    iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
+    auto encryptedTokens =
+        StateCollectionTokensV2(escDataCounterkey, boost::none).encrypt(ecocToken);
+    ASSERT_EQ(encryptedTokens.toCDR().length(), crypto::aesCTRIVSize + sizeof(PrfBlock));
+    iupayload.setEncryptedTokens(std::move(encryptedTokens));
     iupayload.setIndexKeyId(indexKeyId);
 
     iupayload.setValue(value);
@@ -1787,26 +1786,26 @@ TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
 TEST(FLE_EDC, ServerSide_Payloads_V2_InvalidArgs) {
     TestKeyVault keyVault;
     auto value = ConstDataRange(0, 0);
-    auto bogusToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
     PrfBlock bogusTag;
     FLE2InsertUpdatePayloadV2 iupayload;
+    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false).encrypt({{}});
 
     iupayload.setValue(value);
     iupayload.setType(BSONType::NumberLong);
     iupayload.setContentionFactor(0);
     iupayload.setIndexKeyId(indexKeyId);
-    iupayload.setEdcDerivedToken(bogusToken.toCDR());
-    iupayload.setEscDerivedToken(bogusToken.toCDR());
-    iupayload.setServerEncryptionToken(bogusToken.toCDR());
-    iupayload.setServerDerivedFromDataToken(bogusToken.toCDR());
-    iupayload.setEncryptedTokens(bogusToken.toCDR());
+    iupayload.setEdcDerivedToken({{}});
+    iupayload.setEscDerivedToken({{}});
+    iupayload.setServerEncryptionToken({{}});
+    iupayload.setServerDerivedFromDataToken({{}});
+    iupayload.setEncryptedTokens(bogusEncryptedTokens);
 
     std::vector<EdgeTokenSetV2> tokens;
     EdgeTokenSetV2 ets;
-    ets.setEdcDerivedToken(bogusToken.toCDR());
-    ets.setEscDerivedToken(bogusToken.toCDR());
-    ets.setServerDerivedFromDataToken(bogusToken.toCDR());
-    ets.setEncryptedTokens(bogusToken.toCDR());
+    ets.setEdcDerivedToken({{}});
+    ets.setEscDerivedToken({{}});
+    ets.setServerDerivedFromDataToken({{}});
+    ets.setEncryptedTokens(bogusEncryptedTokens);
 
     tokens.push_back(ets);
     tokens.push_back(ets);
@@ -2009,16 +2008,15 @@ TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
 
     FLE2InsertUpdatePayloadV2 iupayload;
 
-    iupayload.setEdcDerivedToken(edcDatakey.toCDR());
-    iupayload.setEscDerivedToken(escDatakey.toCDR());
-    iupayload.setServerEncryptionToken(serverEncryptToken.toCDR());
-    iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken.toCDR());
+    iupayload.setEdcDerivedToken(edcDataCounterkey);
+    iupayload.setEscDerivedToken(escDataCounterkey);
+    iupayload.setServerEncryptionToken(serverEncryptToken);
+    iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken);
 
-    auto swEncryptedTokens = EncryptedStateCollectionTokensV2(escDataCounterkey, false /* isLeaf */)
-                                 .serialize(ecocToken);
-    uassertStatusOK(swEncryptedTokens);
-    ASSERT_EQ(swEncryptedTokens.getValue().size(), crypto::aesCTRIVSize + sizeof(PrfBlock) + 1);
-    iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
+    auto encryptedTokens =
+        StateCollectionTokensV2(escDataCounterkey, false /* isLeaf */).encrypt(ecocToken);
+    ASSERT_EQ(encryptedTokens.toCDR().length(), crypto::aesCTRIVSize + sizeof(PrfBlock) + 1);
+    iupayload.setEncryptedTokens(encryptedTokens);
     iupayload.setIndexKeyId(indexKeyId);
 
     iupayload.setValue(value);
@@ -2028,10 +2026,10 @@ TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
 
     std::vector<EdgeTokenSetV2> tokens;
     EdgeTokenSetV2 ets;
-    ets.setEdcDerivedToken(edcDatakey.toCDR());
-    ets.setEscDerivedToken(escDatakey.toCDR());
-    ets.setServerDerivedFromDataToken(serverDerivedFromDataToken.toCDR());
-    ets.setEncryptedTokens(swEncryptedTokens.getValue());
+    ets.setEdcDerivedToken(edcDataCounterkey);
+    ets.setEscDerivedToken(escDataCounterkey);
+    ets.setServerDerivedFromDataToken(serverDerivedFromDataToken);
+    ets.setEncryptedTokens(encryptedTokens);
 
     tokens.push_back(ets);
     tokens.push_back(ets);
@@ -2298,20 +2296,19 @@ TEST(FLE_ECOC, EncryptedTokensRoundTrip) {
 
     std::vector<boost::optional<bool>> isLeafValues({boost::none, true, false});
     for (auto optIsLeaf : isLeafValues) {
-        EncryptedStateCollectionTokensV2 encryptor{escContentionToken, optIsLeaf};
-        auto swEncryptedTokens = encryptor.serialize(ecocToken);
-        ASSERT_OK(swEncryptedTokens.getStatus());
-        ASSERT_EQ(swEncryptedTokens.getValue().size(),
+        StateCollectionTokensV2 encryptor{escContentionToken, optIsLeaf};
+        auto encryptedTokens = encryptor.encrypt(ecocToken);
+        ASSERT_EQ(encryptedTokens.toCDR().length(),
                   crypto::aesCTRIVSize + sizeof(PrfBlock) + (optIsLeaf ? 1 : 0));
 
-        auto decoded = uassertStatusOK(EncryptedStateCollectionTokensV2::decryptAndParse(
-            ecocToken, swEncryptedTokens.getValue()));
-        ASSERT_EQ(encryptor.esc, decoded.esc);
-        ASSERT_EQ(encryptor.isLeaf, decoded.isLeaf);
+        auto decoded = encryptedTokens.decrypt(ecocToken);
+        ASSERT_EQ(encryptor.getESCDerivedFromDataTokenAndContentionFactorToken(),
+                  decoded.getESCDerivedFromDataTokenAndContentionFactorToken());
+        ASSERT_EQ(encryptor.getIsLeaf(), decoded.getIsLeaf());
 
-        auto rawEcocDoc = ECOCCollection::generateDocument("foo", swEncryptedTokens.getValue());
+        auto rawEcocDoc = encryptedTokens.generateDocument("foo");
 
-        auto ecocDoc = ECOCCollection::parseAndDecryptV2(rawEcocDoc, ecocToken);
+        auto ecocDoc = ECOCCompactionDocumentV2::parseAndDecrypt(rawEcocDoc, ecocToken);
         ASSERT_EQ(ecocDoc.fieldName, "foo");
         ASSERT_EQ(ecocDoc.esc, escContentionToken);
         ASSERT_EQ(ecocDoc.isLeaf, optIsLeaf);

@@ -929,38 +929,11 @@ public:
     ECCDerivedFromDataTokenAndContentionFactorToken ecc;
 };
 
-/*
- * Values of ECOC documents in Queryable Encryption protocol version 2
- *
- * Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken)
- *
- * struct {
- *    uint8_t[32] esc;
- *    uint8_t isLeaf; // Optional: 0 or 1 for range operations, absent for equality.
- * }
- */
-struct EncryptedStateCollectionTokensV2 {
-public:
-    EncryptedStateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken s,
-                                     boost::optional<bool> leaf)
-        : esc(s), isLeaf(std::move(leaf)) {}
-    static StatusWith<EncryptedStateCollectionTokensV2> decryptAndParse(ECOCToken token,
-                                                                        ConstDataRange cdr);
-    StatusWith<std::vector<uint8_t>> serialize(ECOCToken token);
-
-    bool isEquality() const {
-        return isLeaf == boost::none;
-    }
-
-    bool isRange() const {
-        return isLeaf != boost::none;
-    }
-
-    ESCDerivedFromDataTokenAndContentionFactorToken esc;
-    boost::optional<bool> isLeaf;
-};
-
 struct ECOCCompactionDocumentV2 {
+
+    static ECOCCompactionDocumentV2 parseAndDecrypt(const BSONObj& document,
+                                                    const ECOCToken& token);
+
     bool operator==(const ECOCCompactionDocumentV2& other) const {
         return (fieldName == other.fieldName) && (esc == other.esc);
     }
@@ -983,28 +956,6 @@ struct ECOCCompactionDocumentV2 {
     ESCDerivedFromDataTokenAndContentionFactorToken esc;
     boost::optional<bool> isLeaf;
     boost::optional<AnchorPaddingRootToken> anchorPaddingRootToken;
-};
-
-/**
- * ECOC Collection schema
- * {
- *    _id : ObjectId() -- omitted so MongoDB can auto choose it
- *    fieldName : String,S
- *    value : Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken)
- * }
- *
- * where
- *  value comes from client, see EncryptedStateCollectionTokens or
- * FLE2InsertUpdatePayload.getEncryptedTokens()
- *
- * Note:
- * - ECOC is a set of documents, they are unordered
- */
-class ECOCCollection {
-public:
-    static BSONObj generateDocument(StringData fieldName, ConstDataRange payload);
-
-    static ECOCCompactionDocumentV2 parseAndDecryptV2(const BSONObj& doc, ECOCToken token);
 };
 
 /**

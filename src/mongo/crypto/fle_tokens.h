@@ -30,6 +30,8 @@
 #pragma once
 
 #include <array>
+#include <fmt/format.h>
+#include <vector>
 
 #include "mongo/base/data_range.h"
 
@@ -188,5 +190,128 @@ using ServerZerosEncryptionToken = FLEToken<FLETokenType::ServerZerosEncryptionT
 using AnchorPaddingRootToken = FLEToken<FLETokenType::AnchorPaddingRootToken>;
 using AnchorPaddingKeyToken = FLEToken<FLETokenType::AnchorPaddingKeyToken>;
 using AnchorPaddingValueToken = FLEToken<FLETokenType::AnchorPaddingValueToken>;
+
+/**
+ * Values of ECOC documents in Queryable Encryption protocol version 2
+ *
+ * Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken)
+ *
+ * struct {
+ *    uint8_t[32] esc;
+ *    uint8_t isLeaf; // Optional: 0 or 1 for range operations, absent for equality.
+ * }
+ */
+class StateCollectionTokensV2 {
+public:
+    StateCollectionTokensV2() = default;
+
+    /**
+     * Initialize ESCTV2 with an unencrypted payload of ESCToken and isLeaf.
+     * Must call encrypt() before attempting to serialize.
+     */
+    StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken s,
+                            boost::optional<bool> leaf)
+        : _esc(std::move(s)), _isLeaf(std::move(leaf)) {}
+
+    /**
+     * Return the ESCDerivedFromDataTokenAndContentionFactorToken value.
+     */
+    const ESCDerivedFromDataTokenAndContentionFactorToken&
+    getESCDerivedFromDataTokenAndContentionFactorToken() const {
+        return _esc;
+    }
+
+    /**
+     * Returns true if the encryptedToken is an equality token, false otherwise.
+     */
+    bool isEquality() const {
+        return getIsLeaf() == boost::none;
+    }
+
+    /**
+     * Returns true if the encryptedToken is a range token, false otherwise.
+     */
+    bool isRange() const {
+        return getIsLeaf() != boost::none;
+    }
+
+    /**
+     * Returns the trinary value isLeaf indicating equality(none), range-leaf(true), or
+     * range-nonleaf(false).
+     */
+    boost::optional<bool> getIsLeaf() const {
+        return _isLeaf;
+    }
+
+    /**
+     * StateCollectionTokensV2 serialized into a packed structure and encrypted.
+     */
+    class Encrypted {
+    public:
+        Encrypted() = default;
+        explicit Encrypted(std::vector<std::uint8_t> encryptedTokens)
+            : _encryptedTokens(std::move(encryptedTokens)) {
+            assertLength(_encryptedTokens.size());
+        }
+
+        static Encrypted parse(ConstDataRange encryptedTokens) {
+            std::vector<std::uint8_t> ret;
+            const auto* src = encryptedTokens.data<std::uint8_t>();
+            std::copy(src, src + encryptedTokens.length(), std::back_inserter(ret));
+            return Encrypted(std::move(ret));
+        }
+
+        /**
+         * Serialize the encrypted payload to a CDR.
+         */
+        ConstDataRange toCDR() const {
+            // Assert length on serialization to ensure we're not serializing a default object.
+            assertLength(_encryptedTokens.size());
+            return {_encryptedTokens.data(), _encryptedTokens.size()};
+        }
+
+        /**
+         * Generate a BSON document consisting of:
+         * {
+         *   "_id": OID::gen(),
+         *   "fieldName": {fieldName},
+         *   "value": {encryptedTokens},
+         * }
+         */
+        BSONObj generateDocument(StringData fieldName) const;
+
+        /**
+         * Decrypt _encryptedTokens back to esc/isLeaf using ECOCToken.
+         */
+        StateCollectionTokensV2 decrypt(const ECOCToken& token) const;
+
+    private:
+        // Encrypted payloads should be 48 or 49 bytes in length.
+        // IV(16) + PrfBlock(32) + optional-range-flag(1)
+        static constexpr std::size_t kCTRIVSize = 16;
+        static constexpr std::size_t kCipherLengthESCOnly = kCTRIVSize + sizeof(PrfBlock);
+        static constexpr std::size_t kCipherLengthESCAndLeafFlag = kCipherLengthESCOnly + 1;
+
+        static void assertLength(std::size_t sz) {
+            using namespace fmt::literals;
+            uassert(
+                ErrorCodes::BadValue,
+                "Invalid length for EncryptedStateCollectionTokensV2, expected {} or {}, got {}"_format(
+                    sizeof(PrfBlock), sizeof(PrfBlock) + 1, sz),
+                (sz == kCipherLengthESCOnly) || (sz == kCipherLengthESCAndLeafFlag));
+        }
+
+        std::vector<std::uint8_t> _encryptedTokens;
+    };
+
+    /**
+     * Encrypt _esc/_isLeaf and using ECOCToken.
+     */
+    Encrypted encrypt(const ECOCToken& token) const;
+
+private:
+    ESCDerivedFromDataTokenAndContentionFactorToken _esc;
+    boost::optional<bool> _isLeaf;
+};
 
 }  // namespace mongo

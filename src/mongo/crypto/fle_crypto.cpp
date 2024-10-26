@@ -782,15 +782,13 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2(
 
     FLE2InsertUpdatePayloadV2 iupayload;
 
-    iupayload.setEdcDerivedToken(edcDataCounterToken.toCDR());
-    iupayload.setEscDerivedToken(escDataCounterToken.toCDR());
-    iupayload.setServerEncryptionToken(serverEncryptToken.toCDR());
-    iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken.toCDR());
+    iupayload.setEncryptedTokens(
+        StateCollectionTokensV2(escDataCounterToken, boost::none).encrypt(ecocToken));
 
-    auto swEncryptedTokens =
-        EncryptedStateCollectionTokensV2(escDataCounterToken, boost::none).serialize(ecocToken);
-    uassertStatusOK(swEncryptedTokens);
-    iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
+    iupayload.setEdcDerivedToken(std::move(edcDataCounterToken));
+    iupayload.setEscDerivedToken(std::move(escDataCounterToken));
+    iupayload.setServerEncryptionToken(std::move(serverEncryptToken));
+    iupayload.setServerDerivedFromDataToken(std::move(serverDerivedFromDataToken));
 
     auto swCipherText = KeyIdAndValue::serialize(userKey, value);
     uassertStatusOK(swCipherText);
@@ -918,15 +916,13 @@ std::vector<EdgeTokenSetV2> getEdgeTokenSet(
 
         EdgeTokenSetV2 ets;
 
-        ets.setEdcDerivedToken(edcDataCounterkey.toCDR());
-        ets.setEscDerivedToken(escDataCounterkey.toCDR());
-        ets.setServerDerivedFromDataToken(serverDatakey.toCDR());
-
         const bool isLeaf = edge == edges->getLeaf();
-        auto swEncryptedTokens =
-            EncryptedStateCollectionTokensV2(escDataCounterkey, isLeaf).serialize(ecocToken);
-        uassertStatusOK(swEncryptedTokens);
-        ets.setEncryptedTokens(swEncryptedTokens.getValue());
+        ets.setEncryptedTokens(
+            StateCollectionTokensV2(escDataCounterkey, isLeaf).encrypt(ecocToken));
+
+        ets.setEdcDerivedToken(std::move(edcDataCounterkey));
+        ets.setEscDerivedToken(std::move(escDataCounterkey));
+        ets.setServerDerivedFromDataToken(std::move(serverDatakey));
 
         tokens.push_back(ets);
     }
@@ -971,15 +967,13 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForRan
 
     FLE2InsertUpdatePayloadV2 iupayload;
 
-    iupayload.setEdcDerivedToken(edcDataCounterkey.toCDR());
-    iupayload.setEscDerivedToken(escDataCounterkey.toCDR());
-    iupayload.setServerEncryptionToken(serverEncryptToken.toCDR());
-    iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken.toCDR());
+    iupayload.setEncryptedTokens(
+        StateCollectionTokensV2(escDataCounterkey, false /* isLeaf */).encrypt(ecocToken));
 
-    auto swEncryptedTokens = EncryptedStateCollectionTokensV2(escDataCounterkey, false /* isLeaf */)
-                                 .serialize(ecocToken);
-    uassertStatusOK(swEncryptedTokens);
-    iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
+    iupayload.setEdcDerivedToken(std::move(edcDataCounterkey));
+    iupayload.setEscDerivedToken(std::move(escDataCounterkey));
+    iupayload.setServerEncryptionToken(std::move(serverEncryptToken));
+    iupayload.setServerDerivedFromDataToken(std::move(serverDerivedFromDataToken));
 
     auto swCipherText = KeyIdAndValue::serialize(userKey, value);
     uassertStatusOK(swCipherText);
@@ -1412,15 +1406,12 @@ void convertServerPayload(ConstDataRange cdr,
                     isFLE2RangeIndexedSupportedType(sp.bsonType));
 
             std::vector<ServerDerivedFromDataToken> edgeDerivedTokens;
-            auto serverToken = FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
-                v2Payload.getServerEncryptionToken());
             for (auto& ets : v2Payload.getEdgeTokenSet().value()) {
-                edgeDerivedTokens.push_back(
-                    FLETokenFromCDR<FLETokenType::ServerDerivedFromDataToken>(
-                        ets.getServerDerivedFromDataToken()));
+                edgeDerivedTokens.push_back(ets.getServerDerivedFromDataToken());
             }
 
-            auto swEncrypted = sp.serialize(serverToken, edgeDerivedTokens);
+            auto swEncrypted =
+                sp.serialize(v2Payload.getServerEncryptionToken(), edgeDerivedTokens);
             uassertStatusOK(swEncrypted);
             toEncryptedBinData(fieldPath,
                                EncryptedBinDataType::kFLE2RangeIndexedValueV2,
@@ -1443,11 +1434,8 @@ void convertServerPayload(ConstDataRange cdr,
                                   << "' is not a valid type for Queryable Encryption Equality",
                     isFLE2EqualityIndexedSupportedType(sp.bsonType));
 
-            auto swEncrypted =
-                sp.serialize(FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
-                                 v2Payload.getServerEncryptionToken()),
-                             FLETokenFromCDR<FLETokenType::ServerDerivedFromDataToken>(
-                                 v2Payload.getServerDerivedFromDataToken()));
+            auto swEncrypted = sp.serialize(v2Payload.getServerEncryptionToken(),
+                                            v2Payload.getServerDerivedFromDataToken());
             uassertStatusOK(swEncrypted);
             toEncryptedBinData(fieldPath,
                                EncryptedBinDataType::kFLE2EqualityIndexedValueV2,
@@ -2091,65 +2079,59 @@ StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokens::serialize(ECOCT
     return packAndEncrypt(std::tie(esc.data, ecc.data), token);
 }
 
-StatusWith<EncryptedStateCollectionTokensV2> EncryptedStateCollectionTokensV2::decryptAndParse(
-    ECOCToken token, ConstDataRange cdr) {
+StateCollectionTokensV2 StateCollectionTokensV2::Encrypted::decrypt(const ECOCToken& token) const
+    try {
+    assertLength(_encryptedTokens.size());
+    const bool expectLeaf = _encryptedTokens.size() == kCipherLengthESCAndLeafFlag;
 
-    // Ciphertext encodes precisely one PrfBlock (ESC) plus an optional octet for isLeaf.
-    constexpr std::size_t kCipherLengthESCOnly = crypto::aesCTRIVSize + sizeof(PrfBlock);
-    constexpr std::size_t kCipherLengthESCAndLeafFlag = kCipherLengthESCOnly + 1;
-    const bool expectLeaf = cdr.length() == kCipherLengthESCAndLeafFlag;
-    if (!expectLeaf && (cdr.length() != kCipherLengthESCOnly)) {
-        return Status(
-            ErrorCodes::BadValue,
-            "Invalid ciphertext for ESCTokensV2, length should be {} or {}, got {}"_format(
-                kCipherLengthESCOnly, kCipherLengthESCAndLeafFlag, cdr.length()));
-    }
-
-    auto swVec = FLEUtil::decryptData(token.toCDR(), cdr);
-    if (!swVec.isOK()) {
-        return swVec.getStatus();
-    }
-
-    auto& data = swVec.getValue();
+    auto data = uassertStatusOK(FLEUtil::decryptData(token.toCDR(), toCDR()));
     ConstDataRangeCursor cdrc(data);
-
-    auto swToken = cdrc.readAndAdvanceNoThrow<PrfBlock>();
-    if (!swToken.isOK()) {
-        return swToken.getStatus();
-    }
-    auto escToken = ESCDerivedFromDataTokenAndContentionFactorToken(swToken.getValue());
+    auto rawESCToken = cdrc.readAndAdvance<PrfBlock>();
+    auto escToken = ESCDerivedFromDataTokenAndContentionFactorToken(std::move(rawESCToken));
 
     boost::optional<bool> isLeaf;
     if (expectLeaf) {
-        auto swLeaf = cdrc.readAndAdvanceNoThrow<uint8_t>();
-        if (!swLeaf.isOK()) {
-            // Should be impossible given expectLeaf length check above.
-            return swLeaf.getStatus().withContext("Unable to read ESCTokensV2::isLeaf");
-        }
-        auto leafVal = std::move(swLeaf.getValue());
-        if ((leafVal != 0) && (leafVal != 1)) {
-            return Status(ErrorCodes::BadValue,
-                          "Invalid value for ESCTokensV2 leaf tag {}"_format(leafVal));
-        }
+        auto leaf = cdrc.readAndAdvance<uint8_t>();
+        uassert(ErrorCodes::BadValue,
+                "Invalid value for ESCTokensV2 leaf tag {}"_format(leaf),
+                (leaf == 0) || (leaf == 1));
 
-        isLeaf = !!leafVal;
+        isLeaf = !!leaf;
     }
 
-    return EncryptedStateCollectionTokensV2(std::move(escToken), isLeaf);
+    return StateCollectionTokensV2(std::move(escToken), std::move(isLeaf));
+
+} catch (const DBException& ex) {
+    uassertStatusOK(ex.toStatus().withContext("Failed decrypting StateCollectionTokensV2"));
+    MONGO_UNREACHABLE;
 }
 
-StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokensV2::serialize(ECOCToken token) {
-    if (isLeaf) {
-        // Range
-        auto escCDR = esc.toCDR();
-        DataBuilder builder(escCDR.length() + 1);
-        uassertStatusOK(builder.writeAndAdvance(escCDR));
-        uassertStatusOK(builder.writeAndAdvance(*isLeaf));
-        return encryptData(token.toCDR(), builder.getCursor());
+StateCollectionTokensV2::Encrypted StateCollectionTokensV2::encrypt(const ECOCToken& token) const
+    try {
+    std::vector<std::uint8_t> encryptedTokens;
+    if (isRange()) {
+        DataBuilder builder(sizeof(PrfBlock) + 1);
+        uassertStatusOK(builder.writeAndAdvance(_esc.toCDR()));
+        uassertStatusOK(builder.writeAndAdvance(*_isLeaf));
+        encryptedTokens = uassertStatusOK(encryptData(token.toCDR(), builder.getCursor()));
     } else {
         // Equality
-        return encryptData(token.toCDR(), esc.toCDR());
+        encryptedTokens = uassertStatusOK(encryptData(token.toCDR(), _esc.toCDR()));
     }
+
+    return StateCollectionTokensV2::Encrypted(std::move(encryptedTokens));
+} catch (const DBException& ex) {
+    uassertStatusOK(ex.toStatus().withContext("Failed encrypting StateCollectionTokensV2"));
+    MONGO_UNREACHABLE;
+}
+
+BSONObj StateCollectionTokensV2::Encrypted::generateDocument(StringData fieldName) const {
+    assertLength(_encryptedTokens.size());
+    BSONObjBuilder builder;
+    builder.append(kId, OID::gen());
+    builder.append(kFieldName, fieldName);
+    toBinData(kValue, toCDR(), &builder);
+    return builder.obj();
 }
 
 FLEKeyVault::~FLEKeyVault() {}
@@ -2863,10 +2845,10 @@ FLE2FindEqualityPayloadV2 FLEClientCrypto::serializeFindPayloadV2(FLEIndexKeyAnd
 
     FLE2FindEqualityPayloadV2 payload;
 
-    payload.setEdcDerivedToken(edcDatakey.toCDR());
-    payload.setEscDerivedToken(escDatakey.toCDR());
+    payload.setEdcDerivedToken(std::move(edcDatakey));
+    payload.setEscDerivedToken(std::move(escDatakey));
     payload.setMaxCounter(maxContentionFactor);
-    payload.setServerDerivedFromDataToken(serverDataDerivedToken.toCDR());
+    payload.setServerDerivedFromDataToken(std::move(serverDataDerivedToken));
 
     return payload;
 }
@@ -2893,15 +2875,13 @@ FLE2FindRangePayloadV2 FLEClientCrypto::serializeFindRangePayloadV2(
 
         EdgeFindTokenSetV2 tokenSet;
         tokenSet.setEdcDerivedToken(
-            FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value)
-                .toCDR());
+            FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value));
 
         tokenSet.setEscDerivedToken(
-            FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value)
-                .toCDR());
+            FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value));
         tokenSet.setServerDerivedFromDataToken(
-            FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(serverToken, value)
-                .toCDR());
+            FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(serverToken,
+                                                                                 value));
         tokens.push_back(std::move(tokenSet));
     }
 
@@ -2968,26 +2948,18 @@ boost::optional<uint64_t> ECCCollection::emuBinary(const FLEStateCollectionReade
         reader, tagToken, valueToken);
 }
 
-BSONObj ECOCCollection::generateDocument(StringData fieldName, ConstDataRange payload) {
-    BSONObjBuilder builder;
-    builder.append(kId, OID::gen());
-    builder.append(kFieldName, fieldName);
-    toBinData(kValue, payload, &builder);
-    return builder.obj();
-}
-
-ECOCCompactionDocumentV2 ECOCCollection::parseAndDecryptV2(const BSONObj& doc, ECOCToken token) {
+ECOCCompactionDocumentV2 ECOCCompactionDocumentV2::parseAndDecrypt(const BSONObj& doc,
+                                                                   const ECOCToken& token) {
     IDLParserContext ctx("root");
     auto ecocDoc = EcocDocument::parse(ctx, doc);
 
-    auto swTokens = EncryptedStateCollectionTokensV2::decryptAndParse(token, ecocDoc.getValue());
-    uassertStatusOK(swTokens);
-    auto& keys = swTokens.getValue();
+    // The ecocDoc from EcocDocument::parse is const, so make a copy when decrypting.
+    auto keys = StateCollectionTokensV2::Encrypted(ecocDoc.getValue()).decrypt(token);
 
     ECOCCompactionDocumentV2 ret;
     ret.fieldName = ecocDoc.getFieldName().toString();
-    ret.esc = keys.esc;
-    ret.isLeaf = keys.isLeaf;
+    ret.esc = keys.getESCDerivedFromDataTokenAndContentionFactorToken();
+    ret.isLeaf = keys.getIsLeaf();
     return ret;
 }
 
@@ -3652,9 +3624,8 @@ PrfBlock EDCServerCollection::generateTag(EDCTwiceDerivedToken edcTwiceDerived, 
 }
 
 PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
-    auto token = FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
+    auto edcTwiceDerived = FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
         payload.payload.getEdcDerivedToken());
-    auto edcTwiceDerived = FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(token);
     dassert(payload.isRangePayload() == false);
     dassert(payload.counts.size() == 1);
     return generateTag(edcTwiceDerived, payload.counts[0]);
@@ -3677,8 +3648,7 @@ std::vector<PrfBlock> EDCServerCollection::generateTags(const EDCServerPayloadIn
 
     for (size_t i = 0; i < edgeTokenSets.size(); i++) {
         auto edcTwiceDerived = FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
-            FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
-                edgeTokenSets[i].getEdcDerivedToken()));
+            edgeTokenSets[i].getEdcDerivedToken());
         tags.push_back(EDCServerCollection::generateTag(edcTwiceDerived, rangePayload.counts[i]));
     }
     return tags;
@@ -3969,10 +3939,10 @@ ParsedFindEqualityPayload::ParsedFindEqualityPayload(ConstDataRange cdr) {
 
     auto payload = parseFromCDR<FLE2FindEqualityPayloadV2>(subCdr);
 
-    escToken = FLETokenFromCDR<FLETokenType::ESCDerivedFromDataToken>(payload.getEscDerivedToken());
-    edcToken = FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(payload.getEdcDerivedToken());
-    serverDataDerivedToken = FLETokenFromCDR<FLETokenType::ServerDerivedFromDataToken>(
-        payload.getServerDerivedFromDataToken());
+    escToken = payload.getEscDerivedToken();
+    edcToken = payload.getEdcDerivedToken();
+    serverDataDerivedToken = payload.getServerDerivedFromDataToken();
+
     maxCounter = payload.getMaxCounter();
 }
 
@@ -4010,13 +3980,9 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
     auto& info = payload.getPayload().value();
 
     for (auto const& edge : info.getEdges()) {
-        auto escToken =
-            FLETokenFromCDR<FLETokenType::ESCDerivedFromDataToken>(edge.getEscDerivedToken());
-        auto edcToken =
-            FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(edge.getEdcDerivedToken());
-        auto serverDataDerivedToken = FLETokenFromCDR<FLETokenType::ServerDerivedFromDataToken>(
-            edge.getServerDerivedFromDataToken());
-        edgesRef.push_back({edcToken, escToken, serverDataDerivedToken});
+        edgesRef.push_back({edge.getEdcDerivedToken(),
+                            edge.getEscDerivedToken(),
+                            edge.getServerDerivedFromDataToken()});
     }
 
     maxCounter = info.getMaxCounter();
