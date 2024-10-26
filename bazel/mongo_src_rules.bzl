@@ -300,21 +300,6 @@ SASL_WINDOWS_COPTS = select({
     "//conditions:default": [],
 })
 
-SASL_WINDOWS_LINKFLAGS = select({
-    "@platforms//os:windows": ["/LIBPATH:external/windows_sasl/lib"],
-    "//conditions:default": [],
-})
-
-SASL_WINDOWS_LIB_FILES = select({
-    "@platforms//os:windows": ["@windows_sasl//:libraries"],
-    "//conditions:default": [],
-})
-
-SASL_WINDOWS_INCLUDE_FILES = select({
-    "@platforms//os:windows": ["@windows_sasl//:includes"],
-    "//conditions:default": [],
-})
-
 WINDOWS_LINKFLAGS = (
     WINDOWS_DEFAULT_LINKFLAGS +
     WINDOWS_PDB_PAGE_SIZE_LINKOPT +
@@ -1204,18 +1189,10 @@ COVERAGE_FLAGS = select({
 MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc",
     "-I$(GENDIR)/src",
-    "-Isrc/third_party/immer/dist",
-    "-Isrc/third_party/SafeInt",
     "-I$(GENDIR)/src/mongo/db/modules/enterprise/src",
     "-Isrc/mongo/db/modules/enterprise/src",
     "-Isrc/third_party/valgrind/include",
 ]
-
-MONGO_GLOBAL_ACCESSIBLE_HEADERS = [
-    "//src/third_party/immer:headers",
-    "//src/third_party/SafeInt:headers",
-    "//src/third_party/valgrind/include/valgrind:valgrind.h",
-] + SASL_WINDOWS_INCLUDE_FILES
 
 MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/abseil-cpp:absl_base",
@@ -1225,6 +1202,10 @@ MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/libstemmer_c:stemmer",
     "//src/third_party/murmurhash3:murmurhash3",
     "//src/third_party/tomcrypt-1.18.2:tomcrypt",
+    "//src/third_party/immer:headers",
+    "//src/third_party/SafeInt:headers",
+    "//src/third_party/sasl:windows_sasl",
+    "//src/third_party/valgrind:headers",
 ]
 
 MONGO_GLOBAL_DEFINES = (
@@ -1298,11 +1279,10 @@ MONGO_GLOBAL_LINKFLAGS = (
     DISABLE_SOURCE_WARNING_AS_ERRORS_LINKFLAGS +
     THIN_LTO_FLAGS +
     SYMBOL_ORDER_LINKFLAGS +
-    SASL_WINDOWS_LINKFLAGS +
     COVERAGE_FLAGS
 )
 
-MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES + SASL_WINDOWS_LIB_FILES
+MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
 
 MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES + OVERLOADED_VIRTUAL_FEATURES + DISABLE_DEBUGGING_SYMBOLS_FEATURE
 
@@ -1528,7 +1508,7 @@ def mongo_cc_library(
     cc_library(
         name = name + SHARED_ARCHIVE_SUFFIX,
         srcs = srcs + SANITIZER_DENYLIST_HEADERS,
-        hdrs = hdrs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS,
+        hdrs = hdrs + fincludes_hdr,
         deps = deps + cc_deps + [name + HEADER_DEP_SUFFIX],
         textual_hdrs = textual_hdrs,
         visibility = visibility,
@@ -1552,7 +1532,7 @@ def mongo_cc_library(
     cc_library(
         name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs + SANITIZER_DENYLIST_HEADERS,
-        hdrs = hdrs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS,
+        hdrs = hdrs + fincludes_hdr,
         deps = deps + cc_deps + [name + HEADER_DEP_SUFFIX],
         textual_hdrs = textual_hdrs,
         visibility = visibility,
@@ -1685,7 +1665,7 @@ def _mongo_cc_binary_and_program(
 
     args = {
         "name": name + WITH_DEBUG_SUFFIX,
-        "srcs": srcs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS + SANITIZER_DENYLIST_HEADERS,
+        "srcs": srcs + fincludes_hdr + SANITIZER_DENYLIST_HEADERS,
         "deps": all_deps + [name + HEADER_DEP_SUFFIX],
         "visibility": visibility,
         "testonly": testonly,

@@ -4,8 +4,8 @@ package(default_visibility = ["//visibility:public"])
 
 mongo_cc_library(
     name = "headers",
-    hdrs = glob([
-        "dist/immer/**/*.hpp",
-    ]),
-    includes = ["dist"],
+    hdrs = [
+        "include/valgrind/valgrind.h",
+    ],
+    includes = ["valgrind/include"],
 )

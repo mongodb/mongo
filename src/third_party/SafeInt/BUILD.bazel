@@ -1,9 +1,11 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
-filegroup(
+mongo_cc_library(
     name = "headers",
-    srcs = [
+    hdrs = [
         "SafeInt.hpp",
     ],
-    visibility = ["//visibility:public"],
+    includes = ["."],
 )
