@@ -2,6 +2,11 @@
 // All V2 2dsphere indices are sparse in the geo fields.
 //
 // @tags: [
+//   # Some passthrough suites assume that consecutive CRUD operations can be grouped into
+//   # a transaction that is short enough to succeed despite periodic stepdowns.
+//   # Having several bulk inserts in a row violates this assumption: the retries take
+//   # long enough that they will never succeed: they will always be interrupted by the stepdown.
+//   operations_longer_than_stepdown_interval_in_txns,
 // ]
 
 const collNamePrefix = 'geo_s2sparse_';
