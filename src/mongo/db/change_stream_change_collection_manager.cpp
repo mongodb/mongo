@@ -79,7 +79,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -99,8 +98,6 @@
 
 namespace mongo {
 namespace {
-MONGO_FAIL_POINT_DEFINE(changeCollectionTruncateOnlyOnSecondaries);
-
 const auto getChangeCollectionManager =
     ServiceContext::declareDecoration<boost::optional<ChangeStreamChangeCollectionManager>>();
 
@@ -217,38 +214,6 @@ boost::optional<BSONObj> createChangeCollectionEntryFromOplog(const BSONObj& opl
     auto readyChangeCollDoc = changeCollDoc.freeze();
     return readyChangeCollDoc.toBson();
 }
-
-bool usesUnreplicatedTruncates() {
-    // (Ignore FCV check): This feature flag is potentially backported to previous version of the
-    // server. We can't rely on the FCV version to see whether it's enabled or not.
-    return feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
-        .isEnabledAndIgnoreFCVUnsafe();
-}
-
-/**
- * Truncate ranges must be consistent data - no record within a truncate range should be written
- * after the truncate. Otherwise, the data viewed by an open change stream could be corrupted,
- * only seeing part of the range post truncate. The node can either be a secondary or primary at
- * this point. Restrictions must be in place to ensure consistent ranges in both scenarios.
- *      - Primaries can't truncate past the 'allDurable' Timestamp. 'allDurable'
- *      guarantees out-of-order writes on the primary don't leave oplog holes.
- *
- *      - Secondaries can't truncate past the 'lastApplied' timestamp. Within an oplog batch,
- *      entries are applied out of order, thus truncate markers may be created before the entire
- *      batch is finished.
- *      The 'allDurable' Timestamp is not sufficient given it is computed from within WT, which
- *      won't always know there are entries with opTime < 'allDurable' which have yet to enter
- *      the storage engine during secondary oplog application.
- *
- * Returns the maximum 'ts' a change collection document is allowed to have in order to be safely
- * truncated.
- **/
-Timestamp getMaxTSEligibleForTruncate(OperationContext* opCtx) {
-    Timestamp allDurable =
-        Timestamp(opCtx->getServiceContext()->getStorageEngine()->getAllDurableTimestamp());
-    auto lastAppliedOpTime = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
-    return std::min(lastAppliedOpTime.getTimestamp(), allDurable);
-}
 }  // namespace
 
 /**
@@ -257,16 +222,10 @@ Timestamp getMaxTSEligibleForTruncate(OperationContext* opCtx) {
  */
 class ChangeStreamChangeCollectionManager::ChangeCollectionsWriterInternal {
 public:
-    explicit ChangeCollectionsWriterInternal(
-        OperationContext* opCtx,
-        OpDebug* opDebug,
-        const AutoGetChangeCollection::AccessMode& accessMode,
-        ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>* map)
-        : _accessMode{accessMode},
-          _opCtx{opCtx},
-          _opDebug{opDebug},
-          _tenantTruncateMarkersMap(map) {}
-
+    explicit ChangeCollectionsWriterInternal(OperationContext* opCtx,
+                                             OpDebug* opDebug,
+                                             const AutoGetChangeCollection::AccessMode& accessMode)
+        : _accessMode{accessMode}, _opCtx{opCtx}, _opDebug{opDebug} {}
     /**
      * Adds the insert statement for the provided tenant that will be written to the change
      * collection when the 'write()' method is called.
@@ -363,30 +322,6 @@ public:
             tenantWriteStats.docsInserted++;
         }
 
-        for (auto&& [tenantId, autoGetChangeColl] : _tenantToChangeCollectionMap) {
-            // Only update the TruncateMarkers if the change collection exists.
-            if (auto& tenantChangeCollection = *autoGetChangeColl; tenantChangeCollection) {
-                std::shared_ptr<ChangeCollectionTruncateMarkers> truncateMarkers =
-                    usesUnreplicatedTruncates()
-                    ? _tenantTruncateMarkersMap->find(tenantChangeCollection->uuid())
-                    : nullptr;
-
-                // We update the TruncateMarkers instance if it exists. Creation
-                // is performed asynchronously by the remover thread.
-                if (truncateMarkers) {
-                    const auto& tenantWriteStats = tenantToWriteStatsMap[tenantId];
-                    if (tenantWriteStats.bytesInserted > 0) {
-                        truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(
-                            _opCtx,
-                            tenantWriteStats.bytesInserted,
-                            tenantWriteStats.maxRecordIdSeen,
-                            tenantWriteStats.maxWallTimeSeen,
-                            tenantWriteStats.docsInserted);
-                    }
-                }
-            }
-        }
-
         return Status::OK();
     }
 
@@ -440,23 +375,19 @@ private:
 
     // Indicates if locks have been acquired.
     bool _locksAcquired{false};
-
-    ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>*
-        _tenantTruncateMarkersMap;
 };
 
 ChangeStreamChangeCollectionManager::ChangeCollectionsWriter::ChangeCollectionsWriter(
     OperationContext* opCtx,
     std::vector<InsertStatement>::const_iterator beginOplogEntries,
     std::vector<InsertStatement>::const_iterator endOplogEntries,
-    OpDebug* opDebug,
-    ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>* tenantMarkerMap) {
+    OpDebug* opDebug) {
     // This method must be called within a 'WriteUnitOfWork'. The caller must be responsible for
     // commiting the unit of work.
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     _writer = std::make_unique<ChangeCollectionsWriterInternal>(
-        opCtx, opDebug, AutoGetChangeCollection::AccessMode::kWrite, tenantMarkerMap);
+        opCtx, opDebug, AutoGetChangeCollection::AccessMode::kWrite);
 
     // Transform oplog entries to change collections entries and group them by tenant id.
     for (auto oplogEntryIter = beginOplogEntries; oplogEntryIter != endOplogEntries;
@@ -496,8 +427,7 @@ ChangeStreamChangeCollectionManager::createChangeCollectionsWriter(
     std::vector<InsertStatement>::const_iterator beginOplogEntries,
     std::vector<InsertStatement>::const_iterator endOplogEntries,
     OpDebug* opDebug) {
-    return ChangeCollectionsWriter{
-        opCtx, beginOplogEntries, endOplogEntries, opDebug, &_tenantTruncateMarkersMap};
+    return ChangeCollectionsWriter{opCtx, beginOplogEntries, endOplogEntries, opDebug};
 }
 
 BSONObj ChangeStreamChangeCollectionManager::PurgingJobStats::toBSON() const {
@@ -542,23 +472,6 @@ void ChangeStreamChangeCollectionManager::dropChangeCollection(OperationContext*
                                                                const TenantId& tenantId) {
     DropReply dropReply;
     const auto changeCollNss = NamespaceString::makeChangeCollectionNSS(tenantId);
-
-    const bool useUnreplicatedDeletes = usesUnreplicatedTruncates();
-    // We get the UUID now in order to remove the collection from the map later. We can't get the
-    // UUID once the collection has been dropped.
-    auto collUUID = [&]() -> boost::optional<UUID> {
-        if (!useUnreplicatedDeletes) {
-            // Won't update the truncate markers map so no need to get the UUID.
-            return boost::none;
-        }
-        AutoGetDb lk(opCtx, changeCollNss.dbName(), MODE_IS);
-        auto collection =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, changeCollNss);
-        if (collection) {
-            return collection->uuid();
-        }
-        return boost::none;
-    }();
     const auto status =
         dropCollection(opCtx,
                        changeCollNss,
@@ -568,12 +481,6 @@ void ChangeStreamChangeCollectionManager::dropChangeCollection(OperationContext*
             str::stream() << "Failed to drop change collection: "
                           << changeCollNss.toStringForErrorMsg() << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceNotFound);
-
-    if (useUnreplicatedDeletes && collUUID) {
-        // Remove the collection from the TruncateMarkers map. As we are dropping the collection
-        // there's no need to keep it for the remover. Data will be deleted anyways.
-        _tenantTruncateMarkersMap.erase(*collUUID);
-    }
 }
 
 void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
@@ -587,10 +494,7 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     ChangeCollectionsWriterInternal changeCollectionsWriter{
-        opCtx,
-        nullptr /*opDebug*/,
-        AutoGetChangeCollection::AccessMode::kWriteInOplogContext,
-        &_tenantTruncateMarkersMap};
+        opCtx, nullptr /*opDebug*/, AutoGetChangeCollection::AccessMode::kWriteInOplogContext};
 
     for (size_t idx = 0; idx < oplogRecords.size(); idx++) {
         auto& record = oplogRecords[idx];
@@ -676,228 +580,11 @@ size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocume
             batchedDeleteStats.docsDeleted);
         changeCollectionManager.getPurgingJobStats().bytesDeleted.fetchAndAddRelaxed(
             batchedDeleteStats.bytesDeleted);
-
-        // As we are using collection scans this means we aren't using truncate markers. Clear the
-        // map since they will not get updated anyways. The markers will get recreated if the
-        // feature flag is turned on again.
-        changeCollectionManager._tenantTruncateMarkersMap.clear();
-
         return batchedDeleteStats.docsDeleted;
     } catch (const ExceptionFor<ErrorCodes::QueryPlanKilled>&) {
         // It is expected that a collection drop can kill a query plan while deleting an old
         // document, so ignore this error.
         return 0;
     }
-}
-
-namespace {
-std::shared_ptr<ChangeCollectionTruncateMarkers> initialiseTruncateMarkers(
-    OperationContext* opCtx,
-    const CollectionAcquisition& changeCollection,
-    ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>& truncateMap) {
-    const auto& ns = changeCollection.nss();
-
-    auto minBytesPerMarker = gChangeCollectionTruncateMarkersMinBytes;
-
-    YieldableCollectionIterator iterator{opCtx, changeCollection};
-
-    CollectionTruncateMarkers::InitialSetOfMarkers initialSetOfMarkers =
-        CollectionTruncateMarkers::createFromCollectionIterator(
-            opCtx, iterator, ns, minBytesPerMarker, [](const Record& record) {
-                const auto obj = record.data.toBson();
-                auto wallTime = obj[repl::OplogEntry::kWallClockTimeFieldName].Date();
-                return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, wallTime};
-            });
-    // Leftover bytes contains the difference between the amount of bytes we had for the
-    // markers and the latest collection size/count. This is susceptible to a race
-    // condition, but metrics are already assumed to be approximate. Ignoring this issue is
-    // a valid strategy here.
-    auto truncateMarkers = truncateMap.getOrEmplace(changeCollection.uuid(),
-                                                    *ns.tenantId(),
-                                                    std::move(initialSetOfMarkers.markers),
-                                                    initialSetOfMarkers.leftoverRecordsCount,
-                                                    initialSetOfMarkers.leftoverRecordsBytes,
-                                                    minBytesPerMarker);
-
-    auto backScan = InternalPlanner::collectionScan(opCtx,
-                                                    changeCollection,
-                                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                    InternalPlanner::BACKWARD);
-    // Update the truncate markers with the last collection entry's RecordId and wall time.
-    // This is necessary for correct marker expiration. Otherwise the highest seen points
-    // would be null. Nothing would expire since we have to maintain the last entry in the
-    // change collection and null RecordId < any initialised RecordId. This would only get
-    // fixed once an entry has been inserted, initialising the data points.
-    RecordId rId;
-    BSONObj doc;
-    if (backScan->getNext(&doc, &rId) == PlanExecutor::ADVANCED) {
-        auto wallTime = doc[repl::OplogEntry::kWallClockTimeFieldName].Date();
-        truncateMarkers->performPostInitialisation(rId, wallTime);
-    }
-
-    return truncateMarkers;
-}
-
-Timestamp recordIdToTimestamp(const RecordId& rid) {
-    static constexpr auto kTopLevelFieldName = "ridAsBSON"_sd;
-    auto ridAsNestedBSON = record_id_helpers::toBSONAs(rid, kTopLevelFieldName);
-    auto t = ridAsNestedBSON.getField(kTopLevelFieldName).timestamp();
-    return t;
-}
-
-auto acquireChangeCollectionForWrite(OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) {
-    return acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(std::move(nssOrUUID),
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-}
-
-/**
- * Given a 'tenantId', establishes the collection UUID for the tenant's change collection, and the
- * associated truncate markers in 'truncateMap'. Returns a tuple with a NamespaceStringOrUUID
- * containing the collection UUID, and the shared_ptr to ChangeCollectionTruncateMarkers. The caller
- * must use the returned UUID to perform a collection acquisition to ensure the collection is still
- * the same, and that it is correct to truncate based on the returned
- * ChangeCollectionTruncateMarkers.
- */
-auto establishCollUUIDAndTruncateMarkers(
-    OperationContext* opCtx,
-    const TenantId& tenantId,
-    ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>& truncateMap) {
-    const auto nss = NamespaceString::makeChangeCollectionNSS(tenantId);
-    return writeConflictRetry(opCtx, "initialise change collection truncate markers", nss, [&] {
-        auto changeCollection = acquireChangeCollectionForWrite(opCtx, nss);
-
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Tenant change collection not found. Namespace: "
-                              << nss.toStringForErrorMsg(),
-                changeCollection.exists());
-
-        const auto& changeCollectionPtr = changeCollection.getCollectionPtr();
-        auto truncateMarkers = truncateMap.find(changeCollectionPtr->uuid());
-        // No marker means it's a new collection, or we've just performed startup.
-        // Initialize the TruncateMarkers instance.
-        if (!truncateMarkers) {
-            truncateMarkers = initialiseTruncateMarkers(opCtx, changeCollection, truncateMap);
-        }
-        return std::make_tuple(NamespaceStringOrUUID{nss.dbName(), changeCollectionPtr->uuid()},
-                               truncateMarkers);
-    });
-}
-
-void expirePartialMarker(OperationContext* opCtx,
-                         const NamespaceStringOrUUID& dbAndUUID,
-                         ChangeCollectionTruncateMarkers* const truncateMarkers) {
-    writeConflictRetry(opCtx, "expire partial marker", dbAndUUID, [&] {
-        auto changeCollection = acquireChangeCollectionForWrite(opCtx, dbAndUUID);
-        const auto& changeCollectionPtr = changeCollection.getCollectionPtr();
-        truncateMarkers->expirePartialMarker(opCtx, changeCollectionPtr.get());
-    });
-}
-
-}  // namespace
-
-void ChangeStreamChangeCollectionManager::_removeExpiredMarkers(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& dbAndUUID,
-    ChangeCollectionTruncateMarkers* const truncateMarkers,
-    int64_t& numRecordsDeletedAccum) {
-
-    const Timestamp maxTSEligibleForTruncate = getMaxTSEligibleForTruncate(opCtx);
-    while (auto marker = truncateMarkers->peekOldestMarkerIfNeeded(opCtx)) {
-        if (recordIdToTimestamp(marker->lastRecord) > maxTSEligibleForTruncate) {
-            // The truncate marker contains part of a data range not yet consistent
-            // (i.e. there could be oplog holes or partially applied ranges of the oplog in the
-            // range).
-            break;
-        }
-
-        writeConflictRetry(opCtx, "truncate change collection", dbAndUUID, [&] {
-            shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
-            auto changeCollection = acquireChangeCollectionForWrite(opCtx, dbAndUUID);
-            WriteUnitOfWork wuow(opCtx);
-
-            auto bytesDeleted = marker->bytes;
-            auto docsDeleted = marker->records;
-
-            const auto rs = changeCollection.getCollectionPtr()->getRecordStore();
-            auto status =
-                rs->rangeTruncate(opCtx,
-                                  // Truncate from the beginning of the collection, this will
-                                  // cover cases where some leftover documents are present.
-                                  RecordId(),
-                                  marker->lastRecord,
-                                  -bytesDeleted,
-                                  -docsDeleted);
-            invariantStatusOK(status);
-
-            wuow.commit();
-
-            truncateMarkers->popOldestMarker();
-            numRecordsDeletedAccum += docsDeleted;
-
-            _purgingJobStats.docsDeleted.fetchAndAddRelaxed(docsDeleted);
-            _purgingJobStats.bytesDeleted.fetchAndAddRelaxed(bytesDeleted);
-
-            auto millisWallTime = marker->wallTime.toMillisSinceEpoch();
-            if (_purgingJobStats.maxStartWallTimeMillis.load() < millisWallTime) {
-                _purgingJobStats.maxStartWallTimeMillis.store(millisWallTime);
-            }
-        });
-    }
-}
-
-size_t ChangeStreamChangeCollectionManager::_removeExpiredChangeCollectionsDocumentsWithTruncate(
-    OperationContext* opCtx, const TenantId& tenantId) {
-
-    if (MONGO_unlikely(changeCollectionTruncateOnlyOnSecondaries.shouldFail()) &&
-        repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
-            repl::MemberState::RS_PRIMARY) {
-        return 0;
-    }
-
-    int64_t numRecordsDeleted = 0;
-    bool shouldWarn = false;
-    try {
-        // Initialize truncate markers if necessary, and fetch collection UUID. After this point, we
-        // must use UUID to acquire the collection to ensure it has not been recreated.
-        const auto [dbAndUUID, truncateMarkers] =
-            establishCollUUIDAndTruncateMarkers(opCtx, tenantId, _tenantTruncateMarkersMap);
-
-        // Only log a warning if the collection is dropped after the initial check.
-        shouldWarn = true;
-
-        // Even if the collection is concurrently dropped, we hold a shared_ptr to truncateMarkers,
-        // and the object remains valid. After attempting to acquire by UUID, and verifying the
-        // collection does no longer exist, we'll just exit.
-        _removeExpiredMarkers(opCtx, dbAndUUID, truncateMarkers.get(), numRecordsDeleted);
-
-        // We now create a partial marker that will shift the last entry to the next marker if
-        // it's present there. This will allow us to expire all entries up to the last one.
-        expirePartialMarker(opCtx, dbAndUUID, truncateMarkers.get());
-
-        // Second pass to remove the potentially new partial marker.
-        _removeExpiredMarkers(opCtx, dbAndUUID, truncateMarkers.get(), numRecordsDeleted);
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-        // Do nothing. We'll just return the numRecordsDeleted up to the point where the collection
-        // was dropped.
-        if (shouldWarn) {
-            LOGV2_WARNING(8203100,
-                          "change collection dropped while truncating expired documents",
-                          "reason"_attr = ex.reason(),
-                          "tenantId"_attr = tenantId);
-        }
-    }
-    return numRecordsDeleted;
-}
-
-size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocumentsWithTruncate(
-    OperationContext* opCtx, const TenantId& tenantId) {
-    auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
-    return changeCollectionManager._removeExpiredChangeCollectionsDocumentsWithTruncate(opCtx,
-                                                                                        tenantId);
 }
 }  // namespace mongo

@@ -73,18 +73,6 @@ server_parameters:
     default: 10
     redact: false
 
-  changeCollectionTruncateMarkersMinBytes:
-    description: "Server parameter that specifies the minimum number of bytes contained in each
-    truncate marker for change collections. This is only used if
-    featureFlagUseUnreplicatedTruncatesForDeletions is enabled"
-    set_at: startup
-    cpp_varname: gChangeCollectionTruncateMarkersMinBytes
-    cpp_vartype: int32_t
-    default: 33_554_432  # 32 MiB
-    validator:
-      gt: 0
-    redact: false
-
   disableExpiredChangeCollectionRemover:
       description: Disables the expired change collection remover.
       set_at: [ startup ]

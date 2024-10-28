@@ -9,7 +9,6 @@
       fixture:
         mongod_options:
           set_parameters:
-            changeCollectionTruncateMarkersMinBytes: 4096 # 4KiB
             changeCollectionExpiredDocumentsRemoverJobSleepSeconds: 1
 
 - name: exclusions

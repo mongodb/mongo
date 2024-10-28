@@ -2757,13 +2757,10 @@ mongo_cc_library(
 mongo_cc_library(
     name = "change_stream_change_collection_manager",
     srcs = [
-        "change_collection_truncate_markers.cpp",
         "change_stream_change_collection_manager.cpp",
     ],
     hdrs = [
-        "change_collection_truncate_markers.h",
         "change_stream_change_collection_manager.h",
-        "//src/mongo/util:concurrent_shared_values_map.h",
     ],
     deps = [
         ":change_stream_serverless_helpers",

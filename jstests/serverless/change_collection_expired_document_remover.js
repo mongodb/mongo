@@ -27,10 +27,8 @@ const kMinBytesPerMarker = 1;
 const replSet = new ChangeStreamMultitenantReplicaSetTest({
     nodes: 2,
     nodeOptions: {
-        setParameter: {
-            changeCollectionTruncateMarkersMinBytes: kMinBytesPerMarker,
-            changeCollectionExpiredDocumentsRemoverJobSleepSeconds: kExpiredRemovalJobSleepSeconds
-        }
+        setParameter:
+            {changeCollectionExpiredDocumentsRemoverJobSleepSeconds: kExpiredRemovalJobSleepSeconds}
     }
 });
 

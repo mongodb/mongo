@@ -1975,18 +1975,16 @@ At or shortly after startup, an initial set of CollectionTruncateMarkers are cre
 ### Collections that use CollectionTruncateMarkers
 
 - [The oplog](#oplog-truncation) - `OplogTruncateMarkers`
-- [Change stream change collections](#change-collection-truncation) - `ChangeCollectionTruncateMarkers`
 - [Change stream pre images collections](#pre-images-collection-truncation) - `PreImagesTruncateMarkersPerNsUUID`
 
 ### Change Stream Collection Truncation
 
-Change stream collections which use CollectionTruncateMarkers
+Change stream collection that uses CollectionTruncateMarkers
 
-- change collection: `<tenantId>_config.system.change_collection`, exclusive to serverless environments.
 - pre-images: `<tenantId>_config.system.preimages` in serverless, `config.system.preimages` in dedicated environments.
 
-Both change stream collections have a periodic remover thread ([ChangeStreamExpiredPreImagesRemover](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_expired_pre_image_remover.cpp#L71), [ChangeCollectionExpiredDocumentsRemover](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_expired_documents_remover.cpp)).
-Each remover thread:
+The change stream pre-images collections has a periodic remover thread ([ChangeStreamExpiredPreImagesRemover](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_expired_pre_image_remover.cpp#L71).
+The remover thread:
 
 1. Creates the tenant's initial CollectionTruncateMarkers for the tenant if they do not yet exist
    - Lazy initialization of the initial truncate markers is imperative so writes aren't blocked on startup
@@ -1995,12 +1993,6 @@ Each remover thread:
 #### Cleanup After Unclean Shutdown
 
 After an unclean shutdown, all expired pre-images are truncated at startup. WiredTiger truncate cannot guarantee a consistent view of previously truncated data on unreplicated, untimestamped ranges after a crash. Unlike the oplog, the change stream collections aren't logged, don't persist any special timestamps, and it's possible that previously truncated documents can resurface after shutdown.
-
-#### Change Collection Truncation
-
-Change collections are per tenant - and there is one `ChangeCollectionTruncateMarkers` per tenant. The `ChangeStreamChangeCollectionManager` maps the UUID of a tenant's change collection to its corresponding 'ChangeCollectionTruncateMarkers'.
-
-Each tenant has a set 'expireAfterSeconds' parameter. An entry is expired if its 'wall time' is more than 'expireAfterSeconds' older than the node's current wall time. A truncate marker is expired if its last record is expired.
 
 #### Pre Images Collection Truncation
 
@@ -2022,8 +2014,6 @@ For each tenant, `ChangeStreamExpiredPreImagesRemover` iterates over each set of
   - The main api for CollectionTruncateMarkers.
 - [The OplogTruncateMarkers class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h)
   - Oplog specific truncate markers.
-- [The ChangeCollectionTruncateMarkers class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_truncate_markers.h#L47)
-  - Change stream change collection specific truncate markers.
 - [The PreImagesTruncateMarkersPerNsUUID class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h#L62)
   - Truncate markers for a given nsUUID captured within a pre-images collection.
 - [The PreImagesTruncateManager class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_manager.h#L70)

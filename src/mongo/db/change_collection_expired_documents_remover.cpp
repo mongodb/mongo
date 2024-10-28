@@ -93,16 +93,7 @@ change_stream_serverless_helpers::TenantSet getConfigDbTenants(OperationContext*
     return tenantIds;
 }
 
-bool usesUnreplicatedTruncates() {
-    // (Ignore FCV check): This feature flag is potentially backported to previous version of the
-    // server. We can't rely on the FCV version to see whether it's enabled or not.
-    return feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
-        .isEnabledAndIgnoreFCVUnsafe();
-}
-
 void removeExpiredDocuments(Client* client) {
-    bool useUnreplicatedTruncates = usesUnreplicatedTruncates();
-
     try {
         auto opCtx = client->makeOperationContext();
         hangBeforeRemovingExpiredChanges.pauseWhileSet(opCtx.get());
@@ -125,55 +116,49 @@ void removeExpiredDocuments(Client* client) {
             auto expiredAfterSeconds =
                 change_stream_serverless_helpers::getExpireAfterSeconds(tenantId);
 
-            if (useUnreplicatedTruncates) {
-                removedCount += ChangeStreamChangeCollectionManager::
-                    removeExpiredChangeCollectionsDocumentsWithTruncate(opCtx.get(), tenantId);
-            } else {
-                auto changeCollection =
-                    acquireCollection(opCtx.get(),
-                                      CollectionAcquisitionRequest(
-                                          NamespaceString::makeChangeCollectionNSS(tenantId),
-                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                          repl::ReadConcernArgs::get(opCtx.get()),
-                                          AcquisitionPrerequisites::kWrite),
-                                      MODE_IX);
+            auto changeCollection =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::makeChangeCollectionNSS(tenantId),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
 
-                // Early exit if the collection does not exist, or when running on a secondary with
-                // replicated deletes.
-                if (!changeCollection.exists() ||
-                    !repl::ReplicationCoordinator::get(opCtx.get())
-                         ->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kConfig)) {
-                    break;
-                }
-
-                // Get the metadata required for the removal of the expired change collection
-                // documents. Early exit if the metadata is missing, indicating that there is
-                // nothing to remove.
-                auto purgingJobMetadata =
-                    ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
-                        opCtx.get(), changeCollection);
-                if (!purgingJobMetadata) {
-                    continue;
-                }
-
-                removedCount += ChangeStreamChangeCollectionManager::
-                    removeExpiredChangeCollectionsDocumentsWithCollScan(
-                        opCtx.get(),
-                        changeCollection,
-                        purgingJobMetadata->maxRecordIdBound,
-                        currentWallTime - Seconds(expiredAfterSeconds));
-                maxStartWallTime =
-                    std::max(maxStartWallTime, purgingJobMetadata->firstDocWallTimeMillis);
+            // Early exit if the collection does not exist, or when running on a secondary with
+            // replicated deletes.
+            if (!changeCollection.exists() ||
+                !repl::ReplicationCoordinator::get(opCtx.get())
+                     ->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kConfig)) {
+                break;
             }
 
-            changeCollectionManager.getPurgingJobStats().scannedCollections.fetchAndAddRelaxed(1);
+            // Get the metadata required for the removal of the expired change collection
+            // documents. Early exit if the metadata is missing, indicating that there is
+            // nothing to remove.
+            auto purgingJobMetadata =
+                ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
+                    opCtx.get(), changeCollection);
+            if (!purgingJobMetadata) {
+                continue;
+            }
+
+            removedCount += ChangeStreamChangeCollectionManager::
+                removeExpiredChangeCollectionsDocumentsWithCollScan(
+                    opCtx.get(),
+                    changeCollection,
+                    purgingJobMetadata->maxRecordIdBound,
+                    currentWallTime - Seconds(expiredAfterSeconds));
+            maxStartWallTime =
+                std::max(maxStartWallTime, purgingJobMetadata->firstDocWallTimeMillis);
         }
+
+        changeCollectionManager.getPurgingJobStats().scannedCollections.fetchAndAddRelaxed(1);
 
         // The purging job metadata will be 'boost::none' if none of the change collections have
         // more than one oplog entry, as such the 'maxStartWallTimeMillis' will be zero. Avoid
-        // reporting 0 as 'maxStartWallTimeMillis'. If using unreplicated truncates, this is
-        // maintained by the call to removeExpiredChangeCollectionsDocumentsWithTruncate.
-        if (!useUnreplicatedTruncates && maxStartWallTime > 0) {
+        // reporting 0 as 'maxStartWallTimeMillis'.
+        if (maxStartWallTime > 0) {
             changeCollectionManager.getPurgingJobStats().maxStartWallTimeMillis.store(
                 maxStartWallTime);
         }

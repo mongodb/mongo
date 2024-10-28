@@ -21,13 +21,3 @@
             # We do not truncate on the primary in order to maintain a full record of all preimages.
             # That way we can easily detect any pre-image holes on the secondaries.
             failpoint.preImagesTruncateOnlyOnSecondaries: "{mode: 'alwaysOn'}"
-
-- name: change_collection_truncate_only_secondaries
-  value:
-    executor:
-      fixture:
-        mongod_options:
-          set_parameters:
-            # We do not truncate on the primary in order to maintain a full record of all change collection entries.
-            # That way we can easily detect any change collection holes on the secondaries.
-            failpoint.changeCollectionTruncateOnlyOnSecondaries: "{mode: 'alwaysOn'}"

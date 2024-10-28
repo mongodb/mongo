@@ -9,7 +9,6 @@ overrides:
   - "replica_sets_kill_secondary.selector"
   - "replica_sets_kill_secondary.executor"
   - "change_streams_truncate.replica_sets_fixture"
-  - "change_streams_truncate.change_collection_truncate_only_secondaries"
   - "change_streams_change_collection_remover.replica_sets_fixture"
   - "replica_sets_kill_secondary.hooks_with_legacy_validate"
 

@@ -61,7 +61,6 @@ executor:
       serverless: true
       set_parameters:
         changeCollectionExpiredDocumentsRemoverJobSleepSeconds: 1
-        changeCollectionTruncateMarkersMinBytes: 4096
         enableElectionHandoff: 0
         enableTestCommands: 1
         featureFlagRequireTenantID: true
