@@ -10,6 +10,6 @@
     "ninja"
   ],
   "test_tasks" : [
-    "test/unittest/catch2-unittests"
+    "test/catch2/catch2-unittests"
   ]
   }

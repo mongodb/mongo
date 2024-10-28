@@ -41,7 +41,7 @@
     "python3 ../test/suite/run.py test_util19",
     "python3 ../test/suite/run.py test_util02",
     "python3 ../test/suite/run.py test_prefetch02",
-    "test/unittest/catch2-unittests",
+    "test/catch2/catch2-unittests",
     "test/csuite/wt2403_lsm_workload/test_wt2403_lsm_workload",
     "python3 ../test/suite/run.py test_tiered08",
     "python3 ../test/suite/run.py test_chunkcache03",

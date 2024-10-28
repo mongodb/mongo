@@ -1675,7 +1675,7 @@ tasks:
         vars:
           directory: bench/wtperf
 
-  - name: catch2-unittest-test
+  - name: catch2-test
     tags: ["pull_request"]
     commands:
       - func: "get project"
@@ -1690,9 +1690,9 @@ tasks:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            test/unittest/catch2-unittests
+            test/catch2/catch2-unittests
 
-  - name: catch2-unittest-assertions
+  - name: catch2-assertions
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -1706,7 +1706,7 @@ tasks:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            test/unittest/catch2-unittests
+            test/catch2/catch2-unittests
 
   # End of normal make check test tasks
 
@@ -5354,12 +5354,12 @@ buildvariants:
     - name: format-failure-configs-test
       distros: ubuntu2004-large
     - name: ".data-validation-stress-test"
-    - name: catch2-unittest-test
+    - name: catch2-test
     - name: s3-tiered-storage-extensions-test
     # FIXME-WT-12812 - This test is unstable when run with the new tmalloc install script. Disabled while WT-12812 is under investigation.
     # - name: azure-gcp-tiered-storage-extensions-test
     - name: bench-tiered-push-pull
-    - name: catch2-unittest-assertions
+    - name: catch2-assertions
     - name: ".tiered_unittest"
     - name: bench-tiered-push-pull-s3
     - name: csuite-timestamp-abort-test-s3
@@ -5455,10 +5455,10 @@ buildvariants:
       distros: ubuntu2004-build
     - name: format-smoke-test
     - name: ".data-validation-stress-test"
-    - name: catch2-unittest-test
+    - name: catch2-test
     - name: s3-tiered-storage-extensions-test
     - name: bench-tiered-push-pull
-    - name: catch2-unittest-assertions
+    - name: catch2-assertions
     - name: bench-tiered-push-pull-s3
 
 # Very minimal set without any extensions
@@ -5478,7 +5478,7 @@ buildvariants:
     - name: compile
     - name: csuite-tests-fast
     - name: fops
-    - name: catch2-unittest-test
+    - name: catch2-test
     - name: examples-c-test
 
 - name: ubuntu2004-msan
@@ -5662,7 +5662,7 @@ buildvariants:
     - name: make-check-test
     - name: ".unit_test"
     - name: fops
-    - name: catch2-unittest-test
+    - name: catch2-test
 
 - <<: *mac_test_template
   name: macos-13-arm64

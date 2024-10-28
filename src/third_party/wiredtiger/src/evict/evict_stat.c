@@ -116,9 +116,14 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
     WT_STAT_DSRC_SET(session, cache_state_unvisited_count, unvisited_count);
 }
 
-/*
+/* !!!
  * __wt_evict_cache_stat_walk --
- *     Initialize the statistics for evict_cache_walk pass.
+ *     Gather tree-level eviction statistics.
+ *
+ *     It helps in understanding how eviction is functioning for a specific tree, providing insights
+ *     into eviction activity that may assist in diagnosing issues.  This function is not for
+ *     connection-level statistics, and requires a special `cache_walk` configuration defined in
+ *     `api_data.py` to enable eviction statistics for a specific tree.
  */
 void
 __wt_evict_cache_stat_walk(WT_SESSION_IMPL *session)

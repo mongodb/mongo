@@ -247,9 +247,14 @@ __evict_queue_full(WT_EVICT_QUEUE *queue)
     return (queue->evict_current == queue->evict_queue && queue->evict_candidates != 0);
 }
 
-/*
+/* !!!
  * __wt_evict_server_wake --
- *     Wake the eviction server thread.
+ *     Wake up the eviction server thread. The eviction server typically sleeps for some time when
+ *     cache usage is below the target thresholds. When the cache is expected to exceed these
+ *     thresholds, callers can nudge the eviction server to wake up and resume its work.
+ *
+ *     This function is called in situations where pages are queued for urgent eviction or when
+ *     application threads request eviction assistance.
  */
 void
 __wt_evict_server_wake(WT_SESSION_IMPL *session)
@@ -519,9 +524,19 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
     return (0);
 }
 
-/*
+/* !!!
  * __wt_evict_threads_create --
- *     Start the eviction server.
+ *     Initiate the eviction process by creating and launching the eviction threads.
+ *
+ *     The `threads_max` and `threads_min` configurations in `api_data.py` control the maximum and
+ *     minimum number of eviction worker threads in WiredTiger. One of the threads acts as the
+ *     eviction server, responsible for identifying evictable pages and placing them in eviction
+ *     queues. The remaining threads are eviction workers, responsible for evicting pages from these
+ *     eviction queues.
+ *
+ *     This function is called once during `wiredtiger_open` or recovery.
+ *
+ *     Return an error code if the thread group creation fails.
  */
 int
 __wt_evict_threads_create(WT_SESSION_IMPL *session)
@@ -568,9 +583,12 @@ __wt_evict_threads_create(WT_SESSION_IMPL *session)
     return (0);
 }
 
-/*
+/* !!!
  * __wt_evict_threads_destroy --
- *     Destroy the eviction threads.
+ *     Stop and destroy the eviction threads. It must be called exactly once during
+ *     `WT_CONNECTION::close` or recovery to ensure all eviction threads are properly terminated.
+ *
+ *     Return an error code if the thread group destruction fails.
  */
 int
 __wt_evict_threads_destroy(WT_SESSION_IMPL *session)
@@ -962,10 +980,19 @@ __evict_clear_walk_and_saved_tree_if_current_locked(WT_SESSION_IMPL *session)
     return (__evict_clear_walk(session, false));
 }
 
-/*
+/* !!!
  * __wt_evict_file_exclusive_on --
- *     Get exclusive eviction access to a file and discard any of the file's blocks queued for
- *     eviction.
+ *     Acquire exclusive access to a file/tree making it possible to evict the entire file using
+ *     `__wt_evict_file`. It does this by incrementing the `evict_disabled` counter for a
+ *     tree, which disables all other means of eviction (except file eviction).
+ *
+ *     For the incremented `evict_disabled` value, the eviction server skips walking this tree for
+ *     eviction candidates, and force-evicting or queuing pages from this tree is not allowed.
+ *
+ *     It is called from multiple places in the code base, such as when initiating file eviction
+ *     `__wt_evict_file` or when opening or closing trees.
+ *
+ *     Return an error code if unable to acquire necessary locks or clear the eviction queues.
  */
 int
 __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
@@ -1039,9 +1066,13 @@ err:
     return (ret);
 }
 
-/*
+/* !!!
  * __wt_evict_file_exclusive_off --
- *     Release exclusive eviction access to a file.
+ *     Release exclusive access to a file/tree by decrementing the `evict_disabled` count
+ *     back to zero, allowing eviction to proceed for the tree.
+ *
+ *     It is called from multiple places in the code where exclusive eviction access is no longer
+ *     needed.
  */
 void
 __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
@@ -2879,9 +2910,18 @@ done:
     return (ret);
 }
 
-/*
+/* !!!
  * __wt_evict_page_urgent --
- *     Set a page to be evicted as soon as possible.
+ *     Push a page into the urgent eviction queue.
+ *
+ *     It is called by the eviction server if pages require immediate eviction or by the application
+ *     threads as part of forced eviction when directly evicting pages is not feasible.
+ *
+ *     Input parameters:
+ *       `ref`: A reference to the page that is being added to the urgent eviction queue.
+ *
+ *     Return `true` if the page has been successfully added to the urgent queue, or `false` is
+ *     already marked for eviction.
  */
 bool
 __wt_evict_page_urgent(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -2952,9 +2992,18 @@ done:
     return (queued);
 }
 
-/*
+/* !!!
  * __wt_evict_priority_set --
- *     Set a tree's eviction priority.
+ *     Set a tree's eviction priority. A higher priority indicates less likelihood for the tree to
+ *     be considered for eviction. The eviction server skips the eviction of trees with a non-zero
+ *     priority unless eviction is in an aggressive state and the Btree is significantly utilizing
+ *     the cache.
+ *
+ *     At present, it is exclusively called for metadata and bloom filter files, as these are meant
+ *     to be retained in the cache.
+ *
+ *     Input parameter:
+ *       `v`: An integer that denotes the priority level.
  */
 void
 __wt_evict_priority_set(WT_SESSION_IMPL *session, uint64_t v)
@@ -2964,7 +3013,8 @@ __wt_evict_priority_set(WT_SESSION_IMPL *session, uint64_t v)
 
 /*
  * __wt_evict_priority_clear --
- *     Clear a tree's eviction priority.
+ *     Clear a tree's eviction priority to zero. It is called during the closure of the
+ *     dhandle/btree.
  */
 void
 __wt_evict_priority_clear(WT_SESSION_IMPL *session)

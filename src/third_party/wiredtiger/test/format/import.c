@@ -136,7 +136,7 @@ import(void *arg)
              * the latest checkpoint.
              */
             testutil_snprintf(buf, sizeof(buf),
-              "%s,import=(enabled,repair=false,panic_corrupt=false,file_metadata=(%s))t",
+              "%s,import=(enabled,repair=false,panic_corrupt=false,file_metadata=(%s))",
               table_config, file_config);
             ret = session->create(session, IMPORT_URI, buf);
             if (ret != 0) {

@@ -8,9 +8,20 @@
 
 #include "wt_internal.h"
 
-/*
+/* !!!
  * __wt_evict_file --
- *     Discard pages for a specific file.
+ *     Evict all pages for a specific tree/file. Traverse through the tree and either evict or
+ *     discard pages based on the specified sync operation. Before calling this function, ensure
+ *     exclusive access to the tree by using `__wt_evict_file_exclusive_on`.
+ *
+ *     Input parameter:
+ *       `syncop`: The sync operation to perform, with only two legal options:
+ *         - `WT_SYNC_CLOSE`: Evict the tree and reconcile dirty pages, ensuring that all changes
+ *            are durably written to disk.
+ *         - `WT_SYNC_DISCARD`: Discard both clean and dirty pages, bypassing reconciliation.
+ *
+ *     Return an error code from failed reconciliation, inability to evict a page, or other issues
+ *     encountered during this process.
  */
 int
 __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)

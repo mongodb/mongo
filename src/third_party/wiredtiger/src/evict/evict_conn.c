@@ -176,9 +176,19 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
     return (0);
 }
 
-/*
+/* !!!
  * __wt_evict_config --
- *     Configure or reconfigure eviction.
+ *     Parses eviction-related configuration strings during `wiredtiger_open` or
+ *     `WT_CONNECTION::reconfigure` to set eviction parameters.
+ *
+ *     Input parameters:
+ *       (1) `cfg[]`: a stack of configuration strings, where each string specifies a configuration
+ *           option (e.g., `eviction.threads_max`). The full list of valid eviction configurations
+ *           are defined in `api_data.py`.
+ *       (2) `reconfig`: a boolean that indicates whether this function is being called during
+ *           `WT_CONNECTION::reconfigure`.
+ *
+ *     Return an error code for invalid configurations.
  */
 int
 __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
@@ -231,9 +241,19 @@ __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     return (0);
 }
 
-/*
+/* !!!
  * __wt_evict_create --
- *     Initialize eviction.
+ *     Set up eviction's internal structures and stats during `wiredtiger_open` to manage eviction.
+ *     It must be called exactly once during `wiredtiger_open` and must be called before any
+ *     eviction threads are spawned.
+ *
+ *     Input parameter:
+ *       `cfg[]`: An array of configuration strings. This is passed to `__evict_config`, which
+ *       handles all eviction-related configs (i.e., `eviction.*`) as part of the eviction
+ *       setup process.
+ *
+ *     Return an error code for invalid configurations, memory allocation, or spinlock
+ *     initialization failures.
  */
 int
 __wt_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
@@ -288,9 +308,13 @@ __wt_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
     return (0);
 }
 
-/*
+/* !!!
  * __wt_evict_destroy --
- *     Destroy Eviction
+ *     Release all memory and locks related to eviction, ensuring the eviction system is properly
+ *     destroyed. It must be called exactly once during `WT_CONNECTION::close`, and must be called
+ *     after all the eviction threads are destroyed (via `__wt_evict_threads_destroy`).
+ *
+ *     Return an error code if the internal eviction session cannot be closed.
  */
 int
 __wt_evict_destroy(WT_SESSION_IMPL *session)
@@ -321,9 +345,14 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
     return (ret);
 }
 
-/*
+/* !!!
  * __wt_evict_stats_update --
- *     Update the eviction statistics for return to the application.
+ *     Initialize eviction stats, ensuring they start with initial values during the startup
+ *     process. It should be called exactly once when initializing eviction. Running it outside
+ *     of startup will not cause functional failures, but it will reset eviction-related stats.
+ *
+ *     FIXME-WT-13666: Investigate whether this function should be internal to prevent unintended
+ *     stat resets.
  */
 void
 __wt_evict_stats_update(WT_SESSION_IMPL *session)
