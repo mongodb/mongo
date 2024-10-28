@@ -60,7 +60,6 @@
 namespace mongo {
 namespace executor {
 
-extern FailPoint networkInterfaceDiscardCommandsBeforeAcquireConn;
 extern FailPoint networkInterfaceHangCommandsAfterAcquireConn;
 extern FailPoint networkInterfaceCommandsFailedWithErrorCode;
 extern FailPoint networkInterfaceShouldNotKillPendingRequests;

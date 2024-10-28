@@ -1302,10 +1302,7 @@ void ConnectionPool::SpecificPool::processFailure(stdx::unique_lock<stdx::mutex>
 // fulfills as many outstanding requests as possible
 void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex>& lk) {
     if (auto sfp = connectionPoolDoesNotFulfillRequests.scoped(); MONGO_unlikely(sfp.isActive())) {
-        std::string nameToTimeout = sfp.getData()["instance"].String();
-        if (_parent->_name.substr(0, nameToTimeout.size()) == nameToTimeout) {
-            return;
-        }
+        return;
     }
 
     std::vector<std::pair<Promise<ConnectionHandle>, ConnectionHandle>> toFulfill;
