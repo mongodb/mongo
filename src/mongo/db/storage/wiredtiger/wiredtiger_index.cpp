@@ -86,14 +86,14 @@ static CompiledConfiguration clearBoundConfig("WT_CURSOR.bound", "action=clear")
  * Add a data corruption entry to the health log.
  */
 void addDataCorruptionEntryToHealthLog(OperationContext* opCtx,
-                                       const NamespaceString& nss,
+                                       const UUID& uuid,
                                        StringData operation,
                                        StringData message,
                                        const BSONObj& key,
                                        StringData indexName,
                                        StringData uri) {
     HealthLogEntry entry;
-    entry.setNss(nss);
+    entry.setCollectionUUID(uuid);
     entry.setTimestamp(Date_t::now());
     entry.setSeverity(SeverityEnum::Error);
     entry.setScope(ScopeEnum::Index);
@@ -295,16 +295,6 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
       _collectionUUID(collectionUUID),
       _indexName(desc->indexName()),
       _isLogged(isLogged) {}
-
-NamespaceString WiredTigerIndex::getCollectionNamespace(OperationContext* opCtx) const {
-    // TODO SERVER-73111: Remove CollectionCatalog usage.
-    auto nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, _collectionUUID);
-
-    // In testing this may be boost::none.
-    if (!nss)
-        return NamespaceString::kEmpty;
-    return *nss;
-}
 
 namespace {
 void dassertRecordIdAtEnd(const key_string::Value& keyString, KeyFormat keyFormat) {
@@ -1364,15 +1354,6 @@ protected:
         return _kvView;
     }
 
-    NamespaceString getCollectionNamespace(OperationContext* opCtx) const {
-        // TODO SERVER-73111: Remove CollectionCatalog usage.
-        auto nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, _collectionUUID);
-        invariant(nss,
-                  str::stream() << "Cannot find namespace for collection with UUID "
-                                << _collectionUUID);
-        return *nss;
-    }
-
     const Ordering _ordering;
     const key_string::Version _version;
     const KeyFormat _rsKeyFormat;
@@ -1449,10 +1430,9 @@ public:
                 key_string::TypeBits::getReaderFromBuffer(_version, &br);
                 if (!br.atEof()) {
                     const auto bsonKey = redact(curr(KeyInclusion::kInclude)->key);
-                    const auto collectionNamespace = getCollectionNamespace(_opCtx);
                     addDataCorruptionEntryToHealthLog(
                         _opCtx,
-                        collectionNamespace,
+                        _collectionUUID,
                         "WiredTigerIndexUniqueCursor::updatePosition",
                         "Unique index cursor seeing multiple records for key in index",
                         bsonKey,
@@ -1467,7 +1447,7 @@ public:
                         "key"_attr = bsonKey,
                         "index"_attr = _indexName,
                         "uri"_attr = _uri,
-                        logAttrs(collectionNamespace));
+                        logAttrs(_collectionUUID));
                 }
             }
         }
@@ -1549,11 +1529,10 @@ public:
 
         if (!br.atEof()) {
             const auto bsonKey = redact(curr(KeyInclusion::kInclude)->key);
-            const auto collectionNamespace = getCollectionNamespace(_opCtx);
 
             addDataCorruptionEntryToHealthLog(
                 _opCtx,
-                collectionNamespace,
+                _collectionUUID,
                 "WiredTigerIdIndexCursor::updatePosition",
                 "Index cursor seeing multiple records for key in _id index",
                 bsonKey,
@@ -1567,7 +1546,7 @@ public:
                 "key"_attr = bsonKey,
                 "index"_attr = _indexName,
                 "uri"_attr = _uri,
-                logAttrs(collectionNamespace));
+                logAttrs(_collectionUUID));
         }
     }
 };
@@ -1864,10 +1843,9 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     key_string::TypeBits typeBits = key_string::TypeBits::fromBuffer(getKeyStringVersion(), &br);
     if (!br.atEof() || MONGO_unlikely(failWithDataCorruptionForTest)) {
         auto bsonKey = key_string::toBson(keyString, _ordering);
-        const auto collectionNamespace = getCollectionNamespace(opCtx);
 
         addDataCorruptionEntryToHealthLog(opCtx,
-                                          collectionNamespace,
+                                          _collectionUUID,
                                           "WiredTigerIdIndex::_unindex",
                                           "Un-index seeing multiple records for key",
                                           bsonKey,
@@ -1882,7 +1860,7 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
             "key"_attr = bsonKey,
             "index"_attr = _indexName,
             "uri"_attr = _uri,
-            logAttrs(collectionNamespace));
+            logAttrs(_collectionUUID));
     }
 
     // The RecordId matches, so remove the entry.
@@ -1899,7 +1877,7 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     auto key = key_string::toBson(keyString, _ordering);
     LOGV2_WARNING(51797,
                   "Associated record not found in collection while removing index entry",
-                  logAttrs(getCollectionNamespace(opCtx)),
+                  logAttrs(_collectionUUID),
                   "index"_attr = _indexName,
                   "key"_attr = redact(key),
                   "recordId"_attr = id);

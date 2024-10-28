@@ -196,8 +196,6 @@ public:
         return _indexName;
     }
 
-    NamespaceString getCollectionNamespace(OperationContext* opCtx) const;
-
     virtual bool isIdIndex() const {
         return false;
     }
