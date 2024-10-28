@@ -1047,6 +1047,17 @@ bool isIndependentOfImpl(E&& expr,
                          Args&&... renameables) {
     constexpr bool mutating = shouldCollectRenameables<E, Args...>;
 
+    if (expr.getCategory() == MatchExpression::MatchCategory::kLogical) {
+        // The whole expression is independent of 'pathSet' if and only if every child is.
+        for (int i = 0, numChildren = expr.numChildren(); i < numChildren; ++i) {
+            if (!isIndependentOfImpl<E, Args...>(
+                    *expr.getChild(i), pathSet, renames, std::forward<Args>(renameables)...)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // Any expression types that do not have renaming implemented cannot have their independence
     // evaluated here. See applyRenamesToExpression().
     bool hasOnlyRenameables = [&] {
@@ -1069,7 +1080,51 @@ bool isIndependentOfImpl(E&& expr,
     if (depsTracker.needRandomGenerator || depsTracker.needWholeDocument) {
         return false;
     }
-    return areIndependent(pathSet, depsTracker.fields);
+
+    // When the paths diverge but share a nonempty prefix, they may or may
+    // not be independent: it depends on the details of the match predicate.
+    const bool canHaveSharedPrefix = [&] {
+        if (expr.matchType() == MatchExpression::EXPRESSION) {
+            // We assume any dependencies within $expr use ExpressionFieldPath, which
+            // is not affected when prefixes of its path change from scalar to object.
+            // See 'jstests/aggregation/sources/addFields/independence.js'.
+            return true;
+        }
+
+        // The most typical match expression uses a predicate like '$eq',
+        // whose non-leaf behavior traverses arrays. Typically the path is not numeric
+        // and the predicate is false on a missing field. When all these conditions are met,
+        // an $addFields on a diverging path won't affect the predicate result.
+        if (auto* pathMatch = dynamic_cast<const PathMatchExpression*>(&expr)) {
+            const auto kTraverse = ElementPath::NonLeafArrayBehavior::kTraverse;
+            return
+                // Has the typical array behavior.
+                (pathMatch->elementPath()->nonLeafArrayBehavior() == kTraverse)
+                // No numeric components.
+                && !pathMatch->elementPath()->fieldRef().hasNumericPathComponents()
+                // Ignores missing fields.
+                && !pathMatch->matchesSingleElement(BSONObj{}.firstElement(), nullptr);
+        }
+
+        // Other cases may be allowable, but haven't been considered and tested yet.
+        return false;
+    }();
+
+    if (canHaveSharedPrefix) {
+        return areIndependent(pathSet, depsTracker.fields);
+    } else {
+        // All paths must diverge on the first component.
+        OrderedPathSet truncated;
+        for (StringData path : pathSet) {
+            if (size_t dotPos = path.find('.'); dotPos != std::string::npos) {
+                path = path.substr(0, dotPos);
+            }
+            if (auto it = truncated.find(path); it == truncated.end()) {
+                truncated.insert(path.toString());
+            }
+        }
+        return areIndependent(truncated, depsTracker.fields);
+    }
 }
 
 bool isIndependentOf(MatchExpression& expr,

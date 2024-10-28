@@ -166,6 +166,9 @@ bool containsEmptyPaths(const OrderedPathSet& testSet);
 
 /**
  * Determines if 'expr' is reliant upon any path from 'pathSet' and can be renamed by 'renames'.
+ *
+ * In other words: if writing to any of the paths in 'pathSet' (with say $addFields) could change
+ * the evaluation of the expression, then it's not independent.
  */
 bool isIndependentOfConst(const MatchExpression& expr,
                           const OrderedPathSet& pathSet,
@@ -173,6 +176,9 @@ bool isIndependentOfConst(const MatchExpression& expr,
 
 /**
  * Determines if 'expr' is reliant upon any path from 'pathSet' and can be renamed by 'renames'.
+ *
+ * In other words: if writing to any of the paths in 'pathSet' (with say $addFields) could change
+ * the evaluation of the expression, then it's not independent.
  *
  * Note: For a description of the expected value returned in the 'renameables' output parameter, see
  * the documentation for the 'hasOnlyRenameableMatchExpressionChildren()' function.

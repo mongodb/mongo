@@ -82,6 +82,10 @@ public:
         return _elementPath ? &(_elementPath->fieldRef()) : nullptr;
     }
 
+    const boost::optional<ElementPath>& elementPath() const {
+        return _elementPath;
+    }
+
     /**
      * Gets the path that the expression applies to. If the expression does not apply to a specific
      * path, returns boost::none.

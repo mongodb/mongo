@@ -216,20 +216,33 @@ public:
         ExpressionContext* const, BSONElement, const VariablesParseState&)>;
 
     /**
-     * Represents new paths computed by an expression. Computed paths are partitioned into renames
-     * and non-renames. See the comments for Expression::getComputedPaths() for more information.
+     * Describes the paths that an expression produces when it is part of a projection,
+     * or a projection-like clause such as $group _id.
+     *
+     * Produced by 'Expression::getComputedPaths()'.
      */
     struct ComputedPaths {
-        // Non-rename computed paths.
+        /**
+         * Non-rename computed paths.
+         *
+         * Mutually exclusive with the keys of 'renames', but may overlap with the keys of
+         * 'complexRenames'.
+         */
         OrderedPathSet paths;
 
-        // Mappings from the old name of a path before applying this expression, to the new one
-        // after applying this expression. This map includes solely simple field renaming
-        // expression.
+        /**
+         * A rename is when the values in a computed path are the same as the values in some
+         * other path immediately before the projection. (Plural "values" because, for example,
+         * a MatchExpression path can refer to zero or more subparts of a document.)
+         *
+         * For example in {$project: {a: "$x"}}, 'a' is renamed from 'x'.
+         *
+         * 'renames' maps from new name to old name: {"a", "x"} in that example.
+         */
         StringMap<std::string> renames;
 
-        // Mappings from the old name of a path before applying this expression. This map includes
-        // expressions which have dotted notation on the right side.
+        // Like 'renames' except it also includes expressions which have dotted notation on the
+        // right side.
         StringMap<std::string> complexRenames;
     };
 
@@ -267,14 +280,10 @@ public:
     virtual Value evaluate(const Document& root, Variables* variables) const = 0;
 
     /**
-     * Returns information about the paths computed by this expression. This only needs to be
-     * overridden by expressions that have renaming semantics, where optimization code could take
-     * advantage of knowledge of these renames.
+     * Returns information about the paths computed by this expression: see 'ComputedPaths'.
      *
-     * Partitions paths involved in this expression into the set of computed paths and the set of
-     * ("new" => "old") rename mappings. Here "new" refers to the name of the path after applying
-     * this expression, whereas "old" refers to the name of the path before applying this
-     * expression.
+     * This only needs to be overridden by expressions that have renaming semantics, where
+     * optimization code could take advantage of knowledge of these renames.
      *
      * The 'exprFieldPath' is the field path at which the result of this expression will be stored.
      * This is used to determine the value of the "new" path created by the rename.

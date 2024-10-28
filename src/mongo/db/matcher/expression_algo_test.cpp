@@ -850,6 +850,24 @@ TEST(IsIndependent, AndIsIndependentOnlyIfChildrenAre) {
     ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"c"}));
 }
 
+TEST(IsIndependent, EqNullIsIndependentOnlyIfToplevelFieldDiffers) {
+    // This predicate is not independent from 'a.x', because {$set: {'a.x': _}}
+    // can transform some 'a' values from scalar to object. But it is independent
+    // from 'x' or 'x.y', because the top-level field is different.
+    //
+    // See also 'jstests/aggregation/sources/addFields/independence.js'.
+    BSONObj matchPredicate = fromjson("{'a.b': {$eq: null}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(status.getStatus());
+
+    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    ASSERT_FALSE(expression::isIndependentOfConst(*expr.get(), {"a.x"}));
+    ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"x"}));
+    ASSERT_TRUE(expression::isIndependentOfConst(*expr.get(), {"x.y"}));
+}
+
 TEST(IsIndependent, ElemMatchIsIndependent) {
     BSONObj matchPredicate = fromjson("{x: {$elemMatch: {y: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

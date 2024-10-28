@@ -2655,12 +2655,18 @@ TEST(PipelineOptimizationTest, MatchShouldMoveAcrossAddFieldsRenameWithExplicitC
 }
 
 TEST(PipelineOptimizationTest, PartiallyDependentMatchWithRenameShouldSplitAcrossAddFields) {
+    // The $match predicate has two parts:
+    //   1. A simple predicate on 'd'. This cannot be pushed down because 'd' is computed.
+    //   2. An $or on two fields: 'a' and 'x'.
+    // The $or can be pushed down, because:
+    //   - 'x' is preserved by the $addFields.
+    //   - 'a' is computed, but its value is available in field 'c' before the $addFields.
     std::string inputPipe =
-        "[{$addFields: {'a.b': '$c', d: {$add: ['$e', '$f']}}},"
-        "{$match: {$and: [{$or: [{'a.b': 1}, {x: 2}]}, {d: 3}]}}]";
+        "[{$addFields: {'a': '$c', d: {$add: ['$e', '$f']}}},"
+        "{$match: {$and: [{$or: [{'a': 1}, {x: 2}]}, {d: 3}]}}]";
     std::string outputPipe =
         "[{$match: {$or: [{c: {$eq: 1}}, {x: {$eq: 2}}]}},"
-        "{$addFields: {a: {b: '$c'}, d: {$add: ['$e', '$f']}}},"
+        "{$addFields: {a: '$c', d: {$add: ['$e', '$f']}}},"
         "{$match: {d: {$eq: 3}}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe);
 }
@@ -2803,9 +2809,19 @@ TEST(PipelineOptimizationTest, RenameShouldNotBeAppliedToDependentMatch) {
     assertPipelineOptimizesAndSerializesTo(pipeline, pipeline);
 }
 
-TEST(PipelineOptimizationTest, MatchCannotMoveAcrossAddFieldsRenameOfDottedPath) {
+TEST(PipelineOptimizationTest, MatchCannotMoveAcrossAddFieldsRenameOfDottedPathOnRight) {
+    // This one is illegal because the $b.c expression can reshape arrays.
     std::string pipeline = "[{$addFields: {a: '$b.c'}}, {$match: {a: {$eq: 1}}}]";
     assertPipelineOptimizesAndSerializesTo(pipeline, pipeline);
+}
+
+TEST(PipelineOptimizationTest, MatchCannotMoveAcrossAddFieldsRenameOfDottedPathOnLeft) {
+    // This one is illegal because the 'a.b' path can write through doubly-nested arrays,
+    // and it can be a noop when 'a' is empty-array.
+    std::string inputPipe = "[{$addFields: {'a.b': '$x'}}, {$match: {'a.b': {$eq: 1}}}]";
+    // It serializes using this equivalent nested syntax.
+    std::string outputPipe = "[{$addFields: {a: {b: '$x'}}}, {$match: {'a.b': {$eq: 1}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchCannotMoveAcrossProjectRenameOfDottedPath) {
