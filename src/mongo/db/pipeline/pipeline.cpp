@@ -339,7 +339,7 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
         // Verify that we are not attempting to run a router-only stage on a data bearing node.
         uassert(40644,
                 str::stream() << stage->getSourceName() << " can only be run on router",
-                !(constraints.hostRequirement == HostTypeRequirement::kRouter && !pCtx->inRouter));
+                !(constraints.hostRequirement == HostTypeRequirement::kMongoS && !pCtx->inRouter));
 
         uassert(
             ErrorCodes::OperationNotSupportedInTransaction,
@@ -534,7 +534,7 @@ boost::optional<ShardId> Pipeline::needsSpecificShardMerger() const {
 bool Pipeline::needsRouterMerger() const {
     return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
         return stage->constraints(SplitState::kSplitForMerge).resolvedHostTypeRequirement(pCtx) ==
-            HostTypeRequirement::kRouter;
+            HostTypeRequirement::kMongoS;
     });
 }
 
@@ -565,12 +565,12 @@ bool Pipeline::requiredToRunOnRouter() const {
 
         auto hostRequirement = stage->constraints(_splitState).resolvedHostTypeRequirement(pCtx);
 
-        // If a router-only stage occurs before a splittable stage, or if the pipeline is already
-        // split, this entire pipeline must run on router.
-        if (hostRequirement == HostTypeRequirement::kRouter) {
+        // If a mongoS-only stage occurs before a splittable stage, or if the pipeline is already
+        // split, this entire pipeline must run on mongoS.
+        if (hostRequirement == HostTypeRequirement::kMongoS) {
             LOGV2_DEBUG(8346100,
                         1,
-                        "stage {stage} is required to run on router",
+                        "stage {stage} is required to run on mongoS",
                         "stage"_attr = stage->getSourceName());
             return true;
         }

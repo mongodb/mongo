@@ -1353,10 +1353,6 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         auto mergeType = [&]() -> std::string {
             if (mergePipeline->canRunOnRouter().isOK() && !specificMergeShardId) {
                 if (mergeCtx->inRouter) {
-                    if (feature_flags::gFeatureFlagAggMongosToRouter.isEnabled(
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                        return "router";
-                    }
                     return "mongos";
                 }
                 return "local";

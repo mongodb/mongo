@@ -78,7 +78,7 @@ function startProfiling() {
 /**
  * Runs the aggregation specified by 'pipeline', verifying that:
  * - The number of documents returned by the aggregation matches 'expectedCount'.
- * - The merge was performed on a router if 'mergeType' is 'router', and on a shard otherwise.
+ * - The merge was performed on a mongoS if 'mergeType' is 'mongos', and on a shard otherwise.
  */
 function assertMergeBehaviour(
     {testName, pipeline, mergeType, batchSize, allowDiskUse, expectedCount}) {
@@ -119,10 +119,10 @@ function assertMergeBehaviour(
             (owningShardMergeCount + nonPrimaryShardMergeCount);
     };
 
-    if (mergeType === st.getMergeType(mongosDB)) {
+    if (mergeType === "mongos") {
         assert.eq(owningShardMergeCount + nonPrimaryShardMergeCount,
                   0,
-                  "Expected merge on router, but " + foundMessage());
+                  "Expected merge on mongos, but " + foundMessage());
     } else {
         assert(mergeType === "anyShard" || mergeType === "specificShard",
                "unknown merge type: " + mergeType);
@@ -134,13 +134,13 @@ function assertMergeBehaviour(
 
 /**
  * Throws an assertion if the aggregation specified by 'pipeline' does not produce
- * 'expectedCount' results, or if the merge phase is not performed on the router.
+ * 'expectedCount' results, or if the merge phase is not performed on the mongoS.
  */
-function assertMergeOnRouter({testName, pipeline, batchSize, allowDiskUse, expectedCount}) {
+function assertMergeOnMongoS({testName, pipeline, batchSize, allowDiskUse, expectedCount}) {
     assertMergeBehaviour({
         testName: testName,
         pipeline: pipeline,
-        mergeType: st.getMergeType(mongosDB),
+        mergeType: "mongos",
         batchSize: (batchSize || 10),
         allowDiskUse: allowDiskUse,
         expectedCount: expectedCount
@@ -164,12 +164,12 @@ function assertMergeOnMongoD(
 }
 
 /**
- * Runs a series of test cases which will consistently merge on router or mongoD regardless of
+ * Runs a series of test cases which will consistently merge on mongoS or mongoD regardless of
  * whether 'allowDiskUse' is true, false or omitted.
  */
 function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allowDiskUse) {
-    // Test that a $match pipeline with an empty merge stage is merged on router.
-    assertMergeOnRouter({
+    // Test that a $match pipeline with an empty merge stage is merged on mongoS.
+    assertMergeOnMongoS({
         testName: "agg_mongos_merge_match_only",
         pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}],
         allowDiskUse: allowDiskUse,
@@ -177,40 +177,40 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
     });
 
     // Test that a $sort stage which merges pre-sorted streams is run on mongoS.
-    assertMergeOnRouter({
+    assertMergeOnMongoS({
         testName: "agg_mongos_merge_sort_presorted",
         pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}],
         allowDiskUse: allowDiskUse,
         expectedCount: 400
     });
 
-    // Test that $skip is merged on router.
-    assertMergeOnRouter({
+    // Test that $skip is merged on mongoS.
+    assertMergeOnMongoS({
         testName: "agg_mongos_merge_skip",
         pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}, {$skip: 300}],
         allowDiskUse: allowDiskUse,
         expectedCount: 100
     });
 
-    // Test that $limit is merged on router.
-    assertMergeOnRouter({
+    // Test that $limit is merged on mongoS.
+    assertMergeOnMongoS({
         testName: "agg_mongos_merge_limit",
         pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$limit: 300}],
         allowDiskUse: allowDiskUse,
         expectedCount: 300
     });
 
-    // Test that $sample is merged on router if it is the splitpoint, since this will result in
+    // Test that $sample is merged on mongoS if it is the splitpoint, since this will result in
     // a merging $sort of presorted streams in the merge pipeline.
-    assertMergeOnRouter({
+    assertMergeOnMongoS({
         testName: "agg_mongos_merge_sample_splitpoint",
         pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sample: {size: 300}}],
         allowDiskUse: allowDiskUse,
         expectedCount: 300
     });
 
-    // Test that $geoNear is merged on router.
-    assertMergeOnRouter({
+    // Test that $geoNear is merged on mongoS.
+    assertMergeOnMongoS({
         testName: "agg_mongos_merge_geo_near",
         pipeline:
             [{$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}}, {$limit: 300}],
@@ -218,9 +218,9 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
         expectedCount: 300
     });
 
-    // Test that $facet is merged on router if all pipelines are router-mergeable regardless of
+    // Test that $facet is merged on mongoS if all pipelines are mongoS-mergeable regardless of
     // 'allowDiskUse'.
-    assertMergeOnRouter({
+    assertMergeOnMongoS({
         testName: "agg_mongos_merge_facet_all_pipes_eligible_for_mongos",
         pipeline: [
             {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -235,9 +235,9 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
         expectedCount: 1
     });
 
-    // Test that $facet is merged on router if no pipeline has a specific host type requirement,
+    // Test that $facet is merged on mongoS if no pipeline has a specific host type requirement,
     // regardless of 'allowDiskUse'.
-    assertMergeOnRouter({
+    assertMergeOnMongoS({
         testName: "agg_mongos_merge_facet_pipe_no_specific_merging_shard_disk_use_" + allowDiskUse,
         pipeline: [
             {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -291,10 +291,10 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
             expectedCount: 1
         });
 
-    // Test that a pipeline whose merging half can be run on router using only the router
+    // Test that a pipeline whose merging half can be run on mongos using only the mongos
     // execution machinery returns the correct results.
-    // TODO SERVER-30882 Find a way to assert that all stages get absorbed by router.
-    assertMergeOnRouter({
+    // TODO SERVER-30882 Find a way to assert that all stages get absorbed by mongos.
+    assertMergeOnMongoS({
         testName: "agg_mongos_merge_all_mongos_runnable_skip_and_limit_stages",
         pipeline: [
             {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -344,8 +344,8 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
         expectedCount: 400
     });
 
-    // Test that equality $lookup is merged on router when the foreign collection is sharded.
-    assertMergeOnRouter({
+    // Test that equality $lookup is merged on mongoS when the foreign collection is sharded.
+    assertMergeOnMongoS({
         testName: "agg_mongos_merge_lookup_sharded_flag_on_disk_use_" + allowDiskUse,
         pipeline: [
             {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -361,7 +361,7 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
             }
             }
         ],
-        mergeType: st.getMergeType(mongosDB),
+        mergeType: "mongos",
         allowDiskUse: allowDiskUse,
         expectedCount: 400
     });
@@ -372,8 +372,8 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
  * and on mongoS when 'allowDiskUse' is false or omitted.
  */
 function runTestCasesWhoseMergeLocationDependsOnAllowDiskUse(allowDiskUse) {
-    // All test cases should merge on mongoD if allowDiskUse is true, router otherwise.
-    const assertMergeOnMongoX = (allowDiskUse ? assertMergeOnMongoD : assertMergeOnRouter);
+    // All test cases should merge on mongoD if allowDiskUse is true, mongoS otherwise.
+    const assertMergeOnMongoX = (allowDiskUse ? assertMergeOnMongoD : assertMergeOnMongoS);
 
     // Test that $group is only merged on mongoS if 'allowDiskUse' is not set.
     assertMergeOnMongoX({
@@ -506,8 +506,8 @@ for (let allowDiskUse of [false, undefined, true]) {
 // Start a new profiling session before running the final few tests.
 startProfiling();
 
-// Test that merge pipelines containing all router-runnable stages produce the expected output.
-assertMergeOnRouter({
+// Test that merge pipelines containing all mongos-runnable stages produce the expected output.
+assertMergeOnMongoS({
     testName: "agg_mongos_merge_all_mongos_runnable_stages",
     pipeline: [
         {$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}},

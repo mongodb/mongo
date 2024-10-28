@@ -71,8 +71,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
                     mergeType = HostTypeRequirement::kLocalOnly;
                 } else if ("anyShard"_sd == mergeTypeString) {
                     mergeType = HostTypeRequirement::kAnyShard;
-                } else if ("router"_sd == mergeTypeString || "mongos"_sd == mergeTypeString) {
-                    mergeType = HostTypeRequirement::kRouter;
+                } else if ("mongos"_sd == mergeTypeString) {
+                    mergeType = HostTypeRequirement::kMongoS;
                 } else {
                     uasserted(ErrorCodes::BadValue,
                               str::stream() << "unrecognized field while parsing mergeType: '"
@@ -132,13 +132,8 @@ Value DocumentSourceInternalSplitPipeline::serialize(const SerializationOptions&
             mergeTypeString = "localOnly";
             break;
 
-        case HostTypeRequirement::kRouter:
-            if (feature_flags::gFeatureFlagAggMongosToRouter.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                mergeTypeString = "router";
-            } else {
-                mergeTypeString = "mongos";
-            }
+        case HostTypeRequirement::kMongoS:
+            mergeTypeString = "mongos";
             break;
 
         case HostTypeRequirement::kNone:

@@ -102,7 +102,7 @@
 ### Summarized explain
 ```json
 {
-	"mergeType" : "router",
+	"mergeType" : "mongos",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -262,7 +262,7 @@
 ### Summarized explain
 ```json
 {
-	"mergeType" : "router",
+	"mergeType" : "mongos",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -453,7 +453,7 @@
 ### Summarized explain
 ```json
 {
-	"mergeType" : "router",
+	"mergeType" : "mongos",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -650,7 +650,7 @@
 ### Summarized explain
 ```json
 {
-	"mergeType" : "router",
+	"mergeType" : "mongos",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -801,7 +801,7 @@
 ### Summarized explain
 ```json
 {
-	"mergeType" : "router",
+	"mergeType" : "mongos",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {

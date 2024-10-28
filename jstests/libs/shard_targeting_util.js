@@ -1,6 +1,5 @@
 // Contains utilities and helper functions for testing shard targeting of aggregate commands.
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
@@ -110,7 +109,7 @@ export class ShardTargetingTest {
         expectedShard,
         expectedShardStages,
         assertSBELookupPushdown,
-        expectRouter,
+        expectMongos,
     }) {
         if (expectedMergingShard) {
             assert.eq(explain.mergeType, "specificShard", explain);
@@ -151,15 +150,8 @@ export class ShardTargetingTest {
             }
         }
 
-        if (expectRouter) {
-            // TODO SERVER-95358 remove once 9.0 becomes last LTS.
-            let mergeType;
-            if (FeatureFlagUtil.isPresentAndEnabled(this.db, "AggMongosToRouter")) {
-                mergeType = "router";
-            } else {
-                mergeType = "mongos";
-            }
-            assert.eq(explain.mergeType, mergeType, explain);
+        if (expectMongos) {
+            assert.eq(explain.mergeType, "mongos", explain);
             assert(explain.hasOwnProperty("splitPipeline"), explain);
             this._examineSplitPipeline({
                 splitPipeline: explain.splitPipeline,

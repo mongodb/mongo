@@ -1,4 +1,3 @@
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -82,14 +81,6 @@ export class ShardingTest {
 
         throw Error("can't find server connection for db '" + dbname +
                     "'s primary shard: " + tojson(primaryShard));
-    }
-
-    // TODO SERVER-95358 remove once 9.0 becomes last LTS.
-    getMergeType(db) {
-        if (FeatureFlagUtil.isPresentAndEnabled(db, "AggMongosToRouter")) {
-            return "router";
-        }
-        return "mongos";
     }
 
     normalize(x) {

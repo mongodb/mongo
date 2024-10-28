@@ -1,4 +1,4 @@
-// Tests that special stages which must run on router cannot be run in combination with an $out or
+// Tests that special stages which must run on mongos cannot be run in combination with an $out or
 // $merge stage.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -9,14 +9,14 @@ const db = st.s0.getDB("db");
 // failing when the db is empty.
 assert.commandWorked(db.runCommand({create: "coll"}));
 
-// These should fail because the initial stages require router execution and $out/$merge
+// These should fail because the initial stages require mongos execution and $out/$merge
 // requires shard execution.
 assert.commandFailedWithCode(
     db.runCommand({aggregate: 1, pipeline: [{$listLocalSessions: {}}, {$out: "test"}], cursor: {}}),
     ErrorCodes.IllegalOperation);
 assert.commandFailedWithCode(db.runCommand({
     aggregate: "coll",
-    pipeline: [{$_internalSplitPipeline: {mergeType: st.getMergeType(db)}}, {$out: "test"}],
+    pipeline: [{$_internalSplitPipeline: {mergeType: "mongos"}}, {$out: "test"}],
     cursor: {}
 }),
                              ErrorCodes.IllegalOperation);
@@ -29,8 +29,7 @@ assert.commandFailedWithCode(
     ErrorCodes.IllegalOperation);
 assert.commandFailedWithCode(db.runCommand({
     aggregate: "coll",
-    pipeline:
-        [{$_internalSplitPipeline: {mergeType: st.getMergeType(db)}}, {$merge: {into: "test"}}],
+    pipeline: [{$_internalSplitPipeline: {mergeType: "mongos"}}, {$merge: {into: "test"}}],
     cursor: {}
 }),
                              ErrorCodes.IllegalOperation);

@@ -29,7 +29,7 @@ for (let i = 0; i < 100; ++i) {
 assert.commandWorked(bulk.execute());
 
 const pipeline = [
-    {$_internalSplitPipeline: {mergeType: st.getMergeType(testDB)}},
+    {$_internalSplitPipeline: {mergeType: "mongos"}},
     {
         $project: {
             y: {
@@ -46,7 +46,7 @@ const pipeline = [
 ];
 
 // Confirm that an aggregate command with a Javascript expression that is expected to execute on
-// router succeeds.
+// mongos succeeds.
 assert.commandWorked(testDB.runCommand({aggregate: 'coll', pipeline: pipeline, cursor: {}}));
 
 // Confirm that the same pipeline fails when Javascript has been disabled on the router.

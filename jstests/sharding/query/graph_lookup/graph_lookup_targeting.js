@@ -340,7 +340,7 @@ shardTargetingTest.assertShardTargeting({
     explainAssertionObj: {
         expectedShardStages: ["$graphLookup", "$graphLookup"],
         expectedMergingStages: ["$mergeCursors"],
-        expectRouter: true,
+        expectMongos: true,
     },
     expectedResults: expectedResults,
     comment: "first_graph_lookup_inner_unsplittable_1_second_graph_lookup_inner_unsplittable_2",
@@ -357,7 +357,7 @@ shardTargetingTest.assertShardTargeting({
     explainAssertionObj: {
         expectedShardStages: ["$graphLookup", "$graphLookup"],
         expectedMergingStages: ["$mergeCursors"],
-        expectRouter: true,
+        expectMongos: true,
     },
     expectedResults: expectedResults,
     comment: "first_graph_lookup_inner_unsplittable_2_second_graph_lookup_inner_unsplittable_1",
@@ -441,7 +441,7 @@ shardTargetingTest.assertShardTargeting({
     explainAssertionObj: {
         expectedShardStages: ["$graphLookup", "$graphLookup"],
         expectedMergingStages: ["$mergeCursors"],
-        expectRouter: true,
+        expectMongos: true,
     },
     expectedResults: expectedResults,
     comment: "first_graph_lookup_inner_sharded_second_graph_lookup_inner_unsplittable_1",
@@ -525,7 +525,7 @@ shardTargetingTest.assertShardTargeting({
     pipeline: pipeline,
     targetCollName: kShardedColl1Name,
     explainAssertionObj: {
-        expectRouter: true,
+        expectMongos: true,
         expectedShardStages: ["$graphLookup", "$graphLookup"],
         expectedMergingStages: ["$mergeCursors"],
     },
@@ -609,7 +609,7 @@ shardTargetingTest.assertShardTargeting({
     pipeline: pipeline,
     targetCollName: kShardedColl1Name,
     explainAssertionObj: {
-        expectRouter: true,
+        expectMongos: true,
         expectedShardStages: ["$graphLookup", "$graphLookup"],
         expectedMergingStages: ["$mergeCursors"],
     },
@@ -694,7 +694,7 @@ shardTargetingTest.assertShardTargeting({
     pipeline: pipeline,
     targetCollName: kShardedColl1Name,
     explainAssertionObj: {
-        expectRouter: true,
+        expectMongos: true,
         expectedShardStages: ["$graphLookup", "$graphLookup"],
         expectedMergingStages: ["$mergeCursors"],
     },

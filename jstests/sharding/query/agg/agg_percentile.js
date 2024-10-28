@@ -147,7 +147,7 @@ shardTargetingTest.assertShardTargeting({
     pipeline: pipeline,
     targetCollName: kShardedCollName,
     explainAssertionObj: {
-        expectRouter: true,
+        expectMongos: true,
         expectedShardStages: ["$group"],
         expectedMergingStages: ["$mergeCursors", "$group"]
     },
@@ -162,7 +162,7 @@ shardTargetingTest.assertShardTargeting({
     pipeline: pipeline,
     targetCollName: kShardedCollName,
     explainAssertionObj: {
-        expectRouter: true,
+        expectMongos: true,
         expectedShardStages: ["$group"],
         expectedMergingStages: ["$mergeCursors", "$group"]
     },
@@ -182,7 +182,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
         pipeline: pipeline,
         targetCollName: kShardedCollName,
         explainAssertionObj: {
-            expectRouter: true,
+            expectMongos: true,
             expectedShardStages: ["$project"],
             expectedMergingStages: ["$mergeCursors", "$group"]
         },
@@ -197,7 +197,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
         pipeline: pipeline,
         targetCollName: kShardedCollName,
         explainAssertionObj: {
-            expectRouter: true,
+            expectMongos: true,
             expectedShardStages: ["$project"],
             expectedMergingStages: ["$mergeCursors", "$group"]
         },
@@ -216,7 +216,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
         pipeline: pipeline,
         targetCollName: kShardedCollName,
         explainAssertionObj: {
-            expectRouter: true,
+            expectMongos: true,
             expectedShardStages: ["$project"],
             expectedMergingStages: ["$mergeCursors", "$group"]
         },
@@ -231,7 +231,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
         pipeline: pipeline,
         targetCollName: kShardedCollName,
         explainAssertionObj: {
-            expectRouter: true,
+            expectMongos: true,
             expectedShardStages: ["$project"],
             expectedMergingStages: ["$mergeCursors", "$group"]
         },
