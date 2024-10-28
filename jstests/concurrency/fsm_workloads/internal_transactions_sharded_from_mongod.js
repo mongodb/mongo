@@ -108,15 +108,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 print("Starting new sessions after internal transaction error: " +
                       tojsononeline(e));
                 this.startSessions(defaultDb);
-                // When causal consistency is required, the verifyDocuments state would perform
-                // reads against mongos with afterClusterTime equal to the max of the clusterTimes
-                // of all sessions that it has created on the shard that it uses to run internal
-                // transactions from. Bump the clusterTime on the mongos after the shard has
-                // recovered so that the mongos can gossip the clusterTime correctly to the other
-                // shard; otherwise when the next state is the verifyDocuments state, the
-                // afterClusterTime in the command could be higher than the clusterTime known to
-                // that shard and that would cause the command to fail.
-                this.bumpClusterTime(defaultDb, collName);
                 return;
             }
             throw e;

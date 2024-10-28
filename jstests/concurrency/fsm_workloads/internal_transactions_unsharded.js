@@ -635,6 +635,14 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         // The read below should not be done inside a transaction (and use readConcern level
         // "snapshot").
         fsm.forceRunningOutsideTransaction(this);
+        const session = db.getMongo().startSession();
+        const sessionDb = session.getDatabase(db.getName());
+        for (const s of this.sessions) {
+            if (s.getClusterTime() !== undefined)
+                session.advanceClusterTime(s.getClusterTime());
+            if (s.getClusterTime() !== undefined)
+                session.advanceOperationTime(s.getOperationTime());
+        }
 
         const numDocsExpected = Object.keys(this.expectedCounters).length;
         const findCmdObj = {
@@ -648,7 +656,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
                 findCmdObj.readConcern.level = "majority";
             }
         }
-        const docs = assert.commandWorked(db.runCommand(findCmdObj)).cursor.firstBatch;
+        const docs = assert.commandWorked(sessionDb.runCommand(findCmdObj)).cursor.firstBatch;
         print("verifyDocuments " +
               tojsononeline(
                   {findCmdObj, numDocsFound: docs.length, numDocsExpected: numDocsExpected}));
