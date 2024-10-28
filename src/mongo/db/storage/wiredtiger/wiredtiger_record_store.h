@@ -219,8 +219,6 @@ public:
                                 long long numRecords,
                                 long long dataSize) override;
 
-    NamespaceString ns(OperationContext* opCtx) const override;
-
     Status updateOplogSize(OperationContext* opCtx, long long newOplogSize) override;
 
     std::shared_ptr<CollectionTruncateMarkers> getCollectionTruncateMarkers() override;

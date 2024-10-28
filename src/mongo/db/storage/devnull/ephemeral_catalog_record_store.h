@@ -46,6 +46,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/key_format.h"
@@ -151,10 +152,6 @@ public:
     void reserveRecordIds(OperationContext* opCtx,
                           std::vector<RecordId>* out,
                           size_t nRecords) final{};
-
-    NamespaceString ns(OperationContext* opCtx) const final {
-        return _data->ns;
-    }
 
 protected:
     struct EphemeralForTestRecord {

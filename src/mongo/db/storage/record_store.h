@@ -47,7 +47,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/damage_vector.h"
@@ -345,11 +344,6 @@ public:
     }
 
     /**
-     * Get the namespace this RecordStore is associated with.
-     */
-    virtual NamespaceString ns(OperationContext* opCtx) const = 0;
-
-    /**
      * The key format for this RecordStore's RecordIds.
      *
      * Clustered collections may use the String format, however most
@@ -437,7 +431,7 @@ public:
         RecordData data;
         invariant(findRecord(opCtx, loc, &data),
                   str::stream() << "Didn't find RecordId " << loc << " in record store "
-                                << ns(opCtx).toStringForErrorMsg());
+                                << (_uuid ? _uuid->toString() : std::string{}));
         return data;
     }
 

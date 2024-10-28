@@ -96,10 +96,6 @@ public:
         return "devnull";
     }
 
-    NamespaceString ns(OperationContext* opCtx) const override {
-        return _ns;
-    }
-
     long long dataSize(OperationContext* opCtx) const override {
         return 0;
     }

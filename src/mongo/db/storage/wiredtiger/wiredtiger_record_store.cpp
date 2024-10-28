@@ -45,7 +45,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/validate/validate_results.h"
@@ -159,15 +158,6 @@ std::size_t computeRecordIdSize(const RecordId& id) {
     // return 0 in those cases. With the clustering capabilities we now support potentially large
     // keys as they are byte arrays, thus having to take it into account for the read/write metrics.
     return id.isStr() ? id.getStr().size() : 0;
-}
-
-boost::optional<NamespaceString> namespaceForUUID(OperationContext* opCtx,
-                                                  const boost::optional<UUID>& uuid) {
-    if (!uuid)
-        return boost::none;
-
-    // TODO SERVER-73111: Remove the dependency on CollectionCatalog
-    return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid);
 }
 
 RecordId getKey(WT_CURSOR* cursor, KeyFormat keyFormat) {
@@ -521,12 +511,6 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
     }
 }
 
-NamespaceString WiredTigerRecordStore::ns(OperationContext* opCtx) const {
-    auto nss = namespaceForUUID(opCtx, _uuid);
-
-    return nss ? *nss : NamespaceString::kEmpty;
-}
-
 void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {
     std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/true);
     if (!cursor->next()) {
@@ -544,10 +528,8 @@ void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {
         LOGV2_FOR_RECOVERY(23983,
                            2,
                            "Record store was empty; setting count metadata to zero but marking "
-                           "record store as needing size adjustment during recovery. ns: "
-                           "{isTemp_temp_ns}, ident: {ident}",
-                           "isTemp_temp_ns"_attr =
-                               (isTemp() ? "(temp)" : toStringForLogging(ns(opCtx))),
+                           "record store as needing size adjustment during recovery",
+                           "uuid"_attr = _uuid,
                            "ident"_attr = getIdent());
         sizeRecoveryState(getGlobalServiceContext())
             .markCollectionAsAlwaysNeedsSizeAdjustment(getIdent());
@@ -674,7 +656,7 @@ void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const Record
         opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
         HealthLogEntry entry;
-        entry.setNss(namespaceForUUID(opCtx, _uuid));
+        entry.setCollectionUUID(_uuid);
         entry.setTimestamp(Date_t::now());
         entry.setSeverity(SeverityEnum::Error);
         entry.setScope(ScopeEnum::Collection);
@@ -692,13 +674,13 @@ void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const Record
         if (TestingProctor::instance().isEnabled()) {
             LOGV2_FATAL(9099700,
                         "Record to be deleted not found",
-                        "nss"_attr = namespaceForUUID(opCtx, _uuid),
+                        "uuid"_attr = _uuid,
                         "RecordId"_attr = id);
         } else {
             // Return early without crash if in production.
             LOGV2_ERROR(9099701,
                         "Record to be deleted not found",
-                        "nss"_attr = namespaceForUUID(opCtx, _uuid),
+                        "uuid"_attr = _uuid,
                         "RecordId"_attr = id);
             printStackTrace();
             return;
@@ -1129,7 +1111,7 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
 
     invariantWTOK(ret,
                   c->session,
-                  str::stream() << "Namespace: " << ns(opCtx).toStringForErrorMsg()
+                  str::stream() << "UUID: " << (_uuid ? _uuid->toString() : std::string{})
                                 << "; Key: " << getKey(c, _keyFormat) << "; Read Timestamp: "
                                 << shard_role_details::getRecoveryUnit(opCtx)
                                        ->getPointInTimeReadTimestamp()
@@ -1660,7 +1642,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
         rollbackReason = rollbackReason ? rollbackReason : "undefined";
         throwWriteConflictException(
             fmt::format("Rollback ocurred while performing initial write to '{}'. Reason: '{}'",
-                        ns(opCtx).toStringForErrorMsg(),
+                        _uuid ? _uuid->toString() : std::string{},
                         rollbackReason));
     } else if (ret != WT_NOTFOUND) {
         if (ret == ENOTSUP) {
@@ -1670,7 +1652,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
                     6627200,
                     "WiredTiger tables using 'type=lsm' (Log-Structured Merge Tree) are not "
                     "supported.",
-                    "namespace"_attr = ns(opCtx),
+                    "uuid"_attr = _uuid,
                     "metadata"_attr = redact(creationMetadata));
             }
         }
@@ -1939,7 +1921,7 @@ RecordId WiredTigerRecordStoreCursor::nextIdCommon() {
 void WiredTigerRecordStoreCursor::reportOutOfOrderRead(const RecordId& id,
                                                        bool failWithOutOfOrderForTest) const {
     HealthLogEntry entry;
-    entry.setNss(namespaceForUUID(_opCtx, _uuid));
+    entry.setCollectionUUID(_uuid);
     entry.setTimestamp(Date_t::now());
     entry.setSeverity(SeverityEnum::Error);
     entry.setScope(ScopeEnum::Collection);
@@ -1979,7 +1961,7 @@ void WiredTigerRecordStoreCursor::reportOutOfOrderRead(const RecordId& id,
                         "next"_attr = id,
                         "last"_attr = _lastReturnedId,
                         "ident"_attr = _ident,
-                        "ns"_attr = namespaceForUUID(_opCtx, _uuid));
+                        "uuid"_attr = _uuid);
 }
 
 void WiredTigerRecordStoreCursor::checkOrder(const RecordId& id) const {

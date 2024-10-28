@@ -58,11 +58,10 @@ namespace {
 template <typename F>
 static void storageUnavailableRetry(OperationContext* opCtx,
                                     StringData opStr,
-                                    const NamespaceStringOrUUID& nssOrUUID,
                                     F&& f,
                                     boost::optional<size_t> retryLimit = boost::none) {
     // writeConflictRetry already implements a retryBackoff for storage unavailable.
-    writeConflictRetry(opCtx, opStr, nssOrUUID, f, retryLimit);
+    writeConflictRetry(opCtx, opStr, NamespaceString::kEmpty, f, retryLimit);
 }
 }  // namespace
 
@@ -151,7 +150,7 @@ int SpillingStore::upsertToRecordStore(OperationContext* opCtx,
     ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
     auto result = mongo::Status::OK();
 
-    storageUnavailableRetry(opCtx, "SpillingStore::upsertToRecordStore", rs()->ns(opCtx), [&] {
+    storageUnavailableRetry(opCtx, "SpillingStore::upsertToRecordStore", [&] {
         WriteUnitOfWork wuow(opCtx);
         if (update) {
             result = rs()->updateRecord(opCtx, key, buf.buf(), buf.len());
@@ -178,7 +177,7 @@ Status SpillingStore::insertRecords(OperationContext* opCtx,
     ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
     auto status = Status::OK();
 
-    storageUnavailableRetry(opCtx, "SpillingStore::insertRecords", rs()->ns(opCtx), [&] {
+    storageUnavailableRetry(opCtx, "SpillingStore::insertRecords", [&] {
         WriteUnitOfWork wuow(opCtx);
         status = rs()->insertRecords(opCtx, inOutRecords, timestamps);
         wuow.commit();
@@ -195,7 +194,7 @@ boost::optional<value::MaterializedRow> SpillingStore::readFromRecordStore(Opera
     bool found;
     // Because we impose a timeout for storage engine operations, we need to handle errors and retry
     // reads too.
-    storageUnavailableRetry(opCtx, "SpillingStore::readFromRecordStore", rs()->ns(opCtx), [&] {
+    storageUnavailableRetry(opCtx, "SpillingStore::readFromRecordStore", [&] {
         found = rs()->findRecord(opCtx, rid, &record);
     });
 
@@ -212,9 +211,8 @@ bool SpillingStore::findRecord(OperationContext* opCtx, const RecordId& loc, Rec
     bool found;
     // Because we impose a timeout for storage engine operations, we need to handle errors and retry
     // reads too.
-    storageUnavailableRetry(opCtx, "SpillingStore::findRecord", rs()->ns(opCtx), [&] {
-        found = rs()->findRecord(opCtx, loc, out);
-    });
+    storageUnavailableRetry(
+        opCtx, "SpillingStore::findRecord", [&] { found = rs()->findRecord(opCtx, loc, out); });
     return found;
 }
 

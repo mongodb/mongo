@@ -72,10 +72,6 @@ public:
         return true;
     }
 
-    NamespaceString ns(OperationContext* opCtx) const final {
-        return _ns;
-    }
-
     KeyFormat keyFormat() const final {
         return KeyFormat::Long;
     }
