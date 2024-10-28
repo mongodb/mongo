@@ -11,8 +11,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
@@ -56,3 +54,15 @@ assert.commandFailedWithCode(
     db.runCommand(
         {"collMod": collName, "index": {"keyPattern": {_id: 1}, "expireAfterSeconds": 100}}),
     ErrorCodes.InvalidOptions);
+
+const collCapped = db.getCollection(collName + "_capped");
+collCapped.drop();
+db.createCollection(collCapped.getName(), {capped: true, size: 1024 * 1024});
+collCapped.createIndex({a: 1});
+
+// Successfully convert to a TTL index.
+assert.commandWorked(db.runCommand({
+    "collMod": collCapped.getName(),
+    "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100},
+}));
+assert(findTTL(collCapped, {a: 1}, 100), "TTL index should be 100 now");
