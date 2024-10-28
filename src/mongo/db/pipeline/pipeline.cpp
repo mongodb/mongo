@@ -531,7 +531,7 @@ boost::optional<ShardId> Pipeline::needsSpecificShardMerger() const {
     return boost::none;
 }
 
-bool Pipeline::needsMongosMerger() const {
+bool Pipeline::needsRouterMerger() const {
     return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
         return stage->constraints(SplitState::kSplitForMerge).resolvedHostTypeRequirement(pCtx) ==
             HostTypeRequirement::kMongoS;
@@ -553,7 +553,7 @@ bool Pipeline::needsShard() const {
     });
 }
 
-bool Pipeline::requiredToRunOnMongos() const {
+bool Pipeline::requiredToRunOnRouter() const {
     invariant(_splitState != SplitState::kSplitForShards);
 
     for (auto&& stage : _sources) {
@@ -766,7 +766,7 @@ DepsTracker Pipeline::getDependenciesForContainer(
     return deps;
 }
 
-Status Pipeline::canRunOnMongos() const {
+Status Pipeline::canRunOnRouter() const {
     for (auto&& stage : _sources) {
         auto constraints = stage->constraints(_splitState);
         auto hostRequirement = constraints.resolvedHostTypeRequirement(pCtx);

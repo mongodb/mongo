@@ -131,8 +131,8 @@ public:
         return DocumentSourceDeferredMergeSort::create(_expCtx);
     }
 
-    boost::intrusive_ptr<DocumentSourceMustRunOnMongoS> runOnMongos() {
-        return DocumentSourceMustRunOnMongoS::create(_expCtx);
+    boost::intrusive_ptr<DocumentSourceMustRunOnRouter> runOnRouter() {
+        return DocumentSourceMustRunOnRouter::create(_expCtx);
     }
 
     boost::intrusive_ptr<DocumentSourceMatch> matchStage(const std::string& matchStr) {

@@ -384,10 +384,10 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
         shardDispatchResults.splitPipeline->shardCursorsSortSpec,
         requestQueryStatsFromRemotes);
 
-    // First, check whether we can merge on the mongoS. If the merge pipeline MUST run on mongoS,
+    // First, check whether we can merge on the router. If the merge pipeline MUST run on router,
     // then ignore the internalQueryProhibitMergingOnMongoS parameter.
-    if (mergePipeline->requiredToRunOnMongos() ||
-        (!internalQueryProhibitMergingOnMongoS.load() && mergePipeline->canRunOnMongos().isOK() &&
+    if (mergePipeline->requiredToRunOnRouter() ||
+        (!internalQueryProhibitMergingOnMongoS.load() && mergePipeline->canRunOnRouter().isOK() &&
          !shardDispatchResults.mergeShardId)) {
         return runPipelineOnMongoS(namespaces,
                                    batchSize,
@@ -397,7 +397,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                                    requestQueryStatsFromRemotes);
     }
 
-    // If we are not merging on mongoS, then this is not a $changeStream aggregation, and we
+    // If we are not merging on router, then this is not a $changeStream aggregation, and we
     // therefore must have a valid routing table.
     invariant(cri);
 
@@ -769,7 +769,7 @@ AggregationTargeter AggregationTargeter::make(
             cri || pipelineDataSource == PipelineDataSource::kChangeStream ||
                 pipelineDataSource == PipelineDataSource::kQueue);
     auto pipeline = buildPipelineFn();
-    auto policy = pipeline->requiredToRunOnMongos() ? TargetingPolicy::kMongosRequired
+    auto policy = pipeline->requiredToRunOnRouter() ? TargetingPolicy::kMongosRequired
                                                     : TargetingPolicy::kAnyShard;
     if (!cri && pipelineDataSource == PipelineDataSource::kQueue) {
         // If we don't have a routing table and there is a $documents stage, we must run on
@@ -787,10 +787,10 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
                            bool requestQueryStatsFromRemotes) {
     auto expCtx = pipeline->getContext();
 
-    // We should never receive a pipeline which cannot run on mongoS.
+    // We should never receive a pipeline which cannot run on router.
     invariant(!expCtx->explain);
-    uassertStatusOKWithContext(pipeline->canRunOnMongos(),
-                               "pipeline is required to run on mongoS, but cannot");
+    uassertStatusOKWithContext(pipeline->canRunOnRouter(),
+                               "pipeline is required to run on router, but cannot");
 
 
     // Verify that the first stage can produce input for the remainder of the pipeline.

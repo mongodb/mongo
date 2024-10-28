@@ -5369,48 +5369,48 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
 
 }  // namespace needsSpecificShardMerger
 
-namespace mustRunOnMongoS {
+namespace mustRunOnRouter {
 using HostTypeRequirement = StageConstraints::HostTypeRequirement;
-using PipelineMustRunOnMongoSTest = AggregationContextFixture;
+using PipelineMustRunOnRouterTest = AggregationContextFixture;
 
-TEST_F(PipelineMustRunOnMongoSTest, UnsplittablePipelineMustRunOnMongoS) {
+TEST_F(PipelineMustRunOnRouterTest, UnsplittablePipelineMustRunOnRouter) {
     setExpCtx({.inRouter = true, .allowDiskUse = false});
-    auto pipeline = makePipeline({matchStage("{x: 5}"), runOnMongos()});
-    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+    auto pipeline = makePipeline({matchStage("{x: 5}"), runOnRouter()});
+    ASSERT_TRUE(pipeline->requiredToRunOnRouter());
 
     pipeline->optimizePipeline();
-    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+    ASSERT_TRUE(pipeline->requiredToRunOnRouter());
 }
 
-TEST_F(PipelineMustRunOnMongoSTest, UnsplittableMongoSPipelineAssertsIfDisallowedStagePresent) {
+TEST_F(PipelineMustRunOnRouterTest, UnsplittableRouterPipelineAssertsIfDisallowedStagePresent) {
     setExpCtx({.inRouter = true, .allowDiskUse = true});
-    auto pipeline = makePipeline({matchStage("{x: 5}"), runOnMongos(), sortStage("{x: 1}")});
+    auto pipeline = makePipeline({matchStage("{x: 5}"), runOnRouter(), sortStage("{x: 1}")});
     pipeline->optimizePipeline();
 
-    // The entire pipeline must run on mongoS, but $sort cannot do so when 'allowDiskUse' is true.
-    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
-    ASSERT_NOT_OK(pipeline->canRunOnMongos());
+    // The entire pipeline must run on router, but $sort cannot do so when 'allowDiskUse' is true.
+    ASSERT_TRUE(pipeline->requiredToRunOnRouter());
+    ASSERT_NOT_OK(pipeline->canRunOnRouter());
 }
 
-DEATH_TEST_F(PipelineMustRunOnMongoSTest,
-             SplittablePipelineMustMergeOnMongoSAfterSplit,
+DEATH_TEST_F(PipelineMustRunOnRouterTest,
+             SplittablePipelineMustMergeOnRouterAfterSplit,
              "invariant") {
     setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline =
-        makePipeline({matchStage("{x: 5}"), splitStage(HostTypeRequirement::kNone), runOnMongos()});
+        makePipeline({matchStage("{x: 5}"), splitStage(HostTypeRequirement::kNone), runOnRouter()});
 
-    // We don't need to run the entire pipeline on mongoS because we can split at
+    // We don't need to run the entire pipeline on router because we can split at
     // $_internalSplitPipeline.
-    ASSERT_FALSE(pipeline->requiredToRunOnMongos());
+    ASSERT_FALSE(pipeline->requiredToRunOnRouter());
 
     auto splitPipeline = sharded_agg_helpers::SplitPipeline::split(std::move(pipeline));
     ASSERT(splitPipeline.shardsPipeline);
     ASSERT(splitPipeline.mergePipeline);
 
-    ASSERT_TRUE(splitPipeline.mergePipeline->requiredToRunOnMongos());
+    ASSERT_TRUE(splitPipeline.mergePipeline->requiredToRunOnRouter());
 
-    // Calling 'requiredToRunOnMongos' on the shard pipeline will hit an invariant.
-    splitPipeline.shardsPipeline->requiredToRunOnMongos();
+    // Calling 'requiredToRunOnRouter' on the shard pipeline will hit an invariant.
+    splitPipeline.shardsPipeline->requiredToRunOnRouter();
 }
 
 /**
@@ -5425,51 +5425,51 @@ public:
     }
 };
 
-TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStagePresent) {
+TEST_F(PipelineMustRunOnRouterTest, SplitRouterMergePipelineAssertsIfShardStagePresent) {
     setExpCtx({.inRouter = true, .allowDiskUse = true});
     auto expCtx = getExpCtx();
     expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
     auto pipeline = makePipeline(
-        {matchStage("{x: 5}"), splitStage(HostTypeRequirement::kNone), runOnMongos(), outStage()});
+        {matchStage("{x: 5}"), splitStage(HostTypeRequirement::kNone), runOnRouter(), outStage()});
 
-    // We don't need to run the entire pipeline on mongoS because we can split at
+    // We don't need to run the entire pipeline on router because we can split at
     // $_internalSplitPipeline.
-    ASSERT_FALSE(pipeline->requiredToRunOnMongos());
+    ASSERT_FALSE(pipeline->requiredToRunOnRouter());
 
     auto splitPipeline = sharded_agg_helpers::SplitPipeline::split(std::move(pipeline));
 
-    // The merge pipeline must run on mongoS, but $out needs to run on  the primary shard.
-    ASSERT_TRUE(splitPipeline.mergePipeline->requiredToRunOnMongos());
-    ASSERT_NOT_OK(splitPipeline.mergePipeline->canRunOnMongos());
+    // The merge pipeline must run on router, but $out needs to run on the primary shard.
+    ASSERT_TRUE(splitPipeline.mergePipeline->requiredToRunOnRouter());
+    ASSERT_NOT_OK(splitPipeline.mergePipeline->canRunOnRouter());
 }
 
-TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShardSideOfSplit) {
+TEST_F(PipelineMustRunOnRouterTest, SplittablePipelineAssertsIfRouterStageOnShardSideOfSplit) {
     setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline = makePipeline(
-        {matchStage("{x: 5}"), runOnMongos(), splitStage(HostTypeRequirement::kAnyShard)});
+        {matchStage("{x: 5}"), runOnRouter(), splitStage(HostTypeRequirement::kAnyShard)});
     pipeline->optimizePipeline();
 
-    // The 'runOnMongos' stage comes before any splitpoint, so this entire pipeline must run on
-    // mongoS. However, the pipeline *cannot* run on mongoS and *must* split at
-    // $_internalSplitPipeline due to the latter's 'anyShard' requirement. The mongoS stage would
+    // The 'runOnRouter' stage comes before any splitpoint, so this entire pipeline must run on
+    // rotuer. However, the pipeline *cannot* run on router and *must* split at
+    // $_internalSplitPipeline due to the latter's 'anyShard' requirement. The rotuer stage would
     // end up on the shard side of this split, and so it asserts.
-    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
-    ASSERT_NOT_OK(pipeline->canRunOnMongos());
+    ASSERT_TRUE(pipeline->requiredToRunOnRouter());
+    ASSERT_NOT_OK(pipeline->canRunOnRouter());
 }
 
-TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineRunsUnsplitOnMongoSIfSplitpointIsEligible) {
+TEST_F(PipelineMustRunOnRouterTest, SplittablePipelineRunsUnsplitOnRouterIfSplitpointIsEligible) {
     setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline =
-        makePipeline({matchStage("{x: 5}"), runOnMongos(), splitStage(HostTypeRequirement::kNone)});
+        makePipeline({matchStage("{x: 5}"), runOnRouter(), splitStage(HostTypeRequirement::kNone)});
     pipeline->optimizePipeline();
 
-    // The 'runOnMongos' stage is before the splitpoint, so this entire pipeline must run on mongoS.
-    // In this case, the splitpoint is itself eligible to run on mongoS, and so we are able to
+    // The 'runOnRouter' stage is before the splitpoint, so this entire pipeline must run on router.
+    // In this case, the splitpoint is itself eligible to run on router, and so we are able to
     // return true.
-    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+    ASSERT_TRUE(pipeline->requiredToRunOnRouter());
 }
 
-}  // namespace mustRunOnMongoS
+}  // namespace mustRunOnRouter
 
 namespace DeferredSort {
 using PipelineDeferredMergeSortTest = AggregationContextFixture;

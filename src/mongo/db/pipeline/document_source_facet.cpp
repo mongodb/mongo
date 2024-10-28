@@ -370,7 +370,7 @@ void DocumentSourceFacet::addVariableRefs(std::set<Variables::Id>* refs) const {
 intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
 
-    boost::optional<std::string> needsMongoS;
+    boost::optional<std::string> needsRouter;
     boost::optional<std::string> needsShard;
 
     std::vector<FacetPipeline> facetPipelines;
@@ -405,14 +405,14 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
             if (!needsShard && pipeline->needsShard()) {
                 needsShard.emplace(facetName);
             }
-            if (!needsMongoS && pipeline->needsMongosMerger()) {
-                needsMongoS.emplace(facetName);
+            if (!needsRouter && pipeline->needsRouterMerger()) {
+                needsRouter.emplace(facetName);
             }
             uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "$facet pipeline '" << *needsMongoS
-                                  << "' must run on mongoS, but '" << *needsShard
+                    str::stream() << "$facet pipeline '" << *needsRouter
+                                  << "' must run on router, but '" << *needsShard
                                   << "' requires a shard",
-                    !(needsShard && needsMongoS));
+                    !(needsShard && needsRouter));
         }
 
         facetPipelines.emplace_back(facetName, std::move(pipeline));

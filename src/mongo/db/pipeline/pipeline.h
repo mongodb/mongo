@@ -321,9 +321,9 @@ public:
     boost::optional<ShardId> needsSpecificShardMerger() const;
 
     /**
-     * Returns 'true' if the pipeline must merge on mongoS.
+     * Returns 'true' if the pipeline must merge on router.
      */
-    bool needsMongosMerger() const;
+    bool needsRouterMerger() const;
 
     /**
      * Returns 'true' if any stage in the pipeline must run on a shard.
@@ -337,16 +337,16 @@ public:
     bool needsAllShardHosts() const;
 
     /**
-     * Returns Status::OK() if the pipeline can run on mongoS, but is not obliged to; that is, it
+     * Returns Status::OK() if the pipeline can run on router, but is not obliged to; that is, it
      * can run either on mongoS or on a shard.
      */
-    Status canRunOnMongos() const;
+    Status canRunOnRouter() const;
 
     /**
-     * Returns true if this pipeline must only run on mongoS. Can be called on unsplit or merge
+     * Returns true if this pipeline must only run on router. Can be called on unsplit or merge
      * pipelines, but not on the shards part of a split pipeline.
      */
-    bool requiredToRunOnMongos() const;
+    bool requiredToRunOnRouter() const;
 
     /**
      * Modifies the pipeline, optimizing it by combining and swapping stages.

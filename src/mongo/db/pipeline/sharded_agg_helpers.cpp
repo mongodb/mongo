@@ -843,7 +843,7 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
                                 PipelineDataSource pipelineDataSource,
                                 ShardTargetingPolicy shardTargetingPolicy,
                                 const boost::optional<CollectionRoutingInfo>& cri) {
-    const bool needsMongosMerge = pipeline->needsMongosMerger();
+    const bool needsRouterMerge = pipeline->needsRouterMerger();
 
     auto shardQuery = pipeline->getInitialQuery();
 
@@ -869,9 +869,9 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
 
     bool targetAllHosts = pipeline->needsAllShardHosts();
     // Don't need to split the pipeline if we are only targeting a single shard, unless:
-    // - The pipeline contains one or more stages which must always merge on mongoS.
+    // - The pipeline contains one or more stages which must always merge on router.
     // - The pipeline requires the merge to be performed on a specific shard that is not targeted.
-    const bool needsSplit = (shardIds.size() > 1u) || needsMongosMerge || targetAllHosts ||
+    const bool needsSplit = (shardIds.size() > 1u) || needsRouterMerge || targetAllHosts ||
         (mergeShardId && *(shardIds.begin()) != mergeShardId);
 
     if (mergeShardId) {
@@ -1036,10 +1036,10 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
     if (needsSplit) {
         LOGV2_DEBUG(20906,
                     5,
-                    "Splitting pipeline: targeting = {shardIds_size} shards, needsMongosMerge = "
-                    "{needsMongosMerge}, needsSpecificShardMerger = {needsSpecificShardMerger}",
+                    "Splitting pipeline: targeting = {shardIds_size} shards, needsRouterMerge = "
+                    "{needsRouterMerge}, needsSpecificShardMerger = {needsSpecificShardMerger}",
                     "shardIds_size"_attr = shardCount,
-                    "needsMongosMerge"_attr = pipeline->needsMongosMerger(),
+                    "needsRouterMerge"_attr = pipeline->needsRouterMerger(),
                     "needsSpecificShardMerger"_attr =
                         mergeShardId.has_value() ? mergeShardId->toString() : "false");
 
@@ -1351,7 +1351,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         auto* mergePipeline = dispatchResults.splitPipeline->mergePipeline.get();
         auto specificMergeShardId = dispatchResults.mergeShardId;
         auto mergeType = [&]() -> std::string {
-            if (mergePipeline->canRunOnMongos().isOK() && !specificMergeShardId) {
+            if (mergePipeline->canRunOnRouter().isOK() && !specificMergeShardId) {
                 if (mergeCtx->inRouter) {
                     return "mongos";
                 }

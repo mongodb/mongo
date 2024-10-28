@@ -60,10 +60,10 @@ public:
     }
 };
 
-// Like a DocumentSourceMock, but must run on mongoS and can be used anywhere in the pipeline.
-class DocumentSourceMustRunOnMongoS : public DocumentSourceMock {
+// Like a DocumentSourceMock, but must run on router and can be used anywhere in the pipeline.
+class DocumentSourceMustRunOnRouter : public DocumentSourceMock {
 public:
-    DocumentSourceMustRunOnMongoS(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceMustRunOnRouter(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceMock({}, expCtx) {}
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -78,9 +78,9 @@ public:
                 UnionRequirement::kAllowed};
     }
 
-    static boost::intrusive_ptr<DocumentSourceMustRunOnMongoS> create(
+    static boost::intrusive_ptr<DocumentSourceMustRunOnRouter> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceMustRunOnMongoS(expCtx);
+        return new DocumentSourceMustRunOnRouter(expCtx);
     }
 };
 
