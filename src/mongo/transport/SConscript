@@ -155,3 +155,15 @@ env.Benchmark(
     ],
     CONSOLIDATED_TARGET="second_half_bm",
 )
+
+env.Benchmark(
+    target="message_compressor_bm",
+    source=[
+        "message_compressor_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/rpc/message",
+        "message_compressor",
+    ],
+)
