@@ -1651,7 +1651,7 @@ TEST(SSLManager, multipleCRLsFromSameIssuerTests) {
         SSLManagerInterface::create(serverParams, true),
         DBException,
         ErrorCodes::InvalidSSLConfiguration,
-        "CertAddCRLContextToStore Failed  The object or property already exists.");
+        "CertAddCRLContextToStore Failed: The object or property already exists.");
 #else
     {
         clientParams.sslPEMKeyFile = clientKeyFile;
@@ -1755,8 +1755,6 @@ TEST(SSLManager, noCRLFoundTests) {
 // the end-entity cert is not.
 // Caveats:
 // - Apple: CRL unsupported; test disabled
-// - Windows: multiple CRLs (root CRL + intermediate CRL) is not allowed
-// TODO: SERVER-95583 investigate why windows behaves like this.
 TEST(SSLManager, revocationWithCRLsIntermediateTests) {
     // intermediate-ca-B.pem + intermediate-ca-B-leaf.pem bundle
     const std::string intermediateBLeafWithIssuerCertKeyFile = combinePEMFiles(
@@ -1778,19 +1776,11 @@ TEST(SSLManager, revocationWithCRLsIntermediateTests) {
     serverParams.sslCAFile = caFile;
     serverParams.sslPEMKeyFile = intermediateBLeafWithIssuerCertKeyFile;
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
-    ASSERT_THROWS_CODE_AND_WHAT(
-        SSLManagerInterface::create(clientParams, true),
-        DBException,
-        ErrorCodes::InvalidSSLConfiguration,
-        "CertAddCRLContextToStore Failed  The object or property already exists.");
-#else
     SSLTestFixture tf(serverParams, clientParams);
     tf.doHandshake();
     auto result = tf.runIngressEgressValidation();
     checkValidationResults(result, true, false);
     ASSERT_NE(result.egress.getStatus().reason().find("revoked"), std::string::npos);
-#endif
 }
 
 #endif  // MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_APPLE
