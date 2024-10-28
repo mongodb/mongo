@@ -81,6 +81,10 @@ class VersionConstantValues(NamedTuple):
         """Get a string version of the latest FCV."""
         return version_str(self.latest)
 
+    def get_fcv_tags_less_than_latest(self) -> List[str]:
+        """Get the list of all fcv tags less than the latest."""
+        return [tag_str(fcv) for fcv in self.fcvs_less_than_latest]
+
     def build_last_lts_binary(self, base_name: str) -> str:
         """
         Build the name of the binary that the LTS version of the given tool will have.
