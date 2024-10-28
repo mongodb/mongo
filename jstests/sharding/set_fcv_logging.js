@@ -22,48 +22,52 @@ const SetFCVStatus = Object.freeze({called: 1, transitioning: 2, successful: 3})
  */
 function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
     if (status >= SetFCVStatus.called) {
-        assert.soon(() => rawMongoProgramOutput(".*").match(/\"id\":6744300/),
+        assert.soon(() => rawMongoProgramOutput("\"id\":6744300").match(/\"id\":6744300/),
                     '"FCV ' + upgradeOrDowngrade + ' called" log not found');
     } else {
-        assert(rawMongoProgramOutput(".*").match(/\"id\":6744300/) == null,
+        assert(rawMongoProgramOutput("\"id\":6744300").match(/\"id\":6744300/) == null,
                'should not log but "FCV ' + upgradeOrDowngrade + ' called" log found');
     }
     if (status >= SetFCVStatus.transitioning) {
-        assert.soon(() => rawMongoProgramOutput(".*").match(/\"id\":6744301/),
+        assert.soon(() => rawMongoProgramOutput("\"id\":6744301").match(/\"id\":6744301/),
                     '"FCV ' + upgradeOrDowngrade + ' in progress" log not found');
     } else {
-        assert(rawMongoProgramOutput(".*").match(/\"id\":6744301/) == null,
+        assert(rawMongoProgramOutput("\"id\":6744301").match(/\"id\":6744301/) == null,
                'should not log but "FCV ' + upgradeOrDowngrade + ' in progress" log found');
     }
     if (status >= SetFCVStatus.successful) {
-        assert.soon(() => rawMongoProgramOutput(".*").match(/\"id\":6744302/),
+        assert.soon(() => rawMongoProgramOutput("\"id\":6744302").match(/\"id\":6744302/),
                     '"FCV ' + upgradeOrDowngrade + ' success" log not found');
     } else {
-        assert(rawMongoProgramOutput(".*").match(/\"id\":6744302/) == null,
+        assert(rawMongoProgramOutput("\"id\":6744302").match(/\"id\":6744302/) == null,
                'should not log but "FCV ' + upgradeOrDowngrade + ' success" log found');
     }
 
     if (serverType === "replica set/maintenance mode") {
         assert.soon(() => {
-            let matchRes = rawMongoProgramOutput(".*").match(
-                /\"serverType\":"replica set\/maintenance mode"/g);
+            let matchRes = rawMongoProgramOutput("\"serverType\"")
+                               .match(/\"serverType\":"replica set\/maintenance mode"/g);
             return matchRes != null && matchRes.length == status;
         }, "should have " + status + " log(s) with serverType: replica set/maintenance mode");
     } else if (serverType === "shardedCluster") {
         assert.soon(() => {
-            let matchRes = rawMongoProgramOutput(".*").match(/\"serverType\":"config server"/g);
+            let matchRes =
+                rawMongoProgramOutput("\"serverType\"").match(/\"serverType\":"config server"/g);
             return matchRes != null && matchRes.length == status;
         }, "should have " + status + " log(s) with serverType: config server");
         // If the FCV change failed before the config server reached the transitioning state,
         // there should not be any logs containing 'shard server'.
         if (status >= SetFCVStatus.transitioning) {
             assert.soon(() => {
-                let matchRes = rawMongoProgramOutput(".*").match(/\"serverType\":"shard server"/g);
+                let matchRes =
+                    rawMongoProgramOutput("\"serverType\"").match(/\"serverType\":"shard server"/g);
                 return matchRes != null && matchRes.length == numShardServers * status;
             }, "should have " + numShardServers * status + " log(s) with serverType: shard server");
         } else {
-            assert(rawMongoProgramOutput(".*").match(/\"serverType\":"shard server"/g) == null,
-                   'should not have log containing shard server');
+            assert(
+                rawMongoProgramOutput("\"serverType\"").match(/\"serverType\":"shard server"/g) ==
+                    null,
+                'should not have log containing shard server');
         }
     }
     clearRawMongoProgramOutput();  // Clears output for next logging.

@@ -34,7 +34,7 @@ function testWithGoodTimeZoneDir(tzGoodInfoDir) {
         () => MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzBadInfo}),
         [],
         "expected launching mongos with bad timezone rules to fail");
-    assert.neq(-1, rawMongoProgramOutput(".*").search(/Fatal assertion.*40475/));
+    assert.neq(-1, rawMongoProgramOutput("Fatal assertion").search(/40475/));
 
     // Test that a non-existent timezone directory causes mongoS startup to fail.
     assert.throws(
