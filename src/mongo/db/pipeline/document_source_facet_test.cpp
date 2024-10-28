@@ -214,7 +214,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithi
 
     auto spec = fromjson(
         "{$facet: {badPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}, "
-        "{$_internalSplitPipeline: {mergeType: 'mongos'}}]}}");
+        "{$_internalSplitPipeline: {mergeType: 'router'}}]}}");
 
     ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                        AssertionException,
@@ -228,7 +228,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcros
 
     auto spec = fromjson(
         "{$facet: {shardPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}], mongosPipe: "
-        "[{$_internalSplitPipeline: {mergeType: 'mongos'}}]}}");
+        "[{$_internalSplitPipeline: {mergeType: 'router'}}]}}");
 
     ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                        AssertionException,

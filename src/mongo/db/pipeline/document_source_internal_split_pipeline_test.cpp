@@ -42,9 +42,9 @@ using DocumentSourceInternalSplitPipelineTest = AggregationContextFixture;
 TEST_F(DocumentSourceInternalSplitPipelineTest, NotAllowedInLookupIfMustRunOnMongos) {
     auto expCtx = getExpCtx();
     auto split = DocumentSourceInternalSplitPipeline::create(
-        expCtx, StageConstraints::HostTypeRequirement::kMongoS);
+        expCtx, StageConstraints::HostTypeRequirement::kRouter);
     ASSERT_FALSE(split->constraints().isAllowedInLookupPipeline());
-    ASSERT(split->constraints().hostRequirement == StageConstraints::HostTypeRequirement::kMongoS);
+    ASSERT(split->constraints().hostRequirement == StageConstraints::HostTypeRequirement::kRouter);
 }
 
 }  // namespace

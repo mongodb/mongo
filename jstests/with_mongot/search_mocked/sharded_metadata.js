@@ -297,19 +297,20 @@ function testMergeAtLocationSearchMeta(mergeType, localColl, isView) {
 const owningShardMerge = {
     "specificShard": st.shard0.shardName
 };
-testMergeAtLocation("mongos", testColl, false);
+const routerMergeType = st.getMergeType(testDB);
+testMergeAtLocation(routerMergeType, testColl, false);
 testMergeAtLocation("anyShard", testColl, false);
 testMergeAtLocation(owningShardMerge, testColl, false);
 testMergeAtLocation("localOnly", testColl, false);
 
-testMergeAtLocationSearchMeta("mongos", testColl, false);
+testMergeAtLocationSearchMeta(routerMergeType, testColl, false);
 testMergeAtLocationSearchMeta("anyShard", testColl, false);
 testMergeAtLocationSearchMeta(owningShardMerge, testColl, false);
 // Repeat, but the collection is a view.
 assert.commandWorked(
     testDB.createView(collName + "viewColl", testColl.getName(), [{$search: mongotQuery}], {}));
 let viewColl = testDB.getCollection(collName + "viewColl");
-testMergeAtLocation("mongos", viewColl, true);
+testMergeAtLocation(routerMergeType, viewColl, true);
 testMergeAtLocation("anyShard", viewColl, true);
 testMergeAtLocation(owningShardMerge, viewColl, true);
 testMergeAtLocation("localOnly", viewColl, true);
@@ -321,7 +322,7 @@ assert(viewColl.drop());
 assert.commandWorked(testDB.createView(
     collName + "viewColl", testColl.getName(), [{$match: {_id: {$gt: -1000}}}], {}));
 viewColl = testDB.getCollection(collName + "viewColl");
-testSearchMetaFailure("mongos", viewColl, true);
+testSearchMetaFailure(routerMergeType, viewColl, true);
 testSearchMetaFailure("anyShard", viewColl, true);
 testSearchMetaFailure(owningShardMerge, viewColl, true);
 testSearchMetaFailure("localOnly", viewColl, true);
@@ -331,7 +332,7 @@ assert(viewColl.drop());
 assert.commandWorked(
     testDB.createView(collName + "viewColl", testColl.getName(), [{$searchMeta: mongotQuery}], {}));
 viewColl = testDB.getCollection(collName + "viewColl");
-testMergeAtLocationSearchMeta("mongos", testColl, false);
+testMergeAtLocationSearchMeta(routerMergeType, testColl, false);
 testMergeAtLocationSearchMeta("anyShard", viewColl, true);
 testMergeAtLocationSearchMeta(owningShardMerge, viewColl, true);
 stWithMock.stop();

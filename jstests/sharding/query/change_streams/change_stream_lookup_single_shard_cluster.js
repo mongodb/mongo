@@ -24,11 +24,11 @@ assert.commandWorked(
     mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
 assert.commandWorked(mongosColl.insert({_id: 1}));
 
-// Verify that the pipeline splits and merges on mongoS despite only targeting a single shard.
+// Verify that the pipeline splits and merges on router despite only targeting a single shard.
 const explainPlan = assert.commandWorked(
     mongosColl.explain().aggregate([{$changeStream: {fullDocument: "updateLookup"}}]));
 assert.neq(explainPlan.splitPipeline, null);
-assert.eq(explainPlan.mergeType, "mongos");
+assert.eq(explainPlan.mergeType, st.getMergeType(mongosDB));
 
 // Open a $changeStream on the collection with 'updateLookup' and update the test doc.
 const stream = mongosColl.watch([], {fullDocument: "updateLookup"});

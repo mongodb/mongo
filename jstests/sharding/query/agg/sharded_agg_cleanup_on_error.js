@@ -88,11 +88,11 @@ try {
 
     // Issue an aggregation that will fail during a getMore on shard 0, and make sure that
     // this correctly kills the hanging cursor on shard 1. Use $_internalSplitPipeline to ensure
-    // that this pipeline merges on mongos.
+    // that this pipeline merges on router.
     assertFailsAndCleansUpCursors({
         pipeline: [
             {$project: {out: {$divide: ["$_id", 0]}}},
-            {$_internalSplitPipeline: {mergeType: "mongos"}}
+            {$_internalSplitPipeline: {mergeType: st.getMergeType(mongosDB)}}
         ],
         errCode: kDivideByZeroErrCodes
     });

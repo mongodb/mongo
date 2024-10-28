@@ -125,10 +125,11 @@ function testMergeAtLocation(mergeType, localColl, isView, limit = Infinity) {
 const owningShardMerge = {
     "specificShard": st.shard0.shardName
 };
-testMergeAtLocation("mongos", testColl, false);
-testMergeAtLocation("mongos", testColl, false, 3);
-testMergeAtLocation("mongos", testColl, false, 5);
-testMergeAtLocation("mongos", testColl, false, 10);
+const routerMergeType = st.getMergeType(testDB);
+testMergeAtLocation(routerMergeType, testColl, false);
+testMergeAtLocation(routerMergeType, testColl, false, 3);
+testMergeAtLocation(routerMergeType, testColl, false, 5);
+testMergeAtLocation(routerMergeType, testColl, false, 10);
 testMergeAtLocation("anyShard", testColl, false);
 testMergeAtLocation("anyShard", testColl, false, 3);
 testMergeAtLocation("anyShard", testColl, false, 5);
@@ -147,10 +148,10 @@ testDB.createView(
     collName + "viewColl", testColl.getName(), [{$vectorSearch: vectorSearchQuery}], {});
 let viewColl = testDB.getCollection(collName + "viewColl");
 
-testMergeAtLocation("mongos", viewColl, true);
-testMergeAtLocation("mongos", viewColl, true, 3);
-testMergeAtLocation("mongos", viewColl, true, 5);
-testMergeAtLocation("mongos", viewColl, true, 10);
+testMergeAtLocation(routerMergeType, viewColl, true);
+testMergeAtLocation(routerMergeType, viewColl, true, 3);
+testMergeAtLocation(routerMergeType, viewColl, true, 5);
+testMergeAtLocation(routerMergeType, viewColl, true, 10);
 testMergeAtLocation("anyShard", viewColl, true);
 testMergeAtLocation("anyShard", viewColl, true, 3);
 testMergeAtLocation("anyShard", viewColl, true, 5);

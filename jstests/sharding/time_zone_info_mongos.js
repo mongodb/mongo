@@ -78,7 +78,7 @@ function testWithGoodTimeZoneDir(tzGoodInfoDir) {
         const tzExpr = {$const: (tz || "GMT")};
         return [
             {$addFields: {mongodParts: {$dateToParts: {date: "$date", timezone: tzExpr}}}},
-            {$_internalSplitPipeline: {mergeType: "mongos"}},
+            {$_internalSplitPipeline: {mergeType: st.getMergeType(mongosDB)}},
             {
                 $addFields: {
                     mongosDate: {
@@ -108,7 +108,7 @@ function testWithGoodTimeZoneDir(tzGoodInfoDir) {
         // The first stage in the mergerPart will be $mergeCursors, so start comparing the pipelines
         // at the 1st index.
         assert.eq(tzExplain.splitPipeline.mergerPart.slice(1), timeZonePipeline.slice(1));
-        assert.eq(tzExplain.mergeType, "mongos");
+        assert.eq(tzExplain.mergeType, st.getMergeType(mongosDB));
 
         // Confirm that both documents are output by the pipeline, demonstrating that the date has
         // been correctly disassembled on mongoD and reassembled on mongoS.
