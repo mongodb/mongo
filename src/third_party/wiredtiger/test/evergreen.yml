@@ -188,7 +188,7 @@ functions:
         # Find the equivalent mongodb branch that matches the same branch version to wiredtiger. In
         # the case of patch builds, it is possible that the developer has a branch name that doesn't
         # adhere to naming rules, therefore derive the base branch name from git.
-        branch=$(git branch --contains | grep -e "mongodb" -e "develop")
+        branch=$(git branch --contains | grep -e "mongodb" -e "develop" -e "evg-pr-test-")
         if [[ $branch =~ "mongodb-" ]]; then
           mongo_branch=v$(echo $branch | cut -d'-' -f 2)
         else
@@ -217,6 +217,14 @@ functions:
         virtualenv -p python3 venv
         source venv/bin/activate
         buildscripts/poetry_sync.sh
+
+        # FIXME-WT-13607 Bazel uses a substantial amount of space for cache when building
+        # mongo and we run out of disk space on the host. Temporarily soft link ~/.cache
+        # to point to /data - which has more space - until we fix this properly with
+        # bazel flag --user_output_root
+        rm -rf ~/.cache
+        mkdir -p /data/tmp_cache
+        ln -s /data/tmp_cache ~/.cache
 
         ./buildscripts/scons.py --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --link-model=dynamic --ninja generate-ninja ICECC=icecc CCACHE=ccache
         ninja -j$(nproc --all) install-mongod
@@ -994,6 +1002,13 @@ functions:
       script: |
         rm -rf "wiredtiger"
         rm -rf "wiredtiger.tgz"
+        # FIXME-WT-13607 - Clean up the temporary symlink to /data created in "compile mongodb"
+        # This can be removed when we stop creating the symlink
+        if [ -L /data/tmp_cache ]; then
+          sudo rm -rf /data/tmp_cache
+          rm ~/.cache
+          mkdir ~/.cache
+        fi
 
   "run wt hang analyzer":
     command: shell.exec

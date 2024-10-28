@@ -988,6 +988,8 @@ conn_dsrc_stats = [
     # Cache and eviction statistics
     ##########################################
     CacheStat('cache_bytes_dirty', 'tracked dirty bytes in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_dirty_internal', 'tracked dirty internal page bytes in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_dirty_leaf', 'tracked dirty leaf page bytes in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_dirty_total', 'bytes dirty in the cache cumulative', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_inuse', 'bytes currently in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_read', 'bytes read into cache', 'size'),
