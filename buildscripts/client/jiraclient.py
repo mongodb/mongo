@@ -1,11 +1,16 @@
 """Module to access a JIRA server."""
 
+import logging
 from enum import Enum
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, Sequence
 
 from jira import JIRA, Issue
 from jira.client import ResultList
 from pydantic import BaseSettings
+
+ASSIGNED_TEAMS_FIELD = "customfield_12751"
+
+logger = logging.getLogger(__name__)
 
 
 class SecurityLevel(Enum):
@@ -46,7 +51,7 @@ class JiraAuth(BaseSettings):
 class JiraClient:
     """A client for JIRA."""
 
-    def __init__(self, server: str, jira_auth: JiraAuth) -> None:
+    def __init__(self, server: str, jira_auth: JiraAuth, dry_run: bool = False) -> None:
         """
         Initialize the JiraClient with the server URL and user credentials.
 
@@ -59,6 +64,7 @@ class JiraClient:
             self._jira = JIRA(options=opts, validate=True, token_auth=token_auth)
         else:
             self._jira = JIRA(options=opts, validate=True, oauth=jira_auth.get_oauth())
+        self.dry_run = dry_run
 
     def get_ticket_security_level(self, key: str) -> SecurityLevel:
         """
@@ -86,3 +92,36 @@ class JiraClient:
             start_at = results.startAt + results.maxResults
             if start_at > results.total:
                 break
+
+    def create_issue(
+        self,
+        issue_type: str,
+        summary: str,
+        description: str,
+        assigned_teams: Sequence[str],
+        jira_project: str,
+        owner: Optional[str] = None,
+        priority: str = "3",
+        components: Optional[Sequence[str]] = None,
+        labels: Optional[Sequence[str]] = None,
+    ):
+        assigned_teams_mapped = list(map(lambda x: {"value": x}, assigned_teams))
+        fields = {
+            "project": {"key": jira_project},
+            "summary": issue_summary,
+            "description": description,
+            "issuetype": {"name": issue_type},
+            ASSIGNED_TEAMS_FIELD: assigned_teams_mapped,
+            "components": components,
+            "priority": {"id": priority},
+        }
+        if labels:
+            fields["labels"] = labels
+
+        if owner:
+            fields["assignee"] = {"name": owner}
+
+        logger.info({"message": "Creating JIRA issue", "fields": fields})
+
+        if not self.dry_run:
+            return self._jira.create_issue(fields=fields)
