@@ -1019,7 +1019,7 @@ private:
 
                 auto result = releaseResult();
                 result->runtimePlanner = crp_sbe::makePlannerForClassicCacheEntry(
-                    makePlannerData(), *querySolution, cs->decisionReads());
+                    makePlannerData(), std::move(querySolution), cs->decisionReads());
 
                 planCacheCounters.incrementClassicHitsCounter();
                 return result;

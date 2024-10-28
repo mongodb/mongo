@@ -105,11 +105,11 @@ assert(!profileObj.hasOwnProperty("cursorExhausted"), profileObj);
 assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
 
 //
-// Confirm "fromMultiPlanner" metric.
+// Confirm "fromMultiPlanner" and "fromPlanCache" metrics.
 //
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.createIndex({b: 1}));
+assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 for (i = 0; i < 5; ++i) {
     assert.commandWorked(coll.insert({a: i, b: i}));
 }
@@ -122,6 +122,14 @@ assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
 assert.neq(coll.findOne({a: 3, b: 3}), null);
 profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 assert.eq(profileObj.fromMultiPlanner, true, profileObj);
+assert.eq(profileObj.planSummary, "IXSCAN { a: 1, b: 1 }", profileObj);
+assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
+
+assert.neq(coll.findOne({a: 3, b: 3}), null);
+assert.neq(coll.findOne({a: 3, b: 3}), null);
+profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
+assert.eq(profileObj.fromPlanCache, true, profileObj);
+assert.eq(profileObj.planSummary, "IXSCAN { a: 1, b: 1 }", profileObj);
 assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
 
 //

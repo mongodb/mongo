@@ -99,6 +99,7 @@ void recoverWhereExpression(CanonicalQuery* canonicalQuery,
  */
 sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
     const PlannerDataForSBE& plannerData,
+    std::unique_ptr<QuerySolution> solution,
     const AllIndicesRequiredChecker& indexExistenceChecker,
     std::unique_ptr<sbe::PlanStage> root,
     stage_builder::PlanStageData data,
@@ -112,7 +113,7 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
     const size_t maxTrialResultsFromPlanningRoot =
         plannerData.cq->cqPipeline().empty() ? 0 : maxNumResults;
 
-    sbe::plan_ranker::CandidatePlan candidate{nullptr /*solution*/,
+    sbe::plan_ranker::CandidatePlan candidate{std::move(solution),
                                               std::move(root),
                                               sbe::plan_ranker::CandidatePlanData{std::move(data)},
                                               false /* exitedEarly*/,
@@ -201,6 +202,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
     boost::optional<size_t> decisionReads,
     std::unique_ptr<sbe::PlanStage> sbePlan,
     stage_builder::PlanStageData planStageData,
+    std::unique_ptr<QuerySolution> solution,
     const AllIndicesRequiredChecker& indexExistenceChecker,
     const std::function<void(const PlannerData&)>& deactivateCb,
     const std::function<void()>& incrementReplanCounterCb) {
@@ -213,6 +215,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
 
     const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio * *decisionReads;
     auto candidate = collectExecutionStatsForCachedPlan(plannerData,
+                                                        std::move(solution),
                                                         indexExistenceChecker,
                                                         std::move(sbePlan),
                                                         std::move(planStageData),
@@ -282,7 +285,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
 
 PlannerGeneratorFromClassicCacheEntry::PlannerGeneratorFromClassicCacheEntry(
     PlannerDataForSBE plannerDataArg,
-    const QuerySolution& solution,
+    std::unique_ptr<QuerySolution> solution,
     boost::optional<size_t> decisionReads)
     : _plannerData(std::move(plannerDataArg)),
       _solution(std::move(solution)),
@@ -298,7 +301,7 @@ PlannerGeneratorFromClassicCacheEntry::PlannerGeneratorFromClassicCacheEntry(
         stage_builder::buildSlotBasedExecutableTree(_plannerData.opCtx,
                                                     _plannerData.collections,
                                                     *_plannerData.cq,
-                                                    _solution,
+                                                    *_solution,
                                                     _plannerData.sbeYieldPolicy.get());
 }
 
@@ -318,6 +321,7 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromClassicCacheEntry::makePla
                             _decisionReads,
                             std::move(_sbePlan),
                             std::move(*_planStageData),
+                            std::move(_solution),
                             indexExistenceChecker,
                             deactivateEntry,
                             []() { planCacheCounters.incrementClassicReplannedCounter(); });
@@ -372,6 +376,7 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromSbeCacheEntry::makePlanner
                             decisionReads,
                             std::move(sbePlan),
                             std::move(planStageData),
+                            nullptr, /* solution */
                             indexExistenceChecker,
                             deactivateEntry,
                             []() { planCacheCounters.incrementSbeReplannedCounter(); });
@@ -386,10 +391,10 @@ std::unique_ptr<PlannerInterface> makePlannerForSbeCacheEntry(
 
 std::unique_ptr<PlannerInterface> makePlannerForClassicCacheEntry(
     PlannerDataForSBE plannerData,
-    const QuerySolution& solution,
+    std::unique_ptr<QuerySolution> solution,
     boost::optional<size_t> decisionReads) {
     PlannerGeneratorFromClassicCacheEntry generator(
-        std::move(plannerData), solution, decisionReads);
+        std::move(plannerData), std::move(solution), decisionReads);
     return generator.makePlanner();
 }
 }  // namespace mongo::classic_runtime_planner_for_sbe

@@ -328,7 +328,7 @@ protected:
 
         return {planCacheKey,
                 std::make_unique<PlannerGeneratorFromClassicCacheEntry>(
-                    std::move(plannerData), *querySolution, numReads.value)};
+                    std::move(plannerData), std::move(querySolution), numReads.value)};
     }
 
 
