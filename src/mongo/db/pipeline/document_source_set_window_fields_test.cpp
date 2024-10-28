@@ -261,6 +261,110 @@ TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnShiftOperator) {
         redact(*docSource));
 }
 
+TEST_F(DocumentSourceSetWindowFieldsTest, PartitionOutputIsCorrect) {
+    auto spec = fromjson(  // NOLINT
+        R"({
+            "$setWindowFields": { 
+                "sortBy": { "num": 1 },
+                "output": {
+                    "sum": {
+                        "$sum": "$val",
+                        window: {
+                            documents: [ -1 , 1 ]
+                        }
+                    }
+                },
+                partitionBy: "$part"
+            }
+        })");
+
+    auto parsedStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    std::vector<Document> docs;
+    docs.push_back(DOC("num" << 3 << "val" << 25 << "part" << 1));
+    docs.push_back(DOC("num" << 15 << "val" << 12 << "part" << 1));
+    docs.push_back(DOC("num" << 2 << "val" << 1 << "part" << 2));
+    docs.push_back(DOC("num" << 4 << "val" << 3 << "part" << 2));
+    auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
+    parsedStage->setSource(source.get());
+
+    auto next = parsedStage->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.getDocument().toString(), "{num: 3, val: 25, part: 1, sum: 37}");
+
+    next = parsedStage->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.getDocument().toString(), "{num: 15, val: 12, part: 1, sum: 37}");
+
+    next = parsedStage->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.getDocument().toString(), "{num: 2, val: 1, part: 2, sum: 4}");
+
+    next = parsedStage->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.getDocument().toString(), "{num: 4, val: 3, part: 2, sum: 4}");
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, OptimizationRemovesRedundantSortStage) {
+    auto swfSpec = fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$y', sortBy: {y: 1}, output: {'x':
+        {$sum: 1}}}})");
+    auto swfStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(swfSpec.firstElement(), getExpCtx());
+    auto sortSpec = fromjson(R"({$sort: {y: 1}})");
+    auto sortStage = DocumentSourceSort::createFromBson(sortSpec.firstElement(), getExpCtx());
+    swfStage->setSource(sortStage.get());
+    auto prevSortStage = DocumentSourceSort::createFromBson(sortSpec.firstElement(), getExpCtx());
+    Pipeline::SourceContainer pipeline = {prevSortStage, swfStage, sortStage};
+
+    Pipeline::SourceContainer::iterator itr = pipeline.begin();
+
+    // We only care about optimizing the setWindowFields stage.
+    itr = std::next(itr);
+    itr = (*itr).get()->optimizeAt(itr, &pipeline);
+
+    // We should have removed the redundant sort. This optimization works because the preceding and
+    // succeeding sorts are the same, and setWindowFields does not change document order.
+    ASSERT_EQ(pipeline.size(), 2);
+    ASSERT_EQ(std::string(pipeline.front()->getSourceName()), "$sort"_sd);
+    ASSERT_EQ(std::string(pipeline.back()->getSourceName()), "$_internalSetWindowFields"_sd);
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, FailIfCannotSpillAndExceedMemoryLimit) {
+    auto wfSpec = fromjson(R"({
+            $setWindowFields: {
+                sortBy: {val: 1},
+                output: {
+                    sum: {
+                        $sum: "$val",
+                        "window": {
+                            "documents": [
+                                -1000,
+                                +1000
+                            ]
+                        }
+                    }
+                }
+            }
+        })");
+    getExpCtx()->allowDiskUse = false;
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes.store(50);
+    auto pipelineStages =
+        document_source_set_window_fields::createFromBson(wfSpec.firstElement(), getExpCtx());
+    std::vector<Document> docs;
+
+    // Create 100 documents. This should overflow our 50 byte limit and fail.
+    for (int i = 0; i < 100; ++i) {
+        docs.push_back(DOC("val" << i));
+    }
+    auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
+    pipelineStages.push_front(source);
+    auto pipeline = Pipeline::create(pipelineStages, getExpCtx());
+    ASSERT_THROWS_CODE(pipeline->getNext(), DBException, 5643011);
+
+    // Reset to default for future tests.
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes.store(100 * 1024 * 1024);
+}
 
 TEST_F(DocumentSourceSetWindowFieldsTest, outputFieldsIsDeterministic) {
     // This test asserts that setWindowFields returns outputFields in the same order for every
