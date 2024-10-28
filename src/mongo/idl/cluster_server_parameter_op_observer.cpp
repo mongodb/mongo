@@ -67,6 +67,12 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
                                                  std::vector<bool> fromMigrate,
                                                  bool defaultFromMigrate,
                                                  OpStateAccumulator* opAccumulator) {
+
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getSettings().isReplSet() && !replCoord->isDataConsistent()) {
+        return;
+    }
+
     if (!isConfigNamespace(coll->ns())) {
         return;
     }
@@ -85,6 +91,11 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
 void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
                                                 const OplogUpdateEntryArgs& args,
                                                 OpStateAccumulator* opAccumulator) {
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getSettings().isReplSet() && !replCoord->isDataConsistent()) {
+        return;
+    }
+
     auto updatedDoc = args.updateArgs->updatedDoc;
     if (!isConfigNamespace(args.coll->ns()) || args.updateArgs->update.isEmpty()) {
         return;
@@ -105,6 +116,11 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
                                                 const DocumentKey& documentKey,
                                                 const OplogDeleteEntryArgs& args,
                                                 OpStateAccumulator* opAccumulator) {
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getSettings().isReplSet() && !replCoord->isDataConsistent()) {
+        return;
+    }
+
     const auto& nss = coll->ns();
     if (!isConfigNamespace(nss)) {
         return;
@@ -132,13 +148,20 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
 void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
                                                       const DatabaseName& dbName,
                                                       bool markFromMigrate) {
-    if (dbName.isConfigDB()) {
-        // Entire config DB deleted, reset to default state.
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [tenantId = dbName.tenantId()](OperationContext* opCtx, boost::optional<Timestamp>) {
-                cluster_parameters::clearAllTenantParameters(opCtx, tenantId);
-            });
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getSettings().isReplSet() && !replCoord->isDataConsistent()) {
+        return;
     }
+
+    if (!dbName.isConfigDB()) {
+        return;
+    }
+
+    // Entire config DB deleted, reset to default state.
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [tenantId = dbName.tenantId()](OperationContext* opCtx, boost::optional<Timestamp>) {
+            cluster_parameters::clearAllTenantParameters(opCtx, tenantId);
+        });
 }
 
 repl::OpTime ClusterServerParameterOpObserver::onDropCollection(
@@ -147,14 +170,21 @@ repl::OpTime ClusterServerParameterOpObserver::onDropCollection(
     const UUID& uuid,
     std::uint64_t numRecords,
     bool markFromMigrate) {
-    if (isConfigNamespace(collectionName)) {
-        // Entire collection deleted, reset to default state.
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [tenantId = collectionName.dbName().tenantId()](OperationContext* opCtx,
-                                                            boost::optional<Timestamp>) {
-                cluster_parameters::clearAllTenantParameters(opCtx, tenantId);
-            });
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getSettings().isReplSet() && !replCoord->isDataConsistent()) {
+        return {};
     }
+
+    if (!isConfigNamespace(collectionName)) {
+        return {};
+    }
+
+    // Entire collection deleted, reset to default state.
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [tenantId = collectionName.dbName().tenantId()](OperationContext* opCtx,
+                                                        boost::optional<Timestamp>) {
+            cluster_parameters::clearAllTenantParameters(opCtx, tenantId);
+        });
 
     return {};
 }

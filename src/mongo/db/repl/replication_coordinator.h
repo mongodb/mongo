@@ -1233,8 +1233,9 @@ public:
                                             bool isDataMajorityCommitted) = 0;
 
     /**
-     * Returns whether data writes are applied against a consistent copy of the data. This should
-     * start to return true after setConsistentDataAvailable is called.
+     * Returns whether data writes are applied against a consistent copy of the data.
+     * This should start to return true after setConsistentDataAvailable is called.
+     * Always returns false in standalone mode.
      */
     virtual bool isDataConsistent() const = 0;
 

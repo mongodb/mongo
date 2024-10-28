@@ -96,6 +96,12 @@ public:
         }
     }
 
+    void switchReplState(const repl::MemberState& newState) {
+        auto opCtx = cc().makeOperationContext();
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+        ASSERT_OK(replCoord->setFollowerMode(newState));
+    }
+
     void doInserts(const NamespaceString& nss,
                    std::initializer_list<BSONObj> docs,
                    bool commit = true) {
@@ -153,6 +159,20 @@ public:
         if (commit)
             wuow.commit();
     }
+
+    void doDropCollection(const NamespaceString& nss, bool commit = true) {
+        auto opCtx = cc().makeOperationContext();
+        WriteUnitOfWork wuow(opCtx.get());
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_IX);
+        observer.onDropCollection(opCtx.get(),
+                                  nss,
+                                  UUID::gen(),
+                                  0U,
+                                  /*markFromMigrate=*/false);
+        if (commit)
+            wuow.commit();
+    }
+
 
     void doReplicationRollback(const std::vector<NamespaceString>& namespaces) {
         OpObserver::RollbackObserverInfo info;
@@ -298,6 +318,18 @@ TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
     const auto singleStrValue = "OnInsertRecord.single";
 
     ASSERT_LT(initialLogicalTime, singleLogicalTime);
+
+    // Simulate initial sync and attempt to insert a record.
+    switchReplState(repl::MemberState::RS_STARTUP2);
+    doInserts(NamespaceString::kClusterParametersNamespace,
+              {makeClusterParametersDoc(singleLogicalTime, singleIntValue, singleStrValue)});
+    // Ensure that the in-memory state does not change when data is not stable.
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Make sure that we are primary.
+    switchReplState(repl::MemberState::RS_PRIMARY);
+
     doInserts(NamespaceString::kClusterParametersNamespace,
               {makeClusterParametersDoc(singleLogicalTime, singleIntValue, singleStrValue)});
 
@@ -360,6 +392,17 @@ TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
     const auto tenantIntValue = multiIntValue + 1;
     const auto tenantStrValue = "OnInsertRecord.tenant";
 
+    // Simulate initial sync and attempt to insert a record on the separate tenant.
+    switchReplState(repl::MemberState::RS_STARTUP2);
+    doInserts(NamespaceString::makeClusterParametersNSS(kTenantId),
+              {makeClusterParametersDoc(tenantLogicalTime, tenantIntValue, tenantStrValue)});
+    // Ensure that the in-memory state does not change when data is not stable.
+    ASSERT_PARAMETER_STATE(boost::none, multiIntValue, multiStrValue, multiLogicalTime);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Make sure that we are primary.
+    switchReplState(repl::MemberState::RS_PRIMARY);
+
     doInserts(NamespaceString::makeClusterParametersNSS(kTenantId),
               {makeClusterParametersDoc(tenantLogicalTime, tenantIntValue, tenantStrValue)});
 
@@ -379,6 +422,18 @@ TEST_F(ClusterServerParameterOpObserverTest, OnUpdateRecord) {
     const auto singleStrValue = "OnUpdateRecord.single";
     ASSERT_LT(initialLogicalTime, singleLogicalTime);
 
+    // Simulate initial sync and attempt to update the record.
+    switchReplState(repl::MemberState::RS_STARTUP2);
+    doUpdate(NamespaceString::kClusterParametersNamespace,
+             makeClusterParametersDoc(singleLogicalTime, singleIntValue, singleStrValue));
+    // Ensure that the in-memory state does not change when data is not stable.
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Make sure that we are primary.
+    switchReplState(repl::MemberState::RS_PRIMARY);
+
+    // Perform the record update.
     doUpdate(NamespaceString::kClusterParametersNamespace,
              makeClusterParametersDoc(singleLogicalTime, singleIntValue, singleStrValue));
 
@@ -404,6 +459,18 @@ TEST_F(ClusterServerParameterOpObserverTest, OnUpdateRecord) {
     const auto tenantIntValue = singleIntValue + 1;
     const auto tenantStrValue = "OnInsertRecord.tenant";
 
+    // Simulate initial sync and attempt to update the record on a separate tenant.
+    switchReplState(repl::MemberState::RS_STARTUP2);
+    doUpdate(NamespaceString::makeClusterParametersNSS(kTenantId),
+             makeClusterParametersDoc(tenantLogicalTime, tenantIntValue, tenantStrValue));
+    // Ensure that the in-memory state does not change when data is not stable.
+    ASSERT_PARAMETER_STATE(boost::none, singleIntValue, singleStrValue, singleLogicalTime);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Make sure that we are primary.
+    switchReplState(repl::MemberState::RS_PRIMARY);
+
+    // Perform the update on the other tenant.
     doUpdate(NamespaceString::makeClusterParametersNSS(kTenantId),
              makeClusterParametersDoc(tenantLogicalTime, tenantIntValue, tenantStrValue));
 
@@ -432,6 +499,16 @@ TEST_F(ClusterServerParameterOpObserverTest, onDeleteRecord) {
         },
         boost::none);
 
+    // Simulate initial sync and attempt to delete.
+    switchReplState(repl::MemberState::RS_STARTUP2);
+    doDelete(NamespaceString::kClusterParametersNamespace, initialDoc, /*commit=*/true);
+    // Ensure that the in-memory state does not change when data is not stable.
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Make sure that we are primary.
+    switchReplState(repl::MemberState::RS_PRIMARY);
+
     // Reset configuration to defaults when we claim to have deleted the doc.
     doDelete(NamespaceString::kClusterParametersNamespace, initialDoc, /*commit=*/true);
 
@@ -444,6 +521,19 @@ TEST_F(ClusterServerParameterOpObserverTest, onDeleteRecord) {
 
     ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Restore configured state.
+    initializeState();
+
+    // Simulate initial sync and attempt to delete the other tenant with reference.
+    switchReplState(repl::MemberState::RS_STARTUP2);
+    doDelete(NamespaceString::makeClusterParametersNSS(kTenantId), initialDocT, /*commit=*/true);
+    // Ensure that the in-memory state does not change when data is not stable.
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Make sure that we are primary.
+    switchReplState(repl::MemberState::RS_PRIMARY);
 
     // Restore configured state, and delete other tenant with reference.
     initializeState();
@@ -473,6 +563,16 @@ TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
         },
         boost::none);
 
+    // Simulate initial sync and attempt to drop the config DB.
+    switchReplState(repl::MemberState::RS_STARTUP2);
+    doDropDatabase(DatabaseName::kConfig);
+    // Ensure that the in-memory state does not change when data is not stable.
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Make sure that we are primary.
+    switchReplState(repl::MemberState::RS_PRIMARY);
+
     // Actually drop the config DB.
     doDropDatabase(DatabaseName::kConfig);
 
@@ -484,7 +584,67 @@ TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
 
     // Reinitialize and drop the other tenant's config DB.
     initializeState();
+
+    // Simulate initial sync and attempt to drop the other tenant's config DB.
+    switchReplState(repl::MemberState::RS_STARTUP2);
     doDropDatabase(DatabaseName::createDatabaseName_forTest(kTenantId, kConfigDB));
+    // Ensure that the in-memory state does not change when data is not stable.
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Make sure that we are primary.
+    switchReplState(repl::MemberState::RS_PRIMARY);
+
+    // Actually drop the other tenant's config DB.
+    doDropDatabase(DatabaseName::createDatabaseName_forTest(kTenantId, kConfigDB));
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
+}
+
+TEST_F(ClusterServerParameterOpObserverTest, onDropCollection) {
+    initializeState();
+
+    // Ignore collections dropped in other namespaces
+    assertIgnoredOtherNamespaces([this](const auto& nss) { doDropCollection(nss); }, boost::none);
+
+    // Simulate initial sync and attempt to drop the clusterParameters collection.
+    switchReplState(repl::MemberState::RS_STARTUP2);
+    doDropCollection(NamespaceString::kClusterParametersNamespace);
+    // Ensure that the in-memory state does not change when data is not stable.
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Make sure that we are primary.
+    switchReplState(repl::MemberState::RS_PRIMARY);
+
+    // Actually drop the clusterParameters collection.
+    doDropCollection(NamespaceString::kClusterParametersNamespace);
+
+    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
+    ASSERT(sp != nullptr);
+
+    ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Reinitialize and drop the other tenant's clusterParameters collection.
+    initializeState();
+
+    // Simulate initial sync and attempt to drop the other tenant's clusterParameters collection.
+    switchReplState(repl::MemberState::RS_STARTUP2);
+    doDropCollection(NamespaceString::makeClusterParametersNSS(kTenantId));
+    // Ensure that the in-memory state does not change when data is not stable.
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    // Make sure that we are primary.
+    switchReplState(repl::MemberState::RS_PRIMARY);
+
+    // Actually drop the other tenant's clusterParameters collection.
+    doDropCollection(NamespaceString::makeClusterParametersNSS(kTenantId));
+
+    sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
+    ASSERT(sp != nullptr);
 
     ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
