@@ -65,6 +65,7 @@ executor:
     voting_secondaries: false
   hooks:
     - class: PeriodicKillSecondaries
+      use_legacy_validate: true
     - class: EnableChangeStream
       tenant_id: 636d957b2646ddfaf9b5e13f
 matrix_suite: true

@@ -62,7 +62,9 @@ executor:
     - class: CheckReplOplogs
     - class: CheckReplDBHash
     - class: ValidateCollections
+      use_legacy_validate: true
     - class: CleanEveryN
+      skip_database_deletion: true
       n: 20
   fixture:
     class: ReplicaSetFixture
