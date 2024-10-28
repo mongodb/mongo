@@ -24,3 +24,11 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "document_source_internal_search_id_lookup_gen",
+    src = "document_source_internal_search_id_lookup.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

@@ -164,10 +164,7 @@ TEST_F(InternalSearchIdLookupTest, ShouldParseFromSerialized) {
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
 
-    BSONObj spec =
-        BSON("$_internalSearchIdLookup"
-             << BSON("subPipeline" << BSON_ARRAY(BSON("$match" << BSON("_id"
-                                                                       << "_id placeholder")))));
+    BSONObj spec = BSON("$_internalSearchIdLookup" << BSONObj());
     ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(), spec);
 
     // On shard we should be able to re-parse it.
@@ -178,42 +175,27 @@ TEST_F(InternalSearchIdLookupTest, ShouldParseFromSerialized) {
               idLookupStageShard->getSourceName());
 }
 
-TEST_F(InternalSearchIdLookupTest, ShouldFailParsingWhenSpecNotEmptyObject) {
+TEST_F(InternalSearchIdLookupTest, ShouldFailToParseInvalidArgumentTypes) {
     auto expCtx = getExpCtx();
     expCtx->uuid = UUID::gen();
 
+    // Test parsing with not an object.
     ASSERT_THROWS_CODE(
         DocumentSourceInternalSearchIdLookUp::createFromBson(BSON("$_internalSearchIdLookup"
                                                                   << "string spec")
                                                                  .firstElement(),
                                                              expCtx),
         AssertionException,
-        31016);
+        ErrorCodes::FailedToParse);
 
+    // Test parsing with an unknown field.
     ASSERT_THROWS_CODE(DocumentSourceInternalSearchIdLookUp::createFromBson(
-                           BSON("$_internalSearchIdLookup" << 42).firstElement(), expCtx),
-                       AssertionException,
-                       31016);
-
-    ASSERT_THROWS_CODE(DocumentSourceInternalSearchIdLookUp::createFromBson(
-                           BSON("$_internalSearchIdLookup" << BSON("not"
-                                                                   << "empty"))
+                           BSON("$_internalSearchIdLookup" << BSON("unknownParameter"
+                                                                   << "a"))
                                .firstElement(),
                            expCtx),
                        AssertionException,
-                       31016);
-
-    ASSERT_THROWS_CODE(DocumentSourceInternalSearchIdLookUp::createFromBson(
-                           BSON("$_internalSearchIdLookup" << true).firstElement(), expCtx),
-                       AssertionException,
-                       31016);
-
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalSearchIdLookUp::createFromBson(
-            BSON("$_internalSearchIdLookup" << OID("54651022bffebc03098b4567")).firstElement(),
-            expCtx),
-        AssertionException,
-        31016);
+                       ErrorCodes::IDLUnknownField);
 }
 
 TEST_F(InternalSearchIdLookupTest, ShouldAllowStringOrObjectIdValues) {
@@ -278,10 +260,7 @@ TEST_F(InternalSearchIdLookupTest, ShouldNotErrorOnEmptyResult) {
 TEST_F(InternalSearchIdLookupTest, RedactsCorrectly) {
     auto expCtx = getExpCtx();
     expCtx->uuid = UUID::gen();
-    auto specObj =
-        BSON("$_internalSearchIdLookup" << BSON(
-                 "subPipeline" << BSON_ARRAY(BSON("$match" << BSON("_id" << BSON("$eq"
-                                                                                 << "?string"))))));
+    auto specObj = BSON("$_internalSearchIdLookup" << BSONObj());
     auto spec = specObj.firstElement();
 
     auto idLookupStage = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
@@ -297,7 +276,7 @@ TEST_F(InternalSearchIdLookupTest, RedactsCorrectly) {
     limitedLookup.serializeToArray(vec, opts);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$_internalSearchIdLookup":{"limit":"?number", "subPipeline":[{"$match":{"_id":{"$eq":"?string"}}}]}})",
+        R"({"$_internalSearchIdLookup":{"limit":"?number"}})",
         vec[0].getDocument().toBson());
 }
 

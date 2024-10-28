@@ -137,6 +137,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:fastpath_projection_node.h",
         "//src/mongo/db/exec:projection_executor.h",
         "//src/mongo/db/exec:projection_node.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup_gen",
         "//src/mongo/db/pipeline/search:plan_sharded_search_gen",
         "//src/mongo/db/stats:operation_latency_histogram.h",
         "//src/mongo/db/stats:top.h",

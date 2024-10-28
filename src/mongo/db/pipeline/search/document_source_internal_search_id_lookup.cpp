@@ -31,7 +31,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup_gen.h"
 
 namespace mongo {
 
@@ -67,26 +67,17 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
 
 intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    // TODO SERVER-94711 replace this clunky parsing and error message with mini IDL.
-    uassert(
-        31016,
-        str::stream()
-            << "$_internalSearchIdLookup value must be an object. If non-empty, it must have "
-               "a field called 'subPipeline' and optionally a field called 'limit'. Found: "
-            << typeName(elem.type()),
-        elem.type() == BSONType::Object &&
-            (elem.embeddedObject().isEmpty() ||
-             ((elem.embeddedObject().nFields() == 1) &&
-              elem.embeddedObject().hasField("subPipeline")) ||
-             ((elem.embeddedObject().nFields() == 2) &&
-              elem.embeddedObject().hasField("subPipeline") &&
-              elem.embeddedObject().hasField(InternalSearchMongotRemoteSpec::kLimitFieldName))));
-    auto specObj = elem.embeddedObject();
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "The " << kStageName
+                          << " stage specification must be an object, found "
+                          << typeName(elem.type()),
+            elem.type() == BSONType::Object);
 
-    if (specObj.hasField(InternalSearchMongotRemoteSpec::kLimitFieldName)) {
-        auto limitElem = specObj.getField(InternalSearchMongotRemoteSpec::kLimitFieldName);
-        uassert(6770001, "Limit must be a long", limitElem.type() == BSONType::NumberLong);
-        return new DocumentSourceInternalSearchIdLookUp(pExpCtx, limitElem.Long());
+    auto searchIdLookupSpec =
+        DocumentSourceIdLookupSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
+
+    if (searchIdLookupSpec.getLimit()) {
+        return new DocumentSourceInternalSearchIdLookUp(pExpCtx, *searchIdLookupSpec.getLimit());
     }
     return new DocumentSourceInternalSearchIdLookUp(pExpCtx);
 }
@@ -96,23 +87,31 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
     if (_limit) {
         outputSpec["limit"] = Value(opts.serializeLiteral(Value((long long)_limit)));
     }
-    // At serialization, the _id value is unknown as it is only returned by mongot during execution.
-    std::vector<BSONObj> pipeline = {
-        BSON("$match" << Document({{"_id", Value("_id placeholder"_sd)}}))};
 
-    if (pExpCtx->viewNS) {
-        auto viewPipeline = pExpCtx->getResolvedNamespace(*pExpCtx->viewNS).pipeline;
-        pipeline.insert(pipeline.end(), viewPipeline.begin(), viewPipeline.end());
-    }
-    outputSpec["subPipeline"] = Value(Pipeline::parse(pipeline, pExpCtx)->serializeToBson(opts));
+    if (opts.verbosity) {
+        // At serialization, the _id value is unknown as it is only returned by mongot during
+        // execution.
+        // TODO SERVER-93637 add comment explaining why subPipeline is only needed for explain.
+        std::vector<BSONObj> pipeline = {
+            BSON("$match" << Document({{"_id", Value("_id placeholder"_sd)}}))};
 
-    if (opts.verbosity && opts.verbosity.value() >= ExplainOptions::Verbosity::kExecStats) {
-        const PlanSummaryStats& stats = _stats.planSummaryStats;
-        outputSpec["totalDocsExamined"] = Value(static_cast<long long>(stats.totalDocsExamined));
-        outputSpec["totalKeysExamined"] = Value(static_cast<long long>(stats.totalKeysExamined));
-        outputSpec["numDocsFilteredByIdLookup"] = opts.serializeLiteral(
-            Value((long long)(_searchIdLookupMetrics->getDocsSeenByIdLookup() -
-                              _searchIdLookupMetrics->getDocsReturnedByIdLookup())));
+        if (pExpCtx->viewNS) {
+            auto viewPipeline = pExpCtx->getResolvedNamespace(*pExpCtx->viewNS).pipeline;
+            pipeline.insert(pipeline.end(), viewPipeline.begin(), viewPipeline.end());
+        }
+        outputSpec["subPipeline"] =
+            Value(Pipeline::parse(pipeline, pExpCtx)->serializeToBson(opts));
+
+        if (opts.verbosity.value() >= ExplainOptions::Verbosity::kExecStats) {
+            const PlanSummaryStats& stats = _stats.planSummaryStats;
+            outputSpec["totalDocsExamined"] =
+                Value(static_cast<long long>(stats.totalDocsExamined));
+            outputSpec["totalKeysExamined"] =
+                Value(static_cast<long long>(stats.totalKeysExamined));
+            outputSpec["numDocsFilteredByIdLookup"] = opts.serializeLiteral(
+                Value((long long)(_searchIdLookupMetrics->getDocsSeenByIdLookup() -
+                                  _searchIdLookupMetrics->getDocsReturnedByIdLookup())));
+        }
     }
 
     return Value(DOC(getSourceName() << outputSpec.freezeToValue()));
