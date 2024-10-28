@@ -738,12 +738,21 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             // Inaccurate fast count is only expected when there is unclean shutdown.
             return TestData.runningWithShardStepdowns;
         }
-        // TODO SERVER-91030: Remove special handling of error code 7826507.
         if (err.code == 7826507) {
             print(
                 `Failed to analyze the shard key because the number of sampled documents is zero. ${
                     tojsononeline(err)}`);
-            // This may be due to chunk migrations.
+            // Here are the relevant steps in the cluster analyzeShardKey command:
+            // 1. The mongos forwards the analyzeShardKey command to one of the shards that owns
+            //    chunks for the collection (the primary shard is prioritized).
+            // 2. That shard runs a find(One) command to validate that the fields of the shard key
+            //    being analyzed don't contain arrays.
+            // 3. That shard runs a cluster aggregate command $collStats.
+            // 4. That shard runs cluster aggregate $meta: indexKey with readConcern level:
+            //    "available".
+            // For the number of sampled documents to be 0, there must be a data movement between
+            // step (3) and step (4), and the number of shards that own chunks for the collection in
+            // those steps must not overlap. Please see SERVER-91030 for more details.
             return true;
         }
         if (err.code == ErrorCodes.IllegalOperation && err.errmsg &&
