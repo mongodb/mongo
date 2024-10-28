@@ -132,7 +132,7 @@ struct FLEToken {
     FLEToken(PrfBlock dataIn) : data(std::move(dataIn)) {}
 
     static FLEToken parse(ConstDataRange block) {
-        uassert(9999901, "Invalid prf length", block.length() == sizeof(PrfBlock));
+        uassert(9616300, "Invalid prf length", block.length() == sizeof(PrfBlock));
 
         PrfBlock ret;
         std::copy(block.data(), block.data() + block.length(), ret.data());
