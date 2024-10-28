@@ -58,6 +58,7 @@ filters:
   - "dbcheck*":
     approvers:
       - 10gen/server-replication
+      - 10gen/server-rss-sydney
   - "feature_compatibility*":
     approvers:
       - 10gen/server-replication
@@ -111,5 +112,8 @@ filters:
     approvers:
       - 10gen/server-replication
   - "*compact*":
+    approvers:
+      - 10gen/server-rss-sydney
+  - "dbhash*":
     approvers:
       - 10gen/server-rss-sydney

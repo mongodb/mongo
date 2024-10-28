@@ -721,7 +721,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/profile* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/commands/**/set_profiling_filter_globally_cmd* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/commands/**/top_command.cpp @10gen/query-integration-observability @svc-auto-approve-bot
-/src/mongo/db/commands/**/dbcheck* @10gen/server-replication @svc-auto-approve-bot
+/src/mongo/db/commands/**/dbcheck* @10gen/server-replication @10gen/server-rss-sydney @svc-auto-approve-bot
 /src/mongo/db/commands/**/feature_compatibility* @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/db/commands/**/oplog* @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/db/commands/**/*cluster*parameter* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -740,6 +740,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/set_feature_compatibility_version* @10gen/server-catalog-and-routing @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/db/commands/**/snapshot_management* @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/db/commands/**/*compact* @10gen/server-rss-sydney @svc-auto-approve-bot
+/src/mongo/db/commands/**/dbhash* @10gen/server-rss-sydney @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/commands/query_cmd/OWNERS.yml
 /src/mongo/db/commands/query_cmd/**/* @10gen/query @svc-auto-approve-bot
@@ -1026,6 +1027,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/repl/OWNERS.yml
 /src/mongo/db/repl/**/* @10gen/server-replication @svc-auto-approve-bot
+/src/mongo/db/repl/**/dbcheck* @10gen/server-replication @10gen/server-rss-sydney @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/s/OWNERS.yml
 /src/mongo/db/s/**/*active_migrations_registry* @10gen/server-cluster-scalability @svc-auto-approve-bot

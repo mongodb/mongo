@@ -3,3 +3,7 @@ filters:
   - "*":
     approvers:
       - 10gen/server-replication
+  - "dbcheck*":
+    approvers:
+      - 10gen/server-replication
+      - 10gen/server-rss-sydney
