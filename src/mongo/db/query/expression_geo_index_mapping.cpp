@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/query/expression_index.h"
+#include "mongo/db/query/expression_geo_index_mapping.h"
 
 #include <algorithm>
 #include <memory>
@@ -45,7 +45,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/query/expression_index_knobs_gen.h"
+#include "mongo/db/query/expression_geo_index_knobs_gen.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/logv2/log.h"

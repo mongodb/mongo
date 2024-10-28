@@ -36,6 +36,9 @@ filters:
   - "document_source_fill*":
     approvers:
       - 10gen/query-integration-analytic-extensions
+  - "document_source*geo*":
+    approvers:
+      - 10gen/query-integration-geo
   - "document_source_hybrid_scoring*":
     approvers:
       - 10gen/query-integration-search

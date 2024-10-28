@@ -9,7 +9,7 @@ filters:
   - "text_*":
     approvers:
       - 10gen/query-integration-staff-leads
-  - "geo_*":
+  - "*near*":
     approvers:
       - 10gen/query-integration-geo
   - "cached_plan*":

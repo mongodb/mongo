@@ -48,7 +48,7 @@ class S2Region;
 namespace mongo {
 
 /**
- * Functions that compute expression index mappings.
+ * Functions that compute expression index mappings for geospatial queries.
  *
  * TODO: I think we could structure this more generally with respect to planning.
  */

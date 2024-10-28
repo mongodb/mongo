@@ -766,7 +766,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/exec/**/* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/exec/**/*timeseries* @10gen/query-integration-timeseries @svc-auto-approve-bot
 /src/mongo/db/exec/**/text_* @10gen/query-integration-staff-leads @svc-auto-approve-bot
-/src/mongo/db/exec/**/geo_* @10gen/query-integration-geo @svc-auto-approve-bot
+/src/mongo/db/exec/**/*near* @10gen/query-integration-geo @svc-auto-approve-bot
 /src/mongo/db/exec/**/cached_plan* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/exec/**/multi_plan* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/exec/**/subplan* @10gen/query-optimization @svc-auto-approve-bot
@@ -900,6 +900,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_current_op* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_densify* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_fill* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/document_source*geo* @10gen/query-integration-geo @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_hybrid_scoring* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_index_stats* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_internal_unpack_bucket* @10gen/query-integration-timeseries @svc-auto-approve-bot
@@ -951,6 +952,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/*plan_executor* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/**/plan_insert_listener* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/**/sbe* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/**/*geo* @10gen/query-integration-geo @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/boolean_simplification/OWNERS.yml
 /src/mongo/db/query/boolean_simplification/**/* @10gen/query-optimization @svc-auto-approve-bot

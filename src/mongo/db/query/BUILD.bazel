@@ -370,15 +370,15 @@ idl_generator(
 )
 
 idl_generator(
-    name = "expression_index_knobs_gen",
-    src = "expression_index_knobs.idl",
+    name = "expression_geo_index_knobs_gen",
+    src = "expression_geo_index_knobs.idl",
 )
 
 mongo_cc_library(
     name = "query_planner",
     srcs = [
         "distinct_access.cpp",
-        "expression_index.cpp",
+        "expression_geo_index_mapping.cpp",
         "index_bounds_builder.cpp",
         "interval_evaluation_tree.cpp",
         "planner_access.cpp",
@@ -391,7 +391,7 @@ mongo_cc_library(
         "query_solution.cpp",
         "record_id_range.cpp",
         "stage_types.cpp",
-        ":expression_index_knobs_gen",
+        ":expression_geo_index_knobs_gen",
         "//src/mongo/db/query/plan_cache:plan_cache_indexability.cpp",
         "//src/mongo/db/query/plan_enumerator:enumerator_memo.cpp",
         "//src/mongo/db/query/plan_enumerator:memo_prune.cpp",
@@ -401,7 +401,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "distinct_access.h",
-        "expression_index.h",
+        "expression_geo_index_mapping.h",
         "index_bounds_builder.h",
         "interval_evaluation_tree.h",
         "planner_access.h",

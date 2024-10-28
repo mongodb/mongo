@@ -30,3 +30,6 @@ filters:
   - "sbe*":
     approvers:
       - 10gen/query-execution
+  - "*geo*":
+    approvers:
+      - 10gen/query-integration-geo
