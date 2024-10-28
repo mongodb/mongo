@@ -3053,10 +3053,14 @@ TEST(GetComputedPathsTest, ExpressionObjectCorrectlyReportsComputedPathsNested) 
     auto expr = Expression::parseObject(&expCtx, specObject, expCtx.variablesParseState);
     ASSERT(dynamic_cast<ExpressionObject*>(expr.get()));
     auto computedPaths = expr->getComputedPaths("h");
-    ASSERT(computedPaths.paths.empty());
-    ASSERT_EQ(computedPaths.renames.size(), 2u);
+    // Note that the $map does not contribute to any renames because it can change the shape of a
+    // document when the document contains arrays of arrays. Thus the only rename in the output here
+    // is the one specified by 'a: {b: '$c'}', and the path computed by the $map is added to the
+    // 'paths' list.
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("h.d"), 1u);
+    ASSERT_EQ(computedPaths.renames.size(), 1u);
     ASSERT_EQ(computedPaths.renames["h.a.b"], "c");
-    ASSERT_EQ(computedPaths.renames["h.d.f"], "e.g");
 }
 
 TEST(GetComputedPathsTest, ExpressionMapCorrectlyReportsComputedPaths) {
@@ -3066,10 +3070,11 @@ TEST(GetComputedPathsTest, ExpressionMapCorrectlyReportsComputedPaths) {
     auto expr = Expression::parseObject(&expCtx, specObject, expCtx.variablesParseState);
     ASSERT(dynamic_cast<ExpressionMap*>(expr.get()));
     auto computedPaths = expr->getComputedPaths("e");
+    // Note that the $map does not result in any renames because it can change the shape of a
+    // document when the document contains arrays of arrays.
     ASSERT_EQ(computedPaths.paths.size(), 1u);
-    ASSERT_EQ(computedPaths.paths.count("e.d"), 1u);
-    ASSERT_EQ(computedPaths.renames.size(), 1u);
-    ASSERT_EQ(computedPaths.renames["e.b"], "a.c");
+    ASSERT_EQ(computedPaths.paths.count("e"), 1u);
+    ASSERT(computedPaths.renames.empty());
 }
 
 TEST(GetComputedPathsTest, ExpressionMapCorrectlyReportsComputedPathsWithDefaultVarName) {
@@ -3078,10 +3083,11 @@ TEST(GetComputedPathsTest, ExpressionMapCorrectlyReportsComputedPathsWithDefault
     auto expr = Expression::parseObject(&expCtx, specObject, expCtx.variablesParseState);
     ASSERT(dynamic_cast<ExpressionMap*>(expr.get()));
     auto computedPaths = expr->getComputedPaths("e");
+    // Note that the $map does not result in any renames because it can change the shape of a
+    // document when the document contains arrays of arrays.
     ASSERT_EQ(computedPaths.paths.size(), 1u);
-    ASSERT_EQ(computedPaths.paths.count("e.d"), 1u);
-    ASSERT_EQ(computedPaths.renames.size(), 1u);
-    ASSERT_EQ(computedPaths.renames["e.b"], "a.c");
+    ASSERT_EQ(computedPaths.paths.count("e"), 1u);
+    ASSERT(computedPaths.renames.empty());
 }
 
 TEST(GetComputedPathsTest, ExpressionMapCorrectlyReportsComputedPathsWithNestedExprObject) {
@@ -3090,9 +3096,11 @@ TEST(GetComputedPathsTest, ExpressionMapCorrectlyReportsComputedPathsWithNestedE
     auto expr = Expression::parseObject(&expCtx, specObject, expCtx.variablesParseState);
     ASSERT(dynamic_cast<ExpressionMap*>(expr.get()));
     auto computedPaths = expr->getComputedPaths("e");
-    ASSERT(computedPaths.paths.empty());
-    ASSERT_EQ(computedPaths.renames.size(), 1u);
-    ASSERT_EQ(computedPaths.renames["e.b.c"], "a.d");
+    // Note that the $map does not result in any renames because it can change the shape of a
+    // document when the document contains arrays of array.
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("e"), 1u);
+    ASSERT(computedPaths.renames.empty());
 }
 
 TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithWrongRootVariable) {

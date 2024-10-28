@@ -291,13 +291,6 @@ public:
      * The 'renamingVar' is needed for checking whether a field path is a rename. For example, at
      * the top level only field paths that begin with the ROOT variable, as in "$$ROOT.path", are
      * renames. A field path such as "$$var.path" is not a rename.
-     *
-     * Now consider the example of a rename expressed via a $map:
-     *
-     *    {$map: {input: "$array", as: "iter", in: {...}}}
-     *
-     * In this case, only field paths inside the "in" clause beginning with "iter", such as
-     * "$$iter.path", are renames.
      */
     virtual ComputedPaths getComputedPaths(const std::string& exprFieldPath,
                                            Variables::Id renamingVar = Variables::kRootId) const {
@@ -2475,9 +2468,6 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
-
-    ComputedPaths getComputedPaths(const std::string& exprFieldPath,
-                                   Variables::Id renamingVar) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);

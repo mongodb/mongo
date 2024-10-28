@@ -2837,17 +2837,6 @@ TEST(PipelineOptimizationTest, MatchWithTypeShouldMoveAcrossRename) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe);
 }
 
-TEST(PipelineOptimizationTest, MatchOnArrayFieldCanSplitAcrossRenameWithMapAndProject) {
-    std::string inputPipe =
-        "[{$project: {d: {$map: {input: '$a', as: 'iter', in: {e: '$$iter.b', f: {$add: "
-        "['$$iter.c', 1]}}}}}}, {$match: {'d.e': 1, 'd.f': 1}}]";
-    std::string outputPipe =
-        "[{$match: {'a.b': {$eq: 1}}}, {$project: {_id: true, d: {$map: {input: '$a', as: 'iter', "
-        "in: {e: '$$iter.b', f: {$add: ['$$iter.c', {$const: 1}]}}}}}}, {$match: {'d.f': {$eq: "
-        "1}}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe);
-}
-
 TEST(PipelineOptimizationTest,
      MatchElemMatchValueOnArrayFieldCanSplitAcrossRenameWithSimpleProject) {
     // The $project simply renames 'a' to 'b', and the $match with $elemMatch on
@@ -2983,16 +2972,6 @@ TEST(PipelineOptimizationTest, MatchEqObjectCanNotSplitAcrossRenameWithMapAndPro
         )";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
-}
-
-TEST(PipelineOptimizationTest, MatchOnArrayFieldCanSplitAcrossRenameWithMapAndAddFields) {
-    std::string inputPipe =
-        "[{$addFields: {d: {$map: {input: '$a', as: 'iter', in: {e: '$$iter.b', f: {$add: "
-        "['$$iter.c', 1]}}}}}}, {$match: {'d.e': 1, 'd.f': 1}}]";
-    std::string outputPipe =
-        "[{$match: {'a.b': {$eq: 1}}}, {$addFields: {d: {$map: {input: '$a', as: 'iter', in: {e: "
-        "'$$iter.b', f: {$add: ['$$iter.c', {$const: 1}]}}}}}}, {$match: {'d.f': {$eq: 1}}}]";
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchCannotSwapWithLimit) {
