@@ -199,7 +199,11 @@ tasks:
   - <<: *benchmark_template
     name: benchmarks_namespace
     tags:
-      ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
+      [
+        "assigned_to_jira_team_server_programmability",
+        "experimental",
+        "benchmarks",
+      ]
     commands:
       - func: "do benchmark setup"
       - func: "run benchmark tests"
@@ -210,7 +214,11 @@ tasks:
   - <<: *benchmark_template
     name: benchmarks_orphaned_first_half
     tags:
-      ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
+      [
+        "assigned_to_jira_team_server_programmability",
+        "experimental",
+        "benchmarks",
+      ]
     commands:
       - func: "do benchmark setup"
       - func: "run benchmark tests"
@@ -222,7 +230,11 @@ tasks:
   - <<: *benchmark_template
     name: benchmarks_orphaned_second_half
     tags:
-      ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
+      [
+        "assigned_to_jira_team_server_programmability",
+        "experimental",
+        "benchmarks",
+      ]
     commands:
       - func: "do benchmark setup"
       - func: "run benchmark tests"
@@ -235,7 +247,7 @@ tasks:
     name: benchmarks_sep
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_programmability",
         "experimental",
         "benchmarks_sep",
       ]
@@ -252,7 +264,7 @@ tasks:
     # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_security",
         "experimental",
         "incompatible_debug_mode",
         "serverless",
@@ -573,7 +585,7 @@ tasks:
     name: failpoints
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_programmability",
         "release_critical",
         "misc_js",
       ]
@@ -585,7 +597,7 @@ tasks:
     name: failpoints_auth
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_programmability",
         "release_critical",
         "incompatible_mac",
         "incompatible_windows",
@@ -598,7 +610,11 @@ tasks:
   - <<: *task_template
     name: integration_tests_replset
     tags:
-      ["assigned_to_jira_team_server_servicearch", "auxiliary", "integration"]
+      [
+        "assigned_to_jira_team_server_programmability",
+        "auxiliary",
+        "integration",
+      ]
     depends_on:
       - name: compile_integration_test
     commands:
@@ -610,7 +626,11 @@ tasks:
   - <<: *task_template
     name: integration_tests_replset_ssl_auth
     tags:
-      ["assigned_to_jira_team_server_servicearch", "auxiliary", "integration"]
+      [
+        "assigned_to_jira_team_server_programmability",
+        "auxiliary",
+        "integration",
+      ]
     depends_on:
       - name: compile_integration_test
     commands:
@@ -623,7 +643,7 @@ tasks:
     name: integration_tests_sharded
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_programmability",
         "auxiliary",
         "integration",
         "sharded",
@@ -640,7 +660,7 @@ tasks:
     name: integration_tests_standalone
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_programmability",
         "auxiliary",
         "integration",
         "standalone",
@@ -657,7 +677,7 @@ tasks:
     name: integration_tests_standalone_audit
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_programmability",
         "auxiliary",
         "integration",
         "audit",
@@ -674,7 +694,7 @@ tasks:
     name: libunwind_tests
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_programmability",
         "release_critical",
         "incompatible_mac",
         "incompatible_windows",
@@ -693,7 +713,7 @@ tasks:
     # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_security",
         "experimental",
         "incompatible_debug_mode",
         "serverless",
@@ -708,7 +728,7 @@ tasks:
     # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_security",
         "experimental",
         "incompatible_debug_mode",
         "serverless",
@@ -723,7 +743,7 @@ tasks:
     # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_security",
         "experimental",
         "incompatible_debug_mode",
         "serverless",
@@ -737,7 +757,7 @@ tasks:
     name: search_no_pinned_connections_auth
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_networking_and_observability",
         "release_critical",
         "incompatible_community",
         "incompatible_mac",
@@ -770,7 +790,7 @@ tasks:
   - name: server_discovery_and_monitoring_json_test
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_networking_and_observability",
         "default",
         "requires_compile_variant",
       ]
@@ -791,7 +811,7 @@ tasks:
   - name: server_selection_json_test
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_networking_and_observability",
         "default",
         "requires_compile_variant",
         "requires_large_host_debug_mode",
@@ -813,7 +833,7 @@ tasks:
     # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_programmability",
         "experimental",
         "incompatible_debug_mode",
         "requires_large_host_debug_mode",
@@ -826,7 +846,7 @@ tasks:
 
   - <<: *task_template
     name: session_jscore_passthrough
-    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    tags: ["assigned_to_jira_team_server_repl", "default"]
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -835,7 +855,11 @@ tasks:
   - <<: *task_template
     name: watchdog_inmemory
     tags:
-      ["assigned_to_jira_team_server_servicearch", "experimental", "watchdog"]
+      [
+        "assigned_to_jira_team_server_networking_and_observability",
+        "experimental",
+        "watchdog",
+      ]
     commands:
       - func: "do setup"
       - func: "do watchdog setup"
@@ -848,7 +872,11 @@ tasks:
   - <<: *task_template
     name: watchdog_wiredtiger
     tags:
-      ["assigned_to_jira_team_server_servicearch", "experimental", "watchdog"]
+      [
+        "assigned_to_jira_team_server_networking_and_observability",
+        "experimental",
+        "watchdog",
+      ]
     commands:
       - func: "do setup"
       - func: "do watchdog setup"
@@ -1193,7 +1221,7 @@ tasks:
     name: jsCore_heap_profiling
     tags:
       [
-        "assigned_to_jira_team_server_servicearch",
+        "assigned_to_jira_team_server_programmability",
         "default",
         "jscore",
         "incompatible_system_allocator",

@@ -473,7 +473,7 @@ tasks:
             - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
 
   - name: idl_tests
-    tags: ["assigned_to_jira_team_server_servicearch", "default"]
+    tags: ["assigned_to_jira_team_server_programmability", "default"]
     depends_on:
       - name: archive_dist_test
     commands:
