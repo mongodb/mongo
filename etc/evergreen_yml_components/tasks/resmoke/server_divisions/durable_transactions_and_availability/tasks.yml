@@ -572,7 +572,7 @@ tasks:
         vars:
           # This task sometimes has outliers that will hit the default exec timeout set by the
           # historical data. We manually increase the timeout above the historical timeout to avoid this
-          exec_timeout_secs: 900 # 15 mins
+          exec_timeout_secs: 1800 # 30 mins
 
   ## initial sync generational fuzzer to ensure stability in patch builds ##
   - <<: *jstestfuzz_template
