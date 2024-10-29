@@ -1153,21 +1153,14 @@ BSONObj getQueryForExplain(OperationContext* opCtx,
                            const BulkWriteCommandRequest& req,
                            const BulkWriteUpdateOrDeleteOp* op,
                            const NamespaceInfoEntry& nsEntry) {
-    if (shouldDoFLERewrite(nsEntry)) {
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-        }
-
-        if (!nsEntry.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-            return processFLEWriteExplainD(opCtx,
-                                           op->getCollation().value_or(BSONObj()),
-                                           nsEntry.getNs(),
-                                           nsEntry.getEncryptionInformation().get(),
-                                           boost::none, /* runtimeConstants */
-                                           req.getLet(),
-                                           op->getFilter());
-        }
+    if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
+        return processFLEWriteExplainD(opCtx,
+                                       op->getCollation().value_or(BSONObj()),
+                                       nsEntry.getNs(),
+                                       nsEntry.getEncryptionInformation().get(),
+                                       boost::none, /* runtimeConstants */
+                                       req.getLet(),
+                                       op->getFilter());
     }
 
     return op->getFilter();

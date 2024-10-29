@@ -1230,21 +1230,14 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.
-        if (shouldDoFLERewrite(aggExState.getRequest())) {
-            {
-                stdx::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
-                CurOp::get(aggExState.getOpCtx())->setShouldOmitDiagnosticInformation(lk, true);
-            }
-
-            if (!aggExState.getRequest().getEncryptionInformation()->getCrudProcessed().value_or(
-                    false)) {
-                pipeline =
-                    processFLEPipelineD(aggExState.getOpCtx(),
-                                        aggExState.getExecutionNss(),
-                                        aggExState.getRequest().getEncryptionInformation().value(),
-                                        std::move(pipeline));
-                aggExState.getRequest().getEncryptionInformation()->setCrudProcessed(true);
-            }
+        if (prepareForFLERewrite(aggExState.getOpCtx(),
+                                 aggExState.getRequest().getEncryptionInformation())) {
+            pipeline =
+                processFLEPipelineD(aggExState.getOpCtx(),
+                                    aggExState.getExecutionNss(),
+                                    aggExState.getRequest().getEncryptionInformation().value(),
+                                    std::move(pipeline));
+            aggExState.getRequest().getEncryptionInformation()->setCrudProcessed(true);
         }
 
         pipeline->optimizePipeline();

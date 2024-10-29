@@ -1021,15 +1021,11 @@ public:
 
         void _rewriteFLEPayloads(OperationContext* opCtx) {
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
-            if (shouldDoFLERewrite(_cmdRequest)) {
-                invariant(_cmdRequest->getNamespaceOrUUID().isNamespaceString());
-
-                if (!_cmdRequest->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    processFLEFindD(
-                        opCtx, _cmdRequest->getNamespaceOrUUID().nss(), _cmdRequest.get());
-                }
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
+            if (prepareForFLERewrite(opCtx, _cmdRequest->getEncryptionInformation())) {
+                tassert(9483400,
+                        "Expecting a namespace string for find_cmd",
+                        _cmdRequest->getNamespaceOrUUID().isNamespaceString());
+                processFLEFindD(opCtx, _cmdRequest->getNamespaceOrUUID().nss(), _cmdRequest.get());
             }
         }
     };

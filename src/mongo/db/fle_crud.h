@@ -56,7 +56,6 @@
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/transaction/transaction_api.h"
@@ -65,7 +64,6 @@
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 class OperationContext;
@@ -212,14 +210,14 @@ void processFLEFindD(OperationContext* opCtx,
  */
 void processFLECountS(OperationContext* opCtx,
                       const NamespaceString& nss,
-                      CountCommandRequest* countCommand);
+                      CountCommandRequest& countCommand);
 
 /**
  * Process a find command from a replica set.
  */
 void processFLECountD(OperationContext* opCtx,
                       const NamespaceString& nss,
-                      CountCommandRequest* countCommand);
+                      CountCommandRequest& countCommand);
 
 /**
  * Process a pipeline from mongos.
@@ -238,19 +236,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineD(
     NamespaceString nss,
     const EncryptionInformation& encryptInfo,
     std::unique_ptr<Pipeline, PipelineDeleter> toRewrite);
-
-/**
- * Helper function to determine if an IDL object with encryption information should be rewritten.
- */
-template <typename T>
-bool shouldDoFLERewrite(const std::unique_ptr<T>& cmd) {
-    return cmd->getEncryptionInformation().has_value();
-}
-
-template <typename T>
-bool shouldDoFLERewrite(const T& cmd) {
-    return cmd.getEncryptionInformation().has_value();
-}
 
 /**
  * Abstraction layer for FLE

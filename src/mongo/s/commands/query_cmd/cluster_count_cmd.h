@@ -143,12 +143,8 @@ public:
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
-            if (shouldDoFLERewrite(countRequest)) {
-                if (!countRequest.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    processFLECountS(opCtx, nss, &countRequest);
-                }
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
+            if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
+                processFLECountS(opCtx, nss, countRequest);
             }
 
             const auto cri = uassertStatusOK(
@@ -322,11 +318,8 @@ public:
                 nss.isValid());
 
         // If the command has encryptionInformation, rewrite the query as necessary.
-        if (shouldDoFLERewrite(countRequest)) {
-            processFLECountS(opCtx, nss, &countRequest);
-
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
+        if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
+            processFLECountS(opCtx, nss, countRequest);
         }
 
         BSONObj targetingQuery = countRequest.getQuery();

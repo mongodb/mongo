@@ -465,7 +465,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     liteParsedPipeline.verifyIsSupported(opCtx, isSharded, request.getExplain());
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     const auto& involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
-    auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
+    bool shouldDoFLERewrite = request.getEncryptionInformation().has_value();
     auto startsWithQueue = liteParsedPipeline.startsWithQueue();
     auto requiresCollationForParsingUnshardedAggregate =
         liteParsedPipeline.requiresCollationForParsingUnshardedAggregate();

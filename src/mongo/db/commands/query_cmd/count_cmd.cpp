@@ -27,16 +27,15 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <functional>
 #include <limits>
 #include <string>
 #include <utility>
 #include <variant>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -177,16 +176,9 @@ public:
                                   << "context",
                     !request().getNamespaceOrUUID().isUUID());
 
-            // This optional will contain the request object in case it was modified by the
-            // prepareRequest function. We need this so that the request object remains valid during
-            // the lifetime of this function. This approach avoids making a copy of the request
-            // object in case no FLE is used. As a future refactoring, this should be generalized
-            // and moved into the base class(es), so that other commands can make use of the same
-            // mechanism.
-            // TODO(SERVER-94834): clean this up when centralizing processing for FLE in the
-            // TypedCommand base class.
-            boost::optional<CountCommandRequest> potentiallyRewrittenReq;
-            auto req = prepareRequest(opCtx, potentiallyRewrittenReq);
+            if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
+                processFLECountD(opCtx, _ns, request());
+            }
 
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
@@ -202,7 +194,7 @@ public:
             if (ctx->getView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
-                return runExplainOnView(opCtx, req.get(), verbosity, replyBuilder);
+                return runExplainOnView(opCtx, request(), verbosity, replyBuilder);
             }
 
             const auto& collection = ctx->getCollection();
@@ -211,13 +203,13 @@ public:
             auto rangePreverser = buildRangePreserverForShardedCollections(opCtx, collection);
 
             auto expCtx = makeExpressionContextForGetExecutor(
-                opCtx, req.get().getCollation().value_or(BSONObj()), _ns, verbosity);
+                opCtx, request().getCollation().value_or(BSONObj()), _ns, verbosity);
             const auto extensionsCallback = getExtensionsCallback(collection, opCtx, _ns);
             auto parsedFind = uassertStatusOK(
-                parsed_find_command::parseFromCount(expCtx, req.get(), *extensionsCallback, _ns));
+                parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, _ns));
 
             auto statusWithPlanExecutor =
-                getExecutorCount(expCtx, &collection, std::move(parsedFind), req.get());
+                getExecutorCount(expCtx, &collection, std::move(parsedFind), request());
             uassertStatusOK(statusWithPlanExecutor.getStatus());
 
             auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -227,8 +219,8 @@ public:
                 collection,
                 verbosity,
                 BSONObj(),
-                SerializationContext::stateCommandReply(req.get().getSerializationContext()),
-                req.get().toBSON(),
+                SerializationContext::stateCommandReply(request().getSerializationContext()),
+                request().toBSON(),
                 &bodyBuilder);
         }
 
@@ -240,6 +232,10 @@ public:
         CountCommandReply typedRun(OperationContext* opCtx) final {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
+            if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
+                processFLECountD(opCtx, _ns, request());
+            }
+
             // Capture diagnostics for tassert and invariant failures that may occur during query
             // parsing, planning or execution. No work is done on the hot-path, all computation of
             // these diagnostics is done lazily during failure handling. This line just creates an
@@ -247,17 +243,6 @@ public:
             // to print diagnostics in the event of a tassert or invariant.
             ScopedDebugInfo countCmdDiagnostics("commandDiagnostics",
                                                 command_diagnostics::Printer{opCtx});
-
-            // This optional will contain the request object in case it was modified by the
-            // prepareRequest function. We need this so that the request object remains valid during
-            // the lifetime of this function. This approach avoids making a copy of the request
-            // object in case no FLE is used. As a future refactoring, this should be generalized
-            // and moved into the base class(es), so that other commands can make use of the same
-            // mechanism.
-            // TODO(SERVER-94834): clean this up when centralizing processing for FLE in the
-            // TypedCommand base class.
-            boost::optional<CountCommandRequest> potentiallyRewrittenReq;
-            auto req = prepareRequest(opCtx, potentiallyRewrittenReq);
 
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
@@ -274,30 +259,30 @@ public:
             auto curOp = CurOp::get(opCtx);
             curOp->beginQueryPlanningTimer();
 
-            if (req.get().getMirrored().value_or(false)) {
+            if (request().getMirrored().value_or(false)) {
                 const auto& invocation = CommandInvocation::get(opCtx);
                 invocation->markMirrored();
             } else {
-                analyzeShardKeyIfNeeded(opCtx, req.get());
+                analyzeShardKeyIfNeeded(opCtx, request());
             }
 
             auto expCtx =
                 makeExpressionContextForGetExecutor(opCtx,
-                                                    req.get().getCollation().value_or(BSONObj()),
+                                                    request().getCollation().value_or(BSONObj()),
                                                     _ns,
                                                     boost::none /* verbosity*/);
 
             const auto& collection = ctx->getCollection();
             const auto extensionsCallback = getExtensionsCallback(collection, opCtx, _ns);
             auto parsedFind = uassertStatusOK(
-                parsed_find_command::parseFromCount(expCtx, req.get(), *extensionsCallback, _ns));
+                parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, _ns));
 
-            registerRequestForQueryStats(opCtx, expCtx, curOp, ctx, req.get(), *parsedFind);
+            registerRequestForQueryStats(opCtx, expCtx, curOp, ctx, request(), *parsedFind);
 
             if (ctx->getView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
-                return runCountOnView(opCtx, req);
+                return runCountOnView(opCtx, request());
             }
 
             // Check whether we are allowed to read from this node after acquiring our locks.
@@ -309,7 +294,7 @@ public:
             auto rangePreverser = buildRangePreserverForShardedCollections(opCtx, collection);
 
             auto statusWithPlanExecutor =
-                getExecutorCount(expCtx, &collection, std::move(parsedFind), req.get());
+                getExecutorCount(expCtx, &collection, std::move(parsedFind), request());
             uassertStatusOK(statusWithPlanExecutor.getStatus());
 
             auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -462,26 +447,6 @@ public:
                             CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
             }
             return rangePreserver;
-        }
-
-        // Prepare request object so that it gets rewritten when FLE is enabled. Otherwise return
-        // the original request object without modifying/copying it.
-        std::reference_wrapper<const CountCommandRequest> prepareRequest(
-            OperationContext* opCtx,
-            boost::optional<CountCommandRequest>& potentiallyRewrittenReq) {
-            auto req = std::cref(request());
-
-            if (shouldDoFLERewrite(req.get())) {
-                if (!req.get().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    potentiallyRewrittenReq.emplace(req);
-                    processFLECountD(opCtx, _ns, &*potentiallyRewrittenReq);
-                    req = std::cref(potentiallyRewrittenReq.value());
-                }
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-            }
-
-            return req;
         }
 
         // Build the return value for this command.

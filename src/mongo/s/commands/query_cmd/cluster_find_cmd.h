@@ -353,13 +353,14 @@ public:
 
         void registerRequestForQueryStats(const boost::intrusive_ptr<ExpressionContext> expCtx,
                                           const ParsedFindCommand& parsedFind) {
-            if (!_didDoFLERewrite) {
-                query_stats::registerRequest(expCtx->opCtx, expCtx->ns, [&]() {
-                    // This callback is either never invoked or invoked immediately within
-                    // registerRequest, so use-after-move of parsedFind isn't an issue.
-                    return std::make_unique<query_stats::FindKey>(expCtx, parsedFind);
-                });
+            if (_didDoFLERewrite) {
+                return;
             }
+            query_stats::registerRequest(expCtx->opCtx, expCtx->ns, [&]() {
+                // This callback is either never invoked or invoked immediately within
+                // registerRequest, so use-after-move of parsedFind isn't an issue.
+                return std::make_unique<query_stats::FindKey>(expCtx, parsedFind);
+            });
         }
 
         void retryOnViewError(
@@ -397,18 +398,12 @@ public:
         }
 
         void doFLERewriteIfNeeded(OperationContext* opCtx) {
-            if (!shouldDoFLERewrite(_cmdRequest)) {
-                return;
-            }
-
-            invariant(_cmdRequest->getNamespaceOrUUID().isNamespaceString());
-            if (!_cmdRequest->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+            if (prepareForFLERewrite(opCtx, _cmdRequest->getEncryptionInformation())) {
+                tassert(9483401,
+                        "Expecting namespace string for find command",
+                        _cmdRequest->getNamespaceOrUUID().isNamespaceString());
                 processFLEFindS(opCtx, _cmdRequest->getNamespaceOrUUID().nss(), _cmdRequest.get());
                 _didDoFLERewrite = true;
-            }
-            {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
             }
         }
 

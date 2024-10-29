@@ -30,15 +30,14 @@
 #include "mongo/db/commands.h"
 
 #include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsontypes.h"
@@ -52,6 +51,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
@@ -70,7 +70,6 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -174,6 +173,23 @@ BSONObj appendWCToObj(const BSONObj& cmdObj, WriteConcernOptions newWC) {
 }
 
 }  // namespace
+
+bool prepareForFLERewrite(OperationContext* opCtx,
+                          const boost::optional<EncryptionInformation>& encryptionInformation) {
+    // Check if request has encryption information set.
+    // Only if encryption information is set, we can do the actual FLE rewriting.
+    if (!encryptionInformation) {
+        return false;
+    }
+    // Make OperationContext forget about diagnostics, so it won't leak sensitive field
+    // information into them.
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
+    }
+    // Prevent duplicate rewriting.
+    return !encryptionInformation->getCrudProcessed().value_or(false);
+}
 
 void CommandInvocationHooks::set(ServiceContext* serviceContext,
                                  std::unique_ptr<CommandInvocationHooks> hooks) {

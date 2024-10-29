@@ -1943,8 +1943,8 @@ void processFLEFindS(OperationContext* opCtx,
 
 void processFLECountS(OperationContext* opCtx,
                       const NamespaceString& nss,
-                      CountCommandRequest* countCommand) {
-    fle::processCountCommand(opCtx, nss, countCommand, &getTransactionWithRetriesForMongoS);
+                      CountCommandRequest& countCommand) {
+    fle::processCountCommand(opCtx, nss, &countCommand, &getTransactionWithRetriesForMongoS);
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineS(

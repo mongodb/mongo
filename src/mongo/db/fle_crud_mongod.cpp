@@ -456,8 +456,8 @@ void processFLEFindD(OperationContext* opCtx,
 
 void processFLECountD(OperationContext* opCtx,
                       const NamespaceString& nss,
-                      CountCommandRequest* countCommand) {
-    fle::processCountCommand(opCtx, nss, countCommand, &getTransactionWithRetriesForMongoD);
+                      CountCommandRequest& countCommand) {
+    fle::processCountCommand(opCtx, nss, &countCommand, &getTransactionWithRetriesForMongoD);
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineD(

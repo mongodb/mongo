@@ -43,7 +43,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -92,8 +91,8 @@ namespace mongo {
 
 class AuthorizationContract;
 class Command;
-
 class CommandInvocation;
+class EncryptionInformation;
 class OperationContext;
 
 namespace mutablebson {
@@ -107,6 +106,15 @@ extern const std::set<std::string> kNoApiVersions;
 extern const std::set<std::string> kApiVersions1;
 
 boost::optional<BSONArray>& errorLabelsOverride(OperationContext* opCtx);
+
+/**
+ * Whether or not the caller should rewrite the request for FLE. If this function returns false,
+ * no FLE rewriting is needed.
+ * A side effect of calling this function is that diagnostics can be disabled in the passed
+ * OperationContext.
+ */
+bool prepareForFLERewrite(OperationContext* opCtx,
+                          const boost::optional<EncryptionInformation>& encryptionInformation);
 
 /**
  * A simple set of type-erased hooks for pre and post command actions.
@@ -1403,6 +1411,7 @@ private:
                                     opMsgRequest.getValidatedTenantId(),
                                     opMsgRequest.getSerializationContext());
         auto parsed = idl::parseCommandRequest<RequestType>(ctx, opMsgRequest);
+
         auto apiStrict = parsed.getGenericArguments().getApiStrict().value_or(false);
 
         // A command with 'apiStrict' cannot be invoked with alias.
