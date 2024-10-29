@@ -28,9 +28,6 @@ selector:
     # This passthrough implicitly shards the accessed collections. Do not run tests where collections
     # can't be created on `getCollection` call.
     - assumes_no_implicit_collection_creation_on_get_collection
-    # TODO SERVER-70760: The support for transaction in not fully available in multi-tenant sharded
-    #                    cluster. This tag should be removed after it is available.
-    - uses_transactions
 
 executor:
   archive:

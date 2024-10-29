@@ -9,12 +9,6 @@ selector:
     - jstests/change_streams/projection_fakes_internal_event.js
 
     ##
-    # TODO SERVER-70760: This test creates its own sharded cluster and uses transaction. The support
-    #                    for transaction on multi-tenancy is not fully available. Unblock this test
-    #                    after the support is available.
-    - jstests/change_streams/oplog_rewrite/change_stream_basic_match_pushdown_rewrite.js
-
-    ##
     # These tests run in sharded clusters. The tenant token cannot be injected to the sharded cluster
     # currently, as such these tests cannot work in true multitenant environment.
     # TODO SERVER-68341: Remove these JS tests from exclusion list.
