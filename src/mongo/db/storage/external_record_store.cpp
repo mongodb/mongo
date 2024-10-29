@@ -40,10 +40,9 @@
 namespace mongo {
 // 'ident' is an identifer to WT table and a virtual collection does not have any persistent data
 // in WT. So, we set the "dummy" ident for a virtual collection.
-ExternalRecordStore::ExternalRecordStore(const NamespaceString& ns,
-                                         boost::optional<UUID> uuid,
+ExternalRecordStore::ExternalRecordStore(boost::optional<UUID> uuid,
                                          const VirtualCollectionOptions& vopts)
-    : RecordStore(uuid, /*identName=*/"dummy"_sd, /*isCapped=*/false), _vopts(vopts), _ns(ns) {}
+    : RecordStore(uuid, /*identName=*/"dummy"_sd, /*isCapped=*/false), _vopts(vopts) {}
 
 /**
  * Returns a MultiBsonStreamCursor for this record store. Reverse scans are not currently supported

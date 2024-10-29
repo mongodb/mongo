@@ -56,9 +56,7 @@
 namespace mongo {
 class ExternalRecordStore : public RecordStore {
 public:
-    ExternalRecordStore(const NamespaceString& ns,
-                        boost::optional<UUID> uuid,
-                        const VirtualCollectionOptions& vopts);
+    ExternalRecordStore(boost::optional<UUID> uuid, const VirtualCollectionOptions& vopts);
 
     const VirtualCollectionOptions& getOptions() const {
         return _vopts;
@@ -183,6 +181,5 @@ private:
     }
 
     VirtualCollectionOptions _vopts;
-    NamespaceString _ns;
 };
 }  // namespace mongo
