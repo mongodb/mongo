@@ -1055,10 +1055,14 @@ def generate(env: SCons.Environment.Environment) -> None:
 
     if normalized_arch not in ["arm64", "amd64"]:
         bazel_internal_flags.append("--config=local")
-        bazel_internal_flags.append("--jobs=3")
     elif os.environ.get("USE_NATIVE_TOOLCHAIN"):
         print("Custom toolchain detected, using --config=local for bazel build.")
         bazel_internal_flags.append("--config=local")
+
+    if normalized_arch == "s390x":
+        # s390x systems don't have enough RAM to handle the default job count and will
+        # OOM unless we reduce it.
+        bazel_internal_flags.append("--jobs=3")
 
     public_release = False
     # Disable remote execution for public release builds.
