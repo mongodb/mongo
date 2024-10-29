@@ -1,5 +1,5 @@
 /**
- * Tests that opcounters.command on mongos doesn't count inserts, updates and deletes.
+ * Tests that opcounters.command increases appropriately for insert, delete and update.
  *
  * @tags: [
  *   requires_fcv_62,
@@ -19,36 +19,46 @@ function getOpCounters(conn) {
 const dbName = "testDb";
 const collName = "testColl";
 const mongosDB = st.s.getDB(dbName);
+const cnt = 100;
 
 {
     const opCountersBefore = getOpCounters(st.s);
-    assert.commandWorked(mongosDB.runCommand({insert: collName, documents: [{x: 0}]}));
+    for (let i = 1; i <= cnt; ++i) {
+        assert.commandWorked(mongosDB.runCommand({insert: collName, documents: [{x: 0}]}));
+    }
     const opCountersAfter = getOpCounters(st.s);
 
-    assert.eq(opCountersAfter.insert, opCountersBefore.insert + 1);
-    // "command" should only increase by 1 (i.e. count only the 'serverStatus' command).
-    assert.eq(opCountersAfter.command, opCountersBefore.command + 1);
+    assert.gte(opCountersAfter.insert, opCountersBefore.insert + cnt);
+    // "command" should only increase by at least 1 (i.e. count only the 'serverStatus' command).
+    // There can be commands from config server to mongos which can increase the command count.
+    assert.gt(opCountersAfter.command, opCountersBefore.command);
 }
 
 {
     const opCountersBefore = getOpCounters(st.s);
-    assert.commandWorked(
-        mongosDB.runCommand({update: collName, updates: [{q: {x: 0}, u: {$set: {y: 0}}}]}));
+    for (let i = 1; i <= cnt; ++i) {
+        assert.commandWorked(
+            mongosDB.runCommand({update: collName, updates: [{q: {x: 0}, u: {$set: {y: 0}}}]}));
+    }
     const opCountersAfter = getOpCounters(st.s);
-
-    assert.eq(opCountersAfter.update, opCountersBefore.update + 1);
-    // "command" should only increase by 1 (i.e. count only the 'serverStatus' command).
-    assert.eq(opCountersAfter.command, opCountersBefore.command + 1);
+    assert.gte(opCountersAfter.update, opCountersBefore.update + cnt);
+    // "command" should only increase by at least 1 (i.e. count only the 'serverStatus' command).
+    // There can be commands from config server to mongos which can increase the command count.
+    assert.gt(opCountersAfter.command, opCountersBefore.command);
 }
 
 {
     const opCountersBefore = getOpCounters(st.s);
-    assert.commandWorked(mongosDB.runCommand({delete: collName, deletes: [{q: {x: 0}, limit: 0}]}));
+    for (let i = 1; i <= cnt; ++i) {
+        assert.commandWorked(
+            mongosDB.runCommand({delete: collName, deletes: [{q: {x: 0}, limit: 0}]}));
+    }
     const opCountersAfter = getOpCounters(st.s);
 
-    assert.eq(opCountersAfter.delete, opCountersBefore.delete + 1);
-    // "command" should only increase by 1 (i.e. count only the 'serverStatus' command).
-    assert.eq(opCountersAfter.command, opCountersBefore.command + 1);
+    assert.gte(opCountersAfter.delete, opCountersBefore.delete + cnt);
+    // "command" should only increase by at least 1 (i.e. count only the 'serverStatus' command).
+    // There can be commands from config server to mongos which can increase the command count.
+    assert.gt(opCountersAfter.command, opCountersBefore.command);
 }
 
 st.stop();
