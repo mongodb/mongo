@@ -12,4 +12,10 @@ if [[ -z "${BAZELISK_SKIP_WRAPPER}" ]]; then
     exit 0
 fi
 
+# TODO(SERVER-96398): Apply this to Windows when we find a way to do perfect argument forwarding
+# in a batch file.
+if [ -d .git ]; then
+    echo "build --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" > .bazelrc.gitinfo
+fi
+
 $BAZEL_REAL "$@"

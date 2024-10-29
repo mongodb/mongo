@@ -175,21 +175,6 @@ def fmt_build_info(data):
     return ",\n".join([fmt_obj(obj) for _, obj in data.items()])
 
 
-def get_git_version():
-    """Return the git version."""
-    if not os.path.exists(".git") or not os.path.isdir(".git"):
-        return "nogitversion"
-
-    version = open(".git/HEAD", "r").read().strip()
-    if not version.startswith("ref: "):
-        return version
-    version = version[5:]
-    git_ver = ".git/" + version
-    if not os.path.exists(git_ver):
-        return version
-    return open(git_ver, "r").read().strip()
-
-
 logfile_path: str = ""
 loglock = threading.Lock()
 
@@ -257,7 +242,7 @@ def generate_config_header(
         "@mongo_version_patch@": str(version_parts[2]),
         "@mongo_version_extra@": str(version_parts[3]),
         "@mongo_version_extra_str@": version_extra,
-        "@mongo_git_hash@": get_git_version(),
+        "@mongo_git_hash@": extra_definitions_dict["GIT_COMMIT_HASH"],
         "@buildinfo_js_engine@": extra_definitions_dict["js_engine_ver"],
         "@buildinfo_allocator@": extra_definitions_dict["MONGO_ALLOCATOR"],
         "@buildinfo_modules@": module_list,

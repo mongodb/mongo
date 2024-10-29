@@ -774,7 +774,6 @@ mongo_cc_library(
 
 generate_config_header(
     name = "version_constants_gen",
-    additional_inputs = ["//:git_head_optional"],
     checks = ":version_constants_gen.py",
     cpp_defines = MONGO_GLOBAL_DEFINES,
     cpp_linkflags = MONGO_GLOBAL_LINKFLAGS,
@@ -782,6 +781,7 @@ generate_config_header(
     extra_definitions = {
         "MONGO_DISTMOD": "$(MONGO_DISTMOD)",
         "MONGO_VERSION": "$(MONGO_VERSION)",
+        "GIT_COMMIT_HASH": "$(GIT_COMMIT_HASH)",
     } | select({
         "//bazel/config:js_engine_mozjs": {"js_engine_ver": "mozjs"},
         "//conditions:default": {"js_engine_ver": "none"},
