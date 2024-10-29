@@ -555,15 +555,6 @@ class TestRunner(Subcommand):
                 if task:
                     break
 
-        if task is None:
-            raise RuntimeError(f"Error: Could not find evergreen task definition for {suite_name}")
-
-        is_multiversion = "multiversion" in task.tags
-        generate_func = task.find_func_command("generate resmoke tasks")
-        is_jstestfuzz = False
-        if generate_func:
-            is_jstestfuzz = get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) == "true"
-
         local_args = to_local_args()
         local_args = strip_fuzz_config_params(local_args)
 
@@ -629,63 +620,85 @@ class TestRunner(Subcommand):
             local_resmoke_invocation_with_params,
         )
 
-        lines = []
+        try:
+            lines = []
 
-        if is_multiversion:
-            lines.append("# DISCLAIMER:")
-            lines.append(
-                "#     The `db-contrib-tool` command downloads the latest last-continuous/lts mongo shell binaries available in CI."
-            )
-            if multiversion_bin_version:
-                lines.append(
-                    "#     The generated `multiversion_exclude_tags.yml` is dependent on the `backports_required_for_multiversion_tests.yml` file of the last-continuous/lts mongo shell binary git commit."
-                )
-            lines.append(
-                "#     If there have been new commits to last-continuous/lts, the excluded tests & binaries may be slightly different on this task vs locally."
-            )
-        if is_jstestfuzz:
-            lines.append(
-                "# This is a jstestfuzz suite and is dependent on the generated tests specific to this task execution."
-            )
-
-        if suite.get_description():
-            lines.append(f"# {suite.get_description()}")
-
-        lines.append(
-            "# Having trouble reproducing your failure with this? Feel free to reach out in #server-testing."
-        )
-        lines.append("")
-        if is_multiversion:
-            if not os.path.exists("local-db-contrib-tool-invocation.txt"):
+            if task is None:
                 raise RuntimeError(
-                    "ERROR: local-db-contrib-tool-invocation.txt does not exist for multiversion task"
+                    f"Error: Could not find evergreen task definition for {suite_name}"
                 )
 
-            with open("local-db-contrib-tool-invocation.txt", "r") as fh:
-                db_contrib_tool_invocation = fh.read().strip() + " && \\"
-                lines.append(db_contrib_tool_invocation)
+            is_multiversion = "multiversion" in task.tags
+            generate_func = task.find_func_command("generate resmoke tasks")
+            is_jstestfuzz = False
+            if generate_func:
+                is_jstestfuzz = get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) == "true"
 
-            if multiversion_bin_version:
-                generate_tag_file_invocation = f"buildscripts/resmoke.py generate-multiversion-exclude-tags --oldBinVersion={multiversion_bin_version} && \\"
-                lines.append(generate_tag_file_invocation)
+            if is_multiversion:
+                lines.append("# DISCLAIMER:")
+                lines.append(
+                    "#     The `db-contrib-tool` command downloads the latest last-continuous/lts mongo shell binaries available in CI."
+                )
+                if multiversion_bin_version:
+                    lines.append(
+                        "#     The generated `multiversion_exclude_tags.yml` is dependent on the `backports_required_for_multiversion_tests.yml` file of the last-continuous/lts mongo shell binary git commit."
+                    )
+                lines.append(
+                    "#     If there have been new commits to last-continuous/lts, the excluded tests & binaries may be slightly different on this task vs locally."
+                )
+            if is_jstestfuzz:
+                lines.append(
+                    "# This is a jstestfuzz suite and is dependent on the generated tests specific to this task execution."
+                )
 
-        if is_jstestfuzz:
-            download_url = f"https://mciuploads.s3.amazonaws.com/{config.EVERGREEN_PROJECT_NAME}/{config.EVERGREEN_VARIANT_NAME}/{config.EVERGREEN_REVISION}/jstestfuzz/{config.EVERGREEN_TASK_ID}-{config.EVERGREEN_EXECUTION}.tgz"
-            jstestfuzz_dir = "jstestfuzz/"
-            jstests_tar = "jstests.tgz"
-            lines.append(f"mkdir -p {jstestfuzz_dir} && \\")
-            lines.append(f"rm -rf {jstestfuzz_dir}* && \\")
-            lines.append(f"wget '{download_url}' -O {jstests_tar} && \\")
-            lines.append(f"tar -xf {jstests_tar} -C {jstestfuzz_dir} && \\")
-            lines.append(f"rm {jstests_tar} && \\")
+            if suite.get_description():
+                lines.append(f"# {suite.get_description()}")
 
-        if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
-            lines.append(local_resmoke_invocation)
-            lines.append("\n")
-        lines.append(local_resmoke_invocation_with_params)
+            lines.append(
+                "# Having trouble reproducing your failure with this? Feel free to reach out in #server-testing."
+            )
+            lines.append("")
+            if is_multiversion:
+                if not os.path.exists("local-db-contrib-tool-invocation.txt"):
+                    raise RuntimeError(
+                        "ERROR: local-db-contrib-tool-invocation.txt does not exist for multiversion task"
+                    )
 
-        with open("local-resmoke-invocation.txt", "w") as fh:
-            fh.write("\n".join(lines))
+                with open("local-db-contrib-tool-invocation.txt", "r") as fh:
+                    db_contrib_tool_invocation = fh.read().strip() + " && \\"
+                    lines.append(db_contrib_tool_invocation)
+
+                if multiversion_bin_version:
+                    generate_tag_file_invocation = f"buildscripts/resmoke.py generate-multiversion-exclude-tags --oldBinVersion={multiversion_bin_version} && \\"
+                    lines.append(generate_tag_file_invocation)
+
+            if is_jstestfuzz:
+                download_url = f"https://mciuploads.s3.amazonaws.com/{config.EVERGREEN_PROJECT_NAME}/{config.EVERGREEN_VARIANT_NAME}/{config.EVERGREEN_REVISION}/jstestfuzz/{config.EVERGREEN_TASK_ID}-{config.EVERGREEN_EXECUTION}.tgz"
+                jstestfuzz_dir = "jstestfuzz/"
+                jstests_tar = "jstests.tgz"
+                lines.append(f"mkdir -p {jstestfuzz_dir} && \\")
+                lines.append(f"rm -rf {jstestfuzz_dir}* && \\")
+                lines.append(f"wget '{download_url}' -O {jstests_tar} && \\")
+                lines.append(f"tar -xf {jstests_tar} -C {jstestfuzz_dir} && \\")
+                lines.append(f"rm {jstests_tar} && \\")
+
+            if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
+                lines.append(local_resmoke_invocation)
+                lines.append("\n")
+            lines.append(local_resmoke_invocation_with_params)
+
+            with open("local-resmoke-invocation.txt", "w") as fh:
+                fh.write("\n".join(lines))
+
+        except Exception:
+            if config.EVERGREEN_PROJECT_NAME and config.EVERGREEN_PROJECT_NAME.startswith(
+                "mongodb-mongo-"
+            ):
+                raise
+            else:
+                self._resmoke_logger.warning(
+                    "Could not write local-resmoke-invocation.txt file, this evergreen project is likely not configured to support it."
+                )
 
     def _check_for_mongo_processes(self):
         """Check for existing mongo processes as they could interfere with running the tests."""
