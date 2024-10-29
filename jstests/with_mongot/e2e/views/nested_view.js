@@ -2,10 +2,6 @@
  * This test uses nested view to refer to a view that is created on top of another view. This test
  * validates that mongod correctly resolves the underlying namespace of the nested view in its
  * request to mongot by asserting the results of the $search query
- *
- * @tags: [
- * requires_mongot_1_40
- * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

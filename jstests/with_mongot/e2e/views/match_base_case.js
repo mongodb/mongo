@@ -6,10 +6,6 @@
  *
  * Each test case includes running an explain to ensure the user and view stages are in the correct
  * order.
- *
- * @tags: [
- * requires_mongot_1_40
- * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

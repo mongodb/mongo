@@ -1,9 +1,5 @@
 /**
  * This test ensures we support running $vectorSearch on views
- *
- * @tags: [
- * requires_mongot_1_40
- * ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e/lib/explain_utils.js";
