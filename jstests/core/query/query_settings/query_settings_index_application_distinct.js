@@ -130,5 +130,9 @@ testDistinctQuerySettingsApplication(coll.getName());
 testDistinctQuerySettingsApplication(viewName);
 testDistinctWithDistinctScanQuerySettingsApplication(coll.getName());
 
+// The view can persist in the system.views collection, which may cause issues if subsequent tests
+// check this collection.
+assert(db[viewName].drop(), "couldn't drop view");
+
 // TODO: SERVER-87741: Make distinct command on views use DISTINCT_SCAN.
 // testDistinctWithDistinctScanQuerySettingsApplication(viewName);
