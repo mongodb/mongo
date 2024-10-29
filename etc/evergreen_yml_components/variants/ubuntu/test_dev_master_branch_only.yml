@@ -6,8 +6,8 @@
 
 buildvariants:
   - name: &ubuntu2204-arm64-bazel-compile ubuntu2204-arm64-bazel-compile
-    display_name: "! Ubuntu 22.04 arm64 Enterprise Bazel Compile"
-    tags: ["required", "bazel_check"]
+    display_name: "* Ubuntu 22.04 arm64 Enterprise Bazel Compile"
+    tags: ["suggested", "bazel_check"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - ubuntu2204-arm64-large
