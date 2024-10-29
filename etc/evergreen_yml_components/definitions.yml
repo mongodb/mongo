@@ -605,13 +605,13 @@ functions:
         - key: mongo_jstestshell_debugsymbols
           value: ${project}/${compile_variant}/${version_id}/binaries/mongo-jstestshell-debugsymbols-${revision_order_id}.tgz
         - key: mongo_artifacts
-          value: ${project}/${compile_variant}/${version_id}/artifacts/${revision_order_id}.tgz
+          value: ${project}/${compile_variant}/${version_id}/artifacts/artifacts-${revision_order_id}.tgz
         - key: mongo_benchmarks
           value: ${project}/${compile_variant}/${version_id}/binaries/benchmarks-${revision_order_id}.${ext|tgz}
         - key: mongo_benchmarks_debugsymbols
           value: ${project}/${compile_variant}/${version_id}/binaries/benchmarksdebugsymbols-${revision_order_id}.${ext|tgz}
         - key: mongo_venv
-          value: ${project}/${compile_variant}/${version_id}/venv/${revision_order_id}.tgz
+          value: ${project}/${compile_variant}/${version_id}/venv/venv-${revision_order_id}.tgz
         - key: mongo_fuzzer_corpus_mciuploads
           value: ${project}/${build_variant}/${version_id}/libfuzzer-corpora/corpora-${revision_order_id}.${ext|tgz}
         - key: mongo_fuzzer_corpus

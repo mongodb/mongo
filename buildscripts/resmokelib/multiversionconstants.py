@@ -1,5 +1,6 @@
 """FCV and Server binary version constants used for multiversion testing."""
 
+import glob
 import http
 import os
 import shutil
@@ -96,7 +97,14 @@ def in_git_root_dir():
     return git_root_dir == curr_dir
 
 
-if in_git_root_dir():
+# Check for the source dir that exists on spawnhosts
+def in_spawn_host():
+    if glob.glob("/data/mci/source*"):
+        return True
+    return False
+
+
+if in_git_root_dir() and not in_spawn_host():
     generate_mongo_version_file()
 else:
     LOGGER.info("Skipping generating mongo version file since we're not in the root of a git repo")
