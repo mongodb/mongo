@@ -35,13 +35,14 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/transaction_resources.h"
 
 namespace mongo {
 namespace {
-void validateWriteAllowed(OperationContext* opCtx) {
+void validateWriteAllowed(RecoveryUnit& ru) {
     uassert(ErrorCodes::IllegalOperation,
             "Cannot execute a write operation in read-only mode",
-            !opCtx->readOnly());
+            !ru.readOnly());
 }
 
 }  // namespace
@@ -52,14 +53,14 @@ RecordStore::RecordStore(boost::optional<UUID> uuid, StringData identName, bool 
       _cappedInsertNotifier(isCapped ? std::make_shared<CappedInsertNotifier>() : nullptr) {}
 
 void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
-    validateWriteAllowed(opCtx);
+    validateWriteAllowed(*shard_role_details::getRecoveryUnit(opCtx));
     doDeleteRecord(opCtx, dl);
 }
 
 Status RecordStore::insertRecords(OperationContext* opCtx,
                                   std::vector<Record>* inOutRecords,
                                   const std::vector<Timestamp>& timestamps) {
-    validateWriteAllowed(opCtx);
+    validateWriteAllowed(*shard_role_details::getRecoveryUnit(opCtx));
     return doInsertRecords(opCtx, inOutRecords, timestamps);
 }
 
@@ -67,7 +68,7 @@ Status RecordStore::updateRecord(OperationContext* opCtx,
                                  const RecordId& recordId,
                                  const char* data,
                                  int len) {
-    validateWriteAllowed(opCtx);
+    validateWriteAllowed(*shard_role_details::getRecoveryUnit(opCtx));
     return doUpdateRecord(opCtx, recordId, data, len);
 }
 
@@ -76,12 +77,12 @@ StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
                                                       const RecordData& oldRec,
                                                       const char* damageSource,
                                                       const DamageVector& damages) {
-    validateWriteAllowed(opCtx);
+    validateWriteAllowed(*shard_role_details::getRecoveryUnit(opCtx));
     return doUpdateWithDamages(opCtx, loc, oldRec, damageSource, damages);
 }
 
 Status RecordStore::truncate(OperationContext* opCtx) {
-    validateWriteAllowed(opCtx);
+    validateWriteAllowed(*shard_role_details::getRecoveryUnit(opCtx));
     return doTruncate(opCtx);
 }
 
@@ -90,7 +91,7 @@ Status RecordStore::rangeTruncate(OperationContext* opCtx,
                                   const RecordId& maxRecordId,
                                   int64_t hintDataSizeDiff,
                                   int64_t hintNumRecordsDiff) {
-    validateWriteAllowed(opCtx);
+    validateWriteAllowed(*shard_role_details::getRecoveryUnit(opCtx));
     invariant(minRecordId != RecordId() || maxRecordId != RecordId(),
               "Ranged truncate must have one bound defined");
     invariant(minRecordId <= maxRecordId, "Start position cannot be after end position");
@@ -101,7 +102,7 @@ void RecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                       const RecordId& end,
                                       bool inclusive,
                                       const AboutToDeleteRecordCallback& aboutToDelete) {
-    validateWriteAllowed(opCtx);
+    validateWriteAllowed(*shard_role_details::getRecoveryUnit(opCtx));
     doCappedTruncateAfter(opCtx, end, inclusive, aboutToDelete);
 }
 
@@ -115,7 +116,7 @@ void RecordStore::notifyCappedWaitersIfNeeded() {
 }
 
 StatusWith<int64_t> RecordStore::compact(OperationContext* opCtx, const CompactOptions& options) {
-    validateWriteAllowed(opCtx);
+    validateWriteAllowed(*shard_role_details::getRecoveryUnit(opCtx));
     return doCompact(opCtx, options);
 }
 

@@ -37,15 +37,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/unittest/assert.h"
@@ -73,13 +70,14 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
     const RecordData rec(data.c_str(), data.size() + 1);
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -91,6 +89,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
     std::string modifiedData = "11101000";
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             DamageVector dv(3);
             dv[0].sourceOffset = 5;
@@ -106,17 +105,16 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
             dv[2].targetOffset = 5;
             dv[2].targetSize = 3;
 
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(modifiedData, record.data());
@@ -143,13 +141,14 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
     const RecordData rec(data.c_str(), data.size() + 1);
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -161,6 +160,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
     std::string modifiedData = "10100010";
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             DamageVector dv(2);
             dv[0].sourceOffset = 3;
@@ -172,17 +172,16 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
             dv[1].targetOffset = 3;
             dv[1].targetSize = 5;
 
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(modifiedData, record.data());
@@ -210,13 +209,14 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
     const RecordData rec(data.c_str(), data.size() + 1);
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -228,6 +228,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
     std::string modifiedData = "10111010";
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             DamageVector dv(2);
             dv[0].sourceOffset = 0;
@@ -239,17 +240,16 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
             dv[1].targetOffset = 0;
             dv[1].targetSize = 5;
 
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(modifiedData, record.data());
@@ -275,13 +275,14 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
     const RecordData rec(data.c_str(), data.size() + 1);
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -292,20 +293,20 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             DamageVector dv;
 
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, "", dv);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(data, newRecStatus.getValue().data());
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(data, record.data());
@@ -329,26 +330,27 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
     const RecordData obj0Rec(obj0.objdata(), obj0.objsize());
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), obj0Rec.data(), obj0Rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             // {i: {c: "12", d: 2}}
             auto diffOutput = doc_diff::computeOplogDiff(obj0, obj1, 0);
             ASSERT(diffOutput);
@@ -357,21 +359,20 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
                 rs->updateWithDamages(opCtx.get(), loc, obj0Rec, damageSource.get(), damages);
             ASSERT_OK(newRecStatus1.getStatus());
             ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             // {u: {c: "123", d: 3}, i: {a: 1, e: 1}}
             auto diffOutput = doc_diff::computeOplogDiff(obj1, obj2, 0);
             ASSERT(diffOutput);
@@ -380,13 +381,12 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
                 opCtx.get(), loc, rs->dataFor(opCtx.get(), loc), damageSource.get(), damages);
             ASSERT_OK(newRecStatus2.getStatus());
             ASSERT(obj2.binaryEqual(newRecStatus2.getValue().toBson()));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj2.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 }
@@ -414,26 +414,27 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesNested) {
     const RecordData obj0Rec(obj0.objdata(), obj0.objsize());
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), obj0Rec.data(), obj0Rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             // {u: {c: "3"}, sb: {i: {q: 1}}, sd: {sp: {u: {x: {j: "1"}}}}}
             auto diffOutput = doc_diff::computeOplogDiff(obj0, obj1, 0);
             ASSERT(diffOutput);
@@ -442,13 +443,12 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesNested) {
                 rs->updateWithDamages(opCtx.get(), loc, obj0Rec, damageSource.get(), damages);
             ASSERT_OK(newRecStatus1.getStatus());
             ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 }
@@ -469,26 +469,27 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesArray) {
     const RecordData obj0Rec(obj0.objdata(), obj0.objsize());
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), obj0Rec.data(), obj0Rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             // {sfield2: {a: true, l: 6, 's3': {a: true, l: 4, 'u2': [4]}, 'u5': 6}}
             auto diffOutput = doc_diff::computeOplogDiff(obj0, obj1, 0);
             ASSERT(diffOutput);
@@ -497,13 +498,12 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesArray) {
                 rs->updateWithDamages(opCtx.get(), loc, obj0Rec, damageSource.get(), damages);
             ASSERT_OK(newRecStatus1.getStatus());
             ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 }

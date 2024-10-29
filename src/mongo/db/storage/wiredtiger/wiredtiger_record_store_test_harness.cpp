@@ -52,7 +52,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 
@@ -106,10 +105,10 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     std::string config = result.getValue();
 
     {
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(*ru);
         WT_SESSION* s = ru->getSession()->getSession();
         invariantWTOK(s->create(s, uri.c_str(), config.c_str()), s);
-        uow.commit();
+        txn.commit();
     }
 
     WiredTigerRecordStore::Params params;
@@ -164,10 +163,10 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     std::string config = result.getValue();
 
     {
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(*ru);
         WT_SESSION* s = ru->getSession()->getSession();
         invariantWTOK(s->create(s, uri.c_str(), config.c_str()), s);
-        uow.commit();
+        txn.commit();
     }
 
     WiredTigerRecordStore::Params params;

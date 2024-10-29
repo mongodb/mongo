@@ -31,8 +31,6 @@
 #include <memory>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/assert.h"
@@ -55,7 +53,6 @@ void testFindLoc_Hit(IndexType type) {
     }
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     insertToIndex(opCtx.get(),
                   sorted.get(),
@@ -95,7 +92,6 @@ void testFindLoc_Miss(IndexType type) {
     }
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
     insertToIndex(opCtx.get(),
                   sorted.get(),
                   {

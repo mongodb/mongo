@@ -42,7 +42,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -90,17 +89,18 @@ TEST(RecordStoreTestHarness, GetRandomIteratorNonEmpty) {
     RecordId locs[nToInsert];
     for (unsigned i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             stringstream ss;
             ss << "record " << i;
             string data = ss.str();
 
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -150,11 +150,12 @@ TEST(RecordStoreTestHarness, GetRandomIteratorSingleton) {
     RecordId idToRetrieve;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        WriteUnitOfWork uow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "some data", 10, Timestamp());
         ASSERT_OK(res.getStatus());
         idToRetrieve = res.getValue();
-        uow.commit();
+        txn.commit();
     }
 
     // Double-check that the record store has one record in it now.

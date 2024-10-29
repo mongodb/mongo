@@ -169,6 +169,7 @@ public:
 
 TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     auto opCtxPtr = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";
@@ -184,12 +185,12 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 
     RecordId loc;
     {
-        WriteUnitOfWork uow(opCtxPtr.get());
+        StorageWriteTransaction txn(ru);
         StatusWith<RecordId> res =
             rs->insertRecord(opCtxPtr.get(), record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
-        uow.commit();
+        txn.commit();
     }
 
     const boost::optional<boost::filesystem::path> dataFilePath =
@@ -233,6 +234,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 
 TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     auto opCtxPtr = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";
@@ -248,12 +250,12 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
 
     RecordId loc;
     {
-        WriteUnitOfWork uow(opCtxPtr.get());
+        StorageWriteTransaction txn(ru);
         StatusWith<RecordId> res =
             rs->insertRecord(opCtxPtr.get(), record.c_str(), record.length() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
-        uow.commit();
+        txn.commit();
     }
 
     const boost::optional<boost::filesystem::path> dataFilePath =

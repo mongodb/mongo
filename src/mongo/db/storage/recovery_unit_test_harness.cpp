@@ -39,8 +39,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_data.h"
@@ -119,29 +117,23 @@ public:
 };
 
 TEST_F(RecoveryUnitTestHarness, CommitUnitOfWork) {
-    Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
-    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     ru->commitUnitOfWork();
-    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
     RecordData rd;
     ASSERT_TRUE(rs->findRecord(opCtx.get(), s.getValue(), &rd));
 }
 
 TEST_F(RecoveryUnitTestHarness, AbortUnitOfWork) {
-    Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
-    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     ru->abortUnitOfWork();
-    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
     ASSERT_FALSE(rs->findRecord(opCtx.get(), s.getValue(), nullptr));
 }
 
@@ -163,26 +155,20 @@ TEST_F(RecoveryUnitTestHarness, CommitAndRollbackChanges) {
 }
 
 TEST_F(RecoveryUnitTestHarness, CheckIsActiveWithCommit) {
-    Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
-    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
     ASSERT_TRUE(ru->isActive());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ru->commitUnitOfWork();
-    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
     ASSERT_FALSE(ru->isActive());
 }
 
 TEST_F(RecoveryUnitTestHarness, CheckIsActiveWithAbort) {
-    Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
-    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
     ASSERT_TRUE(ru->isActive());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ru->abortUnitOfWork();
-    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
     ASSERT_FALSE(ru->isActive());
 }
 
@@ -221,12 +207,10 @@ TEST_F(RecoveryUnitTestHarness, AbortUnitOfWorkIncrementsSnapshotId) {
 // Note that corresponding tests for calling abandonSnapshot() in AbandonSnapshotMode::kAbort are
 // storage-engine specific.
 TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
-    Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
 
     ru->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kCommit);
 
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
-    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
     StatusWith<RecordId> rid1 = rs->insertRecord(opCtx.get(), "ABC", 3, Timestamp());
     StatusWith<RecordId> rid2 = rs->insertRecord(opCtx.get(), "123", 3, Timestamp());
@@ -234,7 +218,6 @@ TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
     ASSERT_TRUE(rid2.isOK());
     ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
     ru->commitUnitOfWork();
-    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
 
     auto snapshotIdBefore = ru->getSnapshotId();
 
@@ -261,40 +244,54 @@ TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
     ASSERT(recordAfterAbandon);
     ASSERT_EQ(recordAfterAbandon->id, rid2.getValue());
     ASSERT_EQ(strncmp(recordAfterAbandon->data.data(), "123", 3), 0);
+
+    // Explicitly abandon snapshot, forcing a commit. This prevents the RecoveryUnit from
+    // automatically rolling-back the transaction upon destruction.
+    ru->abandonSnapshot();
 }
 
 TEST_F(RecoveryUnitTestHarness, FlipReadOnly) {
     ru->beginUnitOfWork(/*readOnly=*/true);
-    ru->endReadOnlyUnitOfWork();
-
-    ru->beginUnitOfWork(/*readOnly=*/false);
-    ru->commitUnitOfWork();
-
-    ru->beginUnitOfWork(/*readOnly=*/false);
+    ASSERT_TRUE(ru->readOnly());
     ru->abortUnitOfWork();
+    ASSERT_FALSE(ru->readOnly());
+
+    ru->beginUnitOfWork(/*readOnly=*/false);
+    ASSERT_FALSE(ru->readOnly());
+    ru->abortUnitOfWork();
+    ASSERT_FALSE(ru->readOnly());
+
+    ru->beginUnitOfWork(/*readOnly=*/true);
+    ASSERT_TRUE(ru->readOnly());
+    ru->commitUnitOfWork();
+    ASSERT_FALSE(ru->readOnly());
+
+    ru->beginUnitOfWork(/*readOnly=*/false);
+    ASSERT_FALSE(ru->readOnly());
+    ru->commitUnitOfWork();
+    ASSERT_FALSE(ru->readOnly());
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, RegisterChangeMustBeInUnitOfWork, "invariant") {
     int count = 0;
-    shard_role_details::getRecoveryUnit(opCtx.get())
-        ->registerChange(std::make_unique<TestChange>(&count));
+    ru->registerChange(std::make_unique<TestChange>(&count));
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, CommitMustBeInUnitOfWork, "invariant") {
-    shard_role_details::getRecoveryUnit(opCtx.get())->commitUnitOfWork();
+    ru->commitUnitOfWork();
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, AbortMustBeInUnitOfWork, "invariant") {
-    shard_role_details::getRecoveryUnit(opCtx.get())->abortUnitOfWork();
+    ru->abortUnitOfWork();
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, CannotHaveUnfinishedUnitOfWorkOnExit, "invariant") {
-    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(opCtx->readOnly());
+    ru->beginUnitOfWork(opCtx->readOnly());
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, PrepareMustBeInUnitOfWork, "invariant") {
     try {
-        shard_role_details::getRecoveryUnit(opCtx.get())->prepareUnitOfWork();
+        ru->prepareUnitOfWork();
     } catch (const ExceptionFor<ErrorCodes::CommandNotSupported>&) {
         bool prepareCommandSupported = false;
         invariant(prepareCommandSupported);
@@ -302,19 +299,10 @@ DEATH_TEST_F(RecoveryUnitTestHarness, PrepareMustBeInUnitOfWork, "invariant") {
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, AbandonSnapshotMustBeOutOfUnitOfWork, "invariant") {
-    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(opCtx->readOnly());
-    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+    ru->beginUnitOfWork(opCtx->readOnly());
+    ru->abandonSnapshot();
 }
 
-DEATH_TEST_F(RecoveryUnitTestHarness, CommitInReadOnly, "invariant") {
-    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(/*readOnly=*/true);
-    shard_role_details::getRecoveryUnit(opCtx.get())->commitUnitOfWork();
-}
-
-DEATH_TEST_F(RecoveryUnitTestHarness, AbortInReadOnly, "invariant") {
-    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(/*readOnly=*/true);
-    shard_role_details::getRecoveryUnit(opCtx.get())->abortUnitOfWork();
-}
 
 DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
                    LogCommitHandlerTypeWithTimestampBeforeTerminatingOnException,

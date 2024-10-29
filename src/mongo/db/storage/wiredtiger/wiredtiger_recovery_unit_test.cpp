@@ -122,12 +122,12 @@ public:
         std::string config = result.getValue();
 
         {
-            WriteUnitOfWork uow(opCtx);
-            WiredTigerRecoveryUnit* ru =
-                checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx));
-            WT_SESSION* s = ru->getSession()->getSession();
+            auto& ru =
+                *checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx));
+            StorageWriteTransaction txn(ru);
+            WT_SESSION* s = ru.getSession()->getSession();
             invariantWTOK(s->create(s, uri.c_str(), config.c_str()), s);
-            uow.commit();
+            txn.commit();
         }
 
         WiredTigerRecordStore::Params params;
@@ -235,24 +235,22 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
 
     RecordId rid1;
     {
-        WriteUnitOfWork wuow(opCtx1);
+        StorageWriteTransaction txn(*ru1);
         StatusWith<RecordId> res = rs->insertRecord(opCtx1, str.c_str(), str.size() + 1, ts1);
         ASSERT_OK(res);
-        wuow.commit();
+        txn.commit();
         rid1 = res.getValue();
         snapshotManager->setLastApplied(ts1);
     }
 
     // Read without a timestamp. The write should be visible.
-    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx1)->getTimestampReadSource(),
-              RecoveryUnit::ReadSource::kNoTimestamp);
+    ASSERT_EQ(ru1->getTimestampReadSource(), RecoveryUnit::ReadSource::kNoTimestamp);
     RecordData unused;
     ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
 
     // Read with kNoOverlap. The write should be visible.
-    shard_role_details::getRecoveryUnit(opCtx1)->abandonSnapshot();
-    shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
-        RecoveryUnit::ReadSource::kNoOverlap);
+    ru1->abandonSnapshot();
+    ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
     ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
 
     RecordId rid2, rid3;
@@ -260,28 +258,27 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
         // Start, but do not commit a transaction with opCtx2. This sets a timestamp at ts2, which
         // creates a hole. kNoOverlap, which is a function of all_durable, will only be able to read
         // at the time immediately before.
-        WriteUnitOfWork wuow(opCtx2);
+        StorageWriteTransaction txn(*ru2);
         StatusWith<RecordId> res =
             rs->insertRecord(opCtx2, str.c_str(), str.size() + 1, Timestamp());
-        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx2)->setTimestamp(ts2));
+        ASSERT_OK(ru2->setTimestamp(ts2));
         ASSERT_OK(res);
         rid2 = res.getValue();
 
         // While holding open a transaction with opCtx2, perform an insert at ts3 with opCtx1. This
         // creates a "hole".
         {
-            WriteUnitOfWork wuow(opCtx1);
+            StorageWriteTransaction txn(*ru1);
             StatusWith<RecordId> res = rs->insertRecord(opCtx1, str.c_str(), str.size() + 1, ts3);
             ASSERT_OK(res);
-            wuow.commit();
+            txn.commit();
             rid3 = res.getValue();
             snapshotManager->setLastApplied(ts3);
         }
 
         // Read without a timestamp, and we should see the first and third records.
-        shard_role_details::getRecoveryUnit(opCtx1)->abandonSnapshot();
-        shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
-            RecoveryUnit::ReadSource::kNoTimestamp);
+        ru1->abandonSnapshot();
+        ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
         ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
         ASSERT_FALSE(rs->findRecord(opCtx1, rid2, &unused));
         ASSERT_TRUE(rs->findRecord(opCtx1, rid3, &unused));
@@ -289,20 +286,18 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
         // Now read at kNoOverlap. Since the transaction at ts2 has not committed, all_durable is
         // held back to ts1. LastApplied has advanced to ts3, but because kNoOverlap is the minimum,
         // we should only see one record.
-        shard_role_details::getRecoveryUnit(opCtx1)->abandonSnapshot();
-        shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
-            RecoveryUnit::ReadSource::kNoOverlap);
+        ru1->abandonSnapshot();
+        ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
         ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
         ASSERT_FALSE(rs->findRecord(opCtx1, rid2, &unused));
         ASSERT_FALSE(rs->findRecord(opCtx1, rid3, &unused));
 
-        wuow.commit();
+        txn.commit();
     }
 
     // Now that the hole has been closed, kNoOverlap should see all 3 records.
-    shard_role_details::getRecoveryUnit(opCtx1)->abandonSnapshot();
-    shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
-        RecoveryUnit::ReadSource::kNoOverlap);
+    ru1->abandonSnapshot();
+    ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
     ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
     ASSERT_TRUE(rs->findRecord(opCtx1, rid2, &unused));
     ASSERT_TRUE(rs->findRecord(opCtx1, rid3, &unused));
@@ -316,11 +311,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(
-        wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(
-                                   shard_role_details::getRecoveryUnit(clientAndCtx1.second.get())),
-                               cursor),
-        cursor->session);
+    invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -343,11 +334,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(
-        wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(
-                                   shard_role_details::getRecoveryUnit(clientAndCtx1.second.get())),
-                               cursor),
-        cursor->session);
+    invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -371,11 +358,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key1");
     cursor->set_value(cursor, "value1");
-    invariantWTOK(
-        wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(
-                                   shard_role_details::getRecoveryUnit(clientAndCtx1.second.get())),
-                               cursor),
-        cursor->session);
+    invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -394,11 +377,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
     cursor->set_value(cursor, "value2");
 
     // The write is allowed.
-    invariantWTOK(
-        wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(
-                                   shard_role_details::getRecoveryUnit(clientAndCtx1.second.get())),
-                               cursor),
-        cursor->session);
+    invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
 
     ru1->abortUnitOfWork();
     ru2->abortUnitOfWork();
@@ -411,11 +390,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteOnADocumentBeingPreparedTriggersW
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(
-        wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(
-                                   shard_role_details::getRecoveryUnit(clientAndCtx1.second.get())),
-                               cursor),
-        cursor->session);
+    invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -424,10 +399,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteOnADocumentBeingPreparedTriggersW
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value2");
-    int ret =
-        wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(
-                                   shard_role_details::getRecoveryUnit(clientAndCtx2.second.get())),
-                               cursor);
+    int ret = wiredTigerCursorInsert(*ru1, cursor);
     ASSERT_EQ(WT_ROLLBACK, ret);
 
     ru1->abortUnitOfWork();
@@ -476,36 +448,34 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, RoundUpPreparedTimestamps) {
 TEST_F(WiredTigerRecoveryUnitTestFixture,
        ChangeIsPassedEmptyLastTimestampSetOnCommitWithNoTimestamp) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
+
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
-        wuow.commit();
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
+        txn.commit();
     }
     ASSERT(!commitTs);
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsPassedLastTimestampSetOnCommit) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
+
     Timestamp ts1(5, 5);
     Timestamp ts2(6, 6);
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
-        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts1));
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
+        ASSERT_OK(ru1->setTimestamp(ts1));
         ASSERT(!commitTs);
-        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts2));
+        ASSERT_OK(ru1->setTimestamp(ts2));
         ASSERT(!commitTs);
-        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts1));
+        ASSERT_OK(ru1->setTimestamp(ts1));
         ASSERT(!commitTs);
-        wuow.commit();
+        txn.commit();
         ASSERT_EQ(*commitTs, ts1);
     }
     ASSERT_EQ(*commitTs, ts1);
@@ -513,15 +483,14 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsPassedLastTimestampSetOnCommit
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsNotPassedLastTimestampSetOnAbort) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
+
     Timestamp ts1(5, 5);
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
-        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts1));
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
+        ASSERT_OK(ru1->setTimestamp(ts1));
         ASSERT(!commitTs);
     }
     ASSERT(!commitTs);
@@ -529,20 +498,18 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsNotPassedLastTimestampSetOnAbo
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsPassedCommitTimestamp) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
     Timestamp ts1(5, 5);
 
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts1);
+    ru1->setCommitTimestamp(ts1);
     ASSERT(!commitTs);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
         ASSERT(!commitTs);
-        wuow.commit();
+        txn.commit();
         ASSERT_EQ(*commitTs, ts1);
     }
     ASSERT_EQ(*commitTs, ts1);
@@ -550,47 +517,45 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsPassedCommitTimestamp) {
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsNotPassedCommitTimestampIfCleared) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
+
     Timestamp ts1(5, 5);
 
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts1);
+    ru1->setCommitTimestamp(ts1);
     ASSERT(!commitTs);
-    shard_role_details::getRecoveryUnit(opCtx)->clearCommitTimestamp();
+    ru1->clearCommitTimestamp();
     ASSERT(!commitTs);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
         ASSERT(!commitTs);
-        wuow.commit();
+        txn.commit();
     }
     ASSERT(!commitTs);
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsPassedNewestCommitTimestamp) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
+
     Timestamp ts1(5, 5);
     Timestamp ts2(6, 6);
 
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts2);
+    ru1->setCommitTimestamp(ts2);
     ASSERT(!commitTs);
-    shard_role_details::getRecoveryUnit(opCtx)->clearCommitTimestamp();
+    ru1->clearCommitTimestamp();
     ASSERT(!commitTs);
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts1);
+    ru1->setCommitTimestamp(ts1);
     ASSERT(!commitTs);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
         ASSERT(!commitTs);
-        wuow.commit();
+        txn.commit();
         ASSERT_EQ(*commitTs, ts1);
     }
     ASSERT_EQ(*commitTs, ts1);
@@ -598,18 +563,17 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsPassedNewestCommitTimestamp) {
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsNotPassedCommitTimestampOnAbort) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
+
     Timestamp ts1(5, 5);
 
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts1);
+    ru1->setCommitTimestamp(ts1);
     ASSERT(!commitTs);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
         ASSERT(!commitTs);
     }
     ASSERT(!commitTs);
@@ -617,35 +581,33 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ChangeIsNotPassedCommitTimestampOnAbor
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampBeforeSetTimestampOnCommit) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
+
     Timestamp ts1(5, 5);
     Timestamp ts2(6, 6);
 
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts2);
+    ru1->setCommitTimestamp(ts2);
     ASSERT(!commitTs);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
         ASSERT(!commitTs);
-        wuow.commit();
+        txn.commit();
         ASSERT_EQ(*commitTs, ts2);
     }
     ASSERT_EQ(*commitTs, ts2);
-    shard_role_details::getRecoveryUnit(opCtx)->clearCommitTimestamp();
+    ru1->clearCommitTimestamp();
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
-        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts1));
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
+        ASSERT_OK(ru1->setTimestamp(ts1));
         ASSERT_EQ(*commitTs, ts2);
-        wuow.commit();
+        txn.commit();
         ASSERT_EQ(*commitTs, ts1);
     }
     ASSERT_EQ(*commitTs, ts1);
@@ -653,35 +615,33 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampBeforeSetTimestampOnCom
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampAfterSetTimestampOnCommit) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
+
     Timestamp ts1(5, 5);
     Timestamp ts2(6, 6);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
         ASSERT(!commitTs);
-        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts2));
+        ASSERT_OK(ru1->setTimestamp(ts2));
         ASSERT(!commitTs);
-        wuow.commit();
+        txn.commit();
         ASSERT_EQ(*commitTs, ts2);
     }
     ASSERT_EQ(*commitTs, ts2);
 
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts1);
+    ru1->setCommitTimestamp(ts1);
     ASSERT_EQ(*commitTs, ts2);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
         ASSERT_EQ(*commitTs, ts2);
-        wuow.commit();
+        txn.commit();
         ASSERT_EQ(*commitTs, ts1);
     }
     ASSERT_EQ(*commitTs, ts1);
@@ -689,31 +649,29 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampAfterSetTimestampOnComm
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampBeforeSetTimestampOnAbort) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
+
     Timestamp ts1(5, 5);
     Timestamp ts2(6, 6);
 
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts2);
+    ru1->setCommitTimestamp(ts2);
     ASSERT(!commitTs);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
         ASSERT(!commitTs);
     }
     ASSERT(!commitTs);
-    shard_role_details::getRecoveryUnit(opCtx)->clearCommitTimestamp();
+    ru1->clearCommitTimestamp();
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
-        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts1));
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
+        ASSERT_OK(ru1->setTimestamp(ts1));
         ASSERT(!commitTs);
     }
     ASSERT(!commitTs);
@@ -721,31 +679,29 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampBeforeSetTimestampOnAbo
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampAfterSetTimestampOnAbort) {
     boost::optional<Timestamp> commitTs = boost::none;
-    auto opCtx = clientAndCtx1.second.get();
+
     Timestamp ts1(5, 5);
     Timestamp ts2(6, 6);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
         ASSERT(!commitTs);
-        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts2));
+        ASSERT_OK(ru1->setTimestamp(ts2));
         ASSERT(!commitTs);
     }
     ASSERT(!commitTs);
 
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts1);
+    ru1->setCommitTimestamp(ts1);
     ASSERT(!commitTs);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [&](OperationContext*, boost::optional<Timestamp> commitTime) {
-                commitTs = commitTime;
-            });
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCommit([&](OperationContext*, boost::optional<Timestamp> commitTime) {
+            commitTs = commitTime;
+        });
         ASSERT(!commitTs);
     }
     ASSERT(!commitTs);
@@ -754,8 +710,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampAfterSetTimestampOnAbor
 TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsAreNotCached) {
     auto opCtx = clientAndCtx1.second.get();
 
-    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
-
     std::unique_ptr<RecordStore> rs(
         harnessHelper->createRecordStore(opCtx, "test.checkpoint_cached"));
     auto uri = dynamic_cast<WiredTigerRecordStore*>(rs.get())->getURI();
@@ -763,101 +717,99 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsAreNotCached) {
     WiredTigerKVEngine* engine = harnessHelper->getEngine();
 
     // Insert a record.
-    WriteUnitOfWork wuow(opCtx);
+    StorageWriteTransaction txn(*ru1);
     StatusWith<RecordId> s = rs->insertRecord(opCtx, "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords(opCtx));
-    wuow.commit();
+    txn.commit();
 
     // Test 1: A normal read should create a new cursor and release it into the session cache.
 
     // Close all cached cursors to establish a 'before' state.
-    ru->getSession()->closeAllCursors(uri);
-    int cachedCursorsBefore = ru->getSession()->cachedCursors();
+    ru1->getSession()->closeAllCursors(uri);
+    int cachedCursorsBefore = ru1->getSession()->cachedCursors();
 
     RecordData rd;
     ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
 
     // A cursor should have been checked out and released into the cache.
-    ASSERT_GT(ru->getSession()->cachedCursors(), cachedCursorsBefore);
+    ASSERT_GT(ru1->getSession()->cachedCursors(), cachedCursorsBefore);
     // All opened cursors are returned.
-    ASSERT_EQ(0, ru->getSession()->cursorsOut());
+    ASSERT_EQ(0, ru1->getSession()->cursorsOut());
 
-    ru->abandonSnapshot();
+    ru1->abandonSnapshot();
 
     // Force a checkpoint.
     engine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
 
     // Test 2: Checkpoint cursors are not expected to be cached, they
     // should be immediately closed when destructed.
-    ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    ru1->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
 
     // Close any cached cursors to establish a new 'before' state.
-    ru->getSession()->closeAllCursors(uri);
-    cachedCursorsBefore = ru->getSession()->cachedCursors();
+    ru1->getSession()->closeAllCursors(uri);
+    cachedCursorsBefore = ru1->getSession()->cachedCursors();
 
     // Will search the checkpoint cursor for the record, then release the checkpoint cursor.
     ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
 
     // No new cursors should have been released into the cache, with the exception of a metadata
     // cursor that is opened to determine if the table is LSM. Metadata cursors are cached.
-    ASSERT_EQ(ru->getSession()->cachedCursors(), cachedCursorsBefore + 1);
+    ASSERT_EQ(ru1->getSession()->cachedCursors(), cachedCursorsBefore + 1);
 
     // All opened cursors are closed.
-    ASSERT_EQ(0, ru->getSession()->cursorsOut());
+    ASSERT_EQ(0, ru1->getSession()->cursorsOut());
 
-    ASSERT_EQ(ru->getTimestampReadSource(), WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    ASSERT_EQ(ru1->getTimestampReadSource(), WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
     auto opCtx = clientAndCtx1.second.get();
 
-    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
-
     std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.read_once"));
     auto uri = dynamic_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     // Insert a record.
-    WriteUnitOfWork wuow(opCtx);
+    StorageWriteTransaction txn(*ru1);
     StatusWith<RecordId> s = rs->insertRecord(opCtx, "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords(opCtx));
-    wuow.commit();
+    txn.commit();
 
     // Test 1: A normal read should create a new cursor and release it into the session cache.
 
     // Close all cached cursors to establish a 'before' state.
-    ru->getSession()->closeAllCursors(uri);
-    int cachedCursorsBefore = ru->getSession()->cachedCursors();
+    ru1->getSession()->closeAllCursors(uri);
+    int cachedCursorsBefore = ru1->getSession()->cachedCursors();
 
     RecordData rd;
     ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
 
     // A cursor should have been checked out and released into the cache.
-    ASSERT_GT(ru->getSession()->cachedCursors(), cachedCursorsBefore);
+    ASSERT_GT(ru1->getSession()->cachedCursors(), cachedCursorsBefore);
     // All opened cursors are returned.
-    ASSERT_EQ(0, ru->getSession()->cursorsOut());
+    ASSERT_EQ(0, ru1->getSession()->cursorsOut());
 
-    ru->abandonSnapshot();
+    ru1->abandonSnapshot();
 
     // Test 2: A read-once operation should create a new cursor because it has a different
     // configuration. This will be released into the cache.
 
-    ru->setReadOnce(true);
+    ru1->setReadOnce(true);
 
     // Close any cached cursors to establish a new 'before' state.
-    ru->getSession()->closeAllCursors(uri);
-    cachedCursorsBefore = ru->getSession()->cachedCursors();
+    ru1->getSession()->closeAllCursors(uri);
+    cachedCursorsBefore = ru1->getSession()->cachedCursors();
 
     // The subsequent read operation will create a new read_once cursor and release into the cache.
     ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
 
     // A new cursor should have been released into the cache.
-    ASSERT_GT(ru->getSession()->cachedCursors(), cachedCursorsBefore);
+    ASSERT_GT(ru1->getSession()->cachedCursors(), cachedCursorsBefore);
     // All opened cursors are closed.
-    ASSERT_EQ(0, ru->getSession()->cursorsOut());
+    ASSERT_EQ(0, ru1->getSession()->cursorsOut());
 
-    ASSERT(ru->getReadOnce());
+    ASSERT(ru1->getReadOnce());
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CacheMixedOverwrite) {
@@ -865,12 +817,10 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CacheMixedOverwrite) {
     std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.A"));
     auto uri = dynamic_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
-    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
-
     // Close all cached cursors to establish a 'before' state.
-    auto session = ru->getSession();
-    ru->getSession()->closeAllCursors(uri);
-    int cachedCursorsBefore = ru->getSession()->cachedCursors();
+    auto session = ru1->getSession();
+    ru1->getSession()->closeAllCursors(uri);
+    int cachedCursorsBefore = ru1->getSession()->cachedCursors();
 
     // Use a large, unused table ID for this test to ensure we don't collide with any other table
     // ids.
@@ -940,9 +890,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
     auto opCtx1 = clientAndCtx1.second.get();
     auto opCtx2 = clientAndCtx2.second.get();
 
-    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx1));
-    auto ru2 = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx2));
-
     std::unique_ptr<RecordStore> rs(
         harnessHelper->createRecordStore(opCtx1, "test.checkpoint_stable"));
 
@@ -951,12 +898,12 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
     // Insert a record.
     RecordId rid1;
     {
-        WriteUnitOfWork wuow(opCtx1);
+        StorageWriteTransaction txn(*ru1);
         StatusWith<RecordId> s1 = rs->insertRecord(opCtx1, "data", 4, Timestamp());
         ASSERT_TRUE(s1.isOK());
         ASSERT_EQUALS(1, rs->numRecords(opCtx1));
         rid1 = s1.getValue();
-        wuow.commit();
+        txn.commit();
     }
     // Force a checkpoint.
     engine->flushAllFiles(opCtx1, /*callerHoldsReadLock*/ false);
@@ -969,12 +916,12 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
     // Insert a new record.
     RecordId rid2;
     {
-        WriteUnitOfWork wuow(opCtx1);
+        StorageWriteTransaction txn(*ru1);
         StatusWith<RecordId> s2 = rs->insertRecord(opCtx1, "data_2", 6, Timestamp());
         ASSERT_TRUE(s2.isOK());
         ASSERT_EQUALS(2, rs->numRecords(opCtx1));
         rid2 = s2.getValue();
-        wuow.commit();
+        txn.commit();
     }
 
     // Test 2: New record does not appear in original checkpoint cursor.
@@ -983,7 +930,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
 
     // Test 3: New record does not appear in new checkpoint cursor since no new checkpoint was
     // created.
-    ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    ru1->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
     auto checkpointCursor = rs->getCursor(opCtx1, true);
     ASSERT(!checkpointCursor->seekExact(rid2));
 
@@ -992,7 +939,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
 
     // Test 4: Old and new record should appear in new checkpoint cursor. Only old record
     // should appear in the original checkpoint cursor
-    ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    ru1->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
     auto newCheckpointCursor = rs->getCursor(opCtx1, true);
     ASSERT(newCheckpointCursor->seekExact(rid1));
     ASSERT(newCheckpointCursor->seekExact(rid2));
@@ -1003,9 +950,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
 TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorGetId) {
     auto opCtx1 = clientAndCtx1.second.get();
     auto opCtx2 = clientAndCtx2.second.get();
-
-    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx1));
-    auto ru2 = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx2));
 
     std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx1, "test.checkpoint_id"));
 
@@ -1023,45 +967,43 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorGetId) {
     // Insert a record and force a checkpoint.
     RecordId rid1;
     {
-        WriteUnitOfWork wuow(opCtx1);
+        StorageWriteTransaction txn(*ru1);
         StatusWith<RecordId> s1 = rs->insertRecord(opCtx1, "data", 4, Timestamp());
         ASSERT_TRUE(s1.isOK());
         ASSERT_EQUALS(1, rs->numRecords(opCtx1));
         rid1 = s1.getValue();
-        wuow.commit();
+        txn.commit();
     }
     engine->flushAllFiles(opCtx1, /*callerHoldsReadLock*/ false);
 
     // Open another checkpoint cursor and check its new id.
-    ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    ru1->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
     auto newCheckpointCursor = rs->getCursor(opCtx1, true);
     ASSERT(newCheckpointCursor->getCheckpointId() > firstCheckpointId);
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitWithDurableTimestamp) {
-    auto opCtx = clientAndCtx1.second.get();
     Timestamp ts1(3, 3);
     Timestamp ts2(5, 5);
 
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts1);
-    shard_role_details::getRecoveryUnit(opCtx)->setDurableTimestamp(ts2);
-    auto durableTs = shard_role_details::getRecoveryUnit(opCtx)->getDurableTimestamp();
+    ru1->setCommitTimestamp(ts1);
+    ru1->setDurableTimestamp(ts2);
+    auto durableTs = ru1->getDurableTimestamp();
     ASSERT_EQ(ts2, durableTs);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        wuow.commit();
+        StorageWriteTransaction txn(*ru1);
+        txn.commit();
     }
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitWithoutDurableTimestamp) {
-    auto opCtx = clientAndCtx1.second.get();
     Timestamp ts1(5, 5);
-    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(ts1);
+    ru1->setCommitTimestamp(ts1);
 
     {
-        WriteUnitOfWork wuow(opCtx);
-        wuow.commit();
+        StorageWriteTransaction txn(*ru1);
+        txn.commit();
     }
 }
 
@@ -1077,19 +1019,13 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, MultiTimestampConstraintsInternalState
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(
-        wiredTigerCursorInsert(
-            *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), cursor),
-        cursor->session);
+    invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
 
     // Perform a write at ts1.
     cursor->set_key(cursor, "key2");
     cursor->set_value(cursor, "value");
     ASSERT_OK(ru1->setTimestamp(ts1));
-    invariantWTOK(
-        wiredTigerCursorInsert(
-            *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), cursor),
-        cursor->session);
+    invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
 
     // Setting the timestamp again to the same value should not fail.
     ASSERT_OK(ru1->setTimestamp(ts1));
@@ -1103,10 +1039,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, MultiTimestampConstraintsInternalState
     cursor->set_key(cursor, "key3");
     cursor->set_value(cursor, "value");
     ASSERT_OK(ru1->setTimestamp(ts2));
-    invariantWTOK(
-        wiredTigerCursorInsert(
-            *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), cursor),
-        cursor->session);
+    invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
 
     ru1->commitUnitOfWork();
 }
@@ -1124,10 +1057,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, AbandonSnapshotAbortMode) {
         getCursor(ru1, &cursor);
         cursor->set_key(cursor, key);
         cursor->set_value(cursor, "value");
-        invariantWTOK(
-            wiredTigerCursorInsert(
-                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), cursor),
-            cursor->session);
+        invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
 
         ru1->commitUnitOfWork();
     }
@@ -1227,19 +1157,13 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
         getCursor(ru1, &cursor);
         cursor->set_key(cursor, "key");
         cursor->set_value(cursor, "value");
-        invariantWTOK(
-            wiredTigerCursorInsert(
-                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), cursor),
-            cursor->session);
+        invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
 
         // Perform a write at ts1.
         cursor->set_key(cursor, "key2");
         cursor->set_value(cursor, "value");
         ASSERT_OK(ru1->setTimestamp(ts1));
-        invariantWTOK(
-            wiredTigerCursorInsert(
-                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), cursor),
-            cursor->session);
+        invariantWTOK(wiredTigerCursorInsert(*ru1, cursor), cursor->session);
 
         // Setting the timestamp again to a different value should detect that we're trying to set
         // multiple timestamps with the first write being non timestamped.
@@ -1259,23 +1183,20 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
 DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
              SetDurableTimestampTwice,
              "Trying to reset durable timestamp when it was already set.") {
-    auto opCtx = clientAndCtx1.second.get();
     Timestamp ts1(3, 3);
     Timestamp ts2(5, 5);
-    shard_role_details::getRecoveryUnit(opCtx)->setDurableTimestamp(ts1);
-    shard_role_details::getRecoveryUnit(opCtx)->setDurableTimestamp(ts2);
+    ru1->setDurableTimestamp(ts1);
+    ru1->setDurableTimestamp(ts2);
 }
 
 DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
              RollbackHandlerAbortsOnTxnOpen,
              "rollback handler reopened transaction") {
-    auto opCtx = clientAndCtx1.second.get();
-    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
-    ASSERT(ru->getSession());
+    ASSERT(ru1->getSession());
     {
-        WriteUnitOfWork wuow(opCtx);
-        ru->assertInActiveTxn();
-        ru->onRollback([ru](OperationContext*) { ru->getSession(); });
+        StorageWriteTransaction txn(*ru1);
+        ru1->assertInActiveTxn();
+        ru1->onRollback([&](OperationContext*) { ru1->getSession(); });
     }
 }
 

@@ -32,8 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"
@@ -65,14 +63,14 @@ TEST(SortedDataInterface, BuilderAddKey) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), true));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -98,14 +96,14 @@ TEST(SortedDataInterface, BuilderAddKeyString) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), true));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(keyString1.getValueCopy()));
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -129,14 +127,14 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdLong) {
             record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
         ASSERT(record_id_helpers::isReserved(reservedLoc));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -157,14 +155,14 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), true));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -186,16 +184,16 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), false));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
             builder->addKey(makeKeyString(sorted.get(), key1, loc2)), key1, boost::none);
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -224,16 +222,16 @@ TEST(SortedDataInterface, BuilderAddSameKeyString) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), false));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(keyStringLoc1.getValueCopy()));
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
             builder->addKey(keyStringLoc2.getValueCopy()), key1, boost::none);
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -255,15 +253,15 @@ TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), true /* allow duplicates */));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 }
@@ -292,15 +290,15 @@ TEST(SortedDataInterface, BuilderAddSameKeyStringWithDupsAllowed) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), true /* allow duplicates */));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(keyStringLoc1.getValueCopy()));
         ASSERT_SDI_INSERT_OK(builder->addKey(keyStringLoc2.getValueCopy()));
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 }
@@ -321,16 +319,16 @@ TEST(SortedDataInterface, BuilderAddMultipleKeys) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), true));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key2, loc2)));
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key3, loc3)));
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
     }
 }
@@ -360,16 +358,16 @@ TEST(SortedDataInterface, BuilderAddMultipleKeyStrings) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), true));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(keyString1.getValueCopy()));
         ASSERT_SDI_INSERT_OK(builder->addKey(keyString2.getValueCopy()));
         ASSERT_SDI_INSERT_OK(builder->addKey(keyString3.getValueCopy()));
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
     }
 }
@@ -390,18 +388,18 @@ TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), true));
 
-        WriteUnitOfWork wuow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1b, loc2)));
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1c, loc4)));
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey2b, loc3)));
         ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey3a, loc5)));
-        wuow.commit();
+        txn.commit();
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(5, sorted->numEntries(opCtx.get()));
     }
 }

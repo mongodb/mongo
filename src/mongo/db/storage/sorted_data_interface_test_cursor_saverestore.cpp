@@ -37,8 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -62,33 +60,30 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursor) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
-            WriteUnitOfWork uow(opCtx.get());
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+            StorageWriteTransaction txn(ru);
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
             ASSERT_SDI_INSERT_OK(
                 sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
         for (auto entry = cursor->next(); entry; i++, entry = cursor->next()) {
@@ -119,33 +114,30 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorWithEndPosition) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
-            WriteUnitOfWork uow(opCtx.get());
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+            StorageWriteTransaction txn(ru);
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
             ASSERT_SDI_INSERT_OK(
                 sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         cursor->setEndPosition(BSON("" << std::numeric_limits<double>::infinity()), true);
 
@@ -172,33 +164,30 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorReversed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
-            WriteUnitOfWork uow(opCtx.get());
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+            StorageWriteTransaction txn(ru);
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
             ASSERT_SDI_INSERT_OK(
                 sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
@@ -223,33 +212,30 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorOnIdIndex) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
-            WriteUnitOfWork uow(opCtx.get());
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+            StorageWriteTransaction txn(ru);
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
             ASSERT_SDI_INSERT_OK(
                 sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), false));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
@@ -274,33 +260,30 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorReversedOnIdIndex) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
-            WriteUnitOfWork uow(opCtx.get());
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+            StorageWriteTransaction txn(ru);
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
             ASSERT_SDI_INSERT_OK(
                 sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), false));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
@@ -327,32 +310,29 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorWithDupKeys) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
-            WriteUnitOfWork uow(opCtx.get());
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+            StorageWriteTransaction txn(ru);
             RecordId loc(42, i * 2);
             ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key1, loc), true /* allow duplicates */));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
         for (auto entry = cursor->next(); entry; i++, entry = cursor->next()) {
@@ -378,32 +358,29 @@ TEST(SortedDataInterface, SaveAndRestoreWhileIterateCursorWithDupKeysReversed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
-            WriteUnitOfWork uow(opCtx.get());
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+            StorageWriteTransaction txn(ru);
             RecordId loc(42, i * 2);
             ASSERT_SDI_INSERT_OK(sorted->insert(
                 opCtx.get(), makeKeyString(sorted.get(), key1, loc), true /* allow duplicates */));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
@@ -428,30 +405,27 @@ TEST(SortedDataInterface, saveWithoutRestore) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
-            WriteUnitOfWork uow(opCtx.get());
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+            StorageWriteTransaction txn(ru);
             ASSERT_SDI_INSERT_OK(
                 sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         cursor->save();
     }
@@ -466,30 +440,27 @@ TEST(SortedDataInterface, saveWithoutRestoreReversed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
-            WriteUnitOfWork uow(opCtx.get());
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+            StorageWriteTransaction txn(ru);
             ASSERT_SDI_INSERT_OK(
                 sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         cursor->save();
@@ -510,7 +481,6 @@ void testSaveAndRestoreSeesNewInserts(bool forward, IndexType type) {
     }
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
     insertToIndex(opCtx.get(), sorted.get(), {{key1, loc1}, {key3, loc3}}, /*dupsAllowed*/ false);
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
@@ -566,7 +536,6 @@ void testSaveAndRestoreSeesNewInsertsAfterRemove(bool forward, IndexType type) {
     }
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
     insertToIndex(opCtx.get(), sorted.get(), {{key1, loc1}, {key3, loc1}}, /*dupsAllowed*/ false);
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
@@ -621,7 +590,6 @@ void testSaveAndRestoreSeesNewInsertsAfterEOF(bool forward, IndexType type) {
     }
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
     insertToIndex(opCtx.get(), sorted.get(), {{key1, loc1}}, /*dupsAllowed*/ false);
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
@@ -675,7 +643,6 @@ TEST(SortedDataInterface, SaveAndRestoreStandardIndexConsidersRecordId_Forward) 
                                                         });
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
 
@@ -722,7 +689,6 @@ TEST(SortedDataInterface, SaveAndRestoreUniqueIndexWontReturnDupKeys_Forward) {
                                                         });
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
 
@@ -771,7 +737,6 @@ TEST(SortedDataInterface, SaveAndRestoreStandardIndexConsidersRecordId_Reverse) 
                                                         });
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
 
@@ -818,7 +783,6 @@ TEST(SortedDataInterface, SaveAndRestoreUniqueIndexWontReturnDupKeys_Reverse) {
                                                         });
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
 
@@ -867,7 +831,6 @@ TEST(SortedDataInterface, SaveUnpositionedAndRestore) {
                                                         });
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
 
@@ -902,7 +865,6 @@ TEST(SortedDataInterface, SaveRestoreLex) {
                                                         {{key1, RecordId(1)}, {key2, RecordId(2)}});
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     // Check that these keys are lexicographically sorted.
     auto cursor = sorted->newCursor(opCtx.get());
@@ -917,11 +879,12 @@ TEST(SortedDataInterface, SaveRestoreLex) {
 
     // Delete abcd, restore make sure that we don't get abc.
     {
-        WriteUnitOfWork uow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         sorted->unindex(opCtx.get(),
                         makeKeyString(sorted.get(), key2, RecordId(2)),
                         true /* allow duplicates */);
-        uow.commit();
+        txn.commit();
     }
 
     cursor->restore();
@@ -940,7 +903,6 @@ TEST(SortedDataInterface, SaveRestoreLexWithEndPosition) {
                                                         {{key1, RecordId(1)}, {key2, RecordId(2)}});
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     // Check that these keys are lexicographically sorted.
     auto cursor = sorted->newCursor(opCtx.get());

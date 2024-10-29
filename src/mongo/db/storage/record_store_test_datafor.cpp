@@ -36,14 +36,11 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -65,13 +62,14 @@ TEST(RecordStoreTestHarness, DataFor) {
     RecordId loc;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -83,7 +81,6 @@ TEST(RecordStoreTestHarness, DataFor) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(data.size() + 1, static_cast<size_t>(record.size()));
             ASSERT_EQUALS(data, record.data());
@@ -106,17 +103,18 @@ TEST(RecordStoreTestHarness, DataForMultiple) {
     RecordId locs[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             std::stringstream ss;
             ss << "record----" << i;
             std::string data = ss.str();
 
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -128,7 +126,6 @@ TEST(RecordStoreTestHarness, DataForMultiple) {
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             std::stringstream ss;
             ss << "record----" << i;
             std::string data = ss.str();

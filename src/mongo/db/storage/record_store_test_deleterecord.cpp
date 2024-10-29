@@ -42,7 +42,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -69,13 +68,14 @@ TEST(RecordStoreTestHarness, DeleteRecord) {
     RecordId loc;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -86,10 +86,12 @@ TEST(RecordStoreTestHarness, DeleteRecord) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             rs->deleteRecord(opCtx.get(), loc);
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -113,17 +115,18 @@ TEST(RecordStoreTestHarness, DeleteMultipleRecords) {
     RecordId locs[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             stringstream ss;
             ss << "record " << i;
             string data = ss.str();
 
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -134,10 +137,11 @@ TEST(RecordStoreTestHarness, DeleteMultipleRecords) {
 
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             rs->deleteRecord(opCtx.get(), locs[i]);
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -163,17 +167,20 @@ DEATH_TEST_REGEX(RecordStoreTestHarness,
     RecordId loc;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        WriteUnitOfWork uow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         StatusWith<RecordId> res =
             rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
-        uow.commit();
+        txn.commit();
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        WriteUnitOfWork uow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+        StorageWriteTransaction txn(ru);
         // Should crash with a log message.
         rs->deleteRecord(opCtx.get(), RecordId(loc.getLong() + 1));
         MONGO_UNREACHABLE;

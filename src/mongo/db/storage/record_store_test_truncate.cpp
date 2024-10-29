@@ -64,10 +64,11 @@ TEST(RecordStoreTestHarness, TruncateEmpty) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             ASSERT_OK(rs->truncate(opCtx.get()));
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -91,16 +92,17 @@ TEST(RecordStoreTestHarness, TruncateNonEmpty) {
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             stringstream ss;
             ss << "record " << i;
             string data = ss.str();
 
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -111,10 +113,11 @@ TEST(RecordStoreTestHarness, TruncateNonEmpty) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             ASSERT_OK(rs->truncate(opCtx.get()));
-            uow.commit();
+            txn.commit();
         }
     }
 

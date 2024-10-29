@@ -45,15 +45,12 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -94,22 +91,21 @@ TEST(RecordStoreTestHarness, Simple1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc1 = res.getValue();
-            uow.commit();
+            txn.commit();
         }
 
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc1).data());
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc1).data());
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
 
@@ -123,12 +119,13 @@ TEST(RecordStoreTestHarness, Simple1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -152,17 +149,17 @@ TEST(RecordStoreTestHarness, Delete1) {
     RecordId loc;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
 
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
     }
 
@@ -173,11 +170,12 @@ TEST(RecordStoreTestHarness, Delete1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             rs->deleteRecord(opCtx.get(), loc);
-            uow.commit();
+            txn.commit();
         }
 
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
@@ -198,32 +196,33 @@ TEST(RecordStoreTestHarness, Delete2) {
     RecordId loc;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             res = rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
         ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             rs->deleteRecord(opCtx.get(), loc);
-            uow.commit();
+            txn.commit();
         }
     }
 }
@@ -243,36 +242,36 @@ TEST(RecordStoreTestHarness, Update1) {
     RecordId loc;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), s1.c_str(), s1.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s1, rs->dataFor(opCtx.get(), loc).data());
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             Status status = rs->updateRecord(opCtx.get(), loc, s2.c_str(), s2.size() + 1);
             ASSERT_OK(status);
 
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
         ASSERT_EQUALS(s2, rs->dataFor(opCtx.get(), loc).data());
     }
@@ -292,26 +291,27 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
     const RecordData s1Rec(s1.c_str(), s1.size() + 1);
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), s1Rec.data(), s1Rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s1, rs->dataFor(opCtx.get(), loc).data());
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             const char* damageSource = "222";
             DamageVector dv;
             dv.push_back(DamageEvent());
@@ -323,13 +323,12 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
             auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, s1Rec, damageSource, dv);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(s2, newRecStatus.getValue().data());
-            uow.commit();
+            txn.commit();
         }
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s2, rs->dataFor(opCtx.get(), loc).data());
     }
 }
@@ -348,20 +347,20 @@ TEST(RecordStoreTestHarness, Truncate1) {
     RecordId loc;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
-            uow.commit();
+            txn.commit();
         }
     }
 
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
     }
 
@@ -372,10 +371,11 @@ TEST(RecordStoreTestHarness, Truncate1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             rs->truncate(opCtx.get()).transitional_ignore();
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -398,14 +398,15 @@ TEST(RecordStoreTestHarness, Cursor1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             for (int i = 0; i < N; i++) {
                 std::string s = str::stream() << "eliot" << i;
                 ASSERT_OK(rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp())
                               .getStatus());
             }
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -417,7 +418,6 @@ TEST(RecordStoreTestHarness, Cursor1) {
     {
         int x = 0;
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         auto cursor = rs->getCursor(opCtx.get());
         while (auto record = cursor->next()) {
             std::string s = str::stream() << "eliot" << x++;
@@ -430,7 +430,6 @@ TEST(RecordStoreTestHarness, Cursor1) {
     {
         int x = N;
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         auto cursor = rs->getCursor(opCtx.get(), false);
         while (auto record = cursor->next()) {
             std::string s = str::stream() << "eliot" << --x;
@@ -448,17 +447,17 @@ TEST(RecordStoreTestHarness, CursorRestoreForward) {
     auto rs = harnessHelper->newRecordStore(ns, {});
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
 
     {
-        WriteUnitOfWork uow(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 3; i++) {
             ASSERT_OK(
                 rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
                     .getStatus());
         }
-        uow.commit();
+        txn.commit();
     }
 
     auto cursor = rs->getCursor(opCtx.get());
@@ -492,17 +491,17 @@ TEST(RecordStoreTestHarness, CursorRestoreReverse) {
 
     auto rs = harnessHelper->newRecordStore(ns, {});
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     {
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 3; i++) {
             ASSERT_OK(
                 rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
                     .getStatus());
         }
-        uow.commit();
+        txn.commit();
     }
 
     auto cursor = rs->getCursor(opCtx.get(), false);
@@ -536,18 +535,17 @@ TEST(RecordStoreTestHarness, CursorRestoreDeletedDoc) {
 
     auto rs = harnessHelper->newRecordStore(ns, {});
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     {
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 3; i++) {
             ASSERT_OK(
                 rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
                     .getStatus());
         }
-        uow.commit();
+        txn.commit();
     }
 
     auto cursor = rs->getCursor(opCtx.get());
@@ -559,9 +557,9 @@ TEST(RecordStoreTestHarness, CursorRestoreDeletedDoc) {
     shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
 
     {
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         rs->deleteRecord(opCtx.get(), RecordId(1));
-        uow.commit();
+        txn.commit();
     }
     cursor->restore();
 
@@ -573,9 +571,9 @@ TEST(RecordStoreTestHarness, CursorRestoreDeletedDoc) {
     shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
 
     {
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         rs->deleteRecord(opCtx.get(), RecordId(2));
-        uow.commit();
+        txn.commit();
     }
     cursor->restore();
 
@@ -587,9 +585,9 @@ TEST(RecordStoreTestHarness, CursorRestoreDeletedDoc) {
     shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
 
     {
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         rs->deleteRecord(opCtx.get(), RecordId(3));
-        uow.commit();
+        txn.commit();
     }
     cursor->restore();
 
@@ -603,17 +601,17 @@ TEST(RecordStoreTestHarness, CursorSaveRestoreSeek) {
 
     auto rs = harnessHelper->newRecordStore(ns, {});
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     {
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 2; i++) {
             ASSERT_OK(
                 rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
                     .getStatus());
         }
-        uow.commit();
+        txn.commit();
     }
 
     auto cursor = rs->getCursor(opCtx.get());
@@ -639,18 +637,17 @@ TEST(RecordStoreTestHarness, CursorSaveUnpositionedRestoreSeek) {
 
     auto rs = harnessHelper->newRecordStore(ns, {});
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     {
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 2; i++) {
             ASSERT_OK(
                 rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
                     .getStatus());
         }
-        uow.commit();
+        txn.commit();
     }
 
     auto cursor = rs->getCursor(opCtx.get());
@@ -679,7 +676,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     const int numRecords = 100;
     std::vector<Record> records;
@@ -696,9 +693,9 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     }
 
     {
-        WriteUnitOfWork wuow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_OK(rs->insertRecords(opCtx.get(), &records, timestamps));
-        wuow.commit();
+        txn.commit();
     }
 
     {
@@ -748,12 +745,12 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
         BSONObj doc = BSON("i"
                            << "updated");
 
-        WriteUnitOfWork wuow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         for (int i = 0; i < numRecords; i += 10) {
             ASSERT_OK(
                 rs->updateRecord(opCtx.get(), records.at(i).id, doc.objdata(), doc.objsize()));
         }
-        wuow.commit();
+        txn.commit();
 
         for (int i = 0; i < numRecords; i += 10) {
             RecordData rd;
@@ -763,11 +760,11 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     }
 
     {
-        WriteUnitOfWork wuow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         for (int i = 0; i < numRecords; i += 10) {
             rs->deleteRecord(opCtx.get(), records.at(i).id);
         }
-        wuow.commit();
+        txn.commit();
 
         ASSERT_EQ(numRecords - 10, rs->numRecords(opCtx.get()));
     }
@@ -798,7 +795,7 @@ TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreSeek) {
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     const int numRecords = 100;
     std::vector<Record> records;
@@ -821,9 +818,9 @@ TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreSeek) {
         auto record = Record{id, recordData};
         std::vector<Record> recVec = {record};
 
-        WriteUnitOfWork wuow(opCtx.get());
+        StorageWriteTransaction txn(ru);
         ASSERT_OK(rs->insertRecords(opCtx.get(), &recVec, {timestamps[i]}));
-        wuow.commit();
+        txn.commit();
 
         records.push_back(record);
     }
@@ -886,12 +883,13 @@ DEATH_TEST_REGEX(RecordStoreTestHarness,
     auto rs(harnessHelper->newRecordStore());
     {
         auto opCtx(harnessHelper->newOperationContext());
-        char data[] = "data";
-        WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(rs->insertRecord(opCtx.get(), data, strlen(data) + 1, Timestamp()));
-        uow.commit();
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
+        char data[] = "data";
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(rs->insertRecord(opCtx.get(), data, strlen(data) + 1, Timestamp()));
+        txn.commit();
+
         auto cursor = rs->getCursor(opCtx.get());
         // Positions cursor at first record for save()
         ASSERT(cursor->next());

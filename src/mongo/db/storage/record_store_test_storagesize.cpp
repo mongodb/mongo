@@ -61,16 +61,18 @@ TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
         {
             std::stringstream ss;
             ss << "record " << i;
             std::string data = ss.str();
 
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -81,7 +83,6 @@ TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(rs->storageSize(opCtx.get(), nullptr) >= 0);
     }
 }

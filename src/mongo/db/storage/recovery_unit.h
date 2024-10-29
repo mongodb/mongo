@@ -174,8 +174,9 @@ public:
      * Marks the beginning of a unit of work. Each call must be matched with exactly one call to
      * either commitUnitOfWork or abortUnitOfWork.
      *
-     * When called with readOnly=true, no unit of work is started. Calling commitUnitOfWork or
-     * abortUnitOfWork will invariant.
+     * When called with readOnly=true, calls to commitUnitOfWork and abortUnitOfWork will apply any
+     * registered changes and reset the readOnly state, but no writes performed in this unit of work
+     * will be committed.
      *
      * Should be called through WriteUnitOfWork rather than directly.
      */
@@ -199,11 +200,12 @@ public:
     void abortUnitOfWork();
 
     /**
-     * Cleans up any state set for this unit of work.
-     *
-     * Should be called through WriteUnitOfWork rather than directly.
+     * Returns whether or not this RecoveryUnit is in a read-only unit of work. In this state,
+     * users may assert when this RecoveryUnit is used for writing to the storage engine.
      */
-    void endReadOnlyUnitOfWork();
+    bool readOnly() const {
+        return _readOnly;
+    }
 
     /**
      * Sets whether cursors in this operation should engage in pre-fetching data from disk to
@@ -995,5 +997,23 @@ private:
     RecoveryUnit* _recoveryUnit;
     boost::optional<int64_t> _originalOplogVisibleTs;
 };
+
+
+class StorageWriteTransaction {
+public:
+    StorageWriteTransaction(RecoveryUnit&, bool readOnly = false);
+    ~StorageWriteTransaction();
+
+    void prepare();
+    void commit();
+    void abort();
+
+private:
+    RecoveryUnit& _ru;
+    bool _aborted = false;
+    bool _committed = false;
+    bool _prepared = false;
+};
+
 
 }  // namespace mongo

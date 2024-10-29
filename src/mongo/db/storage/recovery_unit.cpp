@@ -113,19 +113,27 @@ void RecoveryUnit::beginUnitOfWork(bool readOnly) {
 }
 
 void RecoveryUnit::commitUnitOfWork() {
-    invariant(!_readOnly);
+    if (_readOnly) {
+        _readOnly = false;
+        commitRegisteredChanges(boost::none);
+        return;
+    }
+
+    runPreCommitHooks(_opCtx);
+
     doCommitUnitOfWork();
     resetSnapshot();
 }
 
 void RecoveryUnit::abortUnitOfWork() {
-    invariant(!_readOnly);
+    if (_readOnly) {
+        _readOnly = false;
+        abortRegisteredChanges();
+        return;
+    }
+
     doAbortUnitOfWork();
     resetSnapshot();
-}
-
-void RecoveryUnit::endReadOnlyUnitOfWork() {
-    _readOnly = false;
 }
 
 void RecoveryUnit::abandonSnapshot() {
@@ -291,6 +299,43 @@ void RecoveryUnit::_setState(State newState) {
 void RecoveryUnit::validateInUnitOfWork() const {
     invariant(_inUnitOfWork() || _readOnly,
               fmt::format("state: {}, readOnly: {}", toString(_getState()), _readOnly));
+}
+
+StorageWriteTransaction::StorageWriteTransaction(RecoveryUnit& ru, bool readOnly) : _ru(ru) {
+    // Cannot nest
+    invariant(!_ru.inUnitOfWork());
+    _ru.beginUnitOfWork(readOnly);
+}
+
+StorageWriteTransaction::~StorageWriteTransaction() {
+    if (!_committed && !_aborted) {
+        abort();
+    }
+}
+
+void StorageWriteTransaction::prepare() {
+    invariant(!_aborted);
+    invariant(!_committed);
+    invariant(!_prepared);
+
+    _ru.prepareUnitOfWork();
+    _prepared = true;
+}
+
+void StorageWriteTransaction::commit() {
+    invariant(!_aborted);
+    invariant(!_committed);
+
+    _ru.commitUnitOfWork();
+    _committed = true;
+}
+
+void StorageWriteTransaction::abort() {
+    invariant(!_aborted);
+    invariant(!_committed);
+
+    _ru.abortUnitOfWork();
+    _aborted = true;
 }
 
 }  // namespace mongo

@@ -17,7 +17,6 @@ wtEnv.CppUnitTest(
     source=[
         "wiredtiger_init_test.cpp",
         "wiredtiger_c_api_test.cpp",
-        "wiredtiger_kv_engine_no_fixture_test.cpp",
         "wiredtiger_kv_engine_test.cpp",
         "wiredtiger_prepare_conflict_test.cpp",
         "wiredtiger_stats_test.cpp",
@@ -54,7 +53,6 @@ wtEnv.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/db/shard_role_api",
         "$BUILD_DIR/mongo/db/storage/record_store_test_harness",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "storage_wiredtiger_core",
@@ -69,7 +67,6 @@ wtEnv.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/index/index_access_method",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/db/shard_role_api",
         "$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness",
         "storage_wiredtiger_core",
     ],
@@ -89,7 +86,6 @@ wtEnv.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
         "$BUILD_DIR/mongo/db/storage/sorted_data_interface_tests",
         "storage_wiredtiger_core",
         "wiredtiger_index_test_harness",
@@ -122,7 +118,6 @@ wtEnv.Benchmark(
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/service_context_non_d",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/db/shard_role_api",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "storage_wiredtiger_core",
     ],

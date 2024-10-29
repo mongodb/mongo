@@ -36,8 +36,6 @@
 #include <utility>
 
 #include "mongo/bson/ordering.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -61,7 +59,6 @@ auto SortedDataInterfaceHarnessHelper::newSortedDataInterface(
     auto index = newSortedDataInterface(unique, partial);
     auto client = serviceContext()->getService()->makeClient("insertToIndex");
     auto opCtx = newOperationContext(client.get());
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
     insertToIndex(opCtx.get(), index.get(), toInsert);
     return index;
 }
@@ -70,22 +67,24 @@ void insertToIndex(OperationContext* opCtx,
                    SortedDataInterface* index,
                    std::initializer_list<IndexKeyEntry> toInsert,
                    bool dupsAllowed) {
-    WriteUnitOfWork wuow(opCtx);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    StorageWriteTransaction txn(ru);
     for (auto&& entry : toInsert) {
         ASSERT_SDI_INSERT_OK(
             index->insert(opCtx, makeKeyString(index, entry.key, entry.loc), dupsAllowed));
     }
-    wuow.commit();
+    txn.commit();
 }
 
 void removeFromIndex(OperationContext* opCtx,
                      SortedDataInterface* index,
                      std::initializer_list<IndexKeyEntry> toRemove) {
-    WriteUnitOfWork wuow(opCtx);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    StorageWriteTransaction txn(ru);
     for (auto&& entry : toRemove) {
         index->unindex(opCtx, makeKeyString(index, entry.key, entry.loc), true);
     }
-    wuow.commit();
+    txn.commit();
 }
 
 key_string::Value makeKeyString(SortedDataInterface* sorted,

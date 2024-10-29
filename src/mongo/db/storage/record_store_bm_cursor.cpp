@@ -33,12 +33,10 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/unittest/assert.h"
 
@@ -63,17 +61,17 @@ struct Fixture {
           harness(newRecordStoreHarnessHelper()),
           rs(harness->newRecordStore("ns", CollectionOptions{.capped = capped})),
           opCtx(harness->newOperationContext()),
-          globalLock(opCtx.get(), MODE_X),
           cursor(rs->getCursor(opCtx.get(), direction == kForward)) {
         char data[] = "data";
         int inserted = 0;
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         while (inserted < nToInsert) {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             for (int i = 0; i < 100; i++) {
                 ASSERT_OK(rs->insertRecord(opCtx.get(), data, strlen(data), Timestamp()));
                 inserted++;
             }
-            uow.commit();
+            txn.commit();
         }
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
@@ -82,7 +80,6 @@ struct Fixture {
     std::unique_ptr<RecordStoreHarnessHelper> harness;
     std::unique_ptr<RecordStore> rs;
     ServiceContext::UniqueOperationContext opCtx;
-    Lock::GlobalLock globalLock;
     std::unique_ptr<SeekableRecordCursor> cursor;
     size_t itemsProcessed = 0;
 };

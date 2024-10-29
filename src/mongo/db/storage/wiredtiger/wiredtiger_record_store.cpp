@@ -77,7 +77,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -741,7 +740,8 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
 
         getNextMarker =
             writeConflictRetry(opCtx, "reclaimOplog", NamespaceString::kRsOplogNamespace, [&] {
-                WriteUnitOfWork wuow(opCtx);
+                auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+                StorageWriteTransaction txn(ru);
 
                 auto seekableCursor =
                     std::make_unique<WiredTigerRecordStoreCursor>(opCtx, *this, true);
@@ -800,7 +800,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
                                   "error"_attr = status);
                     return false;
                 }
-                wuow.commit();
+                txn.commit();
 
                 // Remove the truncate marker after a successful truncation.
                 _oplog->getTruncateMarkers()->popOldestMarker();
@@ -1776,7 +1776,8 @@ void WiredTigerRecordStore::doCappedTruncateAfter(
         firstRemovedId = record->id;
     }
 
-    WriteUnitOfWork wuow(opCtx);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    StorageWriteTransaction txn(ru);
 
     // Compute the number and associated sizes of the records to delete.
     {
@@ -1808,7 +1809,7 @@ void WiredTigerRecordStore::doCappedTruncateAfter(
 
     _changeNumRecordsAndDataSize(opCtx, -recordsRemoved, -bytesRemoved);
 
-    wuow.commit();
+    txn.commit();
 
     if (_oplog) {
         // Immediately rewind visibility to our truncation point, to prevent new

@@ -40,8 +40,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
@@ -51,7 +49,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -64,15 +61,16 @@ StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
                                 KVEngine* engine,
                                 std::unique_ptr<RecordStore>& rs,
                                 const Timestamp& opTime) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     BSONObj obj = BSON("ts" << opTime);
-    WriteUnitOfWork wuow(opCtx.get());
+    StorageWriteTransaction txn(ru);
     Status status = engine->oplogDiskLocRegister(
         *shard_role_details::getRecoveryUnit(opCtx.get()), rs.get(), opTime, false);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
     StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), opTime);
     if (res.isOK())
-        wuow.commit();
+        txn.commit();
     return res;
 }
 
@@ -97,20 +95,21 @@ TEST(RecordStoreTestHarness, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
         // always illegal
         ASSERT_EQ(insertBSON(opCtx, engine, rs, Timestamp(2, -1)).getStatus(),
                   ErrorCodes::BadValue);
 
         {
-            WriteUnitOfWork wuow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             BSONObj obj = BSON("not_ts" << Timestamp(2, 1));
             ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp())
                           .getStatus(),
                       ErrorCodes::BadValue);
         }
         {
-            WriteUnitOfWork wuow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             BSONObj obj = BSON("ts"
                                << "not a Timestamp");
             ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp())
@@ -136,8 +135,6 @@ TEST(RecordStoreTestHarness, SeekOplog) {
     // Forward cursor seeks
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seek(RecordId(0, 1), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
@@ -146,8 +143,6 @@ TEST(RecordStoreTestHarness, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seek(RecordId(2, 1), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
@@ -156,8 +151,6 @@ TEST(RecordStoreTestHarness, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seek(RecordId(2, 2), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
@@ -166,8 +159,6 @@ TEST(RecordStoreTestHarness, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seek(RecordId(2, 3), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT_FALSE(rec);
@@ -176,8 +167,6 @@ TEST(RecordStoreTestHarness, SeekOplog) {
     // Reverse cursor seeks
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get(), false /* forward */);
         auto rec = cur->seek(RecordId(0, 1), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT_FALSE(rec);
@@ -185,8 +174,6 @@ TEST(RecordStoreTestHarness, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get(), false /* forward */);
         auto rec = cur->seek(RecordId(2, 1), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
@@ -195,8 +182,6 @@ TEST(RecordStoreTestHarness, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get(), false /* forward */);
         auto rec = cur->seek(RecordId(2, 2), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
@@ -205,8 +190,6 @@ TEST(RecordStoreTestHarness, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get(), false /* forward */);
         auto rec = cur->seek(RecordId(2, 3), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
@@ -223,7 +206,6 @@ TEST(RecordStoreTestHarness, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seek(RecordId(2, 3), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT_FALSE(rec);
@@ -293,10 +275,11 @@ TEST(RecordStoreTestHarness, OplogOrder) {
 
     {  // first insert a document
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             id1 = _oplogOrderInsertOplog(opCtx.get(), engine, rs, 1);
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -308,7 +291,6 @@ TEST(RecordStoreTestHarness, OplogOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cursor = rs->getCursor(opCtx.get());
         auto record = cursor->seekExact(id1);
         ASSERT(record);
@@ -325,7 +307,6 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         // now we insert 2 docs, but commit the 2nd one first.
         // we make sure we can't find the 2nd until the first is committed.
         ServiceContext::UniqueOperationContext earlyReader(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(earlyReader.get(), MODE_IS);
         auto earlyCursor = rs->getCursor(earlyReader.get());
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         earlyCursor->save();
@@ -333,15 +314,17 @@ TEST(RecordStoreTestHarness, OplogOrder) {
 
         auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
-        WriteUnitOfWork w1(t1.get());
+        auto& ru1 = *shard_role_details::getRecoveryUnit(t1.get());
+        StorageWriteTransaction w1(ru1);
         id2 = _oplogOrderInsertOplog(t1.get(), engine, rs, 20);
         // do not commit yet
 
         {  // create 2nd doc
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto t2 = harnessHelper->newOperationContext(client2.get());
+            auto& ru2 = *shard_role_details::getRecoveryUnit(t2.get());
             {
-                WriteUnitOfWork w2(t2.get());
+                StorageWriteTransaction w2(ru2);
                 id3 = _oplogOrderInsertOplog(t2.get(), engine, rs, 30);
                 w2.commit();
             }
@@ -353,7 +336,6 @@ TEST(RecordStoreTestHarness, OplogOrder) {
 
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekExact(id1);
             ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
@@ -382,7 +364,6 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         {
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seek(id2, SeekableRecordCursor::BoundInclusion::kInclude);
             ASSERT(!record) << stringifyForDebug(opCtx.get(), record, cursor.get());
@@ -391,7 +372,6 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         {  // Test reverse cursors and visibility
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get(), false);
             // 2nd doc (id3) is committed and visibility filter does not apply to reverse cursor
             auto record = cursor->seekExact(id3);
@@ -426,7 +406,6 @@ TEST(RecordStoreTestHarness, OplogOrder) {
     {  // now all 3 docs should be visible
         auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
         auto opCtx = harnessHelper->newOperationContext(client2.get());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cursor = rs->getCursor(opCtx.get());
         auto record = cursor->seekExact(id1);
         ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
@@ -465,7 +444,6 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         // Now we insert 2 docs with timestamps earlier than before, but commit the 2nd one first.
         // We make sure we can't find the 2nd until the first is committed.
         ServiceContext::UniqueOperationContext earlyReader(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(earlyReader.get(), MODE_IS);
         auto earlyCursor = rs->getCursor(earlyReader.get());
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         earlyCursor->save();
@@ -473,7 +451,8 @@ TEST(RecordStoreTestHarness, OplogOrder) {
 
         auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
-        WriteUnitOfWork w1(t1.get());
+        auto& ru1 = *shard_role_details::getRecoveryUnit(t1.get());
+        StorageWriteTransaction w1(ru1);
         RecordId id2 = _oplogOrderInsertOplog(t1.get(), engine, rs, 2);
 
         // do not commit yet
@@ -482,8 +461,9 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         {  // create 2nd doc
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto t2 = harnessHelper->newOperationContext(client2.get());
+            auto& ru2 = *shard_role_details::getRecoveryUnit(t2.get());
             {
-                WriteUnitOfWork w2(t2.get());
+                StorageWriteTransaction w2(ru2);
                 id3 = _oplogOrderInsertOplog(t2.get(), engine, rs, 3);
                 w2.commit();
             }
@@ -506,7 +486,6 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         {
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seek(id2, SeekableRecordCursor::BoundInclusion::kInclude);
             ASSERT_FALSE(record);
@@ -515,7 +494,6 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         {
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seek(id3, SeekableRecordCursor::BoundInclusion::kInclude);
             ASSERT_FALSE(record);
@@ -553,8 +531,9 @@ TEST(RecordStoreTestHarness, OplogVisibilityStandalone) {
     // insert a document
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
-            WriteUnitOfWork uow(opCtx.get());
+            StorageWriteTransaction txn(ru);
             // We must have a "ts" field with a timestamp.
             Timestamp ts(5, 1);
             BSONObj obj = BSON("ts" << ts);
@@ -568,7 +547,7 @@ TEST(RecordStoreTestHarness, OplogVisibilityStandalone) {
             // RecordId should be extracted from 'ts' field when inserting into oplog namespace
             ASSERT(expectedId.getValue().compare(id1) == 0);
 
-            uow.commit();
+            txn.commit();
         }
     }
 
@@ -584,7 +563,6 @@ TEST(RecordStoreTestHarness, OplogVisibilityStandalone) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cursor = rs->getCursor(opCtx.get());
         auto record = cursor->seek(RecordId(id1.getLong() + 1),
                                    SeekableRecordCursor::BoundInclusion::kInclude);

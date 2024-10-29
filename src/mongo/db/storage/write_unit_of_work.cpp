@@ -64,6 +64,7 @@ WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType gr
         shard_role_details::getRecoveryUnit(_opCtx)->beginUnitOfWork(_opCtx->readOnly());
         _opCtx->_ruState = RecoveryUnitState::kActiveUnitOfWork;
     }
+
     // Make sure we don't silently proceed after a previous WriteUnitOfWork under the same parent
     // WriteUnitOfWork fails.
     invariant(_opCtx->_ruState != RecoveryUnitState::kFailedUnitOfWork);
@@ -72,18 +73,12 @@ WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType gr
 WriteUnitOfWork::~WriteUnitOfWork() {
     if (!_released && !_committed) {
         invariant(_opCtx->_ruState != RecoveryUnitState::kNotInUnitOfWork);
-        if (!_opCtx->readOnly()) {
-            if (_toplevel) {
-                // Abort unit of work and execute rollback handlers
-                shard_role_details::getRecoveryUnit(_opCtx)->abortUnitOfWork();
-                _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
-            } else {
-                _opCtx->_ruState = RecoveryUnitState::kFailedUnitOfWork;
-            }
+        if (_toplevel) {
+            // Abort unit of work and execute rollback handlers
+            shard_role_details::getRecoveryUnit(_opCtx)->abortUnitOfWork();
+            _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
         } else {
-            // Clear the readOnly state and execute rollback handlers in readOnly mode.
-            shard_role_details::getRecoveryUnit(_opCtx)->endReadOnlyUnitOfWork();
-            shard_role_details::getRecoveryUnit(_opCtx)->abortRegisteredChanges();
+            _opCtx->_ruState = RecoveryUnitState::kFailedUnitOfWork;
         }
         shard_role_details::getLocker(_opCtx)->endWriteUnitOfWork();
     }
@@ -137,18 +132,7 @@ void WriteUnitOfWork::commit() {
         opObserver->onBatchedWriteCommit(_opCtx, _groupOplogEntries);
     }
     if (_toplevel) {
-        // Execute preCommit hooks before committing the transaction. This is an opportunity to
-        // throw or do any last changes before committing.
-        shard_role_details::getRecoveryUnit(_opCtx)->runPreCommitHooks(_opCtx);
-        if (!_opCtx->readOnly()) {
-            // Commit unit of work and execute commit or rollback handlers depending on whether the
-            // commit was successful.
-            shard_role_details::getRecoveryUnit(_opCtx)->commitUnitOfWork();
-        } else {
-            // Just execute commit handlers in readOnly mode
-            shard_role_details::getRecoveryUnit(_opCtx)->commitRegisteredChanges(boost::none);
-        }
-
+        shard_role_details::getRecoveryUnit(_opCtx)->commitUnitOfWork();
         _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
     }
     shard_role_details::getLocker(_opCtx)->endWriteUnitOfWork();
