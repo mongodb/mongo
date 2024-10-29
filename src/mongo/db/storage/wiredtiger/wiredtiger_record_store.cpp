@@ -336,12 +336,13 @@ private:
 // static
 StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     const std::string& engineName,
-    const NamespaceString& nss,
+    StringData tableName,
     StringData ident,
     const CollectionOptions& options,
     StringData extraStrings,
     KeyFormat keyFormat,
-    bool loggingEnabled) {
+    bool loggingEnabled,
+    bool isOplog) {
 
     // Separate out a prefix and suffix in the default string. User configuration will
     // override values in the prefix, but not values in the suffix.
@@ -371,7 +372,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     ss << ",";
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
-              ->getTableCreateConfig(NamespaceStringUtil::serializeForCatalog(nss));
+              ->getTableCreateConfig(tableName);
 
     ss << extraStrings << ",";
 
@@ -382,7 +383,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
 
     ss << customOptions.getValue();
 
-    if (nss.isOplog()) {
+    if (isOplog) {
         // force file for oplog
         ss << "type=file,";
         // Tune down to 10m.  See SERVER-16247
@@ -410,7 +411,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
 
     // Record store metadata
     ss << ",app_metadata=(formatVersion=" << kCurrentRecordStoreVersion;
-    if (nss.isOplog()) {
+    if (isOplog) {
         ss << ",oplogKeyExtractionVersion=1";
     }
     ss << ")";

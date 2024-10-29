@@ -111,12 +111,13 @@ public:
      * fail with the constructed configuration string.
      */
     static StatusWith<std::string> generateCreateString(const std::string& engineName,
-                                                        const NamespaceString& nss,
+                                                        StringData tableName,
                                                         StringData ident,
                                                         const CollectionOptions& options,
                                                         StringData extraStrings,
                                                         KeyFormat keyFormat,
-                                                        bool loggingEnabled);
+                                                        bool loggingEnabled,
+                                                        bool isOplog = false);
 
     struct Params {
         NamespaceString nss;

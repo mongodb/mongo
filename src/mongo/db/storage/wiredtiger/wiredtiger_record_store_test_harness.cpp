@@ -93,14 +93,15 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     StringData ident = ns;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
 
-    StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-        std::string{kWiredTigerEngineName},
-        NamespaceString::createNamespaceString_forTest(ns),
-        ident,
-        collOptions,
-        "",
-        keyFormat,
-        WiredTigerUtil::useTableLogging(NamespaceString::createNamespaceString_forTest(ns)));
+    StatusWith<std::string> result =
+        WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
+                                                    NamespaceStringUtil::serializeForCatalog(nss),
+                                                    ident,
+                                                    collOptions,
+                                                    "",
+                                                    keyFormat,
+                                                    WiredTigerUtil::useTableLogging(nss),
+                                                    nss.isOplog());
     ASSERT_TRUE(result.isOK());
     std::string config = result.getValue();
 
@@ -151,14 +152,15 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     options.capped = true;
 
     const NamespaceString oplogNss = NamespaceString::kRsOplogNamespace;
-    StatusWith<std::string> result =
-        WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
-                                                    oplogNss,
-                                                    ident,
-                                                    options,
-                                                    "",
-                                                    KeyFormat::Long,
-                                                    WiredTigerUtil::useTableLogging(oplogNss));
+    StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
+        std::string{kWiredTigerEngineName},
+        NamespaceStringUtil::serializeForCatalog(oplogNss),
+        ident,
+        options,
+        "",
+        KeyFormat::Long,
+        WiredTigerUtil::useTableLogging(oplogNss),
+        true);
     ASSERT_TRUE(result.isOK());
     std::string config = result.getValue();
 

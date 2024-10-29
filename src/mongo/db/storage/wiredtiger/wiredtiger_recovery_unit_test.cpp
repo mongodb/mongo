@@ -110,14 +110,15 @@ public:
         std::string ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
-        StatusWith<std::string> result =
-            WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
-                                                        nss,
-                                                        ident,
-                                                        CollectionOptions(),
-                                                        "",
-                                                        KeyFormat::Long,
-                                                        WiredTigerUtil::useTableLogging(nss));
+        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
+            std::string{kWiredTigerEngineName},
+            NamespaceStringUtil::serializeForCatalog(nss),
+            ident,
+            CollectionOptions(),
+            "",
+            KeyFormat::Long,
+            WiredTigerUtil::useTableLogging(nss),
+            nss.isOplog());
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
 

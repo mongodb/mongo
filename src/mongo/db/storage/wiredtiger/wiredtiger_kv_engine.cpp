@@ -1437,12 +1437,13 @@ Status WiredTigerKVEngine::createRecordStore(const NamespaceString& nss,
 
     StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(_canonicalName,
-                                                    nss,
+                                                    NamespaceStringUtil::serializeForCatalog(nss),
                                                     ident,
                                                     options,
                                                     _rsOptions,
                                                     keyFormat,
-                                                    WiredTigerUtil::useTableLogging(nss));
+                                                    WiredTigerUtil::useTableLogging(nss),
+                                                    nss.isOplog());
 
     if (options.clusteredIndex) {
         // A clustered collection requires both CollectionOptions.clusteredIndex and
@@ -1755,7 +1756,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     const bool isLogged = false;
     StatusWith<std::string> swConfig =
         WiredTigerRecordStore::generateCreateString(_canonicalName,
-                                                    NamespaceString::kEmpty /* internal table */,
+                                                    {} /* internal table */,
                                                     ident,
                                                     CollectionOptions(),
                                                     _rsOptions,

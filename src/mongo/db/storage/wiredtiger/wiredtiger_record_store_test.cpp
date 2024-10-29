@@ -1360,7 +1360,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     const std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
     const StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
-                                                    nss,
+                                                    NamespaceStringUtil::serializeForCatalog(nss),
                                                     "",
                                                     CollectionOptions(),
                                                     "",
