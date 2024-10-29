@@ -52,7 +52,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/rebuild_indexes.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -230,53 +229,6 @@ void openCatalog(OperationContext* opCtx,
         fassert(40688,
                 storageEngine->reconcileCatalogAndIdents(
                     opCtx, stableTimestamp, StorageEngine::LastShutdownState::kClean));
-
-    // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
-    // indexes on that collection are done at once, so we use a map to group them together.
-    stdx::unordered_map<NamespaceString, IndexNameObjs> nsToIndexNameObjMap;
-    auto catalog = CollectionCatalog::get(opCtx);
-    for (const StorageEngine::IndexIdentifier& indexIdentifier : reconcileResult.indexesToRebuild) {
-        auto indexName = indexIdentifier.indexName;
-        auto coll = catalog->lookupCollectionByNamespace(opCtx, indexIdentifier.nss);
-        auto indexSpecs = getIndexNameObjs(
-            coll, [&indexName](const std::string& name) { return name == indexName; });
-        if (!indexSpecs.isOK() || indexSpecs.getValue().first.empty()) {
-            fassert(40689,
-                    {ErrorCodes::InternalError,
-                     str::stream()
-                         << "failed to get index spec for index " << indexName << " in collection "
-                         << indexIdentifier.nss.toStringForErrorMsg()});
-        }
-        auto indexesToRebuild = indexSpecs.getValue();
-        invariant(
-            indexesToRebuild.first.size() == 1,
-            str::stream() << "expected to find a list containing exactly 1 index name, but found "
-                          << indexesToRebuild.first.size());
-        invariant(
-            indexesToRebuild.second.size() == 1,
-            str::stream() << "expected to find a list containing exactly 1 index spec, but found "
-                          << indexesToRebuild.second.size());
-
-        auto& ino = nsToIndexNameObjMap[indexIdentifier.nss];
-        ino.first.emplace_back(std::move(indexesToRebuild.first.back()));
-        ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
-    }
-
-    for (const auto& entry : nsToIndexNameObjMap) {
-        NamespaceString collNss(entry.first);
-
-        for (const auto& indexName : entry.second.first) {
-            LOGV2(20275,
-                  "openCatalog: rebuilding index",
-                  logAttrs(collNss),
-                  "index"_attr = indexName);
-        }
-
-        CollectionWriter collWriter(opCtx, collNss);
-
-        const std::vector<BSONObj>& indexSpecs = entry.second.second;
-        fassert(40690, rebuildIndexesOnCollection(opCtx, collWriter, indexSpecs, RepairData::kNo));
-    }
 
     // Once all unfinished index builds have been dropped and the catalog has been reloaded, resume
     // or restart any unfinished index builds. This will not resume/restart any index builds to

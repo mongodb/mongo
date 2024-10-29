@@ -112,7 +112,6 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
         createCollTable(opCtx.get(), NamespaceString::createNamespaceString_forTest("db.coll2")));
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
-    ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
 
     auto identsVec = getAllKVEngineIdents(opCtx.get());
@@ -245,7 +244,6 @@ TEST_F(StorageEngineReconcileTest, ReconcileDropsAllIdentsForUncleanShutdown) {
     // Reconcile will drop all temporary idents when starting up after an unclean shutdown.
     auto reconcileResult = unittest::assertGet(reconcileAfterUncleanShutdown(opCtx.get()));
 
-    ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
     ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
@@ -265,7 +263,6 @@ TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShut
 
     // After clean shutdown, an internal ident should be kept if-and-only-if it is needed to resume
     // an index build.
-    ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
     ASSERT_EQUALS(1UL, reconcileResult.indexBuildsToResume.size());
     ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
@@ -401,10 +398,6 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
     // Reconcile should have to dropped the ident to allow the index to be rebuilt.
     ASSERT(!identExists(opCtx.get(), indexIdent));
 
-    // Because this index is unfinished, reconcile will drop the index and not require it to be
-    // rebuilt.
-    ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
-
     // There are no two-phase builds to resume or restart.
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
@@ -454,10 +447,6 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     // transactionally with the start.
     ASSERT(identExists(opCtx.get(), indexIdentA));
     ASSERT(identExists(opCtx.get(), indexIdentB));
-
-    // Because this is an unfinished two-phase index build, reconcile will not require this index to
-    // be rebuilt to completion, rather restarted.
-    ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
 
     // Only one index build should be indicated as needing to be restarted.
     ASSERT_EQUALS(1UL, reconcileResult.indexBuildsToRestart.size());
@@ -520,7 +509,6 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     // Reconcile would normally return an error if a collection existed with a missing ident in the
     // storage engine. When in a repair context, that should not be the case.
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
-    ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
 
@@ -593,7 +581,6 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     }
     // reconcileCatalogAndIdents() drops orphaned idents.
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
-    ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
 
     ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));

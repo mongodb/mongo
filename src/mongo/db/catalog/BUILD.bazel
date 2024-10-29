@@ -639,7 +639,6 @@ mongo_cc_library(
         ":database_holder",
         "//src/mongo/db:index_builds_coordinator_interface",
         "//src/mongo/db:multitenancy",
-        "//src/mongo/db:rebuild_indexes",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role",
