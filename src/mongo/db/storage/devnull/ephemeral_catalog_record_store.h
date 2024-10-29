@@ -46,7 +46,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/key_format.h"
@@ -66,11 +65,11 @@ namespace mongo {
  */
 class EphemeralForTestRecordStore : public RecordStore {
 public:
-    explicit EphemeralForTestRecordStore(const NamespaceString& ns,
-                                         boost::optional<UUID> uuid,
+    explicit EphemeralForTestRecordStore(boost::optional<UUID> uuid,
                                          StringData identName,
                                          std::shared_ptr<void>* dataInOut,
-                                         bool isCapped = false);
+                                         bool isCapped = false,
+                                         bool isOplog = false);
 
     const char* name() const override;
 
@@ -196,14 +195,12 @@ private:
 
     // This is the "persistent" data.
     struct Data {
-        Data(const NamespaceString& nss, bool isOplog)
-            : dataSize(0), recordsMutex(), nextId(1), ns(nss), isOplog(isOplog) {}
+        explicit Data(bool isOplog) : dataSize(0), recordsMutex(), nextId(1), isOplog(isOplog) {}
 
         int64_t dataSize;
         stdx::recursive_mutex recordsMutex;
         Records records;
         int64_t nextId;
-        NamespaceString ns;
         const bool isOplog;
     };
 

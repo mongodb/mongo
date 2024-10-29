@@ -313,8 +313,7 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
                                                              StringData ident,
                                                              const CollectionOptions& options) {
     if (ident == "_mdb_catalog") {
-        return std::make_unique<EphemeralForTestRecordStore>(
-            nss, options.uuid, ident, &_catalogInfo);
+        return std::make_unique<EphemeralForTestRecordStore>(options.uuid, ident, &_catalogInfo);
     }
     return std::make_unique<DevNullRecordStore>(options.uuid, ident, options, KeyFormat::Long);
 }

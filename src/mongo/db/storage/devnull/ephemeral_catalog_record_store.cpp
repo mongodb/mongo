@@ -43,7 +43,6 @@
 #include <boost/smart_ptr/shared_array.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/damage_vector.h"
@@ -279,18 +278,17 @@ private:
 // RecordStore
 //
 
-EphemeralForTestRecordStore::EphemeralForTestRecordStore(const NamespaceString& ns,
-                                                         boost::optional<UUID> uuid,
+EphemeralForTestRecordStore::EphemeralForTestRecordStore(boost::optional<UUID> uuid,
                                                          StringData identName,
                                                          std::shared_ptr<void>* dataInOut,
-                                                         bool isCapped)
+                                                         bool isCapped,
+                                                         bool isOplog)
     : RecordStore(uuid, identName, isCapped),
       _isCapped(isCapped),
-      _data(*dataInOut ? static_cast<Data*>(dataInOut->get()) : new Data(ns, ns.isOplog())) {
-    // TODO SERVER-78731 We should remove `ns` in the line above.
-    // NOTE : The static_cast here assumes that `dataInOut`, which is a void pointer, contains a
-    // NamespaceString object. As of now, DevNullKVEngine constructs a EphemeralForTestRecordStore
-    // by passing `_catalogInfo` to this method.
+      _data(*dataInOut ? static_cast<Data*>(dataInOut->get()) : new Data(isOplog)) {
+    // NOTE : The static_cast here assumes that `dataInOut`, which is a void pointer. As of now,
+    // DevNullKVEngine constructs a EphemeralForTestRecordStore by passing `_catalogInfo` to this
+    // method.
     if (!*dataInOut) {
         dataInOut->reset(_data);  // takes ownership
     }
@@ -310,11 +308,10 @@ const EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecor
     WithLock, const RecordId& loc) const {
     Records::const_iterator it = _data->records.find(loc);
     if (it == _data->records.end()) {
-        LOGV2_ERROR(
-            23720,
-            "EphemeralForTestRecordStore::recordFor cannot find record for {namespace}:{loc}",
-            logAttrs(_data->ns),
-            "loc"_attr = loc);
+        LOGV2_ERROR(23720,
+                    "EphemeralForTestRecordStore::recordFor cannot find record",
+                    "uuid"_attr = _uuid ? _uuid->toString() : std::string{},
+                    "loc"_attr = loc);
     }
     invariant(it != _data->records.end());
     return &it->second;
@@ -324,11 +321,10 @@ EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecordStore
     WithLock, const RecordId& loc) {
     Records::iterator it = _data->records.find(loc);
     if (it == _data->records.end()) {
-        LOGV2_ERROR(
-            23721,
-            "EphemeralForTestRecordStore::recordFor cannot find record for {namespace}:{loc}",
-            logAttrs(_data->ns),
-            "loc"_attr = loc);
+        LOGV2_ERROR(23721,
+                    "EphemeralForTestRecordStore::recordFor cannot find record",
+                    "uuid"_attr = _uuid ? _uuid->toString() : std::string{},
+                    "loc"_attr = loc);
     }
     invariant(it != _data->records.end());
     return &it->second;
