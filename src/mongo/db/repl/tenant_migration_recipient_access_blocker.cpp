@@ -54,10 +54,8 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 

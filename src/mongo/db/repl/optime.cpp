@@ -37,7 +37,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"

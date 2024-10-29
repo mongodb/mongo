@@ -38,7 +38,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
@@ -46,7 +45,6 @@
 #include "mongo/db/repl/hello_response.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

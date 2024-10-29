@@ -33,11 +33,9 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/idl/idl_parser.h"
 

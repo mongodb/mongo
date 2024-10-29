@@ -34,16 +34,11 @@
 #include <mutex>
 #include <utility>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/sync_source_resolver.h"
@@ -57,7 +52,6 @@
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

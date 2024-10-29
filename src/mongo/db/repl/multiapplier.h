@@ -32,15 +32,10 @@
 #include <boost/move/utility_core.hpp>
 #include <functional>
 #include <iosfwd>
-#include <memory>
-#include <string>
-#include <utility>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"

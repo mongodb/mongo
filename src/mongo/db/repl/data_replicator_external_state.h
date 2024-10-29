@@ -43,7 +43,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 

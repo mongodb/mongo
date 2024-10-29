@@ -45,7 +45,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"

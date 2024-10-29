@@ -47,7 +47,6 @@
 #include "mongo/db/repl/initial_sync_shared_data.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 

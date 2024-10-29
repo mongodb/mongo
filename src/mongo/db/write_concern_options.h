@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
 #include <cstdint>
 #include <string>
 #include <variant>
@@ -38,12 +37,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/write_concern_gen.h"
 #include "mongo/db/write_concern_idl.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

@@ -29,10 +29,6 @@
 
 #include "mongo/db/repl/read_concern_args.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/util/decorable.h"
 

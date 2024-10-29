@@ -33,10 +33,8 @@
 #include <memory>
 
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/fail_point.h"

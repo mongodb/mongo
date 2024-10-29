@@ -31,14 +31,12 @@
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 
 #include <boost/move/utility_core.hpp>
-#include <string>
 
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"

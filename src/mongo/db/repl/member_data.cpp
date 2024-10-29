@@ -31,7 +31,6 @@
 #include <utility>
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/repl/member_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

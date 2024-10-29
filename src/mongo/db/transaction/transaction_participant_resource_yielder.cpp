@@ -30,7 +30,6 @@
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 
 #include "mongo/base/status.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"

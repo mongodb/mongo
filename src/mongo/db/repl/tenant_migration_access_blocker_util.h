@@ -39,13 +39,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
-#include "mongo/db/repl/tenant_migration_conflict_info.h"
-#include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
-#include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
 

@@ -28,11 +28,9 @@
  */
 
 #include <mutex>
-#include <set>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"

@@ -37,7 +37,6 @@
 
 #include "mongo/db/repl/topology_coordinator.h"
 
-#include <absl/container/node_hash_map.h>
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -46,15 +45,13 @@
 #include <fmt/ostream.h>
 #include <limits>
 #include <ostream>
-#include <ratio>
 #include <string>
 
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/repl/heartbeat_response_action.h"

@@ -33,7 +33,6 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_writer_batcher.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace repl {

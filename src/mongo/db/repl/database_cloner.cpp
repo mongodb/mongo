@@ -31,8 +31,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <list>
-#include <mutex>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

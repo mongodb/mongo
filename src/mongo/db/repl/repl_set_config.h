@@ -59,7 +59,6 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 

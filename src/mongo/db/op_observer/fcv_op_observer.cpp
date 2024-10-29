@@ -35,11 +35,9 @@
 #include <boost/optional/optional.hpp>
 #include <string>
 
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/feature_compatibility_version_parser.h"

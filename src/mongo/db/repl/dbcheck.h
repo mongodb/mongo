@@ -43,7 +43,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/throttle_cursor.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"

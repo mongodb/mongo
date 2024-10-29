@@ -33,11 +33,8 @@
 #include <memory>
 
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"

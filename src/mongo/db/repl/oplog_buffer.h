@@ -32,12 +32,10 @@
 #include "mongo/util/assert_util.h"
 #include <boost/optional.hpp>
 #include <cstddef>
-#include <string>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/repl/oplog_batch.h"
 #include "mongo/util/interruptible.h"

@@ -32,7 +32,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"

@@ -41,10 +41,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_entry_gen.h"

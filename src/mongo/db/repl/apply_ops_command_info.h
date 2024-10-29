@@ -31,12 +31,9 @@
 
 #include <vector>
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/apply_ops_gen.h"
-#include "mongo/db/repl/multiapplier.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {

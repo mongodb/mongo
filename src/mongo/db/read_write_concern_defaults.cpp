@@ -28,7 +28,6 @@
  */
 
 
-#include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -51,9 +50,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/future.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

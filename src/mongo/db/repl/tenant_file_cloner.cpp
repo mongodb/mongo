@@ -32,7 +32,6 @@
 #include <cstdint>
 #include <fstream>  // IWYU pragma: keep
 #include <memory>
-#include <mutex>
 #include <type_traits>
 #include <utility>
 

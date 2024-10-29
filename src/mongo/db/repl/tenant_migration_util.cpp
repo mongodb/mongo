@@ -37,7 +37,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
@@ -65,14 +64,10 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/cancellation.h"
-#include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"

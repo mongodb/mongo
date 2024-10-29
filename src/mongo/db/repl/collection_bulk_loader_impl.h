@@ -35,13 +35,11 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/util/time_support.h"

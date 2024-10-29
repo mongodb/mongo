@@ -73,7 +73,6 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"

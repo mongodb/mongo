@@ -34,12 +34,10 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/dbclient_connection.h"
@@ -53,12 +51,10 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/util/errno_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
-#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 

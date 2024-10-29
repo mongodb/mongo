@@ -32,10 +32,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstddef>
-#include <deque>
 #include <memory>
-#include <mutex>
-#include <utility>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -56,7 +53,6 @@
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/journal_listener.h"
-#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"

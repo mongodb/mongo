@@ -30,10 +30,8 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <mutex>
 
 #include "mongo/db/repl/repl_sync_shared_data.h"
-#include "mongo/db/server_options.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"

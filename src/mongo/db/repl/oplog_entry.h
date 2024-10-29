@@ -35,7 +35,6 @@
 #include <iosfwd>
 #include <string>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>

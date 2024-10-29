@@ -31,13 +31,11 @@
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <map>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {

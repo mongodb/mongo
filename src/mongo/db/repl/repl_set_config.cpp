@@ -47,7 +47,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/repl/member_config_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"

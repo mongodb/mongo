@@ -31,7 +31,6 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <functional>
 #include <set>
 #include <string>
 #include <vector>

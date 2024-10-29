@@ -36,11 +36,9 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/db/repl/read_concern_level.h"

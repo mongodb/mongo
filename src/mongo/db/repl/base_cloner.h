@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
-#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,7 +39,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/repl/repl_sync_shared_data.h"
-#include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log_component.h"

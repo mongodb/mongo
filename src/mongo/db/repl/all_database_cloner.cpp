@@ -33,19 +33,15 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <mutex>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/auth/authorization_backend_interface.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/all_database_cloner.h"
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/member_state.h"
@@ -64,9 +60,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
-#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 

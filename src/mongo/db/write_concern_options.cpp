@@ -32,9 +32,7 @@
 #include <limits>
 #include <utility>
 
-#include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"

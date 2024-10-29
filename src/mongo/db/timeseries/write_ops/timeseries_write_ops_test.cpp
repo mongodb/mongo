@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/create_collection.h"

@@ -34,7 +34,7 @@
 #include <boost/move/utility_core.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/roll_back_local_operations.h"

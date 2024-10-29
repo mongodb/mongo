@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"

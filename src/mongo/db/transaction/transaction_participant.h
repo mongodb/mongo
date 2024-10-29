@@ -42,19 +42,16 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/catalog/uncommitted_multikey.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_stats.h"
-#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/update_request.h"

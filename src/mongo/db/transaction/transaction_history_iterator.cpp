@@ -30,24 +30,15 @@
 #include <memory>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -61,7 +52,6 @@
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 

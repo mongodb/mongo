@@ -29,8 +29,6 @@
 
 #include "mongo/db/repl/initial_syncer_common_stats.h"
 
-#include <memory>
-
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

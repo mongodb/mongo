@@ -36,16 +36,13 @@
 #include <boost/smart_ptr.hpp>
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -67,7 +64,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/lockable_adapter.h"
-#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

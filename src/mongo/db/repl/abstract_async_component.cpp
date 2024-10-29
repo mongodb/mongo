@@ -31,7 +31,6 @@
 #include <ostream>
 #include <utility>
 
-#include "mongo/base/status_with.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

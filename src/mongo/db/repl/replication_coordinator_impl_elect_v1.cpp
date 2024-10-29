@@ -29,8 +29,6 @@
 
 
 #include <memory>
-#include <mutex>
-#include <string>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -43,7 +41,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_id.h"
@@ -56,7 +53,6 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

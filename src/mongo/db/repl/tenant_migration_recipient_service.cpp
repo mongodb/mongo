@@ -146,7 +146,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration

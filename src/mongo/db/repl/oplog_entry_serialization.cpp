@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <charconv>
+
 #include "mongo/db/repl/oplog_entry_serialization.h"
 
 namespace mongo {

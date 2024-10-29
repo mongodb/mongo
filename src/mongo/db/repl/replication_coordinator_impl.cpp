@@ -42,7 +42,6 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
-#include <limits>
 #include <ostream>
 #include <type_traits>
 #include <variant>
@@ -58,7 +57,6 @@
 #include "mongo/client/read_preference_gen.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/local_oplog_info.h"

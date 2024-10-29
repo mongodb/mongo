@@ -42,7 +42,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_command.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 

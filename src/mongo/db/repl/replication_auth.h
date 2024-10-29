@@ -32,9 +32,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/dbclient_base.h"
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {

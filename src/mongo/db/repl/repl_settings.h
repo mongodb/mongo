@@ -31,10 +31,6 @@
 
 #include <string>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/repl_set_config_params_gen.h"
-
 namespace mongo {
 namespace repl {
 

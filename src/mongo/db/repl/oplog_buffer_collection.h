@@ -45,7 +45,6 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
-#include "mongo/util/queue.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

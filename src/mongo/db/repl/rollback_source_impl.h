@@ -30,7 +30,6 @@
 #pragma once
 
 #include <functional>
-#include <string>
 #include <utility>
 
 #include "mongo/base/status_with.h"

@@ -32,7 +32,6 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"

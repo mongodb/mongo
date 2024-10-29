@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 #pragma once
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"

@@ -37,10 +37,8 @@
 #include <algorithm>
 #include <boost/smart_ptr.hpp>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -55,13 +53,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/delayable_timeout_callback.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/member_config.h"
@@ -81,8 +77,6 @@
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_metrics_gen.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/tenant_migration_access_blocker.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/storage/control/journal_flusher.h"
@@ -98,10 +92,8 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"

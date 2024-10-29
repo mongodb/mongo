@@ -35,7 +35,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstdint>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
@@ -80,7 +79,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"

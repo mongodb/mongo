@@ -31,7 +31,6 @@
 
 #include <cstddef>
 #include <memory>
-#include <string>
 #include <vector>
 
 #include "mongo/base/status_with.h"

@@ -32,14 +32,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/all_database_cloner.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {

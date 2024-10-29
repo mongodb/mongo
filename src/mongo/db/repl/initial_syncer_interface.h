@@ -33,7 +33,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_connection.h"
-#include "mongo/client/fetcher.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/sync_source_selector.h"
 

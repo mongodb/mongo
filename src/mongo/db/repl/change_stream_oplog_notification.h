@@ -34,7 +34,6 @@
 #include <set>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/client/connection_string.h"
 #include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"

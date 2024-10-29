@@ -32,12 +32,9 @@
 #include <mutex>
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/wire_version.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {

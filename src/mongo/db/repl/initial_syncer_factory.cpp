@@ -31,10 +31,6 @@
 
 #include <utility>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"

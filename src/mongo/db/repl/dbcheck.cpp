@@ -35,10 +35,8 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -68,7 +66,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/duration.h"

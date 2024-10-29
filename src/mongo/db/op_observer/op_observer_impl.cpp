@@ -92,8 +92,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/catalog/type_index_catalog.h"
-#include "mongo/s/database_version.h"
-#include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"

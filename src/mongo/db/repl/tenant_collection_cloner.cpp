@@ -28,14 +28,10 @@
  */
 
 
-#include <absl/container/node_hash_map.h>
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
-#include <cstdint>
 #include <fmt/format.h>
-#include <list>
 #include <memory>
-#include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>

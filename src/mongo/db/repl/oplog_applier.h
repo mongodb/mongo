@@ -31,11 +31,9 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <cstddef>
 #include <memory>
 #include <vector>
 
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
@@ -44,12 +42,10 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 

@@ -32,6 +32,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace repl {

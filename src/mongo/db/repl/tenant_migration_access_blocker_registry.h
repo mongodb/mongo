@@ -36,7 +36,6 @@
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/repl/optime.h"
@@ -45,15 +44,12 @@
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

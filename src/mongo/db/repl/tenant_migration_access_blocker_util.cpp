@@ -43,8 +43,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -78,7 +77,6 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"

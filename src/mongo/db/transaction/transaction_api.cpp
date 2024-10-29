@@ -34,9 +34,9 @@
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <cstdint>
 #include <fmt/format.h>
+#include <memory>
 #include <mutex>
 #include <tuple>
 #include <type_traits>
@@ -56,7 +56,6 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
@@ -90,7 +89,6 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/notification.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"

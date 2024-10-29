@@ -34,7 +34,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/repl_set_tag.h"

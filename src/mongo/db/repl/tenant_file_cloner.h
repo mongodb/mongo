@@ -35,7 +35,6 @@
 #include <boost/move/utility_core.hpp>
 #include <cstddef>
 #include <iosfwd>
-#include <memory>
 #include <string>
 #include <sys/types.h>
 #include <vector>

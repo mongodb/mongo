@@ -37,8 +37,7 @@
 #include <mutex>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"

@@ -33,8 +33,6 @@
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <memory>
-#include <utility>
-#include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
@@ -46,9 +44,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

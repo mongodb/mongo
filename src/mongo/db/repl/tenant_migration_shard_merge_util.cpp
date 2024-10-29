@@ -34,16 +34,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
 #include <string>
 
 #include "mongo/platform/random.h"

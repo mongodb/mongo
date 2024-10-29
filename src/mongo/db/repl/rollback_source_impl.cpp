@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
 #include <list>
 #include <memory>
 
@@ -38,7 +37,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/read_preference.h"

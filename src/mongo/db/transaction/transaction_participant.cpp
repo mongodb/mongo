@@ -32,7 +32,6 @@
 
 #include "mongo/db/transaction/transaction_participant.h"
 
-#include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
 #include <algorithm>
@@ -51,12 +50,9 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -82,13 +78,9 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/query/write_ops/write_ops_retryability.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
@@ -123,9 +115,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/transport/session.h"

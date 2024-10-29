@@ -32,7 +32,6 @@
 #include <cstddef>
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/stats/single_transaction_stats.h"

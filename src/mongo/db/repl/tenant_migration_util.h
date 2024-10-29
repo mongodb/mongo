@@ -40,7 +40,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -51,8 +50,6 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -71,7 +68,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/ssl_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 

@@ -33,9 +33,6 @@
 #include <memory>
 
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/stdx/mutex.h"

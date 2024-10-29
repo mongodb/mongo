@@ -33,9 +33,7 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/smart_ptr.hpp>
-#include <functional>
 #include <mutex>
-#include <tuple>
 #include <type_traits>
 
 #include <boost/move/utility_core.hpp>
@@ -44,8 +42,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/async_remote_command_targeter_adapter.h"
@@ -110,7 +107,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -121,7 +117,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/str.h"
 

@@ -30,7 +30,6 @@
 
 #include <algorithm>
 #include <boost/optional.hpp>
-#include <mutex>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -41,7 +40,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/initial_sync_base_cloner.h"
@@ -56,8 +54,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/optime.h"

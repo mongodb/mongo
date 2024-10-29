@@ -33,7 +33,6 @@
 
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/util/assert_util_core.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 

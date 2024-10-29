@@ -41,7 +41,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_config_gen.h"
 #include "mongo/db/repl/member_id.h"

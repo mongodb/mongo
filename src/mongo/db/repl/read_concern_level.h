@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/read_concern_gen.h"
 

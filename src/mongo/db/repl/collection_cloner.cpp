@@ -33,8 +33,6 @@
 #include <boost/none.hpp>
 #include <cstdint>
 #include <list>
-#include <mutex>
-#include <type_traits>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -47,11 +45,9 @@
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
@@ -59,7 +55,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"

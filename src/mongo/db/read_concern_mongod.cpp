@@ -31,7 +31,6 @@
 #include <iterator>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <ostream>
 #include <string>
 #include <tuple>
@@ -45,8 +44,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -81,7 +78,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"

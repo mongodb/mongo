@@ -29,11 +29,8 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <map>
 #include <memory>
 #include <utility>
 
@@ -48,12 +45,9 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
-#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
-#include "mongo/util/invalidating_lru_cache.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/time_support.h"
 

@@ -47,7 +47,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 

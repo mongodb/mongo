@@ -55,13 +55,11 @@
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/index_bounds.h"
-#include "mongo/db/query/write_ops/single_write_result_gen.h"
 #include "mongo/db/query/write_ops/write_ops_exec.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

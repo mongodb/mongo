@@ -32,7 +32,6 @@
 
 #include <boost/move/utility_core.hpp>
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/logv2/log.h"

@@ -30,12 +30,10 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <functional>
 #include <memory>
 #include <vector>
 
 #include "mongo/base/status_with.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"

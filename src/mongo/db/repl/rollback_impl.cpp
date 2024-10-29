@@ -115,7 +115,6 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -124,7 +123,6 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationRollback
 

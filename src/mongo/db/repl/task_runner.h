@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <functional>
 #include <list>
 #include <string>
 

@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 

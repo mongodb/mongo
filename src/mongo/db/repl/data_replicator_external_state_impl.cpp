@@ -29,7 +29,6 @@
 
 
 #include <cstddef>
-#include <string>
 
 #include <boost/move/utility_core.hpp>
 

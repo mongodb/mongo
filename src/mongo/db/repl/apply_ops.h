@@ -36,7 +36,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/apply_ops_gen.h"
-#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 

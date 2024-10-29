@@ -38,8 +38,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
-#include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

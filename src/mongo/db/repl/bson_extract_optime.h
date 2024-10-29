@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 
