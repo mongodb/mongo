@@ -226,3 +226,11 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_core",
     ],
 )
+
+mongo_cc_library(
+    name = "counter_ops",
+    srcs = [],
+    hdrs = [
+        "counter_ops.h",
+    ],
+)

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_stats.h"
+#include "mongo/db/stats/counter_ops.h"
 
 namespace mongo {
 
@@ -64,7 +65,7 @@ void LockStats<CounterType>::_report(BSONObjBuilder* builder,
     {
         std::unique_ptr<BSONObjBuilder> numAcquires;
         for (int mode = 1; mode < LockModesCount; mode++) {
-            long long value = CounterOps::get(stat.modeStats[mode].numAcquisitions);
+            long long value = counter_ops::get(stat.modeStats[mode].numAcquisitions);
 
             if (value > 0) {
                 if (!numAcquires) {
@@ -83,7 +84,7 @@ void LockStats<CounterType>::_report(BSONObjBuilder* builder,
     {
         std::unique_ptr<BSONObjBuilder> numWaits;
         for (int mode = 1; mode < LockModesCount; mode++) {
-            long long value = CounterOps::get(stat.modeStats[mode].numWaits);
+            long long value = counter_ops::get(stat.modeStats[mode].numWaits);
             if (value > 0) {
                 if (!numWaits) {
                     if (!section) {
@@ -101,7 +102,7 @@ void LockStats<CounterType>::_report(BSONObjBuilder* builder,
     {
         std::unique_ptr<BSONObjBuilder> timeAcquiring;
         for (int mode = 1; mode < LockModesCount; mode++) {
-            long long value = CounterOps::get(stat.modeStats[mode].combinedWaitTimeMicros);
+            long long value = counter_ops::get(stat.modeStats[mode].combinedWaitTimeMicros);
             if (value > 0) {
                 if (!timeAcquiring) {
                     if (!section) {
@@ -157,7 +158,7 @@ template <typename CounterType>
 int64_t LockStats<CounterType>::_getWaitTime(const PerModeLockStatCounters& stat) const {
     int64_t timeAcquiringLocks = 0;
     for (int mode = 1; mode < LockModesCount; mode++) {
-        timeAcquiringLocks += CounterOps::get(stat.modeStats[mode].combinedWaitTimeMicros);
+        timeAcquiringLocks += counter_ops::get(stat.modeStats[mode].combinedWaitTimeMicros);
     }
     return timeAcquiringLocks;
 }

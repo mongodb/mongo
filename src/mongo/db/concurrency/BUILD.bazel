@@ -65,6 +65,7 @@ mongo_cc_library(
         "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/admission:ticketholder_manager",
         "//src/mongo/db/concurrency:flow_control_ticketholder",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/stats:counter_ops",
         "//src/mongo/util:background_job",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
@@ -182,6 +183,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/stats:counter_ops",
         "//src/mongo/db/storage:damage_vector",
         "//src/mongo/util:secure_compare_memory",
     ],

@@ -254,6 +254,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/stats:counter_ops",
         "//src/mongo/db/storage:damage_vector",
     ],
 )

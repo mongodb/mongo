@@ -34,51 +34,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/stats/counter_ops.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
 class BSONObjBuilder;
-
-
-/**
- * Abstraction for manipulating the lock statistics, operating on either AtomicWord<long long> or
- * int64_t, which the rest of the code in this file refers to as CounterType.
- */
-struct CounterOps {
-    static int64_t get(const int64_t& counter) {
-        return counter;
-    }
-
-    static int64_t get(const AtomicWord<long long>& counter) {
-        return counter.load();
-    }
-
-    static void set(int64_t& counter, int64_t value) {
-        counter = value;
-    }
-
-    static void set(int64_t& counter, const AtomicWord<long long>& value) {
-        counter = value.load();
-    }
-
-    static void set(AtomicWord<long long>& counter, int64_t value) {
-        counter.store(value);
-    }
-
-    static void add(int64_t& counter, int64_t value) {
-        counter += value;
-    }
-
-    static void add(int64_t& counter, const AtomicWord<long long>& value) {
-        counter += value.load();
-    }
-
-    static void add(AtomicWord<long long>& counter, int64_t value) {
-        counter.addAndFetch(value);
-    }
-};
-
 
 /**
  * Counts numAcquisitions, numWaits and combinedWaitTimeMicros values.
@@ -90,29 +51,29 @@ template <typename CounterType>
 struct LockStatCounters {
     template <typename OtherType>
     void set(const LockStatCounters<OtherType>& other) {
-        CounterOps::set(numAcquisitions, other.numAcquisitions);
-        CounterOps::set(numWaits, other.numWaits);
-        CounterOps::set(combinedWaitTimeMicros, other.combinedWaitTimeMicros);
+        counter_ops::set(numAcquisitions, other.numAcquisitions);
+        counter_ops::set(numWaits, other.numWaits);
+        counter_ops::set(combinedWaitTimeMicros, other.combinedWaitTimeMicros);
     }
 
     template <typename OtherType>
     void append(const LockStatCounters<OtherType>& other) {
-        CounterOps::add(numAcquisitions, other.numAcquisitions);
-        CounterOps::add(numWaits, other.numWaits);
-        CounterOps::add(combinedWaitTimeMicros, other.combinedWaitTimeMicros);
+        counter_ops::add(numAcquisitions, other.numAcquisitions);
+        counter_ops::add(numWaits, other.numWaits);
+        counter_ops::add(combinedWaitTimeMicros, other.combinedWaitTimeMicros);
     }
 
     template <typename OtherType>
     void subtract(const LockStatCounters<OtherType>& other) {
-        CounterOps::add(numAcquisitions, -other.numAcquisitions);
-        CounterOps::add(numWaits, -other.numWaits);
-        CounterOps::add(combinedWaitTimeMicros, -other.combinedWaitTimeMicros);
+        counter_ops::add(numAcquisitions, -other.numAcquisitions);
+        counter_ops::add(numWaits, -other.numWaits);
+        counter_ops::add(combinedWaitTimeMicros, -other.combinedWaitTimeMicros);
     }
 
     void reset() {
-        CounterOps::set(numAcquisitions, 0);
-        CounterOps::set(numWaits, 0);
-        CounterOps::set(combinedWaitTimeMicros, 0);
+        counter_ops::set(numAcquisitions, 0);
+        counter_ops::set(numWaits, 0);
+        counter_ops::set(combinedWaitTimeMicros, 0);
     }
 
     // The lock statistics we track.
@@ -152,15 +113,15 @@ public:
     }
 
     void recordAcquisition(ResourceId resId, LockMode mode) {
-        CounterOps::add(get(resId, mode).numAcquisitions, 1);
+        counter_ops::add(get(resId, mode).numAcquisitions, 1);
     }
 
     void recordWait(ResourceId resId, LockMode mode) {
-        CounterOps::add(get(resId, mode).numWaits, 1);
+        counter_ops::add(get(resId, mode).numWaits, 1);
     }
 
     void recordWaitTime(ResourceId resId, LockMode mode, int64_t waitMicros) {
-        CounterOps::add(get(resId, mode).combinedWaitTimeMicros, waitMicros);
+        counter_ops::add(get(resId, mode).combinedWaitTimeMicros, waitMicros);
     }
 
     LockStatCountersType& get(ResourceId resId, LockMode mode) {
