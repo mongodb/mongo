@@ -25,6 +25,14 @@ const shard0 = st.rs0;
 const shard1 = st.rs1;
 const shard2 = st.rs2;
 
+function getDefaultOwningShardInput(shardVersion) {
+    return {
+        shardKeyVal: {_id: "$_id"},
+        ns: destinationColl.getFullName(),
+        shardVersion: shardVersion,
+    };
+}
+
 // Retrieves the current shard version for the 'destinationColl' and returns the ShardVersion
 // object.
 function getCurrentShardVersion() {
@@ -37,17 +45,12 @@ function getCurrentShardVersion() {
 }
 
 // Returns a projection stage with the $_internalOwningShard expression.
-function buildProjectionStageWithOwningShardExpression(shardVersion) {
+function buildProjectionStageWithOwningShardExpression(
+    shardVersion, owningShardInput = getDefaultOwningShardInput(shardVersion)) {
     return {
         $project: {
             _id: 0,
-            shard: {
-                $_internalOwningShard: {
-                    shardKeyVal: {_id: "$_id"},
-                    ns: destinationColl.getFullName(),
-                    shardVersion: shardVersion,
-                },
-            },
+            shard: {$_internalOwningShard: owningShardInput},
             indexData: "$$ROOT",
         }
     };
@@ -138,5 +141,59 @@ assertOwningShardExpressionResults(shardVersion, expectedResult);
 const futureShardVersion =
     Object.assign({}, shardVersion, {t: new Timestamp(Math.pow(2, 32) - 1, 0)});
 assertOwningShardExpressionFailure(futureShardVersion);
+
+// Assert invalid inputs will fail with correct error codes.
+(() => {
+    // Missing input.
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: sourceColl.getName(),
+        pipeline: [buildProjectionStageWithOwningShardExpression(shardVersion, "")],
+        cursor: {}
+    }),
+                                 6868600);
+
+    // Missing argument.
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: sourceColl.getName(),
+        pipeline: [buildProjectionStageWithOwningShardExpression(
+            shardVersion, {shardKeyVal: {_id: "$_id"}, shardVersion: shardVersion})],
+        cursor: {}
+    }),
+                                 9567001);
+
+    // 'ns' wrong type.
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: sourceColl.getName(),
+        pipeline: [buildProjectionStageWithOwningShardExpression(
+            shardVersion,
+            {shardKeyVal: {_id: "$_id"}, shardVersion: shardVersion, ns: {doc: "this is a doc"}})],
+        cursor: {}
+    }),
+                                 9567001);
+
+    // 'shardVersion' wrong type.
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: sourceColl.getName(),
+        pipeline: [buildProjectionStageWithOwningShardExpression(shardVersion, {
+            shardKeyVal: {_id: "$_id"},
+            shardVersion: "shardVersion",
+            ns: destinationColl.getFullName()
+        })],
+        cursor: {}
+    }),
+                                 9567002);
+
+    // 'shardKeyVal' wrong type.
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: sourceColl.getName(),
+        pipeline: [buildProjectionStageWithOwningShardExpression(shardVersion, {
+            shardKeyVal: "{_id: $_id}",
+            shardVersion: shardVersion,
+            ns: destinationColl.getFullName()
+        })],
+        cursor: {}
+    }),
+                                 6868600);
+})();
 
 st.stop();

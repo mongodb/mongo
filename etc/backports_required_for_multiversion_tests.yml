@@ -343,6 +343,10 @@ last-continuous:
       ticket: SERVER-95952
     - test_file: jstests/sharding/resharding_skip_cloning_and_applying.js
       ticket: SERVER-91109
+    - test_file: jstests/core/query/find_all_values_at_path_expression.js
+      ticket: SERVER-95670
+    - test_file: jstests/sharding/query/owning_shard_expression.js
+      ticket: SERVER-95670
   suites: null
 last-lts:
   all:
@@ -700,4 +704,8 @@ last-lts:
       ticket: SERVER-95952
     - test_file: jstests/sharding/resharding_skip_cloning_and_applying.js
       ticket: SERVER-91109
+    - test_file: jstests/core/query/find_all_values_at_path_expression.js
+      ticket: SERVER-95670
+    - test_file: jstests/sharding/query/owning_shard_expression.js
+      ticket: SERVER-95670
   suites: null
