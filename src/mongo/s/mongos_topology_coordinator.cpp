@@ -180,6 +180,13 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
 
     HelloMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
 
+    // Wait for a mongos topology change with timeout set to deadline.
+    LOGV2_DEBUG(4695502,
+                1,
+                "Waiting for a hello response from a topology change or until deadline",
+                "deadline"_attr = deadline.value(),
+                "currentMongosTopologyVersionCounter"_attr = _topologyVersion.getCounter());
+
     lk.unlock();
 
     if (MONGO_unlikely(waitForHelloResponseMongos.shouldFail())) {
@@ -192,13 +199,6 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
         LOGV2(4695501, "hangWhileWaitingForHelloResponseMongos failpoint enabled");
         hangWhileWaitingForHelloResponseMongos.pauseWhileSet(opCtx);
     }
-
-    // Wait for a mongos topology change with timeout set to deadline.
-    LOGV2_DEBUG(4695502,
-                1,
-                "Waiting for a hello response from a topology change or until deadline",
-                "deadline"_attr = deadline.value(),
-                "currentMongosTopologyVersionCounter"_attr = _topologyVersion.getCounter());
 
     auto statusWithHello =
         futureGetNoThrowWithDeadline(opCtx, future, deadline.value(), opCtx->getTimeoutError());
