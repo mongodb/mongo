@@ -141,7 +141,8 @@ private:
     ServiceContext* _serviceContext;
 };
 
-class ReshardingCoordinatorServiceTest : public ConfigServerTestFixture {
+class ReshardingCoordinatorServiceTest : service_context_test::WithSetupTransportLayer,
+                                         public ConfigServerTestFixture {
 public:
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) {
         return std::make_unique<ReshardingCoordinatorServiceForTest>(serviceContext);

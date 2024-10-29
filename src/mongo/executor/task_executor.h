@@ -421,6 +421,11 @@ public:
      */
     virtual void appendNetworkInterfaceStats(BSONObjBuilder&) const = 0;
 
+    /**
+     * Passes a ServiceContext down to a NetworkInterface.
+     */
+    virtual void setServiceContext(ServiceContext* svcCtx) {}
+
 protected:
     // Retrieves the Callback from a given CallbackHandle
     static CallbackState* getCallbackFromHandle(const CallbackHandle& cbHandle);

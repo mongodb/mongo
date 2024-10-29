@@ -186,6 +186,11 @@ public:
     virtual void signalWorkAvailable() = 0;
 
     /**
+     * Sets a ServiceContext data member. For impls without a ServiceContext this is a no-op.
+     */
+    virtual void setServiceContext(ServiceContext* svcCtx) {}
+
+    /**
      * Returns the current time.
      */
     virtual Date_t now() = 0;

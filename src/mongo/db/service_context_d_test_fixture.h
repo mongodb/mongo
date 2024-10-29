@@ -145,9 +145,11 @@ public:
         bool _createShardingState = true;
     };
 
-    explicit MongoDScopedGlobalServiceContextForTest(Options options);
+    MongoDScopedGlobalServiceContextForTest(Options options, bool shouldSetupTL);
     MongoDScopedGlobalServiceContextForTest(
-        ServiceContext::UniqueServiceContext serviceContextHolder, Options options);
+        ServiceContext::UniqueServiceContext serviceContextHolder,
+        Options options,
+        bool shouldSetupTL);
 
     ~MongoDScopedGlobalServiceContextForTest() override;
 
@@ -188,8 +190,8 @@ public:
         std::unique_ptr<MongoDScopedGlobalServiceContextForTest> scopedServiceContext)
         : ServiceContextTest(std::move(scopedServiceContext)) {}
     explicit ServiceContextMongoDTest(Options options)
-        : ServiceContextMongoDTest(
-              std::make_unique<MongoDScopedGlobalServiceContextForTest>(std::move(options))) {}
+        : ServiceContextTest(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+              std::move(options), shouldSetupTL)) {}
 
     JournalListener* journalListener() const {
         return mongoDscopedServiceContext()->journalListener();

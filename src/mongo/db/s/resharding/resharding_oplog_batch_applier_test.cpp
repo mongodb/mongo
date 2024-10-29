@@ -131,14 +131,13 @@
 namespace mongo {
 namespace {
 
-class ReshardingOplogBatchApplierTest : public ServiceContextMongoDTest {
+class ReshardingOplogBatchApplierTest : service_context_test::WithSetupTransportLayer,
+                                        public ServiceContextMongoDTest {
 public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 
         auto serviceContext = getServiceContext();
-
-
         {
             auto opCtx = makeOperationContext();
             auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);

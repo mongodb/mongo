@@ -41,7 +41,8 @@
 namespace mongo {
 namespace {
 
-using DocumentSourceVectorSearchTest = AggregationContextFixture;
+class DocumentSourceVectorSearchTest : service_context_test::WithSetupTransportLayer,
+                                       public AggregationContextFixture {};
 
 TEST_F(DocumentSourceVectorSearchTest, NotAllowedInTransaction) {
     auto expCtx = getExpCtx();

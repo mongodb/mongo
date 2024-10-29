@@ -119,6 +119,8 @@ public:
 
     void appendNetworkInterfaceStats(BSONObjBuilder&) const override;
 
+    void setServiceContext(ServiceContext* svcCtx) override;
+
     /**
      * Returns true if there are any tasks currently running or waiting to run.
      */

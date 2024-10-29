@@ -62,7 +62,7 @@ public:
         : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
               boost::none, "unittests", "pipeline_test")) {}
 
-    AggregationContextFixture(NamespaceString nss) {
+    explicit AggregationContextFixture(NamespaceString nss) {
         _opCtx = makeOperationContext();
         _expCtx = make_intrusive<ExpressionContextForTest>(_opCtx.get(), nss);
         _expCtx->tempDir = _tempDir.path();

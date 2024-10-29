@@ -140,7 +140,8 @@
 namespace mongo {
 namespace {
 
-class ReshardingTxnClonerTest : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
+class ReshardingTxnClonerTest : service_context_test::WithSetupTransportLayer,
+                                public ShardServerTestFixtureWithCatalogCacheLoaderMock {
     void setUp() override {
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 

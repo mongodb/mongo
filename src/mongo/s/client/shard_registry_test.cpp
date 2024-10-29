@@ -36,7 +36,8 @@
 
 namespace mongo {
 
-class ShardRegistryTest : public ShardingTestFixture {
+class ShardRegistryTest : service_context_test::WithSetupTransportLayer,
+                          public ShardingTestFixture {
 protected:
     void setUp() override {
         // Setting the role is important for topologyTime gossiping.

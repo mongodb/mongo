@@ -61,7 +61,8 @@ namespace mongo {
 class ShardingTestFixture : public ShardingTestFixtureCommon {
 protected:
     ShardingTestFixture();
-    explicit ShardingTestFixture(bool withMockCatalogCache);
+    explicit ShardingTestFixture(bool withMockCatalogCache)
+        : ShardingTestFixture{withMockCatalogCache, nullptr} {}
     ShardingTestFixture(bool withMockCatalogCache,
                         std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalContext);
 

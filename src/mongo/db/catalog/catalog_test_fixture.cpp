@@ -41,8 +41,9 @@
 
 namespace mongo {
 
-CatalogScopedGlobalServiceContextForTest::CatalogScopedGlobalServiceContextForTest(Options options)
-    : MongoDScopedGlobalServiceContextForTest(std::move(options)) {
+CatalogScopedGlobalServiceContextForTest::CatalogScopedGlobalServiceContextForTest(
+    Options options, bool shouldSetupTL)
+    : MongoDScopedGlobalServiceContextForTest(std::move(options), shouldSetupTL) {
     auto service = getServiceContext();
     auto setupClient = getService()->makeClient("CatalogSCTestCtor");
     AlternativeClientRegion acr(setupClient);

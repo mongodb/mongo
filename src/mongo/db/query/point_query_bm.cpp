@@ -52,7 +52,7 @@ public:
         // Only one thread need to do global setup
         if (state.thread_index == 0) {
             BenchmarkWithProfiler::SetUp(state);
-            _fixture.emplace(CatalogScopedGlobalServiceContextForTest::Options{});
+            _fixture.emplace(CatalogScopedGlobalServiceContextForTest::Options{}, false);
 
             ReadWriteConcernDefaults::create(getGlobalServiceContext(),
                                              _lookupMock.getFetchDefaultsFn());

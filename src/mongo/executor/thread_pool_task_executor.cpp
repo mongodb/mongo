@@ -520,6 +520,10 @@ void ThreadPoolTaskExecutor::appendNetworkInterfaceStats(BSONObjBuilder& bob) co
     _net->appendStats(bob);
 }
 
+void ThreadPoolTaskExecutor::setServiceContext(ServiceContext* svcCtx) {
+    _net->setServiceContext(svcCtx);
+}
+
 ThreadPoolTaskExecutor::EventList ThreadPoolTaskExecutor::makeSingletonEventList() {
     EventList result;
     result.emplace_front(EventState::make());

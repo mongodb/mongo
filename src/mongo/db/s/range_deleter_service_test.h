@@ -76,7 +76,8 @@ private:
     SharedPromise<void> _ongoingQueries;
 };
 
-class RangeDeleterServiceTest : public ShardServerTestFixture {
+class RangeDeleterServiceTest : service_context_test::WithSetupTransportLayer,
+                                public ShardServerTestFixture {
 public:
     void setUp() override;
     void tearDown() override;

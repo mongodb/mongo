@@ -80,7 +80,8 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("foo
 const std::string kShardKey = "_id";
 const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
 
-class RangeDeleterTest : public ShardServerTestFixture {
+class RangeDeleterTest : service_context_test::WithSetupTransportLayer,
+                         public ShardServerTestFixture {
 public:
     // Needed because UUID default constructor is private
     RangeDeleterTest() : _opCtx(nullptr), _uuid(UUID::gen()) {}

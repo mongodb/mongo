@@ -499,6 +499,7 @@ FaultManager::~FaultManager() {
 }
 
 SharedSemiFuture<void> FaultManager::startPeriodicHealthChecks() {
+    _taskExecutor->setServiceContext(_svcCtx);
     _taskExecutor->startup();
     invariant(state() == FaultState::kStartupCheck);
 
