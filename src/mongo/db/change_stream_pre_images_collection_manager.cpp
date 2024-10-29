@@ -312,7 +312,7 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
 
         if (numberOfRemovals > 0) {
             LOGV2_DEBUG(5869104,
-                        3,
+                        1,
                         "Periodic expired pre-images removal job finished executing",
                         "numberOfRemovals"_attr = numberOfRemovals,
                         "jobDuration"_attr = (Date_t::now() - startTime).toString());

@@ -157,6 +157,9 @@ export function setupTimeBasedPreImageRetentionPolicyTest(conn, primary, expireA
 // When run on a sharded cluster, 'conn' represents the connection to the mongos while
 // 'primary' represents the connection to the shard primary node.
 export function testTimeBasedPreImageRetentionPolicy(conn, primary) {
+    // Activate more detailed logging for pre-image removal.
+    conn.getDB("admin").setLogLevel(1, 'query');
+
     const expireAfterSeconds = 1;
     const {
         currentTimeForTimeBasedExpiration,
@@ -187,9 +190,8 @@ export function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     }));
 
     // Verify that at some point in time, all expired pre-images will be deleted.
-    assert.soon(() => {
-        return preImageColl.find().toArray().length == shouldRetainDocs.length;
-    });
+    assert.soon(() => preImageColl.find().toArray().length === shouldRetainDocs.length,
+                () => "Existing pre-images: " + tojson(preImageColl.find().toArray()));
 
     // Verify that pre-images corresponding to documents with document states 'shouldRetain' are
     // present.

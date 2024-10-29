@@ -40,7 +40,7 @@
 #include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/time_support.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace {

@@ -13,15 +13,15 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
-const docA = {
+const docVersion1 = {
     _id: 12345,
     version: 1,
 };
-const docB = {
+const docVersion2 = {
     _id: 12345,
     version: 2,
 };
-const docC = {
+const docVersion3 = {
     _id: 12345,
     version: 3,
 };
@@ -44,18 +44,26 @@ const primaryNode = rst.getPrimary();
 const testDB = primaryNode.getDB(jsTestName());
 const localDB = primaryNode.getDB("local");
 
+// Activate more detailed logging for pre-image removal.
+const adminDB = primaryNode.getDB("admin");
+adminDB.setLogLevel(1, 'query');
+
 // Returns documents from the pre-images collection from 'node'.
 function getPreImages(node) {
     return node.getDB(preImagesCollectionDatabase)[preImagesCollectionName].find().toArray();
 }
 
-// Checks if the oplog has been rolled over from the timestamp of
-// 'lastOplogEntryTsToBeRemoved', ie. the timestamp of the first entry in the oplog is greater
-// than the 'lastOplogEntryTsToBeRemoved' on each node of the replica set.
-function oplogIsRolledOver(lastOplogEntryTsToBeRemoved) {
-    return [primaryNode, rst.getSecondary()].every(
-        (node) => timestampCmp(lastOplogEntryTsToBeRemoved,
-                               getFirstOplogEntry(node, {readConcern: "majority"}).ts) < 0);
+// Ensure that all current oplog entries are disappear from the capped oplog
+// collection by inserting a bunch of large documents.
+function rollOverCurrentOplog() {
+    const lastOplogEntry = getLatestOp(primaryNode);
+    // Keep populating the oplog as long as the first oplog entry is newer (more recent) than
+    // 'lastOplogEntry'. The majority concern guarantees that both nodes of the 2-node replica set
+    // have identical oplogs.
+    while (timestampCmp(lastOplogEntry.ts,
+                        getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) >= 0) {
+        assert.commandWorked(testDB.tmp.insert({largeStr}, {writeConcern: {w: "majority"}}));
+    }
 }
 
 // Invokes function 'func()' and returns the invocation result. Retries the action if 'func()'
@@ -86,12 +94,8 @@ function retryOnCappedPositionLostError(func, message) {
 {
     // Roll over the oplog, leading to 'PeriodicChangeStreamExpiredPreImagesRemover' periodic job
     // deleting all pre-images.
-    let lastOplogEntryToBeRemoved = getLatestOp(primaryNode);
-    while (!oplogIsRolledOver(lastOplogEntryToBeRemoved.ts)) {
-        assert.commandWorked(
-            testDB.tmp.insert({long_str: largeStr}, {writeConcern: {w: "majority"}}));
-    }
-    assert.soon(() => getPreImages(primaryNode).length == 0);
+    rollOverCurrentOplog();
+    assert.soon(() => getPreImages(primaryNode).length === 0);
 
     // Drop and recreate the collections with pre-images recording.
     const collA = assertDropAndRecreateCollection(
@@ -101,9 +105,9 @@ function retryOnCappedPositionLostError(func, message) {
 
     // Perform insert and update operations.
     for (const coll of [collA, collB]) {
-        assert.commandWorked(coll.insert(docA, {writeConcern: {w: "majority"}}));
-        assert.commandWorked(coll.update(docA, {$inc: {version: 1}}));
-        assert.commandWorked(coll.update(docB, {$inc: {version: 1}}));
+        assert.commandWorked(coll.insert(docVersion1, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(coll.update(docVersion1, {$inc: {version: 1}}));
+        assert.commandWorked(coll.update(docVersion2, {$inc: {version: 1}}));
     }
 
     // Pre-images collection should contain four pre-images.
@@ -112,32 +116,30 @@ function retryOnCappedPositionLostError(func, message) {
     assert.eq(preImages.length, preImagesToExpire, preImages);
 
     // Roll over all current oplog entries.
-    lastOplogEntryToBeRemoved = getLatestOp(primaryNode);
+    const lastOplogEntryToBeRemoved = getLatestOp(primaryNode);
     assert.neq(lastOplogEntryToBeRemoved, null);
+    rollOverCurrentOplog();
 
-    // Checks if the oplog has been rolled over from the timestamp of
-    // 'lastOplogEntryToBeRemoved', ie. the timestamp of the first entry in the oplog is greater
-    // than the timestamp of the 'lastOplogEntryToBeRemoved' on each node of the replica set.
-    while (!oplogIsRolledOver(lastOplogEntryToBeRemoved.ts)) {
-        assert.commandWorked(collA.insert({long_str: largeStr}, {writeConcern: {w: "majority"}}));
-    }
-
-    // Perform update operations that insert new pre-images that are not expired yet.
+    // Perform update operations that insert 2 new pre-images that are not expired yet.
     for (const coll of [collA, collB]) {
-        assert.commandWorked(coll.update(docC, {$inc: {version: 1}}));
+        assert.commandWorked(coll.update(docVersion3, {$inc: {version: 1}}));
     }
 
     // Wait until 'PeriodicChangeStreamExpiredPreImagesRemover' periodic job will delete the expired
     // pre-images.
-    assert.soon(() => {
-        // Only two pre-images should still be there, as their timestamp is greater than the oldest
-        // oplog entry timestamp.
-        preImages = getPreImages(primaryNode);
-        const onlyTwoPreImagesLeft = preImages.length == 2;
-        const allPreImagesHaveBiggerTimestamp = preImages.every(
-            preImage => timestampCmp(preImage._id.ts, lastOplogEntryToBeRemoved.ts) == 1);
-        return onlyTwoPreImagesLeft && allPreImagesHaveBiggerTimestamp;
-    }, "Existing pre-images: " + tojson(getPreImages(primaryNode)));
+    assert.soon(
+        () => {
+            // Only two pre-images should still be there, as their timestamp is greater than the
+            // oldest oplog entry timestamp.
+            preImages = getPreImages(primaryNode);
+            const onlyTwoPreImagesLeft = preImages.length === 2;
+            const allPreImagesHaveBiggerTimestamp = preImages.every(
+                preImage => timestampCmp(preImage._id.ts, lastOplogEntryToBeRemoved.ts) === 1);
+            return onlyTwoPreImagesLeft && allPreImagesHaveBiggerTimestamp;
+        },
+        () => "Existing pre-images: " + tojson(getPreImages(primaryNode)) +
+            ", first oplog entry: " +
+            tojson(getFirstOplogEntry(primaryNode, {readConcern: "majority"})));
 
     // If the feature flag is on, then batched deletes will not be used for deletion. Additionally,
     // since truncates are not replicated, the number of pre-images on the primary may differ from
