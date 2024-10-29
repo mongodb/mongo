@@ -21,6 +21,8 @@ import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_in
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
+const isTimeseriesTestSuite = TestData.isTimeseriesTestSuite || false;
+
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const viewName = "identityView";
 assertDropCollection(db, viewName);
@@ -101,7 +103,7 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
         $lookup:
           { from: secondaryCollOrViewName, localField: "a", foreignField: "a", as: "output" }
       },
-      // Ensure that the pipeline is only partially pushed down to SBE to verify its 
+      // Ensure that the pipeline is only partially pushed down to SBE to verify its
       // integrity after the fallback mechanism is engaged.
       { $_internalInhibitOptimization: {} },
       { $limit: 1 },
@@ -112,10 +114,14 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
 
     // Ensure query settings index application for 'mainNs', 'secondaryNs' and both.
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
-    qstests.assertQuerySettingsLookupJoinIndexApplication(
-        aggregateCmd, secondaryNs, isSecondaryCollAView);
-    qstests.assertQuerySettingsIndexAndLookupJoinApplications(
-        aggregateCmd, mainNs, secondaryNs, isSecondaryCollAView);
+    // TODO SERVER-95352 Investigate why some time series queries cannot be answered using only
+    // indexes with Query Settings.
+    if (!isTimeseriesTestSuite) {
+        qstests.assertQuerySettingsLookupJoinIndexApplication(
+            aggregateCmd, secondaryNs, isSecondaryCollAView);
+        qstests.assertQuerySettingsIndexAndLookupJoinApplications(
+            aggregateCmd, mainNs, secondaryNs, isSecondaryCollAView);
+    }
 
     if (!isSecondaryCollAView) {
         qstests.testAggregateQuerySettingsNaturalHintEquiJoinStrategy(
@@ -147,6 +153,11 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
 }
 
 function testAggregateQuerySettingsApplicationWithMerge(collOrViewName, outputColl) {
+    // SPM-2787 Return early since $merge is not allowed into a timeseries collection.
+    if (isTimeseriesTestSuite) {
+        return;
+    }
+
     const qsutils = new QuerySettingsUtils(db, collOrViewName);
     const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
@@ -196,7 +207,7 @@ function testAggregateQuerySettingsApplicationWithLookupPipeline(collOrViewName,
       { $match: { a: 1, b: 5 } },
       {
         $lookup:
-          { from: secondaryCollOrViewName, 
+          { from: secondaryCollOrViewName,
           let: { c: 1, d: 2 }, pipeline: [{ $match: { a: 1, b: 5 } }], as: "output" }
       }
     ], let: {
@@ -207,10 +218,13 @@ function testAggregateQuerySettingsApplicationWithLookupPipeline(collOrViewName,
 
     // Ensure query settings index application for 'mainNs', 'secondaryNs' and both.
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
-    qstests.assertQuerySettingsLookupPipelineIndexApplication(aggregateCmd, secondaryNs);
-    qstests.assertQuerySettingsIndexAndLookupPipelineApplications(
-        aggregateCmd, mainNs, secondaryNs);
-
+    // TODO SERVER-95352 Investigate why some time series queries cannot be answered using only
+    // indexes with Query Settings.
+    if (!isTimeseriesTestSuite) {
+        qstests.assertQuerySettingsLookupPipelineIndexApplication(aggregateCmd, secondaryNs);
+        qstests.assertQuerySettingsIndexAndLookupPipelineApplications(
+            aggregateCmd, mainNs, secondaryNs);
+    }
     // Ensure query settings ignore cursor hints when being set on main collection.
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
 
@@ -257,8 +271,12 @@ function testAggregateQuerySettingsApplicationWithGraphLookup(collOrViewName,
     // Ensure query settings index application for 'mainNs'.
     // TODO SERVER-88561: Ensure query settings index application for 'secondaryNs' after
     // 'indexesUsed' is added to the 'explain' command output for the $graphLookup operation.
-    qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
-    qstests.assertGraphLookupQuerySettingsInCache(aggregateCmd, secondaryNs);
+    // TODO SERVER-95352 Investigate why some time series queries cannot be answered using only
+    // indexes with Query Settings.
+    if (!isTimeseriesTestSuite) {
+        qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
+        qstests.assertGraphLookupQuerySettingsInCache(aggregateCmd, secondaryNs);
+    }
 }
 
 function testAggregateQuerySettingsApplicationWithUnionWithPipeline(collOrViewName,
@@ -282,8 +300,12 @@ function testAggregateQuerySettingsApplicationWithUnionWithPipeline(collOrViewNa
 
     // Ensure query settings index application for 'mainNs', 'secondaryNs' and both.
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
-    qstests.assertQuerySettingsIndexApplication(aggregateCmd, secondaryNs);
-    qstests.assertQuerySettingsIndexApplications(aggregateCmd, mainNs, secondaryNs);
+    // TODO SERVER-95352 Investigate why some time series queries cannot be answered using only
+    // indexes with Query Settings.
+    if (!isTimeseriesTestSuite) {
+        qstests.assertQuerySettingsIndexApplication(aggregateCmd, secondaryNs);
+        qstests.assertQuerySettingsIndexApplications(aggregateCmd, mainNs, secondaryNs);
+    }
 
     // Ensure query settings ignore cursor hints when being set on main collection.
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
@@ -303,8 +325,8 @@ function testAggregateQuerySettingsApplicationWithUnionWithPipeline(collOrViewNa
 // collections.
 function instantiateTestCases(...testCases) {
     for (const testCase of testCases) {
-        testCase(coll.getName(), secondaryColl.getName(), false);
-        testCase(viewName, secondaryColl.getName(), false);
+        testCase(coll.getName(), secondaryColl.getName(), isTimeseriesTestSuite);
+        testCase(viewName, secondaryColl.getName(), isTimeseriesTestSuite);
         testCase(coll.getName(), secondaryViewName, true);
         testCase(viewName, secondaryViewName, true);
     }
@@ -314,8 +336,8 @@ function instantiateTestCases(...testCases) {
 // secondary collection.
 function instantiateTestCasesNoSecondaryView(...testCases) {
     for (const testCase of testCases) {
-        testCase(coll.getName(), secondaryColl.getName(), false);
-        testCase(viewName, secondaryColl.getName(), false);
+        testCase(coll.getName(), secondaryColl.getName(), isTimeseriesTestSuite);
+        testCase(viewName, secondaryColl.getName(), isTimeseriesTestSuite);
     }
 }
 

@@ -92,7 +92,15 @@ selector:
     - jstests/core/query/or/orf.js
     - jstests/core/query/plan_cache/plan_cache_clear.js
     - jstests/core/query/plan_cache/plan_cache_list_plans.js
-    - jstests/core/query/query_settings/**/*.js
+
+    # Ignore because index filters are applied directly to collections, not views (or TS).
+    - jstests/core/query/query_settings/query_settings_and_index_filters.js
+    # Ignore because the rewrite of the query for TS leads to other stages preceding
+    # $planCacheStats, which is not allowed.
+    - jstests/core/query/query_settings/query_settings_reject_application_bypass.js
+    - jstests/core/query/query_settings/query_settings_plan_cache.js
+    # Ignore because the find command is rewritten for TS collections before reaching the failpoint.
+    - jstests/core/query/query_settings/query_shape_hash_in_current_op.js
     - jstests/core/query/regex/regex.js
     - jstests/core/query/regex/regex3.js
     - jstests/core/query/regex/regex4.js
@@ -299,6 +307,9 @@ executor:
   config:
     shell_options:
       eval: globalThis.testingReplication = true;; await import("jstests/libs/override_methods/implicit_timeseries_collections.js");
+      global_vars:
+        TestData:
+          isTimeseriesTestSuite: true
   hooks:
     - class: ValidateCollections
     - class: CleanEveryN

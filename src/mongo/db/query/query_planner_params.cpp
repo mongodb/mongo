@@ -29,6 +29,8 @@
 
 #include "query_planner_params.h"
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/index/multikey_metadata_access_stats.h"
 #include "mongo/db/index/wildcard_access_method.h"
@@ -41,6 +43,8 @@
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -187,11 +191,29 @@ void fillOutPlannerCollectionInfo(OperationContext* opCtx,
         out->storageSizeBytes = recordStore->storageSize(opCtx);
     }
 }
+
+std::vector<IndexHint> transformTimeseriesHints(std::vector<IndexHint> qsIndexHints,
+                                                const TimeseriesOptions& timeseriesOptions) {
+    for (auto&& hint : qsIndexHints) {
+        if (auto indexKeyPattern = hint.getIndexKeyPattern()) {
+            auto timeSeriesKeyPattern = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+                timeseriesOptions, *indexKeyPattern);
+            if (!timeSeriesKeyPattern.isOK()) {
+                dassert(false);
+                LOGV2_INFO(8699600,
+                           "Couldn't convert index hint to time-series format.",
+                           "hint"_attr = hint.getIndexKeyPattern()->toString());
+                continue;
+            }
+            hint = IndexHint{timeSeriesKeyPattern.getValue()};
+        }
+    }
+    return qsIndexHints;
+}
 }  // namespace
 
 void QueryPlannerParams::applyQuerySettingsIndexHintsForCollection(
     const CanonicalQuery& canonicalQuery,
-    const CollectionPtr& collection,
     const std::vector<mongo::IndexHint>& allowedIndexes,
     std::vector<IndexEntry>& indexes) {
     // Checks if index entry is present in the 'allowedIndexes' list.
@@ -239,7 +261,6 @@ void QueryPlannerParams::applyQuerySettingsIndexHintsForCollection(
 //        * Sets the 'collscanDirection' planner parameter to 'boost::none'.
 void QueryPlannerParams::applyQuerySettingsNaturalHintsForCollection(
     const CanonicalQuery& canonicalQuery,
-    const CollectionPtr& collection,
     const std::vector<mongo::IndexHint>& allowedIndexes,
     CollectionInfo& collectionInfo) {
     bool forwardAllowed = false;
@@ -307,22 +328,38 @@ void QueryPlannerParams::applyQuerySettingsNaturalHintsForCollection(
 
 void QueryPlannerParams::applyQuerySettingsForCollection(
     const CanonicalQuery& canonicalQuery,
-    const CollectionPtr& collection,
+    const NamespaceString& nss,
     const query_settings::IndexHintSpecs& hintSpecs,
-    CollectionInfo& collectionInfo) {
+    CollectionInfo& collectionInfo,
+    const boost::optional<TimeseriesOptions>& timeseriesOptions = boost::none) {
     // Retrieving the allowed indexes for the given collection.
     auto allowedIndexes = [&]() {
+        // We should only have the timeseries option present iff namespace is a bucket collection,
+        // as view resolution occurs before applying query settings. dassert is preferred, as this
+        // should not kill the operation when applying query settings in production.
+        dassert(timeseriesOptions.has_value() == nss.isTimeseriesBucketsCollection());
+        const bool isTimeseriesBucketsCollection =
+            nss.isTimeseriesBucketsCollection() && timeseriesOptions.has_value();
+
+        // For time series collections, we need to compare time series view namespace instead of the
+        // internal one, as query settings should be specified with the view name.
+        const auto& namespaceToCompare =
+            isTimeseriesBucketsCollection ? nss.getTimeseriesViewNamespace() : nss;
         auto isHintForCollection = [&](const auto& hint) {
             auto hintNs =
                 NamespaceStringUtil::deserialize(*hint.getNs().getDb(), *hint.getNs().getColl());
-            return hintNs == collection->ns();
+            return hintNs == namespaceToCompare;
         };
-
-        if (auto hintIt = std::find_if(hintSpecs.begin(), hintSpecs.end(), isHintForCollection);
-            hintIt != hintSpecs.end()) {
-            return hintIt->getAllowedIndexes();
+        auto hintIt = std::find_if(hintSpecs.begin(), hintSpecs.end(), isHintForCollection);
+        if (hintIt == hintSpecs.end()) {
+            return std::vector<mongo::IndexHint>();
         }
-        return std::vector<mongo::IndexHint>();
+
+        if (isTimeseriesBucketsCollection) {
+            // Time series KeyPatternIndexes hints need to be converted to match the bucket specs.
+            return transformTimeseriesHints(hintIt->getAllowedIndexes(), *timeseriesOptions);
+        }
+        return hintIt->getAllowedIndexes();
     }();
 
     // Users can not define empty allowedIndexes vector, therefore early exit if no hints are
@@ -332,9 +369,8 @@ void QueryPlannerParams::applyQuerySettingsForCollection(
     }
 
     applyQuerySettingsIndexHintsForCollection(
-        canonicalQuery, collection, allowedIndexes, collectionInfo.indexes);
-    applyQuerySettingsNaturalHintsForCollection(
-        canonicalQuery, collection, allowedIndexes, collectionInfo);
+        canonicalQuery, allowedIndexes, collectionInfo.indexes);
+    applyQuerySettingsNaturalHintsForCollection(canonicalQuery, allowedIndexes, collectionInfo);
 
     querySettingsApplied = true;
 }
@@ -388,8 +424,10 @@ void QueryPlannerParams::applyQuerySettingsOrIndexFiltersForMainCollection(
     auto indexHintSpecs = canonicalQuery.getExpCtx()->getQuerySettings().getIndexHints();
     const bool shouldIgnoreQuerySettings = mainCollectionInfo.options & IGNORE_QUERY_SETTINGS;
     if (indexHintSpecs && !shouldIgnoreQuerySettings) {
+        const auto& timeseriesOptions = collections.getMainCollection()->getTimeseriesOptions();
+        const NamespaceString& targetNss = collections.getMainCollection()->ns();
         applyQuerySettingsForCollection(
-            canonicalQuery, collections.getMainCollection(), *indexHintSpecs, mainCollectionInfo);
+            canonicalQuery, targetNss, *indexHintSpecs, mainCollectionInfo, timeseriesOptions);
     }
 
     // Try to apply index filters only if query settings were not applied.
@@ -437,7 +475,11 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
     for (const auto& [name, coll] : collections.getSecondaryCollections()) {
         if (coll) {
             auto& collInfo = secondaryCollectionsInfo[name];
-            applyQuerySettingsForCollection(canonicalQuery, coll, *indexHintSpecs, collInfo);
+            applyQuerySettingsForCollection(canonicalQuery,
+                                            coll->ns(),
+                                            *indexHintSpecs,
+                                            collInfo,
+                                            coll->getTimeseriesOptions());
         }
     }
 }

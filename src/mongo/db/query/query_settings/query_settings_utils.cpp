@@ -334,11 +334,6 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
                 return query_settings::QuerySettings();
             }
 
-            // No query settings lookup on internal dbs or system collections in user dbs.
-            if (nss.isOnInternalDb() || nss.isSystem()) {
-                return query_settings::QuerySettings();
-            }
-
             // No query settings for queries with encryption information.
             if (parsedFind.findCommandRequest->getEncryptionInformation()) {
                 return query_settings::QuerySettings();
@@ -350,6 +345,11 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
             if (requestComesFromMongosOrSentDirectlyToShard(expCtx->opCtx->getClient())) {
                 return parsedFind.findCommandRequest->getQuerySettings().value_or(
                     query_settings::QuerySettings());
+            }
+
+            // No query settings lookup on internal dbs or system collections in user dbs.
+            if (nss.isOnInternalDb() || nss.isSystem()) {
+                return query_settings::QuerySettings();
             }
 
             // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
@@ -406,11 +406,6 @@ QuerySettings lookupQuerySettingsForAgg(
     const NamespaceString& nss) {
     QuerySettings settings = [&]() {
         try {
-            // No query settings lookup on internal dbs or system collections in user dbs.
-            if (nss.isOnInternalDb() || nss.isSystem()) {
-                return query_settings::QuerySettings();
-            }
-
             // No query settings for queries with encryption information.
             if (aggregateCommandRequest.getEncryptionInformation()) {
                 return query_settings::QuerySettings();
@@ -427,6 +422,11 @@ QuerySettings lookupQuerySettingsForAgg(
                 aggregateCommandRequest.getQuerySettings().has_value()) {
                 return aggregateCommandRequest.getQuerySettings().value_or(
                     query_settings::QuerySettings());
+            }
+
+            // No query settings lookup on internal dbs or system collections in user dbs.
+            if (nss.isOnInternalDb() || nss.isSystem()) {
+                return query_settings::QuerySettings();
             }
 
             // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
@@ -479,11 +479,6 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
                                              const NamespaceString& nss) {
     QuerySettings settings = [&]() {
         try {
-            // No query settings lookup on internal dbs or system collections in user dbs.
-            if (nss.isOnInternalDb() || nss.isSystem()) {
-                return query_settings::QuerySettings();
-            }
-
             // If the incoming request comes from mongos, then no additional query setting lookup
             // has to be performed, rather, if there are query settings associated with the request,
             // they should be attached to the command by mongos.
@@ -492,6 +487,10 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
                     query_settings::QuerySettings());
             }
 
+            // No query settings lookup on internal dbs or system collections in user dbs.
+            if (nss.isOnInternalDb() || nss.isSystem()) {
+                return query_settings::QuerySettings();
+            }
 
             // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
             // this could run during startup while the FCV is still uninitialized.

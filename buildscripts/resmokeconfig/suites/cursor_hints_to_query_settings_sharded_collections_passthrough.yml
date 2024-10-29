@@ -8,8 +8,14 @@ selector:
     - jstests/aggregation/**/*.js
     - jstests/core/**/*.js
   exclude_files:
-    # TODO SERVER-86996 Apply QuerySettings for queries involving timeseries collections.
-    - jstests/core/timeseries/**/*.js
+    # TODO SERVER-95456 Make CLUSTERED_IXSCANs obey query settings allowed indexes
+    - jstests/core/timeseries/timeseries_findAndModify_deletes_hints.js
+    - jstests/core/timeseries/timeseries_findAndModify_updates_hints.js
+    - jstests/core/timeseries/timeseries_index_partial.js
+    - jstests/core/timeseries/timeseries_index_use.js
+    - jstests/core/timeseries/timeseries_match_pushdown.js
+    - jstests/core/timeseries/timeseries_partial_index_opt.js
+    - jstests/core/timeseries/timeseries_update_hint.js
 
     # TODO SERVER-23229: Projection incorrectly returns null value instead of missing field to user if
     # projection is covered.
@@ -82,6 +88,10 @@ selector:
     - jstests/core/query/explain/explain_shell_helpers.js
     - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
     - jstests/core/query/return_key.js
+    - jstests/core/timeseries/timeseries_index_collation.js
+    - jstests/core/timeseries/timeseries_internal_bounded_sort_compound.js
+    - jstests/core/timeseries/timeseries_metric_index_compound.js
+    - jstests/core/timeseries/timeseries_special_indexes_metadata.js
 
     # This suite emits additional explains alongside the tested command. This interferes with the number of
     # expected plan cache entries.
@@ -113,6 +123,7 @@ selector:
     - jstests/core/index/indext.js
     - jstests/core/index/sparse_index_internal_expr.js
     - jstests/core/query/exists/existsa.js
+    - jstests/core/timeseries/timeseries_sparse_index.js
 
     - jstests/core/query/query_settings/**/*.js
     - jstests/core/txns/**/*.js

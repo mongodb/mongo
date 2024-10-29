@@ -19,6 +19,8 @@ import {
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
+const isTimeseriesTestSuite = TestData.isTimeseriesTestSuite || false;
+
 // Create the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.
 const coll = assertDropAndRecreateCollection(db, jsTestName());
@@ -128,7 +130,10 @@ function testDistinctWithDistinctScanQuerySettingsApplication(collOrViewName) {
 
 testDistinctQuerySettingsApplication(coll.getName());
 testDistinctQuerySettingsApplication(viewName);
-testDistinctWithDistinctScanQuerySettingsApplication(coll.getName());
+// TODO: SERVER-87741: Make distinct command on views use DISTINCT_SCAN.
+if (!isTimeseriesTestSuite) {
+    testDistinctWithDistinctScanQuerySettingsApplication(coll.getName());
+}
 
 // The view can persist in the system.views collection, which may cause issues if subsequent tests
 // check this collection.

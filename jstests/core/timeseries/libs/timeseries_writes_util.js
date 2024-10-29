@@ -13,6 +13,9 @@ export const timeFieldName = "time";
 export const metaFieldName = "tag";
 export const sysCollNamePrefix = "system.buckets.";
 
+const tsIndexMinPrefix = "control.min.";
+const tsIndexMaxPrefix = "control.max.";
+
 export const closedBucketFilter = {
     "control.closed": {$not: {$eq: true}}
 };
@@ -1067,4 +1070,33 @@ export function setUpShardedCluster({nMongos} = {
 export function tearDownShardedCluster() {
     assert.neq(null, st, "A sharded cluster must be initialized");
     st.stop();
+}
+
+export function transformIndexHintsForTimeseriesCollection(indexHints) {
+    let transformedIndexes = {};
+    // Transform index to match timeseries control.min/max fields.
+    for (const [key, value] of Object.entries(indexHints)) {
+        transformedIndexes[tsIndexMinPrefix + key] = value;
+        transformedIndexes[tsIndexMaxPrefix + key] = value;
+    }
+    return transformedIndexes;
+}
+
+export function transformIndexHintsFromTimeseriesToView(indexHints) {
+    let transformedIndexes = {};
+    // Transform index from control.min/max fields to normal keys.
+    for (const [key, value] of Object.entries(indexHints)) {
+        if (key.startsWith(tsIndexMinPrefix) || key.startsWith(tsIndexMaxPrefix)) {
+            // Transform the index and add it if it was not already added (by scanning the
+            // corresponding control.max.* or control.min.* index first).
+            const transformedKey = key.substring(tsIndexMinPrefix.length);
+            if (!transformedIndexes.hasOwnProperty(transformedKey)) {
+                transformedIndexes[transformedKey] = value;
+            }
+        } else {
+            // Also add non-bucket keys to index.
+            transformedIndexes[key] = value;
+        }
+    }
+    return transformedIndexes;
 }

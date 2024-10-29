@@ -7,8 +7,14 @@ selector:
     - jstests/aggregation/**/*.js
     - jstests/core/**/*.js
   exclude_files:
-    # TODO SERVER-86996 Apply QuerySettings for queries involving timeseries collections.
-    - jstests/core/timeseries/**/*.js
+    # TODO SERVER-95456 Make CLUSTERED_IXSCANs obey query settings allowed indexes.
+    - jstests/core/timeseries/timeseries_findAndModify_deletes_hints.js
+    - jstests/core/timeseries/timeseries_findAndModify_updates_hints.js
+    - jstests/core/timeseries/timeseries_index_partial.js
+    - jstests/core/timeseries/timeseries_index_use.js
+    - jstests/core/timeseries/timeseries_match_pushdown.js
+    - jstests/core/timeseries/timeseries_partial_index_opt.js
+    - jstests/core/timeseries/timeseries_update_hint.js
 
     # Query settings do not force indexes, and therefore empty filter will result in collection scans.
     - jstests/core/index/geo/geo6.js
@@ -21,6 +27,10 @@ selector:
     - jstests/core/query/index_deduplication.js
     - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
     - jstests/core/query/return_key.js
+    - jstests/core/timeseries/timeseries_index_collation.js
+    - jstests/core/timeseries/timeseries_internal_bounded_sort_compound.js
+    - jstests/core/timeseries/timeseries_metric_index_compound.js
+    - jstests/core/timeseries/timeseries_special_indexes_metadata.js
 
     # Test which asserts on the number of execution metrics. The additional commands emitted by
     # this suite might cause the test to fail.
@@ -45,6 +55,7 @@ selector:
     - jstests/core/index/indext.js
     - jstests/core/index/sparse_index_internal_expr.js
     - jstests/core/query/exists/existsa.js
+    - jstests/core/timeseries/timeseries_sparse_index.js
 
     - jstests/core/query/query_settings/**/*.js
   exclude_with_any_tags:

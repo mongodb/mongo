@@ -1,4 +1,5 @@
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
+import {getCollectionName, isTimeSeriesCollection} from "jstests/libs/cmd_object_utils.js";
 import {
     everyWinningPlan,
     flattenQueryPlanTree,
@@ -60,13 +61,10 @@ export class QuerySettingsIndexHintsTests {
             networkErrorAndTxnOverrideConfig.retryOnNetworkErrors;
 
         // If the collection used is a view, determine the underlying collection being used.
-        const collInfo = this._db.getCollectionInfos({name: collOrViewName})[0];
-        let collName = collOrViewName;
-        if (collInfo !== undefined && collInfo.options.hasOwnProperty('viewOn')) {
-            collName = collInfo.options.viewOn;
-        }
+        const collName = getCollectionName(this._db, command);
         const collHasPartialIndexes = this._db[collName].getIndexes().some(
             (idx) => idx.hasOwnProperty('partialFilterExpression'));
+        const isTimeSeriesColl = isTimeSeriesCollection(this._db, collName);
 
         const shouldCheckPlanCache =
             // Single solution plans are not cached in classic, therefore do not perform plan cache
@@ -102,7 +100,10 @@ export class QuerySettingsIndexHintsTests {
             !TestData.isRunningInitialSync &&
             // If the test is running shard key analysis, it may affect the plan cache by generating
             // and additional entry.
-            !TestData.isAnalyzingShardKey;
+            !TestData.isAnalyzingShardKey &&
+            // For timeseries collections with featureFlagSbeFull turned on, it is not possible to
+            // run the planCacheClear command because it is a view, so we cannot acquire lock.
+            !isTimeSeriesColl;
 
         if (!shouldCheckPlanCache) {
             return;

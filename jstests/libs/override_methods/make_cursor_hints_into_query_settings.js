@@ -1,8 +1,13 @@
+import {sysCollNamePrefix} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
+import {
+    transformIndexHintsFromTimeseriesToView
+} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {
     getCollectionName,
     getCommandName,
     getExplainCommand,
-    getInnerCommand
+    getInnerCommand,
+    isSystemBucketNss
 } from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {everyWinningPlan, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
@@ -41,9 +46,13 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
         return originalResponse;
     }
 
+    const isSystemBucketColl = isSystemBucketNss(innerCmd);
+
     // Construct the equivalent query settings, remove the hint from the original command object and
     // build the representative query.
-    const allowedIndexes = [innerCmd.hint];
+    const allowedIndexes = isSystemBucketColl
+        ? [transformIndexHintsFromTimeseriesToView(innerCmd.hint)]
+        : [innerCmd.hint];
     delete innerCmd.hint;
 
     const explainCmd = getExplainCommand(innerCmd);
@@ -59,7 +68,9 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     }
 
     // If the collection used is a view, determine the underlying collection.
-    const collectionName = getCollectionName(db, innerCmd);
+    const resolvedCollName = getCollectionName(db, innerCmd);
+    const collectionName = isSystemBucketColl ? resolvedCollName.substring(sysCollNamePrefix.length)
+                                              : resolvedCollName;
     if (!collectionName) {
         return originalResponse;
     }
@@ -75,7 +86,8 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     // remove all the settings.
     const settings = {indexHints: {ns: {db: dbName, coll: collectionName}, allowedIndexes}};
     const qsutils = new QuerySettingsUtils(db, collectionName);
-    const representativeQuery = qsutils.makeQueryInstance(innerCmd);
+    const representativeQuery = qsutils.makeQueryInstance(
+        isSystemBucketColl ? {...innerCmd, [getCommandName(innerCmd)]: collectionName} : innerCmd);
     return qsutils.withQuerySettings(
         representativeQuery, settings, () => clientFunction.apply(conn, makeFuncArgs(cmdObj)));
 }
