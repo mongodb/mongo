@@ -132,7 +132,7 @@ withRetryOnTransientTxnError(
 
         session = staleMongoS.startSession();
         session.startTransaction();
-        session.getDatabase(kDatabaseName).TestTransactionColl.insert({Key: 1});
+        session.getDatabase(kDatabaseName).TestTransactionColl.insertOne({Key: 1});
         session.commitTransaction();
     },
     () => {
