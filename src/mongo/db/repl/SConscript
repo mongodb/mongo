@@ -302,24 +302,6 @@ if wiredtiger:
     )
 
     env.CppUnitTest(
-        target="tenant_migration_donor_service_test",
-        source=[
-            "tenant_migration_donor_service_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/client/replica_set_monitor_protocol_test_util",
-            "$BUILD_DIR/mongo/db/op_observer/op_observer",
-            "$BUILD_DIR/mongo/db/op_observer/op_observer_impl",
-            "$BUILD_DIR/mongo/transport/transport_layer_egress_init",
-            "$BUILD_DIR/mongo/unittest/unittest",
-            "$BUILD_DIR/mongo/util/clock_source_mock",
-            "$BUILD_DIR/mongo/util/version_impl",
-            "idempotency_test_fixture",
-            "tenant_migration_donor_service",
-        ],
-    )
-
-    env.CppUnitTest(
         target="db_repl_misc_test",
         source=[
             "abstract_async_component_test.cpp",
@@ -346,12 +328,6 @@ if wiredtiger:
             "sync_source_resolver_test.cpp",
             "task_runner_test.cpp",
             "task_runner_test_fixture.cpp",
-            "tenant_migration_access_blocker_registry_test.cpp",
-            "tenant_migration_access_blocker_util_test.cpp",
-            "tenant_migration_recipient_access_blocker_test.cpp",
-            "tenant_migration_recipient_entry_helpers_test.cpp",
-            "tenant_oplog_applier_test.cpp",
-            "tenant_oplog_batcher_test.cpp",
             "vote_requester_test.cpp",
             "wait_for_majority_service_test.cpp",
         ],
@@ -428,10 +404,6 @@ if wiredtiger:
             "sync_source_selector_mock",
             "task_executor_mock",
             "task_runner",
-            "tenant_migration_donor_service",
-            "tenant_migration_recipient_service",
-            "tenant_migration_utils",
-            "tenant_oplog_processing",
             "timestamp_block",
         ],
     )
@@ -648,7 +620,6 @@ env.Library(
     source=[
         "cloner_test_fixture.cpp",
         "initial_sync_cloner_test_fixture.cpp",
-        "tenant_cloner_test_fixture.cpp",
     ],
     LIBDEPS=[
         # Required for service context test fixture
@@ -671,17 +642,12 @@ env.CppUnitTest(
         "collection_cloner_test.cpp",
         "database_cloner_test.cpp",
         "initial_sync_shared_data_test.cpp",
-        "tenant_all_database_cloner_test.cpp",
-        "tenant_collection_cloner_test.cpp",
-        "tenant_database_cloner_test.cpp",
-        "tenant_file_cloner_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/op_observer/op_observer",
         "$BUILD_DIR/mongo/db/storage/storage_options",
         "cloner_test_fixtures",
         "initial_sync_cloners",
-        "tenant_migration_cloners",
     ],
 )
 
