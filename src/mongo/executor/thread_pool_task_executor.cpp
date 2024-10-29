@@ -402,6 +402,9 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWork(Ca
 
         stdx::unique_lock lk(_mutex);
         _stateChange.wait(lk, [&] { return _inShutdown_inlock(); });
+        // Wait until the executor has reached shutdown state and canceled all outstanding work
+        // before proceeding.
+        auto _ = cbState->cancelSource.token().onCancel().waitNoThrow();
     }
 
     ExecutorFuture(makeGuaranteedExecutor(_pool))
