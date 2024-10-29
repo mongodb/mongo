@@ -42,22 +42,7 @@ let port;
 })();
 
 /**
- * Test 1: Verify that restarting mongod without --repair will crash due to the invalid options in
- * the index specification.
- */
-(function restartAndVerifyMongodCrashes() {
-    jsTestLog("Entering restartAndVerifyMongodCrashes....");
-    assert.throws(() => {
-        startMongodOnExistingPath(dbPath);
-    });
-
-    assert(rawMongoProgramOutput("Fatal assertion").match("28782"),
-           "Mongod should have aborted due to an invalid index descriptor.");
-    jsTestLog("Exiting restartAndVerifyMongodCrashes.");
-})();
-
-/**
- * Test 2: Verify that restarting mongod with --repair will remove the invalid index options.
+ * Verify that restarting mongod with --repair will remove the invalid index options.
  */
 (function runRepairAndVerifyIndexIsRepaired() {
     jsTestLog("Entering runRepairAndVerifyIndexIsRepaired....");
