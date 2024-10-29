@@ -79,15 +79,11 @@ public:
 
 class DevNullRecordStore : public RecordStore {
 public:
-    DevNullRecordStore(const NamespaceString& nss,
-                       boost::optional<UUID> uuid,
+    DevNullRecordStore(boost::optional<UUID> uuid,
                        StringData identName,
                        const CollectionOptions& options,
                        KeyFormat keyFormat)
-        : RecordStore(uuid, identName, options.capped),
-          _options(options),
-          _keyFormat(keyFormat),
-          _ns(nss) {
+        : RecordStore(uuid, identName, options.capped), _options(options), _keyFormat(keyFormat) {
         _numInserts = 0;
         _dummy = BSON("_id" << 1);
     }
@@ -208,7 +204,6 @@ private:
     KeyFormat _keyFormat;
     long long _numInserts;
     BSONObj _dummy;
-    NamespaceString _ns;
 };
 
 class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
@@ -321,7 +316,7 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
         return std::make_unique<EphemeralForTestRecordStore>(
             nss, options.uuid, ident, &_catalogInfo);
     }
-    return std::make_unique<DevNullRecordStore>(nss, options.uuid, ident, options, KeyFormat::Long);
+    return std::make_unique<DevNullRecordStore>(options.uuid, ident, options, KeyFormat::Long);
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::getTemporaryRecordStore(OperationContext* opCtx,
@@ -333,11 +328,8 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getTemporaryRecordStore(OperationC
 std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                        StringData ident,
                                                                        KeyFormat keyFormat) {
-    return std::make_unique<DevNullRecordStore>(NamespaceString::kEmpty /* ns */,
-                                                boost::none /* uuid */,
-                                                ident,
-                                                CollectionOptions(),
-                                                keyFormat);
+    return std::make_unique<DevNullRecordStore>(
+        boost::none /* uuid */, ident, CollectionOptions(), keyFormat);
 }
 
 std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(
