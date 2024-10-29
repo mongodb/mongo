@@ -74,33 +74,29 @@ export class Result {
 }
 
 /**
- * Utility to simplify looping until X iterations or Y milliseconds elapses;
+ * Utility to simplify looping until X milliseconds elapse;
  * a common pattern when retrying operations.
  *
- * let helper = new RetryTracker(3, 3000);
+ * let helper = new RetryTracker(3000);
  * for (let _ of helper) {
- *     ... // E.g., try a command. Will loop until break or exceeding either limit.
+ *     ... // E.g., try a command. Will loop until break or exceeding the time limit.
  * }
  * The timer starts from creation of the helper.
  */
 export class RetryTracker {
-    constructor(retryCount, timeout) {
-        this.retryCount = retryCount;
+    constructor(timeout) {
+        this.retries = 0;
         this.timeout = timeout;
         this.startTime = Date.now();
     }
 
     * [Symbol.iterator]() {
-        if (this.retryCount <= 0) {
-            return;
-        }
-
-        for (let i = 0; i < this.retryCount; ++i) {
+        while (true) {
             let elapsed = Date.now() - this.startTime;
             if (elapsed > this.timeout) {
                 break;
             }
-            yield {remaining: this.retryCount - i - 1, remainingTime: this.timeout - elapsed};
+            yield {retries: this.retries++, remainingTime: this.timeout - elapsed};
         }
     }
 }

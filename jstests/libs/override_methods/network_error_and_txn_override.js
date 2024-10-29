@@ -1011,16 +1011,12 @@ function shouldRetryTxnOnException(cmdName, cmdObj, exception) {
     return false;
 }
 
-// Maximum number of times a transaction can be retried within a given op.
-// Note that a transaction may fail and be retried up to this many times on
-// each call to runCommand, for a total number of retries on the order of
-// maxOpsInTransaction * kMaxNumTxnErrorRetries.
-const kMaxNumTxnErrorRetries = 5;
-const kMaxTxnRetryTimeout = 5 * 60 * 1000;
+// Maximum timeout until which a transaction can be retried within a given op.
+const kMaxTxnRetryTimeoutMS = 10 * 60 * 1000;
 
 function txnRetryOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunction, makeFuncArgs) {
     assert(isCmdInTransaction(cmdObj));
-    const retryTracker = new RetryTracker(kMaxNumTxnErrorRetries, kMaxTxnRetryTimeout);
+    const retryTracker = new RetryTracker(kMaxTxnRetryTimeoutMS);
 
     const logResult = (res) => {
         res.apply(value =>
@@ -1060,8 +1056,8 @@ function txnRetryOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunctio
         const retriedTxnNumber = startNewTransaction(conn, {"ignored object": 1});
 
         logMsgFull('Retrying entire transaction',
-                   `txnNumber: ${retriedTxnNumber}, lsid: ${
-                       tojsononeline(lsid)}, remainingAttempts: ${retry.remaining}`);
+                   `txnNumber: ${retriedTxnNumber}, lsid: ${tojsononeline(lsid)},` +
+                       ` remaining time: ${retry.remainingTime}, retry attempt: ${retry.retries}`);
 
         for (let op of ops) {
             logMsgFull('Retrying op',
