@@ -43,7 +43,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -119,7 +118,7 @@ public:
     static StatusWith<std::string> generateCreateString(const std::string& engineName,
                                                         const std::string& sysIndexConfig,
                                                         const std::string& collIndexConfig,
-                                                        const NamespaceString& collectionNamespace,
+                                                        StringData tableName,
                                                         const IndexDescriptor& desc,
                                                         bool isLogged);
 

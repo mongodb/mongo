@@ -95,8 +95,13 @@ public:
         invariant(desc.isIdIndex());
 
         const bool isLogged = false;
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            std::string{kWiredTigerEngineName}, "", "", nss, desc, isLogged);
+        StatusWith<std::string> result =
+            WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
+                                                  "",
+                                                  "",
+                                                  NamespaceStringUtil::serializeForCatalog(nss),
+                                                  desc,
+                                                  isLogged);
         ASSERT_OK(result.getStatus());
 
         std::string uri = "table:" + ns;
@@ -138,7 +143,7 @@ public:
             WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
                                                   "",
                                                   "",
-                                                  nss,
+                                                  NamespaceStringUtil::serializeForCatalog(nss),
                                                   desc,
                                                   WiredTigerUtil::useTableLogging(nss));
         ASSERT_OK(result.getStatus());

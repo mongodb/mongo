@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/health_log_gen.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -202,13 +201,12 @@ std::string WiredTigerIndex::generateAppMetadataString(const IndexDescriptor& de
 }
 
 // static
-StatusWith<std::string> WiredTigerIndex::generateCreateString(
-    const std::string& engineName,
-    const std::string& sysIndexConfig,
-    const std::string& collIndexConfig,
-    const NamespaceString& collectionNamespace,
-    const IndexDescriptor& desc,
-    bool isLogged) {
+StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string& engineName,
+                                                              const std::string& sysIndexConfig,
+                                                              const std::string& collIndexConfig,
+                                                              StringData tableName,
+                                                              const IndexDescriptor& desc,
+                                                              bool isLogged) {
     str::stream ss;
 
     // Separate out a prefix and suffix in the default string. User configuration will override
@@ -221,7 +219,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
     }
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
-              ->getTableCreateConfig(NamespaceStringUtil::serializeForCatalog(collectionNamespace));
+              ->getTableCreateConfig(tableName);
     ss << sysIndexConfig << ",";
     ss << collIndexConfig << ",";
 

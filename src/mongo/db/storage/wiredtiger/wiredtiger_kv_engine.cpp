@@ -1638,7 +1638,7 @@ Status WiredTigerKVEngine::createSortedDataInterface(RecoveryUnit& ru,
         WiredTigerIndex::generateCreateString(_canonicalName,
                                               _indexOptions,
                                               collIndexOptions,
-                                              nss,
+                                              NamespaceStringUtil::serializeForCatalog(nss),
                                               *desc,
                                               WiredTigerUtil::useTableLogging(nss));
     if (!result.isOK()) {
