@@ -1051,6 +1051,13 @@ StatusWith<std::string> WiredTigerUtil::generateImportString(StringData ident,
     if (importOptions.importTimestampRule == ImportOptions::ImportTimestampRule::kStable) {
         ss << "compare_timestamp=stable_timestamp,";
     }
+    if (!importOptions.panicOnCorruptWtMetadata) {
+        invariant(!importOptions.repair);
+        ss << "panic_corrupt=false,";
+    }
+    if (importOptions.repair) {
+        ss << "repair=true,";
+    }
     ss << "file_metadata=(" << fileMetadata.String() << "))";
 
     return StatusWith<std::string>(ss.str());
