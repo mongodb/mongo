@@ -1340,6 +1340,22 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "fsan_enabled_aarch64",
+    match_all = [
+        ":fsan_enabled",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "fsan_enabled_x86_64",
+    match_all = [
+        ":fsan_enabled",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+selects.config_setting_group(
     name = "no_enabled_sanitizer",
     match_all = [
         ":asan_disabled",

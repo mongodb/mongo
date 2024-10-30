@@ -3357,7 +3357,7 @@ mongo_cc_library(
         "read_write_concern_defaults_cache_lookup_mongod.h",
         "session_manager_mongod.h",
     ],
-    tags = ["compile_requires_large_memory"],
+    tags = ["compile_requires_large_memory_gcc"],
     deps = [
         # NOTE: Do not add new libdeps (public or private) here unless required by the linker to
         # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
@@ -3508,7 +3508,7 @@ mongo_cc_library(
 #         ],
 #         "//conditions:default": [],
 #     }),
-#     # tags = ["compile_requires_large_memory"],
+#     # tags = ["compile_requires_large_memory_gcc"],
 #     #+ env.WindowsResourceFile("mongod.rc"),
 #     deps = [
 #         # NOTE: Do not add new deps here unless required by the linker to

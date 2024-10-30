@@ -1437,12 +1437,23 @@ def mongo_cc_library(
     else:
         enterprise_compatible = []
 
-    if "compile_requires_large_memory" in tags:
+    if "compile_requires_large_memory_gcc" in tags:
         exec_properties |= select({
             "//bazel/config:gcc_x86_64": {
                 "Pool": "large_mem_x86_64",
             },
             "//bazel/config:gcc_aarch64": {
+                "Pool": "large_memory_arm64",
+            },
+            "//conditions:default": {},
+        })
+
+    if "compile_requires_large_memory_fsan" in tags:
+        exec_properties |= select({
+            "//bazel/config:fsan_enabled_x86_64": {
+                "Pool": "large_mem_x86_64",
+            },
+            "//bazel/config:fsan_enabled_aarch64": {
                 "Pool": "large_memory_arm64",
             },
             "//conditions:default": {},

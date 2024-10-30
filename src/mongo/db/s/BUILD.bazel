@@ -558,7 +558,7 @@ mongo_cc_library(
     header_deps = [
         "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
     ],
-    tags = ["compile_requires_large_memory"],
+    tags = ["compile_requires_large_memory_gcc"],
     deps = [
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:internal_transactions_feature_flag",
@@ -939,7 +939,10 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:resharding_txn_cloner.h",
         "//src/mongo/db/s/resharding:resharding_util.h",
     ],
-    tags = ["compile_requires_large_memory"],
+    tags = [
+        "compile_requires_large_memory_fsan",
+        "compile_requires_large_memory_gcc",
+    ],
     deps = [
         ":analyze_shard_key_util",
         ":balancer_stats_registry",
@@ -1218,7 +1221,7 @@ mongo_cc_library(
         "//src/mongo/s/commands/query_cmd:cluster_getmore_cmd.h",
         "//src/mongo/s/commands/query_cmd:cluster_pipeline_cmd.h",
     ],
-    tags = ["compile_requires_large_memory"],
+    tags = ["compile_requires_large_memory_gcc"],
     deps = [
         ":analyze_shard_key_util",
         ":balancer_stats_registry",

@@ -2124,7 +2124,7 @@ mongo_cc_library(
         "tenant_migration_donor_op_observer.h",
         "tenant_migration_donor_service.h",
     ],
-    tags = ["compile_requires_large_memory"],
+    tags = ["compile_requires_large_memory_gcc"],
     deps = [
         ":primary_only_service",
         ":tenant_migration_access_blocker",
@@ -2408,7 +2408,7 @@ mongo_cc_library(
         "tenant_migration_recipient_op_observer.h",
         "tenant_migration_recipient_service.h",
     ],
-    tags = ["compile_requires_large_memory"],
+    tags = ["compile_requires_large_memory_gcc"],
     deps = [
         "cloner_utils",
         "oplog",
