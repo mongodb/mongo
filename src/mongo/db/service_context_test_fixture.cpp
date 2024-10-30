@@ -36,13 +36,12 @@
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 
-ServiceContext::UniqueServiceContext makeServiceContext(bool shouldSetupTL = false) {
+ServiceContext::UniqueServiceContext makeServiceContext() {
     {
         // Reset the global clock source
         ClockSourceMock clkSource;
@@ -53,18 +52,10 @@ ServiceContext::UniqueServiceContext makeServiceContext(bool shouldSetupTL = fal
 }
 
 ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest()
-    : ScopedGlobalServiceContextForTest(makeServiceContext(), false) {}
-
-ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest(bool shouldSetupTL)
-    : ScopedGlobalServiceContextForTest(makeServiceContext(), shouldSetupTL) {}
+    : ScopedGlobalServiceContextForTest(makeServiceContext()) {}
 
 ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest(
-    ServiceContext::UniqueServiceContext serviceContext, bool shouldSetupTL) {
-    if (shouldSetupTL) {
-        serviceContext->setTransportLayerManager(
-            transport::TransportLayerManagerImpl::makeAndStartDefaultEgressTransportLayer());
-    }
-
+    ServiceContext::UniqueServiceContext serviceContext) {
     WireSpec::getWireSpec(serviceContext.get()).initialize(WireSpec::Specification{});
     setGlobalServiceContext(std::move(serviceContext));
 
@@ -100,8 +91,7 @@ Service* ScopedGlobalServiceContextForTest::getService() const {
 }
 
 ServiceContextTest::ServiceContextTest()
-    : _scopedServiceContext(std::make_unique<ScopedGlobalServiceContextForTest>(shouldSetupTL)),
-      _threadClient(_scopedServiceContext->getService(), nullptr) {}
+    : ServiceContextTest{std::make_unique<ScopedGlobalServiceContextForTest>()} {}
 
 ServiceContextTest::ServiceContextTest(
     std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext,
@@ -115,15 +105,13 @@ ClockSourceMockServiceContextTest::ClockSourceMockServiceContextTest()
     : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
           ServiceContext::make(std::make_unique<ClockSourceMock>(),
                                std::make_unique<ClockSourceMock>(),
-                               std::make_unique<TickSourceMock<Milliseconds>>()),
-          shouldSetupTL)) {}
+                               std::make_unique<TickSourceMock<Milliseconds>>()))) {}
 
 SharedClockSourceAdapterServiceContextTest::SharedClockSourceAdapterServiceContextTest(
     std::shared_ptr<ClockSource> clock)
     : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
           ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(clock),
                                std::make_unique<SharedClockSourceAdapter>(clock),
-                               std::make_unique<TickSourceMock<>>()),
-          shouldSetupTL)) {}
+                               std::make_unique<TickSourceMock<>>()))) {}
 
 }  // namespace mongo

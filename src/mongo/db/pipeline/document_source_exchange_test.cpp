@@ -106,8 +106,7 @@ struct ThreadInfo {
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("test.docSourceExchange"_sd);
 
-class DocumentSourceExchangeTest : service_context_test::WithSetupTransportLayer,
-                                   public AggregationContextFixture {
+class DocumentSourceExchangeTest : public AggregationContextFixture {
 protected:
     void setUp() override {
         auto net = executor::makeNetworkInterface("ExchangeTest");

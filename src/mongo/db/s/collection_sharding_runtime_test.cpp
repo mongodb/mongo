@@ -396,8 +396,7 @@ public:
 /**
  * Fixture for when range deletion functionality is required in CollectionShardingRuntime tests.
  */
-class CollectionShardingRuntimeWithRangeDeleterTest : service_context_test::WithSetupTransportLayer,
-                                                      public CollectionShardingRuntimeTest {
+class CollectionShardingRuntimeWithRangeDeleterTest : public CollectionShardingRuntimeTest {
 public:
     void setUp() override {
         CollectionShardingRuntimeTest::setUp();

@@ -354,8 +354,7 @@ private:
  * This fixture starts with the above internals test and also creates (notably) the resharding donor
  * and recipient POSs.
  */
-class ReshardingDonorRecipientCommonTest : service_context_test::WithSetupTransportLayer,
-                                           public ReshardingDonorRecipientCommonInternalsTest {
+class ReshardingDonorRecipientCommonTest : public ReshardingDonorRecipientCommonInternalsTest {
 public:
     void setUp() override {
         ShardServerTestFixtureWithCatalogCacheMock::setUp();

@@ -48,8 +48,7 @@ using boost::intrusive_ptr;
 using std::list;
 using std::vector;
 
-class SearchTest : service_context_test::WithSetupTransportLayer,
-                   public AggregationContextFixture {};
+using SearchTest = AggregationContextFixture;
 
 struct MockMongoInterface final : public StubMongoProcessInterface {
     bool inShardedEnvironment(OperationContext* opCtx) const override {

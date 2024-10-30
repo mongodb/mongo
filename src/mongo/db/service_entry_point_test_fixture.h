@@ -47,8 +47,7 @@ public:
         : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
                                  ServiceContext::make(std::make_unique<ClockSourceMock>(),
                                                       std::make_unique<ClockSourceMock>(),
-                                                      std::make_unique<TickSourceMock<>>()),
-                                 shouldSetupTL),
+                                                      std::make_unique<TickSourceMock<>>())),
                              std::make_shared<transport::MockSession>(nullptr)) {}
     void setUp() override;
 

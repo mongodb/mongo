@@ -65,8 +65,7 @@
 namespace mongo {
 namespace {
 
-class InternalTransactionsReapServiceTest : service_context_test::WithSetupTransportLayer,
-                                            public ServiceContextMongoDTest {
+class InternalTransactionsReapServiceTest : public ServiceContextMongoDTest {
 protected:
     void setUp() override {
         ServiceContextMongoDTest::setUp();

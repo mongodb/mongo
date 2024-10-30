@@ -87,6 +87,7 @@ class NetworkInterfaceTL : public NetworkInterface {
 public:
     NetworkInterfaceTL(std::string instanceName,
                        ConnectionPool::Options connPoolOpts,
+                       ServiceContext* ctx,
                        std::unique_ptr<NetworkConnectionHook> onConnectHook,
                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
     ~NetworkInterfaceTL() override;
@@ -105,7 +106,6 @@ public:
     void waitForWork() override;
     void waitForWorkUntil(Date_t when) override;
     void signalWorkAvailable() override;
-    void setServiceContext(ServiceContext* svcCtx) override;
     Date_t now() override;
     SemiFuture<TaskExecutor::ResponseStatus> startCommand(
         const TaskExecutor::CallbackHandle& cbHandle,
@@ -286,8 +286,6 @@ private:
 
     void _killOperation(CommandStateBase* cmdStateToKill);
 
-    Status _verifyRunning() const;
-
     /**
      * Adds the provided cmdState to the list of in-progress commands.
      * Throws an exception and does not add the state to the list if shutdown has started or
@@ -310,6 +308,10 @@ private:
     ExecutorFuture<RemoteCommandResponse> _runCommand(std::shared_ptr<CommandStateBase> cmdState);
 
     std::string _instanceName;
+    ServiceContext* _svcCtx = nullptr;
+    transport::TransportLayerManager* _tl = nullptr;
+    // Will be created if ServiceContext is null, or if no TransportLayer was configured at startup.
+    std::unique_ptr<transport::TransportLayerManager> _ownedTransportLayer;
     transport::ReactorHandle _reactor;
 
     const ConnectionPool::Options _connPoolOpts;
@@ -341,10 +343,8 @@ private:
             .at(s);
     }
 
-    // Guards _svcCtx, _state, _inProgress, and _inProgressAlarms.
+    // Guards _state, _inProgress, and _inProgressAlarms.
     mutable stdx::mutex _mutex;
-
-    ServiceContext* _svcCtx = nullptr;
 
     // This condition variable is dedicated to block a thread calling this class
     // destructor, strictly when another thread is performing the network

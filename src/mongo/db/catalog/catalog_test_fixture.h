@@ -46,7 +46,7 @@ namespace mongo {
  */
 class CatalogScopedGlobalServiceContextForTest : public MongoDScopedGlobalServiceContextForTest {
 public:
-    explicit CatalogScopedGlobalServiceContextForTest(Options options, bool shouldSetupTL);
+    explicit CatalogScopedGlobalServiceContextForTest(Options options);
 };
 
 class CatalogTestFixture : public ServiceContextTest {
@@ -56,8 +56,8 @@ public:
     CatalogTestFixture() : CatalogTestFixture(Options{}) {}
 
     explicit CatalogTestFixture(Options options)
-        : ServiceContextTest(std::make_unique<CatalogScopedGlobalServiceContextForTest>(
-              std::move(options), shouldSetupTL)) {}
+        : ServiceContextTest(
+              std::make_unique<CatalogScopedGlobalServiceContextForTest>(std::move(options))) {}
 
     OperationContext* operationContext() const;
 

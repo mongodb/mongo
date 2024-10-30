@@ -41,8 +41,7 @@
 namespace mongo {
 namespace {
 
-class DocumentSourceScoreFusionTest : service_context_test::WithSetupTransportLayer,
-                                      public AggregationContextFixture {};
+using DocumentSourceScoreFusionTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoInputsField) {
     auto spec = fromjson(R"({

@@ -200,8 +200,7 @@ void assertBsonObjEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
     ASSERT_EQ(comparator.compare(lhs, rhs), 0);
 }
 
-struct QueryAnalysisWriterTest : service_context_test::WithSetupTransportLayer,
-                                 public ShardServerTestFixture {
+struct QueryAnalysisWriterTest : public ShardServerTestFixture {
 public:
     void setUp() override {
         ShardServerTestFixture::setUp();

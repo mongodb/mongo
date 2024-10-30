@@ -38,7 +38,6 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/tick_source_mock.h"
@@ -144,8 +143,6 @@ public:
             _svcCtx = ServiceContext::make(std::make_unique<ClockSourceMock>(),
                                            std::make_unique<ClockSourceMock>(),
                                            std::make_unique<TickSourceMock<Milliseconds>>());
-            _svcCtx->setTransportLayerManager(
-                transport::TransportLayerManagerImpl::makeAndStartDefaultEgressTransportLayer());
             advanceTime(Seconds(100));
         }
     }

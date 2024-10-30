@@ -338,11 +338,6 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
         // TODO SERVER-78730: add support for load-balanced connections.
     }
 
-    // Mongod should not bind to any ports in repair mode so only allow egress.
-    if (storageGlobalParams.repair) {
-        return transport::TransportLayerManagerImpl::makeAndStartDefaultEgressTransportLayer();
-    }
-
     return transport::TransportLayerManagerImpl::createWithConfig(
         &serverGlobalParams, svcCtx, std::move(loadBalancerPort), std::move(routerPort));
 }
@@ -574,21 +569,17 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     CertificateExpirationMonitor::get()->start(serviceContext);
 #endif
 
-    auto tl = makeTransportLayer(serviceContext);
     if (!storageGlobalParams.repair) {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Transport layer setup",
                                                   &startupTimeElapsedBuilder);
+        auto tl = makeTransportLayer(serviceContext);
         if (auto res = tl->setup(); !res.isOK()) {
             LOGV2_ERROR(20568, "Error setting up listener", "error"_attr = res);
             return ExitCode::netError;
         }
+        serviceContext->setTransportLayerManager(std::move(tl));
     }
-    serviceContext->setTransportLayerManager(std::move(tl));
-
-    LOGV2_OPTIONS(
-        7091600, {LogComponent::kTenantMigration}, "Starting TenantMigrationAccessBlockerRegistry");
-    TenantMigrationAccessBlockerRegistry::get(serviceContext).startup();
 
     FlowControl::set(serviceContext,
                      std::make_unique<FlowControl>(
@@ -1952,6 +1943,18 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         validator->shutDown();
     }
 
+    // The migrationutil executor must be shut down before shutting down the CatalogCache and the
+    // ExecutorPool. Otherwise, it may try to schedule work on those components and fail.
+    LOGV2_OPTIONS(4784921, {LogComponent::kSharding}, "Shutting down the MigrationUtilExecutor");
+    auto migrationUtilExecutor = migrationutil::getMigrationUtilExecutor(serviceContext);
+    {
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Shut down the migration util executor",
+                                                  &shutdownTimeElapsedBuilder);
+        migrationUtilExecutor->shutdown();
+        migrationUtilExecutor->join();
+    }
+
     if (TestingProctor::instance().isEnabled()) {
         auto pool = Grid::get(serviceContext)->isInitialized()
             ? Grid::get(serviceContext)->getExecutorPool()
@@ -2183,6 +2186,10 @@ int mongod_main(int argc, char* argv[]) {
         // exits directly and so never reaches here either.
     }
 #endif
+
+    LOGV2_OPTIONS(
+        7091600, {LogComponent::kTenantMigration}, "Starting TenantMigrationAccessBlockerRegistry");
+    TenantMigrationAccessBlockerRegistry::get(service).startup();
 
     ExitCode exitCode = initAndListen(service);
     exitCleanly(exitCode);

@@ -39,8 +39,7 @@
 namespace mongo {
 namespace {
 
-class DocumentSourceRankFusionTest : service_context_test::WithSetupTransportLayer,
-                                     public AggregationContextFixture {};
+using DocumentSourceRankFusionTest = AggregationContextFixture;
 
 // TODO SERVER-92213: Adapt all the tests that "ASSERT_DOES_NOT_THROW" to confirm that the desugared
 // pipeline returns the correct list of stages when the $rankFusion implementation is complete.

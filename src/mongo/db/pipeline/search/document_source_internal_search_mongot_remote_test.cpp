@@ -38,8 +38,7 @@
 namespace mongo {
 namespace {
 
-class InternalSearchMongotRemoteTest : service_context_test::WithSetupTransportLayer,
-                                       public AggregationContextFixture {};
+using InternalSearchMongotRemoteTest = AggregationContextFixture;
 
 boost::intrusive_ptr<DocumentSource> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

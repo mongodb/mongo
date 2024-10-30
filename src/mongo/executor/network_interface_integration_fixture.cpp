@@ -127,9 +127,10 @@ Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
     const TaskExecutor::CallbackHandle& cbHandle,
     RemoteCommandRequest request,
     const CancellationToken& token) {
-    auto fut = net().startCommand(cbHandle, request, baton(), token);
     _onSchedulingCommand();
-    return std::move(fut)
+
+    return net()
+        .startCommand(cbHandle, request, baton(), token)
         .unsafeToInlineFuture()
         .then([request](TaskExecutor::ResponseStatus resStatus) {
             if (resStatus.isOK()) {

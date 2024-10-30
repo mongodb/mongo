@@ -95,8 +95,8 @@ using repl::ReplSettings;
 
 ShardingMongoDTestFixture::ShardingMongoDTestFixture(
     MongoDScopedGlobalServiceContextForTest::Options options, bool setUpMajorityReads)
-    : ShardingTestFixtureCommon(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
-          std::move(options), shouldSetupTL)),
+    : ShardingTestFixtureCommon(
+          std::make_unique<MongoDScopedGlobalServiceContextForTest>(std::move(options))),
       _setUpMajorityReads(setUpMajorityReads) {}
 
 ShardingMongoDTestFixture::~ShardingMongoDTestFixture() = default;

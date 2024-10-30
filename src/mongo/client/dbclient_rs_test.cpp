@@ -55,7 +55,6 @@
 #include "mongo/db/repl/member_id.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
@@ -85,7 +84,7 @@ BSONObj makeMetadata(ReadPreference rp, TagSet tagSet) {
 /**
  * Ensures a global ServiceContext exists.
  */
-class DBClientRSTest : service_context_test::WithSetupTransportLayer, public ServiceContextTest {
+class DBClientRSTest : public unittest::Test {
 public:
     ClockSource* clock() {
         return _clkSource.get();
@@ -96,6 +95,11 @@ public:
     }
 
 protected:
+    void setUp() override {
+        auto serviceContext = ServiceContext::make();
+        setGlobalServiceContext(std::move(serviceContext));
+    }
+
     std::shared_ptr<ClockSourceMock> _clkSource = std::make_shared<ClockSourceMock>();
     StreamableReplicaSetMonitorForTesting _rsmMonitor;
 

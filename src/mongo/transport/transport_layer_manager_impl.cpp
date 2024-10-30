@@ -225,8 +225,6 @@ void TransportLayerManagerImpl::checkMaxOpenSessionsAtStartup() const {
     // Check if vm.max_map_count is high enough, as per SERVER-51233
     std::size_t maxConns = std::accumulate(
         _tls.cbegin(), _tls.cend(), std::size_t{0}, [&](std::size_t acc, const auto& tl) {
-            if (!tl->getSessionManager())
-                return size_t{0};
             return std::clamp(tl->getSessionManager()->maxOpenSessions(),
                               std::size_t{0},
                               std::numeric_limits<std::size_t>::max() - acc);
@@ -251,8 +249,7 @@ void TransportLayerManagerImpl::checkMaxOpenSessionsAtStartup() const {
 
 void TransportLayerManagerImpl::endAllSessions(Client::TagMask tags) {
     std::for_each(_tls.cbegin(), _tls.cend(), [&](const auto& tl) {
-        if (auto sm = tl->getSessionManager(); sm)
-            sm->endAllSessions(tags);
+        tl->getSessionManager()->endAllSessions(tags);
     });
 }
 
