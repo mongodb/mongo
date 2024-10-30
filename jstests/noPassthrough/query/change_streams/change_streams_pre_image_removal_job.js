@@ -31,7 +31,7 @@ const oplogSizeMB = 1;
 
 // Set up the replica set with two nodes and two collections with 'changeStreamPreAndPostImages'
 // enabled and run expired pre-image removal job every second.
-const rst = new ReplSetTest({nodes: 2, oplogSize: oplogSizeMB});
+const rst = new ReplSetTest({nodes: 2, oplogSize: oplogSizeMB, nodeOptions: {syncdelay: 1}});
 rst.startSet({
     setParameter: {
         expiredChangeStreamPreImageRemovalJobSleepSecs: 1,
