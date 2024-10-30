@@ -610,8 +610,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
     for (unsigned i = 0; i < _argv.size(); i++) {
         if (i)
             ss << ' ';
-        if (_argv[i].find(' ') == string::npos && _argv[i].find('"') == string::npos &&
-            _argv[i].find('\\') == string::npos)
+        if (_argv[i].find(' ') == string::npos)
             ss << _argv[i];
         else {
             ss << '"';
