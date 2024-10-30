@@ -1,0 +1,62 @@
+10gen/devprod-build:
+  - Build
+10gen/devprod-correctness:
+  - Correctness
+10gen/devprod-performance-analysis:
+  - Performance Analysis
+10gen/devprod-performance-infrastructure:
+  - Performance Infrastructure
+10gen/devprod-services-integrations:
+  - Services & Integrations
+10gen/performance:
+  - Product Performance
+10gen/query:
+  - Query Execution
+  - Query Integration
+  - Query Optimization
+10gen/query-execution:
+  - Query Execution
+10gen/query-integration:
+  - Query Integration
+10gen/query-integration-analytic-extensions:
+  - Query Integration
+10gen/query-integration-fle:
+  - Query Integration
+10gen/query-integration-geo:
+  - Query Integration
+10gen/query-integration-javascript:
+  - Query Integration
+10gen/query-integration-observability:
+  - Query Integration
+10gen/query-integration-search:
+  - Query Integration
+10gen/query-integration-search-testing:
+  - Query Integration
+10gen/query-integration-staff-leads:
+  - Query Integration
+10gen/query-integration-timeseries:
+  - Query Integration
+10gen/query-optimization:
+  - Query Optimization
+10gen/server-catalog-and-routing:
+  - Catalog And Routing
+10gen/server-cluster-scalability:
+  - Cluster Scalability
+10gen/server-networking-and-observability:
+  - Networking & Observability
+10gen/server-programmability:
+  - Server Programmability
+10gen/server-replication:
+  - Replication
+10gen/server-root-ownership: #Won't use
+  - ~
+10gen/server-rss-sydney:
+  - RSS Sydney
+10gen/server-security:
+  - Server Security
+10gen/server-storage-execution:
+  - Storage Execution
+10gen/server-workload-scheduling:
+  - Workload Execution
+10gen/streams-engine:
+  - Atlas Streams

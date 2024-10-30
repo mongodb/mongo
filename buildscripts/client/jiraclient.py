@@ -104,7 +104,7 @@ class JiraClient:
         priority: str = "3",
         components: Optional[Sequence[str]] = None,
         labels: Optional[Sequence[str]] = None,
-    ):
+    ) -> Issue:
         assigned_teams_mapped = list(map(lambda x: {"value": x}, assigned_teams))
         fields = {
             "project": {"key": jira_project},
