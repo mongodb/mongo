@@ -103,10 +103,16 @@ overrides:
   enterprise-rhel-8-64-bit-dynamic-classic-engine:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
+    - task: change_stream_optimization_fuzzer
+      exec_timeout: 600 # 10 hours
 
   enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
+    - task: change_stream_optimization_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  enterprise-rhel-8-64-bit-inmem:
     - task: change_stream_optimization_fuzzer
       exec_timeout: 600 # 10 hours
 
