@@ -231,18 +231,14 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(OperationContext* o
                                                              const NamespaceString& nss,
                                                              boost::optional<OID> targetEpoch)
     : _nss(nss), _targetEpoch(std::move(targetEpoch)), _cri(_init(opCtx, false)) {
-    _isUpdateOneWithIdWithoutShardKeyEnabled =
-        feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    _isUpdateOneWithIdWithoutShardKeyEnabled = true;
 }
 
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceString& nss,
                                                              const CollectionRoutingInfo& cri)
     : _nss(nss), _cri(cri) {
     invariant(!cri.cm.hasRoutingTable() || cri.cm.getNss() == nss);
-    _isUpdateOneWithIdWithoutShardKeyEnabled =
-        feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    _isUpdateOneWithIdWithoutShardKeyEnabled = true;
 }
 
 /**
