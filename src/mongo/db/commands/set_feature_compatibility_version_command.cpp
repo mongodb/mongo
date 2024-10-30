@@ -217,24 +217,6 @@ void abortAllReshardCollection(OperationContext* opCtx) {
     }
 }
 
-// TODO SERVER-78330 remove this.
-void deleteShardingStateRecoveryDoc(OperationContext* opCtx) {
-    DBDirectClient client(opCtx);
-    const auto commandResponse = client.runCommand([&] {
-        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kServerConfigurationNamespace);
-        deleteOp.setDeletes(
-            {[&] {
-                write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON("_id"
-                                << "minOpTimeRecovery"));
-                entry.setMulti(false);
-                return entry;
-            }()});
-        return deleteOp.serialize();
-    }());
-    uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
-}
-
 void _setShardedClusterCardinalityParameter(
     OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
     // If the replica set endpoint is not active, then it isn't safe to allow direct connections
@@ -789,11 +771,6 @@ private:
     void _upgradeServerMetadata(OperationContext* opCtx,
                                 const multiversion::FeatureCompatibilityVersion requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
-        if (role && role->has(ClusterRole::ShardServer)) {
-            // Delete any possible leftover ShardingStateRecovery document.
-            // TODO SERVER-78330 remove this.
-            deleteShardingStateRecoveryDoc(opCtx);
-        }
 
         if (role && role->has(ClusterRole::ConfigServer)) {
             _setShardedClusterCardinalityParameter(opCtx, requestedVersion);
