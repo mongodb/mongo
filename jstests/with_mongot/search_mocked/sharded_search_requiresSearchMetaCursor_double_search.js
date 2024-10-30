@@ -197,7 +197,8 @@ function runRequiresSearchMetaCursorTest({
                         .find({
                             "command.comment": comment,
                             "command.aggregate": shardedCollName,
-                            "command.pipeline.0.$search": {$exists: true}
+                            "command.pipeline.0.$search": {$exists: true},
+                            "errCode": {"$ne": ErrorCodes.StaleConfig}
                         })
                         .toArray();
         assert.eq(2, res.length, res);
