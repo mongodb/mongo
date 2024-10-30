@@ -129,8 +129,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
             nullptr,
             WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
             params);
-        ret->postConstructorInit(opCtx.get(),
-                                 NamespaceString::createNamespaceString_forTest("a.b"));
+        ret->postConstructorInit(opCtx.get());
         rs.reset(ret);
     }
 

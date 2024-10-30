@@ -148,7 +148,7 @@ public:
             &_engine,
             WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
             params);
-        ret->postConstructorInit(opCtx, nss);
+        ret->postConstructorInit(opCtx);
         return std::move(ret);
     }
 

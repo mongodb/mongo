@@ -49,8 +49,7 @@ const double kNumMSInHour = 1000 * 60 * 60;
 
 std::shared_ptr<WiredTigerOplogTruncateMarkers>
 WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(OperationContext* opCtx,
-                                                           WiredTigerRecordStore* rs,
-                                                           const NamespaceString& ns) {
+                                                           WiredTigerRecordStore* rs) {
     long long maxSize = rs->getOplogMaxSize();
     invariant(maxSize > 0);
     invariant(rs->keyFormat() == KeyFormat::Long);
@@ -80,7 +79,6 @@ WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(OperationContext* opC
     auto initialSetOfMarkers = CollectionTruncateMarkers::createFromCollectionIterator(
         opCtx,
         iterator,
-        ns,
         minBytesPerTruncateMarker,
         [](const Record& record) {
             BSONObj obj = record.data.toBson();

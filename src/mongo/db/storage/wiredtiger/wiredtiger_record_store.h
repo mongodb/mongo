@@ -50,7 +50,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/collection_crud/capped_visibility.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -249,8 +248,7 @@ public:
 
     int64_t getOplogMaxSize() const;
 
-    // Pass in NamespaceString, it is not possible to resolve the UUID to NamespaceString yet.
-    void postConstructorInit(OperationContext* opCtx, const NamespaceString& ns);
+    void postConstructorInit(OperationContext* opCtx);
 
     /*
      * Check the size information for this RecordStore. This function opens a cursor on the

@@ -45,7 +45,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
@@ -231,7 +230,6 @@ public:
     static InitialSetOfMarkers createFromCollectionIterator(
         OperationContext* opCtx,
         CollectionIterator& collIterator,
-        const NamespaceString& ns,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
         boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
@@ -241,7 +239,6 @@ public:
     static InitialSetOfMarkers createMarkersByScanning(
         OperationContext* opCtx,
         CollectionIterator& collIterator,
-        const NamespaceString& ns,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime);
 
@@ -251,7 +248,6 @@ public:
     static InitialSetOfMarkers createMarkersBySampling(
         OperationContext* opCtx,
         CollectionIterator& collIterator,
-        const NamespaceString& ns,
         int64_t estimatedRecordsPerMarker,
         int64_t estimatedBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,

@@ -1023,7 +1023,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
     // Initialize the truncate markers.
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-    wtrs->postConstructorInit(opCtx.get(), NamespaceString::kRsOplogNamespace);
+    wtrs->postConstructorInit(opCtx.get());
 
     // Confirm that small oplogs are processed by scanning.
     BSONObjBuilder builder;
@@ -1081,7 +1081,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         wtrs->setNumRecords(1024 * 1024);
         wtrs->setDataSize(1024 * 1024 * 1024);
-        wtrs->postConstructorInit(opCtx.get(), NamespaceString::kRsOplogNamespace);
+        wtrs->postConstructorInit(opCtx.get());
     }
 
     // Confirm that sampling occurred.
@@ -1395,7 +1395,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
         wtKvEngine,
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
         params);
-    rs->postConstructorInit(opCtx.get(), nss);
+    rs->postConstructorInit(opCtx.get());
 
     const auto id = StringData{"1"};
     const auto rid = RecordId(id.rawData(), id.size());

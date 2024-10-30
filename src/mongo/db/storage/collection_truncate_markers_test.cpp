@@ -397,7 +397,7 @@ TEST_F(CollectionMarkersTest, ScanningMarkerCreation) {
         UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
 
         auto result = CollectionTruncateMarkers::createMarkersByScanning(
-            opCtx.get(), iterator, collNs, kMinBytes, [](const Record& record) {
+            opCtx.get(), iterator, kMinBytes, [](const Record& record) {
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
             });
         ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
@@ -445,7 +445,7 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
         UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
 
         auto result = CollectionTruncateMarkers::createFromCollectionIterator(
-            opCtx.get(), iterator, collNs, kMinBytesPerMarker, [](const Record& record) {
+            opCtx.get(), iterator, kMinBytesPerMarker, [](const Record& record) {
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
             });
 
@@ -496,7 +496,7 @@ TEST_F(CollectionMarkersTest, ScanningAutoYieldingWorks) {
         YieldableCollectionIterator iterator(opCtx.get(), &coll.getCollection());
 
         auto result = CollectionTruncateMarkers::createMarkersByScanning(
-            opCtx.get(), iterator, collNs, kMinBytes, [](const Record& record) {
+            opCtx.get(), iterator, kMinBytes, [](const Record& record) {
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
             });
         ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
@@ -556,7 +556,7 @@ TEST_F(CollectionMarkersTest, SamplingAutoYieldingWorks) {
         YieldableCollectionIterator iterator(opCtx.get(), &coll.getCollection());
 
         auto result = CollectionTruncateMarkers::createFromCollectionIterator(
-            opCtx.get(), iterator, collNs, kMinBytesPerMarker, [](const Record& record) {
+            opCtx.get(), iterator, kMinBytesPerMarker, [](const Record& record) {
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
             });
 
@@ -621,7 +621,6 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
     CollectionTruncateMarkers::createMarkersBySampling(
         opCtx.get(),
         iterator,
-        collNs,
         estimatedRecordsPerMarker,
         estimatedBytesPerMarker,
         [](const Record& record) {

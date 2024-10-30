@@ -1606,7 +1606,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     std::unique_ptr<WiredTigerRecordStore> ret;
     ret = std::make_unique<WiredTigerRecordStore>(
         this, WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)), params);
-    ret->postConstructorInit(opCtx, nss);
+    ret->postConstructorInit(opCtx);
 
     if (sizeRecoveryState(opCtx->getServiceContext()).shouldRecordStoresAlwaysCheckSize()) {
         ret->checkSize(opCtx);
@@ -1741,7 +1741,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Operati
     std::unique_ptr<WiredTigerRecordStore> rs;
     rs = std::make_unique<WiredTigerRecordStore>(
         this, WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)), params);
-    rs->postConstructorInit(opCtx, NamespaceString::kEmpty);
+    rs->postConstructorInit(opCtx);
 
     return std::move(rs);
 }

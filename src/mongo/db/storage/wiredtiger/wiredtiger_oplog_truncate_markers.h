@@ -93,7 +93,7 @@ public:
     RecordId firstRecord;
 
     static std::shared_ptr<WiredTigerOplogTruncateMarkers> createOplogTruncateMarkers(
-        OperationContext* opCtx, WiredTigerRecordStore* rs, const NamespaceString& ns);
+        OperationContext* opCtx, WiredTigerRecordStore* rs);
     //
     // The following methods are public only for use in tests.
     //

@@ -129,15 +129,14 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
         &_engine,
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
         params);
-    ret->postConstructorInit(opCtx.get(), nss);
+    ret->postConstructorInit(opCtx.get());
     return std::move(ret);
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
     auto ret = newOplogRecordStoreNoInit();
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    dynamic_cast<WiredTigerRecordStore*>(ret.get())->postConstructorInit(
-        opCtx.get(), NamespaceString::kRsOplogNamespace);
+    dynamic_cast<WiredTigerRecordStore*>(ret.get())->postConstructorInit(opCtx.get());
     return ret;
 }
 
