@@ -1,7 +1,6 @@
 import {
     getPlanStage,
-    getQueryPlanner,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isExpress,
     isIxscan
 } from "jstests/libs/query/analyze_plan.js";
@@ -50,10 +49,10 @@ export let assertQueryUsesIndex = function(coll, query, indexName) {
 
     let stage;
     if (isIxscan(coll.getDB(), res)) {
-        stage = getPlanStage(getWinningPlan(getQueryPlanner(res)), "IXSCAN");
+        stage = getPlanStage(getWinningPlanFromExplain(res), "IXSCAN");
     } else {
         assert(isExpress(coll.getDB(), res), tojson(res));
-        stage = getPlanStage(getWinningPlan(getQueryPlanner(res)), "EXPRESS_IXSCAN");
+        stage = getPlanStage(getWinningPlanFromExplain(res), "EXPRESS_IXSCAN");
     }
     assert.eq(
         stage.indexName, indexName, "Expecting index scan on " + indexName + ": " + tojson(res));

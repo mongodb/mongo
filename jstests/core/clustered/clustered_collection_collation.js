@@ -14,7 +14,7 @@ import {
     validateClusteredCollectionHint
 } from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {getQueryPlanner, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const collatedName = 'clustered_collection_with_collation';
 const collated = db[collatedName];
@@ -120,7 +120,7 @@ const verifyHasBoundsAndFindsN = function(coll, expected, predicate, queryCollat
     const res = queryCollation === undefined
         ? assert.commandWorked(coll.find(predicate).explain())
         : assert.commandWorked(coll.find(predicate).collation(queryCollation).explain());
-    const queryPlan = getWinningPlan(getQueryPlanner(res));
+    const queryPlan = getWinningPlanFromExplain(res);
     if (queryPlan.stage != "EXPRESS_CLUSTERED_IXSCAN") {  // simple _id queries don't use COLLSCAN
         const min = assert(queryPlan.minRecord, "No min bound " + tojson({res, queryPlan}));
         const max = assert(queryPlan.maxRecord, "No max bound " + tojson({res, queryPlan}));
@@ -133,7 +133,7 @@ const verifyNoBoundsAndFindsN = function(coll, expected, predicate, queryCollati
     const res = queryCollation === undefined
         ? assert.commandWorked(coll.find(predicate).explain())
         : assert.commandWorked(coll.find(predicate).collation(queryCollation).explain());
-    const queryPlan = getWinningPlan(getQueryPlanner(res));
+    const queryPlan = getWinningPlanFromExplain(res);
     assert.eq(null, queryPlan.minRecord, "There's a min bound " + tojson({res, queryPlan}));
     assert.eq(null, queryPlan.maxRecord, "There's a max bound " + tojson({res, queryPlan}));
     assert.eq(expected, coll.find(predicate).count(), "Didn't find the expected records");
@@ -143,7 +143,7 @@ const verifyNoTightBoundsAndFindsN = function(coll, expected, predicate, queryCo
     const res = queryCollation === undefined
         ? assert.commandWorked(coll.find(predicate).explain())
         : assert.commandWorked(coll.find(predicate).collation(queryCollation).explain());
-    const queryPlan = getWinningPlan(getQueryPlanner(res));
+    const queryPlan = getWinningPlanFromExplain(res);
     const min = queryPlan.minRecord;
     const max = queryPlan.maxRecord;
     assert.neq(null, min, "No min bound " + tojson({res, queryPlan}));

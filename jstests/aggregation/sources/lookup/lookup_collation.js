@@ -11,11 +11,7 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    getAggPlanStages,
-    getQueryPlanner,
-    getWinningPlan
-} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -130,7 +126,7 @@ let explain;
     function assertIndexJoinStrategy(explain) {
         // Check join strategy when $lookup is pushed down.
         if (getAggPlanStages(explain, "$cursor").length === 0) {
-            const winningPlan = getWinningPlan(getQueryPlanner(explain));
+            const winningPlan = getWinningPlanFromExplain(explain);
             assert.eq("EQ_LOOKUP", winningPlan.stage, explain);
             assert.eq("IndexedLoopJoin", winningPlan.strategy, explain);
             // Will choose the index with the matching collation.
@@ -141,7 +137,7 @@ let explain;
     function assertNestedLoopJoinStrategy(explain) {
         // Check join strategy when $lookup is pushed down.
         if (getAggPlanStages(explain, "$cursor").length === 0) {
-            const winningPlan = getWinningPlan(getQueryPlanner(explain));
+            const winningPlan = getWinningPlanFromExplain(explain);
             assert.eq("EQ_LOOKUP", winningPlan.stage, explain);
             assert.eq("NestedLoopJoin", winningPlan.strategy, explain);
         }

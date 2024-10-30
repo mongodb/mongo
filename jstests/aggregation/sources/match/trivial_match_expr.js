@@ -10,7 +10,7 @@
 //   # Explicitly testing optimization.
 //   requires_pipeline_optimization,
 // ]
-import {getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.trivial_match_expr;
 coll.drop();
@@ -20,7 +20,7 @@ assert.commandWorked(coll.insert({foo: 0, bar: "0"}));
 assert.commandWorked(coll.insert({foo: -1, bar: "-1"}));
 
 function hasFilter(explain) {
-    const plan = getWinningPlan(explain.queryPlanner);
+    const plan = getWinningPlanFromExplain(explain);
     return "filter" in plan && Object.keys(plan.filter).length > 0;
 }
 
@@ -73,13 +73,13 @@ assertQueryPlanForFindContainsFilter(
 
 const explainAggregate =
     coll.explain().aggregate([{$match: {$expr: "foo"}}, {$match: {$expr: "$foo"}}]);
-assert.eq(getWinningPlan(explainAggregate.queryPlanner).filter,
+assert.eq(getWinningPlanFromExplain(explainAggregate).filter,
           {$expr: "$foo"},
           "$expr with truthy constant expression should be optimized away when used " +
               "in conjunction with $expr containing non-constant expression");
 
 const explainFind = coll.explain().find({$and: [{$expr: "foo"}, {$expr: "$foo"}]}).finish();
-assert.eq(getWinningPlan(explainFind.queryPlanner).filter,
+assert.eq(getWinningPlanFromExplain(explainFind).filter,
           {$expr: "$foo"},
           "$expr truthy constant expression should be optimized away when used " +
               "in conjunction with $expr containing non-constant expression");

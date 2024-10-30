@@ -4,7 +4,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-import {getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -50,7 +50,7 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
                 .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber},
                       {_id: 1})
                 .finish());
-        const winningPlan = getWinningPlan(explainRes.queryPlanner);
+        const winningPlan = getWinningPlanFromExplain(explainRes);
         assert.eq(winningPlan.stage, "PROJECTION_COVERED");
         assert.eq(winningPlan.inputStage.stage, "IXSCAN");
 
