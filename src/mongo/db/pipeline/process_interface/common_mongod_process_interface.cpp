@@ -49,6 +49,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -171,6 +172,28 @@ void assertIgnorePrepareConflictsBehavior(const boost::intrusive_ptr<ExpressionC
 }
 
 /**
+ * Create a BSONObjBuilder with all fields common to collections, views and timeseries.
+ */
+BSONObjBuilder createCommonNsFields(StringData shardName,
+                                    const NamespaceString& ns,
+                                    const BSONObj& extraElements,
+                                    StringData type = "collection") {
+    BSONObjBuilder builder;
+    builder.append("db",
+                   DatabaseNameUtil::serialize(ns.dbName(), SerializationContext::stateDefault()));
+    builder.append("name", ns.coll());
+    builder.append("type", type);
+    if (!shardName.empty()) {
+        builder.append("shard", shardName);
+    }
+    if (const auto configDebugDump = catalog::getConfigDebugDump(ns); configDebugDump.has_value()) {
+        builder.append("configDebugDump", *configDebugDump);
+    }
+    builder.appendElements(extraElements);
+    return builder;
+}
+
+/**
  * Returns all documents from _mdb_catalog along with a sorted list of all
  * <db>.system.views namespaces found.
  */
@@ -200,16 +223,7 @@ void listDurableCatalog(OperationContext* opCtx,
             systemViewsNamespaces->push_back(ns);
         }
 
-        BSONObjBuilder builder;
-        builder.append(
-            "db", DatabaseNameUtil::serialize(ns.dbName(), SerializationContext::stateDefault()));
-        builder.append("name", ns.coll());
-        builder.append("type", "collection");
-        if (!shardName.empty()) {
-            builder.append("shard", shardName);
-        }
-        builder.appendElements(obj);
-        docs->push_back(builder.obj());
+        docs->push_back(createCommonNsFields(shardName, ns, obj).obj());
     }
 }
 
@@ -337,21 +351,12 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
                 NamespaceString viewOnNs(
                     NamespaceStringUtil::deserialize(ns.dbName(), obj.getStringField("viewOn")));
 
-                BSONObjBuilder builder;
-                builder.append(
-                    "db",
-                    DatabaseNameUtil::serialize(ns.dbName(), SerializationContext::stateDefault()));
-                builder.append("name", ns.coll());
-                if (viewOnNs.isTimeseriesBucketsCollection()) {
-                    builder.append("type", "timeseries");
-                } else {
-                    builder.append("type", "view");
-                }
-                if (auto shardName = getShardName(opCtx); !shardName.empty()) {
-                    builder.append("shard", shardName);
-                }
+                auto builder = createCommonNsFields(
+                    getShardName(opCtx),
+                    ns,
+                    obj,
+                    viewOnNs.isTimeseriesBucketsCollection() ? "timeseries" : "view");
                 builder.appendAs(obj["_id"], "ns");
-                builder.appendElements(obj);
                 docs.push_back(builder.obj());
             }
         }
@@ -380,17 +385,7 @@ boost::optional<BSONObj> CommonMongodProcessInterface::getCatalogEntry(
     auto obj = DurableCatalog::get(opCtx)->getCatalogEntry(
         opCtx, acquisition.getCollectionPtr()->getCatalogId());
 
-    BSONObjBuilder builder;
-    builder.append("db",
-                   DatabaseNameUtil::serialize(ns.dbName(), SerializationContext::stateDefault()));
-    builder.append("name", ns.coll());
-    builder.append("type", "collection");
-    if (auto shardName = getShardName(opCtx); !shardName.empty()) {
-        builder.append("shard", shardName);
-    }
-    builder.appendElements(obj);
-
-    return builder.obj();
+    return createCommonNsFields(getShardName(opCtx), ns, obj).obj();
 }
 
 void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,

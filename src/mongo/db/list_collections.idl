@@ -50,6 +50,13 @@ structs:
                 description: "Unique, immutable collection ID."
                 optional: true
                 stability: stable
+            configDebugDump:
+                type: bool
+                description: >-
+                    When true, the collection should be included in full-cluster dumps
+                    (e.g., mongodump).
+                optional: true
+                stability: unstable
 
     ListCollectionsReplyItem:
         description: "Individual result"

@@ -190,3 +190,10 @@ feature_flags:
     cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
     default: false
     shouldBeFCVGated: true
+  # TODO (SERVER-95599): remove once 9.0 becomes last LTS.
+  featureFlagConfigDebugDumpSupported:
+    description: "The configDebugDump flag is supported in listCollections and $listCatalog."
+    cpp_varname: feature_flags::gConfigDebugDumpSupported
+    default: true
+    version: 8.1
+    shouldBeFCVGated: true

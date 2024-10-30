@@ -44,6 +44,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/view.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
@@ -127,6 +128,29 @@ void forEachCollectionFromDb(OperationContext* opCtx,
         hangBeforeGettingNextCollection.pauseWhileSet();
         collectionCount += 1;
     }
+}
+
+boost::optional<bool> getConfigDebugDump(const NamespaceString& nss) {
+    static const std::array kConfigDumpCollections = {
+        "chunks"_sd,
+        "collections"_sd,
+        "databases"_sd,
+        "settings"_sd,
+        "shards"_sd,
+        "tags"_sd,
+        "version"_sd,
+    };
+
+    if (!nss.isConfigDB()) {
+        return boost::none;
+    }
+
+    if (MONGO_unlikely(!mongo::feature_flags::gConfigDebugDumpSupported.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))) {
+        return boost::none;
+    }
+
+    return std::ranges::find(kConfigDumpCollections, nss.coll()) != kConfigDumpCollections.cend();
 }
 
 }  // namespace catalog

@@ -268,8 +268,13 @@ BSONObj buildCollectionBson(OperationContext* opCtx, const Collection* collectio
 
     BSONObjBuilder infoBuilder;
     infoBuilder.append("readOnly", opCtx->readOnly());
-    if (options.uuid)
+    if (options.uuid) {
         infoBuilder.appendElements(options.uuid->toBSON());
+    }
+    if (const auto configDebugDump = catalog::getConfigDebugDump(nss);
+        configDebugDump.has_value()) {
+        infoBuilder.append("configDebugDump", *configDebugDump);
+    }
     b.append("info", infoBuilder.obj());
 
     auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);

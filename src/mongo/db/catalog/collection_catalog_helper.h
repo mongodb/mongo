@@ -70,5 +70,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
                              CollectionCatalog::CollectionInfoFn callback,
                              CollectionCatalog::CollectionInfoFn predicate = nullptr);
 
+boost::optional<bool> getConfigDebugDump(const NamespaceString& nss);
+
 }  // namespace catalog
 }  // namespace mongo

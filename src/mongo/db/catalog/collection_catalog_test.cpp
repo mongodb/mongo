@@ -3670,5 +3670,57 @@ TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
         });
     }
 }
+
+TEST(GetConfigDebugDumpTest, NonConfigDatabase) {
+    // Run against a non-config database. It should always return boost::none.
+
+    const auto resultNonConfig = catalog::getConfigDebugDump(
+        NamespaceString::createNamespaceString_forTest("nonConfig", "dummy"));
+    ASSERT_FALSE(resultNonConfig);
+
+    const auto resultNonConfigDatabases = catalog::getConfigDebugDump(
+        NamespaceString::createNamespaceString_forTest("nonConfig", "databases"));
+    ASSERT_FALSE(resultNonConfigDatabases);
+};
+
+TEST(GetConfigDebugDumpTest, ConfigDatabase) {
+    // Run against the config database. It should always return a result, and it should be true or
+    // false depending on the collection.
+
+    const auto resultNotListed = catalog::getConfigDebugDump(
+        NamespaceString::createNamespaceString_forTest("config", "dummy"));
+    ASSERT_TRUE(resultNotListed);
+    ASSERT_FALSE(*resultNotListed);
+
+    const auto resultListed = catalog::getConfigDebugDump(
+        NamespaceString::createNamespaceString_forTest("config", "databases"));
+    ASSERT_TRUE(resultListed);
+    ASSERT_TRUE(*resultListed);
+};
+
+// TODO (SERVER-95599): remove once 9.0 becomes last LTS.
+TEST(GetConfigDebugDumpTest, FeatureFlagDisabled) {
+    // With the feature flag disabled, it should always return boost::none.
+
+    RAIIServerParameterControllerForTest featureFlagScope("featureFlagConfigDebugDumpSupported",
+                                                          false);
+
+    const auto resultNonConfig = catalog::getConfigDebugDump(
+        NamespaceString::createNamespaceString_forTest("nonConfig", "dummy"));
+    ASSERT_FALSE(resultNonConfig);
+
+    const auto resultNonConfigDatabases = catalog::getConfigDebugDump(
+        NamespaceString::createNamespaceString_forTest("nonConfig", "databases"));
+    ASSERT_FALSE(resultNonConfigDatabases);
+
+    const auto resultNotListed = catalog::getConfigDebugDump(
+        NamespaceString::createNamespaceString_forTest("config", "dummy"));
+    ASSERT_FALSE(resultNotListed);
+
+    const auto resultListed = catalog::getConfigDebugDump(
+        NamespaceString::createNamespaceString_forTest("config", "databases"));
+    ASSERT_FALSE(resultListed);
+};
+
 }  // namespace
 }  // namespace mongo
