@@ -321,17 +321,10 @@ if env.TargetOSIs("windows"):
     env.Alias("generated-sources", generatedDbManifest)
     env.Depends("mongod.res", generatedDbManifest)
 
-env.Program(
+env.BazelProgram(
     target="mongod",
-    source=[
-        "mongod.cpp",
-    ]
-    + env.WindowsResourceFile("mongod.rc"),
+    source=[],
     LIBDEPS=[
-        # NOTE: Do not add new libdeps (public or private) here unless required by the linker to
-        # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
-        # library to inject a static or mongo initializer to mongod, please add that library as a
-        # private libdep of mongod_initializers.
         "mongod_main",
         "server_base",
     ],

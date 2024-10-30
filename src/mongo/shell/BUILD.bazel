@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@poetry//:dependencies.bzl", "dependency")
 load("@bazel_skylib//lib:selects.bzl", "selects")
@@ -469,5 +469,40 @@ mongo_cc_library(
         "mongo_initializers",
         "program_runner",
         "shell_utils",
+    ],
+)
+
+mongo_cc_binary(
+    name = "mongo",
+    srcs = [
+        "mongo.cpp",
+    ],
+    exec_properties = select({
+        "@platforms//cpu:x86_64": {
+            "Pool": "large_mem_x86_64",
+        },
+        "@platforms//cpu:aarch64": {
+            "Pool": "large_memory_arm64",
+        },
+        "//conditions:default": {},
+    }),
+    linkopts = select({
+        "@platforms//os:linux": [
+            "-ldl",
+            "-lrt",
+        ],
+        "@platforms//os:windows": [
+            "winmm.lib",
+        ],
+        "//conditions:default": [],
+    }),
+    #+ env.WindowsResourceFile("mongo.rc"),
+    deps = [
+        # NOTE: Do not add new deps here unless required by the linker to
+        # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongos, please add that library as a
+        # dep of mongos_initializers.
+        "mongo_main",
+        "//src/mongo/db:server_base",
     ],
 )

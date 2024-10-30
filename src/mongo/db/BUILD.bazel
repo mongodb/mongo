@@ -3487,35 +3487,35 @@ mongo_cc_library(
     ],
 )
 
-# mongo_cc_binary(
-#     name = "mongod",
-#     srcs = [
-#         "mongod.cpp",
-#     ],
-#     exec_properties = select({
-#         "@platforms//cpu:x86_64": {
-#             "Pool": "large_mem_x86_64",
-#         },
-#         "@platforms//cpu:aarch64": {
-#             "Pool": "large_memory_arm64",
-#         },
-#         "//conditions:default": {},
-#     }),
-#     linkopts = ["-latomic"] + select({
-#         "@platforms//os:linux": [
-#             "-ldl",
-#             "-lrt",
-#         ],
-#         "//conditions:default": [],
-#     }),
-#     # tags = ["compile_requires_large_memory_gcc"],
-#     #+ env.WindowsResourceFile("mongod.rc"),
-#     deps = [
-#         # NOTE: Do not add new deps here unless required by the linker to
-#         # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
-#         # library to inject a static or mongo initializer to mongod, please add that library as a
-#         # dep of mongod_initializers.
-#         "mongod_main",
-#         "server_base",
-#     ],
-# )
+mongo_cc_binary(
+    name = "mongod",
+    srcs = [
+        "mongod.cpp",
+    ],
+    exec_properties = select({
+        "@platforms//cpu:x86_64": {
+            "Pool": "large_mem_x86_64",
+        },
+        "@platforms//cpu:aarch64": {
+            "Pool": "large_memory_arm64",
+        },
+        "//conditions:default": {},
+    }),
+    linkopts = ["-latomic"] + select({
+        "@platforms//os:linux": [
+            "-ldl",
+            "-lrt",
+        ],
+        "//conditions:default": [],
+    }),
+    # tags = ["compile_requires_large_memory_gcc"],
+    #+ env.WindowsResourceFile("mongod.rc"),
+    deps = [
+        # NOTE: Do not add new deps here unless required by the linker to
+        # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongod, please add that library as a
+        # dep of mongod_initializers.
+        "mongod_main",
+        "server_base",
+    ],
+)

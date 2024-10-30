@@ -41,22 +41,10 @@ if not has_option("noshell") and jsEngine:
         shellEnv.Alias("generated-sources", generatedMongoManifest)
         shellEnv.Depends("mongo.res", generatedMongoManifest)
 
-    mongo_shell = shellEnv.Program(
+    mongo_shell = shellEnv.BazelProgram(
         target="mongo",
-        source=[
-            "mongo.cpp",
-        ]
-        + env.WindowsResourceFile("mongo.rc"),
-        LIBDEPS=[
-            # NOTE: Do not add new libdeps (public or private) here unless
-            # required by the linker to satisfy symbol dependencies from
-            # the files listed above in `sources`. If you need to add a
-            # library to inject a static or mongo initializer to mongo,
-            # please add that library as a private libdep of
-            # mongo_initializers.
-            "$BUILD_DIR/mongo/db/server_base",
-            "mongo_main",
-        ],
+        source=[],
+        LIBDEPS=["$BUILD_DIR/mongo/db/server_base", "mongo_main"],
         AIB_COMPONENT="jstestshell",
         AIB_COMPONENTS_EXTRA=[
             "devcore",
@@ -65,16 +53,6 @@ if not has_option("noshell") and jsEngine:
             "mongo",
             "serverless-test",
         ],
-        # TODO(SERVER-95322) Remove sys deps after converted to Bazel
-        SYSLIBDEPS=(
-            [
-                "winhttp" if env.TargetOSIs("windows") else "curl",
-            ]
-            if http_client == "on"
-            else []
-        )
-        + (["sasl2"] if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) else [])
-        + (["synchronization"] if env.ToolchainIs("msvc") else []),
     )
 
 env.CppUnitTest(

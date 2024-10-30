@@ -300,6 +300,29 @@ SASL_WINDOWS_COPTS = select({
     "//conditions:default": [],
 })
 
+SASL_WINDOWS_LINKFLAGS = select({
+    "@platforms//os:windows": ["/LIBPATH:external/windows_sasl/lib"],
+    "//conditions:default": [],
+})
+
+GLOBAL_WINDOWS_LIBRAY_LINKFLAGS = select({
+    "@platforms//os:windows": [
+        "bcrypt.lib",
+        "Dnsapi.lib",
+        "Crypt32.lib",
+        "Version.lib",
+        "Winmm.lib",
+        "Iphlpapi.lib",
+        "Pdh.lib",
+        "kernel32.lib",
+        "shell32.lib",
+        "ws2_32.lib",
+        "DbgHelp.lib",
+        "Psapi.lib",
+    ],
+    "//conditions:default": [],
+})
+
 WINDOWS_LINKFLAGS = (
     WINDOWS_DEFAULT_LINKFLAGS +
     WINDOWS_PDB_PAGE_SIZE_LINKOPT +
@@ -1279,7 +1302,9 @@ MONGO_GLOBAL_LINKFLAGS = (
     DISABLE_SOURCE_WARNING_AS_ERRORS_LINKFLAGS +
     THIN_LTO_FLAGS +
     SYMBOL_ORDER_LINKFLAGS +
-    COVERAGE_FLAGS
+    COVERAGE_FLAGS +
+    GLOBAL_WINDOWS_LIBRAY_LINKFLAGS +
+    SASL_WINDOWS_LINKFLAGS
 )
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES

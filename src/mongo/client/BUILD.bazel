@@ -505,7 +505,10 @@ mongo_cc_library(
     linkopts = [
         "-lsasl2",
     ] + select({
-        "@platforms//os:windows": ["secur32.lib"],
+        "@platforms//os:windows": [
+            "secur32.lib",
+            "sasl2.lib",
+        ],
         "//conditions:default": [],
     }),
     target_compatible_with = select({
