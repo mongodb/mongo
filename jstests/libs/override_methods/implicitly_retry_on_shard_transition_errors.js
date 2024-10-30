@@ -76,9 +76,25 @@ function shouldRetry(cmdObj, res) {
         return true;
     }
 
+    const isRetryableWrite = cmdObj.hasOwnProperty("lsid") && cmdObj.hasOwnProperty("txnNumber");
+
     if (res.hasOwnProperty("writeErrors")) {
+        if (!isRetryableWrite)
+            return false;
+
         for (const writeError of res.writeErrors) {
             if (isRetryableError(writeError)) {
+                return true;
+            }
+        }
+    }
+
+    if (res.hasOwnProperty("cursor") && res.cursor.hasOwnProperty("firstBatch")) {
+        if (!isRetryableWrite)
+            return false;
+
+        for (let opRes of res.cursor.firstBatch) {
+            if (isRetryableError(opRes)) {
                 return true;
             }
         }

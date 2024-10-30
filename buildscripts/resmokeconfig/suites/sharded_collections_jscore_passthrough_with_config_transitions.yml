@@ -178,6 +178,10 @@ selector:
     - jstests/core/administrative/cleanup_orphaned.js
     - jstests/core/views/views_all_commands.js
     - jstests/core/commands_namespace_parsing.js
+    # Runs commands using legacy queries, which are not supported on sessions.
+    - jstests/core/**/query/exhaust.js
+    # TODO SERVER-96199 Re-enable this test once FLE updates to a document's shard key work
+    - src/mongo/db/modules/enterprise/jstests/fle2/find_and_modify_replace.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
@@ -204,6 +208,8 @@ selector:
     # This suite performs balancing of unsharded collection in background using moveCollection that
     # changes collections UUID
     - assumes_stable_collection_uuid
+    - does_not_support_retryable_writes
+    - requires_non_retryable_writes
 
 executor:
   archive:
@@ -214,11 +220,15 @@ executor:
   config:
     shell_options:
       eval: >-
+        await import("jstests/libs/override_methods/enable_sessions.js");
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
         await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
       global_vars:
         TestData:
+          alwaysInjectTransactionNumber: true
           shardsAddedRemoved: true
+          sessionOptions:
+            retryWrites: true
   hooks:
     - class: ContinuousAddRemoveShard
       random_balancer_on: false

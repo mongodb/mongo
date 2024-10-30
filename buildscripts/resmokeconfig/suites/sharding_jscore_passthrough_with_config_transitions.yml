@@ -61,6 +61,10 @@ selector:
     - jstests/core/administrative/cleanup_orphaned.js
     - jstests/core/views/views_all_commands.js
     - jstests/core/commands_namespace_parsing.js
+    # TODO SERVER-96199 Re-enable this test once FLE updates to a document's shard key work
+    - src/mongo/db/modules/enterprise/jstests/fle2/find_and_modify_replace.js
+    # TODO SERVER-86443 Enable test once featureFlagTrackUnshardedCollectionsUponCreation is enabled
+    - jstests/core/timeseries/timeseries_update_arbitrary_updates_not_enabled.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
@@ -77,6 +81,8 @@ selector:
     # This suite executes random moveCollections in the background that cause open cursors on the
     # collection to be killed.
     - requires_getmore
+    - does_not_support_retryable_writes
+    - requires_non_retryable_writes
 
 executor:
   archive:
@@ -87,12 +93,16 @@ executor:
   config:
     shell_options:
       eval: >-
+        await import("jstests/libs/override_methods/enable_sessions.js");
         await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
         await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
       global_vars:
         TestData:
+          alwaysInjectTransactionNumber: true
           runningWithBalancer: true
           shardsAddedRemoved: true
+          sessionOptions:
+            retryWrites: true
   hooks:
     - class: ContinuousAddRemoveShard
       random_balancer_on: false
