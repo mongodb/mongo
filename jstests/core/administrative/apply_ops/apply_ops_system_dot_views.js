@@ -10,8 +10,6 @@
  *   requires_non_retryable_commands,
  *   # applyOps uses the oplog that require replication support
  *   requires_replication,
- *   # Tenant migrations don't support applyOps.
- *   tenant_migration_incompatible,
  * ]
  */
 

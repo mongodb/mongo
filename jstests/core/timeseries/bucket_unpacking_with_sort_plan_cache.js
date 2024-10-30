@@ -18,8 +18,6 @@
  *     requires_profiling,
  *     # We need a timeseries collection.
  *     requires_timeseries,
- *     # Plan cache state is node-local and will not get migrated alongside user data.
- *     tenant_migration_incompatible,
  *     assumes_balancer_off,
  * ]
  */

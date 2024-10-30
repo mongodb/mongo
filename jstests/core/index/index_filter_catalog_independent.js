@@ -10,7 +10,6 @@
  *   # mongod, and do not replicate, this test must issue all of its commands against the same node.
  *   assumes_read_preference_unchanged,
  *   does_not_support_stepdowns,
- *   tenant_migration_incompatible,
  *   assumes_balancer_off,
  * ]
  */

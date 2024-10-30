@@ -13,8 +13,6 @@
  *   requires_non_retryable_writes,
  *   # applyOps uses the oplog that require replication support
  *   requires_replication,
- *   # The drop of offending views may not happen on the donor after a committed migration.
- *   tenant_migration_incompatible,
  *   uses_compact,
  *   references_foreign_collection,
  *   # The test leaves the database in a broken state such that listCollections will fail and

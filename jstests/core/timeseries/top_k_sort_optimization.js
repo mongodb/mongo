@@ -30,7 +30,6 @@
  *   does_not_support_stepdowns,
  *   # "Explain of a resolved view must be executed by mongos"
  *   directly_against_shardsvrs_incompatible,
- *   tenant_migration_incompatible,
  *   # Verifying the optimization is applied through explain works in FCV 8.0 and forward.
  *   requires_fcv_80,
  *   # setParameter is not allowed with signed security.

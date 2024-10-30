@@ -5,8 +5,6 @@
 //   # coordinateCommitTransaction, endSession, killCursors, mapReduce, prepareTransaction.
 //   not_allowed_with_signed_security_token,
 //   uses_map_reduce_with_temp_collections,
-//   # Tenant migrations don't support applyOps.
-//   tenant_migration_incompatible,
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

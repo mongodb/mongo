@@ -10,8 +10,6 @@
  *   assumes_superuser_permissions,
  *   # applyOps is not retryable.
  *   requires_non_retryable_commands,
- *   # Tenant migrations don't support applyOps.
- *   tenant_migration_incompatible,
  * ]
  */
 const viewsDBName = jsTestName();

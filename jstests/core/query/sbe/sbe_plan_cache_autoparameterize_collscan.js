@@ -10,8 +10,6 @@
  *   # Auto-parameterization behavior observed by this test changed in 7.0 as a result of enabling
  *   # additional scenarios in SBE.
  *   requires_fcv_70,
- *   # Plan cache state is node-local and will not get migrated alongside user data.
- *   tenant_migration_incompatible,
  *   assumes_balancer_off,
  *   # Uses $where operation.
  *   requires_scripting,

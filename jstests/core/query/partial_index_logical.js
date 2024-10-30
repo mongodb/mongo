@@ -12,8 +12,6 @@
  *  assumes_balancer_off,
  *  assumes_unsharded_collection,
  *  requires_fcv_63,
- *  # Plan cache state is node-local and will not get migrated alongside tenant data.
- *  tenant_migration_incompatible,
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";

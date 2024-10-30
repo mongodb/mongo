@@ -15,8 +15,6 @@
 //   # The SBE plan cache was first enabled in 6.3.
 //   requires_fcv_63,
 //   requires_profiling,
-//   # Plan cache state is node-local and will not get migrated alongside user data.
-//   tenant_migration_incompatible,
 //   assumes_balancer_off,
 //   featureFlagSbeFull,
 // ]

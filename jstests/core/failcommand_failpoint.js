@@ -7,9 +7,6 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   no_selinux,
- *   # This test expects that the connection (i.e. 'threadName') does not change throughout each
- *   # test case. That is not always true when there is a background tenant migration.
- *   tenant_migration_incompatible,
  *   does_not_support_repeated_reads,
  * ]
  */

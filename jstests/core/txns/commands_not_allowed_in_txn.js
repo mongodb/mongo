@@ -6,8 +6,6 @@
 //   not_allowed_with_signed_security_token,
 //   uses_snapshot_read_concern,
 //   uses_transactions,
-//   # Tenant migrations don't support applyOps.
-//   tenant_migration_incompatible,
 // ]
 
 // TODO (SERVER-39704): Remove the following load after SERVER-39704 is completed

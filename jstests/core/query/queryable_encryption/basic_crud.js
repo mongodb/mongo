@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   no_selinux,
- *   tenant_migration_incompatible,
  *   does_not_support_transactions,
  *   does_not_support_stepdowns,
  *   # Test requires an internal connection for the keyvault that can't be overriden by the

@@ -9,8 +9,6 @@
  *   does_not_support_stepdowns,
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
- *   # Plan cache state is node-local and will not get migrated alongside tenant data.
- *   tenant_migration_incompatible,
  *   # The "isCached" field which was introduced in 8.0.
  *   requires_fcv_80,
  *   # Does not support multiplanning, because it caches more plans

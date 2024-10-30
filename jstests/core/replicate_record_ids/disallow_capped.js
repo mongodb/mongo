@@ -12,8 +12,6 @@
  *   # capped collections connot be sharded
  *   assumes_unsharded_collection,
  *   featureFlagRecordIdsReplicated,
- *   # cloneCollectionAsCapped (and capped collections) are not supported on serverless
- *   tenant_migration_incompatible,
  * ]
  */
 

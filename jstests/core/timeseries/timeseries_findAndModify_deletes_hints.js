@@ -2,7 +2,6 @@
  * Tests passing a hint to the findAndModify command on a time-series collection for deletes.
  * @tags: [
  *   does_not_support_stepdowns,
- *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   featureFlagTimeseriesUpdatesSupport,

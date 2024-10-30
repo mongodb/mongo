@@ -2,8 +2,6 @@
  * Test consistency of query solution hashes by extracting from the plan cache.
  *
  * @tags: [
- *   # Plan cache state is node-local and will not get migrated alongside user data.
- *   tenant_migration_incompatible,
  *   assumes_balancer_off,
  *   # $planCacheStats requires readConcern local and reading from the same node.
  *   assumes_read_concern_local,

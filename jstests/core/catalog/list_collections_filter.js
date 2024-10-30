@@ -6,8 +6,6 @@
  *   not_allowed_with_signed_security_token,
  *   # applyOps is not supported on mongos
  *   assumes_against_mongod_not_mongos,
- *   # Tenant migrations don't support applyOps.
- *   tenant_migration_incompatible,
  *   # Requires no extra options present
  *   incompatible_with_preimages_by_default,
  *   # TODO (SERVER-89668): Remove tag. Currently incompatible due to collection

@@ -31,7 +31,6 @@
  *   does_not_support_stepdowns,
  *   # "Explain of a resolved view must be executed by mongos"
  *   directly_against_shardsvrs_incompatible,
- *   tenant_migration_incompatible,
  *   # Buckets being closed during resharding can cause the bucket ranges in this test to vary.
  *   assumes_balancer_off,
  *   # Some optimization is done in 7.2, some tests may fail prior to 7.2.

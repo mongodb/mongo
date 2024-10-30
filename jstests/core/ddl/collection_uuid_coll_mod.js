@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_fcv_60,
- *   tenant_migration_incompatible,
  *   assumes_stable_collection_uuid,
  * ]
  */

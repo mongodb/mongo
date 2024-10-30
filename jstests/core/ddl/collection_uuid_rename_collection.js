@@ -5,7 +5,6 @@
  *   does_not_support_zones,
  *   requires_fcv_60,
  *   requires_non_retryable_commands,
- *   tenant_migration_incompatible,
  *   assumes_stable_collection_uuid,
  * ]
  */

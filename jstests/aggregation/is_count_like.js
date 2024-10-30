@@ -8,8 +8,6 @@
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   assumes_unsharded_collection,
- *   # Plan cache state is node-local and will not get migrated alongside tenant data.
- *   tenant_migration_incompatible,
  *   not_allowed_with_signed_security_token,
  * ]
  */

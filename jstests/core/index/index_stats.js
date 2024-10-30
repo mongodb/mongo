@@ -10,9 +10,6 @@
 //   does_not_support_stepdowns,
 //   does_not_support_repeated_reads,
 //   requires_non_retryable_writes,
-//   # Tenant migrations passthrough suites automatically retry operations on TenantMigrationAborted
-//   # errors.
-//   tenant_migration_incompatible,
 //   # Uses mapReduce command.
 //   requires_scripting,
 //   references_foreign_collection,

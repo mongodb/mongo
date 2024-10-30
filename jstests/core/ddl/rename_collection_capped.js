@@ -8,8 +8,6 @@
  *   requires_capped,
  *   requires_collstats,
  *   no_selinux,
- *   # Causes CappedPositionLost on recipient, which is not recoverable
- *   tenant_migration_incompatible
  * ]
  */
 

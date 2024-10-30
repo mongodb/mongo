@@ -11,10 +11,6 @@
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
 //   requires_capped,
-//   # Server parameters are stored in-memory only so are not transferred onto the recipient. This
-//   # test sets the server parameter "notablescan" to force the node to not execute queries that
-//   # require a collection scan and return an error.
-//   tenant_migration_incompatible,
 // ]
 
 let t = db.test_notablescan_capped;

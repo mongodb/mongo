@@ -12,8 +12,6 @@
  *   requires_getmore,
  *   requires_replication,
  *   uses_api_parameters,
- *   # Tenant migrations don't support applyOps.
- *   tenant_migration_incompatible,
  * ]
  *
  * Note that storage engines used to be allowed to advertise internal collections to the user (in

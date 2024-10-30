@@ -9,7 +9,6 @@
  *   no_selinux,
  *   requires_fcv_80,
  *   simulate_atlas_proxy_incompatible,
- *   tenant_migration_incompatible,
  * ]
  */
 import {EncryptedClient, kSafeContentField} from "jstests/fle2/libs/encrypted_client_util.js";

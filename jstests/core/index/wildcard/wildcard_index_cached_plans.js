@@ -13,8 +13,6 @@
  *   assumes_balancer_off,
  *   inspects_whether_plan_cache_entry_is_active,
  *   requires_fcv_62,
- *   # Plan cache state is node-local and will not get migrated alongside tenant data.
- *   tenant_migration_incompatible,
  *   # Makes checks based on which engine is used. This can change if an index is implicitly
  *   # created.
  *   assumes_no_implicit_index_creation,

@@ -8,7 +8,6 @@
  *   # This test is using fail point which is not supported in serverless.
  *   command_not_supported_in_serverless,
  *   directly_against_shardsvrs_incompatible,
- *   tenant_migration_incompatible,
  *   uses_parallel_shell,
  *   requires_fcv_80,
  * ]

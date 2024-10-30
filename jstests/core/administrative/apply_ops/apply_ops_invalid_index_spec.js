@@ -12,8 +12,6 @@
  *     assumes_against_mongod_not_mongos,
  *     # applyOps uses the oplog which requires replication support.
  *     requires_replication,
- *     # Tenant migrations don't support applyOps.
- *     tenant_migration_incompatible,
  * ]
  */
 

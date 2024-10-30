@@ -9,8 +9,6 @@
  *   assumes_against_mongod_not_mongos,
  *   # applyOps uses the oplog that require replication support
  *   requires_replication,
- *   # Tenant migrations don't support applyOps.
- *   tenant_migration_incompatible,
  *   # As of 6.2, the 'preCondition' option is no longer supported by the applyOps command. The fact
  *   # that 'preCondition' is rejected is validated by this test, so it cannot run against nodes
  *   # older than 6.2.

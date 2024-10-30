@@ -11,7 +11,6 @@
  *   assumes_against_mongod_not_mongos,
  *   multiversion_incompatible,
  *   requires_non_retryable_writes,
- *   tenant_migration_incompatible,
  *   cannot_run_during_upgrade_downgrade,
  *   # Does not support multiplanning, because it stashes documents beyond batch size.
  *   does_not_support_multiplanning_single_solutions,

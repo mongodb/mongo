@@ -10,8 +10,6 @@
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
 //   uses_map_reduce_with_temp_collections,
-//   # Tenant migrations don't support applyOps.
-//   tenant_migration_incompatible,
 //   # Explain of a resolved view must be executed by mongos.
 //   directly_against_shardsvrs_incompatible,
 //   # This test has statements that do not support non-local read concern.

@@ -4,7 +4,6 @@
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns/tenant migration
  *   # may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
- *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   # We assume that all nodes in a mixed-mode replica set are using compressed inserts to a

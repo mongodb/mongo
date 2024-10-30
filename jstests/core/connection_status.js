@@ -9,9 +9,6 @@
 //   creates_and_authenticates_user,
 //   requires_auth,
 //   requires_non_retryable_commands,
-//   # This test uses db._authOrThrow which does not use runCommand (required by the
-//   # simulate_atlas_proxy.js override).
-//   tenant_migration_incompatible,
 // ]
 
 const kAdminDbName = 'admin';

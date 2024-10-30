@@ -6,9 +6,6 @@
 //   does_not_support_stepdowns,
 //   requires_fastcount,
 //   requires_profiling,
-//   # Tenant migrations passthrough suites automatically retry operations on TenantMigrationAborted
-//   # errors.
-//   tenant_migration_incompatible,
 // ]
 
 // Use a special db to support running other tests in parallel.

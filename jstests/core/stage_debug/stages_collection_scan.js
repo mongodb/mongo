@@ -5,7 +5,6 @@
 //   not_allowed_with_signed_security_token,
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
-//   tenant_migration_incompatible,
 //   no_selinux,
 // ]
 

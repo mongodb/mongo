@@ -10,9 +10,6 @@
  *   does_not_support_config_fuzzer,
  *   # The test relies on the precise number of executions of commands.
  *   requires_non_retryable_writes,
- *   # This test contains assertions on the number of executed operations, and tenant migrations
- *   # passthrough suites automatically retry operations on TenantMigrationAborted errors.
- *   tenant_migration_incompatible,
  *   # Multi clients may modify the serverStatus metrices read in this test.
  *   multi_clients_incompatible,
  * ]

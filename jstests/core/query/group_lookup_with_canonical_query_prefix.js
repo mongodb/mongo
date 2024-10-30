@@ -8,7 +8,6 @@
  *    does_not_support_causal_consistency,
  *    # We modify the value of a query knob. setParameter is not persistent.
  *    does_not_support_stepdowns,
- *    tenant_migration_incompatible,
  *    # Explain for the aggregate command cannot run within a multi-document transaction.
  *    does_not_support_transactions,
  *    # Explain command does not support read concerns other than local.

@@ -10,9 +10,6 @@
  *    not_allowed_with_signed_security_token,
  *    assumes_read_preference_unchanged,
  *    requires_fastcount,
- *    # This test contains assertions on the number of executed operations, and tenant migrations
- *    # passthrough suites automatically retry operations on TenantMigrationAborted errors.
- *    tenant_migration_incompatible,
  *    does_not_support_repeated_reads,
  *    requires_fcv_62,
  * ]

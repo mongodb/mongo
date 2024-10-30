@@ -2,8 +2,6 @@
  * Tests for the listDatabases command.
  *
  * @tags: [
- *    # This test depends on hardcoded database name equality.
- *    tenant_migration_incompatible,
  *    # Uses $where operator.
  *    requires_scripting,
  * ]

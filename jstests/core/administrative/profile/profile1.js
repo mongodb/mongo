@@ -9,8 +9,6 @@
 //   requires_collstats,
 //   requires_non_retryable_commands,
 //   requires_profiling,
-//   # This test depends on hardcoded database name equality.
-//   tenant_migration_incompatible,
 //   # This test depends on the strict argument since 6.1.
 //   requires_fcv_61,
 // ]

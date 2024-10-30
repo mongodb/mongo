@@ -11,7 +11,6 @@
  *   does_not_support_stepdowns,
  *   # "Explain of a resolved view must be executed by mongos"
  *   directly_against_shardsvrs_incompatible,
- *   tenant_migration_incompatible,
  *   # The top/bottom common sort key optimization is available since FCV 8.0.
  *   requires_fcv_80,
  *   # Buckets being closed during moveCollection can cause the bucket ranges to differ.

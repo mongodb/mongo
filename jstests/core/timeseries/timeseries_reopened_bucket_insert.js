@@ -5,11 +5,6 @@
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant
  *   # migrations may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
- *   tenant_migration_incompatible,
- *   # This test inserts uncompressed buckets directly into the buckets collection. This may cause
- *   # intermittent failures on tenant migration passthroughs when validation checks that all
- *   # buckets are compressed.
- *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   # This test depends on stats read from the primary node in replica sets.

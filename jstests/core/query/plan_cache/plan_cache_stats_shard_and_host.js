@@ -8,8 +8,6 @@
 //   does_not_support_stepdowns,
 //   # Plan cache key is not guaranteed to be stable across versions.
 //   multiversion_incompatible,
-//   # Plan cache state is node-local and will not get migrated alongside tenant data.
-//   tenant_migration_incompatible,
 // ]
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";

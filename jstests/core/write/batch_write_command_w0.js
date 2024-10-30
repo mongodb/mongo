@@ -7,9 +7,6 @@
  *   assumes_unsharded_collection,
  *   assumes_write_concern_unchanged,
  *   requires_non_retryable_writes,
- *   # This test writes with {w: 0} which doesn't wait for the storage transaction writing the
- *   # document and the oplog entry to commit so the TenantMigrationConflict will not be caught.
- *   tenant_migration_incompatible,
  * ]
  */
 

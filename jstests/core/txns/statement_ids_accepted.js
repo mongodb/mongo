@@ -7,8 +7,6 @@
 //    not_allowed_with_signed_security_token,
 //    uses_transactions,
 //    uses_prepare_transaction,
-//    # Tenant migrations don't support applyOps.
-//    tenant_migration_incompatible
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

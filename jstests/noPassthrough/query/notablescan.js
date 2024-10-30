@@ -10,10 +10,6 @@
 //   assumes_read_preference_unchanged,
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
-//   # Server parameters are stored in-memory only so are not transferred onto the recipient. This
-//   # test sets the server parameter "notablescan" to force the node to not execute queries that
-//   # require a collection scan and return an error.
-//   tenant_migration_incompatible,
 // ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

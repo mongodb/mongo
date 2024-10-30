@@ -6,7 +6,6 @@
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant
  *   # migrations may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
- *   tenant_migration_incompatible,
  *   # Test explicitly relies on multi-updates.
  *   requires_multi_updates,
  *   # We need a timeseries collection.

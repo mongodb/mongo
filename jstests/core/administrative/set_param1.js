@@ -4,10 +4,6 @@
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
 //   requires_fcv_62,
-//   # This test attempts to compare the response from running the {getParameter: "*"}
-//   # command multiple times, which may observe the change to the failpoint enabled by the
-//   # migration hook.
-//   tenant_migration_incompatible,
 //   # This test is not compatible with run-time config parameter fuzzing.
 //   does_not_support_config_fuzzer,
 // ]

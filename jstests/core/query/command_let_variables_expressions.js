@@ -4,7 +4,6 @@
 // @tags: [
 //   requires_non_retryable_writes,
 //   does_not_support_transactions,
-//   tenant_migration_incompatible
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 

@@ -13,9 +13,6 @@
  *   requires_profiling,
  *   uses_parallel_shell,
  *   no_selinux,
- *   # This test uses legacy read mode which does not use runCommand (required by the
- *   # simulate_atlas_proxy.js override).
- *   tenant_migration_incompatible,
  * ]
  */
 

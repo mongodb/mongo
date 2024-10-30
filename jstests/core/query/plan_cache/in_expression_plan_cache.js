@@ -13,8 +13,6 @@
  *   assumes_balancer_off,
  *   assumes_unsharded_collection,
  *   requires_fcv_70,
- *   # Plan cache state is node-local and will not get migrated alongside tenant data.
- *   tenant_migration_incompatible,
  *   # Part of this test does different checks depending on the engine used.  If an implicit index
  *   # is created, the engine use depends on what index is implicitly created. E.g. if a column
  *   # index is implicitly created, the engine used may be different in that passthrough.

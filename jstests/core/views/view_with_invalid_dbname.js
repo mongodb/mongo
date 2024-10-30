@@ -11,8 +11,6 @@
  *   assumes_against_mongod_not_mongos,
  *   # applyOps is not retryable.
  *   requires_non_retryable_commands,
- *   # Tenant migrations don't support applyOps.
- *   tenant_migration_incompatible,
  * ]
  */
 const testDB = db.getSiblingDB("view_with_invalid_dbname");

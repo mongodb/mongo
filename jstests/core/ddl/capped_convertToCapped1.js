@@ -13,8 +13,6 @@
  *  # cloneCollectionAsCapped command is not supported on mongos
  *  # TODO: SERVER-85773 Remove assumes_against_mongod_not_mongos tag
  *  assumes_against_mongod_not_mongos,
- *  # cloneCollectionAsCapped (and capped collections) are not supported on serverless
- *  tenant_migration_incompatible,
  * ]
  */
 
