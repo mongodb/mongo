@@ -319,6 +319,7 @@ GLOBAL_WINDOWS_LIBRAY_LINKFLAGS = select({
         "ws2_32.lib",
         "DbgHelp.lib",
         "Psapi.lib",
+        "Secur32.lib",
     ],
     "//conditions:default": [],
 })
