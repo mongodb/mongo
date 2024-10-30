@@ -203,6 +203,7 @@ tasks:
         "default",
         "aggregation",
         "no_async",
+        "requires_large_host",
       ]
     depends_on:
       - name: aggregation
@@ -308,6 +309,7 @@ tasks:
         "incompatible_mac",
         "aggregation",
         "read_write_concern",
+        "requires_large_host",
       ]
     depends_on:
       - name: aggregation
@@ -341,6 +343,7 @@ tasks:
         "aggregation",
         "secondary_reads",
         "sharded",
+        "requires_large_host",
       ]
     depends_on:
       - name: aggregation
@@ -358,6 +361,7 @@ tasks:
         "aggregation",
         "common",
         "sharded",
+        "requires_large_host",
       ]
     depends_on:
       - name: aggregation
@@ -929,6 +933,7 @@ tasks:
       [
         "assigned_to_jira_team_server_query_execution",
         "development_critical",
+        "requires_large_host",
         "requires_large_host_commit_queue",
         "jscore",
         "common",
@@ -1056,6 +1061,7 @@ tasks:
         "incompatible_windows",
         "incompatible_ppc",
         "incompatible_s390x",
+        "requires_large_host",
       ]
     commands:
       - func: "do setup"
@@ -1074,6 +1080,7 @@ tasks:
         "incompatible_windows",
         "incompatible_ppc",
         "incompatible_s390x",
+        "requires_large_host",
       ]
     commands:
       - func: "do setup"

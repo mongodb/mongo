@@ -255,6 +255,103 @@ buildvariants:
       - name: compile_upload_benchmarks_TG
       - name: .benchmarks_sep
 
+  ### Query Patch-Specific Build Variants ###
+
+  - <<: *amazon_linux2_arm64_static_compile_variant_dependency
+    name: &amazon_linux2_arm64_static-classic-engine-query-patch-only amazon_linux2_arm64_static-classic-engine-query-patch-only
+    display_name: "~ Amazon Linux 2 arm64 Enterprise Query Patch Only (Classic Engine)"
+    tags: []
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    run_on:
+      - amazon2-arm64-atlas-latest-small
+    stepback: false
+    expansions:
+      <<: *amazon_linux2_arm64_dynamic_expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      jstestfuzz_num_generated_files: 20
+      jstestfuzz_concurrent_num_files: 5
+      target_resmoke_time: 30
+      max_sub_suites: 3
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: >-
+        --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+        --excludeWithAnyTags=resource_intensive
+    tasks: &query-alias-task-list
+      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks
+      - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks
+        distros:
+          - amazon2-arm64-atlas-latest-large
+      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks
+      - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks
+        distros:
+          - amazon2-arm64-atlas-latest-large
+      - name: .assigned_to_jira_team_server_query_integration !.requires_large_host !.benchmarks
+      - name: .assigned_to_jira_team_server_query_integration .requires_large_host !.benchmarks
+        distros:
+          - amazon2-arm64-atlas-latest-large
+      - name: burn_in_tests_gen
+        depends_on:
+          - name: version_burn_in_gen
+            variant: generate-tasks-for-version
+            omit_generated_tasks: true
+          - name: archive_dist_test
+            variant: *amazon_linux2_arm64_static_compile_variant_name
+      - name: check_feature_flag_tags
+      - name: check_for_todos
+      - name: test_api_version_compatibility
+      - name: replica_sets_jscore_passthrough_gen
+      - name: sharding_jscore_passthrough_gen
+      - name: sharded_collections_jscore_passthrough_gen
+
+  - <<: *amazon_linux2_arm64_static_compile_variant_dependency
+    name: &amazon_linux2_arm64_static-try-sbe-engine-query-patch-only amazon_linux2_arm64_static-try-sbe-engine-query-patch-only
+    display_name: "~ Amazon Linux 2 arm64 Enterprise Query Patch Only (Try SBE Engine)"
+    tags: []
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    run_on:
+      - amazon2-arm64-atlas-latest-small
+    expansions:
+      expansions:
+      <<: *amazon_linux2_arm64_dynamic_expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      jstestfuzz_num_generated_files: 20
+      jstestfuzz_concurrent_num_files: 5
+      target_resmoke_time: 30
+      max_sub_suites: 3
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: >-
+        --mongodSetParameters="{internalQueryFrameworkControl: trySbeEngine}"
+        --excludeWithAnyTags=resource_intensive
+    tasks: *query-alias-task-list
+
+  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
+    name: &enterprise-amazon-linux2-arm64-all-feature-flags-required-query-patch-only enterprise-amazon-linux2-arm64-all-feature-flags-required-query-patch-only
+    display_name: "~ Amazon Linux 2 arm64 Enterprise Query Patch Only (all feature flags)"
+    tags: []
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    expansions:
+      expansions:
+      <<: *amazon_linux2_arm64_dynamic_expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      jstestfuzz_num_generated_files: 20
+      jstestfuzz_concurrent_num_files: 5
+      target_resmoke_time: 30
+      max_sub_suites: 3
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --excludeWithAnyTags=resource_intensive
+    tasks: *query-alias-task-list
+
   # TODO SERVER-94401: Reenable testing this variant.
   # # Run all-feature-flags along with recordIdsReplicated:true on all collections.
   # - &enterprise-amazon-linux2-arm64-all-feature-flags-recordIdsReplicated
