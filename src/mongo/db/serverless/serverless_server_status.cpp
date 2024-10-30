@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -51,8 +50,6 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder result;
-        ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-            .appendInfoForServerStatus(&result);
         return result.obj();
     }
 };

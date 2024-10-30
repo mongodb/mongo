@@ -353,7 +353,6 @@ if wiredtiger:
             "$BUILD_DIR/mongo/db/query/command_request_response",
             "$BUILD_DIR/mongo/db/s/sharding_runtime_d",
             "$BUILD_DIR/mongo/db/server_base",
-            "$BUILD_DIR/mongo/db/serverless/serverless_lock",
             "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
             "$BUILD_DIR/mongo/db/service_context_test_fixture",
             "$BUILD_DIR/mongo/db/session/logical_session_id_helpers",

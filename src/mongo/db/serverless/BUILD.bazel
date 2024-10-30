@@ -26,21 +26,3 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
-
-mongo_cc_library(
-    name = "serverless_lock",
-    srcs = [
-        "serverless_operation_lock_registry.cpp",
-        "serverless_server_status.cpp",
-        "//src/mongo/db:persistent_task_store.h",
-    ],
-    hdrs = [
-        "serverless_operation_lock_registry.h",
-    ],
-    deps = [
-        "//src/mongo/db:dbdirectclient",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/repl:tenant_migration_state_machine_idl",
-        "//src/mongo/db/repl:tenant_migration_utils",
-    ],
-)

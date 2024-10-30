@@ -44,7 +44,6 @@
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_donor_op_observer.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
-#include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
@@ -75,15 +74,6 @@ MONGO_FAIL_POINT_DEFINE(donorOpObserverFailAfterOnUpdate);
 void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
                                        const TenantMigrationDonorDocument& donorStateDoc) {
     invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAbortingIndexBuilds);
-
-    ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-        .acquireLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
-                     donorStateDoc.getId());
-    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-        [migrationId = donorStateDoc.getId()](OperationContext* opCtx) {
-            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor, migrationId);
-        });
 
     auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
                                                                     donorStateDoc.getId());
@@ -188,9 +178,6 @@ public:
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
         if (_donorStateDoc.getExpireAt()) {
-            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
-                             _donorStateDoc.getId());
 
             auto mtabVector = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                                   .getDonorAccessBlockersForMigration(_donorStateDoc.getId());
@@ -368,9 +355,6 @@ repl::OpTime TenantMigrationDonorOpObserver::onDropCollection(OperationContext* 
             [](OperationContext* opCtx, boost::optional<Timestamp>) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
-
-                ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                    .onDropStateCollection(ServerlessOperationLockRegistry::LockType::kTenantDonor);
             });
     }
     return {};

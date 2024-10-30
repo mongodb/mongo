@@ -75,7 +75,6 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -598,7 +597,6 @@ void InitialSyncer::_tearDown(WithLock lk,
     if (ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
         tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
     }
-    ServerlessOperationLockRegistry::recoverLocks(opCtx);
     reconstructPreparedTransactions(opCtx, repl::OplogApplication::Mode::kInitialSync);
 
     _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);

@@ -108,7 +108,6 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_local.h"
@@ -733,7 +732,6 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     if (_settings.isServerless()) {
         tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
     }
-    ServerlessOperationLockRegistry::recoverLocks(opCtx);
     LOGV2(4280506, "Reconstructing prepared transactions");
     reconstructPreparedTransactions(opCtx,
                                     stableTimestamp ? OplogApplication::Mode::kStableRecovering

@@ -2088,7 +2088,6 @@ TEST_F(
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
 
     // Start the real work.
     ASSERT_OK(initialSyncer->startup(opCtx.get(), initialSyncMaxAttempts));
@@ -2131,7 +2130,6 @@ TEST_F(InitialSyncerTest,
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
@@ -2231,7 +2229,6 @@ TEST_F(InitialSyncerTest,
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
@@ -2283,7 +2280,6 @@ TEST_F(
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -2529,7 +2525,6 @@ TEST_F(InitialSyncerTest, InitialSyncerRetriesLastOplogEntryFetcherNetworkError)
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -3174,7 +3169,6 @@ TEST_F(InitialSyncerTest, InitialSyncerHandlesNetworkErrorsFromRollbackCheckerAf
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -3490,7 +3484,6 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -4172,7 +4165,6 @@ TEST_F(InitialSyncerTest,
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
 
     doSuccessfulInitialSyncWithOneBatch();
 }
@@ -4188,7 +4180,6 @@ TEST_F(InitialSyncerTest,
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -4505,7 +4496,6 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
 
     // Skip clearing initial sync progress so that we can check initialSyncStatus fields after
     // initial sync is complete.
@@ -4874,7 +4864,6 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgressForNetwork
         "skipRecoverTenantMigrationAccessBlockers");
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
 
     // Skip clearing initial sync progress so that we can check initialSyncStatus fields after
     // initial sync is complete.

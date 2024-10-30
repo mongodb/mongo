@@ -2,21 +2,3 @@
 
 Import("env")
 env = env.Clone()
-
-env.CppUnitTest(
-    target="db_serverless_test",
-    source=[
-        "serverless_operation_lock_registry_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
-        "$BUILD_DIR/mongo/db/commands/create_command",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_util",
-        "$BUILD_DIR/mongo/db/repl/primary_only_service_test_fixture",
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker",
-        "$BUILD_DIR/mongo/dbtests/mocklib",
-        "serverless_lock",
-    ],
-)
