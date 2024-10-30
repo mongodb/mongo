@@ -66,6 +66,9 @@ selector:
     # TODO SERVER-86443 Enable test once featureFlagTrackUnshardedCollectionsUponCreation is enabled
     - jstests/core/timeseries/timeseries_update_arbitrary_updates_not_enabled.js
 
+    # The resharding core tests expect the sharding topology to remain constant.
+    - jstests/core_sharding/resharding/**/*.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

@@ -113,6 +113,9 @@ selector:
     - jstests/core/timeseries/timeseries_lastpoint.js
     - jstests/core/timeseries/timeseries_reopened_bucket_insert.js
 
+    # Resharding is not permitted during fcv upgrade and downgrade.
+    - jstests/core_sharding/resharding/*.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

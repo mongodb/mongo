@@ -57,6 +57,7 @@ selector:
     - jstests/core/views/views_drop.js
     - jstests/core/**/query/disallow_system_views_user_writes.js
     - jstests/core/timeseries/bucket_granularity.js
+    - jstests/core_sharding/resharding/*.js
 
     # These tests expect listCollections to return system.bucket.* collections, which are filtered
     # out by mongos when authentication is enabled.

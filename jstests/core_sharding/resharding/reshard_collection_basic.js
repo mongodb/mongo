@@ -1,63 +1,55 @@
-//
-// Basic tests for reshardCollection.
-// @tags: [
-//   uses_atclustertime,
-// ]
-//
+/**
+ * Basic tests for reshardCollection.
+ * @tags: [
+ *  uses_atclustertime
+ * ]
+ */
 
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
+import {createChunks, getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
-const st = new ShardingTest({mongos: 1, shards: 2});
-const kDbName = 'db';
-const collName = 'foo';
-const ns = kDbName + '.' + collName;
-const mongos = st.s0;
-const kNumInitialDocs = 500;
-const reshardCmdTest =
-    new ReshardCollectionCmdTest({st, dbName: kDbName, collName, numInitialDocs: kNumInitialDocs});
-
-const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000; /* 1 day */
-const topology = DiscoverTopology.findConnectedNodes(mongos);
-const coordinator = new Mongo(topology.configsvr.nodes[0]);
-assert.commandWorked(coordinator.getDB("admin").adminCommand(
-    {setParameter: 1, reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}));
-
+const shardNames = getShardNames(db);
 let presetReshardedChunks =
-    [{recipientShardId: st.shard1.shardName, min: {newKey: MinKey}, max: {newKey: MaxKey}}];
+    [{recipientShardId: shardNames[0], min: {newKey: MinKey}, max: {newKey: MaxKey}}];
+const collName = jsTestName();
+const dbName = db.getName();
+const ns = dbName + '.' + collName;
+const mongos = db.getMongo();
+
+const numInitialDocs = 500;
+
+const reshardCmdTest = new ReshardCollectionCmdTest(
+    {mongos, dbName, collName, numInitialDocs, skipDirectShardChecks: true});
 
 /**
  * Fail cases
  */
-
 jsTest.log('Fail if sharding is disabled.');
 assert.commandFailedWithCode(
-    mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}),
+    db.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}),
     ErrorCodes.NamespaceNotFound);
 
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+assert.commandWorked(db.adminCommand({enableSharding: dbName}));
 
 jsTest.log("Fail if collection is unsharded.");
 assert.commandFailedWithCode(
-    mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}),
+    db.adminCommand({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1}),
     [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound]);
 
-assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
+assert.commandWorked(db.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
 jsTest.log("Fail if missing required key.");
-assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, numInitialChunks: 1}),
+assert.commandFailedWithCode(db.adminCommand({reshardCollection: ns, numInitialChunks: 1}),
                              ErrorCodes.IDLFailedToParse);
 
 jsTest.log("Fail if unique is specified and is true.");
 assert.commandFailedWithCode(
-    mongos.adminCommand(
-        {reshardCollection: ns, key: {newKey: 1}, unique: true, numInitialChunks: 1}),
+    db.adminCommand({reshardCollection: ns, key: {newKey: 1}, unique: true, numInitialChunks: 1}),
     ErrorCodes.BadValue);
 
 jsTest.log("Fail if collation is specified and is not {locale: 'simple'}.");
-assert.commandFailedWithCode(mongos.adminCommand({
+assert.commandFailedWithCode(db.adminCommand({
     reshardCollection: ns,
     key: {newKey: 1},
     collation: {locale: 'en_US'},
@@ -66,7 +58,7 @@ assert.commandFailedWithCode(mongos.adminCommand({
                              ErrorCodes.BadValue);
 
 jsTest.log("Fail if both numInitialChunks and _presetReshardedChunks are provided.");
-assert.commandFailedWithCode(mongos.adminCommand({
+assert.commandFailedWithCode(db.adminCommand({
     reshardCollection: ns,
     key: {newKey: 1},
     unique: false,
@@ -78,7 +70,7 @@ assert.commandFailedWithCode(mongos.adminCommand({
 
 jsTest.log("Fail if the zone provided is not assigned to a shard.");
 const nonExistingZoneName = 'x0';
-assert.commandFailedWithCode(mongos.adminCommand({
+assert.commandFailedWithCode(db.adminCommand({
     reshardCollection: ns,
     key: {newKey: 1},
     unique: false,
@@ -89,7 +81,7 @@ assert.commandFailedWithCode(mongos.adminCommand({
                              ErrorCodes.CannotCreateChunkDistribution);
 
 jsTest.log("Fail if zone provided is invalid for storage.");
-assert.commandFailedWithCode(mongos.adminCommand({
+assert.commandFailedWithCode(db.adminCommand({
     reshardCollection: ns,
     key: {"_id": "hashed"},
     numInitialChunks: 1,
@@ -99,19 +91,18 @@ assert.commandFailedWithCode(mongos.adminCommand({
 
 jsTestLog("Fail if splitting collection into multiple chunks while it is still empty.");
 assert.commandFailedWithCode(
-    mongos.adminCommand({reshardCollection: ns, key: {b: 1}, numInitialChunks: 2}), 4952606);
+    db.adminCommand({reshardCollection: ns, key: {b: 1}, numInitialChunks: 2}), 4952606);
 assert.commandFailedWithCode(
-    st.s.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 2}), 4952606);
+    db.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 2}), 4952606);
 
 jsTest.log(
     "Fail if authoritative tags exist in config.tags collection and zones are not provided.");
 const existingZoneName = 'x1';
-assert.commandWorked(
-    st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: existingZoneName}));
-assert.commandWorked(st.s.adminCommand(
+assert.commandWorked(db.adminCommand({addShardToZone: shardNames[0], zone: existingZoneName}));
+assert.commandWorked(db.adminCommand(
     {updateZoneKeyRange: ns, min: {oldKey: 0}, max: {oldKey: 5}, zone: existingZoneName}));
 
-assert.commandFailedWithCode(mongos.adminCommand({
+assert.commandFailedWithCode(db.adminCommand({
     reshardCollection: ns,
     key: {newKey: 1},
     unique: false,
@@ -121,14 +112,14 @@ assert.commandFailedWithCode(mongos.adminCommand({
                              ErrorCodes.BadValue);
 
 // TODO SERVER-87189 remove this test case since a user-created unsharded collection is now always
-// tracked. A temporary db.system.resharding.collection must now exist as unsplittable as well to
-// support moveCollection.
+// tracked. A temporary db.system.resharding.collection must now exist as unsplittable as well
+// to support moveCollection.
 const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
+    db.getSiblingDB('admin'), "TrackUnshardedCollectionsUponCreation");
 if (!isTrackUnshardedUponCreationEnabled) {
     jsTestLog("Fail if attempting insert to an unsharded 'system.resharding.' collection");
     assert.commandFailedWithCode(
-        mongos.getDB('test').system.resharding.mycoll.insert({_id: 1, a: 1}),
+        db.getSiblingDB('test').system.resharding.mycoll.insert({_id: 1, a: 1}),
         [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded]);
 }
 
@@ -136,7 +127,7 @@ if (!isTrackUnshardedUponCreationEnabled) {
  * Success cases
  */
 
-mongos.getDB(kDbName)[collName].drop();
+db.getCollection(collName).drop();
 
 jsTest.log("Succeed when correct locale is provided.");
 reshardCmdTest.assertReshardCollOk(
@@ -147,6 +138,10 @@ jsTest.log("Succeed base case.");
 reshardCmdTest.assertReshardCollOk({reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1},
                                    1);
 
+jsTest.log("Succeed with compound shard key.");
+reshardCmdTest.assertReshardCollOk(
+    {reshardCollection: ns, key: {newKey: 1, oldKey: 1}, numInitialChunks: 2}, 2);
+
 jsTest.log("Succeed if unique is specified and is false.");
 reshardCmdTest.assertReshardCollOk(
     {reshardCollection: ns, key: {newKey: 1}, unique: false, numInitialChunks: 1}, 1);
@@ -156,10 +151,11 @@ jsTest.log(
 reshardCmdTest.assertReshardCollOkWithPreset({reshardCollection: ns, key: {newKey: 1}},
                                              presetReshardedChunks);
 
-presetReshardedChunks = [
-    {recipientShardId: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: 0}},
-    {recipientShardId: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
-];
+presetReshardedChunks = createChunks(shardNames, "newKey", 0, numInitialDocs).map(chunk => {
+    chunk["recipientShardId"] = chunk["shard"];
+    delete chunk["shard"];
+    return chunk;
+});
 
 jsTest.log("Succeed if all optional fields and numInitialChunks are provided with correct values.");
 reshardCmdTest.assertReshardCollOk({
@@ -181,7 +177,7 @@ reshardCmdTest.assertReshardCollOkWithPreset(
 jsTest.log("Succeed if the zone provided is assigned to a shard but not a range for the source" +
            " collection.");
 const newZoneName = 'x2';
-assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: newZoneName}));
+assert.commandWorked(db.adminCommand({addShardToZone: shardNames[0], zone: newZoneName}));
 reshardCmdTest.assertReshardCollOk({
     reshardCollection: ns,
     key: {newKey: 1},
@@ -215,9 +211,8 @@ reshardCmdTest.assertReshardCollOk({
                                    1);
 
 jsTest.log("Succeed if zones are not empty.");
-assert.commandWorked(
-    mongos.adminCommand({addShardToZone: st.shard1.shardName, zone: existingZoneName}));
-assert.commandWorked(st.s.adminCommand(
+assert.commandWorked(db.adminCommand({addShardToZone: shardNames[0], zone: existingZoneName}));
+assert.commandWorked(db.adminCommand(
     {updateZoneKeyRange: ns, min: {oldKey: 0}, max: {oldKey: 5}, zone: existingZoneName}));
 reshardCmdTest.assertReshardCollOk({
     reshardCollection: ns,
@@ -231,11 +226,9 @@ reshardCmdTest.assertReshardCollOk({
 
 jsTest.log("Succeed with hashed shard key that provides enough cardinality.");
 assert.commandWorked(
-    mongos.adminCommand({shardCollection: ns, key: {a: "hashed"}, numInitialChunks: 5}));
-assert.commandWorked(mongos.getCollection(ns).insert(
+    db.adminCommand({shardCollection: ns, key: {a: "hashed"}, numInitialChunks: 5}));
+assert.commandWorked(db.getCollection(collName).insert(
     Array.from({length: 10000}, () => ({a: new ObjectId(), b: new ObjectId()}))));
 assert.commandWorked(
-    st.s.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 5}));
-mongos.getDB(kDbName)[collName].drop();
-
-st.stop();
+    db.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 5}));
+db.getCollection(collName).drop();
