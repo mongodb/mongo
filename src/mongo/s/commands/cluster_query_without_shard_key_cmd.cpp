@@ -490,7 +490,7 @@ public:
                     // Since the retryable write history check happens before a write is executed,
                     // we can just use an empty BSONObj for the target doc.
                     res.setTargetDoc(BSONObj::kEmptyObject);
-                    res.setShardId(boost::optional<mongo::StringData>(response.shardId));
+                    res.setShardId(response.shardId.toString());
                     wasStatementExecuted = true;
                     continue;
                 }

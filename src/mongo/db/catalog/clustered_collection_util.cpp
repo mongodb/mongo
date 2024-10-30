@@ -56,7 +56,7 @@ void ensureClusteredIndexName(ClusteredIndexSpec& indexSpec) {
         if (clusterKey == "_id") {
             indexSpec.setName(IndexConstants::kIdIndexName);
         } else {
-            indexSpec.setName(StringData(clusterKey + "_1"));
+            indexSpec.setName(clusterKey + "_1");
         }
     }
 }

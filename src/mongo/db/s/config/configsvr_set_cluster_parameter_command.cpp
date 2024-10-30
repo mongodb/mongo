@@ -132,7 +132,7 @@ public:
 
                 SetClusterParameterCoordinatorDocument coordinatorDoc;
                 ConfigsvrCoordinatorId cid(ConfigsvrCoordinatorTypeEnum::kSetClusterParameter);
-                cid.setSubId(StringData(tenantId ? tenantId->toString() : ""));
+                cid.setSubId(tenantId ? tenantId->toString() : "");
                 coordinatorDoc.setConfigsvrCoordinatorMetadata({cid});
                 coordinatorDoc.setParameter(cmdParamObj);
                 coordinatorDoc.setTenantId(tenantId);

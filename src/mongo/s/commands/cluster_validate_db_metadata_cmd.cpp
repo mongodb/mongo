@@ -127,7 +127,7 @@ public:
                         IDLParserContext("ErrorReplyElement"), error.Obj());
 
                     // Ensure that the final output doesn't exceed max BSON size.
-                    apiVersionError.setShard(StringData(shardRes.shardId.toString()));
+                    apiVersionError.setShard(shardRes.shardId.toString());
                     if (!sizeTracker.incrementAndCheckOverflow(apiVersionError)) {
                         hasMoreErrors = true;
                         break;

@@ -981,7 +981,7 @@ void TTLMonitor::onStepUp() {
                         // would be used by listIndexes() to convert an invalid value in the
                         // catalog.
                         CollModIndex collModIndex;
-                        collModIndex.setName(StringData{indexName});
+                        collModIndex.setName(indexName);
                         collModIndex.setExpireAfterSeconds(correctedExpireAfterSeconds.value());
 
                         CollMod collModCmd{*nss};

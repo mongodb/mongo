@@ -210,7 +210,7 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t la
 
     if (auto user = getAuthenticatedUser(opCtx->getClient())) {
         id.setUid(user.value()->getDigest());
-        lsr.setUser(StringData(user.value()->getName().getDisplayName()));
+        lsr.setUser(user.value()->getName().getDisplayName());
     } else {
         id.setUid(kNoAuthDigest);
     }
@@ -243,7 +243,7 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx,
 
     if (auto user = getAuthenticatedUser(opCtx->getClient())) {
         if (user.value()->getDigest() == lsid.getUid()) {
-            lsr.setUser(StringData(user.value()->getName().getDisplayName()));
+            lsr.setUser(user.value()->getName().getDisplayName());
         }
     }
 

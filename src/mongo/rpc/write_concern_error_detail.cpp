@@ -70,7 +70,7 @@ BSONObj WriteConcernErrorDetail::toBSON() const {
 
     auto wce = WriteConcernError();
     wce.setCode(_status.code());
-    wce.setCodeName(boost::optional<StringData>(_status.codeString()));
+    wce.setCodeName(_status.codeString());
     wce.setErrmsg(_status.reason());
     wce.setErrInfo(_errInfo);
     wce.serialize(&builder);

@@ -1196,7 +1196,7 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
     metrics.setNumDocsTotal(cardinalityFrequencyMetrics.numDocsTotal);
     if (collStatsMetrics.numOrphanDocs) {
         metrics.setNumOrphanDocs(collStatsMetrics.numOrphanDocs);
-        metrics.setNote(StringData(kOrphanDocsWarningMessage));
+        metrics.setNote(kOrphanDocsWarningMessage);
     }
     metrics.setAvgDocSizeBytes(collStatsMetrics.avgDocSizeBytes);
 

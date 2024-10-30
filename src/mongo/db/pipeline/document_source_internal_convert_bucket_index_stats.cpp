@@ -84,7 +84,7 @@ BSONObj makeTimeseriesIndexStats(const TimeseriesConversionOptions& bucketSpec,
                                  const BSONObj& bucketsIndexStatsBSON) {
     TimeseriesOptions timeseriesOptions(bucketSpec.timeField);
     if (bucketSpec.metaField) {
-        timeseriesOptions.setMetaField(StringData(*bucketSpec.metaField));
+        timeseriesOptions.setMetaField(*bucketSpec.metaField);
     }
     BSONObjBuilder builder;
     for (const auto& elem : bucketsIndexStatsBSON) {

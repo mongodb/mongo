@@ -1084,7 +1084,7 @@ IndexStateInfo SortedDataIndexAccessMethod::BulkBuilderImpl::persistDataForShutd
     auto state = _sorter->persistDataForShutdown();
 
     IndexStateInfo stateInfo;
-    stateInfo.setFileName(StringData(state.fileName));
+    stateInfo.setFileName(state.fileName);
     stateInfo.setNumKeys(_keysInserted);
     stateInfo.setRanges(std::move(state.ranges));
 

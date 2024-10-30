@@ -296,10 +296,10 @@ public:
 
             CreateCommandReply reply;
             if (cmd.getAutoIndexId()) {
-#define DEPR_23800 "The autoIndexId option is deprecated and will be removed in a future release"
-                LOGV2_WARNING(23800, DEPR_23800);
-                reply.setNote(StringData(DEPR_23800));
-#undef DEPR_23800
+                constexpr const char depr_23800[] =
+                    "The autoIndexId option is deprecated and will be removed in a future release";
+                LOGV2_WARNING(23800, depr_23800);
+                reply.setNote(std::string(depr_23800));
             }
 
             if (!cmd.getClusteredIndex()) {

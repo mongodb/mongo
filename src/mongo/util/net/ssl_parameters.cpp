@@ -220,7 +220,7 @@ void ClusterAuthX509OverrideParameter::append(OperationContext* opCtx,
                                               const boost::optional<TenantId>&) {
     ClusterAuthX509Override currentValue;
     if (!sslGlobalParams.clusterAuthX509OverrideAttributes.empty()) {
-        currentValue.setAttributes(StringData{sslGlobalParams.clusterAuthX509OverrideAttributes});
+        currentValue.setAttributes(sslGlobalParams.clusterAuthX509OverrideAttributes);
     } else if (!sslGlobalParams.clusterAuthX509OverrideExtensionValue.empty()) {
         currentValue.setExtensionValue(
             StringData{sslGlobalParams.clusterAuthX509OverrideExtensionValue});
