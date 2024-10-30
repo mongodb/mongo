@@ -113,7 +113,6 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     }
 
     WiredTigerRecordStore::Params params;
-    params.nss = nss;
     params.ident = ident.toString();
     params.engineName = std::string{kWiredTigerEngineName};
     params.isCapped = collOptions.capped ? true : false;
@@ -121,6 +120,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     params.overwrite = collOptions.clusteredIndex ? false : true;
     params.isEphemeral = false;
     params.isLogged = WiredTigerUtil::useTableLogging(nss);
+    params.isChangeCollection = nss.isChangeCollection();
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = collOptions.timeseries != boost::none;
@@ -172,7 +172,6 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     }
 
     WiredTigerRecordStore::Params params;
-    params.nss = oplogNss;
     params.ident = ident;
     params.engineName = std::string{kWiredTigerEngineName};
     params.isCapped = true;
@@ -180,6 +179,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     params.overwrite = true;
     params.isEphemeral = false;
     params.isLogged = true;
+    params.isChangeCollection = false;
     // Large enough not to exceed capped limits.
     params.oplogMaxSize = 1024 * 1024 * 1024;
     params.sizeStorer = nullptr;

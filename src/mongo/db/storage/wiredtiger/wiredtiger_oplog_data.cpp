@@ -34,7 +34,7 @@ namespace mongo {
 
 WiredTigerOplogData::WiredTigerOplogData(const WiredTigerRecordStore::Params& params)
     : _maxSize(params.oplogMaxSize) {
-    invariant(_maxSize.load(), str::stream() << "Namespace " << params.nss.toStringForErrorMsg());
+    invariant(_maxSize.load());
 }
 
 void WiredTigerOplogData::getTruncateStats(BSONObjBuilder& builder) const {

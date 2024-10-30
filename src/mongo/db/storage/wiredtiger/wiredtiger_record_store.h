@@ -120,7 +120,6 @@ public:
                                                         bool isOplog = false);
 
     struct Params {
-        NamespaceString nss;
         boost::optional<UUID> uuid;
         std::string ident;
         std::string engineName;
@@ -129,6 +128,7 @@ public:
         bool overwrite;
         bool isEphemeral;
         bool isLogged;
+        bool isChangeCollection;
         int64_t oplogMaxSize = 0;
         WiredTigerSizeStorer* sizeStorer;
         bool tracksSizeAdjustments;

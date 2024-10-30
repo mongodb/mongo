@@ -113,7 +113,6 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         WiredTigerRecordStore::Params params;
-        params.nss = NamespaceString::createNamespaceString_forTest("a.b");
         params.ident = ident;
         params.engineName = std::string{kWiredTigerEngineName};
         params.isCapped = false;
@@ -121,6 +120,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.overwrite = true;
         params.isEphemeral = false;
         params.isLogged = false;
+        params.isChangeCollection = false;
         params.sizeStorer = &ss;
         params.tracksSizeAdjustments = true;
         params.forceUpdateWithFullDocument = false;
@@ -129,7 +129,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
             nullptr,
             WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
             params);
-        ret->postConstructorInit(opCtx.get(), params.nss);
+        ret->postConstructorInit(opCtx.get(),
+                                 NamespaceString::createNamespaceString_forTest("a.b"));
         rs.reset(ret);
     }
 

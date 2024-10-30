@@ -437,12 +437,12 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _overwrite(params.overwrite),
       _isEphemeral(params.isEphemeral),
       _isLogged(params.isLogged),
-      _isChangeCollection(params.nss.isChangeCollection()),
+      _isChangeCollection(params.isChangeCollection),
       _forceUpdateWithFullDocument(params.forceUpdateWithFullDocument),
       _sizeStorer(params.sizeStorer),
       _tracksSizeAdjustments(params.tracksSizeAdjustments),
       _kvEngine(kvEngine),
-      _oplog(params.nss.isOplog() ? std::make_unique<WiredTigerOplogData>(params) : nullptr) {
+      _oplog(params.oplogMaxSize ? std::make_unique<WiredTigerOplogData>(params) : nullptr) {
     invariant(getIdent().size() > 0);
 
     if (kDebugBuild && _keyFormat == KeyFormat::String) {
@@ -463,7 +463,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
         LOGV2_ERROR(7887900,
                     "Metadata format version check failed.",
                     "uri"_attr = _uri,
-                    "namespace"_attr = params.nss.toStringForErrorMsg(),
+                    "uuid"_attr = _uuid ? _uuid->toString() : std::string{},
                     "version"_attr = versionStatus.reason());
         if (versionStatus.code() == ErrorCodes::FailedToParse) {
             uasserted(28548, versionStatus.reason());

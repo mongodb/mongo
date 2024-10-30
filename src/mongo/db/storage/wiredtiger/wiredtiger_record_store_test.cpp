@@ -1377,7 +1377,6 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     }
 
     WiredTigerRecordStore::Params params;
-    params.nss = nss;
     params.uuid = boost::none;
     params.ident = ns;
     params.engineName = std::string{kWiredTigerEngineName};
@@ -1386,6 +1385,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     params.overwrite = false;
     params.isEphemeral = false;
     params.isLogged = WiredTigerUtil::useTableLogging(nss);
+    params.isChangeCollection = false;
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = false;

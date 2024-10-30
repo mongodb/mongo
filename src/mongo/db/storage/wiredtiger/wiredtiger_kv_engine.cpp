@@ -1582,7 +1582,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     }
 
     WiredTigerRecordStore::Params params;
-    params.nss = nss;
     params.uuid = options.uuid;
     params.ident = ident.toString();
     params.engineName = _canonicalName;
@@ -1593,6 +1592,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     params.overwrite = options.clusteredIndex ? false : true;
     params.isEphemeral = _ephemeral;
     params.isLogged = isLogged;
+    params.isChangeCollection = nss.isChangeCollection();
     params.sizeStorer = _sizeStorer.get();
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = options.timeseries != boost::none;
@@ -1723,7 +1723,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Operati
     // We don't log writes to temporary record stores.
     const bool isLogged = false;
     WiredTigerRecordStore::Params params;
-    params.nss = NamespaceString::kEmpty;
     params.uuid = boost::none;
     params.ident = ident.toString();
     params.engineName = _canonicalName;
@@ -1732,6 +1731,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Operati
     params.overwrite = true;
     params.isEphemeral = _ephemeral;
     params.isLogged = isLogged;
+    params.isChangeCollection = false;
     // Temporary collections do not need to persist size information to the size storer.
     params.sizeStorer = nullptr;
     // Temporary collections do not need to reconcile collection size/counts.
@@ -1741,7 +1741,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Operati
     std::unique_ptr<WiredTigerRecordStore> rs;
     rs = std::make_unique<WiredTigerRecordStore>(
         this, WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)), params);
-    rs->postConstructorInit(opCtx, params.nss);
+    rs->postConstructorInit(opCtx, NamespaceString::kEmpty);
 
     return std::move(rs);
 }

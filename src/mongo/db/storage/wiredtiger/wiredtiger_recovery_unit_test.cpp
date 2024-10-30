@@ -132,7 +132,6 @@ public:
         }
 
         WiredTigerRecordStore::Params params;
-        params.nss = nss;
         params.ident = ident;
         params.engineName = std::string{kWiredTigerEngineName};
         params.isCapped = false;
@@ -140,6 +139,7 @@ public:
         params.overwrite = true;
         params.isEphemeral = false;
         params.isLogged = WiredTigerUtil::useTableLogging(nss);
+        params.isChangeCollection = nss.isChangeCollection();
         params.sizeStorer = nullptr;
         params.tracksSizeAdjustments = true;
         params.forceUpdateWithFullDocument = false;
