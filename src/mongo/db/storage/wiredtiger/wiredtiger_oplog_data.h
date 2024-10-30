@@ -52,7 +52,7 @@ public:
 
     AtomicWord<Timestamp>& getFirstRecordTimestamp();
 
-    Status updateSize(OperationContext* opCtx, int64_t newSize);
+    Status updateSize(int64_t newSize);
 
     // Update this oplog's stats tracker with a new truncation event that
     // took |micros|-microseconds to complete.

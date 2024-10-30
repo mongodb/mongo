@@ -649,7 +649,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSample(
     auto expCtx = pipeline->getContext();
 
     const long long sampleSize = sampleStage->getSampleSize();
-    const long long numRecords = collection->getRecordStore()->numRecords(expCtx->opCtx);
+    const long long numRecords = collection->getRecordStore()->numRecords();
 
     boost::optional<timeseries::BucketUnpacker> bucketUnpacker;
     if (unpackBucketStage) {

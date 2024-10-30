@@ -73,7 +73,7 @@ struct Fixture {
             }
             txn.commit();
         }
-        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(nToInsert, rs->numRecords());
     }
 
     const int nToInsert;

@@ -136,9 +136,10 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     // how much data to ignore because it won't fit anyway
     // datasize and extentSize can't be compared exactly, so add some padding to 'size'
 
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     long long allocatedSpaceGuess =
         std::max(static_cast<long long>(size * 2),
-                 static_cast<long long>(toCollection->getRecordStore()->storageSize(opCtx) * 2));
+                 static_cast<long long>(toCollection->getRecordStore()->storageSize(ru) * 2));
 
     long long excessSize = fromCollection->dataSize(opCtx) - allocatedSpaceGuess;
 

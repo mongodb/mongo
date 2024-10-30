@@ -280,6 +280,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
     long long indexFreeStorageSize = 0;
 
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(name(), MODE_IS));
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
     catalog::forEachCollectionFromDb(
         opCtx, name(), MODE_IS, [&](const Collection* collection) -> bool {
@@ -288,13 +289,13 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
             size += collection->dataSize(opCtx);
 
             BSONObjBuilder temp;
-            storageSize += collection->getRecordStore()->storageSize(opCtx, &temp);
+            storageSize += collection->getRecordStore()->storageSize(ru, &temp);
 
             indexes += collection->getIndexCatalog()->numIndexesTotal();
             indexSize += collection->getIndexSize(opCtx);
 
             if (includeFreeStorage) {
-                freeStorageSize += collection->getRecordStore()->freeStorageSize(opCtx);
+                freeStorageSize += collection->getRecordStore()->freeStorageSize(ru);
                 indexFreeStorageSize += collection->getIndexFreeStorageBytes(opCtx);
             }
 

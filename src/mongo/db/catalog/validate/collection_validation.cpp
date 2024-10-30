@@ -584,7 +584,7 @@ Status validate(OperationContext* opCtx,
         // Record store validation code is executed before we open cursors because it may close
         // and/or invalidate all open cursors.
         validateState.getCollection()->getRecordStore()->validate(
-            opCtx, validateState.isFullValidation(), results);
+            *shard_role_details::getRecoveryUnit(opCtx), validateState.isFullValidation(), results);
 
         // For full index validation, we validate the internal structure of each index and save
         // the number of keys in the index to compare against _validateIndexes()'s count results.

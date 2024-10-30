@@ -495,15 +495,15 @@ public:
     }
 
     long long numRecords(OperationContext* opCtx) const final {
-        return _shared->_recordStore->numRecords(opCtx);
+        return _shared->_recordStore->numRecords();
     }
 
     long long dataSize(OperationContext* opCtx) const final {
-        return _shared->_recordStore->dataSize(opCtx);
+        return _shared->_recordStore->dataSize();
     }
 
     bool isEmpty(OperationContext* opCtx) const final {
-        return _shared->_recordStore->dataSize(opCtx) == 0LL;
+        return _shared->_recordStore->dataSize() == 0LL;
     }
 
     inline int averageObjectSize(OperationContext* opCtx) const override {

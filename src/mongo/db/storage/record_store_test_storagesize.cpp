@@ -53,10 +53,7 @@ TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
@@ -78,12 +75,13 @@ TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(nToInsert, rs->numRecords());
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(rs->storageSize(opCtx.get(), nullptr) >= 0);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        ASSERT(rs->storageSize(ru, nullptr) >= 0);
     }
 }
 

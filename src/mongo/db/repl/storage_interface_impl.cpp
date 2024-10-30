@@ -1308,7 +1308,8 @@ StorageInterfaceImpl::findOplogOpTimeLessThanOrEqualToTimestampRetryOnWCE(
 Timestamp StorageInterfaceImpl::getEarliestOplogTimestamp(OperationContext* opCtx) {
     auto statusWithTimestamp = [&]() {
         AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-        return oplogRead.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
+        return oplogRead.getCollection()->getRecordStore()->getEarliestOplogTimestamp(
+            *shard_role_details::getRecoveryUnit(opCtx));
     }();
 
     // If the storage engine does not support getEarliestOplogTimestamp(), then fall back to higher
@@ -1346,7 +1347,8 @@ Timestamp StorageInterfaceImpl::getEarliestOplogTimestamp(OperationContext* opCt
 Timestamp StorageInterfaceImpl::getLatestOplogTimestamp(OperationContext* opCtx) {
     auto statusWithTimestamp = [&]() {
         AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-        return oplogRead.getCollection()->getRecordStore()->getLatestOplogTimestamp(opCtx);
+        return oplogRead.getCollection()->getRecordStore()->getLatestOplogTimestamp(
+            *shard_role_details::getRecoveryUnit(opCtx));
     }();
 
     // If the storage engine does not support getLatestOplogTimestamp, then fall back to higher
@@ -1417,8 +1419,8 @@ Status StorageInterfaceImpl::setCollectionCount(OperationContext* opCtx,
     auto rs = collection->getRecordStore();
     // We cannot fix the data size correctly, so we just get the current cached value and keep it
     // the same.
-    long long dataSize = rs->dataSize(opCtx);
-    rs->updateStatsAfterRepair(opCtx, newCount, dataSize);
+    long long dataSize = rs->dataSize();
+    rs->updateStatsAfterRepair(newCount, dataSize);
     return Status::OK();
 }
 

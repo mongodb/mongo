@@ -1045,7 +1045,7 @@ void ParallelScanStage::open(bool reOpen) {
     {
         stdx::unique_lock lock(_state->mutex);
         if (_state->ranges.empty()) {
-            auto ranges = _coll.getPtr()->getRecordStore()->numRecords(_opCtx) / 10240;
+            auto ranges = _coll.getPtr()->getRecordStore()->numRecords() / 10240;
             if (ranges < 2) {
                 _state->ranges.emplace_back(Range{RecordId{}, RecordId{}});
             } else {

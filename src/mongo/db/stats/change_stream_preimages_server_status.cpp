@@ -94,8 +94,9 @@ void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* res
         return;
     }
 
-    result->append("storageSize", preImagesColl->getRecordStore()->storageSize(opCtx));
-    result->append("freeStorageSize", preImagesColl->getRecordStore()->freeStorageSize(opCtx));
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    result->append("storageSize", preImagesColl->getRecordStore()->storageSize(ru));
+    result->append("freeStorageSize", preImagesColl->getRecordStore()->freeStorageSize(ru));
 }
 }  // namespace
 

@@ -68,6 +68,7 @@ class CollectionTruncateMarkers;
 class MAdvise;
 class OperationContext;
 class RecordStore;
+class RecoveryUnit;
 
 class ValidateResults;
 class ValidateAdaptor;
@@ -356,13 +357,13 @@ public:
      * The dataSize is an approximation of the sum of the sizes (in bytes) of the
      * documents or entries in the recordStore.
      */
-    virtual long long dataSize(OperationContext* opCtx) const = 0;
+    virtual long long dataSize() const = 0;
 
     /**
      * Total number of records in the RecordStore. You may need to cache it, so this call
      * takes constant time, as it is called often.
      */
-    virtual long long numRecords(OperationContext* opCtx) const = 0;
+    virtual long long numRecords() const = 0;
 
     /**
      * Storage engines can manage oplog truncation internally as opposed to having higher layers
@@ -401,7 +402,7 @@ public:
      * @param level - optional, level of debug info to put in (higher is more)
      * @return total estimate size (in bytes) on stable storage
      */
-    virtual int64_t storageSize(OperationContext* opCtx,
+    virtual int64_t storageSize(RecoveryUnit& ru,
                                 BSONObjBuilder* extraInfo = nullptr,
                                 int infoLevel = 0) const = 0;
 
@@ -410,7 +411,7 @@ public:
      * A return value of zero can mean either no bytes are available, or that the real value is
      * unknown.
      */
-    virtual int64_t freeStorageSize(OperationContext* opCtx) const {
+    virtual int64_t freeStorageSize(RecoveryUnit& ru) const {
         return 0;
     }
 
@@ -617,14 +618,14 @@ public:
      * Performs record store specific validation to ensure consistency of underlying data
      * structures. If corruption is found, details of the errors will be in the results parameter.
      */
-    virtual void validate(OperationContext* opCtx, bool full, ValidateResults* results) {}
+    virtual void validate(RecoveryUnit& ru, bool full, ValidateResults* results) {}
 
     /**
      * @param scaleSize - amount by which to scale size metrics
      * Appends any numeric custom stats from the RecordStore or other unique stats, it should
      * avoid any expensive calls
      */
-    virtual void appendNumericCustomStats(OperationContext* opCtx,
+    virtual void appendNumericCustomStats(RecoveryUnit& ru,
                                           BSONObjBuilder* result,
                                           double scale) const = 0;
 
@@ -634,10 +635,10 @@ public:
      * Appends all custom stats from the RecordStore or other unique stats, it can be more
      * expensive than RecordStore::appendNumericCustomStats
      */
-    virtual void appendAllCustomStats(OperationContext* opCtx,
+    virtual void appendAllCustomStats(RecoveryUnit& ru,
                                       BSONObjBuilder* result,
                                       double scale) const {
-        appendNumericCustomStats(opCtx, result, scale);
+        appendNumericCustomStats(ru, result, scale);
     };
 
     /**
@@ -660,14 +661,12 @@ public:
     /**
      * Called after a repair operation is run with the recomputed numRecords and dataSize.
      */
-    virtual void updateStatsAfterRepair(OperationContext* opCtx,
-                                        long long numRecords,
-                                        long long dataSize) = 0;
+    virtual void updateStatsAfterRepair(long long numRecords, long long dataSize) = 0;
 
     /**
      * Storage engines can choose whether to support changing the oplog size online.
      */
-    virtual Status updateOplogSize(OperationContext* opCtx, long long newOplogSize) {
+    virtual Status updateOplogSize(long long newOplogSize) {
         return Status(ErrorCodes::CommandNotSupported,
                       "This storage engine does not support updateOplogSize");
     }
@@ -709,7 +708,7 @@ public:
      *
      * Unsupported RecordStores return the OplogOperationUnsupported error code.
      */
-    virtual StatusWith<Timestamp> getLatestOplogTimestamp(OperationContext* opCtx) const {
+    virtual StatusWith<Timestamp> getLatestOplogTimestamp(RecoveryUnit& ru) const {
         return Status(ErrorCodes::OplogOperationUnsupported,
                       "The current storage engine doesn't support an optimized implementation for "
                       "getting the latest oplog timestamp.");
@@ -721,7 +720,7 @@ public:
      *
      * Unsupported RecordStores return the OplogOperationUnsupported error code.
      */
-    virtual StatusWith<Timestamp> getEarliestOplogTimestamp(OperationContext* opCtx) {
+    virtual StatusWith<Timestamp> getEarliestOplogTimestamp(RecoveryUnit& ru) {
         return Status(ErrorCodes::OplogOperationUnsupported,
                       "The current storage engine doesn't support an optimized implementation for "
                       "getting the earliest oplog timestamp.");

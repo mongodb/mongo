@@ -119,25 +119,23 @@ public:
                                bool inclusive,
                                const AboutToDeleteRecordCallback& aboutToDelete) override;
 
-    void appendNumericCustomStats(OperationContext* opCtx,
+    void appendNumericCustomStats(RecoveryUnit& ru,
                                   BSONObjBuilder* result,
                                   double scale) const override {}
 
-    int64_t storageSize(OperationContext* opCtx,
+    int64_t storageSize(RecoveryUnit& ru,
                         BSONObjBuilder* extraInfo = nullptr,
                         int infoLevel = 0) const override;
 
-    long long dataSize(OperationContext* opCtx) const override {
+    long long dataSize() const override {
         return _data->dataSize;
     }
 
-    long long numRecords(OperationContext* opCtx) const override {
+    long long numRecords() const override {
         return _data->records.size();
     }
 
-    void updateStatsAfterRepair(OperationContext* opCtx,
-                                long long numRecords,
-                                long long dataSize) override {
+    void updateStatsAfterRepair(long long numRecords, long long dataSize) override {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
         invariant(_data->records.size() == size_t(numRecords));
         _data->dataSize = dataSize;

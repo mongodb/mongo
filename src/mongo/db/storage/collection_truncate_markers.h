@@ -213,12 +213,12 @@ public:
         // calling getNext* will start from the beginning again.
         virtual void reset(OperationContext* opCtx) = 0;
 
-        int64_t numRecords(OperationContext* opCtx) const {
-            return getRecordStore()->numRecords(opCtx);
+        int64_t numRecords() const {
+            return getRecordStore()->numRecords();
         }
 
-        int64_t dataSize(OperationContext* opCtx) const {
-            return getRecordStore()->dataSize(opCtx);
+        int64_t dataSize() const {
+            return getRecordStore()->dataSize();
         }
     };
 

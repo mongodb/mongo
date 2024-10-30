@@ -121,7 +121,7 @@ TEST_F(RecoveryUnitTestHarness, CommitUnitOfWork) {
     ru->beginUnitOfWork(opCtx->readOnly());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
-    ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+    ASSERT_EQUALS(1, rs->numRecords());
     ru->commitUnitOfWork();
     RecordData rd;
     ASSERT_TRUE(rs->findRecord(opCtx.get(), s.getValue(), &rd));
@@ -132,7 +132,7 @@ TEST_F(RecoveryUnitTestHarness, AbortUnitOfWork) {
     ru->beginUnitOfWork(opCtx->readOnly());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
-    ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+    ASSERT_EQUALS(1, rs->numRecords());
     ru->abortUnitOfWork();
     ASSERT_FALSE(rs->findRecord(opCtx.get(), s.getValue(), nullptr));
 }
@@ -216,7 +216,7 @@ TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
     StatusWith<RecordId> rid2 = rs->insertRecord(opCtx.get(), "123", 3, Timestamp());
     ASSERT_TRUE(rid1.isOK());
     ASSERT_TRUE(rid2.isOK());
-    ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
+    ASSERT_EQUALS(2, rs->numRecords());
     ru->commitUnitOfWork();
 
     auto snapshotIdBefore = ru->getSnapshotId();

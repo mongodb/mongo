@@ -210,7 +210,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
         dataSize += doc.objsize();
     }
 
-    collectionIterator.getRecordStore()->updateStatsAfterRepair(opCtx, numRecords, dataSize);
+    collectionIterator.getRecordStore()->updateStatsAfterRepair(numRecords, dataSize);
     auto endTime = curTimeMicros64();
     return CollectionTruncateMarkers::InitialSetOfMarkers{
         std::move(markers),
@@ -290,11 +290,11 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
           "from"_attr = earliestRecordId,
           "to"_attr = latestRecordId);
 
-    int64_t wholeMarkers = collectionIterator.numRecords(opCtx) / estimatedRecordsPerMarker;
+    int64_t wholeMarkers = collectionIterator.numRecords() / estimatedRecordsPerMarker;
     // We don't use the wholeMarkers variable here due to integer division not being associative.
     // For example, 10 * (47500 / 28700) = 10, but (10 * 47500) / 28700 = 16.
-    int64_t numSamples = (CollectionTruncateMarkers::kRandomSamplesPerMarker *
-                          collectionIterator.numRecords(opCtx)) /
+    int64_t numSamples =
+        (CollectionTruncateMarkers::kRandomSamplesPerMarker * collectionIterator.numRecords()) /
         estimatedRecordsPerMarker;
 
     LOGV2(7393216,
@@ -370,8 +370,8 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
 
     // Account for the partially filled chunk.
     auto currentRecords =
-        collectionIterator.numRecords(opCtx) - estimatedRecordsPerMarker * wholeMarkers;
-    auto currentBytes = collectionIterator.dataSize(opCtx) - estimatedBytesPerMarker * wholeMarkers;
+        collectionIterator.numRecords() - estimatedRecordsPerMarker * wholeMarkers;
+    auto currentBytes = collectionIterator.dataSize() - estimatedBytesPerMarker * wholeMarkers;
     return CollectionTruncateMarkers::InitialSetOfMarkers{
         std::move(markers),
         currentRecords,
@@ -423,8 +423,8 @@ CollectionTruncateMarkers::createFromCollectionIterator(
     std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
     boost::optional<int64_t> numberOfMarkersToKeepForOplog) {
 
-    long long numRecords = collectionIterator.numRecords(opCtx);
-    long long dataSize = collectionIterator.dataSize(opCtx);
+    long long numRecords = collectionIterator.numRecords();
+    long long dataSize = collectionIterator.dataSize();
 
     LOGV2(7393203,
           "The size storer reports that the collection contains",

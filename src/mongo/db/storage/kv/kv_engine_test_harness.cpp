@@ -1012,7 +1012,7 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
         ASSERT_OK(res);
         ridA = res.getValue();
         uow.commit();
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(1, rs->numRecords());
     }
 
     {
@@ -1037,7 +1037,7 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
         StatusWith<RecordId> swRid = rs->insertRecord(opCtx.get(), "def", 4, Timestamp(3, 3));
         ASSERT_OK(swRid);
         ridB = swRid.getValue();
-        ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(2, rs->numRecords());
         uow.commit();
     }
 
@@ -1056,7 +1056,7 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
         ASSERT(rs->findRecord(opCtx.get(), ridA, &rd));
         ASSERT_EQ(std::string("abc"), rd.data());
         ASSERT_FALSE(rs->findRecord(opCtx.get(), ridB, nullptr));
-        ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(2, rs->numRecords());
     }
 }
 

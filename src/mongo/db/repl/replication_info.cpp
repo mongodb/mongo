@@ -313,7 +313,8 @@ public:
 
             // Try getting earliest oplog timestamp using getEarliestOplogTimestamp
             auto swEarliestOplogTimestamp =
-                oplogCollection->getRecordStore()->getEarliestOplogTimestamp(opCtx);
+                oplogCollection->getRecordStore()->getEarliestOplogTimestamp(
+                    *shard_role_details::getRecoveryUnit(opCtx));
 
             if (swEarliestOplogTimestamp.getStatus() == ErrorCodes::OplogOperationUnsupported) {
                 // Falling back to use getSingleton if the storage engine does not support

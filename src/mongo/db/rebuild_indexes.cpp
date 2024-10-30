@@ -117,7 +117,7 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
     auto [numRecords, dataSize] = swRebuild.getValue();
 
     // Update the record store stats after finishing and committing the index builds.
-    collWriter->getRecordStore()->updateStatsAfterRepair(opCtx, numRecords, dataSize);
+    collWriter->getRecordStore()->updateStatsAfterRepair(numRecords, dataSize);
 
     return Status::OK();
 }

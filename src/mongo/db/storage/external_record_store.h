@@ -74,15 +74,15 @@ public:
         return KeyFormat::Long;
     }
 
-    long long dataSize(OperationContext*) const final {
+    long long dataSize() const final {
         return 0LL;
     }
 
-    long long numRecords(OperationContext*) const final {
+    long long numRecords() const final {
         return 0LL;
     }
 
-    int64_t storageSize(OperationContext*, BSONObjBuilder*, int) const final {
+    int64_t storageSize(RecoveryUnit&, BSONObjBuilder*, int) const final {
         return 0LL;
     }
 
@@ -109,11 +109,9 @@ public:
         return nullptr;
     }
 
-    void appendNumericCustomStats(OperationContext*, BSONObjBuilder*, double) const final {}
+    void appendNumericCustomStats(RecoveryUnit& ru, BSONObjBuilder*, double) const final {}
 
-    void updateStatsAfterRepair(OperationContext* opCtx,
-                                long long numRecords,
-                                long long dataSize) final {
+    void updateStatsAfterRepair(long long numRecords, long long dataSize) final {
         unimplementedTasserted();
     }
 

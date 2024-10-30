@@ -208,7 +208,8 @@ void WindowStage::spill() {
 
     // Record spilling statistics.
     _specificStats.spilledBytes += spilledBytes;
-    _specificStats.spilledDataStorageSize = _recordStore->rs()->storageSize(_opCtx);
+    auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
+    _specificStats.spilledDataStorageSize = _recordStore->rs()->storageSize(ru);
     setWindowFieldsCounters.incrementSetWindowFieldsCountersPerSpilling(
         1 /* spills */, spilledBytes, _rows.size());
 

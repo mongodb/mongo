@@ -60,10 +60,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
     if (!rs->updateWithDamagesSupported())
         return;
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 
     std::string data = "00010111";
     RecordId loc;
@@ -81,10 +78,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
         }
     }
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(1, rs->numRecords());
 
     std::string modifiedData = "11101000";
     {
@@ -131,10 +125,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
     if (!rs->updateWithDamagesSupported())
         return;
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 
     std::string data = "00010111";
     RecordId loc;
@@ -152,10 +143,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
         }
     }
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(1, rs->numRecords());
 
     std::string modifiedData = "10100010";
     {
@@ -199,10 +187,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
     if (!rs->updateWithDamagesSupported())
         return;
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 
     std::string data = "00010111";
     RecordId loc;
@@ -220,10 +205,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
         }
     }
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(1, rs->numRecords());
 
     std::string modifiedData = "10111010";
     {
@@ -265,10 +247,7 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
     if (!rs->updateWithDamagesSupported())
         return;
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 
     std::string data = "my record";
     RecordId loc;
@@ -286,10 +265,7 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
         }
     }
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(1, rs->numRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

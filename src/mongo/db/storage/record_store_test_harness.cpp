@@ -80,10 +80,7 @@ TEST(RecordStoreTestHarness, Simple1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 
     std::string s = "eliot was here";
 
@@ -107,7 +104,7 @@ TEST(RecordStoreTestHarness, Simple1) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc1).data());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(1, rs->numRecords());
 
         RecordData rd;
         ASSERT(!rs->findRecord(opCtx.get(), RecordId(111, 17), &rd));
@@ -129,20 +126,14 @@ TEST(RecordStoreTestHarness, Simple1) {
         }
     }
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(2, rs->numRecords());
 }
 
 TEST(RecordStoreTestHarness, Delete1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 
     std::string s = "eliot was here";
 
@@ -163,10 +154,7 @@ TEST(RecordStoreTestHarness, Delete1) {
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
     }
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(1, rs->numRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -178,7 +166,7 @@ TEST(RecordStoreTestHarness, Delete1) {
             txn.commit();
         }
 
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(0, rs->numRecords());
     }
 }
 
@@ -186,10 +174,7 @@ TEST(RecordStoreTestHarness, Delete2) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 
     std::string s = "eliot was here";
 
@@ -213,7 +198,7 @@ TEST(RecordStoreTestHarness, Delete2) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
-        ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(2, rs->numRecords());
     }
 
     {
@@ -233,7 +218,7 @@ TEST(RecordStoreTestHarness, Update1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(0, rs->numRecords());
     }
 
     std::string s1 = "eliot was here";
@@ -272,7 +257,7 @@ TEST(RecordStoreTestHarness, Update1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(1, rs->numRecords());
         ASSERT_EQUALS(s2, rs->dataFor(opCtx.get(), loc).data());
     }
 }
@@ -337,10 +322,7 @@ TEST(RecordStoreTestHarness, Truncate1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 
     std::string s = "eliot was here";
 
@@ -364,10 +346,7 @@ TEST(RecordStoreTestHarness, Truncate1) {
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
     }
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(1, rs->numRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -379,10 +358,7 @@ TEST(RecordStoreTestHarness, Truncate1) {
         }
     }
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 }
 
 TEST(RecordStoreTestHarness, Cursor1) {
@@ -391,10 +367,7 @@ TEST(RecordStoreTestHarness, Cursor1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(0, rs->numRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -410,10 +383,7 @@ TEST(RecordStoreTestHarness, Cursor1) {
         }
     }
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(N, rs->numRecords(opCtx.get()));
-    }
+    ASSERT_EQUALS(N, rs->numRecords());
 
     {
         int x = 0;
@@ -766,7 +736,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
         }
         txn.commit();
 
-        ASSERT_EQ(numRecords - 10, rs->numRecords(opCtx.get()));
+        ASSERT_EQ(numRecords - 10, rs->numRecords());
     }
 }
 

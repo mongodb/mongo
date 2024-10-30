@@ -609,8 +609,8 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
 
     static constexpr auto kNumMarkers = 15;
     auto kMinBytesPerMarker = totalBytes / kNumMarkers;
-    long long numRecords = iterator.numRecords(opCtx.get());
-    long long dataSize = iterator.dataSize(opCtx.get());
+    long long numRecords = iterator.numRecords();
+    long long dataSize = iterator.dataSize();
     double avgRecordSize = double(dataSize) / double(numRecords);
     double estimatedRecordsPerMarker = std::ceil(kMinBytesPerMarker / avgRecordSize);
     double estimatedBytesPerMarker = estimatedRecordsPerMarker * avgRecordSize;

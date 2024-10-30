@@ -546,11 +546,11 @@ void EphemeralForTestRecordStore::doCappedTruncateAfter(
     }
 }
 
-int64_t EphemeralForTestRecordStore::storageSize(OperationContext* opCtx,
+int64_t EphemeralForTestRecordStore::storageSize(RecoveryUnit& ru,
                                                  BSONObjBuilder* extraInfo,
                                                  int infoLevel) const {
     // Note: not making use of extraInfo or infoLevel since we don't have extents
-    const int64_t recordOverhead = numRecords(opCtx) * sizeof(EphemeralForTestRecord);
+    const int64_t recordOverhead = numRecords() * sizeof(EphemeralForTestRecord);
     return _data->dataSize + recordOverhead;
 }
 

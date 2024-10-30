@@ -245,7 +245,7 @@ bool WiredTigerOplogTruncateMarkers::_hasExcessMarkers(OperationContext* opCtx) 
     return currRetentionHours >= minRetentionHours;
 }
 
-void WiredTigerOplogTruncateMarkers::adjust(OperationContext* opCtx, int64_t maxSize) {
+void WiredTigerOplogTruncateMarkers::adjust(int64_t maxSize) {
     const unsigned int oplogTruncateMarkerSize =
         std::max(gOplogTruncateMarkerSizeMB * 1024 * 1024, BSONObjMaxInternalSize);
 

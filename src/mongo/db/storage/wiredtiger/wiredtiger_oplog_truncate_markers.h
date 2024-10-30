@@ -86,7 +86,7 @@ public:
     void getOplogTruncateMarkersStats(BSONObjBuilder& builder) const;
 
     // Resize oplog size
-    void adjust(OperationContext* opCtx, int64_t maxSize);
+    void adjust(int64_t maxSize);
 
     // The start point of where to truncate next. Used by the background reclaim thread to
     // efficiently truncate records with WiredTiger by skipping over tombstones, etc.

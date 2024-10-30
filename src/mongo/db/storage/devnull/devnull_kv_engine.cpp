@@ -92,11 +92,11 @@ public:
         return "devnull";
     }
 
-    long long dataSize(OperationContext* opCtx) const override {
+    long long dataSize() const override {
         return 0;
     }
 
-    long long numRecords(OperationContext* opCtx) const override {
+    long long numRecords() const override {
         return 0;
     }
 
@@ -108,7 +108,7 @@ public:
         return _keyFormat;
     }
 
-    int64_t storageSize(OperationContext* opCtx,
+    int64_t storageSize(RecoveryUnit& ru,
                         BSONObjBuilder* extraInfo = nullptr,
                         int infoLevel = 0) const override {
         return 0;
@@ -177,15 +177,13 @@ public:
                                bool inclusive,
                                const AboutToDeleteRecordCallback& aboutToDelete) override {}
 
-    void appendNumericCustomStats(OperationContext* opCtx,
+    void appendNumericCustomStats(RecoveryUnit& ru,
                                   BSONObjBuilder* result,
                                   double scale) const override {
         result->appendNumber("numInserts", _numInserts);
     }
 
-    void updateStatsAfterRepair(OperationContext* opCtx,
-                                long long numRecords,
-                                long long dataSize) override {}
+    void updateStatsAfterRepair(long long numRecords, long long dataSize) override {}
 
     RecordId getLargestKey(OperationContext* opCtx) const final {
         return RecordId();

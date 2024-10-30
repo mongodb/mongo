@@ -83,7 +83,8 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
 
     LOGV2_OPTIONS(20284, {LogComponent::kCommand}, "Compact begin", logAttrs(collectionNss));
 
-    auto bytesBefore = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto bytesBefore = recordStore->storageSize(ru) + collection->getIndexSize(opCtx);
     auto indexCatalog = collection->getIndexCatalog();
 
     pauseCompactCommandBeforeWTCompact.pauseWhileSet();
@@ -112,7 +113,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
               "estimatedBytes"_attr = estimatedBytes);
         return estimatedBytes;
     } else {
-        auto bytesAfter = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
+        auto bytesAfter = recordStore->storageSize(ru) + collection->getIndexSize(opCtx);
         auto bytesDiff = static_cast<int64_t>(bytesBefore) - static_cast<int64_t>(bytesAfter);
         LOGV2(7386700,
               "Compact end",

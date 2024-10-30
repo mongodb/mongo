@@ -186,9 +186,10 @@ void fillOutPlannerCollectionInfo(OperationContext* opCtx,
     if (includeSizeStats) {
         // We only include these sometimes, since they are slightly expensive to compute.
         auto recordStore = collection->getRecordStore();
-        out->noOfRecords = recordStore->numRecords(opCtx);
-        out->approximateDataSizeBytes = recordStore->dataSize(opCtx);
-        out->storageSizeBytes = recordStore->storageSize(opCtx);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        out->noOfRecords = recordStore->numRecords();
+        out->approximateDataSizeBytes = recordStore->dataSize();
+        out->storageSizeBytes = recordStore->storageSize(ru);
     }
 }
 

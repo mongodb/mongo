@@ -761,7 +761,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     // of records when we begin traversing, even if this number may deviate from the final number.
     const auto& coll = _validateState->getCollection();
     const char* curopMessage = "Validate: scanning documents";
-    const auto totalRecords = coll->getRecordStore()->numRecords(opCtx);
+    const auto totalRecords = coll->getRecordStore()->numRecords();
     const auto rs = coll->getRecordStore();
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
@@ -947,7 +947,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     // Do not update the record store stats if we're in the background as we've validated a
     // checkpoint and it may not have the most up-to-date changes.
     if (results->isValid() && !_validateState->isBackground()) {
-        coll->getRecordStore()->updateStatsAfterRepair(opCtx, _numRecords, dataSizeTotal);
+        coll->getRecordStore()->updateStatsAfterRepair(_numRecords, dataSizeTotal);
     }
 }
 

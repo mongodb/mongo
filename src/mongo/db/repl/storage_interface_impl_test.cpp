@@ -600,7 +600,7 @@ TEST_F(StorageInterfaceImplTest, CreateCollectionWithIDIndexCommits) {
 
     AutoGetCollectionForReadCommand coll(opCtx, nss);
     ASSERT(coll);
-    ASSERT_EQ(coll->getRecordStore()->numRecords(opCtx), 2LL);
+    ASSERT_EQ(coll->getRecordStore()->numRecords(), 2LL);
     auto collIdxCat = coll->getIndexCatalog();
     auto idIdxDesc = collIdxCat->findIdIndex(opCtx);
     auto count = getIndexKeyCount(opCtx, collIdxCat, idIdxDesc);
@@ -632,7 +632,7 @@ void _testDestroyUncommitedCollectionBulkLoader(
     // Bulk loader is used to create indexes. The collection is not dropped when the bulk loader is
     // destroyed.
     ASSERT_TRUE(coll);
-    ASSERT_EQ(1LL, coll->getRecordStore()->numRecords(opCtx));
+    ASSERT_EQ(1LL, coll->getRecordStore()->numRecords());
 
     // IndexCatalog::numIndexesTotal() includes unfinished indexes. We need to ensure that
     // the bulk loader drops the unfinished indexes.

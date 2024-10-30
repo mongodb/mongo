@@ -721,7 +721,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsAreNotCached) {
     StorageWriteTransaction txn(*ru1);
     StatusWith<RecordId> s = rs->insertRecord(opCtx, "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
-    ASSERT_EQUALS(1, rs->numRecords(opCtx));
+    ASSERT_EQUALS(1, rs->numRecords());
     txn.commit();
 
     // Test 1: A normal read should create a new cursor and release it into the session cache.
@@ -774,7 +774,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
     StorageWriteTransaction txn(*ru1);
     StatusWith<RecordId> s = rs->insertRecord(opCtx, "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
-    ASSERT_EQUALS(1, rs->numRecords(opCtx));
+    ASSERT_EQUALS(1, rs->numRecords());
     txn.commit();
 
     // Test 1: A normal read should create a new cursor and release it into the session cache.
@@ -902,7 +902,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
         StorageWriteTransaction txn(*ru1);
         StatusWith<RecordId> s1 = rs->insertRecord(opCtx1, "data", 4, Timestamp());
         ASSERT_TRUE(s1.isOK());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx1));
+        ASSERT_EQUALS(1, rs->numRecords());
         rid1 = s1.getValue();
         txn.commit();
     }
@@ -920,7 +920,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
         StorageWriteTransaction txn(*ru1);
         StatusWith<RecordId> s2 = rs->insertRecord(opCtx1, "data_2", 6, Timestamp());
         ASSERT_TRUE(s2.isOK());
-        ASSERT_EQUALS(2, rs->numRecords(opCtx1));
+        ASSERT_EQUALS(2, rs->numRecords());
         rid2 = s2.getValue();
         txn.commit();
     }
@@ -971,7 +971,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorGetId) {
         StorageWriteTransaction txn(*ru1);
         StatusWith<RecordId> s1 = rs->insertRecord(opCtx1, "data", 4, Timestamp());
         ASSERT_TRUE(s1.isOK());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx1));
+        ASSERT_EQUALS(1, rs->numRecords());
         rid1 = s1.getValue();
         txn.commit();
     }

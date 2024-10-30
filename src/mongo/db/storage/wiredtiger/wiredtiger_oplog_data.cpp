@@ -62,7 +62,7 @@ AtomicWord<Timestamp>& WiredTigerOplogData::getFirstRecordTimestamp() {
     return _firstRecordTimestamp;
 }
 
-Status WiredTigerOplogData::updateSize(OperationContext* opCtx, int64_t newSize) {
+Status WiredTigerOplogData::updateSize(int64_t newSize) {
     invariant(_maxSize.load());
 
     if (_maxSize.load() == newSize) {
@@ -72,7 +72,7 @@ Status WiredTigerOplogData::updateSize(OperationContext* opCtx, int64_t newSize)
     _maxSize.store(newSize);
 
     invariant(_truncateMarkers);
-    _truncateMarkers->adjust(opCtx, newSize);
+    _truncateMarkers->adjust(newSize);
     return Status::OK();
 }
 

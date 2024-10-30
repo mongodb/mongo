@@ -283,8 +283,8 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreDoesNotTrackSizeAdjustments) {
         ASSERT_TRUE(s.isOK());
         wuow.commit();
 
-        ASSERT_EQ(rs->numRecords(opCtx.get()), 0);
-        ASSERT_EQ(rs->dataSize(opCtx.get()), 0);
+        ASSERT_EQ(rs->numRecords(), 0);
+        ASSERT_EQ(rs->dataSize(), 0);
     };
 
     // Create the temporary record store and get its ident.

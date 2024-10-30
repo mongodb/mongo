@@ -1009,7 +1009,7 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
     }
 
     if (ns().isOplog() && newCappedSize) {
-        Status status = _shared->_recordStore->updateOplogSize(opCtx, *newCappedSize);
+        Status status = _shared->_recordStore->updateOplogSize(*newCappedSize);
         if (!status.isOK()) {
             return status;
         }
@@ -1152,11 +1152,11 @@ CappedVisibilitySnapshot CollectionImpl::takeCappedVisibilitySnapshot() const {
 }
 
 long long CollectionImpl::numRecords(OperationContext* opCtx) const {
-    return _shared->_recordStore->numRecords(opCtx);
+    return _shared->_recordStore->numRecords();
 }
 
 long long CollectionImpl::dataSize(OperationContext* opCtx) const {
-    return _shared->_recordStore->dataSize(opCtx);
+    return _shared->_recordStore->dataSize();
 }
 
 bool CollectionImpl::isEmpty(OperationContext* opCtx) const {

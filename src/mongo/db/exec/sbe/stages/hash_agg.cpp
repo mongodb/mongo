@@ -372,7 +372,8 @@ void HashAggStage::open(bool reOpen) {
                 spill(memoryCheckData);
             }
 
-            _specificStats.spilledDataStorageSize = _recordStore->rs()->storageSize(_opCtx);
+            auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
+            _specificStats.spilledDataStorageSize = _recordStore->rs()->storageSize(ru);
             groupCounters.incrementGroupCountersPerQuery(_specificStats.spilledDataStorageSize);
 
             // Establish a cursor, positioned at the beginning of the record store.

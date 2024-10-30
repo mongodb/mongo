@@ -211,7 +211,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
 
     LOGV2(9529901,
           "Initializing durable catalog",
-          "numRecords"_attr = _catalogRecordStore->numRecords(opCtx));
+          "numRecords"_attr = _catalogRecordStore->numRecords());
     _catalog.reset(new DurableCatalog(
         _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes, this));
     _catalog->init(opCtx);
@@ -1404,7 +1404,8 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, const Databa
     int64_t size = 0;
 
     auto perCollectionWork = [&](const Collection* collection) {
-        size += collection->getRecordStore()->storageSize(opCtx);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        size += collection->getRecordStore()->storageSize(ru);
 
         auto it = collection->getIndexCatalog()->getIndexIterator(
             opCtx,
