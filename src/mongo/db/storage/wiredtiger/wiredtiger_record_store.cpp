@@ -463,7 +463,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
         LOGV2_ERROR(7887900,
                     "Metadata format version check failed.",
                     "uri"_attr = _uri,
-                    "uuid"_attr = _uuid ? _uuid->toString() : std::string{},
+                    "uuid"_attr = _uuid,
                     "version"_attr = versionStatus.reason());
         if (versionStatus.code() == ErrorCodes::FailedToParse) {
             uasserted(28548, versionStatus.reason());

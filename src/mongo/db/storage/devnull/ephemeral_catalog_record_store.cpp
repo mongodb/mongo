@@ -310,7 +310,7 @@ const EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecor
     if (it == _data->records.end()) {
         LOGV2_ERROR(23720,
                     "EphemeralForTestRecordStore::recordFor cannot find record",
-                    "uuid"_attr = _uuid ? _uuid->toString() : std::string{},
+                    "uuid"_attr = _uuid,
                     "loc"_attr = loc);
     }
     invariant(it != _data->records.end());
@@ -323,7 +323,7 @@ EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecordStore
     if (it == _data->records.end()) {
         LOGV2_ERROR(23721,
                     "EphemeralForTestRecordStore::recordFor cannot find record",
-                    "uuid"_attr = _uuid ? _uuid->toString() : std::string{},
+                    "uuid"_attr = _uuid,
                     "loc"_attr = loc);
     }
     invariant(it != _data->records.end());
