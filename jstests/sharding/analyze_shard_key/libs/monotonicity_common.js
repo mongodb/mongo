@@ -21,7 +21,7 @@ export const kOrderTypes = [
     {
         name: "increasing",
         monotonicity: "monotonic",
-        supportedFieldTypes: ["integer", "string", "date", "objectid"]
+        supportedFieldTypes: ["integer", "string", "date"]
     },
 
     {
@@ -139,9 +139,12 @@ export function appendIncreasingField(docs, fieldName, fieldType, maxFrequency) 
                 return dateValue;
             }
             case "objectid":
-                return new ObjectId();
+                // The last 3 bytes of ObjectId by design is an incrementing counter, initialized
+                // to a random value. When the counter overflows, it is reset to 0 and continues
+                // from there. So there is no guarantee that ObjectId is increasing.
+                throw "Cannot test an increasing ObjectId";
             case "uuid":
-                throw "Cannot have a increasing UUID";
+                throw "Cannot have an increasing UUID";
             default:
                 break;
         }

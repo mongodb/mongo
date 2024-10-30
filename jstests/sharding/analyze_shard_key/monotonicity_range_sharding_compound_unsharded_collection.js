@@ -6,9 +6,9 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
+    numNodesPerRS,
     testAnalyzeShardKeysUnshardedCollection,
 } from "jstests/sharding/analyze_shard_key/libs/monotonicity_common.js";
-import {numNodesPerRS} from "jstests/sharding/analyze_shard_key/libs/monotonicity_common.js";
 import {
     numDocsRange,
     rangeShardingCompoundTestCases,
