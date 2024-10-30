@@ -40,6 +40,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 
@@ -171,7 +172,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
     }
 }
 
-TEST_F(QueryStatsTest, RegisterRequestAbsorbsErrors) {
+DEATH_TEST_REGEX_F(QueryStatsTest, RegisterRequestAbsorbsErrors, "Tripwire assertion.*9423101") {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
 
     auto opCtx = makeOperationContext();
@@ -183,13 +184,13 @@ TEST_F(QueryStatsTest, RegisterRequestAbsorbsErrors) {
     // First case - don't treat errors as fatal.
     internalQueryStatsErrorsAreCommandFatal.store(false);
 
-    // Skip these checks for debug builds because errors are always fatal in that environment.
-    if (!kDebugBuild) {
-        ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
-            uasserted(ErrorCodes::BSONObjectTooLarge, "size error");
-            return nullptr;
-        }));
+    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
+        uasserted(ErrorCodes::BSONObjectTooLarge, "size error");
+        return nullptr;
+    }));
 
+    // Skip this check for debug builds because errors are always fatal in that environment.
+    if (!kDebugBuild) {
         opDebug.queryStatsInfo = OpDebug::QueryStatsInfo{};
         ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
             uasserted(ErrorCodes::BadValue, "fake error");
@@ -207,7 +208,7 @@ TEST_F(QueryStatsTest, RegisterRequestAbsorbsErrors) {
         return nullptr;
     }));
 
-    // This should hit our assertion.
+    // This should hit our tripwire assertion.
     opDebug.queryStatsInfo = OpDebug::QueryStatsInfo{};
     ASSERT_THROWS(query_stats::registerRequest(opCtx.get(),
                                                nss,
