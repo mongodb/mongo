@@ -665,7 +665,8 @@ void ReshardingDonorService::DonorStateMachine::
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         reshardingPauseDonorBeforeCatalogCacheRefresh.pauseWhileSet(opCtx.get());
 
-        _externalState->refreshCatalogCache(opCtx.get(), _metadata.getTempReshardingNss());
+        _externalState->refreshCollectionPlacementInfo(opCtx.get(),
+                                                       _metadata.getTempReshardingNss());
         _externalState->waitForCollectionFlush(opCtx.get(), _metadata.getTempReshardingNss());
     }
 
