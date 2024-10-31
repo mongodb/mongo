@@ -122,15 +122,15 @@ private:
         result.append("shard", shardIdent);
         result.append("shardid", opId);
 
-        ScopedDbConnection conn(shard->getConnString());
-        BSONObjBuilder bob(BSON("killOp" << 1 << "op" << opId));
-        APIParameters::get(opCtx).appendInfo(&bob);
-        // intentionally ignore return value - that is how legacy killOp worked.
-        conn->runCommand(OpMsgRequestBuilder::create(
-            auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
-            DatabaseName::kAdmin,
-            bob.obj()));
-        conn.done();
+        auto cmdToSend = BSON("killOp" << 1 << "op" << opId);
+        shard
+            ->runCommand(opCtx,
+                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                         DatabaseName::kAdmin,
+                         cmdToSend,
+                         Shard::RetryPolicy::kNoRetry)
+            .getStatus()
+            .ignore();
 
         // The original behavior of killOp on mongos is to always return success, regardless of
         // whether the shard reported success or not.
