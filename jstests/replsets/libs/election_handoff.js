@@ -5,6 +5,7 @@
 export var ElectionHandoffTest = (function() {
     const kStepDownPeriodSecs = 30;
     const kSIGTERM = 15;
+    const kTimeoutMS = 5 * 60 * 1000;  // 5 minutes
 
     /**
      * Exercises and validates an election handoff scenario by stepping down the primary and
@@ -52,6 +53,10 @@ export var ElectionHandoffTest = (function() {
             {"a": 1}, {writeConcern: {w: rst.nodes.length}}));
         rst.awaitNodesAgreeOnAppliedOpTime();
 
+        // Make sure we clear any logs of RST setup, which can involve stepping up the original
+        // primary, before checking for stepup logs from the expected candidate node.
+        clearRawMongoProgramOutput();
+
         // Step down the current primary. Skip validation since it prevents election handoff.
         if (options["stepDownBySignal"]) {
             rst.stop(initialPrimaryId, kSIGTERM, {skipValidation: true}, {forRestart: true});
@@ -68,16 +73,23 @@ export var ElectionHandoffTest = (function() {
 
         const expectedCandidate = rst.nodes[expectedCandidateId];
 
-        // The checkLog() function blocks until the log line appears.
-        checkLog.contains(expectedCandidate, "Starting an election due to step up request");
+        let subStr = "Starting an election due to step up request";
+        assert.soon(function() {
+            return rawMongoProgramOutput(".*").includes(subStr);
+        }, "Secondary should have stepped up via step up request", kTimeoutMS);
 
         // If there are only two nodes in the set, verify that the old primary voted "yes".
         if (numNodes === 2) {
-            checkLog.contains(
-                expectedCandidate,
-                `Skipping dry run and running for election","attr":{"newTerm":${term + 1}}}`);
-            checkLog.checkContainsOnceJson(
-                expectedCandidate, 51799, {"term": term + 1, vote: "yes", "from": primary.host});
+            subStr = `Skipping dry run and running for election","attr":{"newTerm":${term + 1}}}`;
+            assert.soon(function() {
+                return rawMongoProgramOutput(".*").includes(subStr);
+            }, "Secondary should have run for an election in term: " + (term + 1), kTimeoutMS);
+
+            subStr = `{"term":${term + 1},"dryRun":false,"vote":"yes","from":"${primary.host}"`;
+            jsTestLog(subStr);
+            assert.soon(function() {
+                return rawMongoProgramOutput(".*").includes(subStr);
+            }, "Primary should have voted yes for secondary", kTimeoutMS);
         }
 
         rst.awaitNodesAgreeOnPrimary();
