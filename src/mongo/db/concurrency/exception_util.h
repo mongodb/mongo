@@ -53,7 +53,7 @@ namespace mongo {
 extern FailPoint skipWriteConflictRetries;
 
 /**
- * Will log a message if sensible and will do an increasing backoff to make sure
+ * Will log a message if sensible and will do an exponential backoff to make sure
  * we don't hammer the same doc over and over.
  * @param attempt - what attempt is this, 1 based
  * @param operation - e.g. "update"
@@ -134,86 +134,6 @@ template <ErrorCodes::Error ec>
     error_details::throwExceptionFor<ErrorCodes::TransactionTooLargeForCache>(std::move(context));
 }
 
-/** Stateful object for executing the `writeConflictRetry` function below. */
-class WriteConflictRetryAlgorithm {
-public:
-    static constexpr double backoffInitial = .1;
-    static constexpr double backoffGrowth = 1.1;
-
-    WriteConflictRetryAlgorithm(OperationContext* opCtx,
-                                StringData opStr,
-                                const NamespaceStringOrUUID& nssOrUUID,
-                                boost::optional<size_t> retryLimit)
-        : _opCtx{opCtx}, _opStr{opStr}, _nssOrUUID{nssOrUUID}, _retryLimit{retryLimit} {
-        invariant(_opCtx);
-        invariant(shard_role_details::getLocker(_opCtx));
-        invariant(shard_role_details::getRecoveryUnit(_opCtx));
-    }
-
-    /** Returns whatever `f` returns. */
-    decltype(auto) operator()(auto&& f) {
-        // Always run without retries in a WuoW.
-        if (shard_role_details::getLocker(_opCtx)->inAWriteUnitOfWork())
-            return _runWithoutRetries(f);
-
-        // This failpoint disables exception handling for write conflicts. Only
-        // allow this exception to escape user operations. Do not allow exceptions
-        // to escape internal threads, which may rely on this exception handler to
-        // avoid crashing.
-        // We avoid "entering" the FailPoint until we really need to.
-        if (auto sfp = skipWriteConflictRetries.scopedIf(
-                [&](auto&&) { return _opCtx->getClient()->isFromUserConnection(); });
-            MONGO_unlikely(sfp.isActive()))
-            return _runWithoutRetries(f);
-
-        // Initialized on the first failure for a faster happy path
-        boost::optional<Timer> timer;
-        while (true) {
-            try {
-                return f();
-            } catch (...) {
-                if (timer)
-                    _conflictTime += timer->elapsed();
-                _handleFailedAttempt();
-                if (!timer)
-                    timer.emplace();
-            }
-        }
-    }
-
-private:
-    decltype(auto) _runWithoutRetries(auto&& f) {
-        try {
-            return f();
-        } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable> const& e) {
-            if (_opCtx->inMultiDocumentTransaction()) {
-                convertToWCEAndRethrow(_opCtx, _opStr, e);
-            }
-            throw;
-        } catch (ExceptionFor<ErrorCodes::WriteConflict>&) {
-            CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-            throw;
-        }
-    }
-
-    void _handleFailedAttempt();
-    void _emitLog(StringData reason);
-    void _assertRetryLimit() const;
-    void _handleWriteConflictException(const ExceptionFor<ErrorCodes::WriteConflict>& e);
-
-    OperationContext* _opCtx;
-    StringData _opStr;
-    const NamespaceStringOrUUID& _nssOrUUID;
-    boost::optional<size_t> _retryLimit;
-
-    size_t _wceCount = 0;
-    size_t _tempUnavailableCount = 0;
-    Microseconds _conflictTime{0};
-    Microseconds _totalSleepTime{0};
-    Microseconds _lastLogTime{0};
-    double _backoffFactor = backoffInitial;
-};
-
 /**
  * Runs the argument function f as many times as needed for f to complete or throw an exception
  * other than WriteConflictException or TemporarilyUnavailableException. For each time f throws
@@ -233,7 +153,52 @@ auto writeConflictRetry(OperationContext* opCtx,
                         const NamespaceStringOrUUID& nssOrUUID,
                         F&& f,
                         boost::optional<size_t> retryLimit = boost::none) {
-    return WriteConflictRetryAlgorithm{opCtx, opStr, nssOrUUID, retryLimit}(std::forward<F>(f));
+    invariant(opCtx);
+    invariant(shard_role_details::getLocker(opCtx));
+    invariant(shard_role_details::getRecoveryUnit(opCtx));
+
+    // This failpoint disables exception handling for write conflicts. Only allow this exception to
+    // escape user operations. Do not allow exceptions to escape internal threads, which may rely on
+    // this exception handler to avoid crashing.
+    bool userSkipWriteConflictRetry = MONGO_unlikely(skipWriteConflictRetries.shouldFail()) &&
+        opCtx->getClient()->isFromUserConnection();
+    if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork() || userSkipWriteConflictRetry) {
+        try {
+            return f();
+        } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable> const& e) {
+            if (opCtx->inMultiDocumentTransaction()) {
+                convertToWCEAndRethrow(opCtx, opStr, e);
+            }
+            throw;
+        } catch (ExceptionFor<ErrorCodes::WriteConflict>&) {
+            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+            throw;
+        }
+    }
+
+    size_t writeConflictAttempts = 0;
+    size_t attemptsTempUnavailable = 0;
+    while (true) {
+        try {
+            return f();
+        } catch (ExceptionFor<ErrorCodes::WriteConflict> const& e) {
+            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+            logWriteConflictAndBackoff(writeConflictAttempts, opStr, e.reason(), nssOrUUID);
+            ++writeConflictAttempts;
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+            if (MONGO_unlikely(retryLimit && writeConflictAttempts > *retryLimit)) {
+                LOGV2_ERROR(7677402,
+                            "Got too many write conflicts, the server may run into problems.");
+                fassert(7677401, !getTestCommandsEnabled());
+            }
+        } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable> const& e) {
+            handleTemporarilyUnavailableException(
+                opCtx, ++attemptsTempUnavailable, opStr, nssOrUUID, e, writeConflictAttempts);
+        } catch (ExceptionFor<ErrorCodes::TransactionTooLargeForCache> const& e) {
+            handleTransactionTooLargeForCacheException(
+                opCtx, opStr, nssOrUUID, e, writeConflictAttempts);
+        }
+    }
 }
 
 }  // namespace mongo
