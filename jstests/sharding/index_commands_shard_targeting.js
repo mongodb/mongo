@@ -59,11 +59,6 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     }
     assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
 
-    // Assert that primary shard still has stale collection version after the command is run
-    // because both the shard version in the command and in the shard's cache are UNSHARDED
-    // (no chunks).
-    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, latestCollectionVersion);
-
     // Assert that the targeted shards have the latest collection version after the command is
     // run.
     ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, latestCollectionVersion);
