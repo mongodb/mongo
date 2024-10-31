@@ -47,8 +47,7 @@ jsTestLog("Waiting for primary to register the index build");
 hangFpOnSetup.wait();
 
 jsTestLog("Stepping up the secondary");
-assert.commandWorked(secondary.adminCommand({replSetStepUp: 1}));
-rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
+rst.stepUp(secondary);
 
 jsTestLog("Waiting for new primary to start index build with the same name");
 let awaitSecondaryIndexBuild =
