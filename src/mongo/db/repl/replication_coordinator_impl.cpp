@@ -193,8 +193,6 @@ MONGO_FAIL_POINT_DEFINE(hangDuringAutomaticReconfig);
 MONGO_FAIL_POINT_DEFINE(ReconfigHangBeforeConfigValidationCheck);
 // Blocks after reconfig runs.
 MONGO_FAIL_POINT_DEFINE(hangAfterReconfig);
-// Allows skipping fetching the config from ping sender.
-MONGO_FAIL_POINT_DEFINE(skipBeforeFetchingConfig);
 // Hang after grabbing the RSTL but before we start rejecting writes.
 MONGO_FAIL_POINT_DEFINE(stepdownHangAfterGrabbingRSTL);
 // Hang before making checks on the new config relative to the current one.
@@ -6214,29 +6212,6 @@ bool ReplicationCoordinatorImpl::getWriteConcernMajorityShouldJournal(WithLock l
     return _rsConfig.getConfig(lk).getWriteConcernMajorityShouldJournal();
 }
 
-namespace {
-// Fail point to block and optionally skip fetching config. Supported arguments:
-//   versionAndTerm: [ v, t ]
-void _handleBeforeFetchingConfig(const BSONObj& customArgs,
-                                 ConfigVersionAndTerm versionAndTerm,
-                                 bool* skipFetchingConfig) {
-    if (customArgs.hasElement("versionAndTerm")) {
-        const auto nested = customArgs["versionAndTerm"].embeddedObject();
-        std::vector<BSONElement> elements;
-        nested.elems(elements);
-        invariant(elements.size() == 2);
-        ConfigVersionAndTerm patternVersionAndTerm =
-            ConfigVersionAndTerm(elements[0].numberInt(), elements[1].numberInt());
-        if (patternVersionAndTerm == versionAndTerm) {
-            LOGV2(5940905,
-                  "Failpoint is activated to skip fetching config for version and term",
-                  "versionAndTerm"_attr = versionAndTerm);
-            *skipFetchingConfig = true;
-        }
-    }
-}
-}  // namespace
-
 Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                                       ReplSetHeartbeatResponse* response) {
     {
@@ -6317,16 +6292,8 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
         // We cannot cancel the enqueued heartbeat, but either this one or the enqueued heartbeat
         // will trigger reconfig, which cancels and reschedules all heartbeats.
         else if (args.hasSender()) {
-            bool inTestSkipFetchingConfig = false;
-            skipBeforeFetchingConfig.execute([&](const BSONObj& customArgs) {
-                _handleBeforeFetchingConfig(
-                    customArgs, args.getConfigVersionAndTerm(), &inTestSkipFetchingConfig);
-            });
-
-            if (!inTestSkipFetchingConfig) {
-                LOGV2(21401, "Scheduling heartbeat to fetch a newer config", attr);
-                _scheduleHeartbeatToTarget(lk, senderHost, now, replSetName);
-            }
+            LOGV2(21401, "Scheduling heartbeat to fetch a newer config", attr);
+            _scheduleHeartbeatToTarget(lk, senderHost, now, replSetName);
         }
     } else if (result.isOK() && args.getPrimaryId() >= 0 &&
                (!response->hasPrimaryId() || response->getPrimaryId() != args.getPrimaryId())) {

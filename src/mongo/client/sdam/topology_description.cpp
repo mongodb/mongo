@@ -55,9 +55,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 
-// Checkpoint to track when election Id and Set version is changed.
-MONGO_FAIL_POINT_DEFINE(maxElectionIdSetVersionPairUpdated);
-
 namespace mongo::sdam {
 MONGO_FAIL_POINT_DEFINE(topologyDescriptionInstallServerDescription);
 
@@ -111,16 +108,6 @@ ElectionIdSetVersionPair TopologyDescription::getMaxElectionIdSetVersionPair() c
 }
 
 void TopologyDescription::updateMaxElectionIdSetVersionPair(const ElectionIdSetVersionPair& pair) {
-    if (MONGO_unlikely(maxElectionIdSetVersionPairUpdated.shouldFail())) {
-        LOGV2(5940906,
-              "Fail point maxElectionIdSetVersionPairUpdated",
-              "topologyId"_attr = _id,
-              "primaryForSet"_attr = _setName ? *_setName : std::string("Unknown"),
-              "incomingElectionId"_attr = pair.electionId,
-              "currentMaxElectionId"_attr = _maxElectionIdSetVersionPair.electionId,
-              "incomingSetVersion"_attr = pair.setVersion,
-              "currentMaxSetVersion"_attr = _maxElectionIdSetVersionPair.setVersion);
-    }
     _maxElectionIdSetVersionPair = pair;
 }
 
