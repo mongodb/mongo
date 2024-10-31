@@ -29,60 +29,60 @@
 
 #include "mongo/bson/oid.h"
 
-#include <cstring>
-
 #include <absl/hash/hash.h>
+#include <cstring>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/platform/endian.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
+
+namespace mongo {
 namespace {
 
-using mongo::OID;
-
-TEST(Equals, Simple) {
+TEST(OIDTest, Equals) {
     OID o1 = OID::gen();
 
-    ASSERT_EQUALS(o1, o1);
+    ASSERT_EQ(o1, o1);
     ASSERT_TRUE(o1 == o1);
-    ASSERT_EQUALS(o1.compare(o1), 0);
+    ASSERT_EQ(o1.compare(o1), 0);
 }
 
-TEST(NotEquals, Simple) {
+TEST(OIDTest, NotEquals) {
     OID o1 = OID::gen();
     OID o2 = OID::gen();
 
+    ASSERT_NE(o1, o2);
     ASSERT_FALSE(o1 == o2);
     ASSERT_TRUE(o1 != o2);
-    ASSERT_NOT_EQUALS(o1.compare(o2), 0);
+    ASSERT_NE(o1.compare(o2), 0);
 }
 
-TEST(Increasing, Simple) {
+TEST(OIDTest, Increasing) {
     OID o1 = OID::gen();
     OID o2 = OID::gen();
-    ASSERT_TRUE(o1 < o2);
+    ASSERT_LT(o1, o2);
 }
 
-TEST(IsSet, Simple) {
+TEST(OIDTest, IsSet) {
     OID o;
     ASSERT_FALSE(o.isSet());
     o.init();
     ASSERT_TRUE(o.isSet());
 }
 
-TEST(JustForked, Simple) {
+TEST(OIDTest, JustForked) {
     OID o1 = OID::gen();
     OID::justForked();
     OID o2 = OID::gen();
 
-    ASSERT_TRUE(std::memcmp(o1.getInstanceUnique().bytes,
-                            o2.getInstanceUnique().bytes,
-                            OID::kInstanceUniqueSize) != 0);
+    ASSERT_NE(std::memcmp(o1.getInstanceUnique().bytes,
+                          o2.getInstanceUnique().bytes,
+                          OID::kInstanceUniqueSize),
+              0);
 }
 
-TEST(TimestampIsBigEndian, Endianness) {
+TEST(OIDTest, TimestampIsBigEndian) {
     OID o1;  // zeroed
     OID::Timestamp ts = 123;
     o1.setTimestamp(ts);
@@ -93,7 +93,7 @@ TEST(TimestampIsBigEndian, Endianness) {
     ASSERT(std::memcmp(&ts_big, oidBytes, sizeof(int32_t)) == 0);
 }
 
-TEST(IncrementIsBigEndian, Endianness) {
+TEST(OIDTest, IncrementIsBigEndian) {
     OID o1;  // zeroed
     OID::Increment incr;
     // Increment is a 3 byte counter big endian
@@ -107,12 +107,12 @@ TEST(IncrementIsBigEndian, Endianness) {
     oidBytes += OID::kTimestampSize + OID::kInstanceUniqueSize;
 
     // now at start of increment
-    ASSERT_EQUALS(uint8_t(oidBytes[0]), 0xBEu);
-    ASSERT_EQUALS(uint8_t(oidBytes[1]), 0xADu);
-    ASSERT_EQUALS(uint8_t(oidBytes[2]), 0xDEu);
+    ASSERT_EQ(uint8_t(oidBytes[0]), 0xBEu);
+    ASSERT_EQ(uint8_t(oidBytes[1]), 0xADu);
+    ASSERT_EQ(uint8_t(oidBytes[2]), 0xDEu);
 }
 
-TEST(Basic, Deserialize) {
+TEST(OIDTest, Deserialize) {
     uint8_t OIDbytes[] = {
         0xDEu,
         0xADu,
@@ -130,10 +130,10 @@ TEST(Basic, Deserialize) {
 
     OID o1 = OID::from(OIDbytes);
 
-    ASSERT_EQUALS(o1.getTimestamp(), -559038737);
+    ASSERT_EQ(o1.getTimestamp(), -559038737);
     OID::InstanceUnique u = o1.getInstanceUnique();
     for (std::size_t i = 0; i < OID::kInstanceUniqueSize; ++i) {
-        ASSERT_EQUALS(u.bytes[i], 0x00u);
+        ASSERT_EQ(u.bytes[i], 0x00u);
     }
     OID::Increment i = o1.getIncrement();
 
@@ -142,23 +142,23 @@ TEST(Basic, Deserialize) {
     uint32_t incr =
         ((uint32_t(i.bytes[0]) << 16)) | ((uint32_t(i.bytes[1]) << 8)) | uint32_t(i.bytes[2]);
 
-    ASSERT_EQUALS(1122867u, incr);
+    ASSERT_EQ(1122867u, incr);
 }
 
-TEST(Basic, FromString) {
+TEST(OIDTest, FromString) {
     std::string oidStr("541b1a00e8a23afa832b218e");
     uint8_t oidBytes[] = {
         0x54u, 0x1Bu, 0x1Au, 0x00u, 0xE8u, 0xA2u, 0x3Au, 0xFAu, 0x83u, 0x2Bu, 0x21u, 0x8Eu};
 
-    ASSERT_EQUALS(OID(oidStr), OID::from(oidBytes));
+    ASSERT_EQ(OID(oidStr), OID::from(oidBytes));
 }
 
-TEST(Basic, FromStringToString) {
+TEST(OIDTest, FromStringToString) {
     std::string fromStr("541b1a00e8a23afa832b218e");
-    ASSERT_EQUALS(OID(fromStr).toString(), fromStr);
+    ASSERT_EQ(OID(fromStr).toString(), fromStr);
 }
 
-TEST(Basic, FromTerm) {
+TEST(OIDTest, FromTerm) {
     auto term = 7;
     auto oid = OID::fromTerm(term);
 
@@ -166,16 +166,17 @@ TEST(Basic, FromTerm) {
     auto oidHead = oidStr.substr(0, 8);
     auto oidTail = oidStr.substr(oidStr.length() - 1);
 
-    ASSERT_EQUALS("7fffffff", oidHead);
+    ASSERT_EQ("7fffffff", oidHead);
     int oidTailInt;
     ASSERT_OK(mongo::NumberParser::strToAny()(oidTail, &oidTailInt));
-    ASSERT_EQUALS(term, oidTailInt);
+    ASSERT_EQ(term, oidTailInt);
 }
 
-TEST(Basic, AbslHash) {
+TEST(OIDTest, AbslHash) {
     OID o1 = OID::gen();
     OID o2 = o1;
-    ASSERT_EQUALS(absl::Hash<OID>{}(o1), absl::Hash<OID>{}(o2));
+    ASSERT_EQ(absl::Hash<OID>{}(o1), absl::Hash<OID>{}(o2));
 }
 
 }  // namespace
+}  // namespace mongo
