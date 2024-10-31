@@ -295,9 +295,11 @@ void setResolvedNamespaceForSearch(const NamespaceString& origNss,
                                    const ResolvedView& resolvedView,
                                    boost::intrusive_ptr<ExpressionContext> expCtx,
                                    boost::optional<UUID> uuid) {
-    auto resolvedNamespaces = StringMap<ResolvedNamespace>{
-        {origNss.coll().toString(),
-         {resolvedView.getNamespace(), resolvedView.getPipeline(), uuid}}};
+    auto resolvedNamespaces = StringMap<ResolvedNamespace>{{origNss.coll().toString(),
+                                                            {resolvedView.getNamespace(),
+                                                             resolvedView.getPipeline(),
+                                                             uuid,
+                                                             true /*involvedNamespaceIsAView*/}}};
     expCtx->setResolvedNamespaces(resolvedNamespaces);
     expCtx->viewNS = boost::make_optional(origNss);
 }

@@ -265,8 +265,12 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContextBuilder::build() {
 
 ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
                                      std::vector<BSONObj> pipeline,
-                                     boost::optional<UUID> collUUID)
-    : ns(std::move(ns)), pipeline(std::move(pipeline)), uuid(collUUID) {}
+                                     boost::optional<UUID> collUUID,
+                                     bool involvedNamespaceIsAView)
+    : ns(std::move(ns)),
+      pipeline(std::move(pipeline)),
+      uuid(collUUID),
+      involvedNamespaceIsAView(involvedNamespaceIsAView) {}
 
 ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
     : explain(params.explain),
@@ -403,6 +407,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
         expCtx->setIgnoreCollator();
     }
 
+    expCtx->viewNS = viewNS;
     expCtx->inRouter = inRouter;
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
     expCtx->subPipelineDepth = subPipelineDepth;

@@ -81,6 +81,7 @@ bool isSearchPipeline(const Pipeline* pipeline);
  */
 bool isSearchMetaPipeline(const Pipeline* pipeline);
 
+/* This function is only called if the mongot pipeline is on a view. */
 void setResolvedNamespaceForSearch(const NamespaceString& origNss,
                                    const ResolvedView& resolvedView,
                                    boost::intrusive_ptr<ExpressionContext> expCtx,

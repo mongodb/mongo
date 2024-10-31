@@ -195,6 +195,11 @@ public:
         return dsLookup;
     }
 
+    void resolvedPipelineHelper(
+        NamespaceString fromNs,
+        std::vector<BSONObj> pipeline,
+        boost::optional<std::pair<std::string, std::string>> localForeignFields,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
     /**
      * Builds the BSONObj used to query the foreign collection and wraps it in a $match.
      */
@@ -432,6 +437,7 @@ private:
 
     NamespaceString _fromNs;
     NamespaceString _resolvedNs;
+    bool _fromNsIsAView;
 
     // Path to the "as" field of the $lookup where the matches output array will be created.
     FieldPath _as;

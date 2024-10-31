@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-namespace search_helpers_bson_obj {
+namespace search_helper_bson_obj {
 
 inline bool isMongotPipeline(const std::vector<BSONObj> pipeline) {
     if (pipeline.size() >= 1 &&
@@ -49,7 +49,7 @@ inline bool isMongotPipeline(const std::vector<BSONObj> pipeline) {
 }
 
 
-}  // namespace search_helpers_bson_obj
+}  // namespace search_helper_bson_obj
 
 
 }  // namespace mongo

@@ -95,7 +95,6 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
         }
         cursorOptionsBob.doneFast();
     }
-
     return getRemoteCommandRequest(opCtx, nss, cmdBob.obj());
 }
 

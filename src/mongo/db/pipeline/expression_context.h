@@ -106,11 +106,13 @@ struct ResolvedNamespace {
     ResolvedNamespace() = default;
     ResolvedNamespace(NamespaceString ns,
                       std::vector<BSONObj> pipeline,
-                      boost::optional<UUID> uuid = boost::none);
+                      boost::optional<UUID> uuid = boost::none,
+                      bool involvedNamespaceIsAView = false);
 
     NamespaceString ns;
     std::vector<BSONObj> pipeline;
     boost::optional<UUID> uuid = boost::none;
+    bool involvedNamespaceIsAView = false;
 };
 
 enum class ExpressionContextCollationMatchesDefault { kYes, kNo };

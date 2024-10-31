@@ -71,8 +71,10 @@ StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces()
             auto&& underlyingNs = resolvedView.getValue().getNamespace();
             // Attempt to acquire UUID of the underlying collection using lock free method.
             auto uuid = catalog->lookupUUIDByNSS(_opCtx, underlyingNs);
-            resolvedNamespaces[ns.coll()] = {
-                underlyingNs, resolvedView.getValue().getPipeline(), uuid};
+            resolvedNamespaces[ns.coll()] = {underlyingNs,
+                                             resolvedView.getValue().getPipeline(),
+                                             uuid,
+                                             true /*involvedNamespaceIsAView*/};
 
             // We parse the pipeline corresponding to the resolved view in case we must resolve
             // other view namespaces that are also involved.
