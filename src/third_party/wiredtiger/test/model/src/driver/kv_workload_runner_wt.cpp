@@ -269,6 +269,23 @@ kv_workload_runner_wt::do_operation(const operation::begin_transaction &op)
  *     Execute the given workload operation in WiredTiger.
  */
 int
+kv_workload_runner_wt::do_operation(const operation::breakpoint &op)
+{
+    std::shared_lock lock(_connection_lock);
+    WT_SESSION *session;
+    int ret = _connection->open_session(_connection, nullptr, nullptr, &session);
+    if (ret != 0)
+        return ret;
+    wiredtiger_session_guard session_guard(session);
+
+    return session->breakpoint(session);
+}
+
+/*
+ * kv_workload_runner_wt::do_operation --
+ *     Execute the given workload operation in WiredTiger.
+ */
+int
 kv_workload_runner_wt::do_operation(const operation::checkpoint &op)
 {
     std::shared_lock lock(_connection_lock);

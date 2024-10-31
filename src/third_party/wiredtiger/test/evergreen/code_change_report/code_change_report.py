@@ -476,9 +476,10 @@ def generate_html_report_as_text(code_change_info: dict, verbose: bool):
     return report
 
 
-def build_pr_comment(code_change_info: dict) -> str | None:
+def build_pr_comment(code_change_info: dict, code_change_report_url: str) -> str | None:
     # Do nothing if the PR has no relevant changes.
     if int(code_change_info['summary_info']['num_lines']) == 0:
+        logging.info("No need to post a PR comment as there's no relevant change made.")
         return None
 
     message = ""
@@ -507,9 +508,17 @@ def build_pr_comment(code_change_info: dict) -> str | None:
         if pct_branches_covered >= 80:
             coverage_note = "Woohoo, the code changed in this PR is pretty well tested! :tada:"
         elif pct_branches_covered >= 50 and pct_lines_covered >= 80:
-            coverage_note = "Test coverage is ok, please try and improve it if that's feasible."
+            coverage_note = "Test coverage is ok, please refer to the Code change/coverage report links below and try to improve it if feasible."
         else:
-            coverage_note = "Test coverage is too low, this change probably shouldn't be merged as-is."
+            coverage_note = "Test coverage is very low, please refer to the Code change/coverage report links below and try to improve it if feasible."
+
+    task_name_code_change_report      = "code-change-report"
+    task_name_coverage_report_catch2  = "coverage-report-catch2"
+    task_name_coverage_report_full    = "generate-coverage-report"
+    file_name_code_change_report_html = "code_change_report.html"
+    file_name_coverage_report_html    = "1_coverage_report_main.html"
+    code_coverage_report_catch2_url   = code_change_report_url.replace(task_name_code_change_report, task_name_coverage_report_catch2).replace(file_name_code_change_report_html, file_name_coverage_report_html)
+    code_coverage_report_full_url     = code_change_report_url.replace(task_name_code_change_report, task_name_coverage_report_full).replace(file_name_code_change_report_html, file_name_coverage_report_html)
 
     message += textwrap.dedent(f"""
         {coverage_note}
@@ -518,7 +527,12 @@ def build_pr_comment(code_change_info: dict) -> str | None:
         |------------------------------------------|-------|
         | Line coverage                            | {lines_covered} |
         | Branch coverage                          | {branches_covered} |
+
+        - [Code change report]({code_change_report_url})
+        - [Code coverage report (catch2)]({code_coverage_report_catch2_url})
+        - [Code coverage report (full)]({code_coverage_report_full_url})
     """)
+    logging.debug(message)
 
     # Complexity
     changed_functions = code_change_info["changed_functions"]
@@ -587,6 +601,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--code_change_info', required=True, help='Path to the code change info file')
     parser.add_argument('-o', '--html_output', required=True, help='Path of the html file to write output to')
+    parser.add_argument('--code_change_report_url', help='URL of the code change report')
     parser.add_argument('--github_repo', default='wiredtiger/wiredtiger', help='The github repo for this change')
     parser.add_argument('--github_pr_number', help='A github PR id for this change')
     parser.add_argument('--github_token', help='An API token for github for leaving pr comments')
@@ -602,6 +617,7 @@ def main():
         print('====================')
         print('Configuration:')
         print('  Code change info file:  {}'.format(args.code_change_info))
+        print('  Code change report URL:  {}'.format(args.code_change_report_url))
         print('  Html output file:  {}'.format(args.html_output))
         print('  Leave PR Comment: {}'.format(leave_pr_comment))
 
@@ -612,7 +628,7 @@ def main():
         output_file.writelines(html_report_as_text)
 
     if leave_pr_comment:
-        comment = build_pr_comment(code_change_info=code_change_info)
+        comment = build_pr_comment(code_change_info=code_change_info, code_change_report_url=args.code_change_report_url)
         post_pr_comment(args.github_repo, args.github_pr_number, args.github_token, comment)
 
 

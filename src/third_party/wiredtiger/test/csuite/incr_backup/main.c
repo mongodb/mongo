@@ -59,6 +59,7 @@
 #define NUM_ALLOC 5
 static const char *alloc_sizes[] = {"512B", "8K", "64K", "1M", "16M"};
 
+static int total_ranges = 0;
 static int verbose_level = 0;
 static uint64_t seed = 0;
 
@@ -427,6 +428,7 @@ incr_backup(WT_CONNECTION *conn, const char *home, TABLE_INFO *tinfo)
       "INCREMENTAL BACKUP: COMPLETE: %" PRIu32 " files=%" PRId32 ", ranges=%" PRId32
       ", unmodified=%" PRId32 "\n",
       tinfo->incr_backup_number, nfiles, nranges, num_modified);
+    total_ranges += nranges;
 }
 
 /*
@@ -774,6 +776,7 @@ main(int argc, char *argv[])
         rnd.v = seed_param;
         run_test(working_dir, &rnd, preserve);
     }
+    printf("Total backup ranges copied: %d\n", total_ranges);
 
     return (EXIT_SUCCESS);
 }

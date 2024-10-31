@@ -30,6 +30,8 @@
  */
 #include <test_util.h>
 
+static int total_ranges = 0;
+
 static const char *const home = "WT_BLOCK";
 static const char *const home_full = "WT_BLOCK_LOG_FULL";
 static const char *const home_incr = "WT_BLOCK_LOG_INCR";
@@ -310,7 +312,7 @@ take_incr_backup(WT_SESSION *session, int i)
     WT_CURSOR *backup_cur, *incr_cur;
     uint64_t offset, size, type;
     size_t alloc, count, rdsize, tmp_sz;
-    int j, ret, rfd, wfd;
+    int j, nranges, ret, rfd, wfd;
     char buf[1024], h[256], *tmp;
     const char *filename, *idstr;
     bool first;
@@ -335,6 +337,7 @@ take_incr_backup(WT_SESSION *session, int i)
     alloc = FLIST_INIT;
     flist = calloc(alloc, sizeof(FILELIST));
     testutil_assert(flist != NULL);
+    nranges = 0;
     /* For each file listed, open a duplicate backup cursor and copy the blocks. */
     while ((ret = backup_cur->next(backup_cur)) == 0) {
         error_check(backup_cur->get_key(backup_cur, &filename));
@@ -366,6 +369,7 @@ take_incr_backup(WT_SESSION *session, int i)
                  * We should never get a range key after a whole file so the read file descriptor
                  * should be valid. If the read descriptor is valid, so is the write one.
                  */
+                ++nranges;
                 if (tmp_sz < size) {
                     tmp = realloc(tmp, size);
                     testutil_assert(tmp != NULL);
@@ -434,6 +438,7 @@ take_incr_backup(WT_SESSION *session, int i)
     /* Done processing all files. Close backup cursor. */
     error_check(backup_cur->close(backup_cur));
     error_check(finalize_files(flist, count));
+    total_ranges += nranges;
     free(tmp);
 }
 
@@ -528,6 +533,7 @@ main(int argc, char *argv[])
     error_check(wt_conn->close(wt_conn, NULL));
 
     printf("Final comparison: dumping and comparing data\n");
+    printf("Total backup ranges copied: %d\n", total_ranges);
     error_check(compare_backups(0));
     for (i = 0; i < (int)filelist_count; ++i) {
         if (last_flist[i].name == NULL)
