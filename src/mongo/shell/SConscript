@@ -61,6 +61,7 @@ env.CppUnitTest(
         "kms_test.cpp" if get_option("ssl") == "on" else [],
         "shell_options_test.cpp",
         "shell_utils_test.cpp",
+        "program_runner_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/util/signal_handlers",
