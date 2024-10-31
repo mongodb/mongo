@@ -1,31 +1,36 @@
 /**
- * Tests for basic functionality of the resharding improvements feature.
+ * Tests for basic functionality of features implemented in the resharding improvements project.
+ * More specifically it tests shardDistribution, forceRedistribution and new index creation for a
+ * shard key (if one does not exist).
  *
  * @tags: [
  *  requires_fcv_72,
  *  featureFlagReshardingImprovements
  * ]
  */
-
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
+import {getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
-const st = new ShardingTest({mongos: 1, shards: 2});
-const kDbName = 'db';
-const collName = 'foo';
-const ns = kDbName + '.' + collName;
-const mongos = st.s0;
+// This test requires at least two shards.
+const shardNames = getShardNames(db);
+if (shardNames.length < 2) {
+    jsTestLog("This test requires at least two shards.");
+    quit();
+}
+
+const collName = jsTestName();
+const dbName = db.getName();
+const ns = dbName + '.' + collName;
+const mongos = db.getMongo();
 const kNumInitialDocs = 500;
-const reshardCmdTest =
-    new ReshardCollectionCmdTest({st, dbName: kDbName, collName, numInitialDocs: kNumInitialDocs});
-
-const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000; /* 1 day */
-const topology = DiscoverTopology.findConnectedNodes(mongos);
-const coordinator = new Mongo(topology.configsvr.nodes[0]);
-assert.commandWorked(coordinator.getDB("admin").adminCommand(
-    {setParameter: 1, reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}));
+const reshardCmdTest = new ReshardCollectionCmdTest({
+    mongos,
+    dbName: dbName,
+    collName,
+    numInitialDocs: kNumInitialDocs,
+    skipDirectShardChecks: true
+});
 
 const testShardDistribution = (mongos) => {
     if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
@@ -43,8 +48,8 @@ const testShardDistribution = (mongos) => {
         reshardCollection: ns,
         key: {newKey: 1},
         shardDistribution: [
-            {shard: st.shard0.shardName, min: {newKey: MinKey}},
-            {shard: st.shard1.shardName, max: {newKey: MaxKey}}
+            {shard: shardNames[0], min: {newKey: MinKey}},
+            {shard: shardNames[1], max: {newKey: MaxKey}}
         ]
     }),
                                  ErrorCodes.InvalidOptions);
@@ -55,8 +60,8 @@ const testShardDistribution = (mongos) => {
         reshardCollection: ns,
         key: {newKey: 1},
         shardDistribution: [
-            {shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: 0}},
-            {shard: st.shard1.shardName, min: {oldKey: 0}, max: {oldKey: MaxKey}}
+            {shard: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: 0}},
+            {shard: shardNames[1], min: {oldKey: 0}, max: {oldKey: MaxKey}}
         ]
     }),
                                  ErrorCodes.InvalidOptions);
@@ -67,8 +72,8 @@ const testShardDistribution = (mongos) => {
         reshardCollection: ns,
         key: {newKey: 1},
         shardDistribution: [
-            {shard: st.shard0.shardName},
-            {shard: st.shard1.shardName, min: {newKey: MinKey}, max: {newKey: MaxKey}}
+            {shard: shardNames[0]},
+            {shard: shardNames[1], min: {newKey: MinKey}, max: {newKey: MaxKey}}
         ]
     }),
                                  ErrorCodes.InvalidOptions);
@@ -79,8 +84,8 @@ const testShardDistribution = (mongos) => {
         reshardCollection: ns,
         key: {newKey: 1},
         shardDistribution: [
-            {shard: st.shard0.shardName, min: {newKey: -1}, max: {newKey: 0}},
-            {shard: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
+            {shard: shardNames[0], min: {newKey: -1}, max: {newKey: 0}},
+            {shard: shardNames[1], min: {newKey: 0}, max: {newKey: MaxKey}}
         ]
     }),
                                  ErrorCodes.InvalidOptions);
@@ -90,8 +95,8 @@ const testShardDistribution = (mongos) => {
         reshardCollection: ns,
         key: {newKey: 1},
         shardDistribution: [
-            {shard: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: -1}},
-            {shard: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
+            {shard: shardNames[0], min: {newKey: MinKey}, max: {newKey: -1}},
+            {shard: shardNames[1], min: {newKey: 0}, max: {newKey: MaxKey}}
         ]
     }),
                                  ErrorCodes.InvalidOptions);
@@ -107,7 +112,7 @@ const testShardDistribution = (mongos) => {
         ]
     }),
                                  ErrorCodes.ShardNotFound);
-    mongos.getDB(kDbName)[collName].drop();
+    mongos.getDB(dbName)[collName].drop();
 
     /**
      * Success cases go below.
@@ -117,23 +122,22 @@ const testShardDistribution = (mongos) => {
         reshardCollection: ns,
         key: {newKey: 1},
         numInitialChunks: 2,
-        shardDistribution: [{shard: st.shard0.shardName}, {shard: st.shard1.shardName}]
+        shardDistribution: [{shard: shardNames[0]}, {shard: shardNames[1]}]
     },
                                        2);
     reshardCmdTest.assertReshardCollOk(
         {
             reshardCollection: ns,
             key: {newKey: 1},
-            numInitialChunks: 1,
             shardDistribution: [
-                {shard: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: 0}},
-                {shard: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
+                {shard: shardNames[0], min: {newKey: MinKey}, max: {newKey: 0}},
+                {shard: shardNames[1], min: {newKey: 0}, max: {newKey: MaxKey}}
             ]
         },
         2,
         [
-            {recipientShardId: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: 0}},
-            {recipientShardId: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
+            {recipientShardId: shardNames[0], min: {newKey: MinKey}, max: {newKey: 0}},
+            {recipientShardId: shardNames[1], min: {newKey: 0}, max: {newKey: MaxKey}}
         ]);
 };
 
@@ -165,39 +169,36 @@ const testForceRedistribution = (mongos) => {
             forceRedistribution: true,
             numInitialChunks: 1,
             shardDistribution:
-                [{shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: MaxKey}}]
+                [{shard: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: MaxKey}}]
         },
         1,
-        [{recipientShardId: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: MaxKey}}]);
+        [{recipientShardId: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: MaxKey}}]);
     reshardCmdTest.assertReshardCollOk(
         {
             reshardCollection: ns,
             key: {oldKey: 1},
             forceRedistribution: true,
             numInitialChunks: 1,
-            shardDistribution: [{shard: st.shard0.shardName}]
+            shardDistribution: [{shard: shardNames[0]}]
         },
         1,
-        [{recipientShardId: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: MaxKey}}]);
+        [{recipientShardId: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: MaxKey}}]);
 
-    // Create a sharded collection with 2 zones, then force same-key resharding without specifying
-    // zones and the resharding should use existing 2 zones
+    // Create a sharded collection with 2 zones, then force same-key resharding without
+    // specifying zones and the resharding should use existing 2 zones
     jsTest.log("When zones is not provided, use existing zones on the collection");
     const additionalSetup = function(test) {
         const st = test._st;
         const ns = test._ns;
         const zoneName1 = 'z1';
         const zoneName2 = 'z2';
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName1}));
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName2}));
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: zoneName2}));
-        assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
-        assert.commandWorked(st.s.adminCommand(
+        assert.commandWorked(db.adminCommand({addShardToZone: shardNames[0], zone: zoneName1}));
+        assert.commandWorked(db.adminCommand({addShardToZone: shardNames[0], zone: zoneName2}));
+        assert.commandWorked(db.adminCommand({addShardToZone: shardNames[1], zone: zoneName2}));
+        assert.commandWorked(db.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
+        assert.commandWorked(db.adminCommand(
             {updateZoneKeyRange: ns, min: {oldKey: MinKey}, max: {oldKey: 0}, zone: zoneName1}));
-        assert.commandWorked(st.s.adminCommand(
+        assert.commandWorked(db.adminCommand(
             {updateZoneKeyRange: ns, min: {oldKey: 0}, max: {oldKey: MaxKey}, zone: zoneName2}));
     };
 
@@ -206,19 +207,18 @@ const testForceRedistribution = (mongos) => {
             reshardCollection: ns,
             key: {oldKey: 1},
             forceRedistribution: true,
-            numInitialChunks: 1,
             shardDistribution: [
-                {shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
-                {shard: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 1}},
-                {shard: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+                {shard: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: -1}},
+                {shard: shardNames[0], min: {oldKey: -1}, max: {oldKey: 1}},
+                {shard: shardNames[1], min: {oldKey: 1}, max: {oldKey: MaxKey}}
             ]
         },
         4,
         [
-            {recipientShardId: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
-            {recipientShardId: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 0}},
-            {recipientShardId: st.shard0.shardName, min: {oldKey: 0}, max: {oldKey: 1}},
-            {recipientShardId: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+            {recipientShardId: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: -1}},
+            {recipientShardId: shardNames[0], min: {oldKey: -1}, max: {oldKey: 0}},
+            {recipientShardId: shardNames[0], min: {oldKey: 0}, max: {oldKey: 1}},
+            {recipientShardId: shardNames[1], min: {oldKey: 1}, max: {oldKey: MaxKey}}
         ],
         [
             {zone: "z1", min: {oldKey: MinKey}, max: {oldKey: 0}},
@@ -231,19 +231,18 @@ const testForceRedistribution = (mongos) => {
             reshardCollection: ns,
             key: {oldKey: 1},
             forceRedistribution: true,
-            numInitialChunks: 1,
             zones: [],
             shardDistribution: [
-                {shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
-                {shard: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 1}},
-                {shard: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+                {shard: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: -1}},
+                {shard: shardNames[0], min: {oldKey: -1}, max: {oldKey: 1}},
+                {shard: shardNames[1], min: {oldKey: 1}, max: {oldKey: MaxKey}}
             ]
         },
         3,
         [
-            {recipientShardId: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
-            {recipientShardId: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 1}},
-            {recipientShardId: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+            {recipientShardId: shardNames[0], min: {oldKey: MinKey}, max: {oldKey: -1}},
+            {recipientShardId: shardNames[0], min: {oldKey: -1}, max: {oldKey: 1}},
+            {recipientShardId: shardNames[1], min: {oldKey: 1}, max: {oldKey: MaxKey}}
         ],
         [],
         additionalSetup);
@@ -276,4 +275,3 @@ const testReshardingWithIndex = (mongos) => {
 testShardDistribution(mongos);
 testForceRedistribution(mongos);
 testReshardingWithIndex(mongos);
-st.stop();

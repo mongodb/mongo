@@ -143,7 +143,9 @@ export class ReshardCollectionCmdTest {
         assert.eq(0, this._mongos.getDB(this._dbName)[tempReshardingCollName].find().itcount());
         assert.eq(0, this._mongosConfig.reshardingOperations.find({ns: this._ns}).itcount());
         assert.eq(
-            0, this._mongosConfig.collections.find({reshardingFields: {$exists: true}}).itcount());
+            0,
+            this._mongosConfig.collections.find({_id: this._ns, reshardingFields: {$exists: true}})
+                .itcount());
 
         if (!this._skipDirectShardChecks) {
             assert.eq(0,
