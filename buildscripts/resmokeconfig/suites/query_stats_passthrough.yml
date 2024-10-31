@@ -19,6 +19,10 @@ selector:
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
     - jstests/core/timeseries/timeseries_union_with.js
+    # TODO SERVER-94818 Re-enable this test in query stats passthroughs.
+    # Query stats changes the error code expected by this test due to how it propagates parsing
+    # errors in test environments.
+    - jstests/core/query/json_schema/misc_validation.js
   exclude_with_any_tags:
     # Running $queryStats will increment these counters which can screw up some test assertions.
     - inspects_command_opcounters

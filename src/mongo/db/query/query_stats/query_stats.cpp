@@ -368,7 +368,14 @@ void registerRequest(OperationContext* opCtx,
                     "status"_attr = status,
                     "command"_attr = cmdObj);
         if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
-            tasserted(9423101,
+            // uassert rather than tassert so that we avoid creating fatal failures on queries that
+            // were going to fail anyway, but trigger the error here first. A query that ONLY fails
+            // when query stats is enabled will still be surfaced by the uassert.
+            // Note that in the former case, these queries will fail with a different error code
+            // than they would have otherwise. Since this block is only applicable in test
+            // environments, this is fine. We make this tradeoff because it is desirable to have
+            // real bugs clearly surfaced as query stats issues.
+            uasserted(9423101,
                       str::stream() << "Failed to create query stats store key. Status: " << status
                                     << " Command: " << cmdObj);
         }

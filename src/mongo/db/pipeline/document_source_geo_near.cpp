@@ -110,7 +110,12 @@ Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {
         result.setField("minDistance", serializeExpr(minDistance));
     }
 
-    result.setField("query", query ? Value(query->getMatchExpression()->serialize(opts)) : Value());
+    if (opts.transformIdentifiers || opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+        auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, pExpCtx));
+        result.setField("query", Value(matchExpr->serialize(opts)));
+    } else {
+        result.setField("query", Value(query));
+    }
     result.setField("spherical", opts.serializeLiteral(spherical));
     if (distanceMultiplier) {
         result.setField("distanceMultiplier", opts.serializeLiteral(*distanceMultiplier));
@@ -191,7 +196,7 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
     // here when an $_internalUnpackBucket stage precedes us.
     uassert(5860207,
             "Must not specify 'query' for $geoNear on a time-series collection; use $match instead",
-            !query);
+            query.isEmpty());
     uassert(
         5860208, "$geoNear 'includeLocs' is not supported on time-series metrics", !includeLocs);
 
@@ -427,7 +432,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
             uassert(ErrorCodes::TypeMismatch,
                     "query must be an object",
                     argument.type() == BSONType::Object);
-            query = std::make_unique<Matcher>(argument.embeddedObject().getOwned(), pExpCtx);
+            query = argument.embeddedObject().getOwned();
         } else if (argName == "spherical") {
             spherical = argument.trueValue();
         } else if (argName == "includeLocs") {
@@ -459,7 +464,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
 
 BSONObj DocumentSourceGeoNear::asNearQuery(StringData nearFieldName) {
     BSONObjBuilder queryBuilder;
-    queryBuilder.appendElements(getQuery());
+    queryBuilder.appendElements(query);
 
     BSONObjBuilder nearBuilder(queryBuilder.subobjStart(nearFieldName));
 
