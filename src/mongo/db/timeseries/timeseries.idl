@@ -72,12 +72,15 @@ server_parameters:
         redact: false
 
     "timeseriesIdleBucketExpiryMemoryUsageThreshold":
-        description: "The threshold in bytes for bucket catalog memory usage above which idle
-                      buckets will be expired. If set to a non-positive number, the threshold will
-                      be automatically over-written to be 2.5% of system memory."
+        description: "The threshold in percentage of system memory or bytes for bucket catalog memory
+                      usage above which idle buckets will be expired. If set to a number between 1-100, 
+                      the threshold will be interpreted as a percentage of system memory. 
+                      If set to a number larger than 100 it will be interpreted as a number of bytes 
+                      for the threshold. If set to zero or a non-positive number it will automatically be 
+                      over-written to be 5% of system memory."
         set_at: [ startup, runtime ]
         cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes"
-        default: 0
+        default: 5
         redact: false
 
     "timeseriesSideBucketCatalogMemoryUsageThreshold":
