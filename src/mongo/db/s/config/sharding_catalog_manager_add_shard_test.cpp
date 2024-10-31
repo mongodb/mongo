@@ -2041,43 +2041,5 @@ TEST_F(AddShardTest, AddShardWithOverlappingHosts) {
     assertShardExists(existingShard);
 }
 
-// Test that `maxSize` field is unset from `config.shards` entries
-// TODO SERVER-80266 remove this test once 8.0 becomes last lts
-TEST_F(AddShardTest, DeleteMaxSizeMb) {
-    auto opCtx = operationContext();
-    // add maxSizeMb
-    std::string existingShardName = "myShard";
-    ConnectionString connString =
-        assertGet(ConnectionString::parse("mySet/host1:12345,host2:12345"));
-
-    ShardType existingShard;
-    existingShard.setName(existingShardName);
-    existingShard.setHost(connString.toString());
-    existingShard.setState(ShardType::ShardState::kShardAware);
-    auto bsonShard = existingShard.toBSON();
-
-    // concatenate maxSizeMb to the shard document
-    bsonShard.addFields(BSON("maxSize" << 100));
-
-    ASSERT_OK(catalogClient()->insertConfigDocument(opCtx,
-                                                    NamespaceString::kConfigsvrShardsNamespace,
-                                                    bsonShard,
-                                                    ShardingCatalogClient::kMajorityWriteConcern));
-    // remove maxSize
-    int nModified = ShardingCatalogManager::get(opCtx)->deleteMaxSizeMbFromShardEntries(opCtx);
-
-    ASSERT_EQUALS(1, nModified);
-
-    // ensure maxSize is deleted
-    auto response = uassertStatusOK(
-        getConfigShard()->exhaustiveFindOnConfig(opCtx,
-                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                                 NamespaceString::kConfigsvrShardsNamespace,
-                                                 BSON("maxSize" << BSON("$exists" << true)),
-                                                 BSONObj(),
-                                                 boost::none));
-    ASSERT_EQUALS(0, response.docs.size());
-}
 }  // namespace
 }  // namespace mongo

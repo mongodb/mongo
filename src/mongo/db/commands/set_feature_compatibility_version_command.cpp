@@ -1655,11 +1655,6 @@ private:
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(opCtx, DDLCoordinatorTypeEnum::kCollMod);
         }
-
-        // TODO SERVER-80266 remove once 8.0 becomes last lts
-        if (role && role->has(ClusterRole::ConfigServer)) {
-            ShardingCatalogManager::get(opCtx)->deleteMaxSizeMbFromShardEntries(opCtx);
-        }
     }
 };
 MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCommand).forShard();
