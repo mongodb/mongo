@@ -627,6 +627,92 @@ buildvariants:
       - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
         patch_only: true
 
+  ### Query Patch-Specific Build Variants ###
+
+  - name: &enterprise-rhel-8-64-bit-dynamic-query-quick-patch-only enterprise-rhel-8-64-bit-dynamic-query-quick-patch-only
+    display_name: "~ Shared Library Enterprise RHEL 8 Query Quick Patch Only"
+    tags: []
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    run_on:
+      - rhel8.8-small
+    stepback: false
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+      target_resmoke_time: 30
+      max_sub_suites: 3
+      test_flags: >-
+        --excludeWithAnyTags=resource_intensive
+    depends_on:
+      - name: archive_dist_test
+        variant: *linux_x86_dynamic_compile_variant_name
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    tasks: &query-quick-alias-task-list
+      - name: aggregation
+      - name: aggregation_mongos_passthrough
+        distros:
+          - rhel8.8-large
+      - name: aggregation_sharded_collections_passthrough
+        distros:
+          - rhel8.8-large
+      - name: jsCore
+        distros:
+          - rhel8.8-xlarge
+      - name: search
+        distros:
+          - rhel8.8-xlarge
+      - name: change_streams
+      - name: query_golden_classic
+      - name: query_golden_sharding
+      - name: vector_search
+      - name: replica_sets_jscore_passthrough_gen
+      - name: sharding_jscore_passthrough_gen
+      - name: sharded_collections_jscore_passthrough_gen
+      - name: burn_in_tests_gen
+        depends_on:
+          - name: version_burn_in_gen
+            variant: generate-tasks-for-version
+            omit_generated_tasks: true
+          - name: archive_dist_test
+            variant: *linux_x86_dynamic_compile_variant_name
+      - name: check_feature_flag_tags
+      - name: check_for_todos
+
+  - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
+    name: &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-quick-patch-only enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-quick-patch-only
+    display_name: "~ Shared Library Enterprise RHEL 8 Query Quick Patch Only (all feature flags)"
+    tags: []
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-expansions
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --excludeWithAnyTags=resource_intensive
+    tasks: *query-quick-alias-task-list
+
+  - name: enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
+    <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
+    display_name: "*| Shared Library Enterprise RHEL 8 (Classic Engine all feature flags) Fuzzers"
+    tags: ["suggested"]
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-expansions
+      target_resmoke_time: 30
+      max_sub_suites: 3
+      test_flags: >-
+        --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+        --runAllFeatureFlagTests
+        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
+    tasks:
+      - name: .aggfuzzer
+      - name: .change_stream_fuzzer !.serverless
+      - name: .query_fuzzer
+      - name: .updatefuzzer
+      - name: .jstestfuzz
+
   ### Security Patch-Specific Build Variants ###
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     name: &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-security-patch-only enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-security-patch-only

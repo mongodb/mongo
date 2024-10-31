@@ -115,6 +115,9 @@ patch_aliases:
   - alias: query
     variant: "^(.*query-patch-only|amazon-linux2-arm64-static-compile)$"
     task: ".*"
+  - alias: query-quick
+    variant: "^(.*query-quick-patch-only|linux-x86-dynamic-compile)$"
+    task: ".*"
   - alias: security
     variant: "^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$"
     task: ".*"
