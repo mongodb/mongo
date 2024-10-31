@@ -34,6 +34,7 @@ buildvariants:
         MONGO_DISTMOD=ubuntu2204
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        BAZEL_FLAGS="--copt=-fsanitize-coverage=trace-pc-guard --linkopt=-lvoidstar"
         CCFLAGS="-fsanitize-coverage=trace-pc-guard"
         LIBS="voidstar"
 
@@ -58,6 +59,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
         --shared-libsan
         --link-model=dynamic
+        BAZEL_FLAGS="--copt=-fsanitize-coverage=trace-pc-guard --linkopt=-lvoidstar"
         CCFLAGS="-fsanitize-coverage=trace-pc-guard"
         LIBS="voidstar"
       san_options: >-
@@ -90,6 +92,7 @@ buildvariants:
         --link-model=dynamic
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        BAZEL_FLAGS="--copt=-fsanitize-coverage=trace-pc-guard --linkopt=-lvoidstar"
         CCFLAGS="-fsanitize-coverage=trace-pc-guard"
         LIBS="voidstar"
       san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4"
