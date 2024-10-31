@@ -30,9 +30,7 @@
 #include <algorithm>
 #include <iterator>
 #include <memory>
-#include <set>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include <boost/container/small_vector.hpp>
@@ -65,7 +63,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/create_indexes_gen.h"
@@ -101,12 +98,9 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/future.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 

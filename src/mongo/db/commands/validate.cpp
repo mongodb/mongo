@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-
-#include <mutex>
 #include <set>
 #include <string>
-
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

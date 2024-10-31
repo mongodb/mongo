@@ -63,7 +63,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"

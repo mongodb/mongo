@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-
-#include <memory>
 #include <string>
 
 #include "mongo/base/error_codes.h"
@@ -41,15 +39,12 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand

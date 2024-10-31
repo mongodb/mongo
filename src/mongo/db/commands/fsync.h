@@ -30,7 +30,6 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
 #include <string>
 
 #include "mongo/db/service_context.h"
