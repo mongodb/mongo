@@ -469,8 +469,18 @@ public:
     DatabaseType createDatabase(OperationContext* opCtx,
                                 const DatabaseName& dbName,
                                 const boost::optional<ShardId>& optPrimaryShard,
-                                const SerializationContext& serializationContext,
-                                bool createDatabaseCoordinator = false);
+                                const SerializationContext& serializationContext);
+
+    /*
+     * Commits the new database metadata for a createDatabase operation.
+     *
+     * Throws ShardNotFound if the proposed 'primaryShard' is found to not exist or be draining.
+     * This check (and the actual) commit, is done under the _kShardMembershipLock to ensure
+     * synchronization with removeShard operations.
+     */
+    DatabaseType commitCreateDatabase(OperationContext* opCtx,
+                                      const DatabaseName& dbName,
+                                      const ShardId& primaryShard);
 
     /**
      * Updates the metadata in config.databases collection with the new primary shard for the given
@@ -928,16 +938,6 @@ private:
                                                                    OperationContext* opCtx);
     Status _updateClusterCardinalityParameterAfterRemoveShardIfNeeded(const Lock::ExclusiveLock&,
                                                                       OperationContext* opCtx);
-    /*
-     * Commits the new database metadata for a createDatabase operation.
-     *
-     * Throws ShardNotFound if the proposed 'primaryShard' is found to not exist or be draining.
-     * This check (and the actual) commit, is done under the _kShardMembershipLock to ensure
-     * synchronization with removeShard operations.
-     */
-    DatabaseType _commitCreateDatabase(OperationContext* opCtx,
-                                       const DatabaseName& dbName,
-                                       const ShardId& primaryShard);
 
     // The owning service context
     ServiceContext* const _serviceContext;

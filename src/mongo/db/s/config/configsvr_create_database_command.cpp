@@ -47,10 +47,12 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/create_database_coordinator.h"
 #include "mongo/db/s/create_database_coordinator_document_gen.h"
+#include "mongo/db/s/create_database_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
@@ -91,9 +93,19 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            auto dbname = request().getCommandParameter();
+            const auto dbNameStr = request().getCommandParameter();
+            const auto dbName = DatabaseNameUtil::deserialize(
+                boost::none, dbNameStr, request().getSerializationContext());
 
-            audit::logEnableSharding(opCtx->getClient(), dbname);
+            audit::logEnableSharding(opCtx->getClient(), dbNameStr);
+
+            // Checks for restricted and invalid namespaces.
+            if (const auto configDatabaseOpt =
+                    create_database_util::checkDbNameConstraints(dbName)) {
+                return configDatabaseOpt->getVersion();
+            }
+            const auto optResolvedPrimaryShard =
+                create_database_util::resolvePrimaryShard(opCtx, request().getPrimaryShardId());
 
             std::function<Response()> getCreateDatabaseResponse;
             {
@@ -106,21 +118,25 @@ public:
                     getCreateDatabaseResponse = [&]() {
                         auto dbt = ShardingCatalogManager::get(opCtx)->createDatabase(
                             opCtx,
-                            DatabaseNameUtil::deserialize(
-                                boost::none, dbname, request().getSerializationContext()),
-                            request().getPrimaryShardId(),
+                            dbName,
+                            optResolvedPrimaryShard,
                             request().getSerializationContext());
 
                         return Response(dbt.getVersion());
                     };
                 } else {
+                    // First perform an optimistic attempt without taking the lock to check if
+                    // database exists. If the database is not found take the lock and try again.
+                    if (auto existingDatabase = create_database_util::findDatabaseExactMatch(
+                            opCtx, dbNameStr, optResolvedPrimaryShard)) {
+                        RoutingInformationCache::get(opCtx)->purgeDatabase(dbName);
+                        return Response(existingDatabase->getVersion());
+                    }
+
                     CreateDatabaseCoordinatorDocument coordinatorDoc;
                     coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                        {{NamespaceString(DatabaseNameUtil::deserialize(
-                              boost::none, dbname, request().getSerializationContext())),
-                          DDLCoordinatorTypeEnum::kCreateDatabase}});
-                    coordinatorDoc.setConfigsvrCreateDatabaseRequest(
-                        request().getConfigsvrCreateDatabaseRequest());
+                        {{NamespaceString(dbName), DDLCoordinatorTypeEnum::kCreateDatabase}});
+                    coordinatorDoc.setPrimaryShard(optResolvedPrimaryShard);
                     auto service = ShardingDDLCoordinatorService::getService(opCtx);
                     auto createDatabaseCoordinator =
                         checked_pointer_cast<CreateDatabaseCoordinator>(

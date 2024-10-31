@@ -44,7 +44,7 @@ public:
 
     CreateDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "CreateDatabaseCoordinator", initialState),
-          _request(_doc.getConfigsvrCreateDatabaseRequest()) {}
+          _primaryShard(_doc.getPrimaryShard()) {}
 
     ~CreateDatabaseCoordinator() override = default;
 
@@ -60,7 +60,10 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    const mongo::ConfigsvrCreateDatabaseRequest _request;
+    // Check the command arguments passed and if a database can be returned right away.
+    void _checkPreconditions();
+
+    const boost::optional<ShardId> _primaryShard;
 
     // Set on successful completion of the coordinator.
     boost::optional<ConfigsvrCreateDatabaseResponse> _result;

@@ -32,7 +32,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/s/sharding_ddl_coordinator.idl"
-    - "mongo/s/request_types/sharded_ddl_commands.idl"
+    - "mongo/s/sharding_types.idl"
 
 enums:
     CreateDatabaseCoordinatorPhase:
@@ -49,9 +49,14 @@ structs:
         strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
-            ConfigsvrCreateDatabaseRequest: ConfigsvrCreateDatabaseRequest
         fields:
             phase:
                 type: CreateDatabaseCoordinatorPhase
                 description: "Coordinator phase."
                 default: kUnset
+            primaryShard:
+                type: shard_id
+                description: >-
+                    Resolved primary shard from the received parameter which may encode either a
+                    shard ID or a connection string.
+                optional: true

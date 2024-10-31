@@ -301,7 +301,7 @@ idl_generator(
     deps = [
         ":sharding_ddl_coordinator_gen",
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/s/request_types:sharded_ddl_commands_gen",
+        "//src/mongo/s:sharding_types_gen",
     ],
 )
 
@@ -581,6 +581,7 @@ mongo_cc_library(
     name = "sharding_catalog_manager",
     srcs = [
         "add_shard_util.cpp",
+        "create_database_util.cpp",
         "ddl_lock_manager.cpp",
         "periodic_sharded_index_consistency_checker.cpp",
         "sharding_ddl_util.cpp",
@@ -616,6 +617,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "add_shard_util.h",
+        "create_database_util.h",
         "ddl_lock_manager.h",
         "periodic_sharded_index_consistency_checker.h",
         "sharding_ddl_util.h",

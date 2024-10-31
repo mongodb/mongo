@@ -28,27 +28,91 @@
  */
 #include "mongo/db/s/create_database_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/create_database_util.h"
+#include "mongo/s/routing_information_cache.h"
 
 namespace mongo {
+
+void CreateDatabaseCoordinator::_checkPreconditions() {
+    auto opCtxHolder = cc().makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    const auto& dbName = nss().dbName();
+    if (const auto& existingDatabase =
+            create_database_util::checkForExistingDatabaseWithDifferentOptions(
+                opCtx, dbName, _primaryShard)) {
+        _result = ConfigsvrCreateDatabaseResponse(existingDatabase->getVersion());
+        // Launches an exception to directly jump to the end of the continuation chain.
+        uasserted(ErrorCodes::RequestAlreadyFulfilled,
+                  str::stream() << "The database" << dbName.toStringForErrorMsg()
+                                << "is already created from a past request");
+    }
+}
 
 ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(Phase::kCommitOnShardingCatalog,
-                                 [this, executor = executor, anchor = shared_from_this()] {
-                                     auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     const auto dbName = nss().dbName();
-                                     auto db = ShardingCatalogManager::get(opCtx)->createDatabase(
-                                         opCtx,
-                                         dbName,
-                                         _request.getPrimaryShardId(),
-                                         _request.getSerializationContext(),
-                                         /*createDatabaseCoordinator=*/true);
-                                     _result = ConfigsvrCreateDatabaseResponse(db.getVersion());
-                                 }))
-        .onError([](const Status& status) { return status; });
+        .then([this, anchor = shared_from_this()] {
+            if (_doc.getPhase() < Phase::kCommitOnShardingCatalog) {
+                _checkPreconditions();
+            }
+        })
+        .then(_buildPhaseHandler(
+            Phase::kCommitOnShardingCatalog,
+            [this, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                const auto& dbName = nss().dbName();
+                const auto dbNameStr =
+                    DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
+                if (const auto& existingDatabase = create_database_util::findDatabaseExactMatch(
+                        opCtx, dbNameStr, _primaryShard)) {
+                    // This means the database was created in a previous run of the same create
+                    // database coordinator instance. Just forces a refresh on the primary.
+                    create_database_util::refreshDbVersionOnPrimaryShard(
+                        opCtx, dbNameStr, existingDatabase->getPrimary());
+                    _result = ConfigsvrCreateDatabaseResponse(existingDatabase->getVersion());
+                } else {
+                    // TODO(SERVER-96180): Limit the number of retries.
+                    const auto candidatePrimaryShardId =
+                        create_database_util::getCandidatePrimaryShard(opCtx, _primaryShard);
+                    auto createdDatabase = ShardingCatalogManager::get(opCtx)->commitCreateDatabase(
+                        opCtx, dbName, candidatePrimaryShardId);
+
+                    // Note, making the primary shard refresh its databaseVersion here is not
+                    // required for correctness, since either:
+                    // 1) This is the first time this database is being created. The primary shard
+                    //    will not have a databaseVersion already cached.
+                    // 2) The database was dropped and is being re-created. Since dropping a
+                    //    database also sends _flushDatabaseCacheUpdates to all shards, the primary
+                    //    shard should not have a database version cached. (Note, it is possible
+                    //    that dropping a database will skip sending _flushDatabaseCacheUpdates if
+                    //    the config server fails over while dropping the database.)
+                    // However, routers don't support retrying internally on StaleDbVersion in
+                    // transactions (SERVER-39704), so if the first operation run against the
+                    // database is in a transaction, it would fail with StaleDbVersion. Making the
+                    // primary shard refresh here allows that first transaction to succeed. This
+                    // allows our transaction passthrough suites and transaction demos to succeed
+                    // without additional special logic.
+                    create_database_util::refreshDbVersionOnPrimaryShard(
+                        opCtx, dbNameStr, createdDatabase.getPrimary());
+
+                    _result = ConfigsvrCreateDatabaseResponse(createdDatabase.getVersion());
+                }
+            }))
+        .onCompletion([this, anchor = shared_from_this()](const Status& status) {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            const auto& dbName = nss().dbName();
+            RoutingInformationCache::get(opCtx)->purgeDatabase(dbName);
+            return status;
+        })
+        .onError([this, anchor = shared_from_this()](const Status& status) {
+            if (status == ErrorCodes::RequestAlreadyFulfilled) {
+                return Status::OK();
+            }
+            return status;
+        });
 }
 
 ConfigsvrCreateDatabaseResponse CreateDatabaseCoordinator::getResult(OperationContext* opCtx) {
