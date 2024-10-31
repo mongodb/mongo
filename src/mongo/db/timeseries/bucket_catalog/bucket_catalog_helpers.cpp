@@ -29,13 +29,10 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 
-#include <algorithm>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
-#include <cstddef>
-#include <type_traits>
 
 #include <boost/optional/optional.hpp>
 
@@ -48,13 +45,9 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
-#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"

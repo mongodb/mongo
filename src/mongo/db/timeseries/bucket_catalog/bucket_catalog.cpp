@@ -31,8 +31,6 @@
 #include <absl/meta/type_traits.h>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
-#include <iterator>
-#include <string>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -40,25 +38,17 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/column/bsoncolumnbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
-#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
-#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/future.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/tracking_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage

@@ -34,11 +34,9 @@
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <utility>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/repl/optime.h"
@@ -46,7 +44,6 @@
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
-#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"

@@ -31,7 +31,6 @@
 
 #include <boost/any.hpp>
 #include <boost/optional/optional.hpp>
-#include <cstddef>
 #include <iosfwd>
 
 #include "mongo/base/string_data.h"

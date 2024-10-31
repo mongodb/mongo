@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-
 #include <boost/optional/optional.hpp>
 #include <string>
-#include <utility>
-#include <vector>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -39,7 +36,6 @@
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/tracking_context.h"
 
 namespace mongo::timeseries::bucket_catalog {

@@ -34,18 +34,13 @@
 #include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <functional>
-#include <map>
 #include <string>
 #include <variant>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/oid.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/tracked_types.h"
 #include "mongo/util/tracking_context.h"
 #include "mongo/util/uuid.h"

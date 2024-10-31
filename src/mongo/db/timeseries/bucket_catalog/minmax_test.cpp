@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/json.h"
 #include <iterator>
 #include <numeric>
 #include <string>

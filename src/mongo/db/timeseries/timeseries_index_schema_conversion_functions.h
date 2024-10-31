@@ -38,7 +38,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/db/timeseries/timeseries_options.h"
 
 /**
  * Namespace for helper functions converting index spec schema between time-series collection and

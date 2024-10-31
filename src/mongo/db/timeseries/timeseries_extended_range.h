@@ -31,7 +31,6 @@
 
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"

@@ -39,11 +39,9 @@
 #include <cstring>
 #include <iterator>
 #include <memory>
-#include <string>
 #include <utility>
 #include <vector>
 
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -56,7 +54,6 @@
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_truncation.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"

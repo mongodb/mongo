@@ -28,7 +28,6 @@
  */
 
 #include <cstddef>
-#include <vector>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -39,8 +38,6 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/unordered_map.h"
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {

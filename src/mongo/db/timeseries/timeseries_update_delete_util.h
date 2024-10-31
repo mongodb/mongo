@@ -33,7 +33,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstddef>
 #include <functional>
-#include <memory>
 #include <utility>
 
 #include "mongo/base/status_with.h"

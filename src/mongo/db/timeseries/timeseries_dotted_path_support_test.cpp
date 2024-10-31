@@ -28,7 +28,6 @@
  */
 
 #include <functional>
-#include <map>
 #include <ostream>
 
 #include <boost/optional/optional.hpp>

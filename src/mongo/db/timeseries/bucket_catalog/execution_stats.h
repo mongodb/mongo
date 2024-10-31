@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/tracked_types.h"

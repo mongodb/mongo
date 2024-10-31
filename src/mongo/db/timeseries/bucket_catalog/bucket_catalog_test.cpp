@@ -30,7 +30,6 @@
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <initializer_list>
-#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -68,8 +67,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {

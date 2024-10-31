@@ -32,7 +32,6 @@
 #include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <functional>
-#include <string>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -40,7 +39,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 

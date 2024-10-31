@@ -29,8 +29,6 @@
 
 #include "mongo/db/timeseries/timeseries_op_observer.h"
 
-#include <memory>
-#include <set>
 #include <utility>
 #include <vector>
 
@@ -38,7 +36,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/oid.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -49,7 +46,6 @@
 #include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/tracked_types.h"
 

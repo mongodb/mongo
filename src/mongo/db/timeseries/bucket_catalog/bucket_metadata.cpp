@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/timeseries/metadata.h"
-#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::timeseries::bucket_catalog {
 

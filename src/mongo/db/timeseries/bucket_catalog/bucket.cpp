@@ -39,8 +39,8 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo::timeseries::bucket_catalog {

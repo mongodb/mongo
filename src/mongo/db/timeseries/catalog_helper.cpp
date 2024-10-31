@@ -28,7 +28,6 @@
  */
 
 #include <boost/none.hpp>
-#include <memory>
 
 #include <boost/optional/optional.hpp>
 

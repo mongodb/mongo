@@ -35,17 +35,13 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
-#include <memory>
 #include <string>
 #include <tuple>
 #include <utility>
-#include <variant>
-#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/tracked_types.h"
 #include "mongo/util/tracking_context.h"
 

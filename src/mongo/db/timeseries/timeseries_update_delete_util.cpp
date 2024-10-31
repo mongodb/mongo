@@ -31,7 +31,6 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
-#include <cstdint>
 #include <fmt/format.h>
 #include <string>
 #include <type_traits>

@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/json.h"
