@@ -2028,6 +2028,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
         }
 
         FilteringMetadataCache::get(opCtx)->forceShardFilteringMetadataRefresh(opCtx, _nss);
+        FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, _nss);
     } catch (const DBException& ex) {
         LOGV2_DEBUG(5899103,
                     2,
@@ -2063,13 +2064,6 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
           "Exited migration recipient critical section",
           logAttrs(_nss),
           "durationMillis"_attr = timeInCriticalSectionMs);
-
-    // Wait for the updates to the catalog cache to be written to disk before removing the
-    // recovery document. This ensures that on case of stepdown, the new primary will know of a
-    // placement version inclusive of the migration. NOTE: We rely on the
-    // deleteMigrationRecipientRecoveryDocument call below to wait for the CatalogCache on-disk
-    // persistence to be majority committed.
-    FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, _nss);
 
     // Delete the recovery document
     migrationutil::deleteMigrationRecipientRecoveryDocument(opCtx, *_migrationId);

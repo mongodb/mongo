@@ -674,6 +674,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                             logAttrs(nss()));
 
         FilteringMetadataCache::get(_opCtx)->forceShardFilteringMetadataRefresh(_opCtx, nss());
+        FilteringMetadataCache::get(_opCtx)->waitForCollectionFlush(_opCtx, nss());
 
         LOGV2_DEBUG_OPTIONS(4817405,
                             2,
@@ -698,10 +699,6 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         }
         scopedGuard.dismiss();
         _cleanup(false);
-        // Best-effort recover of the chunk version.
-        FilteringMetadataCache::get(_opCtx)
-            ->onCollectionPlacementVersionMismatchNoExcept(_opCtx, nss(), boost::none)
-            .ignore();
         throw;
     }
 
@@ -904,16 +901,6 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
 
             if (_state >= kCriticalSection && _state <= kCommittingOnConfig) {
                 _stats.totalCriticalSectionTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
-
-                // Wait for the updates to the cache of the routing table to be fully written to
-                // disk. This way, we ensure that all nodes from a shard which donated a chunk will
-                // always be at the placement version of the last migration it performed.
-                //
-                // If the metadata is not persisted before clearing the 'inMigration' flag below, it
-                // is possible that the persisted metadata is rolled back after step down, but the
-                // write which cleared the 'inMigration' flag is not, a secondary node will report
-                // itself at an older placement version.
-                FilteringMetadataCache::get(newOpCtx)->waitForCollectionFlush(newOpCtx, nss());
             }
             if (completeMigration) {
                 // This can be called on an exception path after the OperationContext has been
