@@ -125,6 +125,7 @@ buildvariants:
         BAZEL_FLAGS="--config=remote_link"
     tasks:
       - name: compile_bazel_TG
+      - name: run_bazel_TG
       - name: compile_bazel_sanitize_TG
       - name: compile_bazel_ninja_TG
 

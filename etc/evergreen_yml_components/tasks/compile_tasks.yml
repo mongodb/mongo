@@ -214,7 +214,7 @@ tasks:
             --keep-going
 
   # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
-  - name: compile_bazel_dist_test
+  - name: compile_dist_test_quick
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
     depends_on:
       - name: version_expansions_gen
@@ -234,88 +234,6 @@ tasks:
       - func: "verify build output present"
         vars:
           output: build/opt/mongo/db/commands/libfsync_locked.a
-
-  - name: compile_bazel_dist_test_windows
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          targets: >-
-            build/opt/mongo/db/commands/fsync_locked.lib
-            build/opt/mongo/db/commands/test_commands_enabled.lib
-          task_compile_flags: >-
-            ICECC=
-            --build-profile=opt
-            --ninja=disabled
-            --link-model=static
-            --modules=
-      - func: "verify build output present"
-        vars:
-          output: build/opt/mongo/db/commands/fsync_locked.lib
-
-  # Validates that the bazel mongo toolchain can be used to compile targets that
-  # contain C and asssembly source code files.
-  # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
-  - name: compile_bazel_c_and_asm_targets_gcc
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "fetch bazel"
-      - func: "bazel compile (gcc)"
-        vars:
-          targets: src/third_party/unwind:unwind
-          compiler: gcc
-
-  # Validates that the scons setting --use-libunwind is propagated to bazel's invocation (via --//bazel/config:use_libunwind)
-  # and that the bazel compilation correctly injects the libunwind dependency into other targets.
-  # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
-  - name: compile_bazel_libunwind
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          targets: >-
-            build/opt/third_party/unwind/libunwind.a
-          task_compile_flags: >-
-            ICECC=
-            --build-profile=opt
-            --ninja=disabled
-            --link-model=static
-            --use-libunwind=on
-            --modules=
-      - func: "verify build output present"
-        vars:
-          output: build/opt/third_party/unwind/libunwind.a
-
-  - name: compile_bazel_program
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          targets: >-
-            build/opt/mongo/platform/visibility_test1
-          separate_debug: on
-          task_compile_flags: >-
-            ICECC=
-            --build-profile=opt
-            --ninja=disabled
-            --link-model=dynamic
-            --use-libunwind=off
-            --modules=
-      - func: "verify build output present"
-        vars:
-          output: build/opt/mongo/platform/visibility_test1
 
   - name: run_bazel_scons_unittest
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
@@ -2206,13 +2124,15 @@ task_groups:
     name: compile_dist_test_TG
     tasks:
       - compile_dist_test
+
   - <<: *compile_bazel_task_group_template
     name: compile_bazel_TG
     tasks:
-      - compile_bazel_dist_test
-      - compile_bazel_c_and_asm_targets_gcc
-      - compile_bazel_libunwind
-      - compile_bazel_program
+      - compile_dist_test_quick
+
+  - <<: *compile_bazel_task_group_template
+    name: run_bazel_TG
+    tasks:
       - run_bazel_scons_unittest
       - run_bazel_program
 
@@ -2234,13 +2154,12 @@ task_groups:
   - <<: *compile_bazel_task_group_template
     name: compile_bazel_windows_TG
     tasks:
-      - compile_bazel_dist_test_windows
       - run_bazel_program_windows
 
   - <<: *compile_bazel_task_group_template
     name: compile_bazel_macos_TG
     tasks:
-      - compile_bazel_dist_test
+      - compile_dist_test_quick
 
   - <<: *compile_task_group_template
     name: compile_upload_benchmarks_TG

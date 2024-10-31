@@ -31,7 +31,6 @@ buildvariants:
       resmoke_jobs_max: 6
       compile_variant: *macos-arm64-bazel-compile
     tasks:
-      - name: compile_bazel_macos_TG
       - name: compile_bazel_ninja_TG
 
   - name: &enterprise-macos-arm64 enterprise-macos-arm64
