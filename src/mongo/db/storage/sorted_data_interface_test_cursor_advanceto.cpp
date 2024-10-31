@@ -30,9 +30,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <memory>
-#include <vector>
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"

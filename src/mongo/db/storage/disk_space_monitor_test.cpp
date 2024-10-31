@@ -29,7 +29,6 @@
 
 #include <utility>
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/unittest/assert.h"

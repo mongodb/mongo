@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <cerrno>
 #include <cstdlib>
 

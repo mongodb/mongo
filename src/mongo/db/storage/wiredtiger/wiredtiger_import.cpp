@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "wiredtiger_import.h"
 
 #include <fmt/format.h>

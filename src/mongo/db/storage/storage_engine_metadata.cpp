@@ -32,7 +32,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <cerrno>
-#include <cstdint>
 #include <exception>
 #include <fstream>  // IWYU pragma: keep
 #include <system_error>

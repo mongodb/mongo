@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <boost/move/utility_core.hpp>
 #include <exception>
 #include <fmt/format.h>
@@ -35,7 +34,6 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -43,10 +41,7 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

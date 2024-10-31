@@ -30,7 +30,6 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -55,11 +54,9 @@
 #include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/platform/random.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 

@@ -38,7 +38,6 @@
 #include <cstddef>
 #include <memory>
 #include <set>
-#include <type_traits>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"

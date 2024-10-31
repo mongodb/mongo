@@ -39,7 +39,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"

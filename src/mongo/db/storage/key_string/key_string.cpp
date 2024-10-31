@@ -37,7 +37,6 @@
 #include <fmt/format.h>
 #include <limits>
 #include <memory>
-#include <set>
 #include <type_traits>
 
 #include <boost/optional/optional.hpp>

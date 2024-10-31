@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <string>
 
 #include <wiredtiger.h>

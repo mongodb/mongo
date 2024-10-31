@@ -30,7 +30,6 @@
 #include <memory>
 #include <utility>
 
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"

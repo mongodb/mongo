@@ -29,10 +29,7 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/db/auth/cluster_auth_mode.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
 

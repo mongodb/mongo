@@ -29,7 +29,6 @@
 
 #include <cstdint>
 #include <fstream>  // IWYU pragma: keep
-#include <utility>
 
 #ifndef _WIN32
 #include <sys/stat.h>
@@ -44,7 +43,6 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"

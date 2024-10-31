@@ -28,9 +28,7 @@
  */
 
 #include <boost/none.hpp>
-#include <memory>
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/assert.h"

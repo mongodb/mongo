@@ -35,8 +35,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
-#include <functional>
-#include <list>
 #include <map>
 #include <memory>
 #include <set>
@@ -54,7 +52,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/backup_block.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"

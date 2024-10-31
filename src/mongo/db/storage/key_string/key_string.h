@@ -36,12 +36,10 @@
 #include <cstring>
 #include <functional>
 #include <iosfwd>
-#include <limits>
 #include <string>
 #include <type_traits>
 #include <utility>
 
-#include "mongo/base/data_type_endian.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"

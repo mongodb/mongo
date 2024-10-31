@@ -30,7 +30,6 @@
 #include <boost/optional/optional.hpp>
 #include <memory>
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/ident.h"

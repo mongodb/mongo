@@ -34,7 +34,6 @@
 #include <boost/move/utility_core.hpp>
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/health_log_mock.h"

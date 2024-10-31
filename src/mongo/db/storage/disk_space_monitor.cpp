@@ -30,11 +30,8 @@
 
 #include "mongo/db/storage/disk_space_monitor.h"
 
-#include <mutex>
 #include <utility>
 
-
-#include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/storage/disk_space_util.h"

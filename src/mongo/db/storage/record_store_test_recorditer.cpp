@@ -35,9 +35,7 @@
 #include <string>
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"

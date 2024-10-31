@@ -36,7 +36,6 @@
 #include <iterator>
 #include <memory>
 #include <numeric>
-#include <shared_mutex>
 #include <utility>
 
 #include <boost/optional/optional.hpp>

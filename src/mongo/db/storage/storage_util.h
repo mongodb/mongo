@@ -43,7 +43,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace catalog {

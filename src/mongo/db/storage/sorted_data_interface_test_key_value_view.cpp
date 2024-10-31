@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/assert.h"

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <algorithm>
 #include <boost/cstdint.hpp>
 #include <fmt/format.h>

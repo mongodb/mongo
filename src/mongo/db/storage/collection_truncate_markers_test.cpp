@@ -33,15 +33,12 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"

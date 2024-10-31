@@ -29,14 +29,7 @@
 
 #pragma once
 
-#include <cstdint>
-#include <functional>
-#include <initializer_list>
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/transaction_resources.h"
 
 namespace mongo {

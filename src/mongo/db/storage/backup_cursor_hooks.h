@@ -31,8 +31,6 @@
 
 #include <functional>
 #include <memory>
-#include <string>
-#include <vector>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"

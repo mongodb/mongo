@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <atomic>
 #include <string>
 
 #include "mongo/platform/atomic_proxy.h"

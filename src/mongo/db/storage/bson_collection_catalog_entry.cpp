@@ -36,7 +36,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <cstddef>
-#include <memory>
 #include <mutex>
 #include <string>
 

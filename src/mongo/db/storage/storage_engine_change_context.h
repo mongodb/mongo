@@ -37,7 +37,6 @@
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 

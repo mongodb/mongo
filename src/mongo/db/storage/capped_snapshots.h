@@ -36,7 +36,6 @@
 #include "mongo/db/collection_crud/capped_visibility.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/platform/basic.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

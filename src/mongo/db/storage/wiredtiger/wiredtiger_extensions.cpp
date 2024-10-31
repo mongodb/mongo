@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"

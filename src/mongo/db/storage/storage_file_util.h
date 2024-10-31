@@ -33,7 +33,6 @@
 #include <boost/filesystem/path.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/platform/basic.h"
 
 namespace mongo {
 

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <benchmark/benchmark.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>

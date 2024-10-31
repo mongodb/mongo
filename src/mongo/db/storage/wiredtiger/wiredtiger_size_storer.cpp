@@ -30,9 +30,7 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
-#include <utility>
 #include <wiredtiger.h>
-
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"

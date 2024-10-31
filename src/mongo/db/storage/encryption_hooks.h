@@ -39,7 +39,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/jsobj.h"
 
 namespace boost {
 namespace filesystem {

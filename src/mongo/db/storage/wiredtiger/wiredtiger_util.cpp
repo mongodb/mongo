@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 

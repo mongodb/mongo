@@ -28,14 +28,10 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/storage/storage_engine_lock_file.h"
 
 #include <boost/filesystem.hpp>
 #include <io.h>
-#include <ostream>
-#include <sstream>
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"

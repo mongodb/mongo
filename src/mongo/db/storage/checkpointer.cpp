@@ -31,7 +31,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include <chrono>
 #include <cstdint>
-#include <mutex>
 #include <utility>
 
 #include "mongo/base/string_data.h"
@@ -45,7 +44,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/atomic_proxy.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/decorable.h"

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <boost/filesystem/operations.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -37,7 +36,6 @@
 #include <boost/filesystem/path.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/remove_saver.h"

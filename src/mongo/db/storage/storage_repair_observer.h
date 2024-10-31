@@ -36,7 +36,6 @@
 #include <vector>
 
 #include "mongo/db/service_context.h"
-#include "mongo/platform/basic.h"
 
 namespace mongo {
 

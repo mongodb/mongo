@@ -42,7 +42,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/storage/temporary_record_store.h"
-#include "mongo/util/functional.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

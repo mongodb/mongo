@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include <utility>
-
+#include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 

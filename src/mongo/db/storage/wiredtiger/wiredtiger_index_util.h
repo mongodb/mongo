@@ -32,7 +32,6 @@
 #include <cstdint>
 #include <string>
 
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/operation_context.h"

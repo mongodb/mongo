@@ -33,8 +33,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include <limits>
 #include <memory>
-#include <mutex>
-#include <string>
 
 #include "mongo/db/client.h"
 #include "mongo/db/record_id.h"

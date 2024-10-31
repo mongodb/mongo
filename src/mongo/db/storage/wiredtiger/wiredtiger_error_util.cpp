@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 #include "mongo/db/concurrency/exception_util.h"

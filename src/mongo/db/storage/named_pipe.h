@@ -36,7 +36,6 @@
 #endif
 #include <string>
 
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/input_object.h"
 
 namespace mongo {

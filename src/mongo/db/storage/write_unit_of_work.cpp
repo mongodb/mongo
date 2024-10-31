@@ -29,19 +29,16 @@
 
 
 #include <ostream>
-#include <string>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

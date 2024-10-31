@@ -30,7 +30,6 @@
 
 #include "mongo/db/storage/deferred_drop_record_store.h"
 
-#include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/storage_engine.h"

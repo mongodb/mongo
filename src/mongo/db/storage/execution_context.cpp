@@ -29,8 +29,6 @@
 
 #include "mongo/db/storage/execution_context.h"
 
-#include <utility>
-
 #include "mongo/util/decorable.h"
 
 namespace mongo {

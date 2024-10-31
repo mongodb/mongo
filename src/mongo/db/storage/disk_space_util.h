@@ -32,8 +32,6 @@
 #include <cstdint>
 #include <string>
 
-#include "mongo/platform/basic.h"
-
 namespace mongo {
 
 // This takes the dbpath as an input because storageGlobalParams.dbpath isn't always safe
