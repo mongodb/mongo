@@ -36,7 +36,6 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/decorable.h"
 
@@ -143,43 +142,6 @@ Status TicketHolderManager::validateConcurrentReadTransactions(const int32_t& ne
     if (!getTestCommandsEnabled() && newReadTransactions < 5) {
         return Status(ErrorCodes::BadValue,
                       "Concurrent read transactions limit must be greater than or equal to 5.");
-    }
-    return Status::OK();
-}
-
-Status TicketHolderManager::updateLowPriorityAdmissionBypassThreshold(
-    const int32_t& newBypassThreshold) {
-    if (auto client = Client::getCurrent()) {
-        // TODO SERVER-72616: Remove the ifdef once TicketPool is implemented in a cross-platform
-        // manner.
-#ifdef __linux__
-        auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
-        auto reader = dynamic_cast<PriorityTicketHolder*>(
-            ticketHolderManager->getTicketHolder(LockMode::MODE_IS));
-        auto writer = dynamic_cast<PriorityTicketHolder*>(
-            ticketHolderManager->getTicketHolder(LockMode::MODE_IX));
-
-        if (reader && writer) {
-            reader->updateLowPriorityAdmissionBypassThreshold(newBypassThreshold);
-            writer->updateLowPriorityAdmissionBypassThreshold(newBypassThreshold);
-            return Status::OK();
-        }
-
-        // The 'lowPriorityAdmissionBypassThreshold' only impacts PriorityTicketHolders.
-        LOGV2_WARNING(7092700,
-                      "Attempting to update lowPriorityAdmissionBypassThreshold when the "
-                      "Ticketholders are not initalized to be PriorityTicketholders");
-        return Status(ErrorCodes::IllegalOperation,
-                      "Attempting to update lowPriorityAdmissionBypassThreshold when the "
-                      "TicketHolders are not initalized to be PriorityTicketholders");
-#else
-        LOGV2_WARNING(7207204,
-                      "Attempting to update lowPriorityAdmissionBypassThreshold when the feature "
-                      "is only supported on Linux");
-        return Status(ErrorCodes::IllegalOperation,
-                      "Attempting to update lowPriorityAdmissionBypassThreshold when the feature "
-                      "is only supported on Linux");
-#endif
     }
     return Status::OK();
 }

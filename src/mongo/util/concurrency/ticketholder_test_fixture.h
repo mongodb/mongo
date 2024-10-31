@@ -50,14 +50,8 @@
 
 namespace mongo {
 /**
- * Since the PriorityTicketHolder is restricted to Linux, and the SemaphoreTicketHolder is not,
- * tests for the two implementations exist in separate files. This fixture allows for a unified
- * location of TicketHolder test helpers and test cases whose behaviors hold regardless of
- * TicketHolder implementation.
- *
- * TODO SERVER-72616: Consider combining semaphore_ticketholder_test.cpp and
- * priority_ticketholder_test.cpp into a single file. Especially since there are few tests that
- * target the legacy SemaphoreTicketHolder.
+ * This fixture allows for a unified location of TicketHolder test helpers and test cases whose
+ * behaviors hold regardless of TicketHolder implementation.
  */
 class TicketHolderTestFixture : public ServiceContextTest {
 public:

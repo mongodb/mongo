@@ -29,13 +29,9 @@
 
 #include "mongo/tools/workload_simulation/throughput_probing/throughput_probing_simulator.h"
 
-#include "mongo/db/admission/execution_control_feature_flags_gen.h"
 #include "mongo/db/admission/execution_control_parameters_gen.h"
 #include "mongo/db/admission/throughput_probing.h"
 #include "mongo/db/admission/throughput_probing_gen.h"
-#ifdef __linux__
-#include "mongo/util/concurrency/priority_ticketholder.h"
-#endif
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -52,26 +48,10 @@ void ThroughputProbing::setup() {
     Milliseconds probingInterval{gStorageEngineConcurrencyAdjustmentIntervalMillis};
 
     constexpr bool trackPeakUsed = true;
-#ifdef __linux__
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        auto lowPriorityBypassThreshold = gLowPriorityAdmissionBypassThreshold.load();
-        _readTicketHolder = std::make_unique<PriorityTicketHolder>(
-            svcCtx(), initialTickets, lowPriorityBypassThreshold, trackPeakUsed);
-        _writeTicketHolder = std::make_unique<PriorityTicketHolder>(
-            svcCtx(), initialTickets, lowPriorityBypassThreshold, trackPeakUsed);
-    } else {
-        _readTicketHolder =
-            std::make_unique<SemaphoreTicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
-        _writeTicketHolder =
-            std::make_unique<SemaphoreTicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
-    }
-#else
     _readTicketHolder =
         std::make_unique<SemaphoreTicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
     _writeTicketHolder =
         std::make_unique<SemaphoreTicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
-#endif
 
     _runner = [svcCtx = svcCtx()] {
         auto runner = std::make_unique<MockPeriodicRunner>();

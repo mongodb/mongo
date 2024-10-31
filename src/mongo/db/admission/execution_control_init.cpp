@@ -33,12 +33,9 @@
 
 #include <string>
 
-#include "mongo/db/admission/execution_control_feature_flags_gen.h"
 #include "mongo/db/admission/execution_control_parameters_gen.h"
 #include "mongo/db/admission/throughput_probing.h"
 #include "mongo/db/admission/ticketholder_manager.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/semaphore_ticketholder.h"  // IWYU pragma: keep
 
 namespace mongo {
@@ -78,40 +75,9 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
         }
     };
 
-    std::unique_ptr<TicketHolderManager> ticketHolderManager;
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-#ifdef __linux__
-        LOGV2_DEBUG(6902900, 1, "Using Priority Queue-based ticketing scheduler");
-
-        auto lowPriorityBypassThreshold = gLowPriorityAdmissionBypassThreshold.load();
-        ticketHolderManager = makeTicketHolderManager(
-            std::make_unique<PriorityTicketHolder>(
-                svcCtx, readTransactions, lowPriorityBypassThreshold, usingThroughputProbing),
-            std::make_unique<PriorityTicketHolder>(
-                svcCtx, writeTransactions, lowPriorityBypassThreshold, usingThroughputProbing));
-#else
-        LOGV2_DEBUG(7207201, 1, "Using semaphore-based ticketing scheduler");
-        // PriorityTicketHolder is implemented using an equivalent mechanism to
-        // std::atomic::wait which isn't available until C++20. We've implemented it in Linux
-        // using futex calls. As this hasn't been implemented in non-Linux platforms we fallback
-        // to the existing semaphore implementation even if the feature flag is enabled.
-        //
-        // TODO SERVER-72616: Remove the ifdefs once TicketPool is implemented with atomic
-        // wait.
-        ticketHolderManager =
-            makeTicketHolderManager(std::make_unique<SemaphoreTicketHolder>(
-                                        svcCtx, readTransactions, usingThroughputProbing),
-                                    std::make_unique<SemaphoreTicketHolder>(
-                                        svcCtx, writeTransactions, usingThroughputProbing));
-#endif
-    } else {
-        ticketHolderManager =
-            makeTicketHolderManager(std::make_unique<SemaphoreTicketHolder>(
-                                        svcCtx, readTransactions, usingThroughputProbing),
-                                    std::make_unique<SemaphoreTicketHolder>(
-                                        svcCtx, writeTransactions, usingThroughputProbing));
-    }
+    std::unique_ptr<TicketHolderManager> ticketHolderManager = makeTicketHolderManager(
+        std::make_unique<SemaphoreTicketHolder>(svcCtx, readTransactions, usingThroughputProbing),
+        std::make_unique<SemaphoreTicketHolder>(svcCtx, writeTransactions, usingThroughputProbing));
 
     TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
 

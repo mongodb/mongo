@@ -44,7 +44,6 @@
 namespace mongo {
 
 class Ticket;
-class PriorityTicketHolder;
 class SemaphoreTicketHolder;
 
 /**

@@ -43,7 +43,6 @@ mongo_cc_library(
         "ticketholder_manager.h",
     ],
     deps = [
-        ":execution_control_feature_flags",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:test_commands_enabled",
@@ -95,31 +94,8 @@ idl_generator(
 )
 
 idl_generator(
-    name = "execution_control_feature_flags_gen",
-    src = "execution_control_feature_flags.idl",
-)
-
-idl_generator(
     name = "throughput_probing_gen",
     src = "throughput_probing.idl",
-)
-
-mongo_cc_library(
-    name = "execution_control_feature_flags",
-    srcs = [
-        ":execution_control_feature_flags_gen",
-    ],
-    hdrs = [
-        "//src/mongo/base:error_codes_header",
-        "//src/mongo/util/version:releases_header",
-    ],
-    header_deps = [
-        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:server_base",
-    ],
 )
 
 mongo_cc_library(

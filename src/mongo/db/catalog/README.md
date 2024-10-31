@@ -1666,23 +1666,6 @@ As of v7.0, the size of each ticket pool is managed dynamically by the server to
 
 Each pool of tickets is maintained in a [TicketHolder](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/util/concurrency/ticketholder.h#L52). Tickets distributed from a given TicketHolder will always be returned to the same TicketHolder (a write ticket will always be returned to the TicketHolder with the write ticket pool).
 
-### Deprioritization
-
-When resources are limited, its important to prioritize which operations are admitted to run first. The [PriorityTicketHolder](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/util/concurrency/priority_ticketholder.h) enables deprioritization of low priority operations and is used by default on [linux machines](https://jira.mongodb.org/browse/SERVER-72616).
-
-If the server is not under load (there are tickets available for the global lock request mode), then tickets are handed out immediately, regardless of admission priority. Otherwise, operations wait until a ticket is available.
-
-Operations waiting for a ticket are assigned to a TicketQueue according to their priority. There are two queues, one manages low priority operations, the other normal priority operations.
-When a ticket is released to the PriorityTicketHolder, the default behavior for the PriorityTicketHolder is as follows:
-
-1. Attempt a ticket transfer through the normal priority TicketQueue. If unsuccessful (e.g there are no normal priority operations waiting for a ticket), continue to (2)
-2. Attempt a ticket transfer through the the low priority TicketQueue
-3. If no transfer can be made, return the ticket to the general ticket pool
-
-#### Preventing Low Priority Operations from Falling too Far Behind
-
-If a server is consistently under load, and ticket transfers were always made through the normal priority TicketQueue first, then operations assigned to the low priority TicketQueue could starve. To remedy this, `lowPriorityAdmissionBypassThreshold` limits the number of consecutive ticket transfers to the normal priority TicketQueue before a ticket transfer is issued through the low priority TicketQueue.
-
 ## Flow Control
 
 The Flow Control mechanism aims to keep replica set majority committed lag less than or equal to a

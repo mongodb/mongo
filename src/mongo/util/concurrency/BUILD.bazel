@@ -54,17 +54,9 @@ mongo_cc_library(
     srcs = [
         "semaphore_ticketholder.cpp",
         "ticketholder.cpp",
-    ] + select({
-        "@platforms//os:linux": [
-            "priority_ticketholder.cpp",
-            "ticket_pool.cpp",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     hdrs = [
-        "priority_ticketholder.h",
         "semaphore_ticketholder.h",
-        "ticket_pool.h",
         "ticketholder.h",
     ],
     deps = [

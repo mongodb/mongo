@@ -51,7 +51,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/admission/execution_admission_context.h"
-#include "mongo/db/admission/execution_control_feature_flags_gen.h"
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
@@ -962,17 +961,6 @@ void CurOp::reportState(BSONObjBuilder* builder,
         builder->append("dataThroughputAverage", *_debug.dataThroughputAverage);
     }
 
-    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage
-    // engine initialization and FCV checking is ignored there, so here we also need to ignore
-    // FCV to keep consistent behavior.
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
-            .isEnabledAndIgnoreFCVUnsafe()) {
-        auto admissionPriority = ExecutionAdmissionContext::get(opCtx).getPriority();
-        if (admissionPriority < AdmissionContext::Priority::kNormal) {
-            builder->append("admissionPriority", toString(admissionPriority));
-        }
-    }
-
     if (auto start = _waitForWriteConcernStart.load(); start > 0) {
         auto end = _waitForWriteConcernEnd.load();
         auto elapsedTimeTotal = _atomicWaitForWriteConcernDurationMillis.load();
@@ -1258,17 +1246,6 @@ void OpDebug::report(OperationContext* opCtx,
 
     if (responseLength > 0) {
         pAttrs->add("reslen", responseLength);
-    }
-
-    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage
-    // engine initialization and FCV checking is ignored there, so here we also need to ignore
-    // FCV to keep consistent behavior.
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
-            .isEnabledAndIgnoreFCVUnsafe()) {
-        auto admissionPriority = ExecutionAdmissionContext::get(opCtx).getPriority();
-        if (admissionPriority < AdmissionContext::Priority::kNormal) {
-            pAttrs->add("admissionPriority", admissionPriority);
-        }
     }
 
     if (lockStats) {

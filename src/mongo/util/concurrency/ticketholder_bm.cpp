@@ -39,7 +39,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/duration.h"
@@ -55,7 +54,6 @@ namespace {
 static int kTickets = 32;
 static int kThreadMin = 16;
 static int kThreadMax = 1024;
-static int kLowPriorityAdmissionBypassThreshold = 100;
 
 // For a given benchmark, specifies the AdmissionContext::Priority of ticket admissions
 enum class AdmissionsPriority {
@@ -74,15 +72,8 @@ public:
     std::unique_ptr<TicketHolder> ticketHolder;
 
     TicketHolderFixture(int threads, ServiceContext* serviceContext) {
-        if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
-            ticketHolder = std::make_unique<TicketHolderImpl>(serviceContext,
-                                                              kTickets,
-                                                              kLowPriorityAdmissionBypassThreshold,
-                                                              true /* track peakUsed */);
-        } else {
-            ticketHolder = std::make_unique<TicketHolderImpl>(
-                serviceContext, kTickets, true /* track peakUsed */);
-        }
+        ticketHolder =
+            std::make_unique<TicketHolderImpl>(serviceContext, kTickets, true /* track peakUsed */);
     }
 };
 
@@ -195,44 +186,11 @@ void BM_acquireAndRelease(benchmark::State& state) {
 
 // The 'AdmissionsPriority' has no effect on SemaphoreTicketHolder performance because the
 // SemaphoreTicketHolder treaats all operations the same, regardless of their specified priority.
-// However, the benchmarks between the SemaphoreTicketHolder and the PriorityTicketHolder are only
-// comparable when all admissions are of normal priority.
 BENCHMARK_TEMPLATE(BM_acquireAndRelease, SemaphoreTicketHolder, AdmissionsPriority::kNormal)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
     ->Threads(128)
     ->Threads(kThreadMax);
-
-// TODO SERVER-72616: Remove ifdefs once PriorityTicketHolder is available cross-platform.
-#ifdef __linux__
-
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriority::kNormal)
-    ->Threads(kThreadMin)
-    ->Threads(kTickets)
-    ->Threads(128)
-    ->Threads(kThreadMax);
-
-// Low priority operations are expected to take longer to acquire a ticket because they are forced
-// to take a slower path than normal priority operations.
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriority::kLow)
-    ->Threads(kThreadMin)
-    ->Threads(kTickets)
-    ->Threads(128)
-    ->Threads(kThreadMax);
-
-// This benchmark is intended for comparisons between different iterations of the
-// PriorityTicketHolder over time.
-//
-// Since it is known low priority operations will be less performant than normal priority
-// operations, the aggregate performance over operations will be lower, and cannot be accurately
-// compared to TicketHolderImpl benchmarks with only normal priority operations.
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriority::kNormalAndLow)
-    ->Threads(kThreadMin)
-    ->Threads(kTickets)
-    ->Threads(128)
-    ->Threads(kThreadMax);
-
-#endif
 
 }  // namespace
 }  // namespace mongo

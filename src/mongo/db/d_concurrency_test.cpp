@@ -68,7 +68,6 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -100,33 +99,11 @@ public:
     explicit UseReaderWriterGlobalThrottling(ServiceContext* svcCtx, int numTickets)
         : _svcCtx(svcCtx) {
         const bool trackPeakUsed = false;
-        // TODO SERVER-72616: Remove ifdefs once PriorityTicketHolder is available cross-platform.
-#ifdef __linux__
-        if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
-            LOGV2(7130100, "Using PriorityTicketHolder for Reader/Writer global throttling");
-            // For simplicity, no low priority operations will ever be expedited in these tests.
-            auto lowPriorityAdmissionsBypassThreshold = 0;
-
-            auto ticketHolderManager = std::make_unique<admission::FixedTicketHolderManager>(
-                std::make_unique<PriorityTicketHolder>(
-                    _svcCtx, numTickets, lowPriorityAdmissionsBypassThreshold, trackPeakUsed),
-                std::make_unique<PriorityTicketHolder>(
-                    _svcCtx, numTickets, lowPriorityAdmissionsBypassThreshold, trackPeakUsed));
-            admission::TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
-        } else {
-            LOGV2(7130101, "Using SemaphoreTicketHolder for Reader/Writer global throttling");
-            auto ticketHolderManager = std::make_unique<admission::FixedTicketHolderManager>(
-                std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed),
-                std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed));
-            admission::TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
-        }
-#else
         LOGV2(7207205, "Using SemaphoreTicketHolder for Reader/Writer global throttling");
         auto ticketHolderManager = std::make_unique<admission::FixedTicketHolderManager>(
             std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed),
             std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed));
         admission::TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
-#endif
     }
 
     ~UseReaderWriterGlobalThrottling() noexcept(false) {
@@ -182,18 +159,8 @@ public:
 
     template <class TicketHolderImpl, class F>
     void runWithThrottling(int numTickets, F&& f) {
-        // TODO SERVER-72616: Remove ifdef when PriorityTicketHolder is available cross-platform.
-#ifdef __linux__
         UseReaderWriterGlobalThrottling<TicketHolderImpl> throttle(getServiceContext(), numTickets);
         f();
-#else
-        // We can only test non-PriorityTicketHolder implementations on non-Linux platforms.
-        if constexpr (!std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
-            UseReaderWriterGlobalThrottling<TicketHolderImpl> throttle(getServiceContext(),
-                                                                       numTickets);
-            f();
-        }
-#endif
     }
 };
 
@@ -1561,7 +1528,6 @@ TEST_F(DConcurrencyTestFixture, Throttling) {
     };
 
     int numTickets = 1;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 
@@ -1585,7 +1551,6 @@ TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
 
     // Limit the locker to 1 ticket at a time.
     int numTickets = 1;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 
@@ -1627,7 +1592,6 @@ TEST_F(DConcurrencyTestFixture, ReleaseAndReacquireTicket) {
 
     // Limit the locker to 1 ticket at a time.
     int numTickets = 1;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 
@@ -1654,7 +1618,6 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToKill) {
 
     // Limit the locker to 0 tickets at a time.
     int numTickets = 0;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 
@@ -1673,7 +1636,6 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToDeadline) {
 
     // Limit the locker to 0 tickets at a time.
     int numTickets = 0;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 
@@ -1689,7 +1651,6 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireShouldNotThrowIfBehaviorIsLeaveUnlo
     };
 
     int numTickets = 0;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 
@@ -1707,7 +1668,6 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireShouldNotThrowIfBehaviorIsLeaveUnlo
     };
 
     int numTickets = 0;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 
@@ -1742,7 +1702,6 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireWithMaxDeadlineRespectsUninterrupti
 
     // Limit the locker to 1 ticket at a time.
     int numTickets = 1;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 
@@ -1782,7 +1741,6 @@ TEST_F(DConcurrencyTestFixture, TicketReacquireCanBeInterrupted) {
 
     // Limit the locker to 1 ticket at a time.
     int numTickets = 1;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 
@@ -1824,7 +1782,6 @@ TEST_F(DConcurrencyTestFixture,
 
     // Limit the locker to 1 ticket at a time.
     int numTickets = 1;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 

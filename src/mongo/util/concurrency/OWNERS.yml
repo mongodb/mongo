@@ -6,9 +6,6 @@ filters:
   - "*ticketholder*":
     approvers:
       - 10gen/server-workload-scheduling
-  - "ticket_pool*":
-    approvers:
-      - 10gen/server-workload-scheduling
   - "admission_context.*":
     approvers:
       - 10gen/server-workload-scheduling

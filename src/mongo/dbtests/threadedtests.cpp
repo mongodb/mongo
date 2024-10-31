@@ -45,7 +45,6 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -240,25 +239,8 @@ public:
     TicketHolderWaits() : _hotel(rooms) {
         auto client = Client::getCurrent();
         constexpr bool trackPeakUsed = false;
-        // TODO SERVER-72616: We can only test PriorityTicketHolder on Linux. Remove ifdefs when
-        // it's available on other platforms.
-#ifdef __linux__
-        if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
-            // When run with the PriorityTicketHolder, scale down the default
-            // 'lowPriorityAdmissionBypassThreshold' for test purposes.
-            int lowPriorityAdmissionBypassThreshold = 100;
-            _tickets = std::make_unique<TicketHolderImpl>(client->getServiceContext(),
-                                                          _hotel._nRooms,
-                                                          lowPriorityAdmissionBypassThreshold,
-                                                          trackPeakUsed);
-        } else {
-            _tickets = std::make_unique<TicketHolderImpl>(
-                client->getServiceContext(), _hotel._nRooms, trackPeakUsed);
-        }
-#else
         _tickets = std::make_unique<TicketHolderImpl>(
             client->getServiceContext(), _hotel._nRooms, trackPeakUsed);
-#endif
     }
 
 private:
@@ -341,11 +323,6 @@ public:
         add<ThreadPoolTest>();
 
         add<TicketHolderWaits<SemaphoreTicketHolder>>();
-        // TODO SERVER-72616: We can only test PriorityTicketHolder on Linux. Remove this when it's
-        // available on other platforms.
-#ifdef __linux__
-        add<TicketHolderWaits<PriorityTicketHolder>>();
-#endif
     }
 };
 
