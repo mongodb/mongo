@@ -682,3 +682,22 @@ assertPipelineResultsAndExplain({
     validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {str: 1, d: 1}),
     options: collationOption
 });
+
+// These tests do not verify data but verify that the server does not die.
+assert.eq(db.nodata.aggregate([{$group: {_id: '$a', o: {$top: {output: 'a', sortBy: {}}}}}])
+              .toArray()
+              .length,
+          0);
+assert.eq(db.nodata.aggregate([{$group: {_id: '$a', o: {$topN: {n: 1, output: 'a', sortBy: {}}}}}])
+              .toArray()
+              .length,
+          0);
+assert.eq(db.nodata.aggregate([{$group: {_id: '$a', o: {$bottom: {output: 'a', sortBy: {}}}}}])
+              .toArray()
+              .length,
+          0);
+assert.eq(
+    db.nodata.aggregate([{$group: {_id: '$a', o: {$bottomN: {n: 1, output: 'a', sortBy: {}}}}}])
+        .toArray()
+        .length,
+    0);

@@ -533,13 +533,22 @@ DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
                 break;
             case AccumulatorDocumentsNeeded::kFirstOutputDocument:
             case AccumulatorDocumentsNeeded::kLastOutputDocument:
-                // We only want to add the 'ouput' portion of the accumulator expression since
-                // that's the only part that should be accumulated. We know 'output' is the first
-                // child of $top and $bottom accumulators since it is added first in
-                // AccumulatorTopBottomN<sense, single>::parseTopBottomN().
-                fields.emplace_back(accumulator.fieldName,
-                                    accumulator.expr.argument->getChildren()[0]);
-                break;
+                if (auto&& args = accumulator.expr.argument; !args->getChildren().empty()) {
+                    // We only want to add the 'ouput' portion of the accumulator expression since
+                    // that's the only part that should be accumulated. We know 'output' is the
+                    // first child of $top and $bottom accumulators since it is added first in
+                    // AccumulatorTopBottomN<sense, single>::parseTopBottomN().
+                    fields.emplace_back(accumulator.fieldName, args->getChildren()[0]);
+                    break;
+                } else {
+                    // $top/$topN/$bottom/$bottomN parser stores 'output' expression and 'sortBy'
+                    // expression into one ExpressionObject expression with two child expressions.
+                    // Unfortunately, if the 'sortBy' is an empty doc and the 'output' is a
+                    // constant, the 'sortBy' expression would be optimized out and the
+                    // ExpressionObject would become just a ExpressionConstant for the 'output'
+                    // field. In this case, we can't apply this optimization.
+                }
+                [[fallthrough]];
             default:
                 return {boost::none, nullptr};
         }
