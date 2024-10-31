@@ -46,6 +46,13 @@ REGISTER_DOCUMENT_SOURCE(_internalSearchIdLookup,
 DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(kStageName, pExpCtx) {
+
+    // When search query is being run on a view, we need to store the view pipeline to append to
+    // the end of the idLookup's subpipeline.
+    if (pExpCtx->viewNS) {
+        auto resolvedNamespace = pExpCtx->getResolvedNamespace(*pExpCtx->viewNS);
+        _viewPipeline = Pipeline::parse(resolvedNamespace.pipeline, pExpCtx);
+    }
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state shared by the
     // DocumentSourceInternalSearchMongotRemote and DocumentSourceInternalSearchIdLookup stages when
     // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is
@@ -57,6 +64,13 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
 DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     const intrusive_ptr<ExpressionContext>& pExpCtx, long long limit)
     : DocumentSource(kStageName, pExpCtx), _limit(limit) {
+
+    // When search query is being run on a view, we need to store the view pipeline to append to
+    // the end of the idLookup's subpipeline.
+    if (pExpCtx->viewNS) {
+        auto resolvedNamespace = pExpCtx->getResolvedNamespace(*pExpCtx->viewNS);
+        _viewPipeline = Pipeline::parse(resolvedNamespace.pipeline, pExpCtx);
+    }
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state shared by the
     // DocumentSourceInternalSearchMongotRemote and DocumentSourceInternalSearchIdLookup stages when
     // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is
@@ -145,16 +159,17 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
             pipelineOpts.attachCursorSource = false;
             auto pipeline =
                 Pipeline::makePipeline({BSON("$match" << documentKey)}, pExpCtx, pipelineOpts);
-            // TODO SERVER-94755 move this entire if clause to constructor and off the hot path.
+
             if (pExpCtx->viewNS) {
                 // When search query is being run on a view, we append the view pipeline to the end
                 // of the idLookup's subpipeline. This allows idLookup to retrieve the
                 // full/unmodified documents (from the _id values returned by mongot), apply the
                 // view's data transforms, and pass said transformed documents through the rest of
                 // the user pipeline.
-                auto resolvedNamespace = pExpCtx->getResolvedNamespace(*pExpCtx->viewNS);
-                auto viewPipeline = Pipeline::parse(resolvedNamespace.pipeline, pExpCtx);
-                pipeline->appendPipeline(std::move(viewPipeline));
+                tassert(9475500,
+                        "We should have a _viewPipeline if pExpCtx references a view",
+                        _viewPipeline);
+                pipeline->appendPipeline(_viewPipeline->clone(pExpCtx));
             }
 
             pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(

@@ -189,6 +189,9 @@ private:
         std::make_shared<SearchIdLookupMetrics>();
 
     DocumentSourceIdLookupStats _stats;
+
+    // If a search query is run on a view, we store the parsed view pipeline.
+    std::unique_ptr<Pipeline, PipelineDeleter> _viewPipeline;
 };
 
 }  // namespace mongo
