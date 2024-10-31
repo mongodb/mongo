@@ -1338,12 +1338,12 @@ void commitTimeseriesBucketsAtomically(
     try {
         std::vector<write_ops::InsertCommandRequest> insertOps;
         std::vector<write_ops::UpdateCommandRequest> updateOps;
-
         auto& mainBucketCatalog =
             bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(sideBucketCatalog, batch.get()->bucketId);
-            auto prepareCommitStatus = prepareCommit(sideBucketCatalog, batch);
+            auto prepareCommitStatus =
+                prepareCommit(sideBucketCatalog, batch, coll->getDefaultCollator());
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return;

@@ -40,7 +40,7 @@ namespace mongo::timeseries::bucket_catalog {
  * 9.0: WRITING-27603
  */
 namespace {
-static constexpr uint64_t kExpectedOpenBucketSize = 880;
+static constexpr uint64_t kExpectedOpenBucketSize = 872;
 static constexpr uint64_t kExpectedArchivedBucketSize = 52;
 static constexpr uint64_t kExpectedSchemaSizePerElement = 110;
 static constexpr uint64_t kExpectedMinMaxSizePerElement = 216;
@@ -58,8 +58,7 @@ TEST(TimeseriesSizingConstants, OpenBucket) {
         contexts.global,
         contexts,
         BucketId{UUID::gen(), OID{}, BucketKey::Signature{}},
-        BucketKey{UUID::gen(),
-                  BucketMetadata{contexts.global, BSONElement{}, nullptr, boost::none}},
+        BucketKey{UUID::gen(), BucketMetadata{contexts.global, BSONElement{}, boost::none}},
         ""_sd,
         Date_t{},
         registry);
