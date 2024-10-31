@@ -863,14 +863,13 @@ TEST_F(InitialSyncerTest, StartupSetsInitialSyncFlagOnSuccess) {
     ASSERT_TRUE(_replicationProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx.get()));
 }
 
-TEST_F(InitialSyncerTest, StartupSetsInitialDataTimestampAndStableTimestampOnSuccess) {
+TEST_F(InitialSyncerTest, StartupSetsInitialDataTimestampOnSuccess) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
     // Set initial data timestamp forward first.
     auto serviceCtx = opCtx.get()->getServiceContext();
     _storageInterface->setInitialDataTimestamp(serviceCtx, Timestamp(5, 5));
-    _storageInterface->setStableTimestamp(serviceCtx, Timestamp(6, 6));
 
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
     ASSERT_TRUE(initialSyncer->isActive());

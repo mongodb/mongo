@@ -558,7 +558,7 @@ void InitialSyncer::_setUp(WithLock lk,
 
     auto serviceCtx = opCtx->getServiceContext();
     _storage->setInitialDataTimestamp(serviceCtx, Timestamp::kAllowUnstableCheckpointsSentinel);
-    _storage->setStableTimestamp(serviceCtx, Timestamp::min());
+    invariant(serviceCtx->getStorageEngine()->getStableTimestamp().isNull());
 
     LOGV2_DEBUG(21162, 1, "Creating oplogBuffer");
     _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(opCtx);
