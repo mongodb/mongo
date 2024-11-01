@@ -74,6 +74,9 @@ selector:
     # The resharding core tests expect the sharding topology to remain constant.
     - jstests/core_sharding/resharding/**/*.js
 
+    # The resharding core tests expect the sharding topology to remain constant.
+    - jstests/core_sharding/resharding/**/*.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

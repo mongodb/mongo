@@ -10,9 +10,6 @@ export var CreateShardedCollectionUtil = (function() {
      * @param shardCollOptions: options that are passed in to the shardCollection cmd.
      */
     function shardCollectionWithChunks(collection, shardKey, chunks, shardCollOptions) {
-        assert(collection.getDB().getMongo().isMongos(),
-               "collection must have an underlying connection to a mongos");
-
         const adminDB = collection.getDB().getSiblingDB("admin");
         const configDB = collection.getDB().getSiblingDB("config");
 
