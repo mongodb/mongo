@@ -584,6 +584,14 @@ functions:
       exec_timeout_secs: ${exec_timeout_secs}
       timeout_secs: ${timeout_secs}
 
+  "set code coverage expansion": &set_code_coverage_expansion
+    command: expansions.update
+    display_name: "set code coverage expansion"
+    params:
+      updates:
+        - key: gather_code_coverage_results
+          value: "true"
+
   ### Set expansion macros used in each task.
   "set task expansion macros": &set_task_expansion_macros
     command: expansions.update
@@ -1160,6 +1168,8 @@ functions:
           - key: aws_secret_remote
             value: ${mongodatafiles_aws_secret}
     - *f_expansions_write
+    - *set_code_coverage_expansion
+    - *f_expansions_write
     - *set_up_remote_credentials
     - *f_expansions_write
     - *determine_resmoke_jobs
@@ -1187,6 +1197,8 @@ functions:
     - *update_task_timeout_expansions
     - *f_expansions_write
     - *update_task_timeout
+    - *f_expansions_write
+    - *set_code_coverage_expansion
     - *f_expansions_write
     - command: expansions.update
       params:
@@ -1411,6 +1423,8 @@ functions:
   "bazel coverage":
     - *get_version_expansions
     - *apply_version_expansions
+    - *f_expansions_write
+    - *set_code_coverage_expansion
     - *f_expansions_write
     - *bazel_coverage_sh
 

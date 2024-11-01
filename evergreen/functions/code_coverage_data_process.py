@@ -7,6 +7,7 @@ import sys
 import tarfile
 from urllib.request import urlretrieve
 
+import git
 import requests
 import retry
 
@@ -72,6 +73,31 @@ def main():
         )
         return 0
 
+    should_gather_code_coverage = expansions.get("gather_code_coverage_results", False)
+    if not should_gather_code_coverage:
+        print("Missing 'gather_code_coverage_results' expansion, skipping code coverage.")
+        return 0
+
+    if not os.path.exists(".git"):
+        print("No git repo found in working directory. Code coverage needs git repo to function.")
+        return 1
+
+    repo = git.Repo()
+    head_sha = repo.head.object.hexsha
+    evergreen_revision = expansions.get("revision")
+    # We need all code coverage runs from the same patch to have the same commit on HEAD
+    # When different runs have different git SHAs they are grouped in different builds in coveralls.
+    #
+    # Because of the weird cloning we do to have a git repo present during code coverage tasks
+    # and the inconsistent behaviors of the local git state during evergreen patches and
+    # commit-queue runs. We need to always ensure that the HEAD matches the evergreen revision
+    # for consistency in coveralls.
+    if head_sha != evergreen_revision:
+        print("test not equal")
+        print(f"head_sha: {head_sha}")
+        print(f"evergreen revision: {evergreen_revision}")
+        repo.git.reset("--mixed", evergreen_revision)
+
     disallowed_arches = {"s390x", "s390", "ppc64le", "ppc64", "ppc", "ppcle"}
     arch = platform.uname().machine.lower()
     print(f"Detected arch: {arch}")
@@ -123,6 +149,8 @@ def main():
                 )
             args.append(bazel_coverage_report_location)
             retry_coveralls_report(args)
+            # no gcda files are generated from bazel coverage so we can exit early here
+            return 0
 
     scons_build_dir = os.path.join(workdir, "src", "build", "debug")
     if os.path.exists(scons_build_dir):
