@@ -1210,6 +1210,14 @@ COVERAGE_FLAGS = select({
     "//conditions:default": [],
 })
 
+MACOS_SSL_LINKFLAGS = select({
+    "//bazel/config:ssl_enabled_macos": [
+        "-framework CoreFoundation",
+        "-framework Security",
+    ],
+    "//conditions:default": [],
+})
+
 MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc",
     "-I$(GENDIR)/src",
@@ -1305,7 +1313,8 @@ MONGO_GLOBAL_LINKFLAGS = (
     SYMBOL_ORDER_LINKFLAGS +
     COVERAGE_FLAGS +
     GLOBAL_WINDOWS_LIBRAY_LINKFLAGS +
-    SASL_WINDOWS_LINKFLAGS
+    SASL_WINDOWS_LINKFLAGS +
+    MACOS_SSL_LINKFLAGS
 )
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES

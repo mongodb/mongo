@@ -3501,10 +3501,14 @@ mongo_cc_binary(
         },
         "//conditions:default": {},
     }),
-    linkopts = ["-latomic"] + select({
+    linkopts = select({
         "@platforms//os:linux": [
             "-ldl",
             "-lrt",
+            "-latomic",
+        ],
+        "@platforms//os:windows": [
+            "-latomic",
         ],
         "//conditions:default": [],
     }),
