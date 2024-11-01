@@ -156,8 +156,7 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
 
     return liteParsedPipeline.getInvolvedNamespaces();
 }
-// TODO SERVER-93638 add comment for expected behavior of $lookup/$unionWith which might have
-// multiple backing collections.
+
 NamespaceString findSourceCollectionNamespace(OperationContext* opCtx,
                                               std::shared_ptr<const CollectionCatalog> catalog,
                                               const NamespaceString& nss) {
