@@ -316,9 +316,6 @@ buildvariants:
       - name: compile_test_parallel_unittest_stream_TG
         distros:
           - rhel93-large
-      - name: compile_build_tools_next_TG
-        distros:
-          - rhel93-large
       - name: test_packages
         distros:
           - ubuntu2204-large

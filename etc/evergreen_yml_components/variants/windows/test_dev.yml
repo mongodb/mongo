@@ -71,10 +71,8 @@ buildvariants:
       compile_variant: *windows-compile-required
     tasks:
       - name: compile_ninja_quick_TG
-      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_serial_no_unittests_TG
       - name: compile_test_parallel_unittest_stream_TG
-      - name: compile_test_parallel_dbtest_stream_TG
-      - name: compile_build_tools_next_TG
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch
         distros:

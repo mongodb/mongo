@@ -590,18 +590,6 @@ tasks:
           ninja_file: "build.ninja"
           targets: "install-devcore compiledb"
 
-  - name: compile_build_tools_next
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          task_compile_flags: >-
-            --build-tools=next
-          targets: install-core
-
   - name: libdeps_graph_linting
     tags:
       [
@@ -2187,11 +2175,6 @@ task_groups:
     name: compile_ninja_next_TG
     tasks:
       - compile_ninja_next
-
-  - <<: *compile_task_group_template
-    name: compile_build_tools_next_TG
-    tasks:
-      - compile_build_tools_next
 
   - <<: *compile_task_group_template
     name: compile_ninja_TG

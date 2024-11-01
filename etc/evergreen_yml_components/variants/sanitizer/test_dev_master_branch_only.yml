@@ -357,9 +357,6 @@ buildvariants:
       - name: compile_and_archive_dist_test_TG
         distros:
           - windows-2022-xxlarge
-      - name: compile_build_tools_next_TG
-        distros:
-          - windows-2022-xxlarge
       - name: audit
     # Do not add more tasks to this list.
 
