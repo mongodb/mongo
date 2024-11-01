@@ -39,6 +39,8 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     const shouldApplyQuerySettings =
         // Only intercept commands with cursor hints.
         "hint" in innerCmd &&
+        // TODO SERVER-96460 Validate against empty PQS index key pattern hints.
+        innerCmd["hint"] && Object.keys(innerCmd["hint"]).length > 0 &&
         // Only intercept command types supported by query settings.
         QuerySettingsUtils.isSupportedCommand(getCommandName(innerCmd)) &&
         !isMinMaxQuery(innerCmd) && !requestsResumeToken(innerCmd);
