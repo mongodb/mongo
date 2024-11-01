@@ -2083,9 +2083,13 @@ def mongo_cc_proto_library(
         deps,
         **kwargs):
     native.cc_proto_library(
-        name = name,
+        name = name + "_raw",
         deps = deps,
         **kwargs
+    )
+    strip_deps(
+        name = name,
+        input = name + "_raw",
     )
 
 def mongo_cc_grpc_library(

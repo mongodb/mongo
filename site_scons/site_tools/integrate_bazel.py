@@ -1017,6 +1017,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         "--define",
         f"MONGO_DISTMOD={env['MONGO_DISTMOD']}",
         "--compilation_mode=dbg",  # always build this compilation mode as we always build with -g
+        "--dynamic_mode=off",
     ]
 
     if not os.environ.get("USE_NATIVE_TOOLCHAIN"):
