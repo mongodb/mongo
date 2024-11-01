@@ -161,22 +161,14 @@ private:
     char _buffer[maxLogLineSize];
 };
 
-class MallocFreeOStream : public std::ostream {
+class MallocFreeOStream : private MallocFreeStreambuf, public std::ostream {
+public:
+    MallocFreeOStream() : std::ostream{static_cast<MallocFreeStreambuf*>(this)} {}
     MallocFreeOStream(const MallocFreeOStream&) = delete;
     MallocFreeOStream& operator=(const MallocFreeOStream&) = delete;
 
-public:
-    MallocFreeOStream() : std::ostream(&_buf) {}
-
-    StringData str() const {
-        return _buf.str();
-    }
-    void rewind() {
-        _buf.rewind();
-    }
-
-private:
-    MallocFreeStreambuf _buf;
+    using MallocFreeStreambuf::rewind;
+    using MallocFreeStreambuf::str;
 };
 
 MallocFreeOStream mallocFreeOStream;
