@@ -73,6 +73,9 @@ function retryOnRetryableError(func, numRetries, sleepMs, additionalCodesToRetry
     additionalCodesToRetry = additionalCodesToRetry || [];
 
     while (true) {
+        if (numRetries % 10 === 0) {
+            print("retryOnRetryableError has " + numRetries + " retries remaining.");
+        }
         try {
             return func();
         } catch (e) {
