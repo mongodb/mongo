@@ -36,7 +36,7 @@ mkdir -p $TMPDIR
 
 # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
 if [[ $ARCH == "ppc64le" ]] || [[ $ARCH == "s390x" ]]; then
-  REMOTE_PATH=https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-${ARCH}
+  REMOTE_PATH=https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-${ARCH}
   LOCAL_PATH=$TMPDIR/bazel
 else
   REMOTE_PATH=https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-${OS}-${ARCH}${EXT}

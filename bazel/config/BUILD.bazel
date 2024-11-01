@@ -194,7 +194,7 @@ config_setting(
     name = "linux_ppc64le",
     constraint_values = [
         "@platforms//os:linux",
-        "@platforms//cpu:ppc64le",
+        "@platforms//cpu:ppc",
     ],
 )
 
@@ -259,7 +259,7 @@ selects.config_setting_group(
     match_any = [
         "@platforms//cpu:aarch64",
         "@platforms//cpu:x86_64",
-        "@platforms//cpu:ppc64le",
+        "@platforms//cpu:ppc",
     ],
 )
 
@@ -848,7 +848,7 @@ selects.config_setting_group(
     name = "_tcmalloc_gperf_auto_supported",
     match_any = [
         "@platforms//os:windows",
-        "@platforms//cpu:ppc64le",
+        "@platforms//cpu:ppc",
         "@platforms//cpu:s390x",
     ],
 )

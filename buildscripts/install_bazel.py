@@ -10,8 +10,8 @@ import urllib.request
 from retry import retry
 
 _S3_HASH_MAPPING = {
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-ppc64le": "dd21c75817533ff601bf797e64f0eb2f7f6b813af26c829f0bda30e328caef46",
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-s390x": "6d72eabc1789b041bbe4cfc033bbac4491ec9938ef6da9899c0188ecf270a7f4",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-ppc64le": "4ecc7f1396b8d921c6468b34cc8ed356c4f2dbe8a154c25d681a61ccb5dfc9cb",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-s390x": "2f5f7fd747620d96e885766a4027347c75c0f455c68219211a00e72fc6413be9",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-amd64": "f2ba5f721a995b54bab68c6b76a340719888aa740310e634771086b6d1528ecd",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-arm64": "69fa21cd2ccffc2f0970c21aa3615484ba89e3553ecce1233a9d8ad9570d170e",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-amd64": "d28b588ac0916abd6bf02defb5433f6eddf7cba35ffa808eabb65a44aab226f7",
@@ -72,7 +72,7 @@ def install_bazel(binary_directory: str) -> str:
         print(
             "Warning: Bazelisk is not supported on this platform. Installing Bazel directly instead."
         )
-        s3_path = f"https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-{normalized_arch}"
+        s3_path = f"https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-{normalized_arch}"
 
     _download_path_with_retry(s3_path, binary_path)
     _verify_s3_hash(s3_path, binary_path)

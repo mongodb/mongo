@@ -3,6 +3,7 @@ load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 WITH_DEBUG_SUFFIX = "_with_debug"
 CC_SHARED_LIBRARY_SUFFIX = "_shared"
 SHARED_ARCHIVE_SUFFIX = "_shared_archive"
+MAC_DEBUG_FOLDER_EXTENSION = ".dSYM"
 
 def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
     """
@@ -35,7 +36,10 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
         if shared_lib:
             basename = shared_lib.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext + CC_SHARED_LIBRARY_SUFFIX)]
             if ctx.attr.enabled:
-                debug_info = ctx.actions.declare_file(basename + shared_ext + debug_ext)
+                if debug_ext == MAC_DEBUG_FOLDER_EXTENSION:
+                    debug_info = ctx.actions.declare_directory(basename + shared_ext + debug_ext)
+                else:
+                    debug_info = ctx.actions.declare_file(basename + shared_ext + debug_ext)
             else:
                 debug_info = None
             output_bin = ctx.actions.declare_file(basename + shared_ext)
@@ -49,7 +53,10 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
 
         basename = program_bin.basename[:-len(WITH_DEBUG_SUFFIX)]
         if ctx.attr.enabled:
-            debug_info = ctx.actions.declare_file(basename + debug_ext)
+            if debug_ext == MAC_DEBUG_FOLDER_EXTENSION:
+                debug_info = ctx.actions.declare_directory(basename + debug_ext)
+            else:
+                debug_info = ctx.actions.declare_file(basename + debug_ext)
         else:
             debug_info = None
         output_bin = ctx.actions.declare_file(basename)
@@ -292,7 +299,7 @@ def linux_extraction(ctx, cc_toolchain, inputs):
 def macos_extraction(ctx, cc_toolchain, inputs):
     outputs = []
     unstripped_static_bin = None
-    input_bin, output_bin, debug_info, static_lib = get_inputs_and_outputs(ctx, ".dylib", ".a", ".dSYM")
+    input_bin, output_bin, debug_info, static_lib = get_inputs_and_outputs(ctx, ".dylib", ".a", MAC_DEBUG_FOLDER_EXTENSION)
     input_file = ctx.attr.binary_with_debug.files.to_list()
 
     if input_bin:

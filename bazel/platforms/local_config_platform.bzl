@@ -12,7 +12,7 @@ _ARCH_MAP = {
     "amd64": "@platforms//cpu:x86_64",
     "aarch64": "@platforms//cpu:arm64",
     "x86_64": "@platforms//cpu:x86_64",
-    "ppc64le": "@platforms//cpu:ppc64le",
+    "ppc64le": "@platforms//cpu:ppc",
     "s390x": "@platforms//cpu:s390x",
 }
 
@@ -85,18 +85,24 @@ def _setup_local_config_platform(ctx):
     }
 
     ctx.template(
-        "BUILD.bazel",
+        "host/BUILD.bazel",
         ctx.attr.build_tpl,
         substitutions = substitutions,
     )
 
     ctx.template(
-        "constraints.bzl",
+        "host/constraints.bzl",
         ctx.attr.constraints_tpl,
         substitutions = substitutions,
     )
 
-    return result
+    ctx.template(
+        "host/extension.bzl",
+        ctx.attr.extension_tpl,
+        substitutions = substitutions,
+    )
+
+    return None
 
 setup_local_config_platform = repository_rule(
     implementation = _setup_local_config_platform,
@@ -107,6 +113,10 @@ setup_local_config_platform = repository_rule(
         ),
         "constraints_tpl": attr.label(
             default = "//bazel/platforms:local_config_platform_constraints.bzl",
+            doc = "Template modeling the builtin local config platform constraints file.",
+        ),
+        "extension_tpl": attr.label(
+            default = "//bazel/platforms:local_config_platform_extension.bzl",
             doc = "Template modeling the builtin local config platform constraints file.",
         ),
     },

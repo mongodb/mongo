@@ -42,9 +42,9 @@ fi
 # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
 # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
 if [[ $ARCH == "ppc64le" ]]; then
-  export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
+  export JAVA_HOME="/usr/lib/jvm/java-21-openjdk-21.0.4.0.7-1.el8.ppc64le"
 elif [[ $ARCH == "s390x" ]]; then
-  export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x"
+  export JAVA_HOME="/usr/lib/jvm/java-21-openjdk-21.0.4.0.7-1.el8.s390x"
 fi
 
 # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le

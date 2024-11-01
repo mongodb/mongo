@@ -12,7 +12,7 @@ _ARCH_MAP = {
     "amd64": "@platforms//cpu:x86_64",
     "aarch64": "@platforms//cpu:arm64",
     "x86_64": "@platforms//cpu:x86_64",
-    "ppc64le": "@platforms//cpu:ppc64le",
+    "ppc64le": "@platforms//cpu:ppc",
     "s390x": "@platforms//cpu:s390x",
 }
 

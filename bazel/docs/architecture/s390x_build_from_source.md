@@ -8,12 +8,12 @@ Bazel usually comes with a built-in JDK. However, the tooling used to build the 
 
 On the MongoDB S390X Evergreen static hosts and dev hosts, the OpenJDK 11 installation exists at:
 
-/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x
+/usr/lib/jvm/java-21-openjdk-21.0.4.0.7-1.el8.s390x
 
 To compile with on these platforms, the developer must set JAVA_HOME before invoking Bazel.
 
-# Bazel v6.4.0 Compilation Steps
+# Bazel v7.2.1 Compilation Steps
 
-    curl -O -L https://github.com/bazelbuild/bazel/releases/download/6.4.0/bazel-6.4.0-dist.zip
-    unzip bazel-6.4.0-dist.zip
-    JAVA_HOME=/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x ./compile.sh
+    curl -O -L https://github.com/bazelbuild/bazel/releases/download/7.2.1/bazel-7.2.1-dist.zip
+    unzip bazel-7.2.1-dist.zip
+    JAVA_HOME=/usr/lib/jvm/java-21-openjdk-21.0.4.0.7-1.el8.s390x ./compile.sh

@@ -98,7 +98,7 @@ mongo_cc_library(
                    "dist/src/x86_64/is_fpreg.c",
                    "dist/src/x86_64/regname.c",
                ],
-               "@platforms//cpu:ppc64le": [
+               "@platforms//cpu:ppc": [
                    "dist/src/ppc/Lget_proc_info.c",
                    "dist/src/ppc/Lget_save_loc.c",
                    "dist/src/ppc/Linit_local.c",
@@ -142,7 +142,7 @@ mongo_cc_library(
             "dist/src/x86_64/getcontext.S",
             "dist/src/x86_64/setcontext.S",
         ],
-        "@platforms//cpu:ppc64le": [],
+        "@platforms//cpu:ppc": [],
         "@platforms//cpu:s390x": [
             "dist/src/s390x/getcontext.S",
             "dist/src/s390x/setcontext.S",
@@ -171,7 +171,7 @@ mongo_cc_library(
             "-Isrc/third_party/unwind/platform/linux_x86_64/build/include",
             "-Isrc/third_party/unwind/dist/include/tdep-x86_64",
         ],
-        "@platforms//cpu:ppc64le": [
+        "@platforms//cpu:ppc": [
             "-Isrc/third_party/unwind/platform/linux_ppc64le/build/include",
             "-Isrc/third_party/unwind/dist/include/tdep-ppc64",
         ],
@@ -204,14 +204,10 @@ mongo_cc_library(
         "no_warn_non_virtual_detour",
     ],
     includes = select({
-        "@platforms//cpu:{}".format(cpu): ["platform/linux_{}/install/include".format(cpu)]
-        for cpu in [
-            "aarch64",
-            "x86_64",
-            "ppc64le",
-            "s390x",
-        ]
-    } | {
+        "@platforms//cpu:aarch64": ["platform/linux_aarch64/install/include"],
+        "@platforms//cpu:x86_64": ["platform/linux_x86_64/install/include"],
+        "@platforms//cpu:ppc": ["platform/linux_ppc64le/install/include"],
+        "@platforms//cpu:s390x": ["platform/linux_s390x/install/include"],
         "//conditions:default": [],
     }),
     local_defines = [

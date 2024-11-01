@@ -71,7 +71,7 @@ mongo_cc_library(
     ] + select({
         "@platforms//cpu:x86_64": ["byte_vector_sse2.h"],
         "@platforms//cpu:aarch64": ["byte_vector_neon.h"],
-        "@platforms//cpu:ppc64le": ["byte_vector_altivec.h"],
+        "@platforms//cpu:ppc": ["byte_vector_altivec.h"],
         "//conditions:default": [],
     }),
     deps = [

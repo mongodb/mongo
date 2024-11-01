@@ -3,6 +3,12 @@
 # Whenever Bazel is invoked, it first calls this script setting "BAZEL_REAL" to the path of the real Bazel binary.
 # Use this file as a wrapper for any logic that should run before bazel itself is executed.
 
+# WARNING : If you run //:compiledb target, you can not print to stdout in this file as it will fail with
+# "Bazel aquery failed." because it is reading this files stdout as aquery output
+
+bazel_real="$BAZEL_REAL"
+bazelrc_xcode_lines=()
+
 if [[ -z "${BAZELISK_SKIP_WRAPPER}" ]]; then
     echo "You're not using Bazelisk, which is recommended for a consistent build environment." >&2
     echo "Your version of Bazel may be mismatched with the version intended to be used to build MongoDB." >&2
@@ -18,4 +24,18 @@ if [ -d .git ]; then
     echo "build --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" > .bazelrc.gitinfo
 fi
 
-$BAZEL_REAL "$@"
+if [[ $OSTYPE == darwin* ]]; then
+  echo "Running on Apple (darwin), creating .bazelrc for xcode settings." >&2
+  xcode_path=$(xcode-select -p) >&2
+  xcode_version=$(xcodebuild -version | tail -1 | cut -d " " -f3) >&2
+  xcode_build_number=$(/usr/bin/xcodebuild -version 2>/dev/null | tail -1 | cut -d " " -f3) >&2
+
+  bazelrc_lines+=("startup --host_jvm_args=-Xdock:name=$xcode_path") >&2
+  bazelrc_lines+=("build --xcode_version=$xcode_version") >&2
+  bazelrc_lines+=("build --repo_env=USE_CLANG_CL=$xcode_version") >&2
+  bazelrc_lines+=("build --repo_env=DEVELOPER_DIR=$xcode_path") >&2
+fi
+
+printf '%s\n' "${bazelrc_xcode_lines[@]}" > .bazelrc.xcode
+
+exec "$bazel_real" "$@"

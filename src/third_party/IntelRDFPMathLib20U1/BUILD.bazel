@@ -74,6 +74,11 @@ IGNORE_WARNINGS_COPT = select({
     "//conditions:default": ["-w"],
 })
 
+DYNAMIC_LOOKUP_LINKOPT = select({
+    "@platforms//os:macos": ["-Wl,-undefined,dynamic_lookup"],
+    "//conditions:default": [""],
+})
+
 INTEL_RDFP_FLOAT128_INTERNAL_HEADERS = [
     "LIBRARY/float128/architecture.h",
     "LIBRARY/float128/assert.h",
@@ -132,6 +137,7 @@ mongo_cc_library(
         "LIBRARY/float128/dpml_log.c",
     ] + INTEL_RDFP_FLOAT128_INTERNAL_HEADERS,
     copts = IGNORE_WARNINGS_COPT,
+    linkopts = DYNAMIC_LOOKUP_LINKOPT,
     local_defines = INTEL_RDFP_MATHLIB_DEFINES + [
         "LOG1P=1",
         "efi2=1",

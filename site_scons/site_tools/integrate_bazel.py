@@ -74,8 +74,8 @@ _DISTRO_PATTERN_MAP = {
 }
 
 _S3_HASH_MAPPING = {
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-ppc64le": "dd21c75817533ff601bf797e64f0eb2f7f6b813af26c829f0bda30e328caef46",
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-s390x": "6d72eabc1789b041bbe4cfc033bbac4491ec9938ef6da9899c0188ecf270a7f4",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-ppc64le": "4ecc7f1396b8d921c6468b34cc8ed356c4f2dbe8a154c25d681a61ccb5dfc9cb",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-s390x": "2f5f7fd747620d96e885766a4027347c75c0f455c68219211a00e72fc6413be9",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-amd64": "f2ba5f721a995b54bab68c6b76a340719888aa740310e634771086b6d1528ecd",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-arm64": "69fa21cd2ccffc2f0970c21aa3615484ba89e3553ecce1233a9d8ad9570d170e",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-amd64": "d28b588ac0916abd6bf02defb5433f6eddf7cba35ffa808eabb65a44aab226f7",
@@ -172,7 +172,9 @@ def bazel_builder_action(
             # So we will do the renaming of dwarf file to what scons expects here, before we copy to scons tree
             substring_end = str(t).find(".dSYM/") + 5
             t = str(t)[:substring_end]
-            s = Globals.bazel_output(t)
+            # This is declared as an output folder, so bazel appends (TreeArtifact) to it
+            s = Globals.bazel_output(t + " (TreeArtifact)")
+            s = str(s).removesuffix(" (TreeArtifact)")
             dwarf_info_base = os.path.splitext(os.path.splitext(os.path.basename(t))[0])[0]
             dwarf_sym_with_debug = os.path.join(
                 s, f"Contents/Resources/DWARF/{dwarf_info_base}_shared_with_debug.dylib"
@@ -186,12 +188,20 @@ def bazel_builder_action(
                     s, f"Contents/Resources/DWARF/{dwarf_info_base}_with_debug"
                 )
                 dwarf_sym = os.path.join(s, f"Contents/Resources/DWARF/{dwarf_info_base}")
-            # rename the file for scons
-            shutil.copy(dwarf_sym_with_debug, dwarf_sym)
 
             # copy the whole dSYM in one operation. Clean any existing files that might be in the way.
+            print(f"Moving .dSYM from {s} over to {t}.")
             shutil.rmtree(str(t), ignore_errors=True)
             shutil.copytree(s, str(t))
+            # we want to change the permissions back to normal permissions on the folders copied rather than read only
+            os.chmod(t, 0o755)
+            for root, dirs, files in os.walk(t):
+                for name in files:
+                    os.chmod(os.path.join(root, name), 0o755)
+                for name in dirs:
+                    os.chmod(os.path.join(root, name), 0o755)
+            # shouldn't write our own files to the bazel directory, renaming file for scons
+            shutil.copy(dwarf_sym_with_debug.replace(s, t), dwarf_sym.replace(s, t))
         else:
             s = Globals.bazel_output(t)
             shutil.copy(s, str(t))
@@ -898,11 +908,11 @@ def setup_bazel_env_vars() -> None:
     # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
     if platform.machine().lower() == "ppc64le":
         Globals.bazel_env_variables["JAVA_HOME"] = (
-            "/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
+            "/usr/lib/jvm/java-21-openjdk-21.0.4.0.7-1.el8.ppc64le"
         )
     elif platform.machine().lower() == "s390x":
         Globals.bazel_env_variables["JAVA_HOME"] = (
-            "/usr/lib/jvm/java-11-openjdk-11.0.11.0.9-0.el8_3.s390x"
+            "/usr/lib/jvm/java-21-openjdk-21.0.4.0.7-1.el8.s390x"
         )
 
 

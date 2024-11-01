@@ -1,4 +1,23 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# Apple cc toolchain needs to be loaded before regular cc toolchain or else Apple will just use regular cc toolchain
+http_archive(
+    name = "build_bazel_apple_support",
+    sha256 = "b53f6491e742549f13866628ddffcc75d1f3b2d6987dc4f14a16b242113c890b",
+    url = "https://github.com/bazelbuild/apple_support/releases/download/1.17.1/apple_support.1.17.1.tar.gz",
+)
+
+load(
+    "@build_bazel_apple_support//lib:repositories.bzl",
+    "apple_support_dependencies",
+)
+
+apple_support_dependencies()
+
+load("@bazel_features//:deps.bzl", "bazel_features_deps")
+
+bazel_features_deps()
+
 load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
 load("//bazel/toolchains:mongo_toolchain.bzl", "toolchain_download")
 
@@ -17,7 +36,7 @@ http_archive(
     ],
 )
 
-setup_local_config_platform(name = "local_config_platform")
+setup_local_config_platform(name = "internal_platforms_do_not_use")
 
 toolchain_download(name = "mongo_toolchain")
 

@@ -1329,7 +1329,7 @@ def force_includes_copt(package_name, name):
     if package_name.startswith("src/mongo"):
         basic_h = "mongo/platform/basic.h"
         return select({
-            "@platforms//os:windows": ["/FI", basic_h],
+            "@platforms//os:windows": ["/FI" + basic_h],
             "//conditions:default": ["-include", basic_h],
         })
 
@@ -1341,7 +1341,7 @@ def force_includes_copt(package_name, name):
             "//bazel/config:linux_x86_64": ["-include", "third_party/mozjs/platform/x86_64/linux/build/js-config.h"],
             "//bazel/config:macos_aarch64": ["-include", "third_party/mozjs/platform/aarch64/macOS/build/js-config.h"],
             "//bazel/config:macos_x86_64": ["-include", "third_party/mozjs/platform/x86_64/macOS/build/js-config.h"],
-            "//bazel/config:windows_x86_64": ["/FI", "third_party/mozjs/platform/x86_64/windows/build/js-config.h"],
+            "//bazel/config:windows_x86_64": ["/FI" + "third_party/mozjs/platform/x86_64/windows/build/js-config.h"],
         })
 
     return []

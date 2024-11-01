@@ -129,7 +129,7 @@ build:linux --jobs=200
 build --remote_cache=grpcs://sodalite.cluster.engflow.com
 build --bes_backend=grpcs://sodalite.cluster.engflow.com
 build --bes_results_url=https://sodalite.cluster.engflow.com/invocation/
-build --experimental_remote_cache_compression=true
+build --remote_cache_compression=true 
 build --grpc_keepalive_time=30s
 build --nolegacy_important_outputs
 build --bes_keywords=repo:mongo
@@ -156,7 +156,7 @@ build:local --bes_backend=
 build:local --bes_results_url=
 build:local --tls_client_certificate=
 build:local --tls_client_key=
-build:local --experimental_remote_cache_compression=false
+build:local --remote_cache_compression=false
 build:local --grpc_keepalive_time=0s
 build:local --legacy_important_outputs
 build:local --jobs=auto
@@ -174,18 +174,17 @@ build:public-release --bes_backend=
 build:public-release --bes_results_url=
 build:public-release --tls_client_certificate=
 build:public-release --tls_client_key=
-build:public-release --experimental_remote_cache_compression=false
+build:public-release --remote_cache_compression=false
 build:public-release --grpc_keepalive_time=0s
 build:public-release --legacy_important_outputs
 
 # Avoid failing builds when BES metadata fails to upload.
 common --bes_upload_mode=fully_async
 
-# TODO SERVER-89593
-# Renable after bazel 7.0 due to query bug:
-# https://github.com/bazelbuild/bazel/issues/10902
 # Enable Build without the Bytes
-# common --remote_download_outputs=toplevel
+common --remote_download_outputs=toplevel
+
+common --enable_bzlmod=false
 
 # Default Mongo Version if a version is not specified.
 build --define=MONGO_VERSION=8.1.0-alpha
@@ -204,6 +203,9 @@ try-import %workspace%/.bazelrc.evergreen_engflow_creds
 
 # Evergreen settings, ex. in evergreen this will set the key/cert options for access to the cluster
 try-import %workspace%/.bazelrc.evergreen
+
+# Import settings for selecting the right xcode version on mac
+try-import %workspace%/.bazelrc.xcode
 
 # local default dev settings
 try-import %workspace%/.bazelrc.workstation

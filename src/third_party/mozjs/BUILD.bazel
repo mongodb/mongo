@@ -47,8 +47,7 @@ PLATFORM_INCLUDES = select({
 
 PLATFORM_COPTS = select({
     config: [
-        "/FI" if os == "windows" else "-include",
-        "$(location platform/{}/{}/build/js-confdefs.h)".format(arch, os),
+        ("/FI" if os == "windows" else "-include") + "$(location platform/{}/{}/build/js-confdefs.h)".format(arch, os),
     ] + (["-mavx2"] if arch == "x86_64" and os != "windows" else [])
     for config, (arch, os) in PLATFORMS.items()
 } | {
@@ -297,6 +296,10 @@ mongo_cc_library(
         "include",
         "mongo_sources",
     ] + PLATFORM_INCLUDES,
+    linkopts = select({
+        "@platforms//os:macos": ["-Wl,-undefined,dynamic_lookup"],
+        "//conditions:default": [""],
+    }),
     local_defines = [
         "IMPL_MFBT=1",
         "U_NO_DEFAULT_INCLUDE_UTF_HEADERS=1",
