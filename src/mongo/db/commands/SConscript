@@ -66,6 +66,7 @@ env.CppUnitTest(
         "server_status_command_test.cpp",
         "server_status_metric_test.cpp",
         "set_cluster_parameter_invocation_test.cpp",
+        "set_profiling_filter_globally_cmd_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/crypto/aead_encryption",
@@ -99,6 +100,7 @@ env.CppUnitTest(
         "dbcheck_command",
         "list_collections_filter",
         "mongod",
+        "profile_common",
         "server_status_core",
         "servers",
         "standalone",

@@ -47,6 +47,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/commands/db_command_test_fixture.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
@@ -95,17 +96,10 @@ private:
     bool pipeCreated = false;
 };
 
-class ExternalDataSourceCommandsTest : public ServiceContextMongoDTest {
+class ExternalDataSourceCommandsTest : public DBCommandTestFixture {
 protected:
     void setUp() override {
-        ServiceContextMongoDTest::setUp();
-
-        const auto service = getServiceContext();
-        auto replCoord =
-            std::make_unique<repl::ReplicationCoordinatorMock>(service, repl::ReplSettings{});
-        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-        repl::ReplicationCoordinator::set(service, std::move(replCoord));
-        repl::createOplog(_opCtx);
+        DBCommandTestFixture::setUp();
 
         computeModeEnabled = true;
     }
@@ -146,26 +140,16 @@ protected:
 
     // This verifies that a simple aggregate command works with explain:true. Virtual collections
     // are created even for explain aggregate command.
-    void verifyExplainAggCommand(DBDirectClient& client, const BSONObj& originalAggCommand) {
+    void verifyExplainAggCommand(const BSONObj& originalAggCommand) {
         // The first request.
-        BSONObj res;
-        ASSERT_TRUE(client.runCommand(
-            kDatabaseName, originalAggCommand.addFields(BSON("explain" << true)), res))
-            << "Expected to succeed but failed. result = {}"_format(res.toString());
+        BSONObj res = runCommand(originalAggCommand.addFields(BSON("explain" << true)));
         // Sanity checks of result.
         ASSERT_EQ(res["ok"].Number(), 1.0)
             << "Expected to succeed but failed. result = {}"_format(res.toString());
     }
 
     PseudoRandom _random{SecureRandom{}.nextInt64()};
-    ServiceContext::UniqueOperationContext _uniqueOpCtx{makeOperationContext()};
-    OperationContext* _opCtx{_uniqueOpCtx.get()};
-
-    static const DatabaseName kDatabaseName;
 };
-
-const DatabaseName ExternalDataSourceCommandsTest::kDatabaseName =
-    DatabaseName::createDatabaseName_forTest(boost::none, "external_data_source");
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
     const auto nDocs = _random.nextInt32(100) + 1;
@@ -186,7 +170,6 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    DBDirectClient client(_opCtx);
     auto aggCmdObj = fromjson(R"(
 {
     aggregate: "coll",
@@ -200,8 +183,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
     )");
 
     // The first request.
-    BSONObj res;
-    ASSERT_TRUE(client.runCommand(kDatabaseName, aggCmdObj.getOwned(), res));
+    BSONObj res = runCommand(aggCmdObj.getOwned());
 
     // Sanity checks of result.
     ASSERT_EQ(res["ok"].Number(), 1.0);
@@ -218,7 +200,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
 
     // The second request. This verifies that virtual collections are cleaned up after the
     // aggregation request is done.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverMultipleNamedPipesAggRequest) {
@@ -251,7 +233,6 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverMultipleNamedPipesAggReques
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    DBDirectClient client(_opCtx);
     auto aggCmdObj = fromjson(R"(
 {
     aggregate: "coll",
@@ -268,8 +249,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverMultipleNamedPipesAggReques
     )");
 
     // The first request.
-    BSONObj res;
-    ASSERT_TRUE(client.runCommand(kDatabaseName, aggCmdObj.getOwned(), res));
+    BSONObj res = runCommand(aggCmdObj.getOwned());
 
     // Sanity checks of result.
     ASSERT_EQ(res["ok"].Number(), 1.0);
@@ -286,7 +266,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverMultipleNamedPipesAggReques
 
     // The second request. This verifies that virtual collections are cleaned up after the
     // aggregation request is done.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverLargeObjectsAggRequest) {
@@ -310,7 +290,6 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverLargeObjectsAggRequest) {
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    DBDirectClient client(_opCtx);
     auto aggCmdObj = fromjson(R"(
 {
     aggregate: "coll",
@@ -324,8 +303,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverLargeObjectsAggRequest) {
     )");
 
     // The first request.
-    BSONObj res;
-    ASSERT_TRUE(client.runCommand(kDatabaseName, aggCmdObj.getOwned(), res));
+    BSONObj res = runCommand(aggCmdObj.getOwned());
 
     // Sanity checks of result.
     ASSERT_EQ(res["ok"].Number(), 1.0);
@@ -342,7 +320,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverLargeObjectsAggRequest) {
 
     // The second request. This verifies that virtual collections are cleaned up after the
     // aggregation request is done.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(aggCmdObj);
 }
 
 // Tests that 'explain' flag works and also tests that the same aggregation request works with the
@@ -361,12 +339,11 @@ TEST_F(ExternalDataSourceCommandsTest, ExplainAggRequest) {
 }
     )");
 
-    DBDirectClient client(_opCtx);
     // The first request.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(aggCmdObj);
 
     // The second request.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
@@ -389,7 +366,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    DBDirectClient client(_opCtx);
+    DBDirectClient client(opCtx);
     auto aggCmdObj = fromjson(R"(
 {
     aggregate: "coll",
@@ -422,7 +399,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // multi-batch result for an aggregation request.
-    verifyExplainAggCommand(client, swAggReq.getValue().toBSON());
+    verifyExplainAggCommand(swAggReq.getValue().toBSON());
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
@@ -451,7 +428,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    DBDirectClient client(_opCtx);
+    DBDirectClient client(opCtx);
     auto aggCmdObj = fromjson(R"(
 {
     aggregate: "coll",
@@ -482,7 +459,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, swAggReq.getValue().toBSON());
+    verifyExplainAggCommand(swAggReq.getValue().toBSON());
 }
 
 TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
@@ -505,7 +482,6 @@ TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    DBDirectClient client(_opCtx);
     auto aggCmdObj = fromjson(R"(
 {
     aggregate: "coll",
@@ -519,8 +495,7 @@ TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
     )");
 
     // The first request.
-    BSONObj res;
-    ASSERT_TRUE(client.runCommand(kDatabaseName, aggCmdObj.getOwned(), res));
+    BSONObj res = runCommand(aggCmdObj.getOwned());
 
     // Sanity checks of result.
     ASSERT_EQ(res["ok"].Number(), 1.0);
@@ -535,14 +510,14 @@ TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
     auto killCursorCmdObj = BSON("killCursors"
                                  << "coll"
                                  << "cursors" << BSON_ARRAY(cursorId));
-    ASSERT_TRUE(client.runCommand(kDatabaseName, killCursorCmdObj.getOwned(), res));
+    res = runCommand(killCursorCmdObj.getOwned());
     ASSERT_EQ(res["ok"].Number(), 1.0);
     auto cursorsKilled = res["cursorsKilled"].Array();
     ASSERT_TRUE(cursorsKilled.size() == 1 && cursorsKilled[0].Long() == cursorId);
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the cursor for the aggregate request is killed.
-    verifyExplainAggCommand(client, aggCmdObj);
+    verifyExplainAggCommand(aggCmdObj);
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggRequest) {
@@ -573,7 +548,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggR
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    DBDirectClient client(_opCtx);
+    DBDirectClient client(opCtx);
     // An aggregate request with a simple scan and $unionWith stage. $_externalDataSources option
     // defines multiple data sources.
     auto aggCmdObj = fromjson(R"(
@@ -610,7 +585,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggR
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, swAggReq.getValue().toBSON());
+    verifyExplainAggCommand(swAggReq.getValue().toBSON());
 }
 
 TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
@@ -662,7 +637,7 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    DBDirectClient client(_opCtx);
+    DBDirectClient client(opCtx);
     auto aggCmdObj = fromjson(R"(
 {
     aggregate: "coll",
@@ -715,7 +690,7 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, swAggReq.getValue().toBSON());
+    verifyExplainAggCommand(swAggReq.getValue().toBSON());
 }
 
 TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
@@ -766,7 +741,7 @@ TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
     // Gives some time to the producer so that it can initialize a named pipe.
     pw.wait();
 
-    DBDirectClient client(_opCtx);
+    DBDirectClient client(opCtx);
     auto aggCmdObj = fromjson(R"(
 {
     aggregate: "coll1",
@@ -825,7 +800,7 @@ TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
 
     // The second explain request. This verifies that virtual collections are cleaned up after
     // the aggregation request is done.
-    verifyExplainAggCommand(client, swAggReq.getValue().toBSON());
+    verifyExplainAggCommand(swAggReq.getValue().toBSON());
 }
 }  // namespace
 }  // namespace mongo
