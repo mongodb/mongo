@@ -206,8 +206,11 @@ MONGO_FAIL_POINT_DEFINE(throwBeforeRecoveringTenantMigrationAccessBlockers);
 // Hang before allowing the transition from RECOVERING to SECONDARY.
 MONGO_FAIL_POINT_DEFINE(hangBeforeFinishRecovery);
 
+// Reports number of waiters in _replicationWaiterList.
 Counter64& replicationWaiterListMetric = *MetricBuilder<Counter64>("repl.waiters.replication");
-Atomic64Metric& opTimeWaiterListMetric = *MetricBuilder<Atomic64Metric>("repl.waiters.opTime");
+// Reports total number of waiters in both _lastAppliedOpTimeWaiterList and
+// _lastWrittenOpTimeWaiterList.
+Counter64& opTimeWaiterListMetric = *MetricBuilder<Counter64>("repl.waiters.opTime");
 
 namespace {
 
@@ -260,18 +263,14 @@ constexpr StringData kQuiesceModeShutdownMessage =
 
 }  // namespace
 
-ReplicationCoordinatorImpl::WaiterList::WaiterList(Atomic64Metric& waiterCountMetric)
+ReplicationCoordinatorImpl::WaiterList::WaiterList(Counter64& waiterCountMetric)
     : _waiterCountMetric(waiterCountMetric) {}
-
-void ReplicationCoordinatorImpl::WaiterList::_updateMetric(WithLock) {
-    _waiterCountMetric.set(_waiters.size());
-}
 
 void ReplicationCoordinatorImpl::WaiterList::add(WithLock lk,
                                                  const OpTime& opTime,
                                                  SharedWaiterHandle waiter) {
     _waiters.emplace(opTime, std::move(waiter));
-    _updateMetric(lk);
+    _waiterCountMetric.incrementRelaxed();
 }
 
 std::pair<SharedSemiFuture<void>, ReplicationCoordinatorImpl::SharedWaiterHandle>
@@ -279,7 +278,7 @@ ReplicationCoordinatorImpl::WaiterList::add(WithLock lk, const OpTime& opTime) {
     auto pf = makePromiseFuture<void>();
     auto waiter = std::make_shared<Waiter>(std::move(pf.promise), boost::none);
     _waiters.emplace(opTime, waiter);
-    _updateMetric(lk);
+    _waiterCountMetric.incrementRelaxed();
     return std::make_pair(std::move(pf.future), std::move(waiter));
 }
 
@@ -290,7 +289,7 @@ bool ReplicationCoordinatorImpl::WaiterList::remove(WithLock lk,
     for (auto iter = begin; iter != end; iter++) {
         if (iter->second == waiter) {
             _waiters.erase(iter);
-            _updateMetric(lk);
+            _waiterCountMetric.decrementRelaxed();
             return true;
         }
     }
@@ -301,6 +300,8 @@ void ReplicationCoordinatorImpl::WaiterList::setValueIf(
     WithLock lk,
     std::function<bool(WithLock, const OpTime&, const SharedWaiterHandle&)> func,
     boost::optional<OpTime> opTime) {
+
+    std::size_t erased = 0;
     for (auto it = _waiters.begin(); it != _waiters.end() && (!opTime || it->first <= *opTime);) {
         const auto& waiter = it->second;
         try {
@@ -309,26 +310,30 @@ void ReplicationCoordinatorImpl::WaiterList::setValueIf(
                 // clean up the WaiterList faster.
                 waiter->promise.setError({ErrorCodes::CallbackCanceled, "Waiter has given up"});
                 it = _waiters.erase(it);
+                ++erased;
             } else if (func(lk, it->first, waiter)) {
                 waiter->promise.emplaceValue();
                 it = _waiters.erase(it);
+                ++erased;
             } else {
                 ++it;
             }
         } catch (const DBException& e) {
             waiter->promise.setError(e.toStatus());
             it = _waiters.erase(it);
+            ++erased;
         }
     }
-    _updateMetric(lk);
+    _waiterCountMetric.decrementRelaxed(erased);
 }
 
 void ReplicationCoordinatorImpl::WaiterList::setValueAll(WithLock lk) {
     for (auto& [opTime, waiter] : _waiters) {
         waiter->promise.emplaceValue();
     }
+    // Not using setToZero() as the metric could be shared by multiple waiterLists.
+    _waiterCountMetric.decrementRelaxed(_waiters.size());
     _waiters.clear();
-    _updateMetric(lk);
 }
 
 void ReplicationCoordinatorImpl::WaiterList::setErrorAll(WithLock lk, Status status) {
@@ -336,8 +341,9 @@ void ReplicationCoordinatorImpl::WaiterList::setErrorAll(WithLock lk, Status sta
     for (auto& [opTime, waiter] : _waiters) {
         waiter->promise.setError(status);
     }
+    // Not using setToZero() as the metric could be shared by multiple waiterLists.
+    _waiterCountMetric.decrementRelaxed(_waiters.size());
     _waiters.clear();
-    _updateMetric(lk);
 }
 
 ReplicationCoordinatorImpl::WriteConcernWaiterList::WriteConcernWaiterList(

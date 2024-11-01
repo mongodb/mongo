@@ -888,7 +888,7 @@ private:
     class WaiterList {
     public:
         WaiterList() = delete;
-        WaiterList(Atomic64Metric& waiterCountMetric);
+        WaiterList(Counter64& waiterCountMetric);
 
         // Adds waiter into the list.
         void add(WithLock lk, const OpTime& opTime, SharedWaiterHandle waiter);
@@ -909,13 +909,11 @@ private:
         void setErrorAll(WithLock lk, Status status);
 
     private:
-        void _updateMetric(WithLock);
-
         // Waiters sorted by OpTime.
         std::multimap<OpTime, SharedWaiterHandle> _waiters;
         // We keep a separate count outside _waiters.size() in order to avoid having to
         // take a lock to read the metric.
-        Atomic64Metric& _waiterCountMetric;
+        Counter64& _waiterCountMetric;
     };
 
     // This is a waiter list for things waiting on opTimes along with a WriteConcern.  It breaks
@@ -2183,7 +2181,7 @@ private:
 };
 
 extern Counter64& replicationWaiterListMetric;
-extern Atomic64Metric& opTimeWaiterListMetric;
+extern Counter64& opTimeWaiterListMetric;
 
 }  // namespace repl
 }  // namespace mongo
