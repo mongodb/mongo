@@ -740,19 +740,6 @@ def add_libdeps_time(env, delate_time):
     count_of_libdeps_links += 1
 
 
-def clean_bazel_sandbox():
-    if platform.system() != "Windows":
-        proc = subprocess.run(
-            f"{Globals.bazel_executable} info | grep output_base: | cut -d' ' -f2",
-            shell=True,
-            text=True,
-            capture_output=True,
-        )
-        bazel_sandbox_dir = proc.stdout.strip() + "/sandbox"
-        print(f"Cleaning bazel sandbox directory: {bazel_sandbox_dir}")
-        shutil.rmtree(bazel_sandbox_dir, ignore_errors=True)
-
-
 def prefetch_toolchain(env):
     setup_bazel_env_vars()
     setup_max_retry_attempts()
@@ -764,7 +751,6 @@ def prefetch_toolchain(env):
     if not os.path.exists(bazel_bin_dir):
         os.makedirs(bazel_bin_dir)
     Globals.bazel_executable = install_bazel(bazel_bin_dir)
-    clean_bazel_sandbox()
     if platform.system() == "Linux" and not ARGUMENTS.get("CC") and not ARGUMENTS.get("CXX"):
         exec_root = f'bazel-{os.path.basename(env.Dir("#").abspath)}'
         if exec_root and not os.path.exists(f"{exec_root}/external/mongo_toolchain"):
