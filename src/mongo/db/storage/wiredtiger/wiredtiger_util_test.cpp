@@ -48,6 +48,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
@@ -648,6 +649,262 @@ TEST_F(WiredTigerUtilTest, SkipPreparedUpdateNoBound) {
 
     session1->commit_transaction(session1, "durable_timestamp=1,commit_timestamp=1");
     ASSERT_EQ(0, cursor2->next(cursor2));
+}
+
+TEST(WiredTigerConfigParserTest, IterationAndKeyLookup) {
+    // Configuration string containing a mix of value types, including a repeated key.
+    WiredTigerConfigParser parser(
+        ",a=123,b=abc,c=\"def\",a=true,d=false,e=,f,g=500M,h=(x=7,y=8,z=9)");
+    WT_CONFIG_ITEM key;
+    WT_CONFIG_ITEM value;
+
+    // Leading comma at the beginning of the config string is ignored.
+
+    // a=123 ... a=true
+    // Tests that getting repeated key returns the last instance.
+    ASSERT_EQUALS(parser.get("a", &value), 0);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL);
+    ASSERT_TRUE(value.val);
+
+    // a=123
+    ASSERT_EQUALS(parser.next(&key, &value), 0);
+    ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(key.str, key.len), "a"_sd);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
+    ASSERT_EQUALS(value.val, 123);
+
+    // b=abc
+    ASSERT_EQUALS(parser.next(&key, &value), 0);
+    ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(key.str, key.len), "b"_sd);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(value.str, value.len), "abc"_sd);
+
+    // c="def"
+    ASSERT_EQUALS(parser.next(&key, &value), 0);
+    ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(key.str, key.len), "c"_sd);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING);
+    ASSERT_EQUALS(StringData(value.str, value.len), "def"_sd);
+
+    // a=true
+    ASSERT_EQUALS(parser.next(&key, &value), 0);
+    ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(key.str, key.len), "a"_sd);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL);
+    ASSERT_TRUE(value.val);
+
+    // d=false
+    ASSERT_EQUALS(parser.next(&key, &value), 0);
+    ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(key.str, key.len), "d"_sd);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL);
+    ASSERT_FALSE(value.val);
+
+    // e=
+    ASSERT_EQUALS(parser.next(&key, &value), 0);
+    ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(key.str, key.len), "e"_sd);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL);
+    ASSERT_TRUE(value.val);
+
+    // f
+    ASSERT_EQUALS(parser.next(&key, &value), 0);
+    ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(key.str, key.len), "f"_sd);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL);
+    ASSERT_TRUE(value.val);
+
+    // g=500M
+    ASSERT_EQUALS(parser.next(&key, &value), 0);
+    ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(key.str, key.len), "g"_sd);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
+    ASSERT_EQUALS(value.val, 500 * 1024 * 1024);
+
+    // h=(x=7,y=8,z=9)
+    ASSERT_EQUALS(parser.next(&key, &value), 0);
+    ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(key.str, key.len), "h"_sd);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT);
+    ASSERT_EQUALS(StringData(value.str, value.len), "(x=7,y=8,z=9)"_sd);
+    {
+        WiredTigerConfigParser structParser(value);
+
+        // x=7
+        ASSERT_EQUALS(structParser.next(&key, &value), 0);
+        ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+        ASSERT_EQUALS(StringData(key.str, key.len), "x"_sd);
+        ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
+        ASSERT_EQUALS(value.val, 7);
+
+        // y=8
+        ASSERT_EQUALS(structParser.next(&key, &value), 0);
+        ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+        ASSERT_EQUALS(StringData(key.str, key.len), "y"_sd);
+        ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
+        ASSERT_EQUALS(value.val, 8);
+
+        // z=9
+        ASSERT_EQUALS(structParser.next(&key, &value), 0);
+        ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+        ASSERT_EQUALS(StringData(key.str, key.len), "z"_sd);
+        ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
+        ASSERT_EQUALS(value.val, 9);
+    }
+
+    ASSERT_EQUALS(parser.next(&key, &value), WT_NOTFOUND);
+
+    // a=123 ... a=true
+    // Tests that, after we have iterated through all the keys in the configuration string,
+    // that getting the value of a repeated key still returns the last instance.
+    ASSERT_EQUALS(parser.get("a", &value), 0);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL);
+    ASSERT_TRUE(value.val);
+}
+
+TEST(WiredTigerConfigParserTest, IsTableLoggingEnabled) {
+    // Reject non-boolean values for "enabled".
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled=12345)").isTableLoggingEnabled());
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled=abc)").isTableLoggingEnabled());
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled=\"def\")").isTableLoggingEnabled());
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled=(a=1,b=2))").isTableLoggingEnabled());
+
+    // Reject "log" keys without "enabled" sub-key.
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled_not_really=true)").isTableLoggingEnabled());
+
+    // Configuration strings without "log" key.
+    ASSERT_FALSE(WiredTigerConfigParser("no_log_key=123").isTableLoggingEnabled());
+    ASSERT_FALSE(WiredTigerConfigParser("").isTableLoggingEnabled());
+
+    // Test cases below expect non-optional results from isTableLoggingEnabled().
+    auto assertGetEnabled = [](StringData config) {
+        WiredTigerConfigParser parser(config);
+        auto enabled = parser.isTableLoggingEnabled();
+        ASSERT(enabled);
+        return *enabled;
+    };
+
+    ASSERT(assertGetEnabled("log=(enabled=true)"));
+    ASSERT(assertGetEnabled("log=(enabled=true,remove=false)"));
+    ASSERT(assertGetEnabled("log=(remove=false,enabled=true)"));
+
+    ASSERT_FALSE(assertGetEnabled("log=(enabled=false)"));
+    ASSERT_FALSE(assertGetEnabled("log=(enabled=false,remove=false)"));
+    ASSERT_FALSE(assertGetEnabled("log=(remove=false,enabled=false)"));
+
+    // Only the last "enabled" sub-key of the last "log" key in the configuration string
+    // is evaluated for the table logging setting queried using this helper function.
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled=true),log=12345").isTableLoggingEnabled());
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled=true),log=(enabled=false,enabled=123)")
+                     .isTableLoggingEnabled());
+    ASSERT(assertGetEnabled("log=(enabled=true,enabled=false),log=(enabled=false,enabled=true)"));
+    ASSERT_FALSE(
+        assertGetEnabled("log=(enabled=false,enabled=true),log=(enabled=true,enabled=false)"));
+}
+
+TEST(WiredTigerConfigParserTest, IsTableLoggingSettingValid) {
+    ASSERT(WiredTigerConfigParser("log=(enabled=true)").isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("log=(enabled=false)").isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("a=123,log=(enabled=true)").isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("a=123,log=(enabled=false)").isTableLoggingSettingValid());
+
+    // Ignore non-struct "log" values.
+    ASSERT(WiredTigerConfigParser("log=123").isTableLoggingSettingValid());
+
+    // No "log" key.
+    ASSERT(WiredTigerConfigParser("x=y").isTableLoggingSettingValid());
+
+    // Every "log" key only honors the last "enabled" subkey.
+    ASSERT(WiredTigerConfigParser("log=(enabled=true),log=(enabled=true)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("a=123,log=(enabled=true),log=(enabled=true)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("log=(enabled=true),log=(enabled=true),log=(enabled=true)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser(
+               "log=(enabled=true),log=(enabled=true),log=(,remove=false,enabled=true)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("log=(enabled=false),log=(enabled=false)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("a=123,log=(enabled=false),log=(enabled=false)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("log=(enabled=false),log=(enabled=false),log=(enabled=false)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser(
+               "log=(enabled=false),log=(remove=false,enabled=false),log=(enabled=false)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("log=(enabled=false,enabled=true),log=(remove=false,enabled="
+                                  "false,enabled=true),log=(enabled=false,enabled=true)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("log=(enabled=true,enabled=false),log=(remove=false,enabled=true,"
+                                  "enabled=false),log=(enabled=true,enabled=false)")
+               .isTableLoggingSettingValid());
+    ASSERT_FALSE(
+        WiredTigerConfigParser("log=(enabled=true,enabled=false),log=(remove=false,enabled=false,"
+                               "enabled=true),log=(enabled=false,enabled=true)")
+            .isTableLoggingSettingValid());
+    ASSERT_FALSE(
+        WiredTigerConfigParser("log=(enabled=false,enabled=true),log=(remove=false,enabled=true,"
+                               "enabled=false),log=(enabled=true,enabled=false)")
+            .isTableLoggingSettingValid());
+
+    // Keys with "log" suffixes should be ignored.
+    ASSERT(WiredTigerConfigParser("log=(enabled=true),some_other_log=(enabled=false)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("some_other_log=(enabled=true),log=(enabled=false)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("log=(enabled=false),some_other_log=(enabled=true)")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("some_other_log=(enabled=false),log=(enabled=true)")
+               .isTableLoggingSettingValid());
+
+    // Keys with nested "log" fields should be ignored as we are only interested in top level "log"
+    // keys
+    ASSERT(WiredTigerConfigParser("log=(enabled=true),mystruct=(log=(enabled=false))")
+               .isTableLoggingSettingValid());
+    ASSERT(WiredTigerConfigParser("log=(enabled=false),mystruct=(log=(enabled=false))")
+               .isTableLoggingSettingValid());
+
+    // Multiple "log" keys with different "enabled" values should be rejected.
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled=true),log=(enabled=false)")
+                     .isTableLoggingSettingValid());
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled=false),log=(enabled=true)")
+                     .isTableLoggingSettingValid());
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled=true),log=(remove=false,enabled=false)")
+                     .isTableLoggingSettingValid());
+    ASSERT_FALSE(WiredTigerConfigParser("log=(enabled=false),log=(remove=false,enabled=true)")
+                     .isTableLoggingSettingValid());
+    ASSERT_FALSE(WiredTigerConfigParser("a=123,log=(enabled=true),log=(enabled=false)")
+                     .isTableLoggingSettingValid());
+    ASSERT_FALSE(WiredTigerConfigParser("a=123,log=(enabled=false),log=(enabled=true)")
+                     .isTableLoggingSettingValid());
+}
+
+DEATH_TEST_REGEX(WiredTigerConfigParserTest,
+                 DoesNotSupportMultipleCalls,
+                 "Invariant failure.*!_nextCalled") {
+    WiredTigerConfigParser parser("log=(enabled=true)");
+
+    ASSERT(parser.isTableLoggingSettingValid());
+
+    parser.isTableLoggingSettingValid();
+}
+
+DEATH_TEST_REGEX(WiredTigerConfigParserTest,
+                 IterationAlreadyStarted,
+                 "Invariant failure.*!_nextCalled") {
+    WiredTigerConfigParser parser("a=123,log=(enabled=true)");
+
+    WT_CONFIG_ITEM key;
+    WT_CONFIG_ITEM value;
+    ASSERT_EQUALS(parser.next(&key, &value), 0);
+    ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+    ASSERT_EQUALS(StringData(key.str, key.len), "a"_sd);
+    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
+    ASSERT_EQUALS(value.val, 123);
+
+    parser.isTableLoggingSettingValid();
 }
 
 }  // namespace
