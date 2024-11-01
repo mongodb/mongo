@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/storage/key_string/key_string.h"
-
 namespace mongo {
 
 class BSONObj;
