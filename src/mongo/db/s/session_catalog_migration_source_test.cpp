@@ -258,13 +258,15 @@ repl::DurableReplOperation makeDurableReplOp(
     return op;
 }
 
-repl::OplogEntry makeApplyOpsOplogEntry(repl::OpTime opTime,
-                                        repl::OpTime prevWriteOpTimeInTransaction,
-                                        std::vector<repl::DurableReplOperation> ops,
-                                        LogicalSessionId sessionId,
-                                        TxnNumber txnNumber,
-                                        bool isPrepare,
-                                        bool isPartial) {
+repl::OplogEntry makeApplyOpsOplogEntry(
+    repl::OpTime opTime,
+    repl::OpTime prevWriteOpTimeInTransaction,
+    std::vector<repl::DurableReplOperation> ops,
+    LogicalSessionId sessionId,
+    TxnNumber txnNumber,
+    bool isPrepare,
+    bool isPartial,
+    boost::optional<repl::MultiOplogEntryType> multiOplogEntryType = boost::none) {
     BSONObjBuilder applyOpsBuilder;
 
     BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
@@ -290,6 +292,7 @@ repl::OplogEntry makeApplyOpsOplogEntry(repl::OpTime opTime,
     op.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
     op.setWallClockTime(Date_t::now());
     op.setNss({});
+    op.setMultiOpType(multiOplogEntryType);
 
     return {op.toBSON()};
 }
@@ -3150,6 +3153,61 @@ TEST_F(SessionCatalogMigrationSourceTest, ExtractShardKeyFromOplogNonCRUD) {
     ASSERT_BSONOBJ_EQ(
         SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(pattern, commandOplog),
         BSONObj());
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, DeriveOplogEntriesForMultiApplyOpsBasic) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
+    auto op1 = makeDurableReplOp(
+        repl::OpTypeEnum::kUpdate, kNs, BSON("$set" << BSON("_id" << 1)), BSON("x" << 1), {1});
+    // op for a different ns.
+    auto op2 =
+        makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << 3), BSONObj(), {3});
+    auto op3 = makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 4), BSONObj(), {4});
+    // op that does not touch the chunk being migrated.
+    auto op4 =
+        makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << -5), BSONObj(), {5});
+    auto op5 = makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 6), BSONObj(), {7});
+
+    auto applyOpsOpTime = repl::OpTime(Timestamp(210, 1), 1);
+    auto entry = makeApplyOpsOplogEntry(applyOpsOpTime,
+                                        {},  // prevOpTime
+                                        {op1, op2, op3, op4, op5},
+                                        sessionId,
+                                        txnNumber,
+                                        false,  // isPrepare
+                                        true,   // isPartial
+                                        repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+    insertOplogEntry(entry);
+
+    SessionTxnRecord txnRecord;
+    txnRecord.setSessionId(sessionId);
+    txnRecord.setTxnNum(txnNumber);
+    txnRecord.setLastWriteOpTime(applyOpsOpTime);
+    txnRecord.setLastWriteDate(Date_t::now());
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+    migrationSource.init(opCtx(), kMigrationLsid);
+
+    const std::vector<repl::DurableReplOperation> expectedOps{op5, op3, op1};
+
+    for (const auto& op : expectedOps) {
+        ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+        ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), sessionId);
+        ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), txnNumber);
+        ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getDurableReplOperation().toBSON(), op.toBSON());
+        ASSERT_FALSE(nextOplogResult.oplog->getMultiOpType());
+    }
+
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 3);
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 2);
 }
 
 }  // namespace

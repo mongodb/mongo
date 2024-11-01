@@ -90,15 +90,18 @@ protected:
      * session is an internal session for retryable writes, uses the "_id" of each document as its
      * statement id.
      */
-    repl::OplogEntry makeApplyOpsForInsert(const std::vector<BSONObj> documents,
-                                           boost::optional<LogicalSessionId> lsid = boost::none,
-                                           boost::optional<TxnNumber> txnNumber = boost::none,
-                                           boost::optional<bool> isPrepare = boost::none,
-                                           boost::optional<bool> isPartial = boost::none) {
+    repl::OplogEntry makeApplyOpsForInsert(
+        const std::vector<BSONObj> documents,
+        boost::optional<LogicalSessionId> lsid = boost::none,
+        boost::optional<TxnNumber> txnNumber = boost::none,
+        boost::optional<bool> isPrepare = boost::none,
+        boost::optional<bool> isPartial = boost::none,
+        boost::optional<repl::MultiOplogEntryType> multiOplogEntryType = boost::none,
+        bool useStmtIds = false) {
         std::vector<repl::DurableReplOperation> ops;
         for (const auto& document : documents) {
             auto insertOp = repl::DurableReplOperation(repl::OpTypeEnum::kInsert, {}, document);
-            if (lsid && isInternalSessionForRetryableWrite(*lsid)) {
+            if ((lsid && isInternalSessionForRetryableWrite(*lsid)) || useStmtIds) {
                 if (document.hasField("_id")) {
                     auto id = document.getIntField("_id");
                     insertOp.setStatementIds({id});
@@ -107,14 +110,17 @@ protected:
             ops.emplace_back(insertOp);
         }
 
-        return makeApplyOpsOplogEntry(ops, lsid, txnNumber, isPrepare, isPartial);
+        return makeApplyOpsOplogEntry(
+            ops, lsid, txnNumber, isPrepare, isPartial, multiOplogEntryType);
     }
 
-    repl::OplogEntry makeApplyOpsOplogEntry(std::vector<repl::DurableReplOperation> ops,
-                                            boost::optional<LogicalSessionId> lsid = boost::none,
-                                            boost::optional<TxnNumber> txnNumber = boost::none,
-                                            boost::optional<bool> isPrepare = boost::none,
-                                            boost::optional<bool> isPartial = boost::none) {
+    repl::OplogEntry makeApplyOpsOplogEntry(
+        std::vector<repl::DurableReplOperation> ops,
+        boost::optional<LogicalSessionId> lsid = boost::none,
+        boost::optional<TxnNumber> txnNumber = boost::none,
+        boost::optional<bool> isPrepare = boost::none,
+        boost::optional<bool> isPartial = boost::none,
+        boost::optional<repl::MultiOplogEntryType> multiOplogEntryType = boost::none) {
         BSONObjBuilder applyOpsBuilder;
 
         BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
@@ -145,6 +151,10 @@ protected:
         op.setNss({});
         op.setOpTime({{}, {}});
         op.setWallClockTime({});
+
+        if (multiOplogEntryType) {
+            op.setMultiOpType(*multiOplogEntryType);
+        }
 
         return {op.toBSON()};
     }
@@ -739,6 +749,37 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForPartialUnprepared
     runTest(makeLogicalSessionIdForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsDeriveCrudOpsForMultiApplyOpsBasic) {
+    const auto lsid = makeLogicalSessionIdForTest();
+    const TxnNumber txnNumber{1};
+
+    OplogBatch batch;
+    // 'makeApplyOpsForInsert' uses the "_id" of each document as the "stmtId"
+    batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)},
+                                             lsid,
+                                             txnNumber,
+                                             false /* isPrepare */,
+                                             false /* isPartial */,
+                                             repl::MultiOplogEntryType::kApplyOpsAppliedSeparately,
+                                             true /* useStmtIds */));
+
+    std::list<repl::OplogEntry> derivedOps;
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
+    ASSERT_FALSE(writerVectors.empty());
+
+    auto writer = getNonEmptyWriterVector(writerVectors);
+
+    ASSERT_EQ(writer.size(), 3U);
+    ASSERT_EQ(derivedOps.size(), 3U);
+    for (size_t i = 0; i < writer.size(); ++i) {
+        ASSERT_EQ(writer[i]->getSessionId(), lsid);
+        ASSERT_EQ(*writer[i]->getTxnNumber(), txnNumber);
+        ASSERT(writer[i]->getOpType() == repl::OpTypeEnum::kInsert);
+        ASSERT_BSONOBJ_EQ(writer[i]->getObject(), (BSON("_id" << static_cast<int>(i))));
+        ASSERT_FALSE(writer[i]->getMultiOpType());
+    }
 }
 
 }  // namespace

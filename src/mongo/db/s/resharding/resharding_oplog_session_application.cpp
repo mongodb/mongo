@@ -123,25 +123,6 @@ boost::optional<repl::OpTime> ReshardingOplogSessionApplication::_logPrePostImag
         });
 }
 
-namespace {
-std::vector<StmtId> gatherApplyOpsStatementIds(const mongo::repl::OplogEntry& op) {
-    std::vector<StmtId> stmtIds;
-    for (const auto& innerOp :
-         op.getObject()[repl::ApplyOpsCommandInfoBase::kOperationsFieldName].Array()) {
-        auto innerStmtIds =
-            repl::parseZeroOneManyStmtId(innerOp[repl::OplogEntry::kStatementIdFieldName]);
-        stmtIds.insert(stmtIds.end(), innerStmtIds.begin(), innerStmtIds.end());
-
-        // We have no way of handling migration of multiple pre or post images right now.  There
-        // are multiple options for handling it, but right now this format is only used for inserts
-        // (which have neither) so it should never come up.
-        invariant(innerOp[repl::OplogEntry::kPreImageOpTimeFieldName].eoo());
-        invariant(innerOp[repl::OplogEntry::kPostImageOpTimeFieldName].eoo());
-    }
-    return stmtIds;
-}
-}  // namespace
-
 boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryApplyOperation(
     OperationContext* opCtx, const mongo::repl::OplogEntry& op) const {
     invariant(op.getSessionId());
@@ -168,23 +149,20 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
             return boost::none;
         }
     }
+    tassert(9572400,
+            str::stream() << "Resharding session oplog application unexpectedly received a multi "
+                             "apply ops entry: "
+                          << redact(op.toBSONForLogging()),
+            op.getMultiOpType() != repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
     auto txnNumber = *op.getTxnNumber();
-    bool isRetryableApplyOps = op.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
-        op.getMultiOpType() == repl::MultiOplogEntryType::kApplyOpsAppliedSeparately;
-    bool isRetryableWrite = op.isCrudOpType() || isRetryableApplyOps;
+    auto isRetryableWrite = op.isCrudOpType();
 
     auto o2Field =
         isRetryableWrite ? op.getEntry().getRaw() : TransactionParticipant::kDeadEndSentinel;
 
-    auto stmtIds = [&] {
-        if (!isRetryableWrite)
-            return std::vector<StmtId>{kIncompleteHistoryStmtId};
-        else if (!isRetryableApplyOps)
-            return op.getStatementIds();
-        else
-            return gatherApplyOpsStatementIds(op);
-    }();
+    auto stmtIds =
+        isRetryableWrite ? op.getStatementIds() : std::vector<StmtId>{kIncompleteHistoryStmtId};
     invariant(!stmtIds.empty());
 
     auto opId = ReshardingDonorOplogId::parse(IDLParserContext{"ReshardingOplogSessionApplication"},
