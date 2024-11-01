@@ -29,6 +29,18 @@
 global:
   cpp_namespace: "mongo::transport"
 
+imports:
+  - "mongo/db/basic_types.idl"
+
+structs:
+  MaxIncomingConnectionsParameters:
+    description: "Represents CIDR ranges that are exempt from the maxIncomingConnections limit"
+    strict: true
+    fields:
+      ranges:
+        description: 'An array of exempted CIDR ranges'
+        type: array<string>
+
 server_parameters:
   # Options to configure inbound TFO connections.
   tcpFastOpenServer:
@@ -56,4 +68,13 @@ server_parameters:
     cpp_varname: gTCPFastOpenClient
     cpp_vartype: bool
     default: true
+    redact: false
+
+  maxIncomingConnectionsOverride:
+    description: 'CIDR ranges that are exempt from the maxIncomingConnections limit'
+    set_at: runtime  # Use the configuration option for setting this at startup.
+    cpp_class:
+        name: "MaxIncomingConnectionsOverrideServerParameter"
+        # Expects the payload to be an instance of `MaxIncomingConnectionsParameters`.
+        override_set: true
     redact: false

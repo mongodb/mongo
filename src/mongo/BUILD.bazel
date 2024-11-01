@@ -363,6 +363,7 @@ mongo_cc_library(
         "//src/mongo/util:tracking_allocator.h",
         "//src/mongo/util:uuid.h",
         "//src/mongo/util:version.h",
+        "//src/mongo/util:versioned_value.h",
         "//src/mongo/util:waitable.h",
         "//src/mongo/util/concurrency:idle_thread_block.h",
         "//src/mongo/util/concurrency:thread_name.h",

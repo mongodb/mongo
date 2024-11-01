@@ -91,6 +91,16 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target="versioned_value_test",
+    source=[
+        "versioned_value_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
 tcmallocAttrs = None
 for impl in [
     {

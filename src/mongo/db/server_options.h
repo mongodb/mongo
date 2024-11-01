@@ -49,6 +49,7 @@
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/version/releases.h"
+#include "mongo/util/versioned_value.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -119,7 +120,7 @@ struct ServerGlobalParams {
     std::string socket = "/tmp";  // UNIX domain socket directory
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
-    std::vector<std::variant<CIDR, std::string>> maxConnsOverride;
+    VersionedValue<std::vector<std::variant<CIDR, std::string>>> maxConnsOverride;
     int reservedAdminThreads = 0;
 
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket

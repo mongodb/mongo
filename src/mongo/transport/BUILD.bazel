@@ -56,12 +56,16 @@ mongo_cc_library(
 idl_generator(
     name = "transport_options_gen",
     src = "transport_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )
 
 mongo_cc_library(
     name = "transport_layer",
     srcs = [
         "proxy_protocol_header_parser.cpp",
+        ":transport_options.cpp",
         ":transport_options_gen",
         "//src/mongo/transport/asio:asio_session_impl.cpp",
         "//src/mongo/transport/asio:asio_session_manager.cpp",
@@ -93,6 +97,7 @@ mongo_cc_library(
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_options",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.

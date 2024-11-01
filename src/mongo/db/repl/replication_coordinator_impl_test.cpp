@@ -153,62 +153,6 @@ std::shared_ptr<const repl::HelloResponse> awaitHelloWithNewOpCtx(
     return replCoord->awaitHelloResponse(newOpCtx.get(), horizonParams, topologyVersion, deadline);
 }
 
-TEST_F(ReplCoordTest, LeaseIsntStaleIfConfigHasntChanged) {
-    auto rsConfig = ReplicationCoordinatorImpl::SharedReplSetConfig();
-    auto lease = rsConfig.renew();
-    ASSERT_FALSE(rsConfig.isStale(lease));
-    lease = rsConfig.renew();
-    ASSERT_FALSE(rsConfig.isStale(lease));
-}
-
-TEST_F(ReplCoordTest, LeaseIsStaleIfConfigHasChanged) {
-    auto rsConfig = ReplicationCoordinatorImpl::SharedReplSetConfig();
-    auto lease = rsConfig.renew();
-    rsConfig.setConfig(std::make_shared<ReplSetConfig>(ReplSetConfig()));
-    ASSERT_TRUE(rsConfig.isStale(lease));
-}
-
-TEST_F(ReplCoordTest, LeaseRenewDoesntChangeVersionIfConfigHasntChanged) {
-    auto rsConfig = ReplicationCoordinatorImpl::SharedReplSetConfig();
-    auto lease = rsConfig.renew();
-    ASSERT_EQUALS(1, lease.version);
-    lease = rsConfig.renew();
-    ASSERT_EQUALS(1, lease.version);
-}
-
-TEST_F(ReplCoordTest, LeaseRenewChangesVersionIfConfigHasChanged) {
-    auto rsConfig = ReplicationCoordinatorImpl::SharedReplSetConfig();
-    auto lease = rsConfig.renew();
-    ASSERT_EQUALS(1, lease.version);
-    rsConfig.setConfig(std::make_shared<ReplSetConfig>(ReplSetConfig()));
-    ASSERT_EQUALS(1, lease.version);
-    lease = rsConfig.renew();
-    ASSERT_EQUALS(2, lease.version);
-}
-
-TEST_F(ReplCoordTest, LeaseRenewChangesConfigIfConfigHasChanged) {
-    auto oldConfigObj = BSON("_id"
-                             << "myOldSet"
-                             << "version" << 1 << "protocolVersion" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                      << "h1:1")));
-    ReplSetConfig oldConfig = assertMakeRSConfig(oldConfigObj);
-    auto rsConfig = ReplicationCoordinatorImpl::SharedReplSetConfig();
-    rsConfig.setConfig(std::make_shared<ReplSetConfig>(oldConfig));
-    auto lease = rsConfig.renew();
-    ASSERT_EQUALS(oldConfig.getReplicaSetId(), lease.config->getReplicaSetId());
-    auto newConfigObj = BSON("_id"
-                             << "myNewSet"
-                             << "version" << 1 << "protocolVersion" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                      << "h1:1")));
-    ReplSetConfig newConfig = assertMakeRSConfig(oldConfigObj);
-    rsConfig.setConfig(std::make_shared<ReplSetConfig>(newConfig));
-    ASSERT_EQUALS(oldConfig.getReplicaSetId(), lease.config->getReplicaSetId());
-    lease = rsConfig.renew();
-    ASSERT_EQUALS(newConfig.getReplicaSetId(), lease.config->getReplicaSetId());
-}
-
 TEST_F(ReplCoordTest, IsWritablePrimaryFalseDuringStepdown) {
     BSONObj configObj = BSON("_id"
                              << "mySet"

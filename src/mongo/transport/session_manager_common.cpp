@@ -37,6 +37,7 @@
 
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
@@ -51,6 +52,8 @@
 
 namespace mongo::transport {
 namespace {
+
+thread_local decltype(ServerGlobalParams::maxConnsOverride)::Snapshot maxConnsOverride;
 
 /** Some diagnostic data that we will want to log about a Client after its death. */
 struct ClientSummary {
@@ -245,8 +248,9 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     invariant(session);
     IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
 
+    serverGlobalParams.maxConnsOverride.refreshSnapshot(maxConnsOverride);
     const bool isPrivilegedSession =
-        session->shouldOverrideMaxConns(serverGlobalParams.maxConnsOverride);
+        maxConnsOverride && session->shouldOverrideMaxConns(*maxConnsOverride);
     const bool verbose = !quiet();
 
     auto service = _svcCtx->getService();
