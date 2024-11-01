@@ -7024,10 +7024,12 @@ private:
     static Value performConvertBinDataToBinData(ExpressionContext* const expCtx,
                                                 Value inputValue,
                                                 SubtypeArg subtypeValue) {
-        auto binDataType = computeBinDataType(subtypeValue);
         auto binData = inputValue.getBinData();
+        uassert(ErrorCodes::ConversionFailure,
+                "Conversions between different BinData subtypes are not supported",
+                binData.type == computeBinDataType(subtypeValue));
 
-        return Value(BSONBinData{binData.data, binData.length, binDataType});
+        return Value(BSONBinData{binData.data, binData.length, binData.type});
     }
 
     template <class ReturnType, class SizeClass>

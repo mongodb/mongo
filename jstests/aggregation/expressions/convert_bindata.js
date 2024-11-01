@@ -118,7 +118,7 @@ const conversionTestDocs = [
         expected: "🙂😎",
     },
 
-    // Test conversions from BinData to BinData.
+    // Test BinData identity conversions.
     {
         _id: 20,
         input: UUID("867dee52-c331-484e-92d1-c56479b8e67e"),
@@ -127,42 +127,16 @@ const conversionTestDocs = [
     },
     {
         _id: 21,
-        input: UUID("867dee52-c331-484e-92d1-c56479b8e67e"),
+        input: BinData(kNonUUIDSubtype, "hn3uUsMxSE6S0cVkebjmfg=="),
         target: {type: "binData", subtype: kNonUUIDSubtype},
         expected: BinData(kNonUUIDSubtype, "hn3uUsMxSE6S0cVkebjmfg=="),
     },
     {
         _id: 22,
         input: BinData(kNonUUIDSubtype, "hn3uUsMxSE6S0cVkebjmfg=="),
-        target: {type: "binData", subtype: kUUIDSubtype},
-        expected: BinData(kUUIDSubtype, "hn3uUsMxSE6S0cVkebjmfg=="),
-    },
-    {
-        _id: 23,
-        input: BinData(kNonUUIDSubtype, "hn3uUsMxSE6S0cVkebjmfg=="),
-        target: {type: "binData", subtype: kNonUUIDSubtype},
-        expected: BinData(kNonUUIDSubtype, "hn3uUsMxSE6S0cVkebjmfg=="),
-    },
-    {
-        _id: 24,
-        input: BinData(kNonUUIDSubtype, "hn3uUsMxSE6S0cVkebjmfg=="),
         // 'subtype' defaults to 0 (generic BinData).
         target: "binData",
         expected: BinData(kNonUUIDSubtype, "hn3uUsMxSE6S0cVkebjmfg=="),
-    },
-    // Conversion from pre-defined type to a user-defined type.
-    {
-        _id: 25,
-        input: UUID("867dee52-c331-484e-92d1-c56479b8e67e"),
-        target: {type: "binData", subtype: 255},
-        expected: BinData(255, "hn3uUsMxSE6S0cVkebjmfg=="),
-    },
-    // Conversion from user-defined type to a pre-defined type.
-    {
-        _id: 26,
-        input: BinData(255, "hn3uUsMxSE6S0cVkebjmfg=="),
-        target: {type: "binData", subtype: 0},
-        expected: BinData(0, "hn3uUsMxSE6S0cVkebjmfg=="),
     },
 ];
 
@@ -241,6 +215,29 @@ const illegalConversionTestDocs = [
         input: "hn3uUsMxSE6S0cVkebjmfg==",
         target: {type: "binData", subtype: kUUIDSubtype},
         format: "auto"
+    },
+
+    // Forbidden conversions between different binData subtypes
+    {
+        _id: 14,
+        input: UUID("867dee52-c331-484e-92d1-c56479b8e67e"),
+        target: {type: "binData", subtype: kNonUUIDSubtype},
+        expected: BinData(kNonUUIDSubtype, "hn3uUsMxSE6S0cVkebjmfg=="),
+    },
+    {
+        _id: 15,
+        input: BinData(kNonUUIDSubtype, "hn3uUsMxSE6S0cVkebjmfg=="),
+        target: {type: "binData", subtype: kUUIDSubtype},
+    },
+    {
+        _id: 16,
+        input: UUID("867dee52-c331-484e-92d1-c56479b8e67e"),
+        target: {type: "binData", subtype: 255},
+    },
+    {
+        _id: 17,
+        input: BinData(255, "hn3uUsMxSE6S0cVkebjmfg=="),
+        target: {type: "binData", subtype: 0},
     },
 ];
 

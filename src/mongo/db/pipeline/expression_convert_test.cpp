@@ -877,7 +877,7 @@ TEST_F(ExpressionConvertTest, BinDataToBinDataConversionSameSubtype) {
         convertExp->evaluate(binDataInput, &expCtx->variables), expected, BSONType::BinData);
 }
 
-TEST_F(ExpressionConvertTest, BinDataToBinDataConversionDifferentSubtypes) {
+TEST_F(ExpressionConvertTest, BinDataToBinDataConversionDifferentSubtypesFails) {
     auto expCtx = getExpCtx();
 
     auto spec = BSON("$convert" << BSON("input"
@@ -893,8 +893,15 @@ TEST_F(ExpressionConvertTest, BinDataToBinDataConversionDifferentSubtypes) {
     BSONBinData expected{data.data(), static_cast<int>(data.size()), newUUID};
 
     Document binDataInput{{"path1", input}};
-    ASSERT_VALUE_CONTENTS_AND_TYPE(
-        convertExp->evaluate(binDataInput, &expCtx->variables), expected, BSONType::BinData);
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(binDataInput, &expCtx->variables),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(
+                exception.reason(),
+                "Conversions between different BinData subtypes are not supported");
+        });
 }
 
 TEST_F(ExpressionConvertTest, Base64StringToNonUUIDBinDataConversion) {
