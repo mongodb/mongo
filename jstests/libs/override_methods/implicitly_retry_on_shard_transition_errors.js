@@ -79,8 +79,16 @@ function shouldRetry(cmdObj, res) {
     const isRetryableWrite = cmdObj.hasOwnProperty("lsid") && cmdObj.hasOwnProperty("txnNumber");
 
     if (res.hasOwnProperty("writeErrors")) {
-        if (!isRetryableWrite)
+        // If the write isn't retryable and the batch size is > 1, we may double apply writes in the
+        // batch if we just blindly retry the entire batch, since some writes in the batch might
+        // have been successful. We allow retrying batch inserts because we handle duplicate key
+        // errors for inserts in runCommandWithRetries below - this doesn't necessarily guarantee
+        // that the inserts aren't double applied, but allows for more tests to run in suites that
+        // use this override (and has not proven a problem thus far).
+        if (!isRetryableWrite && (cmdObj.update && cmdObj.updates.length > 1) ||
+            (cmdObj.delete && cmdObj.deletes.length > 1)) {
             return false;
+        }
 
         for (const writeError of res.writeErrors) {
             if (isRetryableError(writeError)) {
