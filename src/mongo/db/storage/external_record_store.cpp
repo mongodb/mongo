@@ -41,7 +41,7 @@ namespace mongo {
 // in WT. So, we set the "dummy" ident for a virtual collection.
 ExternalRecordStore::ExternalRecordStore(boost::optional<UUID> uuid,
                                          const VirtualCollectionOptions& vopts)
-    : RecordStore(uuid, /*identName=*/"dummy"_sd, /*isCapped=*/false), _vopts(vopts) {}
+    : _vopts(vopts) {}
 
 /**
  * Returns a MultiBsonStreamCursor for this record store. Reverse scans are not currently supported

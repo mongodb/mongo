@@ -69,7 +69,7 @@ public:
         auto oplogCollection =
             catalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace);
         if (oplogCollection) {
-            oplogCollection->getRecordStore()->getOplogTruncateStats(builder);
+            oplogCollection->getRecordStore()->oplog()->getTruncateStats(builder);
         }
         return builder.obj();
     }

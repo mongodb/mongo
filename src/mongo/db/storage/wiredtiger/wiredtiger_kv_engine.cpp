@@ -1571,42 +1571,55 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
                                                                 const NamespaceString& nss,
                                                                 StringData ident,
                                                                 const CollectionOptions& options) {
-
-    bool isLogged;
-    if (nss.size() == 0) {
-        fassert(8423353, ident.startsWith("internal-"));
-        isLogged = !getGlobalReplSettings().isReplSet() &&
-            !repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
-    } else {
-        isLogged = WiredTigerUtil::useTableLogging(nss);
-    }
-
-    WiredTigerRecordStore::Params params;
-    params.uuid = options.uuid;
-    params.ident = ident.toString();
-    params.engineName = _canonicalName;
-    params.isCapped = options.capped;
-    params.keyFormat = (options.clusteredIndex) ? KeyFormat::String : KeyFormat::Long;
-    // Record stores for clustered collections need to guarantee uniqueness by preventing
-    // overwrites.
-    params.overwrite = options.clusteredIndex ? false : true;
-    params.isEphemeral = _ephemeral;
-    params.isLogged = isLogged;
-    params.isChangeCollection = nss.isChangeCollection();
-    params.sizeStorer = _sizeStorer.get();
-    params.tracksSizeAdjustments = true;
-    params.forceUpdateWithFullDocument = options.timeseries != boost::none;
-
-    if (nss.isOplog()) {
-        // The oplog collection must have a size provided.
-        invariant(options.cappedSize > 0);
-        params.oplogMaxSize = options.cappedSize;
-    }
-
     std::unique_ptr<WiredTigerRecordStore> ret;
-    ret = std::make_unique<WiredTigerRecordStore>(
-        this, WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)), params);
-    ret->postConstructorInit(opCtx);
+    if (nss.isOplog()) {
+        ret = std::make_unique<WiredTigerRecordStore::Oplog>(
+            this,
+            WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
+            WiredTigerRecordStore::Oplog::Params{.uuid = *options.uuid,
+                                                 .ident = ident.toString(),
+                                                 .engineName = _canonicalName,
+                                                 .isEphemeral = _ephemeral,
+                                                 .oplogMaxSize = options.cappedSize,
+                                                 .sizeStorer = _sizeStorer.get(),
+                                                 .tracksSizeAdjustments = true,
+                                                 .forceUpdateWithFullDocument =
+                                                     options.timeseries.has_value()});
+        static_cast<WiredTigerRecordStore::Oplog*>(ret.get())->postConstructorInit(opCtx);
+    } else {
+        WiredTigerRecordStore::Params params{
+            .uuid = options.uuid,
+            .ident = ident.toString(),
+            .engineName = _canonicalName,
+            .keyFormat = options.clusteredIndex ? KeyFormat::String : KeyFormat::Long,
+            // Record stores for clustered collections need to guarantee uniqueness by preventing
+            // overwrites.
+            .overwrite = !options.clusteredIndex,
+            .isEphemeral = _ephemeral,
+            .isLogged =
+                [&] {
+                    if (!nss.isEmpty()) {
+                        return WiredTigerUtil::useTableLogging(nss);
+                    }
+                    fassert(8423353, ident.startsWith("internal-"));
+                    return !getGlobalReplSettings().isReplSet() &&
+                        !repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+                }(),
+            .isChangeCollection = nss.isChangeCollection(),
+            .sizeStorer = _sizeStorer.get(),
+            .tracksSizeAdjustments = true,
+            .forceUpdateWithFullDocument = options.timeseries.has_value()};
+
+        ret = options.capped
+            ? std::make_unique<WiredTigerRecordStore::Capped>(
+                  this,
+                  WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
+                  params)
+            : std::make_unique<WiredTigerRecordStore>(
+                  this,
+                  WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
+                  params);
+    }
 
     if (sizeRecoveryState(opCtx->getServiceContext()).shouldRecordStoresAlwaysCheckSize()) {
         ret->checkSize(opCtx);
@@ -1726,7 +1739,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Operati
     params.uuid = boost::none;
     params.ident = ident.toString();
     params.engineName = _canonicalName;
-    params.isCapped = false;
     params.keyFormat = keyFormat;
     params.overwrite = true;
     params.isEphemeral = _ephemeral;
@@ -1737,13 +1749,8 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Operati
     // Temporary collections do not need to reconcile collection size/counts.
     params.tracksSizeAdjustments = false;
     params.forceUpdateWithFullDocument = false;
-
-    std::unique_ptr<WiredTigerRecordStore> rs;
-    rs = std::make_unique<WiredTigerRecordStore>(
+    return std::make_unique<WiredTigerRecordStore>(
         this, WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)), params);
-    rs->postConstructorInit(opCtx);
-
-    return std::move(rs);
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
@@ -2644,7 +2651,7 @@ Status WiredTigerKVEngine::oplogDiskLocRegister(RecoveryUnit& ru,
 
     // Inserts and updates usually notify waiters on commit, but the oplog collection has special
     // visibility rules and waiters must be notified whenever the oplog read timestamp is forwarded.
-    oplogRecordStore->notifyCappedWaitersIfNeeded();
+    oplogRecordStore->capped()->notifyWaitersIfNeeded();
     return Status::OK();
 }
 
@@ -2652,8 +2659,7 @@ void WiredTigerKVEngine::waitForAllEarlierOplogWritesToBeVisible(
     OperationContext* opCtx, RecordStore* oplogRecordStore) const {
     auto oplogManager = getOplogManager();
     if (oplogManager->isRunning()) {
-        oplogManager->waitForAllEarlierOplogWritesToBeVisible(
-            checked_cast<WiredTigerRecordStore*>(oplogRecordStore), opCtx);
+        oplogManager->waitForAllEarlierOplogWritesToBeVisible(oplogRecordStore, opCtx);
     }
 }
 

@@ -303,7 +303,7 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         auto opCtx = newOperationContext();
         AutoGetCollectionForRead ac(opCtx.get(), nss);
         const CollectionPtr& coll = ac.getCollection();
-        coll->getRecordStore()->cappedTruncateAfter(
+        coll->getRecordStore()->capped()->truncateAfter(
             opCtx.get(), id1, /*inclusive*/ false, [](auto _1, auto _2, auto _3) {});
     }
 

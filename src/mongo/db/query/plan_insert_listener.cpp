@@ -106,7 +106,7 @@ std::unique_ptr<Notifier> getCappedInsertNotifier(OperationContext* opCtx,
         invariant(collection);
 
         return std::make_unique<LocalCappedInsertNotifier>(
-            collection->getRecordStore()->getCappedInsertNotifier());
+            collection->getRecordStore()->capped()->getInsertNotifier());
     }
 }
 

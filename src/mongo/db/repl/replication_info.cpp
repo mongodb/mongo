@@ -313,7 +313,7 @@ public:
 
             // Try getting earliest oplog timestamp using getEarliestOplogTimestamp
             auto swEarliestOplogTimestamp =
-                oplogCollection->getRecordStore()->getEarliestOplogTimestamp(
+                oplogCollection->getRecordStore()->oplog()->getEarliestTimestamp(
                     *shard_role_details::getRecoveryUnit(opCtx));
 
             if (swEarliestOplogTimestamp.getStatus() == ErrorCodes::OplogOperationUnsupported) {

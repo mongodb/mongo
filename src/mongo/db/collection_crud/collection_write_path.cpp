@@ -489,9 +489,11 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
     // store's lifetime is controlled by the collection IX lock held on the write paths, whereas the
     // CollectionPtr is just a front to the collection and its lifetime is shorter
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [recordStore = collection->getRecordStore()](OperationContext*,
-                                                     boost::optional<Timestamp>) {
-            recordStore->notifyCappedWaitersIfNeeded();
+        [capped = collection->getRecordStore()->capped()](OperationContext*,
+                                                          boost::optional<Timestamp>) {
+            if (capped) {
+                capped->notifyWaitersIfNeeded();
+            }
         });
 
     return loc.getStatus();
@@ -551,9 +553,11 @@ Status insertDocuments(OperationContext* opCtx,
     // store's lifetime is controlled by the collection IX lock held on the write paths, whereas the
     // CollectionPtr is just a front to the collection and its lifetime is shorter
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [recordStore = collection->getRecordStore()](OperationContext*,
-                                                     boost::optional<Timestamp>) {
-            recordStore->notifyCappedWaitersIfNeeded();
+        [capped = collection->getRecordStore()->capped()](OperationContext*,
+                                                          boost::optional<Timestamp>) {
+            if (capped) {
+                capped->notifyWaitersIfNeeded();
+            }
         });
 
     hangAfterCollectionInserts.executeIf(

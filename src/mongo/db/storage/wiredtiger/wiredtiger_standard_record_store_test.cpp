@@ -115,7 +115,6 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         WiredTigerRecordStore::Params params;
         params.ident = ident;
         params.engineName = std::string{kWiredTigerEngineName};
-        params.isCapped = false;
         params.keyFormat = KeyFormat::Long;
         params.overwrite = true;
         params.isEphemeral = false;
@@ -129,7 +128,6 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
             nullptr,
             WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
             params);
-        ret->postConstructorInit(opCtx.get());
         rs.reset(ret);
     }
 

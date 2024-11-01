@@ -86,7 +86,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
 
         // Create another reference to the oplog truncate markers while holding a lock on
         // the collection to prevent it from being destructed.
-        oplogTruncateMarkers = rs->getCollectionTruncateMarkers();
+        oplogTruncateMarkers = rs->oplog()->getCollectionTruncateMarkers();
         invariant(oplogTruncateMarkers);
     }
 
@@ -104,7 +104,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             LOGV2_DEBUG(9064300, 2, "oplog collection does not exist");
             return false;
         }
-        rs->reclaimOplog(opCtx);
+        rs->oplog()->reclaim(opCtx);
     }
 
     return true;

@@ -39,7 +39,7 @@ class WiredTigerOplogTruncateMarkers;
 // Container for holding oplog-specific metadata.
 class WiredTigerOplogData {
 public:
-    WiredTigerOplogData(const WiredTigerRecordStore::Params& params);
+    WiredTigerOplogData(const WiredTigerRecordStore::Oplog::Params& params);
 
     // Adds the truncation statistics for this oplog to the |builder| (for
     // populating the ServerStatus).

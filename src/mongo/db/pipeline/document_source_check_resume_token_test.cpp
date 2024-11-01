@@ -163,8 +163,8 @@ private:
 class ChangeStreamOplogCollectionMock : public CollectionMock {
 public:
     ChangeStreamOplogCollectionMock() : CollectionMock(NamespaceString::kRsOplogNamespace) {
-        _recordStore =
-            _devNullEngine.getRecordStore(nullptr, NamespaceString::kRsOplogNamespace, "", {});
+        _recordStore = _devNullEngine.getRecordStore(
+            nullptr, NamespaceString::kRsOplogNamespace, "", {.uuid = UUID::gen()});
     }
 
     void push_back(Document doc) {

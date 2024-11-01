@@ -234,7 +234,7 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
 
             auto wakeUpEarlyForWaitersPredicate = [&] {
                 return _shuttingDown || _opsWaitingForOplogVisibilityUpdate ||
-                    oplogRecordStore->haveCappedWaiters();
+                    oplogRecordStore->capped()->hasWaiters();
             };
 
             // Check once a millisecond, up to the delay deadline, whether the delay should be
@@ -287,7 +287,7 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
         // We normally notify waiters on capped collection inserts/updates, but oplog entries will
         // not become visible immediately upon insert, so we notify waiters here as well, when new
         // oplog entries actually become visible to cursors.
-        oplogRecordStore->notifyCappedWaitersIfNeeded();
+        oplogRecordStore->capped()->notifyWaitersIfNeeded();
     }
 }
 

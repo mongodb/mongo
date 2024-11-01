@@ -1308,7 +1308,7 @@ StorageInterfaceImpl::findOplogOpTimeLessThanOrEqualToTimestampRetryOnWCE(
 Timestamp StorageInterfaceImpl::getEarliestOplogTimestamp(OperationContext* opCtx) {
     auto statusWithTimestamp = [&]() {
         AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-        return oplogRead.getCollection()->getRecordStore()->getEarliestOplogTimestamp(
+        return oplogRead.getCollection()->getRecordStore()->oplog()->getEarliestTimestamp(
             *shard_role_details::getRecoveryUnit(opCtx));
     }();
 
@@ -1347,7 +1347,7 @@ Timestamp StorageInterfaceImpl::getEarliestOplogTimestamp(OperationContext* opCt
 Timestamp StorageInterfaceImpl::getLatestOplogTimestamp(OperationContext* opCtx) {
     auto statusWithTimestamp = [&]() {
         AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-        return oplogRead.getCollection()->getRecordStore()->getLatestOplogTimestamp(
+        return oplogRead.getCollection()->getRecordStore()->oplog()->getLatestTimestamp(
             *shard_role_details::getRecoveryUnit(opCtx));
     }();
 

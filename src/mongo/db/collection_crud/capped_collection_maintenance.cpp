@@ -286,7 +286,7 @@ void cappedTruncateAfter(OperationContext* opCtx,
     invariant(collection->isCapped());
     invariant(collection->getIndexCatalog()->numIndexesInProgress() == 0);
 
-    collection->getRecordStore()->cappedTruncateAfter(
+    collection->getRecordStore()->capped()->truncateAfter(
         opCtx, end, inclusive, [&](OperationContext* opCtx, const RecordId& loc, RecordData data) {
             BSONObj doc = data.releaseToBson();
             int64_t* const nullKeysDeleted = nullptr;

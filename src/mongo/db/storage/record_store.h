@@ -312,37 +312,23 @@ private:
  * methods must be thread safe, see DurableCatalog.
  */
 class RecordStore {
-    RecordStore(const RecordStore&) = delete;
-    RecordStore& operator=(const RecordStore&) = delete;
-
 public:
-    RecordStore(boost::optional<UUID> uuid, StringData identName, bool isCapped);
+    class Capped;
+    class Oplog;
+
     virtual ~RecordStore() {}
 
-    // META
-
-    // name of the RecordStore implementation
     virtual const char* name() const = 0;
 
-    boost::optional<UUID> uuid() const {
-        return _uuid;
-    }
+    virtual boost::optional<UUID> uuid() const = 0;
 
-    bool isTemp() const {
-        return !_uuid.has_value();
-    }
+    virtual bool isTemp() const = 0;
 
-    std::shared_ptr<Ident> getSharedIdent() const {
-        return _ident;
-    }
+    virtual std::shared_ptr<Ident> getSharedIdent() const = 0;
 
-    const std::string& getIdent() const {
-        return _ident->getIdent();
-    }
+    virtual const std::string& getIdent() const = 0;
 
-    void setIdent(std::shared_ptr<Ident> newIdent) {
-        _ident = std::move(newIdent);
-    }
+    virtual void setIdent(std::shared_ptr<Ident>) = 0;
 
     /**
      * The key format for this RecordStore's RecordIds.
@@ -366,43 +352,11 @@ public:
     virtual long long numRecords() const = 0;
 
     /**
-     * Storage engines can manage oplog truncation internally as opposed to having higher layers
-     * manage it for them.
-     */
-    virtual bool selfManagedOplogTruncation() const {
-        return false;
-    }
-
-    /**
-     * Get a pointer to a capped insert notifier object. The caller can wait on this object
-     * until it is notified of a new insert into the capped collection.
-     *
-     * It is invalid to call this method unless the owning collection is capped.
-     */
-    std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const {
-        return _cappedInsertNotifier;
-    }
-
-    /**
-     * Uses the reference counter of the capped insert notifier shared pointer to decide whether
-     * anyone is waiting in order to optimise notifications on a potentially hot path. It is
-     * acceptable for this function to return 'true' even if there are no more waiters, but the
-     * inverse is not allowed.
-     */
-    bool haveCappedWaiters() const;
-
-    /**
-     * If the record store is capped and there are listeners waiting for notifications for capped
-     * inserts, notifies them.
-     */
-    void notifyCappedWaitersIfNeeded();
-
-    /**
      * @param extraInfo - optional more debug info
      * @param level - optional, level of debug info to put in (higher is more)
      * @return total estimate size (in bytes) on stable storage
      */
-    virtual int64_t storageSize(RecoveryUnit& ru,
+    virtual int64_t storageSize(RecoveryUnit&,
                                 BSONObjBuilder* extraInfo = nullptr,
                                 int infoLevel = 0) const = 0;
 
@@ -411,11 +365,7 @@ public:
      * A return value of zero can mean either no bytes are available, or that the real value is
      * unknown.
      */
-    virtual int64_t freeStorageSize(RecoveryUnit& ru) const {
-        return 0;
-    }
-
-    // CRUD related
+    virtual int64_t freeStorageSize(RecoveryUnit&) const = 0;
 
     /**
      * Get the RecordData at loc, which must exist.
@@ -428,13 +378,7 @@ public:
      * In general, prefer findRecord or RecordCursor::seekExact since they can tell you if a record
      * has been removed.
      */
-    RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const {
-        RecordData data;
-        invariant(findRecord(opCtx, loc, &data),
-                  str::stream() << "Didn't find RecordId " << loc << " in record store "
-                                << (_uuid ? _uuid->toString() : std::string{}));
-        return data;
-    }
+    virtual RecordData dataFor(OperationContext*, const RecordId&) const = 0;
 
     /**
      * @param out - If the record exists, the contents of this are set.
@@ -446,64 +390,38 @@ public:
      * In general prefer RecordCursor::seekExact since it can avoid copying data in more
      * storageEngines.
      */
-    virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* out) const {
-        auto cursor = getCursor(opCtx);
-        auto record = cursor->seekExact(loc);
-        if (!record)
-            return false;
+    virtual bool findRecord(OperationContext*, const RecordId&, RecordData*) const = 0;
 
-        record->data.makeOwned();  // Unowned data expires when cursor goes out of scope.
-        *out = std::move(record->data);
-        return true;
-    }
-
-    void deleteRecord(OperationContext* opCtx, const RecordId& dl);
+    virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl) = 0;
 
     /**
      * Inserts the specified records into this RecordStore by copying the passed-in record data and
      * updates 'inOutRecords' to contain the ids of the inserted records.
      */
-    Status insertRecords(OperationContext* opCtx,
-                         std::vector<Record>* inOutRecords,
-                         const std::vector<Timestamp>& timestamps);
+    virtual Status insertRecords(OperationContext*,
+                                 std::vector<Record>*,
+                                 const std::vector<Timestamp>&) = 0;
 
     /**
      * A thin wrapper around insertRecords() to simplify handling of single document inserts.
      */
-    StatusWith<RecordId> insertRecord(OperationContext* opCtx,
-                                      const char* data,
-                                      int len,
-                                      Timestamp timestamp) {
-        // Record stores with the Long key format accept a null RecordId, as the storage engine will
-        // generate one.
-        invariant(keyFormat() == KeyFormat::Long);
-        return insertRecord(opCtx, RecordId(), data, len, timestamp);
-    }
+    virtual StatusWith<RecordId> insertRecord(OperationContext*,
+                                              const char* data,
+                                              int len,
+                                              Timestamp) = 0;
 
     /**
      * A thin wrapper around insertRecords() to simplify handling of single document inserts.
      * If RecordId is null, the storage engine will generate one and return it.
      */
-    StatusWith<RecordId> insertRecord(OperationContext* opCtx,
-                                      const RecordId& rid,
-                                      const char* data,
-                                      int len,
-                                      Timestamp timestamp) {
-        std::vector<Record> inOutRecords{Record{rid, RecordData(data, len)}};
-        Status status = insertRecords(opCtx, &inOutRecords, std::vector<Timestamp>{timestamp});
-        if (!status.isOK())
-            return status;
-        return std::move(inOutRecords.front().id);
-    }
+    virtual StatusWith<RecordId> insertRecord(
+        OperationContext*, const RecordId&, const char* data, int len, Timestamp) = 0;
 
     /**
      * Updates the record with id 'recordId', replacing its contents with those described by
      * 'data' and 'len'.
      */
-    Status updateRecord(OperationContext* opCtx,
-                        const RecordId& recordId,
-                        const char* data,
-                        int len);
+    virtual Status updateRecord(OperationContext*, const RecordId&, const char* data, int len) = 0;
 
     /**
      * @return Returns 'false' if this record store does not implement
@@ -515,18 +433,19 @@ public:
     virtual bool updateWithDamagesSupported() const = 0;
 
     /**
-     * Updates the record positioned at 'loc' in-place using the deltas described by 'damages'. The
-     * 'damages' vector describes contiguous ranges of 'damageSource' from which to copy and apply
-     * byte-level changes to the data. Behavior is undefined for calling this on a non-existant loc.
+     * Updates the record positioned at the provided id in-place using the deltas described by the
+     * provided damages. The damages vector describes contiguous ranges of 'damageSource' from which
+     * to copy and apply byte-level changes to the data. Behavior is undefined for calling this on a
+     * non-existant loc.
      *
      * @return the updated version of the record. If unowned data is returned, then it is valid
      * until the next modification of this Record or the lock on the collection has been released.
      */
-    StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
-                                             const RecordId& loc,
-                                             const RecordData& oldRec,
-                                             const char* damageSource,
-                                             const DamageVector& damages);
+    virtual StatusWith<RecordData> updateWithDamages(OperationContext*,
+                                                     const RecordId&,
+                                                     const RecordData&,
+                                                     const char* damageSource,
+                                                     const DamageVector&) = 0;
 
     /**
      * Prints any storage engine provided metadata for the record with 'recordId'.
@@ -534,9 +453,9 @@ public:
      * If provided, saves any valid timestamps (startTs, startDurableTs, stopTs, stopDurableTs)
      * related to this record in 'recordTimestamps'.
      */
-    virtual void printRecordMetadata(OperationContext* opCtx,
-                                     const RecordId& recordId,
-                                     std::set<Timestamp>* recordTimestamps) const = 0;
+    virtual void printRecordMetadata(OperationContext*,
+                                     const RecordId&,
+                                     std::set<Timestamp>*) const = 0;
 
     /**
      * Returns a new cursor over this record store.
@@ -546,7 +465,7 @@ public:
      * are allowed to lazily seek to the first Record when next() is called rather than doing
      * it on construction.
      */
-    virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
+    virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
                                                             bool forward = true) const = 0;
 
     /**
@@ -560,16 +479,12 @@ public:
      * the record store. Implementations should avoid obvious biases toward older, newer, larger
      * smaller or other specific classes of documents.
      */
-    virtual std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const {
-        return {};
-    }
-
-    // higher level
+    virtual std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*) const = 0;
 
     /**
      * Removes all Records.
      */
-    Status truncate(OperationContext* opCtx);
+    virtual Status truncate(OperationContext*) = 0;
 
     /**
      * Removes all Records in the range [minRecordId, maxRecordId] inclusive of both. The hint*
@@ -579,55 +494,38 @@ public:
      * hints if they have a way of obtaining the correct values without the help of external
      * callers.
      */
-    Status rangeTruncate(OperationContext* opCtx,
-                         const RecordId& minRecordId = RecordId(),
-                         const RecordId& maxRecordId = RecordId(),
-                         int64_t hintDataSizeIncrement = 0,
-                         int64_t hintNumRecordsIncrement = 0);
-
-    /**
-     * Truncate documents newer than the document at 'end' from the capped
-     * collection.  The collection cannot be completely emptied using this
-     * function.  An assertion will be thrown if that is attempted.
-     * @param inclusive - Truncate 'end' as well iff true
-     */
-    using AboutToDeleteRecordCallback =
-        std::function<void(OperationContext* opCtx, const RecordId& loc, RecordData data)>;
-    void cappedTruncateAfter(OperationContext* opCtx,
-                             const RecordId& end,
-                             bool inclusive,
-                             const AboutToDeleteRecordCallback& aboutToDelete);
+    virtual Status rangeTruncate(OperationContext*,
+                                 const RecordId& minRecordId = RecordId(),
+                                 const RecordId& maxRecordId = RecordId(),
+                                 int64_t hintDataSizeIncrement = 0,
+                                 int64_t hintNumRecordsIncrement = 0) = 0;
 
     /**
      * does this RecordStore support the compact operation?
      *
      * If you return true, you must provide implementations of all compact methods.
      */
-    virtual bool compactSupported() const {
-        return false;
-    }
+    virtual bool compactSupported() const = 0;
 
     /**
      * Attempt to reduce the storage space used by this RecordStore.
      * Only called if compactSupported() returns true.
      * Returns an estimated number of bytes when doing a dry run.
      */
-    StatusWith<int64_t> compact(OperationContext* opCtx, const CompactOptions& options);
+    virtual StatusWith<int64_t> compact(OperationContext*, const CompactOptions&) = 0;
 
     /**
      * Performs record store specific validation to ensure consistency of underlying data
      * structures. If corruption is found, details of the errors will be in the results parameter.
      */
-    virtual void validate(RecoveryUnit& ru, bool full, ValidateResults* results) {}
+    virtual void validate(RecoveryUnit&, bool full, ValidateResults*) = 0;
 
     /**
      * @param scaleSize - amount by which to scale size metrics
      * Appends any numeric custom stats from the RecordStore or other unique stats, it should
      * avoid any expensive calls
      */
-    virtual void appendNumericCustomStats(RecoveryUnit& ru,
-                                          BSONObjBuilder* result,
-                                          double scale) const = 0;
+    virtual void appendNumericCustomStats(RecoveryUnit&, BSONObjBuilder*, double scale) const = 0;
 
 
     /**
@@ -635,11 +533,7 @@ public:
      * Appends all custom stats from the RecordStore or other unique stats, it can be more
      * expensive than RecordStore::appendNumericCustomStats
      */
-    virtual void appendAllCustomStats(RecoveryUnit& ru,
-                                      BSONObjBuilder* result,
-                                      double scale) const {
-        appendNumericCustomStats(ru, result, scale);
-    };
+    virtual void appendAllCustomStats(RecoveryUnit&, BSONObjBuilder*, double scale) const = 0;
 
     /**
      * Returns the largest RecordId in the RecordStore, regardless of visibility rules. If the store
@@ -648,15 +542,13 @@ public:
      * May throw WriteConflictException in certain cache-stuck scenarios even if the operation isn't
      * part of a WriteUnitOfWork.
      */
-    virtual RecordId getLargestKey(OperationContext* opCtx) const = 0;
+    virtual RecordId getLargestKey(OperationContext*) const = 0;
 
     /**
      * Reserve a range of contiguous RecordIds. Returns the first valid RecordId in the range. Must
      * only be called on a RecordStore with KeyFormat::Long.
      */
-    virtual void reserveRecordIds(OperationContext* opCtx,
-                                  std::vector<RecordId>* out,
-                                  size_t nRecords) = 0;
+    virtual void reserveRecordIds(OperationContext*, std::vector<RecordId>*, size_t numRecords) = 0;
 
     /**
      * Called after a repair operation is run with the recomputed numRecords and dataSize.
@@ -664,30 +556,72 @@ public:
     virtual void updateStatsAfterRepair(long long numRecords, long long dataSize) = 0;
 
     /**
+     * Returns nullptr if this record store is not capped.
+     */
+    virtual Capped* capped() = 0;
+
+    /**
+     * Returns nullptr if this record store is not the oplog.
+     */
+    virtual Oplog* oplog() = 0;
+};
+
+class RecordStore::Capped {
+public:
+    /**
+     * Get a pointer to a capped insert notifier object. The caller can wait on this object
+     * until it is notified of a new insert into the capped collection.
+     *
+     * It is invalid to call this method unless the owning collection is capped.
+     */
+    virtual std::shared_ptr<CappedInsertNotifier> getInsertNotifier() const = 0;
+
+    /**
+     * Uses the reference counter of the capped insert notifier shared pointer to decide whether
+     * anyone is waiting in order to optimise notifications on a potentially hot path. It is
+     * acceptable for this function to return 'true' even if there are no more waiters, but the
+     * inverse is not allowed.
+     */
+    virtual bool hasWaiters() const = 0;
+
+    /**
+     * If the record store is capped and there are listeners waiting for notifications for capped
+     * inserts, notifies them.
+     */
+    virtual void notifyWaitersIfNeeded() = 0;
+
+    /**
+     * Truncate documents newer than the document at 'end' from the capped
+     * collection.  The collection cannot be completely emptied using this
+     * function.  An assertion will be thrown if that is attempted.
+     * @param inclusive - Truncate 'end' as well iff true
+     */
+    using AboutToDeleteRecordCallback =
+        std::function<void(OperationContext*, const RecordId&, RecordData)>;
+    virtual void truncateAfter(OperationContext*,
+                               const RecordId&,
+                               bool inclusive,
+                               const AboutToDeleteRecordCallback&) = 0;
+};
+
+class RecordStore::Oplog {
+public:
+    /**
+     * Storage engines can manage oplog truncation internally as opposed to having higher layers
+     * manage it for them.
+     */
+    virtual bool selfManagedTruncation() const = 0;
+
+    /**
      * Storage engines can choose whether to support changing the oplog size online.
      */
-    virtual Status updateOplogSize(long long newOplogSize) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "This storage engine does not support updateOplogSize");
-    }
-
-    /**
-     * Returns a shared reference to the oplog truncate markers to allow the caller to wait
-     * for a deletion request.
-     * This should only be called if StorageEngine::supportsOplogTruncateMarkers() is true.
-     * Storage engines supporting oplog truncate markers must implement this function.
-     */
-    virtual std::shared_ptr<CollectionTruncateMarkers> getCollectionTruncateMarkers() {
-        MONGO_UNREACHABLE;
-    }
+    virtual Status updateSize(long long size) = 0;
 
     /**
      * This should only be called if StorageEngine::supportsOplogTruncateMarkers() is true.
      * Storage engines supporting oplog truncate markers must implement this function.
      */
-    virtual void reclaimOplog(OperationContext* opCtx) {
-        MONGO_UNREACHABLE;
-    }
+    virtual void reclaim(OperationContext*) = 0;
 
     /**
      * This should only be called if StorageEngine::supportsOplogTruncateMarkers() is true.
@@ -695,9 +629,7 @@ public:
      * Populates `builder` with various statistics pertaining to oplog truncate markers and oplog
      * truncation.
      */
-    virtual void getOplogTruncateStats(BSONObjBuilder& builder) const {
-        MONGO_UNREACHABLE;
-    }
+    virtual void getTruncateStats(BSONObjBuilder&) const = 0;
 
     /**
      * If supported, this method returns the timestamp value for the latest storage engine committed
@@ -708,11 +640,7 @@ public:
      *
      * Unsupported RecordStores return the OplogOperationUnsupported error code.
      */
-    virtual StatusWith<Timestamp> getLatestOplogTimestamp(RecoveryUnit& ru) const {
-        return Status(ErrorCodes::OplogOperationUnsupported,
-                      "The current storage engine doesn't support an optimized implementation for "
-                      "getting the latest oplog timestamp.");
-    }
+    virtual StatusWith<Timestamp> getLatestTimestamp(RecoveryUnit&) const = 0;
 
     /**
      * If supported, this method returns the timestamp value for the earliest storage engine
@@ -720,49 +648,15 @@ public:
      *
      * Unsupported RecordStores return the OplogOperationUnsupported error code.
      */
-    virtual StatusWith<Timestamp> getEarliestOplogTimestamp(RecoveryUnit& ru) {
-        return Status(ErrorCodes::OplogOperationUnsupported,
-                      "The current storage engine doesn't support an optimized implementation for "
-                      "getting the earliest oplog timestamp.");
-    }
+    virtual StatusWith<Timestamp> getEarliestTimestamp(RecoveryUnit&) = 0;
 
-protected:
-    // Functions derived classes need to override to implement this interface. Any write needs to be
-    // first checked so we are not in read only mode in this base class and then redirected to the
-    // derived class if allowed to perform the write.
-    virtual void doDeleteRecord(OperationContext* opCtx, const RecordId& dl) = 0;
-    virtual Status doInsertRecords(OperationContext* opCtx,
-                                   std::vector<Record>* inOutRecords,
-                                   const std::vector<Timestamp>& timestamps) = 0;
-    virtual Status doUpdateRecord(OperationContext* opCtx,
-                                  const RecordId& recordId,
-                                  const char* data,
-                                  int len) = 0;
-    virtual StatusWith<RecordData> doUpdateWithDamages(OperationContext* opCtx,
-                                                       const RecordId& loc,
-                                                       const RecordData& oldRec,
-                                                       const char* damageSource,
-                                                       const DamageVector& damages) = 0;
-    virtual Status doTruncate(OperationContext* opCtx) = 0;
-    virtual Status doRangeTruncate(OperationContext* opCtx,
-                                   const RecordId& minRecordId,
-                                   const RecordId& maxRecordId,
-                                   int64_t hintDataSizeDiff,
-                                   int64_t hintNumRecordsDiff) = 0;
-    virtual void doCappedTruncateAfter(OperationContext* opCtx,
-                                       const RecordId& end,
-                                       bool inclusive,
-                                       const AboutToDeleteRecordCallback& aboutToDelete) = 0;
-
-    virtual StatusWith<int64_t> doCompact(OperationContext* opCtx, const CompactOptions& options) {
-        MONGO_UNREACHABLE;
-    }
-
-    std::shared_ptr<Ident> _ident;
-
-    boost::optional<UUID> _uuid;
-
-    std::shared_ptr<CappedInsertNotifier> _cappedInsertNotifier;
+    /**
+     * Returns a shared reference to the oplog truncate markers to allow the caller to wait
+     * for a deletion request.
+     * This should only be called if StorageEngine::supportsOplogTruncateMarkers() is true.
+     * Storage engines supporting oplog truncate markers must implement this function.
+     */
+    virtual std::shared_ptr<CollectionTruncateMarkers> getCollectionTruncateMarkers() = 0;
 };
 
 }  // namespace mongo

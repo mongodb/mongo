@@ -2481,7 +2481,7 @@ void establishOplogRecordStoreForLogging(OperationContext* opCtx, RecordStore* r
 void signalOplogWaiters() {
     const auto& oplog = LocalOplogInfo::get(getGlobalServiceContext())->getRecordStore();
     if (oplog) {
-        oplog->getCappedInsertNotifier()->notifyAll();
+        oplog->capped()->getInsertNotifier()->notifyAll();
     }
 }
 

@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-WiredTigerOplogData::WiredTigerOplogData(const WiredTigerRecordStore::Params& params)
+WiredTigerOplogData::WiredTigerOplogData(const WiredTigerRecordStore::Oplog::Params& params)
     : _maxSize(params.oplogMaxSize) {
     invariant(_maxSize.load());
 }

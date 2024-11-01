@@ -828,6 +828,7 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
         ASSERT(collectionRs);
 
         CollectionOptions options;
+        options.uuid = UUID::gen();
         options.capped = true;
         options.cappedSize = 10240;
         options.cappedMaxDocs = -1;

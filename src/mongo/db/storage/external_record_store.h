@@ -64,8 +64,27 @@ public:
         return "external";
     }
 
-    bool isTemp() const {
+    boost::optional<UUID> uuid() const final {
+        return boost::none;
+    }
+
+    bool isTemp() const final {
         return true;
+    }
+
+    std::shared_ptr<Ident> getSharedIdent() const final {
+        unimplementedTasserted();
+        return nullptr;
+    }
+
+    const std::string& getIdent() const final {
+        unimplementedTasserted();
+        static std::string ident;
+        return ident;
+    }
+
+    void setIdent(std::shared_ptr<Ident>) final {
+        unimplementedTasserted();
     }
 
     KeyFormat keyFormat() const final {
@@ -84,13 +103,61 @@ public:
         return 0LL;
     }
 
+    int64_t freeStorageSize(RecoveryUnit&) const final {
+        return 0ULL;
+    }
+
+    RecordData dataFor(OperationContext*, const RecordId&) const final {
+        unimplementedTasserted();
+        return {};
+    }
+
     bool findRecord(OperationContext*, const RecordId&, RecordData*) const final {
         unimplementedTasserted();
         return false;
     }
 
+    void deleteRecord(OperationContext* opCtx, const RecordId& dl) final {
+        unimplementedTasserted();
+    }
+
+    Status insertRecords(OperationContext*,
+                         std::vector<Record>*,
+                         const std::vector<Timestamp>&) final {
+        unimplementedTasserted();
+        return {ErrorCodes::Error::UnknownError, "Unknown error"};
+    }
+
+    StatusWith<RecordId> insertRecord(OperationContext*,
+                                      const char* data,
+                                      int len,
+                                      Timestamp) final {
+        unimplementedTasserted();
+        return {ErrorCodes::Error::UnknownError, "Unknown error"};
+    }
+
+    StatusWith<RecordId> insertRecord(
+        OperationContext*, const RecordId&, const char* data, int len, Timestamp) final {
+        unimplementedTasserted();
+        return {ErrorCodes::Error::UnknownError, "Unknown error"};
+    }
+
+    Status updateRecord(OperationContext*, const RecordId&, const char* data, int len) final {
+        unimplementedTasserted();
+        return {ErrorCodes::Error::UnknownError, "Unknown error"};
+    }
+
     bool updateWithDamagesSupported() const final {
         return false;
+    }
+
+    StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
+                                             const RecordId& loc,
+                                             const RecordData& oldRec,
+                                             const char* damageSource,
+                                             const DamageVector& damages) final {
+        unimplementedTasserted();
+        return {ErrorCodes::Error::UnknownError, "Unknown error"};
     }
 
     void printRecordMetadata(OperationContext*,
@@ -107,68 +174,56 @@ public:
         return nullptr;
     }
 
-    void appendNumericCustomStats(RecoveryUnit& ru, BSONObjBuilder*, double) const final {}
+    Status truncate(OperationContext*) final {
+        unimplementedTasserted();
+        return {ErrorCodes::Error::UnknownError, "Unknown error"};
+    }
+
+    Status rangeTruncate(OperationContext*,
+                         const RecordId& minRecordId = RecordId(),
+                         const RecordId& maxRecordId = RecordId(),
+                         int64_t hintDataSizeIncrement = 0,
+                         int64_t hintNumRecordsIncrement = 0) final {
+        unimplementedTasserted();
+        return {ErrorCodes::Error::UnknownError, "Unknown error"};
+    }
+
+    bool compactSupported() const final {
+        return false;
+    }
+
+    StatusWith<int64_t> compact(OperationContext*, const CompactOptions&) final {
+        unimplementedTasserted();
+        return {ErrorCodes::Error::UnknownError, "Unknown error"};
+    }
+
+    void validate(RecoveryUnit&, bool full, ValidateResults*) final {
+        unimplementedTasserted();
+    }
+
+    void appendNumericCustomStats(RecoveryUnit&, BSONObjBuilder*, double) const final {}
+
+    void appendAllCustomStats(RecoveryUnit&, BSONObjBuilder*, double scale) const final {}
+
+    RecordId getLargestKey(OperationContext*) const final {
+        unimplementedTasserted();
+        return {};
+    }
+
+    void reserveRecordIds(OperationContext*, std::vector<RecordId>*, size_t numRecords) final {
+        unimplementedTasserted();
+    }
 
     void updateStatsAfterRepair(long long numRecords, long long dataSize) final {
         unimplementedTasserted();
     }
 
-protected:
-    void doDeleteRecord(OperationContext*, const RecordId&) final {
-        unimplementedTasserted();
+    RecordStore::Capped* capped() final {
+        return nullptr;
     }
 
-    Status doInsertRecords(OperationContext*,
-                           std::vector<Record>*,
-                           const std::vector<Timestamp>&) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
-
-    Status doUpdateRecord(OperationContext*, const RecordId&, const char*, int) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
-
-    StatusWith<RecordData> doUpdateWithDamages(OperationContext*,
-                                               const RecordId&,
-                                               const RecordData&,
-                                               const char*,
-                                               const DamageVector&) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
-
-    Status doTruncate(OperationContext* opCtx) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
-
-    Status doRangeTruncate(OperationContext* opCtx,
-                           const RecordId& minRecordId,
-                           const RecordId& maxRecordId,
-                           int64_t hintDataSizeIncrement,
-                           int64_t hintNumRecordsIncrement) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
-
-    void doCappedTruncateAfter(OperationContext*,
-                               const RecordId&,
-                               bool,
-                               const AboutToDeleteRecordCallback&) final {
-        unimplementedTasserted();
-    }
-
-    RecordId getLargestKey(OperationContext* opCtx) const final {
-        unimplementedTasserted();
-        return RecordId();
-    }
-
-    void reserveRecordIds(OperationContext* opCtx,
-                          std::vector<RecordId>* out,
-                          size_t nRecords) final {
-        unimplementedTasserted();
+    RecordStore::Oplog* oplog() final {
+        return nullptr;
     }
 
 private:

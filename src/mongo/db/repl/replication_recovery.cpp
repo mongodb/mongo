@@ -923,7 +923,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
                                                        truncateAfterOplogEntryTs);
         }
     }
-    oplogCollection->getRecordStore()->cappedTruncateAfter(
+    oplogCollection->getRecordStore()->capped()->truncateAfter(
         opCtx, truncateAfterRecordId, false /*inclusive*/, nullptr /* aboutToDelete callback */);
 
     LOGV2(21554,

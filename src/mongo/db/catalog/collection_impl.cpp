@@ -336,8 +336,8 @@ CollectionImpl::SharedState::~SharedState() {
     // The record store will be null when the collection is instantiated as part of the repair path.
     // The repair path intentionally doesn't create a record store because it directly accesses the
     // underlying storage engine.
-    if (_recordStore && _recordStore->getCappedInsertNotifier()) {
-        _recordStore->getCappedInsertNotifier()->kill();
+    if (_recordStore && _recordStore->capped()) {
+        _recordStore->capped()->getInsertNotifier()->kill();
     }
 }
 
@@ -821,7 +821,7 @@ bool CollectionImpl::isCappedAndNeedsDelete(OperationContext* opCtx) const {
         return false;
     }
 
-    if (ns().isOplog() && getRecordStore()->selfManagedOplogTruncation()) {
+    if (getRecordStore()->oplog() && getRecordStore()->oplog()->selfManagedTruncation()) {
         // Storage engines can choose to manage oplog truncation internally.
         return false;
     }
@@ -1009,7 +1009,7 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
     }
 
     if (ns().isOplog() && newCappedSize) {
-        Status status = _shared->_recordStore->updateOplogSize(*newCappedSize);
+        Status status = _shared->_recordStore->oplog()->updateSize(*newCappedSize);
         if (!status.isOK()) {
             return status;
         }
@@ -1111,7 +1111,7 @@ std::vector<RecordId> CollectionImpl::reserveCappedRecordIds(OperationContext* o
     // in the process of committing uncommitted records.
     auto cappedObserver = getCappedVisibilityObserver();
     cappedObserver->registerWriter(shard_role_details::getRecoveryUnit(opCtx), [this]() {
-        _shared->_recordStore->notifyCappedWaitersIfNeeded();
+        _shared->_recordStore->capped()->notifyWaitersIfNeeded();
     });
 
     std::vector<RecordId> ids;

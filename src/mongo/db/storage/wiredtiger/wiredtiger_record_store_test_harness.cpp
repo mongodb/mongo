@@ -114,7 +114,6 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     WiredTigerRecordStore::Params params;
     params.ident = ident.toString();
     params.engineName = std::string{kWiredTigerEngineName};
-    params.isCapped = collOptions.capped ? true : false;
     params.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
     params.overwrite = collOptions.clusteredIndex ? false : true;
     params.isEphemeral = false;
@@ -124,18 +123,16 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = collOptions.timeseries != boost::none;
 
-    auto ret = std::make_unique<WiredTigerRecordStore>(
+    return std::make_unique<WiredTigerRecordStore>(
         &_engine,
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
         params);
-    ret->postConstructorInit(opCtx.get());
-    return std::move(ret);
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
     auto ret = newOplogRecordStoreNoInit();
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    dynamic_cast<WiredTigerRecordStore*>(ret.get())->postConstructorInit(opCtx.get());
+    dynamic_cast<WiredTigerRecordStore::Oplog*>(ret.get())->postConstructorInit(opCtx.get());
     return ret;
 }
 
@@ -169,24 +166,18 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
         txn.commit();
     }
 
-    WiredTigerRecordStore::Params params;
-    params.ident = ident;
-    params.engineName = std::string{kWiredTigerEngineName};
-    params.isCapped = true;
-    params.keyFormat = KeyFormat::Long;
-    params.overwrite = true;
-    params.isEphemeral = false;
-    params.isLogged = true;
-    params.isChangeCollection = false;
-    // Large enough not to exceed capped limits.
-    params.oplogMaxSize = 1024 * 1024 * 1024;
-    params.sizeStorer = nullptr;
-    params.tracksSizeAdjustments = true;
-    params.forceUpdateWithFullDocument = false;
-    return std::make_unique<WiredTigerRecordStore>(
+    return std::make_unique<WiredTigerRecordStore::Oplog>(
         &_engine,
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
-        params);
+        WiredTigerRecordStore::Oplog::Params{.uuid = UUID::gen(),
+                                             .ident = ident,
+                                             .engineName = std::string{kWiredTigerEngineName},
+                                             .isEphemeral = false,
+                                             // Large enough not to exceed capped limits.
+                                             .oplogMaxSize = 1024 * 1024 * 1024,
+                                             .sizeStorer = nullptr,
+                                             .tracksSizeAdjustments = true,
+                                             .forceUpdateWithFullDocument = false});
 }
 
 std::unique_ptr<RecoveryUnit> WiredTigerHarnessHelper::newRecoveryUnit() {

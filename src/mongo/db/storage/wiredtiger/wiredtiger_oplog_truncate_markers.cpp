@@ -50,7 +50,7 @@ const double kNumMSInHour = 1000 * 60 * 60;
 std::shared_ptr<WiredTigerOplogTruncateMarkers>
 WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(OperationContext* opCtx,
                                                            WiredTigerRecordStore* rs) {
-    long long maxSize = rs->getOplogMaxSize();
+    long long maxSize = checked_cast<WiredTigerRecordStore::Oplog*>(rs->oplog())->getMaxSize();
     invariant(maxSize > 0);
     invariant(rs->keyFormat() == KeyFormat::Long);
 
@@ -215,7 +215,7 @@ bool WiredTigerOplogTruncateMarkers::_hasExcessMarkers(OperationContext* opCtx) 
     }
 
     // check that oplog truncate markers is at capacity
-    if (totalBytes <= _rs->getOplogMaxSize()) {
+    if (totalBytes <= checked_cast<WiredTigerRecordStore::Oplog*>(_rs->oplog())->getMaxSize()) {
         return false;
     }
 

@@ -134,7 +134,6 @@ public:
         WiredTigerRecordStore::Params params;
         params.ident = ident;
         params.engineName = std::string{kWiredTigerEngineName};
-        params.isCapped = false;
         params.keyFormat = KeyFormat::Long;
         params.overwrite = true;
         params.isEphemeral = false;
@@ -148,7 +147,6 @@ public:
             &_engine,
             WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
             params);
-        ret->postConstructorInit(opCtx);
         return std::move(ret);
     }
 
