@@ -1592,6 +1592,16 @@ void LogRetryableApplyOpsForShardingHandler::commit(OperationContext* opCtx,
     for (const auto& nss : _namespaces) {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
+
+        // For vectored inserts an applyOps entry will only affect a single namespace that is still
+        // under a WUOW, so we should be holding an IX lock on it. Other affected namespaces should
+        // be skipped since they were handled already in one of LogInsertForShardingHandler,
+        // LogUpdateForShardingHandler, LogDeleteForShardingHandler, or a previous invocation of
+        // LogRetryableApplyOpsForShardingHandler.
+        if (!shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX)) {
+            continue;
+        }
+
         const auto scopedCss =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
 
