@@ -12,6 +12,8 @@ selector:
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
+    # These tests move chunks, and they expect the balancer to be disabled.
+    - jstests/core_sharding/chunk_migration/*.js
     # These tests are run in sharded_jscore_txns.
     - jstests/core/txns/**/*.js
     # The following tests fail because a certain command or functionality is not supported on

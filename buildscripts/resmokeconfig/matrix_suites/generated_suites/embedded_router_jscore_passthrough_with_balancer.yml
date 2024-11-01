@@ -46,6 +46,7 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
+    - jstests/core_sharding/chunk_migration/*.js
     - jstests/core/txns/**/*.js
     - jstests/core/query/map_reduce/*.js
     - jstests/core/**/apitest_db.js

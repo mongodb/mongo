@@ -7,6 +7,8 @@ selector:
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
+    # These tests use chunk migration, and they expect the balancer to be disabled.
+    - jstests/core_sharding/chunk_migration/*.js
     # These tests are run in sharded_jscore_txns.
     - jstests/core/txns/**/*.js
     # TODO SERVER-87108 re-enable all map reduce tests
