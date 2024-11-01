@@ -333,7 +333,8 @@ public:
         BSONObj request;
         RemoteCommandResponse response;
     };
-    HelloData waitForHello() {
+
+    virtual HelloData waitForHello() {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _helloCondVar.wait(lk, [this] { return _helloResult != boost::none; });
 
@@ -397,6 +398,7 @@ private:
         NetworkInterfaceTest* _parent;
     };
 
+protected:
     stdx::mutex _mutex;
     stdx::condition_variable _helloCondVar;
     boost::optional<HelloData> _helloResult;
@@ -418,6 +420,15 @@ public:
 
     Interruptible* interruptible() override {
         return _opCtx.get();
+    }
+
+    HelloData waitForHello() override {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        auto clockSource = _serviceContext->getPreciseClockSource();
+        Waitable::wait(
+            _baton.get(), clockSource, _helloCondVar, lk, [&] { return _helloResult.has_value(); });
+
+        return std::move(*_helloResult);
     }
 
 private:
