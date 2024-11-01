@@ -543,6 +543,7 @@ void SessionCatalogMigrationSource::_extractOplogEntriesForRetryableApplyOps(
     auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(applyOpsOplogEntry.getObject());
     auto unrolledOp =
         uassertStatusOK(repl::MutableOplogEntry::parse(applyOpsOplogEntry.getEntry().toBSON()));
+    unrolledOp.setMultiOpType(boost::none);
 
     for (const auto& innerOp : applyOpsInfo.getOperations()) {
         auto replOp = repl::ReplOperation::parse(

@@ -181,44 +181,88 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
     return writerVectors;
 }
 
+struct SessionOpsList {
+    TxnNumber txnNum = kUninitializedTxnNumber;
+    std::vector<const repl::OplogEntry*> ops;
+};
+
+void updateSessionTracker(LogicalSessionIdMap<SessionOpsList>& sessionTracker,
+                          const repl::OplogEntry* op) {
+    uassert(9572401,
+            str::stream() << "Missing sessionId for oplog entry: "
+                          << redact(op->toBSONForLogging()),
+            op->getSessionId());
+    uassert(4990700,
+            str::stream() << "Missing txnNumber for oplog entry with lsid: "
+                          << redact(op->toBSONForLogging()),
+            op->getTxnNumber());
+
+    const auto& lsid = *op->getSessionId();
+    auto txnNumber = *op->getTxnNumber();
+
+    auto& retryableOpList = sessionTracker[lsid];
+    if (txnNumber == retryableOpList.txnNum) {
+        retryableOpList.ops.emplace_back(op);
+    } else if (txnNumber > retryableOpList.txnNum) {
+        retryableOpList.ops = {op};
+        retryableOpList.txnNum = txnNumber;
+    } else {
+        uasserted(4990401,
+                  str::stream() << "Encountered out of order txnNumbers; batch had "
+                                << redact(op->toBSONForLogging()) << " after "
+                                << redact(retryableOpList.ops.back()->toBSONForLogging()));
+    }
+}
+
+void unrollApplyOpsAndUpdateSessionTracker(LogicalSessionIdMap<SessionOpsList>& sessionTracker,
+                                           std::list<repl::OplogEntry>& derivedOps,
+                                           const repl::OplogEntry& op,
+                                           const LogicalSessionId& lsid,
+                                           TxnNumber txnNumber) {
+    auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(op.getObject());
+    uassert(ErrorCodes::OplogOperationUnsupported,
+            str::stream() << "Commands within applyOps are not supported during resharding: "
+                          << redact(op.toBSONForLogging()),
+            applyOpsInfo.areOpsCrudOnly());
+
+    auto unrolledOp = uassertStatusOK(repl::MutableOplogEntry::parse(op.getEntry().toBSON()));
+    unrolledOp.setSessionId(lsid);
+    unrolledOp.setTxnNumber(txnNumber);
+    unrolledOp.setMultiOpType(boost::none);
+
+    for (const auto& innerOp : applyOpsInfo.getOperations()) {
+        auto replOp = repl::ReplOperation::parse(
+            IDLParserContext{"unrollApplyOpsAndUpdateSessionTracker innerOp"}, innerOp);
+        if (replOp.getStatementIds().empty()) {
+            // Skip this operation since it is not retryable.
+            continue;
+        }
+        unrolledOp.setDurableReplOperation(replOp);
+
+        // There isn't a direct way to convert from a MutableOplogEntry to a
+        // DurableOplogEntry or OplogEntry. We serialize the unrolledOp to have it get
+        // re-parsed into an OplogEntry.
+        auto& derivedOp = derivedOps.emplace_back(unrolledOp.toBSON());
+        invariant(derivedOp.isCrudOpType() ||
+                  isWouldChangeOwningShardSentinelOplogEntry(unrolledOp));
+
+        // `&derivedOp` is guaranteed to remain stable while we append more derived
+        // oplog entries because `derivedOps` is a std::list.
+        updateSessionTracker(sessionTracker, &derivedOp);
+    }
+}
+
 WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
     const OplogBatchToPrepare& batch, std::list<OplogEntry>& derivedOps) const {
     auto writerVectors = _makeEmptyWriterVectors();
 
-    struct SessionOpsList {
-        TxnNumber txnNum = kUninitializedTxnNumber;
-        std::vector<const OplogEntry*> ops;
-    };
-
     LogicalSessionIdMap<SessionOpsList> sessionTracker;
-
-    auto updateSessionTracker = [&](const OplogEntry* op) {
-        if (const auto& lsid = op->getSessionId()) {
-            uassert(4990700,
-                    str::stream() << "Missing txnNumber for oplog entry with lsid: "
-                                  << redact(op->toBSONForLogging()),
-                    op->getTxnNumber());
-
-            auto txnNumber = *op->getTxnNumber();
-
-            auto& retryableOpList = sessionTracker[*lsid];
-            if (txnNumber == retryableOpList.txnNum) {
-                retryableOpList.ops.emplace_back(op);
-            } else if (txnNumber > retryableOpList.txnNum) {
-                retryableOpList.ops = {op};
-                retryableOpList.txnNum = txnNumber;
-            } else {
-                uasserted(4990401,
-                          str::stream() << "Encountered out of order txnNumbers; batch had "
-                                        << redact(op->toBSONForLogging()) << " after "
-                                        << redact(retryableOpList.ops.back()->toBSONForLogging()));
-            }
-        }
-    };
 
     for (auto& op : batch) {
         if (op.isCrudOpType()) {
-            updateSessionTracker(&op);
+            if (op.getSessionId()) {
+                updateSessionTracker(sessionTracker, &op);
+            }
         } else if (op.isCommand()) {
             throwIfUnsupportedCommandOp(op);
 
@@ -226,49 +270,20 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
                 continue;
             }
 
-            auto sessionId = *op.getSessionId();
+            const auto& sessionId = *op.getSessionId();
 
-            if (isInternalSessionForRetryableWrite(sessionId) &&
-                op.getCommandType() == OplogEntry::CommandType::kApplyOps) {
-                // Derive retryable write CRUD oplog entries from this retryable internal
-                // transaction applyOps oplog entry.
-
-                auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(op.getObject());
-                uassert(ErrorCodes::OplogOperationUnsupported,
-                        str::stream()
-                            << "Commands within applyOps are not supported during resharding: "
-                            << redact(op.toBSONForLogging()),
-                        applyOpsInfo.areOpsCrudOnly());
-
-                auto unrolledOp =
-                    uassertStatusOK(repl::MutableOplogEntry::parse(op.getEntry().toBSON()));
-                unrolledOp.setSessionId(*getParentSessionId(sessionId));
-                unrolledOp.setTxnNumber(*sessionId.getTxnNumber());
-
-                for (const auto& innerOp : applyOpsInfo.getOperations()) {
-                    auto replOp = repl::ReplOperation::parse(
-                        IDLParserContext{
-                            "ReshardingOplogBatchPreparer::makeSessionOpWriterVectors innerOp"},
-                        innerOp);
-                    if (replOp.getStatementIds().empty()) {
-                        // Skip this operation since it is not retryable.
-                        continue;
-                    }
-                    unrolledOp.setDurableReplOperation(replOp);
-
-                    // There isn't a direct way to convert from a MutableOplogEntry to a
-                    // DurableOplogEntry or OplogEntry. We serialize the unrolledOp to have it get
-                    // re-parsed into an OplogEntry.
-                    auto& derivedOp = derivedOps.emplace_back(unrolledOp.toBSON());
-                    invariant(derivedOp.isCrudOpType() ||
-                              isWouldChangeOwningShardSentinelOplogEntry(unrolledOp));
-
-                    // `&derivedOp` is guaranteed to remain stable while we append more derived
-                    // oplog entries because `derivedOps` is a std::list.
-                    updateSessionTracker(&derivedOp);
-                }
+            if (op.getMultiOpType() == repl::MultiOplogEntryType::kApplyOpsAppliedSeparately) {
+                unrollApplyOpsAndUpdateSessionTracker(
+                    sessionTracker, derivedOps, op, sessionId, *op.getTxnNumber());
+            } else if (isInternalSessionForRetryableWrite(sessionId) &&
+                       op.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+                unrollApplyOpsAndUpdateSessionTracker(sessionTracker,
+                                                      derivedOps,
+                                                      op,
+                                                      *getParentSessionId(sessionId),
+                                                      *sessionId.getTxnNumber());
             } else {
-                updateSessionTracker(&op);
+                updateSessionTracker(sessionTracker, &op);
             }
         } else {
             invariant(repl::OpTypeEnum::kNoop == op.getOpType());
