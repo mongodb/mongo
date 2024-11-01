@@ -748,7 +748,7 @@ def clean_bazel_sandbox():
             text=True,
             capture_output=True,
         )
-        bazel_sandbox_dir = proc.stdout + "/sandbox"
+        bazel_sandbox_dir = proc.stdout.strip() + "/sandbox"
         print(f"Cleaning bazel sandbox directory: {bazel_sandbox_dir}")
         shutil.rmtree(bazel_sandbox_dir, ignore_errors=True)
 
