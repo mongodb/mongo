@@ -36,6 +36,14 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 
+namespace mongo::unittest {
+template <typename T>
+T* get_if(boost::optional<T>* opt) {
+    return opt ? &**opt : nullptr;
+}
+}  // namespace mongo::unittest
+
+
 #define ASSERT_SDI_INSERT_OK(EXPR)                  \
     {                                               \
         auto result = EXPR;                         \
@@ -44,11 +52,13 @@
         ASSERT_OK(*status);                         \
     }
 
-#define ASSERT_SDI_INSERT_DUPLICATE_KEY(EXPR, KEY, ID)                            \
-    {                                                                             \
-        auto result = EXPR;                                                       \
-        auto duplicate = std::get_if<SortedDataInterface::DuplicateKey>(&result); \
-        ASSERT(duplicate);                                                        \
-        ASSERT_BSONOBJ_EQ(duplicate->key, KEY);                                   \
-        ASSERT_EQ(duplicate->id, ID);                                             \
+#define ASSERT_SDI_INSERT_DUPLICATE_KEY(EXPR, KEY, ID)                       \
+    {                                                                        \
+        using std::get_if;                                                   \
+        using mongo::unittest::get_if;                                       \
+        auto result = EXPR;                                                  \
+        auto duplicate = get_if<SortedDataInterface::DuplicateKey>(&result); \
+        ASSERT(duplicate);                                                   \
+        ASSERT_BSONOBJ_EQ(duplicate->key, KEY);                              \
+        ASSERT_EQ(duplicate->id, ID);                                        \
     }

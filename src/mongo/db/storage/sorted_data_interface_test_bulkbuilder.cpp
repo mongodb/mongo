@@ -38,7 +38,6 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -63,7 +62,7 @@ TEST(SortedDataInterface, BuilderAddKey) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
         txn.commit();
     }
 
@@ -96,7 +95,7 @@ TEST(SortedDataInterface, BuilderAddKeyString) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(keyString1.getValueCopy()));
+        ASSERT_FALSE(builder->addKey(keyString1.getValueCopy()));
         txn.commit();
     }
 
@@ -127,7 +126,7 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdLong) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
         txn.commit();
     }
 
@@ -155,7 +154,7 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
         txn.commit();
     }
 
@@ -184,7 +183,7 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
             builder->addKey(makeKeyString(sorted.get(), key1, loc2)), key1, boost::none);
         txn.commit();
@@ -222,7 +221,7 @@ TEST(SortedDataInterface, BuilderAddSameKeyString) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(keyStringLoc1.getValueCopy()));
+        ASSERT_FALSE(builder->addKey(keyStringLoc1.getValueCopy()));
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
             builder->addKey(keyStringLoc2.getValueCopy()), key1, boost::none);
         txn.commit();
@@ -253,8 +252,8 @@ TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
         txn.commit();
     }
 
@@ -290,8 +289,8 @@ TEST(SortedDataInterface, BuilderAddSameKeyStringWithDupsAllowed) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(keyStringLoc1.getValueCopy()));
-        ASSERT_SDI_INSERT_OK(builder->addKey(keyStringLoc2.getValueCopy()));
+        ASSERT_FALSE(builder->addKey(keyStringLoc1.getValueCopy()));
+        ASSERT_FALSE(builder->addKey(keyStringLoc2.getValueCopy()));
         txn.commit();
     }
 
@@ -319,9 +318,9 @@ TEST(SortedDataInterface, BuilderAddMultipleKeys) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key2, loc2)));
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key3, loc3)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key2, loc2)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key3, loc3)));
         txn.commit();
     }
 
@@ -358,9 +357,9 @@ TEST(SortedDataInterface, BuilderAddMultipleKeyStrings) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(keyString1.getValueCopy()));
-        ASSERT_SDI_INSERT_OK(builder->addKey(keyString2.getValueCopy()));
-        ASSERT_SDI_INSERT_OK(builder->addKey(keyString3.getValueCopy()));
+        ASSERT_FALSE(builder->addKey(keyString1.getValueCopy()));
+        ASSERT_FALSE(builder->addKey(keyString2.getValueCopy()));
+        ASSERT_FALSE(builder->addKey(keyString3.getValueCopy()));
         txn.commit();
     }
 
@@ -388,11 +387,11 @@ TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1b, loc2)));
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1c, loc4)));
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey2b, loc3)));
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey3a, loc5)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey1b, loc2)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey1c, loc4)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey2b, loc3)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), compoundKey3a, loc5)));
         txn.commit();
     }
 

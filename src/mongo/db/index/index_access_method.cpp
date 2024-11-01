@@ -941,9 +941,6 @@ public:
                         bool dupsAllowed,
                         const RecordIdHandlerFn& onDuplicateRecord);
 
-    std::variant<Status, SortedDataInterface::DuplicateKey> insertKey(
-        std::unique_ptr<SortedDataBuilderInterface>& inserter, const Sorter::Data& data);
-
     Status keyCommitted(const KeyHandlerFn& onDuplicateKeyInserted,
                         const Sorter::Data& data,
                         bool isDup);
@@ -1176,12 +1173,6 @@ bool SortedDataIndexAccessMethod::BulkBuilderImpl::duplicateCheck(
         uassertStatusOK(_iam->_handleDuplicateKey(opCtx, entry, data.first, onDuplicateRecord));
     }
     return isDup;
-}
-
-std::variant<Status, SortedDataInterface::DuplicateKey>
-SortedDataIndexAccessMethod::BulkBuilderImpl::insertKey(
-    std::unique_ptr<SortedDataBuilderInterface>& inserter, const Sorter::Data& data) {
-    return inserter->addKey(data.first);
 }
 
 Status SortedDataIndexAccessMethod::BulkBuilderImpl::keyCommitted(

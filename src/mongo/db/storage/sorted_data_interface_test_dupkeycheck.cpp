@@ -43,6 +43,15 @@
 namespace mongo {
 namespace {
 
+bool dupKeyCheck(SortedDataInterface& sorted,
+                 OperationContext* opCtx,
+                 const key_string::Value& keyString) {
+    return sorted.dupKeyCheck(opCtx, SortedDataKeyValueView::fromValue(keyString)).has_value();
+}
+bool dupKeyCheck(SortedDataInterface& sorted, OperationContext* opCtx, BSONObj bsonKey) {
+    return dupKeyCheck(sorted, opCtx, makeKeyString(&sorted, bsonKey));
+}
+
 // Insert a key and verify that dupKeyCheck() returns a non-OK status for
 // the same key. When dupKeyCheck() is called with the exact (key, RecordId)
 // pair that was inserted, it should still return an OK status.
@@ -77,7 +86,7 @@ TEST(SortedDataInterface, DupKeyCheckAfterInsert) {
         {
             auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
             StorageWriteTransaction txn(ru);
-            ASSERT_FALSE(sorted->dupKeyCheck(opCtx.get(), makeKeyString(sorted.get(), key1)));
+            ASSERT_FALSE(dupKeyCheck(*sorted, opCtx.get(), key1));
             txn.commit();
         }
     }
@@ -116,7 +125,7 @@ TEST(SortedDataInterface, DupKeyCheckAfterInsertKeyString) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_FALSE(sorted->dupKeyCheck(opCtx.get(), keyString1WithoutRecordId));
+        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx.get(), keyString1WithoutRecordId));
     }
 }
 
@@ -134,7 +143,7 @@ TEST(SortedDataInterface, DupKeyCheckEmpty) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_FALSE(sorted->dupKeyCheck(opCtx.get(), makeKeyString(sorted.get(), key1)));
+        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx.get(), key1));
     }
 }
 
@@ -154,7 +163,7 @@ TEST(SortedDataInterface, DupKeyCheckEmptyKeyString) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_FALSE(sorted->dupKeyCheck(opCtx.get(), keyString1WithoutRecordId));
+        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx.get(), keyString1WithoutRecordId));
     }
 }
 
@@ -191,7 +200,7 @@ TEST(SortedDataInterface, DupKeyCheckWhenDiskLocBefore) {
         {
             auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
             StorageWriteTransaction txn(ru);
-            ASSERT_FALSE(sorted->dupKeyCheck(opCtx.get(), makeKeyString(sorted.get(), key1)));
+            ASSERT_FALSE(dupKeyCheck(*sorted, opCtx.get(), key1));
             txn.commit();
         }
     }
@@ -230,7 +239,7 @@ TEST(SortedDataInterface, DupKeyCheckWhenDiskLocAfter) {
         {
             auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
             StorageWriteTransaction txn(ru);
-            ASSERT_FALSE(sorted->dupKeyCheck(opCtx.get(), makeKeyString(sorted.get(), key1)));
+            ASSERT_FALSE(dupKeyCheck(*sorted, opCtx.get(), key1));
             txn.commit();
         }
     }
@@ -257,7 +266,7 @@ TEST(SortedDataInterface, DupKeyCheckWithDuplicates) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
-        ASSERT_TRUE(sorted->dupKeyCheck(opCtx.get(), makeKeyString(sorted.get(), key1)));
+        ASSERT_TRUE(dupKeyCheck(*sorted, opCtx.get(), key1));
     }
 }
 
@@ -284,7 +293,7 @@ TEST(SortedDataInterface, DupKeyCheckWithDuplicateKeyStrings) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
-        ASSERT_TRUE(sorted->dupKeyCheck(opCtx.get(), keyString1WithoutRecordId));
+        ASSERT_TRUE(dupKeyCheck(*sorted, opCtx.get(), keyString1WithoutRecordId));
     }
 }
 
@@ -317,7 +326,7 @@ TEST(SortedDataInterface, DupKeyCheckWithDeletedFirstEntry) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
-        ASSERT_FALSE(sorted->dupKeyCheck(opCtx.get(), makeKeyString(sorted.get(), key1)));
+        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx.get(), key1));
     }
 }
 
@@ -349,7 +358,7 @@ TEST(SortedDataInterface, DupKeyCheckWithDeletedSecondEntry) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
-        ASSERT_FALSE(sorted->dupKeyCheck(opCtx.get(), makeKeyString(sorted.get(), key1)));
+        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx.get(), key1));
     }
 }
 

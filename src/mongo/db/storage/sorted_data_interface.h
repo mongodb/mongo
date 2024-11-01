@@ -127,14 +127,14 @@ public:
                                               StringData keyString) const = 0;
 
     /**
-     * Return duplicate key information if there is more than one occurence of 'KeyString' in this
+     * Return duplicate key information if there is more than one occurrence of 'KeyString' in this
      * index, or boost::none otherwise. This call is only allowed on a unique index, and will fail
      * an invariant otherwise.
      *
      * @param opCtx the transaction under which this operation takes place
      */
     virtual boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
-                                                      const key_string::Value& keyString) = 0;
+                                                      const SortedDataKeyValueView& keyString) = 0;
 
     /**
      * Attempt to reduce the storage space used by this index via compaction. Only called if the
@@ -447,7 +447,7 @@ public:
      * transactionally. Other storage engines do not perform inserts transactionally and will ignore
      * any parent WriteUnitOfWork.
      */
-    virtual std::variant<Status, SortedDataInterface::DuplicateKey> addKey(
+    virtual boost::optional<SortedDataInterface::DuplicateKey> addKey(
         const key_string::Value& keyString) = 0;
 };
 
@@ -483,6 +483,19 @@ public:
           _id(id) {
         invariant(ksSize > 0 && ridSize >= 0 && typeBitsSize >= 0);
         _ksOriginalSize = isRecordIdAtEndOfKeyString ? (ksSize + ridSize) : ksSize;
+    }
+
+    /**
+     * Construct a SortedDataKeyValueView which points into the given RecordData, which must outlive
+     * this view.
+     */
+    SortedDataKeyValueView(const RecordData& record, key_string::Version keyStringVersion)
+        : _version(keyStringVersion) {
+        BufReader reader(record.data(), record.size());
+        _ksOriginalSize = _ksSize = reader.read<LittleEndian<int32_t>>();
+        _ksData = static_cast<const char*>(reader.skip(_ksSize));
+        _tbSize = reader.remaining();
+        _tbData = static_cast<const char*>(reader.skip(_tbSize));
     }
 
     SortedDataKeyValueView() = default;

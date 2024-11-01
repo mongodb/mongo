@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/catalog/import_options.h"
 #include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
@@ -51,8 +52,8 @@ struct WiredTigerItem : public WT_ITEM {
         data = d;
         size = s;
     }
-    WiredTigerItem(const std::string& str) {
-        data = str.c_str();
+    WiredTigerItem(StringData str) {
+        data = str.data();
         size = str.size();
     }
     // NOTE: do not call Get() on a temporary.

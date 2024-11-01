@@ -60,7 +60,8 @@ extern FailPoint hangIndexBuildDuringBulkLoadPhaseSecond;
  *                       const RecordIdHandlerFn& onDuplicateRecord)
  *
  *   Output key to write cursor.
- *   void insertKey(Inserter& inserter, const Key& data)
+ *   boost::optional<SortedDataInterface::DuplicateKey> insertKey(Inserter& inserter,
+                                                                  const Key& data)
  *
  *  Perform finalizing steps for key.
  *  Status keyCommited(const KeyHandlerFn& onDuplicateKeyInserted, const Key& data, bool isDup)
@@ -141,23 +142,18 @@ public:
                 continue;
             }
 
-
             try {
                 writeConflictRetry(opCtx, "addingKey", _ns, [&] {
                     WriteUnitOfWork wunit(opCtx);
-                    visit(OverloadedVisitor{[](const Status& status) { uassertStatusOK(status); },
-                                            [opCtx, entry, &collection](
-                                                SortedDataInterface::DuplicateKey&& duplicate) {
-                                                uassertStatusOK(buildDupKeyErrorStatus(
-                                                    duplicate.key,
-                                                    collection->ns(),
-                                                    entry->descriptor()->indexName(),
-                                                    entry->descriptor()->keyPattern(),
-                                                    entry->descriptor()->collation(),
-                                                    std::move(duplicate.foundValue),
-                                                    std::move(duplicate.id)));
-                                            }},
-                          static_cast<T*>(this)->insertKey(builder, data));
+                    if (auto duplicate = builder->addKey(data.first)) {
+                        uassertStatusOK(buildDupKeyErrorStatus(duplicate->key,
+                                                               collection->ns(),
+                                                               entry->descriptor()->indexName(),
+                                                               entry->descriptor()->keyPattern(),
+                                                               entry->descriptor()->collation(),
+                                                               std::move(duplicate->foundValue),
+                                                               std::move(duplicate->id)));
+                    }
                     wunit.commit();
                 });
             } catch (DBException& e) {
@@ -179,8 +175,8 @@ public:
 
             {
                 stdx::unique_lock<Client> lk(*opCtx->getClient());
-                // If we're here either it's a dup and we're cool with it or the addKey went just
-                // fine.
+                // If we're here either it's a dup and we're cool with it or the addKey went
+                // just fine.
                 pm.get(lk)->hit();
             }
         }

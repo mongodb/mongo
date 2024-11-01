@@ -433,7 +433,7 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdStr) {
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
-        ASSERT_SDI_INSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
+        ASSERT_FALSE(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
         txn.commit();
     }
 

@@ -211,9 +211,9 @@ class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
 public:
     DevNullSortedDataBuilderInterface() {}
 
-    std::variant<Status, SortedDataInterface::DuplicateKey> addKey(
+    boost::optional<SortedDataInterface::DuplicateKey> addKey(
         const key_string::Value& keyString) override {
-        return Status::OK();
+        return {};
     }
 };
 
@@ -245,7 +245,7 @@ public:
                  bool dupsAllowed) override {}
 
     boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
-                                              const key_string::Value& keyString) override {
+                                              const SortedDataKeyValueView& keyString) override {
         return boost::none;
     }
 
