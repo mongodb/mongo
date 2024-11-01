@@ -526,28 +526,6 @@ server_parameters:
             gte: 1
         redact: false
 
-    maxTenantMigrationDonorServiceThreadPoolSize:
-        description: >-
-            The maximum number of threads in the tenant migration donor service's thread pool.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: maxTenantMigrationDonorServiceThreadPoolSize
-        default: 8
-        validator:
-            gte: 1
-        redact: false
-    
-    minTenantMigrationDonorServiceThreadPoolSize:
-        description: >-
-            The minimum number of threads in the tenant migration donor service's thread pool.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: minTenantMigrationDonorServiceThreadPoolSize
-        default: 0
-        validator:
-            gte: 1
-        redact: false
-
     importQuorumTimeoutSeconds:
         description: >-
             Period of time, in seconds, shard merge recipient primary will wait for import quorum to get satisfied.

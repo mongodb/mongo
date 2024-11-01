@@ -164,9 +164,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_donor_op_observer.h"
-#include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_op_observer.h"
-#include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -439,11 +437,6 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
         services.push_back(std::make_unique<MultiUpdateCoordinatorService>(serviceContext));
-    }
-
-    if (getGlobalReplSettings().isServerless()) {
-        services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
-        services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
     }
 
     if (change_stream_serverless_helpers::canInitializeServices()) {

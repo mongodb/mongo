@@ -96,8 +96,6 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_donor_service.h"
-#include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
@@ -707,13 +705,6 @@ private:
                                   const multiversion::FeatureCompatibilityVersion requestedVersion,
                                   boost::optional<Timestamp> changeTimestamp) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
-        if (!role || role->has(ClusterRole::None)) {
-            if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
-                _cancelServerlessMigrations(opCtx);
-            }
-            return;
-        }
-
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
         if (role && role->has(ClusterRole::ConfigServer)) {
@@ -1004,12 +995,6 @@ private:
     // S mode.
     void _prepareToDowngradeActions(OperationContext* opCtx) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
-        if ((!role || role->has(ClusterRole::None)) &&
-            repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
-            _cancelServerlessMigrations(opCtx);
-            return;
-        }
-
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
         if (role && role->has(ClusterRole::ConfigServer)) {
@@ -1538,28 +1523,6 @@ private:
         }
 
         hangBeforeTransitioningToDowngraded.pauseWhileSet(opCtx);
-    }
-
-    /**
-     * Abort all serverless migrations active on this node, for both donors and recipients.
-     * Called after reaching an upgrading or downgrading state for nodes with ClusterRole::None.
-     * Must only be called in serverless mode.
-     */
-    void _cancelServerlessMigrations(OperationContext* opCtx) {
-        invariant(repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless());
-        invariant(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
-                      .isUpgradingOrDowngrading());
-
-        auto donorService = checked_cast<TenantMigrationDonorService*>(
-            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                ->lookupServiceByName(TenantMigrationDonorService::kServiceName));
-        donorService->abortAllMigrations(opCtx);
-
-        auto recipientService = checked_cast<repl::TenantMigrationRecipientService*>(
-            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                ->lookupServiceByName(
-                    repl::TenantMigrationRecipientService::kTenantMigrationRecipientServiceName));
-        recipientService->abortAllMigrations(opCtx);
     }
 
     /**

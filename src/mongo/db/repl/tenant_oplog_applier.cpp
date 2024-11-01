@@ -62,7 +62,6 @@
 #include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
-#include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
@@ -493,9 +492,6 @@ bool isResumeTokenNoop(const OplogEntry& entry) {
         return false;
     }
     if (!entry.getObject().hasField("msg")) {
-        return false;
-    }
-    if (entry.getObject().getStringField("msg") != TenantMigrationRecipientService::kNoopMsg) {
         return false;
     }
     return true;

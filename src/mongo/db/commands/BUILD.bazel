@@ -482,33 +482,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "tenant_migration_donor_cmds_gen",
-    src = "tenant_migration_donor_cmds.idl",
-    deps = [
-        "//src/mongo/client:read_preference_setting_gen",
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/repl:tenant_migration_state_machine_gen",
-        "//src/mongo/db/serverless:serverless_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:sharding_types_gen",
-    ],
-)
-
-idl_generator(
-    name = "tenant_migration_recipient_cmds_gen",
-    src = "tenant_migration_recipient_cmds.idl",
-    deps = [
-        "//src/mongo/client:read_preference_setting_gen",
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/repl:replication_types_gen",
-        "//src/mongo/db/serverless:serverless_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:sharding_types_gen",
-        "//src/mongo/util/net:hostandport_gen",
-    ],
-)
-
-idl_generator(
     name = "txn_cmds_gen",
     src = "txn_cmds.idl",
     deps = [
@@ -994,25 +967,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_library(
-    name = "tenant_migration_cmds_request",
-    srcs = [
-        "tenant_migration_donor_cmds_gen",
-        "tenant_migration_recipient_cmds_gen",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/client:connection_string",
-        "//src/mongo/client:read_preference",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/repl:repl_coordinator_interface",
-        "//src/mongo/db/repl:repl_server_parameters",
-        "//src/mongo/db/repl:tenant_migration_state_machine_idl",
-        "//src/mongo/db/serverless:serverless_types_idl",
-        "//src/mongo/idl:idl_parser",
-    ],
-)
-
 # Commands available in every process that executes commands
 mongo_cc_library(
     name = "core",
@@ -1443,8 +1397,6 @@ mongo_cc_library(
         "set_user_write_block_mode_command.cpp",
         "shutdown_d.cpp",
         "snapshot_management.cpp",
-        "tenant_migration_donor_cmds.cpp",
-        "tenant_migration_recipient_cmds.cpp",
         "top_command.cpp",
         "txn_cmds.cpp",
         "user_management_commands.cpp",
@@ -1477,7 +1429,6 @@ mongo_cc_library(
         "set_user_write_block_mode_idl",
         "shutdown_idl",
         "standalone",
-        "tenant_migration_cmds_request",
         "test_commands",
         "test_commands_enabled",
         "txn_cmd_request",

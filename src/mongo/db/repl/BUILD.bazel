@@ -1053,7 +1053,6 @@ mongo_cc_library(
         "//src/mongo/db/catalog:virtual_collection_options.h",
         "//src/mongo/db/commands:create_gen",
         "//src/mongo/db/commands:fle2_cleanup_gen",
-        "//src/mongo/db/commands:tenant_migration_donor_cmds_gen",
         "//src/mongo/db/commands:user_management_commands_gen",
         "//src/mongo/db/matcher/schema:encrypt_schema_gen",
         "//src/mongo/db/pipeline:aggregate_command_gen",
@@ -1512,7 +1511,6 @@ mongo_cc_library(
         "//src/mongo/db:shard_role",
         "//src/mongo/db/catalog:local_oplog_info",
         "//src/mongo/db/commands:server_status_core",
-        "//src/mongo/db/commands:tenant_migration_cmds_request",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:thread_pool_task_executor",
@@ -1699,7 +1697,6 @@ mongo_cc_library(
         "tenant_base_cloner.h",
         "tenant_collection_cloner.h",
         "tenant_database_cloner.h",
-        "tenant_migration_recipient_service.h",
         "tenant_oplog_applier.h",
         "tenant_oplog_batcher.h",
     ],
@@ -2117,11 +2114,9 @@ mongo_cc_library(
     name = "tenant_migration_donor_service",
     srcs = [
         "tenant_migration_donor_op_observer.cpp",
-        "tenant_migration_donor_service.cpp",
     ],
     hdrs = [
         "tenant_migration_donor_op_observer.h",
-        "tenant_migration_donor_service.h",
     ],
     tags = ["compile_requires_large_memory_gcc"],
     deps = [
@@ -2398,11 +2393,9 @@ mongo_cc_library(
     name = "tenant_migration_recipient_service",
     srcs = [
         "tenant_migration_recipient_op_observer.cpp",
-        "tenant_migration_recipient_service.cpp",
     ],
     hdrs = [
         "tenant_migration_recipient_op_observer.h",
-        "tenant_migration_recipient_service.h",
     ],
     tags = ["compile_requires_large_memory_gcc"],
     deps = [
