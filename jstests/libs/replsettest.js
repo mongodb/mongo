@@ -352,8 +352,17 @@ export class ReplSetTest {
     getURL() {
         var hosts = [];
 
+        // If the hostname specified for the replica set or nodes is like 'primary', 'secondary0',
+        // 'secondary1' (not 'localhost' and not an ip address (like 127.0.0.1 or
+        // ip-10-122-7-63)), then this replica set is started by antithesis. In this
+        // case, use the node's host for url so that the hostnames on the logs would be
+        // different for each node. Otherwise, use the hostname specified for the replica set.
         for (var i = 0; i < this.ports.length; i++) {
-            hosts.push(this.host + ":" + this.ports[i]);
+            if (this.host !== 'localhost' && !this.host.includes("-") && !this.host.includes(".")) {
+                hosts.push(this.nodes[i].host);
+            } else {
+                hosts.push(this.host + ":" + this.ports[i]);
+            }
         }
 
         return this.name + "/" + hosts.join(",");
