@@ -1405,7 +1405,8 @@ def mongo_cc_library(
         defines = [],
         additional_linker_inputs = [],
         features = [],
-        exec_properties = {}):
+        exec_properties = {},
+        **kwargs):
     """Wrapper around cc_library.
 
     Args:
@@ -1574,6 +1575,7 @@ def mongo_cc_library(
         }) + target_compatible_with + enterprise_compatible,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         exec_properties = exec_properties,
+        **kwargs
     )
     cc_library(
         name = name + WITH_DEBUG_SUFFIX,
@@ -1599,6 +1601,7 @@ def mongo_cc_library(
         target_compatible_with = target_compatible_with + enterprise_compatible,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         exec_properties = exec_properties,
+        **kwargs
     )
 
     # Creates a shared library version of our target only if
@@ -1662,7 +1665,8 @@ def _mongo_cc_binary_and_program(
         additional_linker_inputs = [],
         features = [],
         exec_properties = {},
-        _program_type = ""):
+        _program_type = "",
+        **kwargs):
     if linkstatic == True:
         fail("""Linking specific targets statically is not supported.
         The mongo build must link entirely statically or entirely dynamically.
@@ -1734,7 +1738,7 @@ def _mongo_cc_binary_and_program(
         "target_compatible_with": target_compatible_with + enterprise_compatible,
         "additional_linker_inputs": additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         "exec_properties": exec_properties,
-    }
+    } | kwargs
 
     if _program_type == "binary":
         cc_binary(**args)
