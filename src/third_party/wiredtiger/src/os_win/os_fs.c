@@ -452,6 +452,7 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
     WT_DECL_RET;
     WT_FILE_HANDLE *file_handle;
     WT_FILE_HANDLE_WIN *win_fh;
+    WT_LOG_MANAGER *log_mgr;
     WT_SESSION_IMPL *session;
     DWORD dwCreationDisposition, windows_error;
     int f;
@@ -459,6 +460,7 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
     WT_UNUSED(file_system);
     session = (WT_SESSION_IMPL *)wt_session;
     conn = S2C(session);
+    log_mgr = &conn->log_mgr;
     *file_handlep = NULL;
 
     WT_RET(__wt_calloc_one(session, &win_fh));
@@ -507,7 +509,7 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
     if (FLD_ISSET(conn->write_through, file_type))
         f |= FILE_FLAG_WRITE_THROUGH;
 
-    if (file_type == WT_FS_OPEN_FILE_TYPE_LOG && FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC))
+    if (file_type == WT_FS_OPEN_FILE_TYPE_LOG && FLD_ISSET(log_mgr->txn_logsync, WT_LOG_DSYNC))
         f |= FILE_FLAG_WRITE_THROUGH;
 
     /* If the user indicated a random workload, disable read-ahead. */

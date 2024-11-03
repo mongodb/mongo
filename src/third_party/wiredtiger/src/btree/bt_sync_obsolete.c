@@ -579,7 +579,7 @@ __checkpoint_cleanup_eligibility(WT_SESSION_IMPL *session, const char *uri, cons
      * Logged table. The logged tables do not support timestamps, so we need to check for obsolete
      * pages in them.
      */
-    if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED)) {
+    if (F_ISSET(&S2C(session)->log_mgr, WT_LOG_ENABLED)) {
         WT_RET(__wt_config_getones(session, config, "log.enabled", &cval));
         if (cval.val)
             return (true);

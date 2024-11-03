@@ -1156,7 +1156,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      */
     WT_RET(__checkpoint_apply_operation(session, cfg, NULL));
 
-    logging = FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED);
+    logging = F_ISSET(&conn->log_mgr, WT_LOG_ENABLED);
 
     /* Reset the statistics tracked per checkpoint. */
     __wt_atomic_store64(&evict->evict_max_page_size, 0);
@@ -1395,7 +1395,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      * view of the data, make sure that all the logs are flushed to disk before the checkpoint is
      * complete.
      */
-    if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+    if (F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
         WT_ERR(__wt_log_flush(session, WT_LOG_FSYNC));
 
     /*
@@ -2409,7 +2409,7 @@ __checkpoint_tree(WT_SESSION_IMPL *session, bool is_checkpoint, const char *cfg[
     WT_FULL_BARRIER();
 
     /* Tell logging that a file checkpoint is starting. */
-    if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+    if (F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
         WT_ERR(__wt_txn_checkpoint_log(session, false, WT_TXN_LOG_CKPT_START, &ckptlsn));
 
     /* Tell the block manager that a file checkpoint is starting. */
@@ -2432,7 +2432,7 @@ fake:
      * If we're faking a checkpoint and logging is enabled, recovery should roll forward any changes
      * made between now and the next checkpoint, so set the checkpoint LSN to the beginning of time.
      */
-    if (fake_ckpt && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+    if (fake_ckpt && F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
         WT_INIT_LSN(&ckptlsn);
 
     /*
@@ -2471,7 +2471,7 @@ fake:
     }
 
     /* Tell logging that the checkpoint is complete. */
-    if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+    if (F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
         WT_ERR(__wt_txn_checkpoint_log(session, false, WT_TXN_LOG_CKPT_STOP, NULL));
 
 err:

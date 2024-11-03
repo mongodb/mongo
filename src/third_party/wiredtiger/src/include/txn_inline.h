@@ -44,8 +44,10 @@ static WT_INLINE bool
 __wt_txn_log_op_check(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
+    WT_LOG_MANAGER *log_mgr;
 
     conn = S2C(session);
+    log_mgr = &conn->log_mgr;
 
     /*
      * Objects with checkpoint durability don't need logging unless we're in debug mode. That rules
@@ -59,7 +61,7 @@ __wt_txn_log_op_check(WT_SESSION_IMPL *session)
      * Correct the above check for logging being configured. Files are configured for logging to
      * turn off timestamps, so stop here if there aren't actually any log files.
      */
-    if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+    if (!FLD_ISSET(log_mgr->flags, WT_LOG_ENABLED))
         return (false);
 
     /* No logging during recovery. */
@@ -1603,7 +1605,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
 
     txn = session->txn;
     txn->isolation = session->isolation;
-    txn->txn_logsync = S2C(session)->txn_logsync;
+    txn->txn_logsync = S2C(session)->log_mgr.txn_logsync;
     txn->commit_timestamp = WT_TS_NONE;
     txn->first_commit_timestamp = WT_TS_NONE;
 

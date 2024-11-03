@@ -1709,8 +1709,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     /* If we are logging, write a commit log record. */
     if (txn->logrec != NULL) {
         /* Assert environment and tree are logging compatible, the fast-check is short-hand. */
-        WT_ASSERT(session,
-          !F_ISSET(conn, WT_CONN_RECOVERING) && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED));
+        WT_ASSERT(
+          session, !F_ISSET(conn, WT_CONN_RECOVERING) && F_ISSET(&conn->log_mgr, WT_LOG_ENABLED));
 
         /*
          * The default sync setting is inherited from the connection, but can be overridden by an

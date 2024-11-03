@@ -14,7 +14,7 @@ jobs:
         with:
           script: |
             const comment = `
-            Thanks for creating a pull request! The below questions and checklist are intended to help with verifying your change is well tested. Please edit this comment by answering the questions below, or replacing the questions with your own description. Please remove this paragraph once you finish editing this comment.
+            Thanks for creating a pull request! Please answer the questions below by editing this comment.
 
             ## Type of change made in this PR
             - [ ] Functional change
@@ -23,12 +23,11 @@ jobs:
             - [ ] Other non-functional change
 
             ## What makes this change safe?
-            A good answer to this question helps the reviewers understand where they should focus their attention, so please consider these questions:
-            - How risky is this change? Why? 
-            - What tests are you adding or changing? Why?
-            - What existing tests are you relying on? 
+            Answering this question helps the reviewers understand where they should focus their attention. Please consider these prompts:
+            - How risky is this change? Why?
+            - What tests are you adding, changing or relying on? Why?
             - What, if anything, are you concerned about that you'd like the reviewer to focus on?
-            
+
             References:
             - [Risk level guide](https://github.com/wiredtiger/wiredtiger/blob/develop/.github/risk_level_guide.md)
             - [Testing frameworks](https://github.com/wiredtiger/wiredtiger/blob/develop/test/testing_frameworks.md)
@@ -36,7 +35,7 @@ jobs:
             ## Checklist before requesting a review
             - [ ] I have performed a self-review of my code.
             - [ ] I have made corresponding changes to the documentation, or no documentation change is needed.
-            - [ ] I have added/updated tests that demonstrate my fix is effective or that my feature works correctly, or have described the reason above if no test change is made.
+            - [ ] I have tests that show my change is correct, or have described above why functional test changes are not required.
             `;
 
             github.rest.issues.createComment({

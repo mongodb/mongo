@@ -125,6 +125,54 @@ struct __wt_txn_printlog_args {
     uint32_t flags;
 };
 
+struct __wt_log_thread {
+    WT_CONDVAR *cond;         /* wait mutex */
+    WT_SESSION_IMPL *session; /* session associated with thread */
+    wt_thread_t tid;          /* thread id*/
+    bool tid_set;             /* thread set */
+};
+
+struct __wt_log_manager {
+
+    WT_LOG *log; /* Logging structure */
+
+    WT_COMPRESSOR *compressor; /* configuration : Logging compressor */
+
+    wt_off_t dirty_max;             /* configuration : Log dirty system cache max size */
+    wt_off_t extend_len;            /* configuration : file_extend log length */
+    wt_off_t file_max;              /* configuration : Log file max size */
+    uint32_t force_write_wait;      /* configuration : Log force write wait */
+    const char *log_path;           /* configuration : Logging path format */
+    wt_shared uint32_t txn_logsync; /* configuration : Log sync */
+
+    wt_shared uint32_t cursors;   /* Private : Log cursor count */
+    uint32_t prealloc;            /* Private : Log file pre-allocation */
+    uint32_t prealloc_init_count; /* Private : initial number of pre-allocated log files */
+    uint16_t req_max;             /* Private : Max required log version */
+    uint16_t req_min;             /* Private : Min required log version */
+
+    WT_LOG_THREAD file;   /* Private : file thread */
+    WT_LOG_THREAD server; /* Private : server thread */
+    WT_LOG_THREAD wrlsn;  /* Private : write lsn thread */
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_LOG_CONFIG_ENABLED 0x001u  /* Logging is configured */
+#define WT_LOG_DOWNGRADED 0x002u      /* Running older version */
+#define WT_LOG_ENABLED 0x004u         /* Logging is enabled */
+#define WT_LOG_EXISTED 0x008u         /* Log files found */
+#define WT_LOG_FORCE_DOWNGRADE 0x010u /* Force downgrade */
+#define WT_LOG_INCR_BACKUP 0x020u     /* Incremental backup log required */
+#define WT_LOG_RECOVER_DIRTY 0x040u   /* Recovering unclean */
+#define WT_LOG_RECOVER_DONE 0x080u    /* Recovery completed */
+#define WT_LOG_RECOVER_ERR 0x100u     /* Error if recovery required */
+#define WT_LOG_RECOVER_FAILED 0x200u  /* Recovery failed */
+#define WT_LOG_REMOVE 0x400u          /* Removal is enabled */
+#define WT_LOG_ZERO_FILL 0x800u       /* Manually zero files */
+                                      /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+
+    uint32_t flags; /* Global logging configuration */
+};
+
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
 extern int __wt_curlog_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[],

@@ -36,14 +36,13 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
      * The checkpoint configuration requires a wait time and/or a log size, if neither is set, we're
      * not running at all. Checkpoints based on log size also require logging be enabled.
      */
-    if (conn->ckpt_usecs != 0 ||
-      (ckpt_logsize != 0 && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))) {
+    if (conn->ckpt_usecs != 0 || (ckpt_logsize != 0 && F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))) {
         /*
          * If checkpointing based on log data, use a minimum of the log file size. The logging
          * subsystem has already been initialized.
          */
-        if (ckpt_logsize != 0 && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
-            __wt_atomic_storei64(&conn->ckpt_logsize, WT_MAX(ckpt_logsize, conn->log_file_max));
+        if (ckpt_logsize != 0 && F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
+            __wt_atomic_storei64(&conn->ckpt_logsize, WT_MAX(ckpt_logsize, conn->log_mgr.file_max));
         /* Checkpoints are incompatible with in-memory configuration */
         WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
         if (cval.val != 0)

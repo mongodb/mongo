@@ -131,7 +131,7 @@ __txn_backup_post_recovery(WT_RECOVERY *r)
     }
     if (clear) {
         F_CLR(conn, WT_CONN_INCR_BACKUP);
-        FLD_CLR(conn->log_flags, WT_CONN_LOG_INCR_BACKUP);
+        F_CLR(&conn->log_mgr, WT_LOG_INCR_BACKUP);
         conn->incr_granularity = 0;
     }
     return;
@@ -985,7 +985,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
      * with logging disabled, recovery should not run. Scan the metadata to figure out the largest
      * file ID.
      */
-    if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_EXISTED) || WT_IS_MAX_LSN(&metafile->ckpt_lsn)) {
+    if (!F_ISSET(&conn->log_mgr, WT_LOG_EXISTED) || WT_IS_MAX_LSN(&metafile->ckpt_lsn)) {
         /*
          * Detect if we're going from logging disabled to enabled. We need to know this to verify
          * LSNs and start at the correct log file later. If someone ran with logging, then disabled
@@ -1000,7 +1000,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
          */
         metafile = &r.files[WT_METAFILE_ID];
 
-        if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && WT_IS_MAX_LSN(&metafile->ckpt_lsn) &&
+        if (F_ISSET(&conn->log_mgr, WT_LOG_ENABLED) && WT_IS_MAX_LSN(&metafile->ckpt_lsn) &&
           !WT_IS_MAX_LSN(&r.max_ckpt_lsn))
             WT_ERR(__wt_log_reset(session, __wt_lsn_file(&r.max_ckpt_lsn)));
         else
@@ -1109,7 +1109,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
      * automatic recovery.
      */
     if (needs_rec &&
-      (FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR) || F_ISSET(conn, WT_CONN_READONLY))) {
+      (F_ISSET(&conn->log_mgr, WT_LOG_RECOVER_ERR) || F_ISSET(conn, WT_CONN_READONLY))) {
         if (F_ISSET(conn, WT_CONN_READONLY))
             WT_ERR_MSG(session, WT_RUN_RECOVERY, "Read-only database needs recovery");
         WT_ERR_MSG(session, WT_RUN_RECOVERY, "Database needs recovery");
@@ -1142,7 +1142,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
      * connection. We can consider skipping it in the future.
      */
     if (needs_rec)
-        FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY);
+        F_SET(&conn->log_mgr, WT_LOG_RECOVER_DIRTY);
     if (WT_IS_INIT_LSN(&r.ckpt_lsn))
         ret = __wt_log_scan(
           session, NULL, NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
@@ -1256,9 +1256,9 @@ done:
      * If we're downgrading and have newer log files, force log removal, no matter what the remove
      * setting is.
      */
-    if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_FORCE_DOWNGRADE))
+    if (F_ISSET(&conn->log_mgr, WT_LOG_FORCE_DOWNGRADE))
         WT_ERR(__wt_log_truncate_files(session, NULL, true));
-    FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE);
+    F_SET(&conn->log_mgr, WT_LOG_RECOVER_DONE);
 
     /* Time since the recovery has started. */
     __wt_timer_evaluate_ms(session, &timer, &conn->recovery_timeline.recovery_ms);
@@ -1275,10 +1275,10 @@ err:
 
     WT_TRET(__recovery_close_cursors(&r));
     __wt_free(session, config);
-    FLD_CLR(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY);
+    F_CLR(&conn->log_mgr, WT_LOG_RECOVER_DIRTY);
 
     if (ret != 0) {
-        FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_FAILED);
+        F_SET(&conn->log_mgr, WT_LOG_RECOVER_FAILED);
         __wt_err(session, ret, "Recovery failed");
     }
 

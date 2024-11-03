@@ -844,6 +844,7 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
     WT_DECL_RET;
     WT_FILE_HANDLE *file_handle;
     WT_FILE_HANDLE_POSIX *pfh;
+    WT_LOG_MANAGER *log_mgr;
     WT_SESSION_IMPL *session;
     mode_t mode;
     int advise_flag, f;
@@ -855,6 +856,7 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
 
     session = (WT_SESSION_IMPL *)wt_session;
     conn = S2C(session);
+    log_mgr = &conn->log_mgr;
 
     WT_RET(__wt_calloc_one(session, &pfh));
 
@@ -911,7 +913,7 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
         f |= O_NOATIME;
 #endif
 
-    if (file_type == WT_FS_OPEN_FILE_TYPE_LOG && FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC)) {
+    if (file_type == WT_FS_OPEN_FILE_TYPE_LOG && FLD_ISSET(log_mgr->txn_logsync, WT_LOG_DSYNC)) {
 #ifdef O_DSYNC
         f |= O_DSYNC;
 #elif defined(O_SYNC)
