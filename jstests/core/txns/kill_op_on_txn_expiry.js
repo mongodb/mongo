@@ -26,7 +26,7 @@ const sessionColl = sessionDb[collName];
 
 // Need the original 'transactionLifetimeLimitSeconds' value so that we can reset it back at the
 // end of the test.
-const res =
+let res =
     assert.commandWorked(db.adminCommand({getParameter: 1, transactionLifetimeLimitSeconds: 1}));
 const originalTransactionLifetimeLimitSeconds = res.transactionLifetimeLimitSeconds;
 
@@ -34,6 +34,20 @@ const originalTransactionLifetimeLimitSeconds = res.transactionLifetimeLimitSeco
 jsTest.log("Decrease transactionLifetimeLimitSeconds from " +
            originalTransactionLifetimeLimitSeconds + " to 30 seconds.");
 assert.commandWorked(db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 30}));
+
+res = assert.commandWorked(
+    db.adminCommand({getParameter: 1, AbortExpiredTransactionsSessionCheckoutTimeout: 1}));
+const originalAbortExpiredTransactionsSessionCheckoutTimeout =
+    res.AbortExpiredTransactionsSessionCheckoutTimeout;
+
+// Increase the AbortExpiredTransactionsSessionCheckoutTimeout to prevent it from conflicting with
+// the abortExpiredTransactions job on slower machines. This ensures that the
+// abortExpiredTransactions job is responsible for aborting the transaction, even if it takes
+// longer, allowing the test to function as intended.
+jsTest.log("Increase AbortExpiredTransactionsSessionCheckoutTimeout from " +
+           originalAbortExpiredTransactionsSessionCheckoutTimeout + " ms to 5 minutes.");
+assert.commandWorked(db.adminCommand(
+    {setParameter: 1, AbortExpiredTransactionsSessionCheckoutTimeout: 5 * 60 * 1000}));
 
 try {
     jsTestLog("Starting transaction");
@@ -88,11 +102,17 @@ try {
     workerThread.join();
     assert(!workerThread.hasFailed());
 } finally {
-    // Must ensure that the transactionLifetimeLimitSeconds is reset so that it does not impact
-    // other tests in the suite.
+    // Must ensure that the transactionLifetimeLimitSeconds and
+    // AbortExpiredTransactionsSessionCheckoutTimeout are reset so that it does not impact other
+    // tests in the suite.
     assert.commandWorked(db.adminCommand({
         setParameter: 1,
         transactionLifetimeLimitSeconds: originalTransactionLifetimeLimitSeconds
+    }));
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        AbortExpiredTransactionsSessionCheckoutTimeout:
+            originalAbortExpiredTransactionsSessionCheckoutTimeout
     }));
 }
 
