@@ -63,12 +63,12 @@ function testLargeProject() {
     });
     runAgg([{$project: projectFields}]);
 
-    const pathSize = 1000000;
+    const pathSize = 195;
     let nestedProjectField = "a0";
     for (let i = 1; i < pathSize; i++) {
         nestedProjectField += ".a" + i;
     }
-    runAgg([{$project: {nestedProjectField: 1}}]);
+    runAgg([{$project: {[nestedProjectField]: 1}}]);
 }
 
 // Run $and and $or with many different types of predicates.
