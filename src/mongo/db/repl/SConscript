@@ -736,8 +736,6 @@ env.Benchmark(
         "replication_consistency_markers_impl",
         "replmocks",
         "storage_interface_impl",
-        "tenant_migration_donor_service",
-        "tenant_migration_recipient_service",
     ],
     CONSOLIDATED_TARGET="repl_bm",
 )

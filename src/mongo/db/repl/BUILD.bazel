@@ -2111,29 +2111,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "tenant_migration_donor_service",
-    srcs = [
-        "tenant_migration_donor_op_observer.cpp",
-    ],
-    hdrs = [
-        "tenant_migration_donor_op_observer.h",
-    ],
-    tags = ["compile_requires_large_memory_gcc"],
-    deps = [
-        ":primary_only_service",
-        ":tenant_migration_access_blocker",
-        ":tenant_migration_statistics",
-        ":tenant_migration_utils",
-        "//src/mongo/client:fetcher",
-        "//src/mongo/db:index_builds_coordinator_interface",
-        "//src/mongo/db/catalog:local_oplog_info",
-        "//src/mongo/db/collection_crud",
-        "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/executor:async_rpc",
-    ],
-)
-
-mongo_cc_library(
     name = "rollback_impl",
     srcs = [
         "rollback_impl.cpp",
@@ -2386,46 +2363,5 @@ mongo_cc_library(
         "//src/mongo/rpc:metadata",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/util:fail_point",
-    ],
-)
-
-mongo_cc_library(
-    name = "tenant_migration_recipient_service",
-    srcs = [
-        "tenant_migration_recipient_op_observer.cpp",
-    ],
-    hdrs = [
-        "tenant_migration_recipient_op_observer.h",
-    ],
-    tags = ["compile_requires_large_memory_gcc"],
-    deps = [
-        "cloner_utils",
-        "oplog",
-        "oplog_buffer_collection",
-        "oplog_entry",
-        "oplog_fetcher",
-        "oplog_interface_local",
-        "primary_only_service",
-        "repl_server_parameters",
-        "replica_set_aware_service",
-        "replication_auth",
-        "tenant_migration_access_blocker",
-        "tenant_migration_cloners",
-        "tenant_migration_state_machine_idl",
-        "tenant_migration_statistics",
-        "tenant_migration_utils",
-        "tenant_oplog_processing",
-        "//src/mongo/client:clientdriver_network",
-        "//src/mongo/client:fetcher",
-        "//src/mongo/client:read_preference",
-        "//src/mongo/db:vector_clock_mutable",
-        "//src/mongo/db/catalog:commit_quorum_options",
-        "//src/mongo/db/catalog:local_oplog_info",
-        "//src/mongo/db/collection_crud",
-        "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
-        "//src/mongo/db/query/write_ops:write_ops_exec",
-        "//src/mongo/db/session:session_catalog_mongod",
-        "//src/mongo/db/transaction",
     ],
 )

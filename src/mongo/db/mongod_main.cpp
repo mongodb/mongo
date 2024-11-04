@@ -163,8 +163,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
-#include "mongo/db/repl/tenant_migration_donor_op_observer.h"
-#include "mongo/db/repl/tenant_migration_recipient_op_observer.h"
 #include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -1464,12 +1462,7 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
-        if (getGlobalReplSettings().isServerless()) {
-            opObserverRegistry->addObserver(
-                std::make_unique<repl::TenantMigrationDonorOpObserver>());
-            opObserverRegistry->addObserver(
-                std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-        }
+
         if (!gMultitenancySupport) {
             opObserverRegistry->addObserver(
                 std::make_unique<analyze_shard_key::QueryAnalysisOpObserverShardSvr>());
@@ -1491,12 +1484,6 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
-        if (getGlobalReplSettings().isServerless()) {
-            opObserverRegistry->addObserver(
-                std::make_unique<repl::TenantMigrationDonorOpObserver>());
-            opObserverRegistry->addObserver(
-                std::make_unique<repl::TenantMigrationRecipientOpObserver>());
-        }
 
         auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
         if (!gMultitenancySupport && replCoord && replCoord->getSettings().isReplSet()) {

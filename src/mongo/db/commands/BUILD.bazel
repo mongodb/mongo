@@ -1475,8 +1475,6 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl:replica_set_messages",
-        "//src/mongo/db/repl:tenant_migration_donor_service",
-        "//src/mongo/db/repl:tenant_migration_recipient_service",
         "//src/mongo/db/s:sharding_catalog",
         "//src/mongo/db/s:sharding_catalog_manager",
         "//src/mongo/db/s:sharding_commands_d",
