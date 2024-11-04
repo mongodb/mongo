@@ -91,7 +91,8 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       bool fromMigrate,
                                                       bool dropSystemCollections,
-                                                      const boost::optional<UUID>& expectedUUID) {
+                                                      const boost::optional<UUID>& expectedUUID,
+                                                      bool requireCollectionEmpty) {
 
     boost::optional<UUID> collectionUUID;
     {
@@ -118,6 +119,26 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                         "uuid"_attr = *collectionUUID,
                         "expectedUUID"_attr = *expectedUUID);
             return;
+        }
+
+        if (requireCollectionEmpty) {
+            bool isEmpty = [&]() {
+                auto localCatalog = CollectionCatalog::get(opCtx);
+                const auto coll = localCatalog->lookupCollectionByNamespace(opCtx, nss);
+                if (coll) {
+                    return coll->isEmpty(opCtx);
+                }
+                return true;
+            }();
+            if (!isEmpty) {
+                // Ignore the drop collection if the collection has records locally and it's
+                // explicitely required to skip non-empty collections.
+                LOGV2_DEBUG(9525700,
+                            1,
+                            "Skipping dropping the collection because it is not empty",
+                            "nss"_attr = nss);
+                return;
+            }
         }
     }
 

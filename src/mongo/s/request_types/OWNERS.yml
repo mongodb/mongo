@@ -72,3 +72,6 @@ filters:
   - "cluster_commands_without_shard_key.idl":
     approvers:
       - 10gen/query-execution
+  - "untrack_unsplittable_collection.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing

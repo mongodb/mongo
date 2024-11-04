@@ -1150,6 +1150,7 @@ const allCommands = {
     transitionToDedicatedConfigServer: {skip: requiresMongoS},
     transitionToShardedCluster: {skip: isAnInternalCommand},
     unshardCollection: {skip: requiresMongoS},
+    untrackUnshardedCollection: {skip: requiresMongoS},
     update: {
         setUp: function(conn) {
             assert.commandWorked(conn.getCollection(fullNs).insert({x: 1}));

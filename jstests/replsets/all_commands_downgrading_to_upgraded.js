@@ -1556,6 +1556,10 @@ const allCommands = {
     },
     transitionToShardedCluster: {skip: isAnInternalCommand},
     unshardCollection: {skip: cannotRunWhileDowngrading},
+    untrackUnshardedCollection: {
+        // The command requires moveCollection on setup which is not allowed in fcv downgrading.
+        skip: cannotRunWhileDowngrading
+    },
     update: {
         setUp: function(conn) {
             assert.commandWorked(conn.getCollection(fullNs).insert({x: 1}));

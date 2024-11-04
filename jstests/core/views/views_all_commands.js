@@ -738,6 +738,12 @@ let viewsCommandTests = {
         expectFailure: true,
         isAdminCommand: true,
     },
+    untrackUnshardedCollection: {
+        command: {untrackUnshardedCollection: "test.view"},
+        skipStandalone: true,
+        expectFailure: false,
+        isAdminCommand: true,
+    },
     update: {command: {update: "view", updates: [{q: {x: 1}, u: {x: 2}}]}, expectFailure: true},
     updateRole: {
         command: {

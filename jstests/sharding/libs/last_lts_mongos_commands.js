@@ -26,6 +26,7 @@ export const commandsAddedToMongosSinceLastLTS = [
     "setQuerySettings",
     "removeQuerySettings",
     "unshardCollection",
+    "untrackUnshardedCollection",  // TODO (SERVER-96072) remove once the command is backported.
     "changePrimary",
     "autoSplitVector",
     "transitionFromDedicatedConfigServer"

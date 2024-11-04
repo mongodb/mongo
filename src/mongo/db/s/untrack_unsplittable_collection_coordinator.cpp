@@ -53,6 +53,7 @@ void UntrackUnsplittableCollectionCoordinator::appendCommandInfo(
 
 void UntrackUnsplittableCollectionCoordinator::checkIfOptionsConflict(
     const BSONObj& coorDoc) const {
+    stdx::lock_guard lk{_docMutex};
     const auto otherDoc = UntrackUnsplittableCollectionCoordinatorDocument::parse(
         IDLParserContext("UntrackUnsplittableCollectionCoordinatorDocument"), coorDoc);
     uassert(ErrorCodes::ConflictingOperationInProgress,
@@ -144,6 +145,28 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
     // start-up from a configTime that is inclusive of the metadata deletions that were committed
     // during the critical section.
     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+
+    // We need to send the drop to all the shards because movePrimary leaves garbage behind for
+    // unsplittable collections.
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    // Remove primary shard from participants
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+    participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
+                       participants.end());
+    {
+        const auto session = getNewSession(opCtx);
+        const auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+        sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+            opCtx,
+            nss(),
+            participants,
+            **executor,
+            session,
+            true /* fromMigrate */,
+            false /* dropSystemCollections */,
+            uuid,
+            true /*requireCollectionEmpty*/);
+    }
 }
 
 void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(

@@ -533,6 +533,9 @@ commands:
                 type: uuid
                 description: "The expected UUID of the collection."
                 optional: true
+            requireCollectionEmpty:
+                type: optionalBool
+                description: "If true, the drop operation will only proceed if the collection has no documents."
 
         reply_type: OkReply
 

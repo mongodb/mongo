@@ -44,10 +44,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.transitions = {
         query: {
-            query: 0.63,
+            query: 0.58,
             createIndexes: 0.1,
             dropIndex: 0.1,
             collMod: 0.1,
+            untrackUnshardedCollection: 0.05,
             movePrimary: 0.05,
             // Converting the target collection to a capped collection or a sharded collection will
             // cause all subsequent aggregations to fail, so give these a low probability to make
@@ -61,6 +62,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         collMod: {query: 1},
         convertToCapped: {query: 1},
         shardCollection: {query: 1},
+        untrackUnshardedCollection: {query: 1},
     };
 
     /**
@@ -174,9 +176,31 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ]);
     };
 
+    /*
+     * Untrack the collection from the sharding catalog.
+     */
+    $config.states.untrackUnshardedCollection = function untrackCollection(db, collName) {
+        // Note this command will behave as no-op in case the collection is not tracked.
+        const namespace = `${db}.${collName}`;
+        jsTestLog(`Running untrackUnshardedCollection: ns=${namespace}`);
+        if (isMongos(db)) {
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({untrackUnshardedCollection: namespace}), [
+                    // Handles the case where the collection is not located on its primary
+                    ErrorCodes.OperationFailed,
+                    // Handles the case where the collection is sharded
+                    ErrorCodes.InvalidNamespace,
+                    // Handles the case where the collection/db does not exist
+                    ErrorCodes.NamespaceNotFound,
+                    //  TODO (SERVER-96072) remove this error once the command is backported.
+                    ErrorCodes.CommandNotFound,
+                ]);
+        }
+    };
+
     /**
-     * Converts '$config.data.outputCollName' to a capped collection. This is never undone, and all
-     * subsequent $out's to this collection should fail.
+     * Converts '$config.data.outputCollName' to a capped collection. This is never undone, and
+     * all subsequent $out's to this collection should fail.
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);

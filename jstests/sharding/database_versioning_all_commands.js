@@ -771,6 +771,7 @@ let testCases = {
     transitionFromDedicatedConfigServer: {skip: "not on a user database"},
     transitionToDedicatedConfigServer: {skip: "not on a user database"},
     unshardCollection: {skip: "does not forward command to primary shard"},
+    untrackUnshardedCollection: {skip: "does not forward command to primary shard"},
     update: {
         run: {
             sendsDbVersion: true,

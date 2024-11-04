@@ -177,6 +177,7 @@ mongo_cc_library(
         "cluster_transition_from_dedicated_config_server_cmd.cpp",
         "cluster_transition_to_dedicated_config_server_cmd.cpp",
         "cluster_unshard_collection_cmd.cpp",
+        "cluster_untrack_unsplittable_collection.cpp",
         "cluster_validate_cmd.cpp",
         "cluster_validate_db_metadata_cmd.cpp",
         "cluster_whats_my_uri_cmd.cpp",

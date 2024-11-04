@@ -419,6 +419,7 @@ mongo_cc_library(
         "//src/mongo/s/request_types:shardsvr_join_migrations_request_gen",
         "//src/mongo/s/request_types:transition_from_dedicated_config_server_gen",
         "//src/mongo/s/request_types:transition_to_dedicated_config_server_gen",
+        "//src/mongo/s/request_types:untrack_unsplittable_collection_gen",
         "//src/mongo/s/request_types:update_zone_key_range_request_type.cpp",
         "//src/mongo/s/request_types:wait_for_fail_point_gen",
         "//src/mongo/s/resharding:common_types_gen",

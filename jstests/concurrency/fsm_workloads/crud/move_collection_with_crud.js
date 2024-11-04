@@ -24,6 +24,7 @@ export const $config = (function() {
 
     const data = {
         moveCollectionCount: 0,
+        primaryShard: undefined,
     };
 
     /**
@@ -36,12 +37,22 @@ export const $config = (function() {
         return documents;
     }
 
-    function calcuateToShard(conn, ns) {
+    function calculateToShard(conn, ns) {
         var config = conn.rsConns.config.getDB('config');
         var unshardedColl = config.collections.findOne({_id: ns});
-        var chunk = config.chunks.findOne({uuid: unshardedColl.uuid});
-        var currentShard = chunk.shard;
-
+        // In case the collection is untracked the current shard is the primary shard.
+        let currentShardFn = () => {
+            if (unshardedColl === null) {
+                return data.primaryShard;
+            } else {
+                var chunk = config.chunks.findOne({uuid: unshardedColl.uuid});
+                if (chunk === null) {
+                    return data.primaryShard;
+                }
+                return chunk.shard;
+            }
+        };
+        var currentShard = currentShardFn();
         var shards = Object.keys(conn.shards);
         var destinationShards = shards.filter(function(shard) {
             if (shard !== currentShard) {
@@ -57,13 +68,15 @@ export const $config = (function() {
         print(`Started moveCollection on ${coll.getFullName()} to shard ${tojson(toShard)}`);
 
         let moveCollectionCmdObj = {moveCollection: coll.getFullName(), toShard: toShard};
+        let acceptedErrors = [
+            // Handles the edge case where a collection becomes untracked in the brief moment
+            // between being tracked and moved
+            ErrorCodes.NamespaceNotFound,
+        ];
         if (TestData.runningWithShardStepdowns) {
-            assert.commandWorkedOrFailedWithCode(db.adminCommand(moveCollectionCmdObj),
-                                                 [ErrorCodes.SnapshotUnavailable]);
-        } else {
-            assert.commandWorked(db.adminCommand(moveCollectionCmdObj));
+            acceptedErrors.push(ErrorCodes.SnapshotUnavailable);
         }
-
+        assert.commandWorkedOrFailedWithCode(db.adminCommand(moveCollectionCmdObj), acceptedErrors);
         print(`Finished moveCollection on ${coll.getFullName()} to shard ${tojson(toShard)}`);
     }
 
@@ -95,23 +108,44 @@ export const $config = (function() {
                 this.moveCollectionCount <= kMaxMoveCollectionExecutions;
             if (this.tid === 0 && shouldContinueMoveCollection) {
                 const coll = db.getCollection(collName);
-                const toShard = calcuateToShard(connCache, coll.getFullName());
+                const toShard = calculateToShard(connCache, coll.getFullName());
                 executeMoveCollectionCommand(db, coll, toShard);
 
                 this.moveCollectionCount += 1;
             }
+        },
+        untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
+            const namespace = `${db}.${collName}`;
+            print(`Started to untrack collection ${namespace}`);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({untrackUnshardedCollection: namespace}), [
+                    // Handles the case where the collection is not located on its primary
+                    ErrorCodes.OperationFailed,
+                    // Handles the case where the collection is sharded
+                    ErrorCodes.InvalidNamespace,
+                    //  TODO (SERVER-96072) remove this error once the command is backported.
+                    ErrorCodes.CommandNotFound,
+                ]);
+            print(`Untrack collection completed`);
         }
     };
 
     const transitions = {
         moveCollection: {insert: 1.0},
-        insert: {insert: 0.85, moveCollection: 0.15},
+        untrackUnshardedCollection: {insert: 1.0},
+        insert: {insert: 0.75, moveCollection: 0.15, untrackUnshardedCollection: 0.10},
     };
 
     function setup(db, collName, _cluster) {
-        print(`Started unshardCollection on ${db + '.' + collName}`);
-        assert.commandWorked(db.adminCommand({unshardCollection: db + '.' + collName}));
-        print(`Finished unshardCollection on ${db + '.' + collName}`);
+        const ns = db + '.' + collName;
+        print(`Started unshardCollection on ${ns}`);
+        assert.commandWorked(db.adminCommand({unshardCollection: ns}));
+        print(`Finished unshardCollection on ${ns}`);
+
+        // Calculate the primary shard
+        var unshardedColl = db.getSiblingDB("config").collections.findOne({_id: ns});
+        var chunk = db.getSiblingDB("config").chunks.findOne({uuid: unshardedColl.uuid});
+        this.primaryShard = chunk.shard;
 
         const coll = db.getCollection(collName);
         assert.commandWorked(coll.insert(createDocuments(kTotalWorkingDocuments)));

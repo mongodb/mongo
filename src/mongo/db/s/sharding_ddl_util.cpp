@@ -581,11 +581,13 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   const OperationSessionInfo& osi,
                                                   bool fromMigrate,
                                                   bool dropSystemCollections,
-                                                  const boost::optional<UUID>& collectionUUID) {
+                                                  const boost::optional<UUID>& collectionUUID,
+                                                  bool requireCollectionEmpty) {
     ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
     dropCollectionParticipant.setFromMigrate(fromMigrate);
     dropCollectionParticipant.setDropSystemCollections(dropSystemCollections);
     dropCollectionParticipant.setCollectionUUID(collectionUUID);
+    dropCollectionParticipant.setRequireCollectionEmpty(requireCollectionEmpty);
     generic_argument_util::setOperationSessionInfo(dropCollectionParticipant, osi);
     generic_argument_util::setMajorityWriteConcern(dropCollectionParticipant);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>>(
