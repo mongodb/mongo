@@ -15,6 +15,9 @@ filters:
   - "client_strand*":
     approvers:
       - 10gen/server-programmability
+  - "cloner.*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "keys_collection*":
     approvers:
       - 10gen/server-cluster-scalability
