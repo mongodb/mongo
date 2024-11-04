@@ -46,7 +46,6 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"

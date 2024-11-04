@@ -36,7 +36,6 @@
 
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/query/optimizer/node.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
 
 
 namespace mongo::optimizer::unit_test_abt_literals {

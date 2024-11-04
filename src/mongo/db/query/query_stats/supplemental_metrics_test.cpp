@@ -34,7 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/exec/sbe/abt/abt_unit_test_utils.h"
 #include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"

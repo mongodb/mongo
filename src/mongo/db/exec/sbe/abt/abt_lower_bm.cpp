@@ -41,6 +41,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
+#include "mongo/db/exec/sbe/abt/abt_unit_test_utils.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
@@ -51,8 +52,6 @@
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 

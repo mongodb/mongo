@@ -144,7 +144,7 @@ TypeSignature constantFold(optimizer::ABT& abt,
     auto& runtimeEnv = *state.env;
 
     // Do not use descriptive names here.
-    auto prefixId = optimizer::PrefixId::create(false /*useDescriptiveNames*/);
+    auto prefixId = PrefixId::create(false /*useDescriptiveNames*/);
 
     const CollatorInterface* collator = nullptr;
     boost::optional<SlotId> collatorSlot = state.getCollatorSlot();

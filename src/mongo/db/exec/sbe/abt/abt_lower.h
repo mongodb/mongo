@@ -46,7 +46,6 @@
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {

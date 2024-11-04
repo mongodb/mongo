@@ -14,28 +14,14 @@ env.SConscript(
     ],
 )
 
-# Lightweight test utils.
-env.Library(
-    target="unit_test_utils",
-    source=[
-        "utils/unit_test_utils.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_base",
-        "$BUILD_DIR/mongo/unittest/unittest",
-    ],
-)
-
 env.CppUnitTest(
     target="optimizer_test",
     source=[
         "reference_tracker_test.cpp",
-        "unit_test_infra_test.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/exec/sbe/abt_unit_test_utils",
         "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
-        "unit_test_utils",
     ],
 )
 
@@ -45,9 +31,9 @@ optimizer_gdb_test_program = env.Program(
         "optimizer_gdb_test_program.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/exec/sbe/abt_unit_test_utils",
         "$BUILD_DIR/mongo/db/service_context_non_d",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "unit_test_utils",
     ],
     AIB_COMPONENT="pretty-printer-tests",
     AIB_COMPONENTS_EXTRA=["dist-test"],

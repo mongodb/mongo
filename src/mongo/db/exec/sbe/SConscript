@@ -137,6 +137,30 @@ env.CppUnitTest(
     ],
 )
 
+# Lightweight test utils.
+env.Library(
+    target="abt_unit_test_utils",
+    source=[
+        "abt/abt_unit_test_utils.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
+        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_base",
+        "$BUILD_DIR/mongo/unittest/unittest",
+    ],
+)
+
+env.CppUnitTest(
+    target="abt_unit_test_infra_test",
+    source=[
+        "abt/abt_unit_test_infra_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
+        "abt_unit_test_utils",
+    ],
+)
+
 env.CppUnitTest(
     target="sbe_abt_test",
     source=[
@@ -144,10 +168,10 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
-        "$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
+        "abt_unit_test_utils",
         "query_sbe_abt",
     ],
 )
@@ -170,8 +194,8 @@ env.CppUnitTest(
         "abt/abt_lower_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils",
         "$BUILD_DIR/mongo/unittest/unittest",
+        "abt_unit_test_utils",
         "query_sbe_abt",
     ],
 )
@@ -182,8 +206,8 @@ env.Benchmark(
         "abt/abt_lower_bm.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils",
         "$BUILD_DIR/mongo/unittest/unittest",
+        "abt_unit_test_utils",
         "query_sbe_abt",
     ],
 )

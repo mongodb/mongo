@@ -54,6 +54,35 @@ SbExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
                                  std::vector<SbExpr> leaves,
                                  StageBuilderState& state);
 
+template <typename Builder>
+optimizer::ABT makeBalancedTreeImpl(Builder builder,
+                                    std::vector<optimizer::ABT>& leaves,
+                                    size_t from,
+                                    size_t until) {
+    invariant(from < until);
+    if (from + 1 == until) {
+        return std::move(leaves[from]);
+    } else {
+        size_t mid = from + (until - from) / 2;
+        auto lhs = makeBalancedTreeImpl(builder, leaves, from, mid);
+        auto rhs = makeBalancedTreeImpl(builder, leaves, mid, until);
+        return builder(std::move(lhs), std::move(rhs));
+    }
+}
+
+template <typename Builder>
+optimizer::ABT makeBalancedTree(Builder builder, std::vector<optimizer::ABT> leaves) {
+    return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
+}
+
+inline optimizer::ABT makeBalancedBooleanOpTree(optimizer::Operations logicOp,
+                                                std::vector<optimizer::ABT> leaves) {
+    auto builder = [=](optimizer::ABT lhs, optimizer::ABT rhs) {
+        return optimizer::make<optimizer::BinaryOp>(logicOp, std::move(lhs), std::move(rhs));
+    };
+    return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
+}
+
 inline auto makeABTFunction(StringData name, optimizer::ABTVector args) {
     return optimizer::make<optimizer::FunctionCall>(name.toString(), std::move(args));
 }

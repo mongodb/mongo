@@ -34,13 +34,15 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
 #include <cmath>
-#include <functional>
-#include <sstream>
 
-#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/util/assert_util.h"
+
+namespace {
+inline void updateHash(size_t& result, const size_t hash) {
+    result = 31 * result + hash;
+}
+}  // namespace
 
 namespace mongo::optimizer {
 

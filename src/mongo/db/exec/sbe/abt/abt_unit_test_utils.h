@@ -38,7 +38,6 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/inline_auto_update.h"

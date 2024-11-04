@@ -27,36 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/exec/sbe/abt/abt_unit_test_utils.h"
 
 #include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <initializer_list>
-#include <istream>
+#include <cstddef>
+#include <fstream>  // IWYU pragma: keep
+#include <iostream>
+#include <utility>
 
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/util/assert_util.h"
-
 
 namespace mongo::optimizer {
 
-ABT makeBalancedBooleanOpTree(Operations logicOp, std::vector<ABT> leaves) {
-    auto builder = [=](ABT lhs, ABT rhs) {
-        return make<BinaryOp>(logicOp, std::move(lhs), std::move(rhs));
-    };
-    return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
-}
+static constexpr bool kDebugAsserts = false;
 
+void maybePrintABT(const ABT::reference_type abt) {
+    // Always print using the supported versions to make sure we don't crash.
+    const std::string strV2 = ExplainGenerator::explainV2(abt);
+    const std::string strBSON = ExplainGenerator::explainBSONStr(abt);
+
+    if constexpr (kDebugAsserts) {
+        std::cout << "V2: " << strV2 << "\n";
+        std::cout << "BSON: " << strBSON << "\n";
+    }
+}
 }  // namespace mongo::optimizer

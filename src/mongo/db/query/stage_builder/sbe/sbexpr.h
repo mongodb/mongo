@@ -42,7 +42,6 @@
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::stage_builder {
 
@@ -52,6 +51,55 @@ class SbSlot;
 class SbLocalVar;
 class SbVar;
 class SbExpr;
+
+/**
+ * Used to vend out fresh projection names. The method getNextId receives an optional prefix. If we
+ * are generating descriptive names, the variable name we return starts with the prefix and includes
+ * a prefix-specific counter. If we are not generating descriptive variable names, the prefix is
+ * ignored and instead we use a global counter instead and ignore the prefix.
+ */
+class PrefixId {
+    using IdType = uint64_t;
+    using PrefixMapType = optimizer::opt::unordered_map<std::string, IdType>;
+
+public:
+    static PrefixId create(const bool useDescriptiveVarNames) {
+        return {useDescriptiveVarNames};
+    }
+    static PrefixId createForTests() {
+        return {true /*useDescriptiveVarNames*/};
+    }
+
+    template <size_t N>
+    optimizer::ProjectionName getNextId(const char (&prefix)[N]) {
+        return optimizer::ProjectionName{visit(
+            [&]<typename T>(T& v) -> std::string {
+                using namespace fmt::literals;
+                if constexpr (std::is_same_v<T, IdType>)
+                    return "p{}"_format(v++);
+                else if constexpr (std::is_same_v<T, PrefixMapType>)
+                    return "{}_{}"_format(prefix, v[prefix]++);
+            },
+            _ids)};
+    }
+
+    PrefixId(const PrefixId& other) = delete;
+    PrefixId(PrefixId&& other) = default;
+
+    PrefixId& operator=(const PrefixId& other) = delete;
+    PrefixId& operator=(PrefixId&& other) = default;
+
+private:
+    PrefixId(const bool useDescriptiveVarNames) {
+        if (useDescriptiveVarNames) {
+            _ids = {PrefixMapType{}};
+        } else {
+            _ids = {uint64_t{}};
+        }
+    }
+
+    std::variant<IdType, PrefixMapType> _ids;
+};
 
 optimizer::ProjectionName getABTVariableName(SbSlot s);
 
