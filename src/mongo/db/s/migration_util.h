@@ -160,14 +160,6 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
 void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
 
 /**
- * Drive each unfished migration coordination in the given namespace to completion.
- * Assumes the caller to have entered CollectionCriticalSection.
- */
-void recoverMigrationCoordinations(OperationContext* opCtx,
-                                   NamespaceString nss,
-                                   CancellationToken cancellationToken);
-
-/**
  * Instructs the recipient shard to release its critical section.
  */
 ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(

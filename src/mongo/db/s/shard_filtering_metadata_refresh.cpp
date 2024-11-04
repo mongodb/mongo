@@ -49,6 +49,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -58,6 +59,7 @@
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/shard_filtering_util.h"
@@ -65,6 +67,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -75,12 +78,12 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/read_through_cache.h"
@@ -91,10 +94,16 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible);
+
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(skipDatabaseVersionMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
+MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
 
 const auto getDecoration = ServiceContext::declareDecoration<FilteringMetadataCache>();
@@ -205,6 +214,42 @@ bool joinCollectionPlacementVersionOperation(OperationContext* opCtx,
     return false;
 }
 
+void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const UUID& collUUID,
+                                     const ChunkRange& range,
+                                     const ChunkVersion& preMigrationChunkVersion) {
+    ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
+    ensureChunkVersionIsGreaterThanRequest.setDbName(DatabaseName::kAdmin);
+    ensureChunkVersionIsGreaterThanRequest.setMinKey(range.getMin());
+    ensureChunkVersionIsGreaterThanRequest.setMaxKey(range.getMax());
+    ensureChunkVersionIsGreaterThanRequest.setVersion(preMigrationChunkVersion);
+    ensureChunkVersionIsGreaterThanRequest.setNss(nss);
+    ensureChunkVersionIsGreaterThanRequest.setCollectionUUID(collUUID);
+    generic_argument_util::setMajorityWriteConcern(ensureChunkVersionIsGreaterThanRequest);
+    const auto ensureChunkVersionIsGreaterThanRequestBSON =
+        ensureChunkVersionIsGreaterThanRequest.toBSON();
+
+    hangInEnsureChunkVersionIsGreaterThanInterruptible.pauseWhileSet(opCtx);
+
+    const auto ensureChunkVersionIsGreaterThanResponse =
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::kAdmin,
+            ensureChunkVersionIsGreaterThanRequestBSON,
+            Shard::RetryPolicy::kIdempotent);
+    const auto ensureChunkVersionIsGreaterThanStatus =
+        Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);
+
+    uassertStatusOK(ensureChunkVersionIsGreaterThanStatus);
+
+    if (hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible.shouldFail()) {
+        hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible.pauseWhileSet();
+        uasserted(ErrorCodes::InternalError,
+                  "simulate an error response for _configsvrEnsureChunkVersionIsGreaterThan");
+    }
+}
 }  // namespace
 
 void FilteringMetadataCache::init(ServiceContext* serviceCtx,
@@ -446,34 +491,6 @@ Status FilteringMetadataCache::onCollectionPlacementVersionMismatchNoExcept(
     }
 }
 
-CollectionMetadata FilteringMetadataCache::forceGetCurrentMetadata(OperationContext* opCtx,
-                                                                   const NamespaceString& nss) {
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    invariant(!opCtx->getClient()->isInDirectClient());
-    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
-
-    if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
-        uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
-    }
-
-    try {
-        const auto cm = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-
-        if (!cm.hasRoutingTable()) {
-            return CollectionMetadata();
-        }
-
-        return CollectionMetadata(cm, ShardingState::get(opCtx)->shardId());
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-        LOGV2(505070,
-              "Namespace not found, collection may have been dropped",
-              logAttrs(nss),
-              "error"_attr = redact(ex));
-        return CollectionMetadata();
-    }
-}
-
 ChunkVersion FilteringMetadataCache::forceShardFilteringMetadataRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
@@ -573,13 +590,165 @@ Status FilteringMetadataCache::onDbVersionMismatchNoExcept(
     }
 }
 
+CollectionMetadata FilteringMetadataCache::_forceGetCurrentMetadata(OperationContext* opCtx,
+                                                                    const NamespaceString& nss) {
+    try {
+        const auto cm = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+
+        if (!cm.hasRoutingTable()) {
+            return CollectionMetadata();
+        }
+
+        return CollectionMetadata(cm, ShardingState::get(opCtx)->shardId());
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+        LOGV2(505070,
+              "Namespace not found, collection may have been dropped",
+              logAttrs(nss),
+              "error"_attr = redact(ex));
+        return CollectionMetadata();
+    }
+}
+
+void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* opCtx,
+                                                            NamespaceString nss,
+                                                            CancellationToken cancellationToken) {
+    LOGV2_DEBUG(4798501, 2, "Starting migration recovery", logAttrs(nss));
+
+    unsigned migrationRecoveryCount = 0;
+
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        NamespaceString::kMigrationCoordinatorsNamespace);
+    store.forEach(
+        opCtx,
+        BSON(MigrationCoordinatorDocument::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
+        [&](const MigrationCoordinatorDocument& doc) {
+            LOGV2_DEBUG(4798502,
+                        2,
+                        "Recovering migration",
+                        "migrationCoordinatorDocument"_attr = redact(doc.toBSON()));
+
+            // Ensure there is only one migrationCoordinator document to be recovered for this
+            // namespace.
+            invariant(++migrationRecoveryCount == 1,
+                      str::stream() << "Found more then one migration to recover for namespace '"
+                                    << nss.toStringForErrorMsg() << "'");
+
+            // Create a MigrationCoordinator to complete the coordination.
+            migrationutil::MigrationCoordinator coordinator(doc);
+
+            if (doc.getDecision()) {
+                // The decision is already known.
+                coordinator.setShardKeyPattern(
+                    rangedeletionutil::getShardKeyPatternFromRangeDeletionTask(opCtx, doc.getId()));
+                coordinator.completeMigration(opCtx);
+                return true;
+            }
+
+            // The decision is not known. Recover the decision from the config server.
+
+            ensureChunkVersionIsGreaterThan(opCtx,
+                                            doc.getNss(),
+                                            doc.getCollectionUuid(),
+                                            doc.getRange(),
+                                            doc.getPreMigrationChunkVersion());
+
+            hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(opCtx);
+
+            auto currentMetadata = _forceGetCurrentMetadata(opCtx, doc.getNss());
+
+            if (hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
+                    .shouldFail()) {
+                hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
+                    .pauseWhileSet();
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response for forceGetCurrentMetadata");
+            }
+
+            auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {
+                AutoGetDb autoDb(opCtx, doc.getNss().dbName(), MODE_IX);
+                Lock::CollectionLock collLock(opCtx, doc.getNss(), MODE_IX);
+                auto scopedCsr =
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                        opCtx, doc.getNss());
+
+                auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
+                invariant(!optMetadata);
+
+                if (!cancellationToken.isCanceled()) {
+                    scopedCsr->setFilteringMetadata(opCtx, std::move(currentMetadata));
+                }
+            };
+
+            if (!currentMetadata.isSharded() ||
+                !currentMetadata.uuidMatches(doc.getCollectionUuid())) {
+                if (!currentMetadata.isSharded()) {
+                    LOGV2(4798503,
+                          "During migration recovery the collection was discovered to have been "
+                          "dropped."
+                          "Deleting the range deletion tasks on the donor and the recipient "
+                          "as well as the migration coordinator document on this node",
+                          "migrationCoordinatorDocument"_attr = redact(doc.toBSON()));
+                } else {
+                    // UUID don't match
+                    LOGV2(4798504,
+                          "During migration recovery the collection was discovered to have been "
+                          "dropped and recreated. Collection has a UUID that "
+                          "does not match the one in the migration coordinator "
+                          "document. Deleting the range deletion tasks on the donor and "
+                          "recipient as well as the migration coordinator document on this node",
+                          "migrationCoordinatorDocument"_attr = redact(doc.toBSON()),
+                          "refreshedMetadataUUID"_attr =
+                              currentMetadata.getChunkManager()->getUUID(),
+                          "coordinatorDocumentUUID"_attr = doc.getCollectionUuid(),
+                          logAttrs(doc.getNss()));
+                }
+
+                // TODO SERVER-77472: remove this once we are sure all operations persist the config
+                // time after a collection drop. Since the collection has been dropped, persist
+                // config time inclusive of the drop collection event before deleting leftover
+                // migration metadata. This will ensure that in case of stepdown the new primary
+                // won't read stale data from config server and think that the sharded collection
+                // still exists.
+                VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+
+                rangedeletionutil::deleteRangeDeletionTaskOnRecipient(opCtx,
+                                                                      doc.getRecipientShardId(),
+                                                                      doc.getCollectionUuid(),
+                                                                      doc.getRange(),
+                                                                      doc.getId());
+                rangedeletionutil::deleteRangeDeletionTaskLocally(
+                    opCtx, doc.getCollectionUuid(), doc.getRange());
+                coordinator.forgetMigration(opCtx);
+                setFilteringMetadata();
+                return true;
+            }
+
+            // Note this should only extend the range boundaries (if there has been a shard key
+            // refine since the migration began) and never truncate them.
+            auto chunkRangeToCompareToMetadata =
+                migrationutil::extendOrTruncateBoundsForMetadata(currentMetadata, doc.getRange());
+            if (currentMetadata.keyBelongsToMe(chunkRangeToCompareToMetadata.getMin())) {
+                coordinator.setMigrationDecision(DecisionEnum::kAborted);
+            } else {
+                coordinator.setMigrationDecision(DecisionEnum::kCommitted);
+                if (!currentMetadata.getChunkManager()->getVersion(doc.getDonorShardId()).isSet()) {
+                    migrationutil::notifyChangeStreamsOnDonorLastChunk(
+                        opCtx, doc.getNss(), doc.getDonorShardId(), doc.getCollectionUuid());
+                }
+            }
+
+            coordinator.setShardKeyPattern(KeyPattern(currentMetadata.getKeyPattern()));
+            coordinator.completeMigration(opCtx);
+            setFilteringMetadata();
+            return true;
+        });
+}
+
 Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
                                                   const DatabaseName& dbName,
                                                   CancellationToken cancellationToken) {
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    invariant(!opCtx->getClient()->isInDirectClient());
-    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
-
     ScopeGuard resetRefreshFutureOnError([&] {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         // Can be uninterruptible because the work done under it can never block.
@@ -809,11 +978,11 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
                 auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
                 if (!replCoord->getSettings().isReplSet() ||
                     replCoord->getMemberState().primary()) {
-                    migrationutil::recoverMigrationCoordinations(opCtx, nss, cancellationToken);
+                    _recoverMigrationCoordinations(opCtx, nss, cancellationToken);
                 }
             }
 
-            auto currentMetadata = forceGetCurrentMetadata(opCtx, nss);
+            auto currentMetadata = _forceGetCurrentMetadata(opCtx, nss);
 
             if (currentMetadata.hasRoutingTable()) {
                 // Abort and join any ongoing migration if migrations are disallowed for the

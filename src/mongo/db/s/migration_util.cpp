@@ -94,7 +94,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -116,10 +115,6 @@ namespace {
 using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeFilteringMetadataRefresh);
-MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanInterruptible);
-MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible);
-MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessInterruptible);
-MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateCommitDecisionInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible);
@@ -211,43 +206,6 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
                           "simulate an error response for onCollectionPlacementVersionMismatch");
             }
         });
-}
-
-void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const UUID& collUUID,
-                                     const ChunkRange& range,
-                                     const ChunkVersion& preMigrationChunkVersion) {
-    ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
-    ensureChunkVersionIsGreaterThanRequest.setDbName(DatabaseName::kAdmin);
-    ensureChunkVersionIsGreaterThanRequest.setMinKey(range.getMin());
-    ensureChunkVersionIsGreaterThanRequest.setMaxKey(range.getMax());
-    ensureChunkVersionIsGreaterThanRequest.setVersion(preMigrationChunkVersion);
-    ensureChunkVersionIsGreaterThanRequest.setNss(nss);
-    ensureChunkVersionIsGreaterThanRequest.setCollectionUUID(collUUID);
-    generic_argument_util::setMajorityWriteConcern(ensureChunkVersionIsGreaterThanRequest);
-    const auto ensureChunkVersionIsGreaterThanRequestBSON =
-        ensureChunkVersionIsGreaterThanRequest.toBSON();
-
-    hangInEnsureChunkVersionIsGreaterThanInterruptible.pauseWhileSet(opCtx);
-
-    const auto ensureChunkVersionIsGreaterThanResponse =
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin,
-            ensureChunkVersionIsGreaterThanRequestBSON,
-            Shard::RetryPolicy::kIdempotent);
-    const auto ensureChunkVersionIsGreaterThanStatus =
-        Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);
-
-    uassertStatusOK(ensureChunkVersionIsGreaterThanStatus);
-
-    if (hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible.shouldFail()) {
-        hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible.pauseWhileSet();
-        uasserted(ErrorCodes::InternalError,
-                  "simulate an error response for _configsvrEnsureChunkVersionIsGreaterThan");
-    }
 }
 
 BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {
@@ -573,144 +531,6 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                 2,
                 "Finished migration coordinator step-up recovery",
                 "unfinishedMigrationsCount"_attr = unfinishedMigrationsCount);
-}
-
-void recoverMigrationCoordinations(OperationContext* opCtx,
-                                   NamespaceString nss,
-                                   CancellationToken cancellationToken) {
-    LOGV2_DEBUG(4798501, 2, "Starting migration recovery", logAttrs(nss));
-
-    unsigned migrationRecoveryCount = 0;
-
-    PersistentTaskStore<MigrationCoordinatorDocument> store(
-        NamespaceString::kMigrationCoordinatorsNamespace);
-    store.forEach(
-        opCtx,
-        BSON(MigrationCoordinatorDocument::kNssFieldName
-             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
-        [&opCtx, &nss, &migrationRecoveryCount, &cancellationToken](
-            const MigrationCoordinatorDocument& doc) {
-            LOGV2_DEBUG(4798502,
-                        2,
-                        "Recovering migration",
-                        "migrationCoordinatorDocument"_attr = redact(doc.toBSON()));
-
-            // Ensure there is only one migrationCoordinator document to be recovered for this
-            // namespace.
-            invariant(++migrationRecoveryCount == 1,
-                      str::stream() << "Found more then one migration to recover for namespace '"
-                                    << nss.toStringForErrorMsg() << "'");
-
-            // Create a MigrationCoordinator to complete the coordination.
-            MigrationCoordinator coordinator(doc);
-
-            if (doc.getDecision()) {
-                // The decision is already known.
-                coordinator.setShardKeyPattern(
-                    rangedeletionutil::getShardKeyPatternFromRangeDeletionTask(opCtx, doc.getId()));
-                coordinator.completeMigration(opCtx);
-                return true;
-            }
-
-            // The decision is not known. Recover the decision from the config server.
-
-            ensureChunkVersionIsGreaterThan(opCtx,
-                                            doc.getNss(),
-                                            doc.getCollectionUuid(),
-                                            doc.getRange(),
-                                            doc.getPreMigrationChunkVersion());
-
-            hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(opCtx);
-
-            auto currentMetadata =
-                FilteringMetadataCache::get(opCtx)->forceGetCurrentMetadata(opCtx, doc.getNss());
-
-            if (hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
-                    .shouldFail()) {
-                hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
-                    .pauseWhileSet();
-                uasserted(ErrorCodes::InternalError,
-                          "simulate an error response for forceGetCurrentMetadata");
-            }
-
-            auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {
-                AutoGetDb autoDb(opCtx, doc.getNss().dbName(), MODE_IX);
-                Lock::CollectionLock collLock(opCtx, doc.getNss(), MODE_IX);
-                auto scopedCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                        opCtx, doc.getNss());
-
-                auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
-                invariant(!optMetadata);
-
-                if (!cancellationToken.isCanceled()) {
-                    scopedCsr->setFilteringMetadata(opCtx, std::move(currentMetadata));
-                }
-            };
-
-            if (!currentMetadata.isSharded() ||
-                !currentMetadata.uuidMatches(doc.getCollectionUuid())) {
-                if (!currentMetadata.isSharded()) {
-                    LOGV2(4798503,
-                          "During migration recovery the collection was discovered to have been "
-                          "dropped."
-                          "Deleting the range deletion tasks on the donor and the recipient "
-                          "as well as the migration coordinator document on this node",
-                          "migrationCoordinatorDocument"_attr = redact(doc.toBSON()));
-                } else {
-                    // UUID don't match
-                    LOGV2(4798504,
-                          "During migration recovery the collection was discovered to have been "
-                          "dropped and recreated. Collection has a UUID that "
-                          "does not match the one in the migration coordinator "
-                          "document. Deleting the range deletion tasks on the donor and "
-                          "recipient as well as the migration coordinator document on this node",
-                          "migrationCoordinatorDocument"_attr = redact(doc.toBSON()),
-                          "refreshedMetadataUUID"_attr =
-                              currentMetadata.getChunkManager()->getUUID(),
-                          "coordinatorDocumentUUID"_attr = doc.getCollectionUuid(),
-                          logAttrs(doc.getNss()));
-                }
-
-                // TODO SERVER-77472: remove this once we are sure all operations persist the config
-                // time after a collection drop. Since the collection has been dropped, persist
-                // config time inclusive of the drop collection event before deleting leftover
-                // migration metadata. This will ensure that in case of stepdown the new primary
-                // won't read stale data from config server and think that the sharded collection
-                // still exists.
-                VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
-
-                rangedeletionutil::deleteRangeDeletionTaskOnRecipient(opCtx,
-                                                                      doc.getRecipientShardId(),
-                                                                      doc.getCollectionUuid(),
-                                                                      doc.getRange(),
-                                                                      doc.getId());
-                rangedeletionutil::deleteRangeDeletionTaskLocally(
-                    opCtx, doc.getCollectionUuid(), doc.getRange());
-                coordinator.forgetMigration(opCtx);
-                setFilteringMetadata();
-                return true;
-            }
-
-            // Note this should only extend the range boundaries (if there has been a shard key
-            // refine since the migration began) and never truncate them.
-            auto chunkRangeToCompareToMetadata =
-                extendOrTruncateBoundsForMetadata(currentMetadata, doc.getRange());
-            if (currentMetadata.keyBelongsToMe(chunkRangeToCompareToMetadata.getMin())) {
-                coordinator.setMigrationDecision(DecisionEnum::kAborted);
-            } else {
-                coordinator.setMigrationDecision(DecisionEnum::kCommitted);
-                if (!currentMetadata.getChunkManager()->getVersion(doc.getDonorShardId()).isSet()) {
-                    notifyChangeStreamsOnDonorLastChunk(
-                        opCtx, doc.getNss(), doc.getDonorShardId(), doc.getCollectionUuid());
-                }
-            }
-
-            coordinator.setShardKeyPattern(KeyPattern(currentMetadata.getKeyPattern()));
-            coordinator.completeMigration(opCtx);
-            setFilteringMetadata();
-            return true;
-        });
 }
 
 ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(

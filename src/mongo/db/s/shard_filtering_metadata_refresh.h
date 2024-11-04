@@ -40,6 +40,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 
@@ -139,14 +140,6 @@ public:
                                        boost::optional<DatabaseVersion> clientDbVersion) noexcept;
 
     /**
-     * Unconditionally get the shard's filtering metadata from the config server on the calling
-     * thread. Returns the metadata if the nss is sharded, otherwise default unsharded metadata.
-     *
-     * NOTE: Does network I/O, so it must not be called with a lock
-     */
-    CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
      * Unconditionally causes the shard's filtering metadata to be refreshed from the config server
      * and returns the resulting placement version (which might not have changed), or throws.
      *
@@ -157,6 +150,23 @@ public:
                                                     const NamespaceString& nss);
 
 private:
+    /**
+     * Unconditionally get the shard's filtering metadata from the config server on the calling
+     * thread. Returns the metadata if the nss is sharded, otherwise default unsharded metadata.
+     *
+     * NOTE: Does network I/O, so it must not be called with a lock
+     */
+    CollectionMetadata _forceGetCurrentMetadata(OperationContext* opCtx,
+                                                const NamespaceString& nss);
+
+    /**
+     * Drive each unfished migration coordination in the given namespace to completion.
+     * Assumes the caller to have entered CollectionCriticalSection.
+     */
+    void _recoverMigrationCoordinations(OperationContext* opCtx,
+                                        NamespaceString nss,
+                                        CancellationToken cancellationToken);
+
     /**
      * Unconditionally refreshes the database metadata from the config server.
      *
@@ -182,5 +192,8 @@ private:
 
     std::shared_ptr<CatalogCacheLoader> _loader = nullptr;
 };
+
+extern FailPoint hangInRefreshFilteringMetadataUntilSuccessInterruptible;
+extern FailPoint hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible;
 
 }  // namespace mongo
