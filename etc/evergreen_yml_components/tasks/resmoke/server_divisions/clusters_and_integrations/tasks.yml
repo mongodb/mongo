@@ -772,7 +772,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *task_template
-    name: no_passthrough_architecture
+    name: no_passthrough_network
     tags:
       [
         "assigned_to_jira_team_server_networking_and_observability",

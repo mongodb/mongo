@@ -9,7 +9,7 @@ description: |
 
 selector:
   roots:
-    - jstests/noPassthrough/architecture/*.js
+    - jstests/noPassthrough/network/*.js
     # TODO: SERVER-95548 remove these special cases once the tests are owned by us.
     - jstests/noPassthrough/replication/awaitable_hello_metrics.js
     - jstests/noPassthrough/replication/awaitable_hello.js

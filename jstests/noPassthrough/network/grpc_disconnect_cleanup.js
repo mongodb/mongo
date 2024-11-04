@@ -7,7 +7,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const kThisFile = "jstests/noPassthrough/architecture/grpc_disconnect_cleanup.js";
+const kThisFile = "jstests/noPassthrough/network/grpc_disconnect_cleanup.js";
 const kTestName = "grpc_disconnect_cleanup";
 
 function setupShardedCollection(st, dbName, collName) {

@@ -8,3 +8,6 @@ filters:
   - "queryable_wt*":
     approvers:
       - 10gen/server-rss-sydney
+  - "no_passthrough_network*":
+    approvers:
+      - 10gen/server-networking-and-observability
