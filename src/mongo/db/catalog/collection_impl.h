@@ -460,7 +460,6 @@ private:
         // default collation is simple binary compare.
         std::unique_ptr<CollatorInterface> _collator;
 
-        const bool _isCapped;
         const bool _needCappedLock;
 
         // Tracks in-progress capped inserts to inform visibility for forward scans so that no
