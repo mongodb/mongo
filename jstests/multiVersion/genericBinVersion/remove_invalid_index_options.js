@@ -49,10 +49,9 @@ assert.eq(validateRes.errors.length, 0);
 assert.eq(validateRes.warnings.length, 2);
 
 validateRes = assert.commandWorked(secondaryDB.runCommand({validate: collName}));
-// TODO (SERVER-87985): Enable assertions.
-// assert(validateRes.valid);
-// assert.eq(validateRes.errors.length, 0);
-// assert.eq(validateRes.warnings.length, 2);
+assert(validateRes.valid);
+assert.eq(validateRes.errors.length, 0);
+assert.eq(validateRes.warnings.length, 2);
 
 // Use collMod to remove the invalid index options in the collection.
 assert.commandWorked(primaryDB.runCommand({collMod: collName}));
