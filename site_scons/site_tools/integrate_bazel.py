@@ -765,21 +765,10 @@ def prefetch_toolchain(env):
         exec_root = f'bazel-{os.path.basename(env.Dir("#").abspath)}'
         if exec_root and not os.path.exists(f"{exec_root}/external/mongo_toolchain"):
             print("Prefetch the mongo toolchain...")
-
-            local_flags = []
-            if is_local_execution(env):
-                local_flags = ["--config=local"]
-            else:
-                print(
-                    "Running bazel with remote execution enabled. To disable bazel remote execution, please add BAZEL_FLAGS=--config=local to the end of your scons command line invocation."
-                )
-                if not validate_remote_execution_certs(env):
-                    sys.exit(1)
-
             try:
                 retry_call(
                     subprocess.run,
-                    [[Globals.bazel_executable, "build", "@mongo_toolchain"] + local_flags],
+                    [[Globals.bazel_executable, "build", "@mongo_toolchain", "--config=local"]],
                     fkwargs={
                         "env": {**os.environ.copy(), **Globals.bazel_env_variables},
                         "check": True,
