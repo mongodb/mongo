@@ -5,7 +5,7 @@
 // ]
 import {
     assertCoveredQueryAndCount,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isIndexOnly
 } from "jstests/libs/query/analyze_plan.js";
 
@@ -56,7 +56,7 @@ assertCoveredQueryAndCount({collection: coll, query: {a: {$lte: {}}}, project: p
 // Adding a document containing an array makes the index multi-key which can never be used for a
 // covered query.
 assert.commandWorked(coll.insert({a: []}));
-assert(!isIndexOnly(db, getWinningPlan(coll.find({a: {$gt: {}}}, proj).explain().queryPlanner)));
-assert(!isIndexOnly(db, getWinningPlan(coll.find({a: {$gte: {}}}, proj).explain().queryPlanner)));
-assert(!isIndexOnly(db, getWinningPlan(coll.find({a: {$lt: {}}}, proj).explain().queryPlanner)));
-assert(!isIndexOnly(db, getWinningPlan(coll.find({a: {$lte: {}}}, proj).explain().queryPlanner)));
+assert(!isIndexOnly(db, getWinningPlanFromExplain(coll.find({a: {$gt: {}}}, proj).explain())));
+assert(!isIndexOnly(db, getWinningPlanFromExplain(coll.find({a: {$gte: {}}}, proj).explain())));
+assert(!isIndexOnly(db, getWinningPlanFromExplain(coll.find({a: {$lt: {}}}, proj).explain())));
+assert(!isIndexOnly(db, getWinningPlanFromExplain(coll.find({a: {$lte: {}}}, proj).explain())));

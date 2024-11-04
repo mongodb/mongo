@@ -6,7 +6,7 @@
  * ]
  */
 // For making assertions about explain output.
-import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.getCollection("index_multikey");
 coll.drop();
@@ -14,7 +14,7 @@ coll.drop();
 function getIndexScanExplainOutput() {
     const explain = coll.find().hint({a: 1, b: 1}).explain();
     assert.commandWorked(explain);
-    return getPlanStage(getWinningPlan(explain.queryPlanner), "IXSCAN");
+    return getPlanStage(getWinningPlanFromExplain(explain), "IXSCAN");
 }
 
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));

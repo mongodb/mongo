@@ -51,7 +51,6 @@ import {
     getPlanStage,
     getQueryPlanner,
     getSingleNodeExplain,
-    getWinningPlan,
     getWinningPlanFromExplain,
     isClusteredIxscan,
     isCollscan,
@@ -230,10 +229,11 @@ assert.commandWorked(explain);
 
 explain = getSingleNodeExplain(explain);
 const queryPlanner = getQueryPlanner(explain);
-const winningPlan = getWinningPlan(queryPlanner);
+const winningPlan = getWinningPlanFromExplain(explain);
 const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 if (collectionIsClustered) {
-    assert(isExpress(db, getWinningPlan(queryPlanner)), "Expected Express: " + tojson(explain));
+    assert(isExpress(db, getWinningPlanFromExplain(explain)),
+           "Expected Express: " + tojson(explain));
 } else {
     assert(isIdhackOrExpress(db, winningPlan), winningPlan);
 }
@@ -307,12 +307,10 @@ assert.commandWorked(coll.runCommand('planCacheSetFilter',
 // pattern.
 
 explain = getSingleNodeExplain(coll.find(queryAA).explain());
-assert(isIxscan(db, getWinningPlan(getQueryPlanner(explain))),
-       "Expected index scan: " + tojson(explain));
+assert(isIxscan(db, getWinningPlanFromExplain(explain)), "Expected index scan: " + tojson(explain));
 
 explain = getSingleNodeExplain(coll.find(queryAA).collation(collationEN).explain());
-assert(isIxscan(db, getWinningPlan(getQueryPlanner(explain))),
-       "Expected index scan: " + tojson(explain));
+assert(isIxscan(db, getWinningPlanFromExplain(explain)), "Expected index scan: " + tojson(explain));
 
 // Ensure that index names in planCacheSetFilter only select matching names.
 
@@ -320,8 +318,7 @@ assert.commandWorked(coll.runCommand('planCacheSetFilter',
                                      {query: queryAA, collation: collationEN, indexes: ["a_1"]}));
 
 explain = getSingleNodeExplain(coll.find(queryAA).collation(collationEN).explain());
-assert(isCollscan(db, getWinningPlan(getQueryPlanner(explain))),
-       "Expected collscan: " + tojson(explain));
+assert(isCollscan(db, getWinningPlanFromExplain(explain)), "Expected collscan: " + tojson(explain));
 
 //
 // Test that planCacheSetFilter and planCacheClearFilters allow queries containing $expr.

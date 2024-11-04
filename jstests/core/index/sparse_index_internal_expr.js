@@ -9,7 +9,7 @@
  * ]
  */
 
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.sparse_index_internal_expr;
 coll.drop();
@@ -32,7 +32,7 @@ assert.docEq(res[0], {a: 1});
 assert.commandWorked(coll.createIndex({"missing": 1}));
 
 // Explain the query, and determine whether an indexed solution is available.
-let ixScans = getPlanStages(getWinningPlan(coll.find(exprQuery).explain().queryPlanner), "IXSCAN");
+let ixScans = getPlanStages(getWinningPlanFromExplain(coll.find(exprQuery).explain()), "IXSCAN");
 
 // Verify that the winning plan uses the $** index with the expected bounds.
 assert.gt(ixScans.length, 0, ixScans);
@@ -50,7 +50,7 @@ assert.commandWorked(
 
 // Run the same query to test that a COLLSCAN plan is used rather than an indexed plan.
 const collScans =
-    getPlanStages(getWinningPlan(coll.find(exprQuery).explain().queryPlanner), "COLLSCAN");
+    getPlanStages(getWinningPlanFromExplain(coll.find(exprQuery).explain()), "COLLSCAN");
 
 // Verify that the winning plan uses the $** index with the expected bounds.
 assert.gt(collScans.length, 0, collScans);
@@ -61,7 +61,7 @@ res = coll.find(exprQuery, {_id: 0}).hint("missing_1_sparse").toArray();
 assert.eq(res.length, 0);
 
 ixScans = getPlanStages(
-    getWinningPlan(coll.find(exprQuery).hint("missing_1_sparse").explain().queryPlanner), "IXSCAN");
+    getWinningPlanFromExplain(coll.find(exprQuery).hint("missing_1_sparse").explain()), "IXSCAN");
 
 assert.gt(ixScans.length, 0, ixScans);
 assert.eq("missing_1_sparse", ixScans[0].indexName, ixScans);

@@ -17,7 +17,6 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {
     getPlanStages,
     getQueryPlanners,
-    getWinningPlan,
     getWinningPlanFromExplain,
     isCollscan
 } from "jstests/libs/query/analyze_plan.js";
@@ -37,7 +36,7 @@ function assertOneIndexFilter(query, indexes) {
 }
 
 function assertIsIxScanOnIndex(explain, keyPattern) {
-    let winningPlan = getWinningPlan(explain.queryPlanner);
+    let winningPlan = getWinningPlanFromExplain(explain);
     const ixScans = getPlanStages(winningPlan, "IXSCAN");
     assert.gt(ixScans.length, 0);
     ixScans.every((ixScan) => assert.eq(ixScan.keyPattern, keyPattern));
@@ -76,13 +75,13 @@ assertOneIndexFilter({x: 3}, [{x: 1, y: 1}]);
 // Since we dropped the {x: 1, y: 1} index, a COLLSCAN must be used.
 explain = coll.find({x: 3}).explain();
 checkIndexFilterSet(explain, true);
-assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
+assert(isCollscan(db, getWinningPlanFromExplain(explain)));
 
 // Create another index. This should not change whether the index filter is applied.
 assert.commandWorked(coll.createIndex({x: 1, z: 1}));
 explain = assert.commandWorked(coll.find({x: 3}).explain());
 checkIndexFilterSet(explain, true);
-assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
+assert(isCollscan(db, getWinningPlanFromExplain(explain)));
 
 // Changing the catalog and then setting an index filter should not result in duplicate entries.
 assert.commandWorked(coll.createIndex({x: 1, a: 1}));

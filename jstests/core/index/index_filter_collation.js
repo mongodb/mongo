@@ -16,7 +16,7 @@
  *   assumes_balancer_off,
  * ]
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "index_filter_collation";
 const coll = db[collName];
@@ -105,13 +105,13 @@ function assertIsIxScanOnIndex(winningPlan, keyPattern) {
 // filter without a collation should apply to this query.
 let explain = coll.find({x: 3}).explain();
 checkIndexFilterSet(explain, true);
-assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
+assertIsIxScanOnIndex(getWinningPlanFromExplain(explain), {x: 1, y: 1});
 
 // When the query specifies the collation, the index filter that also specifies the collation should
 // apply.
 explain = coll.find({x: 3}).collation(caseInsensitive).explain();
 checkIndexFilterSet(explain, true);
-assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1});
+assertIsIxScanOnIndex(getWinningPlanFromExplain(explain), {x: 1});
 
 if (isIndexFiltersToQuerySettings) {
     // Query settings can't be used to substitute index filters for distinct commands. Configuring
@@ -123,8 +123,8 @@ if (isIndexFiltersToQuerySettings) {
 // Ensure distinct commands behave correctly and consistently with the find commands.
 explain = coll.explain().distinct("_id", {x: 3});
 checkIndexFilterSet(explain, true);
-assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
+assertIsIxScanOnIndex(getWinningPlanFromExplain(explain), {x: 1, y: 1});
 
 explain = coll.explain().distinct("_id", {x: 3}, {collation: caseInsensitive});
 checkIndexFilterSet(explain, true);
-assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1});
+assertIsIxScanOnIndex(getWinningPlanFromExplain(explain), {x: 1});

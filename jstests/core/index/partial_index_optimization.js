@@ -17,7 +17,7 @@ import {
     assertFetchFilter,
     assertNoFetchFilter,
     assertStagesForExplainOfCommand,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isCollscan,
 } from "jstests/libs/query/analyze_plan.js";
 
@@ -222,4 +222,4 @@ assertFetchFilter({coll: coll, predicate: predicate, expectedFilter: fetchFilter
 const exp =
     coll.find({$and: [{a: {$gte: 90}}, {$or: [{b: {$gte: 80}}, {flag: "true"}]}]}).explain();
 assert(isCollscan(db, exp),
-       "Expected collection scan, got " + tojson(getWinningPlan(exp.queryPlanner)));
+       "Expected collection scan, got " + tojson(getWinningPlanFromExplain(exp)));

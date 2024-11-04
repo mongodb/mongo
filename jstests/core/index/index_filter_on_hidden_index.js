@@ -22,7 +22,11 @@
  * ]
  */
 
-import {getPlanStages, getWinningPlan, isCollscan} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    isCollscan
+} from "jstests/libs/query/analyze_plan.js";
 
 const collName = 'hidden_indexes_remain_visible_in_index_filters';
 db[collName].drop();
@@ -60,7 +64,7 @@ function validateIxscanOrCollscanUsed(queryShape, idxName) {
 
     if (idxName) {
         // Expect the given index was used.
-        const ixScanStage = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN")[0];
+        const ixScanStage = getPlanStages(getWinningPlanFromExplain(explain), "IXSCAN")[0];
         assert(ixScanStage, `Index '${idxName}' was not used.`);
         assert.eq(ixScanStage.indexName, idxName, `Index '${idxName}' was not used.`);
     } else {

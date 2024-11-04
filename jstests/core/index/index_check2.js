@@ -7,7 +7,7 @@ let t = db.index_check2;
 t.drop();
 
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 for (var i = 0; i < 1000; i++) {
     var a = [];
@@ -32,9 +32,9 @@ assert.eq(120, t.find(q2).itcount(), "q2 a");
 assert.eq(60, t.find(q3).itcount(), "q3 a");
 
 // We expect these queries to use index scans over { tags: 1 }.
-assert(isIxscan(db, getWinningPlan(t.find(q1).explain().queryPlanner)), "e1");
-assert(isIxscan(db, getWinningPlan(t.find(q2).explain().queryPlanner)), "e2");
-assert(isIxscan(db, getWinningPlan(t.find(q3).explain().queryPlanner)), "e3");
+assert(isIxscan(db, getWinningPlanFromExplain(t.find(q1).explain())), "e1");
+assert(isIxscan(db, getWinningPlanFromExplain(t.find(q2).explain())), "e2");
+assert(isIxscan(db, getWinningPlanFromExplain(t.find(q3).explain())), "e3");
 
 let scanned1 = t.find(q1).explain("executionStats").executionStats.totalKeysExamined;
 let scanned2 = t.find(q2).explain("executionStats").executionStats.totalKeysExamined;

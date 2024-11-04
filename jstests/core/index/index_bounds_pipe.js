@@ -7,7 +7,7 @@
  * ]
  */
 import {exhaustFindCursorAndReturnResults} from "jstests/libs/find_cmd_util.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
@@ -35,7 +35,7 @@ function assertIndexBoundsAndResult(params) {
 
     // Check that the query uses correct index bounds. When run against a sharded cluster, there
     // may be multiple index scan stages, but each should have the same index bounds.
-    const ixscans = getPlanStages(getWinningPlan(explain.queryPlanner), 'IXSCAN');
+    const ixscans = getPlanStages(getWinningPlanFromExplain(explain), 'IXSCAN');
     assert.gt(ixscans.length, 0, 'Plan unexpectedly missing IXSCAN stage: ' + tojson(explain));
     for (let i = 0; i < ixscans.length; i++) {
         const ixscan = ixscans[i];
