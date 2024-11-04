@@ -317,7 +317,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -592,7 +592,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -867,7 +867,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -1142,7 +1142,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -1353,7 +1353,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -1565,7 +1565,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -1778,7 +1778,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -1990,7 +1990,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -2160,7 +2160,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -2327,7 +2327,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -2495,7 +2495,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -2662,7 +2662,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -2929,7 +2929,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -3191,7 +3191,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -3453,7 +3453,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -3715,7 +3715,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -3909,7 +3909,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -4103,7 +4103,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -4276,7 +4276,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -4440,7 +4440,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -4737,7 +4737,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {
@@ -5054,7 +5054,7 @@
 			}
 		}
 	],
-	"mergeType" : "mongos",
+	"mergeType" : "router",
 	"mergerPart" : [
 		{
 			"$mergeCursors" : {

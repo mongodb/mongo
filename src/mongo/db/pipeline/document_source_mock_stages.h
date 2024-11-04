@@ -70,7 +70,7 @@ public:
         // Overrides DocumentSourceMock's required position.
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                HostTypeRequirement::kMongoS,
+                HostTypeRequirement::kRouter,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kAllowed,

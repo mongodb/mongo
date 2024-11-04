@@ -18,7 +18,8 @@ if (!shardDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
     quit();
 }
 
-const session = st.s0.getDB("test").getMongo().startSession();
+const mongosDB = st.s0.getDB("test");
+const session = mongosDB.getMongo().startSession();
 const mongosColl = session.getDatabase("test")[jsTestName()];
 
 // Shard the collection, split it into two chunks, and move the [1, MaxKey] chunk to the other
@@ -40,7 +41,9 @@ assert.eq([{_id: 0}, {_id: 1}, {_id: 2}],
 // Test a couple more aggregations to be sure.
 assert.eq(
     [{_id: 0}, {_id: 1}, {_id: 2}],
-    mongosColl.aggregate([{$_internalSplitPipeline: {mergeType: "mongos"}}, {$sort: {_id: 1}}])
+    mongosColl
+        .aggregate(
+            [{$_internalSplitPipeline: {mergeType: st.getMergeType(mongosDB)}}, {$sort: {_id: 1}}])
         .toArray());
 assert.eq(mongosColl.aggregate([{$sort: {_id: 1}}, {$out: "testing"}]).itcount(), 0);
 

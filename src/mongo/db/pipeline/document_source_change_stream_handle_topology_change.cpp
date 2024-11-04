@@ -159,7 +159,7 @@ StageConstraints DocumentSourceChangeStreamHandleTopologyChange::constraints(
     Pipeline::SplitState) const {
     StageConstraints constraints{StreamType::kStreaming,
                                  PositionRequirement::kNone,
-                                 HostTypeRequirement::kMongoS,
+                                 HostTypeRequirement::kRouter,
                                  DiskUseRequirement::kNoDiskUse,
                                  FacetRequirement::kNotAllowed,
                                  TransactionRequirement::kNotAllowed,
