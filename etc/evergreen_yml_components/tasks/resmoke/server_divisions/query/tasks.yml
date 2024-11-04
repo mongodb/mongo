@@ -865,55 +865,120 @@ tasks:
         vars:
           resmoke_jobs_max: 1
 
-  - <<: *task_template
-    name: cursor_hints_to_query_settings_replset_passthrough
+  - <<: *gen_task_template
+    name: aggregation_mongos_pqs_fallback_gen
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
         "default",
-        "requires_large_host",
       ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
-  - <<: *gen_task_template
-    name: cursor_hints_to_query_settings_sharded_collections_passthrough_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "default"]
     commands:
       - func: "generate resmoke tasks"
         vars:
           use_large_distro: "true"
 
   - <<: *gen_task_template
-    name: cursor_hints_to_query_settings_unsharded_collections_passthrough_gen
-    tags: ["assigned_to_jira_team_server_query_execution", "default"]
+    name: aggregation_mongos_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
           use_large_distro: "true"
 
-  - <<: *task_template
-    name: implicit_query_settings_fallback
+  - <<: *gen_task_template
+    name: aggregation_pqs_fallback_gen
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
         "default",
-        "requires_large_host",
       ]
     commands:
-      - func: "do setup"
-      - func: "run tests"
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
 
-  - <<: *task_template
-    name: query_shape_hash_stability
-    tags: ["assigned_to_jira_team_server_query_execution", "default"]
+  - <<: *gen_task_template
+    name: aggregation_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
     commands:
-      - func: "do setup"
-      - func: "run tests"
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
 
-  - <<: *task_template
-    name: index_filters_to_query_settings
+  - <<: *gen_task_template
+    name: aggregation_sharded_collections_pqs_fallback_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_sharded_collections_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: replica_sets_jscore_pqs_fallback_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: replica_sets_jscore_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: replica_sets_jscore_pqs_index_filters_gen
     # Not every build variant speaks 'sbe_only' and this suite requires SBE
     # which can be enforced by 'requires_all_feature_flags'
     tags:
@@ -924,8 +989,181 @@ tasks:
         "requires_all_feature_flags",
       ]
     commands:
-      - func: "do setup"
-      - func: "run tests"
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharded_collections_pqs_fallback_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharded_collections_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharded_collections_pqs_index_filters_gen
+    # Not every build variant speaks 'sbe_only' and this suite requires SBE
+    # which can be enforced by 'requires_all_feature_flags'
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "sbe_only",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_pqs_fallback_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_pqs_index_filters_gen
+    # Not every build variant speaks 'sbe_only' and this suite requires SBE
+    # which can be enforced by 'requires_all_feature_flags'
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "sbe_only",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_mongos_query_shape_hash_stability_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_query_shape_hash_stability_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: replica_sets_jscore_query_shape_hash_stability_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_query_shape_hash_stability_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_sharded_collections_query_shape_hash_stability_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharded_collections_query_shape_hash_stability_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
 
   - <<: *task_template
     name: jsCore

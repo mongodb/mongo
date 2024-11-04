@@ -1,0 +1,70 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharded_collections_pqs_index_filters.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  Test the correctness of query settings application by replacing index
+  filter commands with query settings ones. This suite runs a select subset of jscore
+  tests on a sharded cluster fixture which implicitly shards accessed collections.
+  For testing purposes, SetQuerySettingsCommand and RemoveQuerySettingsCommand clear
+  the plan cache upon successful command exectution. However, since only the SBE plan
+  cache is cleared (classic cache is untouched), this suite can only be run with 'internalQueryFrameworkControl'
+  server parameter set to 'trySbeEngine'.
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        'await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
+        await import("jstests/libs/override_methods/make_index_filters_into_query_settings.js");
+        db.adminCommand({configureFailPoint: ''querySettingsPlanCacheInvalidation'',
+        mode: ''alwaysOn''});'
+      global_vars:
+        TestData:
+          isIndexFiltersToQuerySettings: true
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_shards: 2
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files: []
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    - assumes_no_implicit_collection_creation_on_get_collection
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    - requires_profiling
+    - requires_capped
+  roots:
+    - jstests/core/index/index_filter_catalog_independent.js
+    - jstests/core/index/index_filter_collation.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/index/index_filter_on_hidden_index.js
+    - jstests/core/index/wildcard/wildcard_index_filter.js
+    - jstests/core/index/wildcard/compound_wildcard_index_filter.js
+test_kind: js_test

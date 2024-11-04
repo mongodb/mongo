@@ -40,16 +40,6 @@ overrides:
     - task: change_stream_serverless_no_optimization_fuzzer
       exec_timeout: 600 # 10 hours
 
-  enterprise-amazon-linux2-arm64-all-feature-flags:
-    - task: cursor_hints_to_query_settings_replset_passthrough
-      exec_timeout: 240 # 4 hours
-    - task: cursor_hints_to_query_settings_sharded_collections_passthrough
-      exec_timeout: 240 # 4 hours
-    - task: cursor_hints_to_query_settings_unsharded_collections_passthrough
-      exec_timeout: 240 # 4 hours
-    - task: query_shape_hash_stability
-      exec_timeout: 240 # 4 hours
-
   enterprise-amazon2-streams:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
@@ -91,14 +81,6 @@ overrides:
   enterprise-rhel-8-64-bit:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
-
-  enterprise-rhel-8-64-bit-dynamic-all-feature-flags:
-    - task: cursor_hints_to_query_settings_replset_passthrough
-      exec_timeout: 240 # 4 hours
-    - task: cursor_hints_to_query_settings_sharded_collections_passthrough
-      exec_timeout: 240 # 4 hours
-    - task: cursor_hints_to_query_settings_unsharded_collections_passthrough
-      exec_timeout: 240 # 4 hours
 
   enterprise-rhel-8-64-bit-dynamic-classic-engine:
     - task: aggregation_blockprocessing_fuzzer

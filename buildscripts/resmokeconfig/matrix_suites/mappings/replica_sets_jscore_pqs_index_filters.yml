@@ -1,0 +1,12 @@
+base_suite: replica_sets_jscore_passthrough
+description: >-
+  Test the correctness of query settings application by replacing index filter commands with query settings ones. This suite runs a select subset of jscore tests on a replica set fixture.
+  For testing purposes, SetQuerySettingsCommand and RemoveQuerySettingsCommand clear the plan cache
+  upon successful command exectution. However, since only the SBE plan cache is cleared (classic
+  cache is untouched), this suite can only be run with 'internalQueryFrameworkControl' server
+  parameter set to 'trySbeEngine'.
+eval:
+  - "query_settings.eval_index_filters_to_query_settings"
+overrides:
+  - "query_settings.index_filters_to_query_settings_selector"
+  - "query_settings.test_data_index_filters_to_query_settings"

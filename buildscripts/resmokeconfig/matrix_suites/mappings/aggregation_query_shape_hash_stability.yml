@@ -1,0 +1,10 @@
+base_suite: aggregation
+description: >-
+  This suite runs through all existing aggregation tests and ensures that the 'queryShapeHash'
+  attribute returned in explain is same for multiple explain invocations on replica set deployments.
+excludes:
+  - "query_settings.common_aggregation_excludes"
+eval:
+  - "query_settings.eval_query_shape_hash_stability"
+overrides:
+  - "query_settings.replica_sets_fixture"

@@ -9,8 +9,14 @@ import {documentEq} from "jstests/aggregation/extras/utils.js";
  */
 export function getQueryPlanners(explain) {
     return getAllNodeExplains(explain).flatMap(nodeExplain => {
-        const queryPlanners = getNestedProperties(nodeExplain, "queryPlanner");
-        return queryPlanners.length == 0 ? [nodeExplain] : queryPlanners;
+        // When the shards are present in 'queryPlanner.winningPlan', then the 'nodeExplain' itself
+        // represents the shard's 'queryPlanner'.
+        const isQueryPlanner = nodeExplain.hasOwnProperty("winningPlan");
+        if (isQueryPlanner) {
+            return [nodeExplain];
+        }
+        // Otherwise, the planner outputs will be nested deeper under a 'queryPlanner' field.
+        return getNestedProperties(nodeExplain, "queryPlanner");
     });
 }
 

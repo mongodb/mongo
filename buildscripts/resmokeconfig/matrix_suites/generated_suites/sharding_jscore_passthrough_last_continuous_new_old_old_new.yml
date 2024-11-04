@@ -12,7 +12,8 @@ executor:
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
-  config: {}
+  config:
+    shell_options: {}
   fixture:
     class: ShardedClusterFixture
     mixed_bin_versions: new_old_old_new

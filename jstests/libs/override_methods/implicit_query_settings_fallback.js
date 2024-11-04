@@ -39,6 +39,11 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
             return;
         }
 
+        if (explain.hasOwnProperty("warning")) {
+            // The explain output exceeded the 16MB BSON size limit and was truncated.
+            return;
+        }
+
         // If the query explain has no 'winningPlan', we can not assert for query settings
         // fallback.
         if (getNestedProperties(explain, "winningPlan").length === 0) {

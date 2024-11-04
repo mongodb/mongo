@@ -312,8 +312,24 @@ buildvariants:
       - name: vector_search
       - name: vector_search_auth
       - name: vector_search_ssl
-      - name: cursor_hints_to_query_settings_replset_passthrough
-      - name: cursor_hints_to_query_settings_sharded_collections_passthrough_gen
-      - name: cursor_hints_to_query_settings_unsharded_collections_passthrough_gen
-      - name: implicit_query_settings_fallback
-      - name: query_shape_hash_stability
+      - name: aggregation_mongos_pqs_fallback_gen
+      - name: aggregation_mongos_pqs_hints_gen
+      - name: aggregation_mongos_query_shape_hash_stability_gen
+      - name: aggregation_pqs_fallback_gen
+      - name: aggregation_pqs_hints_gen
+      - name: aggregation_query_shape_hash_stability_gen
+      - name: aggregation_sharded_collections_pqs_fallback_gen
+      - name: aggregation_sharded_collections_pqs_hints_gen
+      - name: aggregation_sharded_collections_query_shape_hash_stability_gen
+      - name: replica_sets_jscore_pqs_fallback_gen
+      - name: replica_sets_jscore_pqs_hints_gen
+      - name: replica_sets_jscore_pqs_index_filters_gen
+      - name: replica_sets_jscore_query_shape_hash_stability_gen
+      - name: sharded_collections_pqs_fallback_gen
+      - name: sharded_collections_pqs_hints_gen
+      - name: sharded_collections_pqs_index_filters_gen
+      - name: sharded_collections_query_shape_hash_stability_gen
+      - name: sharding_pqs_fallback_gen
+      - name: sharding_pqs_hints_gen
+      - name: sharding_pqs_index_filters_gen
+      - name: sharding_query_shape_hash_stability_gen

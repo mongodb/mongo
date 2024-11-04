@@ -1,0 +1,9 @@
+base_suite: aggregation_mongos_passthrough
+description: >-
+  Test the correctness of the query settings fallback mechanism by introducing planner
+  failures and then expecting that the fallback-generated plan is identical to the
+  original plan. This suite runs aggregation tests using a sharded cluster fixture.
+excludes:
+  - "query_settings.common_aggregation_excludes"
+eval:
+  - "query_settings.eval_implicit_query_settings_fallback"

@@ -1,0 +1,9 @@
+base_suite: aggregation_sharded_collections_passthrough
+description: >-
+  This suite runs through all existing aggregation tests and ensures that the 'queryShapeHash'
+  attribute returned in explain is same for multiple explain invocations on sharded cluster deployments
+  which implicitly shards accessed collections.
+excludes:
+  - "query_settings.common_aggregation_excludes"
+eval:
+  - "query_settings.eval_query_shape_hash_stability"

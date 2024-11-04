@@ -1,0 +1,8 @@
+base_suite: sharding_jscore_passthrough
+description: >-
+  This suite runs through all existing core tests and ensures that the 'queryShapeHash'
+  attribute returned in explain is same for multiple explain invocations in sharded cluster deployments.
+excludes:
+  - "query_settings.common_core_excludes"
+eval:
+  - "query_settings.eval_query_shape_hash_stability"

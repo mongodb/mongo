@@ -47,7 +47,8 @@ executor:
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
-  config: {}
+  config:
+    shell_options: {}
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
