@@ -193,8 +193,15 @@ BSONObj getUntrackedCollectionCollation(OperationContext* opCtx,
                                         const NamespaceString& nss) {
     auto shard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
-    ScopedDbConnection conn(shard->getConnString());
-    std::list<BSONObj> all = conn->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()));
+    BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << BSON("name" << nss.coll())
+                                            << "cursor" << BSONObj());
+    auto cursorResult = uassertStatusOK(
+        shard->runExhaustiveCursorCommand(opCtx,
+                                          ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
+                                          nss.dbName(),
+                                          cmdObj,
+                                          Milliseconds(-1)));
+    std::vector<BSONObj> all = cursorResult.docs;
 
     // Collection or collection info does not exist; return an empty collation object.
     if (all.empty() || all.front().isEmpty()) {
