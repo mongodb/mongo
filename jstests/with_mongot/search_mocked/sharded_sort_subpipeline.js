@@ -132,6 +132,10 @@ function mockMongotShardResponses(mongotQuery) {
 }
 
 (function testUnionWith() {
+    // Before running this test, make sure shard0 has up-to-date routing information.
+    assert.commandWorked(
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: shardedColl.getFullName()}));
+
     const mongotQuery = {sort: {a: 1}};
     const sortSpec = {"$searchSortValues.a": 1};
     mockPlanShardedSearchResponseOnConn(

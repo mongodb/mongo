@@ -299,6 +299,10 @@ function setupAllMockRequests(searchColl, mockResponses, explainVerbosity = null
 }
 
 function lookupTest(baseColl, searchColl, mockResponses) {
+    // Before running the test, make sure shard1 has up-to-date routing information.
+    assert.commandWorked(
+        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: searchColl.getFullName()}));
+
     setupAllMockRequests(searchColl, mockResponses);
     assert.sameMembers(expectedLookupResults,
                        baseColl.aggregate(makeLookupPipeline(searchColl)).toArray());

@@ -39,6 +39,9 @@ const originalShard0Metrics =
 const originalShard1Metrics =
     assert.commandWorked(st.shard1.adminCommand({serverStatus: 1})).transactions;
 
+// Refresh the routing information for the foreign collection in shard0 before running the checks.
+assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+
 const session = st.s.startSession();
 const sessionDB = session.getDatabase(dbName);
 session.startTransaction();
