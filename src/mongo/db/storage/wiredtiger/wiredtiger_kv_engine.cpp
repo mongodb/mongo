@@ -811,7 +811,18 @@ void WiredTigerKVEngine::cleanShutdown() {
 
     auto startTime = Date_t::now();
     LOGV2(4795902, "Closing WiredTiger", "closeConfig"_attr = closeConfig);
-    invariantWTOK(_conn->close(_conn, closeConfig.c_str()), nullptr);
+    // Attempting to close the connection might transiently fail with EBUSY.
+    int retCode = 0;
+    for (int attempts = 0; attempts < gWiredTigerMaxAttemptsToCloseConnectionOnShutdown.load();
+         ++attempts) {
+        retCode = _conn->close(_conn, closeConfig.c_str());
+        if (retCode != EBUSY) {
+            break;
+        }
+        LOGV2(9513600, "Attempt to close WT returned EBUSY, retrying", "attempts"_attr = attempts);
+        sleepmillis(100);
+    }
+    fassert(9513601, retCode == 0);
     LOGV2(4795901, "WiredTiger closed", "duration"_attr = Date_t::now() - startTime);
     _conn = nullptr;
 }

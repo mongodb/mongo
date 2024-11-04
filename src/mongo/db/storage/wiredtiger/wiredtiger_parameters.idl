@@ -245,3 +245,15 @@ server_parameters:
       cpp_varname: gWiredTigerVerboseShutdownCheckpointLogs
       default: false
       redact: false
+
+    wiredTigerMaxAttemptsToCloseConnectionOnShutdown:
+      description: >- 
+        In rare cases where closing WT while performing a clean shutdown returns EBUSY, or another
+        error code, we will retry the close. This value represents the maximum number of attempts
+        we will try.
+      set_at: [ startup, runtime ]
+      cpp_vartype: "AtomicWord<int>"
+      cpp_varname: "gWiredTigerMaxAttemptsToCloseConnectionOnShutdown"
+      default: 3
+      validator: {gte: 1}
+      redact: false
