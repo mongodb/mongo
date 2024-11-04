@@ -274,6 +274,11 @@ BSONObj copyFileRange(const BSONObj& args, void* data) {
     out.write(buffer.data(), bytesRead);
     out.close();
 
+    uassert(9663000,
+            "Couldn't write {} bytes starting at {} from file {} to {}"_format(
+                length, offset, src, dest),
+            out);
+
     return BSON("n" << bytesRead << "earlyEOF" << earlyEOF);
 }
 
@@ -365,7 +370,9 @@ BSONObj copyFile(const BSONObj& args, void* data) {
     const std::string source = it.next().str();
     const std::string destination = it.next().str();
 
-    boost::filesystem::copy_file(source, destination);
+    bool success = boost::filesystem::copy_file(source, destination);
+    uassert(
+        9663001, str::stream() << "failed to copy " << source << " to " << destination, success);
 
     return undefinedReturn;
 }
