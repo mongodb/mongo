@@ -6,6 +6,7 @@
  *   uses_transactions,
  * ]
  */
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
@@ -61,32 +62,38 @@ const testLookupDoesNotSeeDocumentsOutsideSnapshot = function() {
         assert.commandWorked(unshardedColl.insert({_id: i, foreign_always_one: 1}));
     }
 
-    session.startTransaction();
+    withRetryOnTransientTxnError(
+        () => {
+            session.startTransaction();
 
-    const curs = shardedColl.aggregate(
-        pipeline, {readConcern: {level: "snapshot"}, cursor: {batchSize: kBatchSize}});
+            const curs = shardedColl.aggregate(
+                pipeline, {readConcern: {level: "snapshot"}, cursor: {batchSize: kBatchSize}});
 
-    for (let i = 0; i < kBatchSize; i++) {
-        const doc = curs.next();
-        assert.eq(doc.matches.length, kUnshardedCollOriginalSize);
-    }
+            for (let i = 0; i < kBatchSize; i++) {
+                const doc = curs.next();
+                assert.eq(doc.matches.length, kUnshardedCollOriginalSize);
+            }
 
-    // Do writes on the unsharded collection from outside the session.
-    (function() {
-        const unshardedCollOutsideSession =
-            st.s.getDB(sessionDB.getName())[unshardedColl.getName()];
-        assert.commandWorked(unshardedCollOutsideSession.insert({b: 1, xyz: 1}));
-        assert.commandWorked(unshardedCollOutsideSession.insert({b: 1, xyz: 2}));
-    })();
+            // Do writes on the unsharded collection from outside the session.
+            (function() {
+                const unshardedCollOutsideSession =
+                    st.s.getDB(sessionDB.getName())[unshardedColl.getName()];
+                assert.commandWorked(unshardedCollOutsideSession.insert({b: 1, xyz: 1}));
+                assert.commandWorked(unshardedCollOutsideSession.insert({b: 1, xyz: 2}));
+            })();
 
-    // We shouldn't see those writes from the aggregation within the session.
-    assert.eq(curs.hasNext(), true);
-    while (curs.hasNext()) {
-        const doc = curs.next();
-        assert.eq(doc.matches.length, kUnshardedCollOriginalSize);
-    }
+            // We shouldn't see those writes from the aggregation within the session.
+            assert.eq(curs.hasNext(), true);
+            while (curs.hasNext()) {
+                const doc = curs.next();
+                assert.eq(doc.matches.length, kUnshardedCollOriginalSize);
+            }
 
-    assert.commandWorked(session.abortTransaction_forTesting());
+            assert.commandWorked(session.abortTransaction_forTesting());
+        },
+        () => {
+            session.abortTransaction_forTesting();
+        });
 };
 
 // Run the test once, with all of the data on shard 1. This means that the merging shard (shard
