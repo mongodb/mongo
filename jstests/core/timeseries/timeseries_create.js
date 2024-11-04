@@ -46,12 +46,8 @@ const testOptions = function({
     if (!errorCode) {
         assert.commandWorked(res);
 
-        // TODO (SERVER-80362): Always test idempotency.
-        const version = db.version().split('.');
-        if ((version[0] == 7 && version[1] >= 1) || version[0] > 7) {
-            // Test that the creation is idempotent.
-            assert.commandWorked(create());
-        }
+        // Test that the creation is idempotent.
+        assert.commandWorked(create());
 
         const collections =
             assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
