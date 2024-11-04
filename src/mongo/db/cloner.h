@@ -92,7 +92,7 @@ public:
                                                           const std::string& masterHost) override;
 
 private:
-    std::unique_ptr<ScopedDbConnection> _conn;
+    std::unique_ptr<DBClientBase> _conn;
 
     // Filters a database's collection list and removes collections that should not be cloned.
     StatusWith<std::vector<BSONObj>> _filterCollectionsForClone(
@@ -131,7 +131,7 @@ private:
     struct BatchHandler;
 
     DBClientBase* getConn() {
-        return _conn->get();
+        return _conn.get();
     }
 };
 
