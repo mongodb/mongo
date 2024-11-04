@@ -7,7 +7,7 @@
  *  requires_sharding,
  * ]
  */
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -102,10 +102,9 @@ let parallelShellArr = collections.map((coll) => {
         }, dbName, coll), st.s.port);
 });
 
-// Wait for all queries to refresh. Unrelated refreshes can happen, so timesEntered is not reliable.
-// Wait for the log message instead.
-assert.soon(() =>
-                checkLog.checkContainsWithCountJson(configShard, 9131800, {}, collections.length));
+// Wait for all queries to refresh. Each thread hits the failpoint twice: once to test the
+// condition, and then once to wait on it.
+cacheFP.wait(kDefaultWaitForFailPointTimeout, collections.length * 2);
 
 // Unblock threads.
 cacheFP.off();
