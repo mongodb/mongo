@@ -37,8 +37,6 @@ namespace mongo::ce {
 
 enum class EstimationAlgo { HistogramV1, HistogramV2, HistogramV3 };
 
-// --------------------- SCALAR HISTOGRAM ESTIMATION METHODS ---------------------
-
 /**
  * Computes an estimate for a value and estimation type. Uses linear interpolation to
  * calculate the frequency of a value in a bucket.
@@ -102,7 +100,8 @@ EstimationResult estimateCardinalityEq(const stats::CEHistogram& ceHist,
 /**
  * Estimates the cardinality of a range predicate given an CEHistogram and a range predicate.
  * Set 'includeScalar' to true to indicate whether or not the provided range should include no-array
- * values. The other fields define the range of the estimation.
+ * values. The other fields define the range of the estimation. This method assumes that the values
+ * are in order.
  */
 EstimationResult estimateCardinalityRange(const stats::CEHistogram& ceHist,
                                           bool lowInclusive,
@@ -128,5 +127,34 @@ Cardinality estimateIntervalCardinality(const stats::CEHistogram& ceHist,
 bool canEstimateBound(const stats::CEHistogram& ceHist,
                       sbe::value::TypeTags tag,
                       bool includeScalar);
+
+/**
+ * Estimate the cardinality of a point query (e.g., {a: {$eq: val}}) via type counts. The value
+ * 'val' has to be of specific type/value combination for which we are able to estimate using type
+ * counts. Such types are:
+ * - Boolean (True/False)
+ * - Array (Empty)
+ * - Null/Nothing
+ * - Int (NaN)
+ */
+boost::optional<EstimationResult> estimateCardinalityEqViaTypeCounts(
+    const stats::CEHistogram& ceHist, sbe::value::TypeTags tag, sbe::value::Value val);
+
+/**
+ * Estimate the cardinality of a range query (e.g., [valLow, valHigh]) via type counts. The function
+ * will return a result if the values 'valLow', 'valHigh' are i. either Boolean (True/False) or ii.
+ * completely enclose a specific data type (i.e., all values belonging to a specific data type).
+ * This function assumes that i. The two typetags of the interval boundary values (tagLow, tagHigh)
+ * may differ, ii. valLow and valHigh differ, and iii. valLow and valHigh are sorted by value (i.e.,
+ * valLow < valHigh).
+ */
+boost::optional<EstimationResult> estimateCardinalityRangeViaTypeCounts(
+    const stats::CEHistogram& ceHist,
+    bool lowInclusive,
+    sbe::value::TypeTags tagLow,
+    sbe::value::Value valLow,
+    bool highInclusive,
+    sbe::value::TypeTags tagHigh,
+    sbe::value::Value valHigh);
 
 }  // namespace mongo::ce

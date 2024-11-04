@@ -37,8 +37,6 @@ using stats::sameTypeBracket;
 using stats::ScalarHistogram;
 using stats::valueToDouble;
 
-// --------------------- SCALAR HISTOGRAM ESTIMATION METHODS ---------------------
-
 EstimationResult estimateCardinality(const ScalarHistogram& h,
                                      sbe::value::TypeTags tag,
                                      sbe::value::Value val,
@@ -242,17 +240,122 @@ EstimationResult estimateRangeQueryOnArray(const ScalarHistogram& histogramAmin,
     return highEstimate - lowEstimate;
 }
 
-// --------------------- CE HISTOGRAM ESTIMATION METHODS ---------------------
+boost::optional<EstimationResult> estimateCardinalityEqViaTypeCounts(
+    const stats::CEHistogram& ceHist, sbe::value::TypeTags tag, sbe::value::Value val) {
+    EstimationResult estimation = {0.0 /*card*/, 0.0 /*ndv*/};
+    if (tag == sbe::value::TypeTags::Boolean) {
+        if (stats::isTrueBool(tag, val)) {
+            estimation.card = ceHist.getTrueCount();
+        } else {
+            estimation.card = ceHist.getFalseCount();
+        }
+        return estimation;
+    } else if (tag == sbe::value::TypeTags::Array && stats::isEmptyArray(tag, val)) {
+        estimation.card = ceHist.getEmptyArrayCount();
+        return estimation;
+    } else if ((tag == sbe::value::TypeTags::Null) || (tag == sbe::value::TypeTags::Nothing)) {
+        auto nTypeCounts = ceHist.getTypeCounts().find(tag);
+        if (nTypeCounts != ceHist.getTypeCounts().end()) {
+            estimation.card = nTypeCounts->second;
+            return estimation;
+        }
+    } else if (sbe::value::isNumber(tag) && sbe::value::isNaN(tag, val)) {
+        estimation.card = ceHist.getNanCount();
+        return estimation;
+    }
+    return boost::none;
+}
+
+boost::optional<EstimationResult> estimateCardinalityRangeViaTypeCounts(
+    const stats::CEHistogram& ceHist,
+    bool lowInclusive,
+    sbe::value::TypeTags tagLow,
+    sbe::value::Value valLow,
+    bool highInclusive,
+    sbe::value::TypeTags tagHigh,
+    sbe::value::Value valHigh) {
+
+    // The values must differ and the values have to be in order.
+    tassert(9163902,
+            "Order of values invalid for type count estimation",
+            stats::compareValues(tagLow, valLow, tagHigh, valHigh) < 0);
+
+    EstimationResult estimation = {0.0 /*card*/, 0.0 /*ndv*/};
+
+    if (tagLow == sbe::value::TypeTags::Boolean &&
+        stats::sameTypeBracketInterval(tagLow, highInclusive, tagHigh, valHigh)) {
+
+        // If the types of the bounds are both Boolean, check the inclusivity fo the bounds to
+        // accumulate the correct counts of true/false values. We assume that the two values are
+        // different and that when sorted False < True.
+        // E.g., [False, True], [False, True)
+
+        if (lowInclusive) {
+            estimation.card += ceHist.getFalseCount();
+        }
+
+        if (highInclusive) {
+            estimation.card += ceHist.getTrueCount();
+        }
+
+        return estimation;
+    } else {
+
+        // For all other types, the interval has to fully cover a full type.
+        // E.g., an interval covering all strings: ["", {}), the lower bound is inclusive whereas
+        // the uppper bound is non inclusive.
+
+        if (stats::isFullBracketInterval(
+                tagLow, valLow, lowInclusive, tagHigh, valHigh, highInclusive)) {
+
+            // Responding to cardinality estimations using TypeCounts, StringSmall and StringBig are
+            // considered to be the same type.
+            std::vector<sbe::value::TypeTags> toAdd;
+            switch (tagLow) {
+                case sbe::value::TypeTags::StringSmall:
+                case sbe::value::TypeTags::StringBig:
+                    toAdd.push_back(sbe::value::TypeTags::StringSmall);
+                    toAdd.push_back(sbe::value::TypeTags::StringBig);
+                    break;
+                default:
+                    toAdd.push_back(tagLow);
+                    break;
+            }
+
+            bool set = false;
+            for (auto tag : toAdd) {
+                auto typeCounts = ceHist.getTypeCounts().find(tag);
+                if (typeCounts != ceHist.getTypeCounts().end()) {
+                    estimation.card += typeCounts->second;
+                    set = true;
+                }
+            }
+
+            if (set) {
+                return estimation;
+            }
+        }
+    }
+    return boost::none;
+}
 
 EstimationResult estimateCardinalityEq(const stats::CEHistogram& ceHist,
                                        sbe::value::TypeTags tag,
                                        sbe::value::Value val,
                                        bool includeScalar) {
+    // Try to estimate via type counts.
+    auto typeCountEstimation = estimateCardinalityEqViaTypeCounts(ceHist, tag, val);
+    if (typeCountEstimation) {
+        return typeCountEstimation.get();
+    }
+
     EstimationResult estimation = {0.0 /*card*/, 0.0 /*ndv*/};
+
     // Estimate cardinality for fields containing scalar values if includeScalar is true.
     if (includeScalar) {
         estimation = estimateCardinality(ceHist.getScalar(), tag, val, EstimationType::kEqual);
     }
+
     // If histogram includes array data points, calculate cardinality for fields containing array
     // values.
     if (ceHist.isArray()) {
@@ -275,6 +378,13 @@ EstimationResult estimateCardinalityRange(const stats::CEHistogram& ceHist,
             "The interval must be in ascending order",
             !reversedInterval(tagLow, valLow, tagHigh, valHigh));
 
+    // Try to estimate via type counts.
+    auto typeCountEstimation = estimateCardinalityRangeViaTypeCounts(
+        ceHist, lowInclusive, tagLow, valLow, highInclusive, tagHigh, valHigh);
+    if (typeCountEstimation) {
+        return typeCountEstimation.get();
+    }
+
     // Helper lambda to shorten code for legibility.
     auto estRange = [&](const stats::ScalarHistogram& h) {
         return estimateCardinalityRange(
@@ -282,6 +392,7 @@ EstimationResult estimateCardinalityRange(const stats::CEHistogram& ceHist,
     };
 
     EstimationResult result = {0.0 /*card*/, 0.0 /*ndv*/};
+
     if (ceHist.isArray()) {
 
         if (includeScalar) {
@@ -392,22 +503,26 @@ Cardinality estimateIntervalCardinality(const stats::CEHistogram& ceHist,
 
     // If 'startTag' and 'endTag' are either in the same type or type-bracketed, they
     // are estimable directly via either histograms or type counts.
-    if (stats::sameTypeBracketedInterval(startTag, endInclusive, endTag, endVal)) {
-        if (stats::canEstimateTypeViaHistogram(startTag)) {
-            if (stats::compareValues(startTag, startVal, endTag, endVal) == 0) {
-                return estimateCardinalityEq(ceHist, startTag, startVal, includeScalar).card;
-            }
-            return estimateCardinalityRange(ceHist,
-                                            startInclusive,
-                                            startTag,
-                                            startVal,
-                                            endInclusive,
-                                            endTag,
-                                            endVal,
-                                            includeScalar)
-                .card;
+    if ((stats::sameTypeBracketInterval(startTag, endInclusive, endTag, endVal) &&
+         stats::canEstimateTypeViaHistogram(startTag)) ||
+        stats::canEstimateTypeViaTypeCounts(
+            startTag, startVal, startInclusive, endTag, endVal, endInclusive)) {
+
+        // If start and end values are the same and both are inclusive in the interval then evaluate
+        // as a point query. The interval has to be inclusive from both sides.
+        if ((stats::compareValues(startTag, startVal, endTag, endVal) == 0)) {
+            return estimateCardinalityEq(ceHist, startTag, startVal, includeScalar).card;
         }
-        // TODO: SERVER-91639 to support estimating via type counts here.
+
+        return estimateCardinalityRange(ceHist,
+                                        startInclusive,
+                                        startTag,
+                                        startVal,
+                                        endInclusive,
+                                        endTag,
+                                        endVal,
+                                        includeScalar)
+            .card;
     }
 
     // Cardinality estimation for an interval should only be called if interval bounds are

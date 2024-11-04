@@ -71,7 +71,7 @@ void assertSameTypeBracketedInterval(const Interval& interval) {
     sbe::value::ValueGuard startGuard{startTag, startVal};
     sbe::value::ValueGuard endGuard{endTag, endVal};
 
-    ASSERT(sameTypeBracketedInterval(startTag, interval.endInclusive, endTag, endVal));
+    ASSERT(sameTypeBracketInterval(startTag, interval.endInclusive, endTag, endVal));
 }
 
 TEST_F(ValueUtilsTest, SameTypeBracketedIntervalEqual) {

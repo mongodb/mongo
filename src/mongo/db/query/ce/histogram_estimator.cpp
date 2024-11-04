@@ -35,6 +35,12 @@ Cardinality HistogramEstimator::estimateCardinality(const stats::CEHistogram& hi
                                                     const Cardinality collectionSize,
                                                     const mongo::Interval& interval,
                                                     bool includeScalar) {
+
+    // Empty histogram.
+    if (hist.getSampleSize() <= 0) {
+        return 0.0;
+    }
+
     // Rescales the cardinality according to the current collection size.
     return (estimateIntervalCardinality(hist, interval, includeScalar) / hist.getSampleSize()) *
         collectionSize;
@@ -51,12 +57,14 @@ bool HistogramEstimator::canEstimateInterval(const stats::CEHistogram& hist,
 
     // If 'startTag' and 'endTag' are either in the same type or type-bracketed, they are estimable
     // directly via either histograms or type counts.
-    if (stats::sameTypeBracketedInterval(startTag, interval.endInclusive, endTag, endVal)) {
-        // TODO: SERVER-91639 to support estimating via type counts here.
-        return stats::canEstimateTypeViaHistogram(startTag);
-    }
+    bool viaHistogram =
+        (stats::sameTypeBracketInterval(startTag, interval.endInclusive, endTag, endVal) &&
+         stats::canEstimateTypeViaHistogram(startTag));
 
-    return false;
+    auto viaTypeCounts = stats::canEstimateTypeViaTypeCounts(
+        startTag, startVal, interval.startInclusive, endTag, endVal, interval.endInclusive);
+
+    return viaHistogram || viaTypeCounts;
 }
 
 }  // namespace mongo::ce

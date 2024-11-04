@@ -50,13 +50,24 @@ std::tuple<double, double, double, double> percentiles(std::vector<double> arr) 
             arr[(size_t)(arr.size() * 0.99)]};
 }
 
-static size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                                 sbe::value::TypeTags type,
-                                                 stats::SBEValue valueToCalculate) {
+size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
+                                          sbe::value::TypeTags type,
+                                          stats::SBEValue valueToCalculate) {
     int actualCard = 0;
     for (const auto& value : data) {
         if (mongo::stats::compareValues(
                 type, value.getValue(), type, valueToCalculate.getValue()) == 0) {
+            actualCard++;
+        }
+    }
+    return actualCard;
+}
+
+size_t calculateTypeFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
+                                              sbe::value::TypeTags type) {
+    int actualCard = 0;
+    for (const auto& value : data) {
+        if (type == value.getTag()) {
             actualCard++;
         }
     }
@@ -187,9 +198,25 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                                                    const TypeCombination& typeCombination,
                                                    const size_t ndv,
                                                    std::mt19937_64& seedArray,
-                                                   stats::MixedDistributionDescriptor& mdd) {
+                                                   stats::MixedDistributionDescriptor& mdd,
+                                                   int arrayLength = 0) {
     for (auto type : typeCombination) {
         switch (type.first) {
+            case sbe::value::TypeTags::Null:
+                td.push_back(std::make_unique<stats::NullDistribution>(mdd, type.second, ndv));
+                break;
+            case sbe::value::TypeTags::Boolean: {
+                bool includeFalse = false, includeTrue = false;
+                if (!(bool)interval.first || !(bool)interval.second) {
+                    includeFalse = true;
+                }
+                if ((bool)interval.first || (bool)interval.second) {
+                    includeTrue = true;
+                }
+                td.push_back(std::make_unique<stats::BooleanDistribution>(
+                    mdd, type.second, ndv, includeFalse, includeTrue));
+                break;
+            }
             case sbe::value::TypeTags::NumberInt32:
             case sbe::value::TypeTags::NumberInt64:
                 td.push_back(std::make_unique<stats::IntDistribution>(
@@ -206,12 +233,16 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                 break;
             case sbe::value::TypeTags::Array: {
                 stats::TypeDistrVector arrayData;
-                arrayData.push_back(
-                    std::make_unique<stats::IntDistribution>(mdd, 1.0, 100, 0, 10000));
+                arrayData.push_back(std::make_unique<stats::IntDistribution>(
+                    mdd, type.second, ndv, interval.first, interval.second));
                 auto arrayDataDesc =
                     std::make_unique<stats::DatasetDescriptorNew>(std::move(arrayData), seedArray);
-                td.push_back(std::make_unique<stats::ArrDistribution>(
-                    mdd, 1.0, 10, 1, 5, std::move(arrayDataDesc)));
+                td.push_back(std::make_unique<stats::ArrDistribution>(mdd,
+                                                                      1.0 /*weight*/,
+                                                                      10 /*ndv*/,
+                                                                      0 /*minArraLen*/,
+                                                                      arrayLength /*maxArrLen*/,
+                                                                      std::move(arrayDataDesc)));
                 break;
             }
             default:
@@ -225,7 +256,8 @@ void generateDataUniform(size_t size,
                          const TypeCombination& typeCombination,
                          const size_t seed,
                          const size_t ndv,
-                         std::vector<stats::SBEValue>& data) {
+                         std::vector<stats::SBEValue>& data,
+                         int arrayLength) {
 
     // Generator for type selection.
     std::mt19937 rng(seed);
@@ -239,7 +271,7 @@ void generateDataUniform(size_t size,
     stats::TypeDistrVector td;
 
     populateTypeDistrVectorAccordingToInputConfig(
-        td, interval, typeCombination, ndv, seedArray, uniform);
+        td, interval, typeCombination, ndv, seedArray, uniform, arrayLength);
 
     stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
     data = desc.genRandomDataset(size);

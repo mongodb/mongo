@@ -304,6 +304,44 @@ protected:
 using TypeDistrVector = std::vector<std::unique_ptr<DataTypeDistrNew>>;
 
 /**
+ * Null data distribution.
+ */
+class NullDistribution : public DataTypeDistrNew {
+public:
+    NullDistribution(MixedDistributionDescriptor distrDescriptor, double weight, size_t ndv);
+
+    /*
+     * Generate a set of null values, and store them in _valSet.
+     */
+    void init(DatasetDescriptorNew* parentDesc, std::mt19937_64& gen) override;
+};
+
+/**
+ * Boolean data distribution.
+ */
+class BooleanDistribution : public DataTypeDistrNew {
+public:
+    BooleanDistribution(MixedDistributionDescriptor distrDescriptor,
+                        double weight,
+                        size_t ndv,
+                        bool includeFalse,
+                        bool includeTrue,
+                        double nullsRatio = 0);
+
+    /*
+     * Generate a set of random booleans, and store them in _valSet.
+     */
+    void init(DatasetDescriptorNew* parentDesc, std::mt19937_64& gen) override;
+
+protected:
+    // _includeFalse and _includeTrue define which of true/false values will appear in the dataset.
+    // if _includeFalse is true, then 'false' values will be generated, otherwise not.
+    // Similarly for _includeTrue.
+    bool _includeFalse;
+    bool _includeTrue;
+};
+
+/**
  * Integer data distribution.
  */
 class IntDistribution : public DataTypeDistrNew {

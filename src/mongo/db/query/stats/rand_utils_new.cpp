@@ -72,6 +72,40 @@ void DataTypeDistrNew::generate(value::Array* randValueArray, std::mt19937_64& g
     }
 }
 
+NullDistribution::NullDistribution(MixedDistributionDescriptor distrDescriptor,
+                                   double weight,
+                                   size_t ndv)
+    : DataTypeDistrNew(distrDescriptor, value::TypeTags::Null, weight, ndv, 1) {}
+
+void NullDistribution::init(DatasetDescriptorNew* parentDesc, std::mt19937_64& gen) {}
+
+BooleanDistribution::BooleanDistribution(MixedDistributionDescriptor distrDescriptor,
+                                         double weight,
+                                         size_t ndv,
+                                         bool includeFalse,
+                                         bool includeTrue,
+                                         double nullsRatio)
+    : DataTypeDistrNew(distrDescriptor, value::TypeTags::NumberInt64, weight, ndv, nullsRatio),
+      _includeFalse(includeFalse),
+      _includeTrue(includeTrue) {
+    uassert(9163901, "At least one of the values needs to be true.", (includeFalse || includeTrue));
+}
+
+void BooleanDistribution::init(DatasetDescriptorNew* parentDesc, std::mt19937_64& gen) {
+    _valSet.reserve(2);
+
+    if (_includeFalse) {
+        const auto [tagFalse, valFalse] = makeBooleanValue(0);
+        _valSet.emplace_back(tagFalse, valFalse);
+    }
+
+    if (_includeTrue) {
+        const auto [tagTrue, valTrue] = makeBooleanValue(1);
+        _valSet.emplace_back(tagTrue, valTrue);
+    }
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
+}
+
 IntDistribution::IntDistribution(MixedDistributionDescriptor distrDescriptor,
                                  double weight,
                                  size_t ndv,

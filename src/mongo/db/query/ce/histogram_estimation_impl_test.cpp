@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/ce/test_utils.h"
+#include "mongo/unittest/death_test.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -1839,6 +1840,513 @@ TEST(CEHistogramEstimatorDataTest, Histogram1000ArraysLarge10Buckets) {
     }
 }
 
+TEST(CEHistogramEstimatorCanEstimateTest, EstimateCardinalityEqViaTypeCountsIntegerFail) {
+
+    int numberOfBuckets = 3;
+    std::vector<stats::SBEValue> data = {stats::makeInt64Value(1),
+                                         stats::makeInt64Value(2),
+                                         stats::makeInt64Value(3),
+                                         stats::makeInt64Value(4),
+                                         stats::makeInt64Value(4),
+                                         stats::makeInt64Value(2),
+                                         stats::makeInt64Value(1)};
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {
+        stats::SBEValue val = stats::makeInt64Value(1);
+
+        ASSERT_FALSE(estimateCardinalityEqViaTypeCounts(
+            *ceHist, sbe::value::TypeTags::NumberDouble, val.getValue()));
+    }
+}
+
+TEST(CEHistogramEstimatorCanEstimateTest, EstimateCardinalityEqViaTypeCountsDoubleFail) {
+
+    int numberOfBuckets = 3;
+    std::vector<stats::SBEValue> data = {stats::makeDoubleValue(100.047),
+                                         stats::makeDoubleValue(178.127),
+                                         stats::makeDoubleValue(861.267),
+                                         stats::makeDoubleValue(446.197),
+                                         stats::makeDoubleValue(763.798),
+                                         stats::makeDoubleValue(428.679),
+                                         stats::makeDoubleValue(432.447)};
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {
+        stats::SBEValue val = stats::makeDoubleValue(420.21);
+
+        ASSERT_FALSE(estimateCardinalityEqViaTypeCounts(
+            *ceHist, sbe::value::TypeTags::NumberDouble, val.getValue()));
+    }
+}
+
+TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsBooleanMixInclusiveBounds) {
+
+    size_t trueValues = 24, falseValues = 6, size = trueValues + falseValues;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    for (size_t i = 0; i < falseValues; i++) {
+        data.push_back(stats::makeBooleanValue(0 /*false*/));
+    }
+
+    for (size_t i = 0; i < trueValues; i++) {
+        data.push_back(stats::makeBooleanValue(1 /*true*/));
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // {a: {$eq: false}}
+        Interval interval(fromjson("{'': false, '': false}"), true, true);
+        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(falseValues, estimation.get().card);
+    }
+
+    {  // {a: {$eq: true}}
+        Interval interval(fromjson("{'': true, '': true}"), true, true);
+        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(trueValues, estimation.get().card);
+    }
+
+    {  // {a: {$or: {{$eq: false}, {$eq: true}} }
+        Interval interval(fromjson("{'': false, '': true}"), true, true);
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(size, estimation.get().card);
+    }
+}
+
+TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsBooleanMixNotInclusiveBounds) {
+
+    size_t trueValues = 24, falseValues = 6;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    for (size_t i = 0; i < falseValues; i++) {
+        data.push_back(stats::makeBooleanValue(0 /*false*/));
+    }
+
+    for (size_t i = 0; i < trueValues; i++) {
+        data.push_back(stats::makeBooleanValue(1 /*true*/));
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // {a: {$lt: true}}
+        Interval interval(fromjson("{'': false, '': true}"), true, false);
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(falseValues, estimation.get().card);
+    }
+
+    {  // {a: {$gt: false}}
+        Interval interval(fromjson("{'': false, '': true}"), false, true);
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(trueValues, estimation.get().card);
+    }
+}
+
+DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+           EstimateViaTypeCountsBooleanMixUnorderedValues1,
+           "Tripwire assertion") {
+
+    size_t trueValues = 24, falseValues = 6;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    for (size_t i = 0; i < falseValues; i++) {
+        data.push_back(stats::makeBooleanValue(0 /*false*/));
+    }
+
+    for (size_t i = 0; i < trueValues; i++) {
+        data.push_back(stats::makeBooleanValue(1 /*true*/));
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // [true, false]
+        Interval interval(fromjson("{'': true, '': false}"), true, true);
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+
+        // This should fail using tassert 9163900.
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+    }
+}
+
+DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+           EstimateViaTypeCountsBooleanMixUnorderedValues2,
+           "Tripwire assertion") {
+
+    size_t trueValues = 24, falseValues = 6;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    for (size_t i = 0; i < falseValues; i++) {
+        data.push_back(stats::makeBooleanValue(0 /*false*/));
+    }
+
+    for (size_t i = 0; i < trueValues; i++) {
+        data.push_back(stats::makeBooleanValue(1 /*true*/));
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // (true, false]
+        Interval interval(fromjson("{'': true, '': false}"), false, true);
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+
+        // This should fail using tassert 9163900.
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+    }
+}
+
+DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+           EstimateViaTypeCountsBooleanRangeWithSameValues1,
+           "Tripwire assertion") {
+
+    size_t trueValues = 8, falseValues = 2;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    for (size_t i = 0; i < falseValues; i++) {
+        data.push_back(stats::makeBooleanValue(0 /*false*/));
+    }
+
+    for (size_t i = 0; i < trueValues; i++) {
+        data.push_back(stats::makeBooleanValue(1 /*true*/));
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // [false, false)
+        Interval interval(fromjson("{'': false, '': false}"), true, false);
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+
+        // This should fail using tassert 9163900.
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+    }
+}
+
+DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+           EstimateViaTypeCountsBooleanRangeWithSameValues3,
+           "Tripwire assertion") {
+
+    size_t trueValues = 8, falseValues = 2;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    for (size_t i = 0; i < falseValues; i++) {
+        data.push_back(stats::makeBooleanValue(0 /*false*/));
+    }
+
+    for (size_t i = 0; i < trueValues; i++) {
+        data.push_back(stats::makeBooleanValue(1 /*true*/));
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // (false, false]
+        Interval interval(fromjson("{'': false, '': false}"), false, true);
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+
+        // This should fail using tassert 9163900.
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+    }
+}
+
+DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+           EstimateViaTypeCountsBooleanRangeWithSameValues2,
+           "Tripwire assertion") {
+
+    size_t trueValues = 8, falseValues = 2;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    for (size_t i = 0; i < falseValues; i++) {
+        data.push_back(stats::makeBooleanValue(0 /*false*/));
+    }
+
+    for (size_t i = 0; i < trueValues; i++) {
+        data.push_back(stats::makeBooleanValue(1 /*true*/));
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // [true, true)
+        Interval interval(fromjson("{'': true, '': true}"), true, false);
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+
+        // This should fail using tassert 9163900.
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+    }
+}
+
+DEATH_TEST(CEHistogramEstimatorCanEstimateTest,
+           EstimateViaTypeCountsBooleanRangeWithSameValues4,
+           "Tripwire assertion") {
+
+    size_t trueValues = 8, falseValues = 2;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    for (size_t i = 0; i < falseValues; i++) {
+        data.push_back(stats::makeBooleanValue(0 /*false*/));
+    }
+
+    for (size_t i = 0; i < trueValues; i++) {
+        data.push_back(stats::makeBooleanValue(1 /*true*/));
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // (true, true]
+        Interval interval(fromjson("{'': true, '': true}"), false, true);
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+
+        // This should fail using tassert 9163900.
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+    }
+}
+
+TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsEmptyArray) {
+
+    size_t size = 10;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    for (size_t i = 0; i < size; i++) {
+        data.push_back(sbe::value::makeNewArray());
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // {a: {$eq: []}}
+        Interval interval(fromjson("{'': [], '': []}"), true, true);
+        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
+        sbe::value::ValueGuard valGuard{valTag, val};
+
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(size, estimation.get().card);
+    }
+}
+
+TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsNull) {
+
+    size_t size = 10;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    for (size_t i = 0; i < size; i++) {
+        data.push_back(stats::makeNullValue());
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // {a: {$eq: null}}
+        Interval interval(fromjson("{'': null, '': null}"), true, true);
+        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(size, estimation.get().card);
+    }
+}
+
+TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsNaN) {
+
+    size_t sizeNaN = 3;  //, totalSize = size + sizeNaN;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data = {stats::makeDoubleValue(100.047),
+                                         stats::makeDoubleValue(178.127),
+                                         stats::makeDoubleValue(861.267),
+                                         stats::makeDoubleValue(446.197),
+                                         stats::makeDoubleValue(763.798),
+                                         stats::makeDoubleValue(428.679),
+                                         stats::makeDoubleValue(432.447)};
+
+    // add NaN values.
+    for (size_t i = 0; i < sizeNaN; i++) {
+        data.push_back(stats::makeNaNValue());
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // {a: {$eq: NaN}}
+        Interval interval(fromjson("{'': NaN, '': NaN}"), true, true);
+        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(sizeNaN, estimation.get().card);
+    }
+}
+
+TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsAllString) {
+
+    size_t size = 10;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data = {
+        value::makeNewString("wc2VFWKqCZT3V8GVLWqAJ442vWYgKJIviv9pZqrrGD4Yyjk9epx9J9RflpASGi97BCS"),
+        value::makeNewString("LjzZ9RmI4KsGgU8DEiEIe9VWFUicFHSyD5irCgWXUwh0kBV3ADkaOzxejDLK3FHt0Vl"),
+        value::makeNewString("MZUjm9UCx5Kv97nuc3dXDul7NW8iCOTlY0MbCjeyxi18dCw"),
+        value::makeNewString("fpOYzNMqdqeBvPKIDQ5LwrgeiYWdPfIWrWJTtPVn1khtHcQ5IyWeQBu8IS4gLzqGgUj"),
+        value::makeNewString("eoktVgPzGp6NvUYZPAAy0uYv342tXltHYqX4oAxwIB1DnLPO4C3DqmhyuvKdPHxjVpM"),
+        value::makeNewString("IO8ycvxdMyRveS4hMdej2O8FN2WipSbvi116Sdf97hAM4VtrGOMMqxpBwqIY5szeZC1"),
+        value::makeNewString("GPqhYMa7tcl0pp5cmQqpbEt11dZjXKkxwNaZE0TOSxQeLk6xSmDY2PDfZ0XFeLlCZmH"),
+        value::makeNewString("kEqBJ7aCd0ROzP6ScOiWm4xWVWPwwTvXtv7119VdSOAtiZKlmTqXvOoJvKJAnEAqrdd"),
+        value::makeNewString("OsNrN0e2BxnRA8mwTQKGtgXx8GbJZmvDH38RJJywp614ff36UFfPttEuAUj1oaIM5vg"),
+        value::makeNewString("rPfTNYop7sT4hUnkkg4VBKoWLlD1vJxpVWKLOx4uoJPphSU7MeOFWNU7MMksJiua4Q")};
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // {$and: [{a: {$gte: ""}},{a: {$lt: {}}}]}
+        Interval interval(fromjson("{'': \"\", '': {}}"), true, false);
+
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        sbe::value::ValueGuard startGuard{startTag, startVal};
+        sbe::value::ValueGuard endGuard{endTag, endVal};
+
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(size, estimation.get().card);
+    }
+}
+
+TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsMixTypes) {
+
+    size_t strCount = 10, sizeNaN = 3, trueValues = 5, falseValues = 5;
+    size_t numberOfBuckets = 10;
+
+    std::vector<stats::SBEValue> data = {
+        value::makeNewString("wc2VFWKqCZT3V8GVLWqAJ442vWYgKJIviv9pZqrrGD4Yyjk9epx9J9RflpASGi97BCS"),
+        value::makeNewString("LjzZ9RmI4KsGgU8DEiEIe9VWFUicFHSyD5irCgWXUwh0kBV3ADkaOzxejDLK3FHt0Vl"),
+        value::makeNewString("MZUjm9UCx5Kv97nuc3dXDul7NW8iCOTlY0MbCjeyxi18dCw"),
+        value::makeNewString("fpOYzNMqdqeBvPKIDQ5LwrgeiYWdPfIWrWJTtPVn1khtHcQ5IyWeQBu8IS4gLzqGgUj"),
+        value::makeNewString("eoktVgPzGp6NvUYZPAAy0uYv342tXltHYqX4oAxwIB1DnLPO4C3DqmhyuvKdPHxjVpM"),
+        value::makeNewString("IO8ycvxdMyRveS4hMdej2O8FN2WipSbvi116Sdf97hAM4VtrGOMMqxpBwqIY5szeZC1"),
+        value::makeNewString("GPqhYMa7tcl0pp5cmQqpbEt11dZjXKkxwNaZE0TOSxQeLk6xSmDY2PDfZ0XFeLlCZmH"),
+        value::makeNewString("kEqBJ7aCd0ROzP6ScOiWm4xWVWPwwTvXtv7119VdSOAtiZKlmTqXvOoJvKJAnEAqrdd"),
+        value::makeNewString("OsNrN0e2BxnRA8mwTQKGtgXx8GbJZmvDH38RJJywp614ff36UFfPttEuAUj1oaIM5vg"),
+        value::makeNewString("rPfTNYop7sT4hUnkkg4VBKoWLlD1vJxpVWKLOx4uoJPphSU7MeOFWNU7MMksJiua4Q"),
+        stats::makeDoubleValue(100.047),
+        stats::makeDoubleValue(178.127),
+        stats::makeDoubleValue(861.267),
+        stats::makeDoubleValue(446.197),
+        stats::makeDoubleValue(763.798),
+        stats::makeDoubleValue(428.679),
+        stats::makeDoubleValue(432.447)};
+
+    // add True boolean values.
+    for (size_t i = 0; i < trueValues; i++) {
+        data.push_back(stats::makeBooleanValue(1 /*true*/));
+    }
+
+    // add True boolean values.
+    for (size_t i = 0; i < falseValues; i++) {
+        data.push_back(stats::makeBooleanValue(0 /*false*/));
+    }
+
+    // add NaN values.
+    for (size_t i = 0; i < sizeNaN; i++) {
+        data.push_back(stats::makeNaNValue());
+    }
+
+    auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
+
+    {  // {a: {$eq: true}}
+        Interval interval(fromjson("{'': true, '': true}"), true, true);
+        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(trueValues, estimation.get().card);
+    }
+
+
+    {  // {a: {$eq: false}}
+        Interval interval(fromjson("{'': false, '': false}"), true, true);
+        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(falseValues, estimation.get().card);
+    }
+
+    {  // {a: {$eq: NaN}}
+        Interval interval(fromjson("{'': NaN, '': NaN}"), true, true);
+        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(sizeNaN, estimation.get().card);
+    }
+
+    {  // {$and: [{a: {$gte: ""}},{a: {$lt: {}}}]}
+        Interval interval(fromjson("{'': \"\", '': {}}"), true, false);
+        bool startInclusive = interval.startInclusive;
+        bool endInclusive = interval.endInclusive;
+        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        sbe::value::ValueGuard startGuard{startTag, startVal};
+        sbe::value::ValueGuard endGuard{endTag, endVal};
+
+        auto estimation = estimateCardinalityRangeViaTypeCounts(
+            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        ASSERT_TRUE(estimation);
+        ASSERT_EQ(strCount, estimation.get().card);
+    }
+}
 
 }  // namespace
 }  // namespace mongo::ce

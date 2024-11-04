@@ -102,6 +102,10 @@ value::Value SBEValue::getValue() const {
     return _val;
 }
 
+std::pair<value::TypeTags, value::Value> makeBooleanValue(int64_t v) {
+    return std::make_pair(value::TypeTags::Boolean, value::bitcastFrom<bool>(v));
+};
+
 std::pair<value::TypeTags, value::Value> makeInt64Value(int64_t v) {
     return std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(v));
 };
@@ -125,6 +129,12 @@ std::pair<value::TypeTags, value::Value> makeTimestampValue(Timestamp v) {
 
 std::pair<value::TypeTags, value::Value> makeNullValue() {
     return std::make_pair(value::TypeTags::Null, 0);
+};
+
+std::pair<value::TypeTags, value::Value> makeNaNValue() {
+    return std::make_pair(
+        sbe::value::TypeTags::NumberDouble,
+        sbe::value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
 };
 
 bool sameTypeClass(value::TypeTags tag1, value::TypeTags tag2) {
@@ -160,6 +170,20 @@ int32_t compareValues(value::TypeTags tag1,
     const auto [compareTag, compareVal] = value::compareValue(tag1, val1, tag2, val2);
     uassert(6660547, "Invalid comparison result", compareTag == value::TypeTags::NumberInt32);
     return value::bitcastTo<int32_t>(compareVal);
+}
+
+bool isEmptyArray(value::TypeTags tag, value::Value val) {
+    auto [tagArray, valEmptyArray] = value::makeNewArray();
+    auto isEmpty = (stats::compareValues(tag, val, tagArray, valEmptyArray) == 0);
+    value::releaseValue(tagArray, valEmptyArray);
+    return isEmpty;
+}
+
+bool isTrueBool(value::TypeTags tag, value::Value val) {
+    return (stats::compareValues(tag,
+                                 val,
+                                 sbe::value::TypeTags::Boolean,
+                                 sbe::value::bitcastFrom<int64_t>(1) /*SBEValue boolean*/) == 0);
 }
 
 void sortValueVector(std::vector<SBEValue>& sortVector) {
@@ -301,6 +325,69 @@ bool canEstimateTypeViaHistogram(value::TypeTags tag) {
     MONGO_UNREACHABLE;
 }
 
+bool canEstimateTypeViaTypeCounts(sbe::value::TypeTags startTag,
+                                  sbe::value::Value startVal,
+                                  bool startInclusive,
+                                  sbe::value::TypeTags endTag,
+                                  sbe::value::Value endVal,
+                                  bool endInclusive) {
+
+    bool isFullBracketInterval = stats::isFullBracketInterval(
+        startTag, startVal, startInclusive, endTag, endVal, endInclusive);
+
+    if (isFullBracketInterval) {
+        return true;
+    }
+
+    bool sameTypeBracketInterval =
+        stats::sameTypeBracketInterval(startTag, endInclusive, endTag, endVal);
+
+    bool pointQuery = (sameTypeBracketInterval &&
+                       (stats::compareValues(startTag, startVal, endTag, endVal) == 0));
+
+    switch (startTag) {
+        // Types that can only be estimated via the type-counters.
+        case value::TypeTags::Null:
+        case value::TypeTags::Nothing:
+        case value::TypeTags::Boolean: {
+            if (pointQuery) {
+                // i. For point queries with both sides need to be inclusive.
+                return (startInclusive && endInclusive);
+            } else {
+                // ii. For range query at least one side needs to be inclusive.
+                return (sameTypeBracketInterval && (startInclusive || endInclusive));
+            }
+            break;
+        }
+        case value::TypeTags::Array: {
+            if (sameTypeBracketInterval && stats::isEmptyArray(startTag, startVal) && pointQuery) {
+                return true;
+            }
+            break;
+        }
+        case value::TypeTags::NumberInt32:
+        case value::TypeTags::NumberDouble: {
+            if (sameTypeBracketInterval && sbe::value::isNaN(startTag, startVal) && pointQuery) {
+                return true;
+            }
+            break;
+        }
+        case value::TypeTags::Timestamp:
+        case value::TypeTags::Object:
+        case value::TypeTags::StringSmall:
+        case value::TypeTags::StringBig: {
+            break;
+        }
+        // Trying to estimate any other types should result in an error.
+        default:
+            uasserted(9163900,
+                      str::stream() << "Type " << startTag
+                                    << " is not supported by histogram type counts estimation.");
+    }
+
+    return false;
+}
+
 std::string serialize(value::TypeTags tag) {
     std::ostringstream os;
     os << tag;
@@ -346,9 +433,12 @@ value::TypeTags deserialize(const std::string& name) {
               str::stream() << "String " << name << " is not convertable to SBE type tag.");
 }
 
-std::pair<stats::SBEValue, bool> getMinMaxBoundForSBEType(const sbe::value::TypeTags& tag,
-                                                          const bool isMin) {
+std::pair<stats::SBEValue, bool> getMinMaxBoundForSBEType(sbe::value::TypeTags tag, bool isMin) {
     switch (tag) {
+        case sbe::value::TypeTags::MinKey:
+            return {{tag, 0}, false};
+        case sbe::value::TypeTags::MaxKey:
+            return {{tag, 0}, false};
         case sbe::value::TypeTags::NumberInt32:
         case sbe::value::TypeTags::NumberInt64:
         case sbe::value::TypeTags::NumberDouble:
@@ -468,11 +558,10 @@ std::pair<stats::SBEValue, bool> getMinMaxBoundForSBEType(const sbe::value::Type
     MONGO_UNREACHABLE;
 }
 
-
-bool sameTypeBracketedInterval(sbe::value::TypeTags startTag,
-                               const bool endInclusive,
-                               sbe::value::TypeTags endTag,
-                               sbe::value::Value endVal) {
+bool sameTypeBracketInterval(sbe::value::TypeTags startTag,
+                             bool endInclusive,
+                             sbe::value::TypeTags endTag,
+                             sbe::value::Value endVal) {
     if (stats::sameTypeClass(startTag, endTag)) {
         return true;
     }
@@ -481,8 +570,28 @@ bool sameTypeBracketedInterval(sbe::value::TypeTags startTag,
         return false;
     }
 
-    auto [min, minInclusive] = getMinMaxBoundForSBEType(startTag, false /*isMin*/);
-    return stats::compareValues(endTag, endVal, min.getTag(), min.getValue()) == 0;
+    auto [max, maxInclusive] = getMinMaxBoundForSBEType(startTag, false /*isMin*/);
+    return stats::compareValues(endTag, endVal, max.getTag(), max.getValue()) == 0;
+}
+
+bool isFullBracketInterval(sbe::value::TypeTags startTag,
+                           sbe::value::Value startVal,
+                           bool startInclusive,
+                           sbe::value::TypeTags endTag,
+                           sbe::value::Value endVal,
+                           bool endInclusive) {
+
+    auto [expectedMin, minInclusive] = getMinMaxBoundForSBEType(startTag, true /*isMin*/);
+    auto [expectedMax, maxInclusive] = getMinMaxBoundForSBEType(startTag, false /*isMin*/);
+
+    bool compareValuesMin =
+        (stats::compareValues(startTag, startVal, expectedMin.getTag(), expectedMin.getValue()) ==
+         0);
+
+    bool compareValuesMax =
+        (stats::compareValues(endTag, endVal, expectedMax.getTag(), expectedMax.getValue()) == 0);
+
+    return (compareValuesMin && (compareValuesMax && !endInclusive));
 }
 
 }  // namespace mongo::stats
