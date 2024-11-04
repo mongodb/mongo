@@ -87,6 +87,7 @@ The reason they should be pushed as separate commits is in the case of needing t
   - Remove `evergreen/system_perf/master/master_variants.yml` from "include" section
   - Update `evergreen/system_perf/master/variants.yml` to `evergreen/system_perf/X.Y/variants.yml` in the "include" section
   - Update `evergreen/system_perf/master/genny_tasks.yml` to `evergreen/system_perf/X.Y/genny_tasks.yml` in the "include" section
+  - Update the [evergreen project variable](https://docs.devprod.prod.corp.mongodb.com/evergreen/Project-Configuration/Project-and-Distro-Settings#variables) `compile_project` in the new sys-perf-X.X evergreen project to point to the new mongodb-mongo-X branch
 
 ### Other files
 
