@@ -97,8 +97,8 @@ public:
     }
 
     Bucket& createBucket(InsertContext& info, Date_t time) {
-        auto ptr = &internal::allocateBucket(
-            *this, *stripes[info.stripeNumber], withLock, info, time, nullptr);
+        auto ptr =
+            &internal::allocateBucket(*this, *stripes[info.stripeNumber], withLock, info, time);
         ASSERT_FALSE(hasBeenCleared(*ptr));
         return *ptr;
     }
@@ -165,7 +165,7 @@ public:
     UUID uuid3 = UUID::gen();
     BSONElement elem;
     TrackingContext trackingContext;
-    BucketMetadata bucketMetadata{trackingContext, elem, boost::none};
+    BucketMetadata bucketMetadata{trackingContext, elem, nullptr, boost::none};
     BucketKey bucketKey1{uuid1, bucketMetadata};
     BucketKey bucketKey2{uuid2, bucketMetadata};
     BucketKey bucketKey3{uuid3, bucketMetadata};
@@ -783,7 +783,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
                                      stats,
                                      StringData{bucket.timeField.data(), bucket.timeField.size()});
     ASSERT(claimWriteBatchCommitRights(*batch));
-    ASSERT_OK(prepareCommit(*this, batch, nullptr));
+    ASSERT_OK(prepareCommit(*this, batch));
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kPrepared));
 
     {

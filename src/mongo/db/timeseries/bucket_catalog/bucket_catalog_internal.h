@@ -144,8 +144,7 @@ Bucket* useBucket(BucketCatalog& catalog,
                   WithLock stripeLock,
                   InsertContext& info,
                   AllowBucketCreation mode,
-                  const Date_t& time,
-                  const StringDataComparator* comparator);
+                  const Date_t& time);
 
 /**
  * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets
@@ -214,8 +213,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     InsertContext& insertContext,
     Bucket& existingBucket,
     const Date_t& time,
-    uint64_t storageCacheSize,
-    const StringDataComparator* comparator);
+    uint64_t storageCacheSize);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -336,8 +334,7 @@ Bucket& allocateBucket(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
                        InsertContext& info,
-                       const Date_t& time,
-                       const StringDataComparator* comparator);
+                       const Date_t& time);
 
 /**
  * Close the existing, full bucket and open a new one for the same metadata.
@@ -350,8 +347,7 @@ Bucket& rollover(BucketCatalog& catalog,
                  Bucket& bucket,
                  InsertContext& info,
                  RolloverAction action,
-                 const Date_t& time,
-                 const StringDataComparator* comparator);
+                 const Date_t& time);
 
 /**
  * Determines if 'bucket' needs to be rolled over to accommodate 'doc'. If so, determines whether
@@ -367,8 +363,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     Sizes& sizesToBeAdded,
     AllowBucketCreation mode,
     const Date_t& time,
-    uint64_t storageCacheSize,
-    const StringDataComparator* comparator);
+    uint64_t storageCacheSize);
 
 /**
  * Retrieves or initializes the execution stats for the given namespace, for writing.

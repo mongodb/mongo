@@ -124,6 +124,7 @@ protected:
             {bucket_catalog::getTrackingContext(_trackingContexts,
                                                 bucket_catalog::TrackingScope::kOpenBucketsByKey),
              {},
+             nullptr,
              boost::none});
     }
 
@@ -458,6 +459,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
                       {bucket_catalog::getTrackingContext(
                            _trackingContexts, bucket_catalog::TrackingScope::kOpenBucketsByKey),
                        uncompressedPreImage.getField("meta"),
+                       nullptr,
                        boost::none});
     const std::vector<BSONObj> measurements = {
         fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"meta":{"tag":1},"a":0,"b":0})"),
@@ -1146,6 +1148,7 @@ TEST_F(TimeseriesWriteUtilTest, SortMeasurementsOnTimeField) {
                       {bucket_catalog::getTrackingContext(
                            _trackingContexts, bucket_catalog::TrackingScope::kOpenBucketsByKey),
                        metaField.getField("meta"),
+                       nullptr,
                        boost::none});
     batch->measurements = {measurements.begin(), measurements.end()};
     batch->min = fromjson(R"({"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1})");
@@ -1199,6 +1202,7 @@ TEST_F(TimeseriesWriteUtilTest, SortMeasurementsOnTimeFieldExtendedRange) {
                       {bucket_catalog::getTrackingContext(
                            _trackingContexts, bucket_catalog::TrackingScope::kOpenBucketsByKey),
                        metaField.getField("meta"),
+                       nullptr,
                        boost::none});
     batch->measurements = {measurements.begin(), measurements.end()};
     batch->min = measurements[1];

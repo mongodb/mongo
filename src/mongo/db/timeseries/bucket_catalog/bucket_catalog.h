@@ -315,9 +315,7 @@ void waitToInsert(InsertWaiter* waiter);
  * on the same bucket, or there is an outstanding 'ReopeningRequest' for the same series (metaField
  * value), this operation will block waiting for it to complete.
  */
-Status prepareCommit(BucketCatalog& catalog,
-                     std::shared_ptr<WriteBatch> batch,
-                     const StringDataComparator* comparator);
+Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch);
 
 /**
  * Records the result of a batch commit. Caller must already have commit rights on batch, and batch

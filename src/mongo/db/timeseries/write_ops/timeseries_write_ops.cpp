@@ -298,8 +298,6 @@ void tryPerformTimeseriesBucketCompression(OperationContext* opCtx,
         }
     }
 }
-}  // namespace
-namespace details {
 
 /**
  * Returns whether the request can continue.
@@ -318,15 +316,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
 
     auto metadata = getMetadata(bucketCatalog, batch->bucketId);
-    auto catalog = CollectionCatalog::get(opCtx);
-    auto nss = makeTimeseriesBucketsNamespace(ns(request));
-    auto coll = catalog->lookupCollectionByNamespace(opCtx, nss);
-
-
-    if (!coll) {
-        assertTimeseriesBucketsCollectionNotFound(nss);
-    }
-    auto status = prepareCommit(bucketCatalog, batch, coll->getDefaultCollator());
+    auto status = bucket_catalog::prepareCommit(bucketCatalog, batch);
     if (!status.isOK()) {
         invariant(bucket_catalog::isWriteBatchFinished(*batch));
         docsToRetry->push_back(index);
@@ -404,9 +394,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     abort(bucketCatalog, batch, ex.toStatus());
     throw;
 }
-}  // namespace details
 
-namespace {
 std::shared_ptr<bucket_catalog::WriteBatch>& extractFromPair(
     std::pair<std::shared_ptr<bucket_catalog::WriteBatch>, size_t>& pair) {
     return pair.first;
@@ -437,13 +425,10 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
     try {
         std::vector<mongo::write_ops::InsertCommandRequest> insertOps;
         std::vector<mongo::write_ops::UpdateCommandRequest> updateOps;
-        auto catalog = CollectionCatalog::get(opCtx);
-        auto coll = catalog->lookupCollectionByNamespace(
-            opCtx, makeTimeseriesBucketsNamespace(ns(request)));
+
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(bucketCatalog, batch.get()->bucketId);
-            auto prepareCommitStatus =
-                bucket_catalog::prepareCommit(bucketCatalog, batch, coll->getDefaultCollator());
+            auto prepareCommitStatus = bucket_catalog::prepareCommit(bucketCatalog, batch);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return false;
@@ -912,17 +897,17 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
             auto stmtIds = isTimeseriesWriteRetryable(opCtx) ? std::move(bucketStmtIds[batch.get()])
                                                              : std::vector<StmtId>{};
             try {
-                canContinue = details::commitTimeseriesBucket(opCtx,
-                                                              batch,
-                                                              start,
-                                                              index,
-                                                              std::move(stmtIds),
-                                                              errors,
-                                                              opTime,
-                                                              electionId,
-                                                              &docsToRetry,
-                                                              retryAttemptsForDup,
-                                                              request);
+                canContinue = commitTimeseriesBucket(opCtx,
+                                                     batch,
+                                                     start,
+                                                     index,
+                                                     std::move(stmtIds),
+                                                     errors,
+                                                     opTime,
+                                                     electionId,
+                                                     &docsToRetry,
+                                                     retryAttemptsForDup,
+                                                     request);
             } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
                 auto bucketId = ex.extraInfo<timeseries::BucketCompressionFailure>()->bucketId();
                 auto keySignature =
@@ -1135,7 +1120,6 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
 }
 
 namespace details {
-
 Status performAtomicTimeseriesWrites(
     OperationContext* opCtx,
     const std::vector<mongo::write_ops::InsertCommandRequest>& insertOps,
