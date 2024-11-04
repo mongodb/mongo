@@ -608,7 +608,7 @@ std::variant<bool, SortedDataInterface::DuplicateKey> WiredTigerIndex::_checkDup
     // An entry with prefix key already exists. This can happen only during rolling upgrade when
     // both timestamp unsafe and timestamp safe index format keys could be present.
     if (ret == WT_DUPLICATE_KEY) {
-        return DuplicateKey{key_string::toBson(prefix.data(), _ordering, keyString.getTypeBits())};
+        return DuplicateKey{key_string::toBson(prefix, _ordering, keyString.getTypeBits())};
     }
     invariantWTOK(ret,
                   c->session,
