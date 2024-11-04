@@ -262,7 +262,7 @@ auto downgradeError =
     Status{ErrorCodes::MustDowngrade,
            str::stream() << "UPGRADE PROBLEM: The data files need to be fully upgraded to version "
                             "4.4 before attempting a binary upgrade; see "
-                         << feature_compatibility_version_documentation::kUpgradeLink
+                         << feature_compatibility_version_documentation::upgradeLink()
                          << " for more details."};
 
 /**

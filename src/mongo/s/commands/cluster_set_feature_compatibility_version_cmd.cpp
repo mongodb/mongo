@@ -96,7 +96,7 @@ public:
           << multiversion::toString(GenericFCV::kLatest)
           << "' features are enabled, and all nodes in the cluster must be binary version "
           << multiversion::toString(GenericFCV::kLatest) << ". See "
-          << feature_compatibility_version_documentation::kCompatibilityLink << ".";
+          << feature_compatibility_version_documentation::compatibilityLink() << ".";
         return h.str();
     }
 

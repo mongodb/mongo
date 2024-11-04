@@ -594,7 +594,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
                              << "). If the current featureCompatibilityVersion is below "
                              << multiversion::toString(multiversion::GenericFCV::kLastLTS)
                              << ", see the documentation on upgrading at "
-                             << feature_compatibility_version_documentation::kUpgradeLink << "."});
+                             << feature_compatibility_version_documentation::upgradeLink() << "."});
     }
 
     auto version = swVersion.getValue();
@@ -724,7 +724,7 @@ Status FeatureCompatibilityVersionParameter::setFromString(StringData,
                                                            const boost::optional<TenantId>&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << feature_compatibility_version_documentation::compatibilityLink()
                           << "."};
 }
 

@@ -521,7 +521,7 @@ void ExpressionContext::throwIfFeatureFlagIsNotEnabledOnFCV(
             // dependency cycle (see SERVER-31968).
             str::stream() << name
                           << " is not allowed in the current feature compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << feature_compatibility_version_documentation::compatibilityLink()
                           << " for more information.",
             flag->isEnabledOnVersion(versionToCheck));
 }

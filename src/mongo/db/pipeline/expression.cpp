@@ -7347,26 +7347,28 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
         } else if (field == "to"_sd) {
             to = parseOperand(expCtx, elem, vps);
         } else if (field == "format"_sd) {
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "The 'format' argument to $convert is not allowed in the "
-                                     "current feature compatibility version. See "
-                                  << feature_compatibility_version_documentation::kCompatibilityLink
-                                  << ".",
-                    // If the command came from router, it means router must be on an FCV that
-                    // supports the 'format' field.
-                    expCtx->fromRouter || allowBinDataConvert);
+            uassert(
+                ErrorCodes::FailedToParse,
+                str::stream() << "The 'format' argument to $convert is not allowed in the "
+                                 "current feature compatibility version. See "
+                              << feature_compatibility_version_documentation::compatibilityLink()
+                              << ".",
+                // If the command came from router, it means router must be on an FCV that
+                // supports the 'format' field.
+                expCtx->fromRouter || allowBinDataConvert);
             format = parseOperand(expCtx, elem, vps);
         } else if (field == "onError"_sd) {
             onError = parseOperand(expCtx, elem, vps);
         } else if (field == "onNull"_sd) {
             onNull = parseOperand(expCtx, elem, vps);
         } else if (field == "byteOrder"_sd) {
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "The 'byteOrder' argument to $convert is not allowed in the "
-                                     "current feature compatibility version. See "
-                                  << feature_compatibility_version_documentation::kCompatibilityLink
-                                  << ".",
-                    allowBinDataConvertNumeric);
+            uassert(
+                ErrorCodes::FailedToParse,
+                str::stream() << "The 'byteOrder' argument to $convert is not allowed in the "
+                                 "current feature compatibility version. See "
+                              << feature_compatibility_version_documentation::compatibilityLink()
+                              << ".",
+                allowBinDataConvertNumeric);
             byteOrder = parseOperand(expCtx, elem, vps);
         } else {
             uasserted(ErrorCodes::FailedToParse,
@@ -7568,7 +7570,8 @@ Value ExpressionConvert::performConversion(ConvertTargetTypeInfo targetTypeInfo,
     uassert(ErrorCodes::ConversionFailure,
             str::stream() << "BinData $convert is not allowed in the current feature "
                              "compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink << ".",
+                          << feature_compatibility_version_documentation::compatibilityLink()
+                          << ".",
             _allowBinDataConvert || targetTypeInfo.type == BSONType::Bool ||
                 (inputType != BSONType::BinData && targetTypeInfo.type != BSONType::BinData));
 
@@ -7576,7 +7579,7 @@ Value ExpressionConvert::performConversion(ConvertTargetTypeInfo targetTypeInfo,
             str::stream()
                 << "BinData $convert with numeric values is not allowed in the current feature "
                    "compatibility version. See "
-                << feature_compatibility_version_documentation::kCompatibilityLink << ".",
+                << feature_compatibility_version_documentation::compatibilityLink() << ".",
             _allowBinDataConvertNumeric ||
                 !requestingConvertBinDataNumeric(targetTypeInfo, inputType));
 

@@ -31,16 +31,24 @@
 
 #include <fmt/format.h>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 
-namespace mongo {
-namespace feature_compatibility_version_documentation {
-using namespace fmt::literals;
-const std::string kCompatibilityLink =
-    "https://docs.mongodb.com/master/release-notes/{}-compatibility/#feature-compatibility"_format(
+namespace mongo::feature_compatibility_version_documentation {
+constexpr inline auto kReleaseNotesRoot = "https://docs.mongodb.com/master/release-notes"_sd;
+
+inline std::string compatibilityLink() {
+    return fmt::format(                                //
+        "{}/{}-compatibility/#feature-compatibility",  //
+        kReleaseNotesRoot,                             //
         multiversion::toString(multiversion::GenericFCV::kLastLTS));
-const std::string kUpgradeLink =
-    "https://docs.mongodb.com/master/release-notes/{}/#upgrade-procedures"_format(
+}
+
+inline std::string upgradeLink() {
+    return fmt::format(               //
+        "{}/{}/#upgrade-procedures",  //
+        kReleaseNotesRoot,            //
         multiversion::toString(multiversion::GenericFCV::kLastLTS));
-}  // namespace feature_compatibility_version_documentation
-}  // namespace mongo
+}
+
+}  // namespace mongo::feature_compatibility_version_documentation

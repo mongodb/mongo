@@ -62,7 +62,7 @@ multiversion::FeatureCompatibilityVersion FeatureCompatibilityVersionParser::par
                             << "'; expected '" << multiversion::toString(GenericFCV::kLastLTS)
                             << "' or '" << multiversion::toString(GenericFCV::kLastContinuous)
                             << "' or '" << multiversion::toString(GenericFCV::kLatest) << "'. See "
-                            << feature_compatibility_version_documentation::kCompatibilityLink
+                            << feature_compatibility_version_documentation::compatibilityLink()
                             << ".");
 }
 
@@ -122,7 +122,7 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
                         << " document in "
                         << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
                         << ": " << featureCompatibilityVersionDoc << ". See "
-                        << feature_compatibility_version_documentation::kCompatibilityLink << ".");
+                        << feature_compatibility_version_documentation::compatibilityLink() << ".");
             }
             if (version == GenericFCV::kLastLTS) {
                 // Downgrading to last-lts.
@@ -143,7 +143,7 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
                     << " document in "
                     << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg() << ": "
                     << featureCompatibilityVersionDoc << ". See "
-                    << feature_compatibility_version_documentation::kCompatibilityLink << ".");
+                    << feature_compatibility_version_documentation::compatibilityLink() << ".");
         }
 
         // Upgrading FCV.
@@ -157,7 +157,7 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
                         << "Invalid " << multiversion::kParameterName << " document in "
                         << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
                         << ": " << featureCompatibilityVersionDoc << ". See "
-                        << feature_compatibility_version_documentation::kCompatibilityLink << ".");
+                        << feature_compatibility_version_documentation::compatibilityLink() << ".");
             }
 
             if (version == GenericFCV::kLastLTS) {
@@ -170,7 +170,7 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
                             << "Invalid " << multiversion::kParameterName << " document in "
                             << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
                             << ": " << featureCompatibilityVersionDoc << ". See "
-                            << feature_compatibility_version_documentation::kCompatibilityLink
+                            << feature_compatibility_version_documentation::compatibilityLink()
                             << ".",
                         version == GenericFCV::kLastContinuous);
                 return GenericFCV::kUpgradingFromLastContinuousToLatest;
@@ -185,7 +185,7 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
                           << "Invalid " << multiversion::kParameterName << " document in "
                           << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
                           << ": " << featureCompatibilityVersionDoc << ". See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << feature_compatibility_version_documentation::compatibilityLink()
                           << ".");
         return status;
     }
