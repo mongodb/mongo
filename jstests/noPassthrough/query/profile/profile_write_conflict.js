@@ -25,7 +25,7 @@ const doc = {
     a: 1,
     b: 1
 };
-const writeConflicts = 100;
+const writeConflicts = 20;
 
 // If the collection is clustered, there is no _id index.
 const numIdIndexKeys = ClusteredCollectionUtil.areAllCollectionsClustered(testDB) ? 0 : 1;

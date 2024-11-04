@@ -47,6 +47,25 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo {
+namespace {
+auto& temporarilyUnavailableErrors =
+    *MetricBuilder<Counter64>{"operation.temporarilyUnavailableErrors"};
+auto& temporarilyUnavailableErrorsEscaped =
+    *MetricBuilder<Counter64>{"operation.temporarilyUnavailableErrorsEscaped"};
+auto& temporarilyUnavailableErrorsConvertedToWriteConflict =
+    *MetricBuilder<Counter64>{"operation.temporarilyUnavailableErrorsConvertedToWriteConflict"};
+
+auto& transactionTooLargeForCacheErrors =
+    *MetricBuilder<Counter64>{"operation.transactionTooLargeForCacheErrors"};
+auto& transactionTooLargeForCacheErrorsConvertedToWriteConflict = *MetricBuilder<Counter64>{
+    "operation.transactionTooLargeForCacheErrorsConvertedToWriteConflict"};
+
+/** Apply floating point multiply to a Duration. */
+template <typename Dur>
+Dur floatScaleDuration(double scale, Dur dur) {
+    return Dur{static_cast<typename Dur::rep>(scale * durationCount<Dur>(dur))};
+}
+}  // namespace
 
 MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
 
@@ -68,21 +87,6 @@ void logWriteConflictAndBackoff(size_t attempt,
                   "namespace"_attr = toStringForLogging(nssOrUUID));
 }
 
-namespace {
-
-auto& temporarilyUnavailableErrors =
-    *MetricBuilder<Counter64>{"operation.temporarilyUnavailableErrors"};
-auto& temporarilyUnavailableErrorsEscaped =
-    *MetricBuilder<Counter64>{"operation.temporarilyUnavailableErrorsEscaped"};
-auto& temporarilyUnavailableErrorsConvertedToWriteConflict =
-    *MetricBuilder<Counter64>{"operation.temporarilyUnavailableErrorsConvertedToWriteConflict"};
-
-auto& transactionTooLargeForCacheErrors =
-    *MetricBuilder<Counter64>{"operation.transactionTooLargeForCacheErrors"};
-auto& transactionTooLargeForCacheErrorsConvertedToWriteConflict = *MetricBuilder<Counter64>{
-    "operation.transactionTooLargeForCacheErrorsConvertedToWriteConflict"};
-
-}  // namespace
 
 void handleTemporarilyUnavailableException(
     OperationContext* opCtx,
@@ -171,6 +175,58 @@ void handleTransactionTooLargeForCacheException(
         writeConflictAttempts, opStr, e.reason(), NamespaceStringOrUUID(nssOrUUID));
     ++writeConflictAttempts;
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+}
+
+void WriteConflictRetryAlgorithm::_handleFailedAttempt() {
+    try {
+        throw;
+    } catch (ExceptionFor<ErrorCodes::WriteConflict> const& e) {
+        _handleWriteConflictException(e);
+    } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable> const& e) {
+        ++_tempUnavailableCount;
+        handleTemporarilyUnavailableException(
+            _opCtx, _tempUnavailableCount, _opStr, _nssOrUUID, e, _wceCount);
+    } catch (ExceptionFor<ErrorCodes::TransactionTooLargeForCache> const& e) {
+        handleTransactionTooLargeForCacheException(_opCtx, _opStr, _nssOrUUID, e, _wceCount);
+    }
+}
+
+void WriteConflictRetryAlgorithm::_emitLog(StringData reason) {
+    logv2::detail::doLog(46404,
+                         _logSeverity(),
+                         {logv2::LogComponent::kWrite},
+                         "Caught WriteConflictException",
+                         "operation"_attr = _opStr,
+                         "reason"_attr = reason,
+                         "namespace"_attr = toStringForLogging(_nssOrUUID),
+                         "attempts"_attr = _wceCount);
+}
+
+void WriteConflictRetryAlgorithm::_assertRetryLimit() const {
+    if (MONGO_unlikely(_retryLimit && _wceCount > *_retryLimit)) {
+        LOGV2_ERROR(7677402, "Got too many write conflicts, the server may run into problems.");
+        fassert(7677401, !getTestCommandsEnabled());
+    }
+}
+
+/**
+ * Sleeps for (10% of average attempt time) * 1.1^attempt. Experimentally a very gentle
+ * exponential slow appears to work well for many operations; under very heavy load it's
+ * important that we eventually reach significant backoff but under light load sleeping
+ * significantly hurts performance, and "light load" includes scenarios where each write
+ * takes several attempts.
+ */
+void WriteConflictRetryAlgorithm::_handleWriteConflictException(
+    const ExceptionFor<ErrorCodes::WriteConflict>& e) {
+    ++_wceCount;
+    CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+    shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+    _emitLog(e.reason());
+
+    sleepFor(floatScaleDuration(_backoffFactor / _wceCount, _conflictTime));
+    _backoffFactor *= backoffGrowth;
+
+    _assertRetryLimit();
 }
 
 }  // namespace mongo

@@ -52,7 +52,7 @@ for (let i = 75; i < 100; ++i) {
 
 // Trigger WriteConflictExceptions during writes.
 assert.commandWorked(st.shard1.adminCommand(
-    {configureFailPoint: 'WTWriteConflictException', mode: {activationProbability: 0.5}}));
+    {configureFailPoint: 'WTWriteConflictException', mode: {activationProbability: 0.1}}));
 preTransferModsFailpoint.off();
 
 awaitResult();
