@@ -62,41 +62,11 @@ TimeseriesTest.run((insert) => {
         }
     };
 
-    const testHint = function(indexName, numDocsExpected) {
+    const testIndex = (userKeyPattern, bucketsKeyPattern, numDocs) => {
         const coll = db.getCollection(collName);
-        const bucketsColl = db.getCollection("system.buckets." + collName);
-
-        // Tests hint() using the index name.
-        assert.eq(numDocsExpected, bucketsColl.find().hint(indexName).toArray().length);
-        assert.eq(numDocsExpected, coll.find().hint(indexName).toArray().length);
-
-        // Tests that hint() cannot be used when the index is hidden.
-        assert.commandWorked(coll.hideIndex(indexName));
-        assert.commandFailedWithCode(
-            assert.throws(() => bucketsColl.find().hint(indexName).toArray()), ErrorCodes.BadValue);
-        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(indexName).toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandWorked(coll.unhideIndex(indexName));
-    };
-
-    const testIndex = function(viewDefinition, bucketsDefinition, numDocsExpected) {
-        const coll = db.getCollection(collName);
-        const bucketsColl = db.getCollection("system.buckets." + collName);
-
-        setup(viewDefinition, /*shouldSucceed=*/ true);
-
-        // Check definition on view
-        let userIndexes = coll.getIndexes();
-        assert.eq(viewDefinition, userIndexes[userIndexes.length - 1].key);
-
-        // Check definition on buckets collection
-        let bucketIndexes = bucketsColl.getIndexes();
-        assert.eq(bucketsDefinition, bucketIndexes[bucketIndexes.length - 1].key);
-
-        testHint(bucketIndexes[bucketIndexes.length - 1].name, numDocsExpected);
-
-        // Drop index by key pattern.
-        assert.commandWorked(coll.dropIndex(viewDefinition));
+        setup(userKeyPattern, /*shouldSucceed=*/ true);
+        TimeseriesTest.checkIndex(coll, userKeyPattern, bucketsKeyPattern, numDocs);
+        assert.commandWorked(coll.dropIndex(userKeyPattern));
     };
 
     // Test metadata-only sparse indexes.
@@ -120,10 +90,7 @@ TimeseriesTest.run((insert) => {
     testIndex({[`${timeFieldName}`]: 1, [`${metaFieldName}.tag`]: 1},
               {"control.min.tm": 1, "control.max.tm": 1, "meta.tag": 1},
               3);
-    testIndex({
-        [`${metaFieldName}.abc`]: 1,
-        [`${timeFieldName}`]: -1,
-    },
+    testIndex({[`${metaFieldName}.abc`]: 1, [`${timeFieldName}`]: -1},
               {"meta.abc": 1, "control.max.tm": -1, "control.min.tm": -1},
               3);
 });

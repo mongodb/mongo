@@ -357,8 +357,10 @@ config_fuzzer_params = {
             "fuzz_at": ["startup"],
         },
         # Choose whether to shuffle the list command results or not.
-        # TODO SERVER-95058: Uncomment this once the config fuzzer can run the shuffling again.
-        # "failpoint.shuffleListCommandResults": {"choices": [{"mode": "off"}, {"mode": "alwaysOn"}]},
+        "failpoint.shuffleListCommandResults": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
     },
     "mongos": {
         # We need a higher timeout to account for test slowness

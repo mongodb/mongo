@@ -72,45 +72,14 @@ TimeseriesTest.run((insert) => {
         assert.eq(numBucketIndexesBefore + 1, bucketsColl.getIndexes().length);
     };
 
-    const testHint = function(indexName, count) {
-        const coll = db.getCollection(collName);
-        const bucketsColl = db.getCollection("system.buckets." + collName);
-
-        // Tests hint() using the index name.
-        assert.eq(count, bucketsColl.find().hint(indexName).toArray().length);
-        assert.eq(count, coll.find().hint(indexName).toArray().length);
-
-        // Tests that hint() cannot be used when the index is hidden.
-        assert.commandWorked(coll.hideIndex(indexName));
-        assert.commandFailedWithCode(
-            assert.throws(() => bucketsColl.find().hint(indexName).toArray()), ErrorCodes.BadValue);
-        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(indexName).toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandWorked(coll.unhideIndex(indexName));
-    };
-
-    const testIndex = function(viewDefinition, bucketsDefinition, count) {
-        if (count === undefined) {
-            count = docs.length;
+    const testIndex = (userKeyPattern, bucketsKeyPattern, numDocs) => {
+        if (numDocs == undefined) {
+            numDocs = docs.length;
         }
-
         const coll = db.getCollection(collName);
-        const bucketsColl = db.getCollection("system.buckets." + collName);
-
-        setup(viewDefinition);
-
-        // Check definition on view
-        let userIndexes = coll.getIndexes();
-        assert.eq(viewDefinition, userIndexes[userIndexes.length - 1].key);
-
-        // Check definition on buckets collection
-        let bucketIndexes = bucketsColl.getIndexes();
-        assert.eq(bucketsDefinition, bucketIndexes[bucketIndexes.length - 1].key);
-
-        testHint(bucketIndexes[bucketIndexes.length - 1].name, count);
-
-        // Drop index by key pattern.
-        assert.commandWorked(coll.dropIndex(viewDefinition));
+        setup(userKeyPattern);
+        TimeseriesTest.checkIndex(coll, userKeyPattern, bucketsKeyPattern, numDocs);
+        assert.commandWorked(coll.dropIndex(userKeyPattern));
     };
 
     // Test metadata-only indexes.

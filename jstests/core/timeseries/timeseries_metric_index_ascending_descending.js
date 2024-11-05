@@ -18,10 +18,12 @@ TimeseriesTest.run((insert) => {
     const metaFieldName = "mm";
 
     // Unique metadata values to create separate buckets.
-    const firstDoc = {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "a"}, x: 1};
-    const secondDoc = {_id: 1, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "b"}, x: 2};
-    const thirdDoc = {_id: 2, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "c"}, "x.y": 3};
-    const fourthDoc = {_id: 3, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "d"}, x: {y: 4}};
+    const docs = [
+        {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "a"}, x: 1},
+        {_id: 1, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "b"}, x: 2},
+        {_id: 2, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "c"}, "x.y": 3},
+        {_id: 3, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "d"}, x: {y: 4}}
+    ];
 
     const setup = function(keyForCreate) {
         const coll = db.getCollection(collName);
@@ -38,10 +40,7 @@ TimeseriesTest.run((insert) => {
         const numBucketIndexesBefore = bucketsColl.getIndexes().length;
 
         // Insert data on the time-series collection and index it.
-        assert.commandWorked(insert(coll, firstDoc), "failed to insert doc: " + tojson(firstDoc));
-        assert.commandWorked(insert(coll, secondDoc), "failed to insert doc: " + tojson(secondDoc));
-        assert.commandWorked(insert(coll, thirdDoc), "failed to insert doc: " + tojson(thirdDoc));
-        assert.commandWorked(insert(coll, fourthDoc), "failed to insert doc: " + tojson(fourthDoc));
+        assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
         assert.commandWorked(coll.createIndex(keyForCreate),
                              "failed to create index: " + tojson(keyForCreate));
 
@@ -49,67 +48,23 @@ TimeseriesTest.run((insert) => {
         assert.eq(numBucketIndexesBefore + 1, bucketsColl.getIndexes().length);
     };
 
-    const testHint = function(indexName) {
-        const coll = db.getCollection(collName);
-        const bucketsColl = db.getCollection("system.buckets." + collName);
-
-        // Tests hint() using the index name.
-        assert.eq(4,
-                  bucketsColl.find().hint(indexName).toArray().length,
-                  tojson(bucketsColl.getIndexes()));
-        assert.eq(4, coll.find().hint(indexName).toArray().length, tojson(coll.getIndexes()));
-
-        // Tests that hint() cannot be used when the index is hidden.
-        assert.commandWorked(coll.hideIndex(indexName));
-        assert.commandFailedWithCode(
-            assert.throws(() => bucketsColl.find().hint(indexName).toArray()), ErrorCodes.BadValue);
-        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(indexName).toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandWorked(coll.unhideIndex(indexName));
-    };
-
     const coll = db.getCollection(collName);
     const bucketsColl = db.getCollection("system.buckets." + collName);
 
+    const testIndex = (userKeyPattern, bucketsKeyPattern) => {
+        setup(userKeyPattern);
+        TimeseriesTest.checkIndex(coll, userKeyPattern, bucketsKeyPattern, docs.length);
+        assert.commandWorked(coll.dropIndex(userKeyPattern));
+    };
+
     // Test a simple ascending index.
-    setup({x: 1});
-    let userIndexes = coll.getIndexes();
-    assert.eq({x: 1}, userIndexes[userIndexes.length - 1].key);
-
-    let bucketIndexes = bucketsColl.getIndexes();
-    assert.eq({"control.min.x": 1, "control.max.x": 1},
-              bucketIndexes[bucketIndexes.length - 1].key);
-    testHint(bucketIndexes[bucketIndexes.length - 1].name);
-
-    // Drop index by key pattern.
-    assert.commandWorked(coll.dropIndex({x: 1}));
-    bucketIndexes = bucketsColl.getIndexes();
+    testIndex({x: 1}, {["control.min.x"]: 1, ["control.max.x"]: 1});
 
     // Test a simple descending index.
-    setup({x: -1});
-    userIndexes = coll.getIndexes();
-    assert.eq({x: -1}, userIndexes[userIndexes.length - 1].key);
-
-    bucketIndexes = bucketsColl.getIndexes();
-    let bucketIndex = bucketIndexes[bucketIndexes.length - 1];
-    assert.eq({"control.max.x": -1, "control.min.x": -1}, bucketIndex.key);
-    testHint(bucketIndex.name);
-
-    assert.commandWorked(coll.dropIndex(bucketIndex.name));
-    bucketIndexes = bucketsColl.getIndexes();
+    testIndex({x: -1}, {["control.max.x"]: -1, ["control.min.x"]: -1});
 
     // Test an index on dotted and sub document fields.
-    setup({"x.y": 1});
-    userIndexes = coll.getIndexes();
-    assert.eq({"x.y": 1}, userIndexes[userIndexes.length - 1].key);
-
-    bucketIndexes = bucketsColl.getIndexes();
-    bucketIndex = bucketIndexes[bucketIndexes.length - 1];
-    assert.eq({"control.min.x.y": 1, "control.max.x.y": 1}, bucketIndex.key);
-    testHint(bucketIndex.name);
-
-    assert.commandWorked(coll.dropIndex(bucketIndex.name));
-    bucketIndexes = bucketsColl.getIndexes();
+    testIndex({"x.y": 1}, {["control.min.x.y"]: 1, ["control.max.x.y"]: 1});
 
     // Test bad input.
     assert.commandFailedWithCode(coll.createIndex({x: "abc"}), ErrorCodes.CannotCreateIndex);
@@ -152,8 +107,8 @@ TimeseriesTest.run((insert) => {
     // default on the time-series bucket collection.
     const numExtraIndexes = (FixtureHelpers.isSharded(bucketsColl) ? 1 : 0) + 1;
 
-    userIndexes = coll.getIndexes();
+    const userIndexes = coll.getIndexes();
     assert.eq(numExtraIndexes, userIndexes.length, tojson(userIndexes));
-    bucketIndexes = bucketsColl.getIndexes();
+    const bucketIndexes = bucketsColl.getIndexes();
     assert.eq(13 + numExtraIndexes, bucketIndexes.length, tojson(bucketIndexes));
 });

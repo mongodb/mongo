@@ -304,6 +304,54 @@ export var TimeseriesTest = class {
             return stats[name];
         return 0;
     }
+
+    // Check that the hint method can be used with the bucket/user collection index specified by
+    // `indexName`. Ensure that this is not possible when the specified index is hidden. Note that
+    // the `indexName` parameter is expected to be the same for both the buckets collection and
+    // timeseries view.
+    static checkHint(coll, indexName, numDocsExpected) {
+        const db = coll.getDB();
+        const bucketsColl = db[this.getBucketsCollName(coll.getName())];
+
+        // Tests hint() using the index name.
+        assert.eq(numDocsExpected, bucketsColl.find().hint(indexName).toArray().length);
+        assert.eq(numDocsExpected, coll.find().hint(indexName).toArray().length);
+
+        // Tests that hint() cannot be used when the index is hidden.
+        assert.commandWorked(coll.hideIndex(indexName));
+        assert.commandFailedWithCode(
+            assert.throws(() => bucketsColl.find().hint(indexName).toArray()), ErrorCodes.BadValue);
+        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(indexName).toArray()),
+                                                  ErrorCodes.BadValue);
+
+        // Unhide the index and make sure that it can be used again.
+        assert.commandWorked(coll.unhideIndex(indexName));
+        assert.eq(numDocsExpected, bucketsColl.find().hint(indexName).toArray().length);
+        assert.eq(numDocsExpected, coll.find().hint(indexName).toArray().length);
+    }
+
+    static checkIndex(coll, userKeyPattern, bucketsKeyPattern, numDocsExpected) {
+        const db = coll.getDB();
+        const bucketsColl = db[this.getBucketsCollName(coll.getName())];
+
+        const expectedName =
+            Object.entries(userKeyPattern).map(([key, value]) => `${key}_${value}`).join('_');
+
+        // Check definition on view
+        const userIndexes = Object.fromEntries(coll.getIndexes().map(idx => [idx.name, idx]));
+        assert.contains(expectedName, Object.keys(userIndexes));
+        assert.eq(expectedName, userIndexes[expectedName].name);
+        assert.eq(userKeyPattern, userIndexes[expectedName].key);
+
+        // Check definition on buckets collection
+        const bucketIndexes =
+            Object.fromEntries(bucketsColl.getIndexes().map(idx => [idx.name, idx]));
+        assert.contains(expectedName, Object.keys(bucketIndexes));
+        assert.eq(expectedName, bucketIndexes[expectedName].name);
+        assert.eq(bucketsKeyPattern, bucketIndexes[expectedName].key);
+
+        this.checkHint(coll, expectedName, numDocsExpected);
+    }
 };
 
 TimeseriesTest.BucketVersion = {
