@@ -83,6 +83,28 @@ generate_config_header(
     template = "config.h.in",
 )
 
+# DO NOT ADD TO THIS UNLESS ABSOLUTELY NECESSARY TO UNBLOCK WORK!!
+# This library is added as a global dependency to anything in the src/mongo tree
+# and is used as a workaround for any headers added that will require a significant
+# refactor to get working (ex. many hours of work). This work needs to be done eventually,
+# but if resolving a header cycle is blocking critical work this list can be used to
+# defer the refactor until later.
+#
+# Any header added to this list must reference its own TODO ticket to refactor
+# the header graph to not require it to be added globally.
+#
+# If modifying this list please add the Build team as a reviewer to make sure that
+# the header can't be used normally without a large refactor.
+#
+# This list is an absolute last resort; do not add to this list unless you've put
+# significant effort into trying to use a header reference without it.
+mongo_cc_library(
+    name = "_global_header_bypass",
+    hdrs = [
+        "_bypass_header_example.h",
+    ],
+)
+
 mongo_cc_library(
     name = "base",
     srcs = [

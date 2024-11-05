@@ -109,3 +109,20 @@ Testing notes:
 const double f = 1.0;
 const int foo = (int)(f + 0.5);
 ```
+
+# Frequently Asked Questions
+
+### The header I want to add is referenced in several places, how do I figure out where to add references to it in the BUILD.bazel files?
+
+Follow this loop to figure out where the header needs to be added
+
+1. Build directly with bazel to speed up the loop: `bazel build //src/...`
+2. This will fail on the first missing header dependency, search the bazel build files for the library the header is defined on. Currently there are cases where headers are incorrectly located so you'll need to use your best judgement. If the header exists on some library, add that library as a dep, for example `scoped_timer.h` is part of `scope_timer` library so add `//src/mongo/db/exec:scoped_timer` to deps field (this will take care of `scoped_timer.h` transitive dependencies). If not add the header directly to the hdrs field of the library that's failing to compile.
+3. Build directly with bazel `bazel build //src/...`
+4. If there is a cycle remove the dependency from Step #2, add the header as direct dependency to the hdrs field, and then start back at Step #1
+
+### The header I want to add is referenced in dozens or more locations, and adding it to the proper location requires a large refactor that is blocking critical work, what should I do?
+
+If you've put in a significant amount of work to try to get a header added and have found to get it added to the right place (usually alongside the associated .cpp file, having all dependents add that library as a dep) will take a significant refactor, create a SERVER ticket explaining the problem, solution, and complexity required to resolve it. Then, open up src/mongo/BUILD.bazel and add the header to "\_global_header_bypass" referencing your ticket in a TODO comment.
+
+This is very much a last resort and should only be done if the refactor will take a very significant amount of time and is blocking other work.

@@ -1464,6 +1464,8 @@ def mongo_cc_library(
         hdrs = hdrs + ["//src/mongo:mongo_config_header"]
         if name != "boost_assert_shim":
             deps += MONGO_GLOBAL_SRC_DEPS
+            if name != "_global_header_bypass":
+                deps += ["//src/mongo:_global_header_bypass"]
 
     if "modules/enterprise" in native.package_name():
         enterprise_compatible = select({
@@ -1675,6 +1677,7 @@ def _mongo_cc_binary_and_program(
     if native.package_name().startswith("src/mongo"):
         srcs = srcs + ["//src/mongo:mongo_config_header"]
         deps += MONGO_GLOBAL_SRC_DEPS
+        deps += ["//src/mongo:_global_header_bypass"]
 
     if "modules/enterprise" in native.package_name():
         enterprise_compatible = select({
