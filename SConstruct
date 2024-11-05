@@ -6609,30 +6609,6 @@ elif env.GetOption("build-mongot"):
     )
 
 
-# Ensure that every thin target transitively-included library is auto-installed.
-# Note that BAZEL_LIBDEPS_AUTOINSTALLED ensures we only invoke it once for each such library
-BAZEL_LIBDEPS_AUTOINSTALLED = set()
-
-
-def bazel_auto_install_emitter(target, source, env):
-    global BAZEL_LIBDEPS_AUTOINSTALLED
-
-    for libdep in env.Flatten(env.get("LIBDEPS", [])) + env.Flatten(env.get("LIBDEPS_PRIVATE", [])):
-        libdep_node = libdeps._get_node_with_ixes(env, env.Entry(libdep).abspath, "SharedLibrary")
-        if str(libdep_node.abspath) not in BAZEL_LIBDEPS_AUTOINSTALLED:
-            shlib_suffix = env.subst("$SHLIBSUFFIX")
-            env.BazelAutoInstall(libdep_node, shlib_suffix)
-            BAZEL_LIBDEPS_AUTOINSTALLED.add(str(libdep_node.abspath))
-
-    return target, source
-
-
-for builder_name in ["Program", "SharedLibrary"]:
-    builder = env["BUILDERS"][builder_name]
-    base_emitter = builder.emitter
-    new_emitter = SCons.Builder.ListEmitter([base_emitter, bazel_auto_install_emitter])
-    builder.emitter = new_emitter
-
 # load the tool late to make sure we can copy over any new
 # emitters/scanners we may have created in the SConstruct when
 # we go to make stand in bazel builders for the various scons builders
@@ -6649,6 +6625,113 @@ else:
 
     env.AddMethod(noop, "WaitForBazel")
     env.AddMethod(noop, "BazelAutoInstall")
+
+if env.get("__NINJA_NO") != "1":
+    BAZEL_AUTOINSTALLED_LIBDEPS = set()
+
+    # the next emitters will read link lists
+    # to determine dependencies in order for scons
+    # to handle the install
+    def bazel_auto_install_emitter(target, source, env):
+        for libdep in env.Flatten(env.get("LIBDEPS", [])) + env.Flatten(
+            env.get("LIBDEPS_PRIVATE", [])
+        ):
+            libdep_node = libdeps._get_node_with_ixes(
+                env, env.Entry(libdep).abspath, "SharedLibrary"
+            )
+            try:
+                shlib_suffix = env.subst("$SHLIBSUFFIX")
+                bazel_libdep = env.File(
+                    f"#/{env['SCONS2BAZEL_TARGETS'].bazel_output(libdep_node.path)}"
+                )
+                if str(bazel_libdep).endswith(shlib_suffix):
+                    if bazel_libdep not in BAZEL_AUTOINSTALLED_LIBDEPS:
+                        env.BazelAutoInstall(bazel_libdep, shlib_suffix)
+                        BAZEL_AUTOINSTALLED_LIBDEPS.add(bazel_libdep)
+                    env.Depends(
+                        env.GetAutoInstalledFiles(target[0]),
+                        env.GetAutoInstalledFiles(bazel_libdep),
+                    )
+            except KeyError:
+                if env.Verbose():
+                    print("BazelAutoInstall not processing non bazel target:\n{libdep_node}}")
+
+        return target, source
+
+    for builder_name in ["Program", "SharedLibrary"]:
+        builder = env["BUILDERS"][builder_name]
+        base_emitter = builder.emitter
+        new_emitter = SCons.Builder.ListEmitter([base_emitter, bazel_auto_install_emitter])
+        builder.emitter = new_emitter
+
+    def bazel_program_auto_install_emitter(target, source, env):
+        if env.GetOption("link-model") == "dynamic-sdk":
+            return target, source
+
+        bazel_target = env["SCONS2BAZEL_TARGETS"].bazel_target(target[0].path)
+
+        linkfile = bazel_target.replace("//src/", "bazel-bin/src/") + "_links.list"
+        linkfile = "/".join(linkfile.rsplit(":", 1))
+
+        with open(os.path.join(env.Dir("#").abspath, linkfile)) as f:
+            query_results = f.read()
+
+        filtered_results = ""
+        for lib in query_results.splitlines():
+            bazel_out_path = lib.replace("\\", "/").replace(
+                f"{env['BAZEL_OUT_DIR']}/src", "bazel-bin/src"
+            )
+            if os.path.exists(
+                env.File("#/" + bazel_out_path + ".exclude_lib").abspath.replace("\\", "/")
+            ):
+                continue
+            filtered_results += lib + "\n"
+        query_results = filtered_results
+
+        t = target[0]
+        suffix = getattr(t.attributes, "aib_effective_suffix", t.get_suffix())
+        bazel_node = env.File(
+            t.abspath.replace(
+                f"{env.Dir('#').abspath}/{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path
+            )
+        )
+
+        prog_output = env.BazelAutoInstallSingleTarget(bazel_node, suffix, bazel_node)
+
+        libs = []
+        debugs = []
+        for lib in query_results.splitlines():
+            libdep = env.File(
+                lib.replace("\\", "/").replace(f"{env['BAZEL_OUT_DIR']}/src", "$BUILD_DIR")
+            )
+            libdep_node = libdeps._get_node_with_ixes(
+                env, env.Entry(libdep).abspath, "SharedLibrary"
+            )
+            bazel_libdep = env.File(
+                f"#/{env['SCONS2BAZEL_TARGETS'].bazel_output(libdep_node.path)}"
+            )
+            shlib_suffix = env.subst("$SHLIBSUFFIX")
+            if str(bazel_libdep).endswith(shlib_suffix):
+                if bazel_libdep not in BAZEL_AUTOINSTALLED_LIBDEPS:
+                    env.BazelAutoInstall(bazel_libdep, shlib_suffix)
+                    BAZEL_AUTOINSTALLED_LIBDEPS.add(bazel_libdep)
+                libs.append(env.GetAutoInstalledFiles(bazel_libdep)[0])
+                if hasattr(bazel_libdep.attributes, "separate_debug_files"):
+                    debugs.append(
+                        env.GetAutoInstalledFiles(
+                            getattr(bazel_libdep.attributes, "separate_debug_files")[0]
+                        )[0]
+                    )
+
+            env.Depends(prog_output[0], libs)
+            if len(prog_output) == 2:
+                env.Depends(prog_output[1], debugs)
+        return target, source
+
+    builder = env["BUILDERS"]["BazelProgram"]
+    base_emitter = builder.emitter
+    new_emitter = SCons.Builder.ListEmitter([bazel_program_auto_install_emitter, base_emitter])
+    builder.emitter = new_emitter
 
 
 def injectMongoIncludePaths(thisEnv):

@@ -23,7 +23,7 @@ if shouldBuildGRPC(env):
     env.InjectThirdParty(libraries=["grpc"])
 
 
-if not has_option("noshell") and jsEngine:
+if not has_option("noshell") and jsEngine != "none":
     shellEnv = env.Clone()
     if env.TargetOSIs("windows"):
         shellEnv.Append(LIBS=["winmm"])
@@ -44,7 +44,7 @@ if not has_option("noshell") and jsEngine:
     mongo_shell = shellEnv.BazelProgram(
         target="mongo",
         source=[],
-        LIBDEPS=["$BUILD_DIR/mongo/db/server_base", "mongo_main"],
+        LIBDEPS=[],
         AIB_COMPONENT="jstestshell",
         AIB_COMPONENTS_EXTRA=[
             "devcore",

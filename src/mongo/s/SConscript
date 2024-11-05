@@ -49,10 +49,7 @@ if env.TargetOSIs("windows"):
 env.BazelProgram(
     target="mongos",
     source=[],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "mongos_main",
-    ],
+    LIBDEPS=[],
     AIB_COMPONENT="mongos",
     AIB_COMPONENTS_EXTRA=[
         "core",

@@ -664,38 +664,31 @@ def timed_auto_install_bazel(env, libdep, shlib_suffix):
     count_of_auto_installing += 1
 
 
-def auto_install_single_target(env, libdep, suffix, target):
-    bazel_node = env.File(f"#/{target}")
+def auto_install_single_target(env, libdep, suffix, bazel_node):
     auto_install_mapping = env["AIB_SUFFIX_MAP"].get(suffix)
 
-    new_installed_files = env.AutoInstall(
-        "$PREFIX_BINDIR" if mongo_platform.get_running_os_name() == "windows" else "$PREFIX_LIBDIR",
-        bazel_node,
-        AIB_COMPONENT="AIB_DEFAULT_COMPONENT",
+    env.AutoInstall(
+        target=auto_install_mapping.directory,
+        source=[bazel_node],
+        AIB_COMPONENT=env.get("AIB_COMPONENT", "AIB_DEFAULT_COMPONENT"),
         AIB_ROLE=auto_install_mapping.default_role,
         AIB_COMPONENTS_EXTRA=env.get("AIB_COMPONENTS_EXTRA", []),
-        BAZEL_INSTALL="True",
     )
+    auto_installed_libdep = env.GetAutoInstalledFiles(libdep)
+    auto_installed_bazel_node = env.GetAutoInstalledFiles(bazel_node)
 
-    if not new_installed_files:
-        new_installed_files = getattr(bazel_node.attributes, "AIB_INSTALLED_FILES", [])
-    installed_files = getattr(libdep.attributes, "AIB_INSTALLED_FILES", [])
-    setattr(
-        libdep.attributes,
-        "AIB_INSTALLED_FILES",
-        list(set(new_installed_files + installed_files)),
-    )
+    if auto_installed_libdep[0] != auto_installed_bazel_node[0]:
+        env.Depends(auto_installed_libdep[0], auto_installed_bazel_node[0])
+
+    return env.GetAutoInstalledFiles(bazel_node)
 
 
 def auto_install_bazel(env, libdep, shlib_suffix):
-    # we are only interested in queries for shared library thin targets
-    if not str(libdep).endswith(shlib_suffix) or not (
-        libdep.has_builder() and libdep.get_builder().get_name(env) == "ThinTarget"
-    ):
-        return
-
-    bazel_target = env["SCONS2BAZEL_TARGETS"].bazel_target(libdep.path)
-    bazel_libdep = env.File(f"#/{env['SCONS2BAZEL_TARGETS'].bazel_output(libdep.path)}")
+    scons_target = str(libdep).replace(
+        f"{env.Dir('#').abspath}/{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path
+    )
+    bazel_target = env["SCONS2BAZEL_TARGETS"].bazel_target(scons_target)
+    bazel_libdep = env.File(f"#/{env['SCONS2BAZEL_TARGETS'].bazel_output(scons_target)}")
 
     query_results = env.CheckBazelDepsCache(bazel_target)
 
@@ -720,14 +713,68 @@ def auto_install_bazel(env, libdep, shlib_suffix):
         if not line.endswith(shlib_suffix):
             continue
 
-        if env.GetOption("separate-debug") == "on":
-            shlib_suffix = env.subst("$SHLIBSUFFIX")
-            sep_dbg = env.subst("$SEPDBG_SUFFIX")
-            if sep_dbg and line.endswith(shlib_suffix):
-                debug_file = line + sep_dbg
-                auto_install_single_target(env, bazel_libdep, sep_dbg, debug_file)
+        bazel_node = env.File(f"#/{line}")
+        bazel_node_debug = env.File(f"#/{line}$SEPDBG_SUFFIX")
 
-        auto_install_single_target(env, bazel_libdep, shlib_suffix, line)
+        setattr(bazel_node_debug.attributes, "debug_file_for", bazel_node)
+        setattr(bazel_node.attributes, "separate_debug_files", [bazel_node_debug])
+
+        auto_install_single_target(env, bazel_libdep, shlib_suffix, bazel_node)
+
+        if env.GetAutoInstalledFiles(bazel_libdep):
+            auto_install_single_target(
+                env,
+                getattr(bazel_libdep.attributes, "separate_debug_files")[0],
+                env.subst("$SEPDBG_SUFFIX"),
+                bazel_node_debug,
+            )
+
+    return env.GetAutoInstalledFiles(libdep)
+
+
+def auto_archive_bazel(env, node, already_archived, search_stack):
+    bazel_child = getattr(node.attributes, "AIB_INSTALL_FROM", node)
+    if not str(bazel_child).startswith("bazel-out"):
+        try:
+            bazel_child = env["SCONS2BAZEL_TARGETS"].bazel_output(bazel_child.path)
+        except KeyError:
+            if env.Verbose():
+                print("BazelAutoArchive not processing non bazel target:\n{bazel_child}}")
+            return
+
+    if str(bazel_child) not in already_archived:
+        already_archived.add(str(bazel_child))
+        scons_target = str(bazel_child).replace(
+            f"{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path
+        )
+        bazel_target = env["SCONS2BAZEL_TARGETS"].bazel_target(scons_target)
+
+        linkfile = bazel_target.replace("//src/", "bazel-bin/src/") + "_links.list"
+        linkfile = "/".join(linkfile.rsplit(":", 1))
+
+        with open(os.path.join(env.Dir("#").abspath, linkfile)) as f:
+            query_results = f.read()
+
+        filtered_results = ""
+        for lib in query_results.splitlines():
+            bazel_out_path = lib.replace("\\", "/").replace(
+                f"{env['BAZEL_OUT_DIR']}/src", "bazel-bin/src"
+            )
+            if os.path.exists(
+                env.File("#/" + bazel_out_path + ".exclude_lib").abspath.replace("\\", "/")
+            ):
+                continue
+            filtered_results += lib + "\n"
+        query_results = filtered_results
+        for lib in query_results.splitlines():
+            if str(bazel_child).endswith(env.subst("$SEPDBG_SUFFIX")):
+                debug_file = getattr(env.File("#/" + lib).attributes, "separate_debug_files")[0]
+                bazel_install_file = env.GetAutoInstalledFiles(debug_file)[0]
+            else:
+                bazel_install_file = env.GetAutoInstalledFiles(env.File("#/" + lib))[0]
+
+            if bazel_install_file:
+                search_stack.append(bazel_install_file)
 
 
 def load_bazel_builders(env):
@@ -1221,15 +1268,21 @@ def generate(env: SCons.Environment.Environment) -> None:
                 # TODO when we support test lists in bazel we can make BazelPrograms thin targets
                 bazel_program = handle_bazel_program_exception(env, target, outputs)
 
-        if bazel_program:
-            continue
-
         scons_node_strs = [
             bazel_output_file.replace(
                 f"{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path.replace("\\", "/")
             )
             for bazel_output_file in outputs
         ]
+
+        if bazel_program:
+            for scons_node, bazel_output_file in zip(scons_node_strs, outputs):
+                Globals.scons2bazel_targets[scons_node.replace("\\", "/")] = {
+                    "bazel_target": target,
+                    "bazel_output": bazel_output_file.replace("\\", "/"),
+                }
+            continue
+
         scons_nodes = env.ThinTarget(
             target=scons_node_strs, source=outputs, NINJA_GENSOURCE_INDEPENDENT=True
         )
@@ -1288,3 +1341,5 @@ def generate(env: SCons.Environment.Environment) -> None:
     env.AddMethod(bazel_query_func, "RunBazelQuery")
     env.AddMethod(ninja_bazel_builder, "NinjaBazelBuilder")
     env.AddMethod(auto_install_bazel, "BazelAutoInstall")
+    env.AddMethod(auto_install_single_target, "BazelAutoInstallSingleTarget")
+    env.AddMethod(auto_archive_bazel, "BazelAutoArchive")

@@ -39,12 +39,8 @@ env.Benchmark(
 if get_option("link-model") == "dynamic":
     visibility_test1 = env.BazelProgram(
         target="visibility_test1",
-        source=[
-            "visibility_test1.cpp",
-        ],
-        LIBDEPS=[
-            "visibility_test_lib1",
-        ],
+        source=[],
+        LIBDEPS=[],
         AIB_COMPONENT="visibility-test",
         AIB_COMPONENTS_EXTRA=[
             "unittests",

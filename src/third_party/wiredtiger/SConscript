@@ -6,10 +6,8 @@ env = env.Clone()
 if "-flto=thin" not in env["CCFLAGS"]:
     wtbin = env.BazelProgram(
         target='wt',
-        source=Glob('src/utilities/*.c'),
-        LIBDEPS=[
-            'wiredtiger',
-        ],
+        source=[],
+        LIBDEPS=[],
         AIB_COMPONENT='wiredtiger',
         AIB_COMPONENTS_EXTRA=[
             'dist-test',

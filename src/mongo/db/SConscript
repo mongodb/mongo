@@ -324,10 +324,7 @@ if env.TargetOSIs("windows"):
 env.BazelProgram(
     target="mongod",
     source=[],
-    LIBDEPS=[
-        "mongod_main",
-        "server_base",
-    ],
+    LIBDEPS=[],
     AIB_COMPONENT="mongod",
     AIB_COMPONENTS_EXTRA=[
         "core",

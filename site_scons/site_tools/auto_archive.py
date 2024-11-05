@@ -123,7 +123,7 @@ def collect_transitive_files(env, entry):
 
     # Now we will call the scanner to find the transtive files of any files that
     # we found from the component DAG.
-
+    bazel_installed = set()
     while stack:
         s = stack.pop()
         if s in cache:
@@ -135,6 +135,23 @@ def collect_transitive_files(env, entry):
         # this loop. If it hasn't already run for a file we need to run it
         # anyway.
         stack.extend(env.GetTransitivelyInstalledFiles(s))
+
+        # if the current file is a bazel target we need to find its bazel deps
+        # and add them to the archive.
+        if env.GetOption("ninja") == "disabled" and env.GetOption("link-model") == "dynamic":
+            env.BazelAutoArchive(s, bazel_installed, stack)
+            real_node = getattr(s.attributes, "AIB_INSTALL_FROM", s)
+            # usually you might use scons .children call but we know we only care about
+            # direct libdeps in this case as they may be transition nodes that are between
+            # scons and bazels graph.
+            for child in getattr(real_node.attributes, "libdeps_direct_sorted", []):
+                try:
+                    bazel_libdep = env.File(f"#/{env['SCONS2BAZEL_TARGETS'].bazel_output(child)}")
+                    install_file = env.GetAutoInstalledFiles(bazel_libdep)
+                    env.BazelAutoArchive(install_file[0], bazel_installed, stack)
+                except KeyError:
+                    if env.Verbose():
+                        print("BazelAutoArchive not processing non bazel target:\n{child}}")
 
     # Setting the AIB_NO_ARCHIVE attribute to True prevents outputs from an
     # AutoInstall builder from being included into archives produced by this
@@ -214,7 +231,9 @@ def archive_builder(source, target, env, for_signature):
         else:
             compression_flags = "-z"
 
-        command_prefix = "{tar} -vc {compression_flags} -C {common_ancestor} -T {file_list} --ignore-failed-read -f {archive_name}"
+        command_prefix = (
+            "{tar} -vc {compression_flags} -C {common_ancestor} -T {file_list} -f {archive_name}"
+        )
     else:
         command_prefix = "{python} {make_archive_script} {archive_type} {archive_name} {common_ancestor} {file_list}"
 
@@ -285,6 +304,11 @@ def archive_builder(source, target, env, for_signature):
         common_ancestor=common_ancestor,
         file_list=file_list,
     )
+    if env.GetOption("ninja") != "disabled":
+        if env.TargetOSIs("windows"):
+            cmd = 'echo "archive not supported with ninja, use scons only." & exit /b 1'
+        else:
+            cmd = 'echo "archive not supported with ninja, use scons only."; exit 1'
 
     return cmd
 

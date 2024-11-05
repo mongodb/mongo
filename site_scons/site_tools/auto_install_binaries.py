@@ -258,11 +258,12 @@ def scan_for_transitive_install(node, env, _path):
         for grandchild in direct_children.get_executor().get_all_targets()
         if direct_children.get_executor() and grandchild.has_builder()
     )
-
     for child in installed_children:
-        if child.has_builder() and child.get_builder().get_name(env) == "ThinTarget":
-            child = env.File(f"#/{env['SCONS2BAZEL_TARGETS'].bazel_output(child)}")
         auto_installed_files = get_auto_installed_files(env, child)
+        bazel_child = getattr(child.attributes, "AIB_INSTALL_FROM", child)
+        if str(bazel_child).startswith("bazel-out"):
+            auto_installed_files += get_auto_installed_files(env, bazel_child)
+
         if not auto_installed_files:
             continue
 
@@ -380,13 +381,8 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
         # adding debug files to the runtime component file if we do not skip
         # this.
         existing_installed_files = get_auto_installed_files(env, s)
-        if "BAZEL_INSTALL" in kwargs:
-            if s in bazel_installs:
-                continue
-            bazel_installs.add(s)
-        else:
-            if existing_installed_files:
-                continue
+        if existing_installed_files:
+            continue
 
         # We must do an early subst here so that the _aib_debugdir
         # generator has a chance to run while seeing 'source'. We need
@@ -401,10 +397,7 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
         aib_additional_directory = getattr(s.attributes, "aib_additional_directory", None)
         if aib_additional_directory is not None:
             target_for_source = env.Dir(aib_additional_directory, directory=target_for_source)
-
         new_installed_files = env.Install(target=target_for_source, source=s)
-        if s.has_builder() and s.get_builder().get_name(env) == "ThinTarget":
-            new_installed_files += getattr(s.attributes, INSTALLED_FILES, [])
         setattr(s.attributes, INSTALLED_FILES, new_installed_files)
         setattr(new_installed_files[0].attributes, "AIB_INSTALL_FROM", s)
         installed_files.extend(new_installed_files)
