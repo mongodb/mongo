@@ -234,6 +234,13 @@ public:
     static NamespaceString makeListCollectionsNSS(const DatabaseName& dbName);
 
     /**
+     * Constructs a NamespaceString representing a shardsvrParticipantBlock namespace. The format
+     * for this namespace is "<dbName>.$cmd.shardsvrParticipantBlock".
+     */
+    static NamespaceString makeCollectionlessShardsvrParticipantBlockNSS(
+        const DatabaseName& dbName);
+
+    /**
      * Constructs the cluster parameters NamespaceString for the specified tenant. The format for
      * this namespace is "(<tenantId>_)config.clusterParameters".
      */
@@ -627,6 +634,7 @@ public:
      */
     bool isCollectionlessAggregateNS() const;
     bool isListCollectionsCursorNS() const;
+    bool isCollectionlessShardsvrParticipantBlockNS() const;
 
     /**
      * Returns true if a client can modify this namespace even though it is under ".system."

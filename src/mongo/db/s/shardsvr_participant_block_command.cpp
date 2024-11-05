@@ -168,7 +168,9 @@ public:
 
     private:
         NamespaceString ns() const override {
-            return request().getNamespace();
+            const auto& nss = request().getNamespace();
+            return nss.isCollectionlessShardsvrParticipantBlockNS() ? NamespaceString(nss.dbName())
+                                                                    : nss;
         }
 
         bool supportsWriteConcern() const override {

@@ -46,6 +46,8 @@ namespace {
 
 constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
 constexpr auto bulkWriteCursorCol = "$cmd.bulkWrite"_sd;
+constexpr auto collectionlessShardsvrParticipantBlockCollection =
+    "$cmd.shardsvrParticipantBlock"_sd;
 constexpr auto dropPendingNSPrefix = "system.drop."_sd;
 
 constexpr auto fle2Prefix = "enxcol_."_sd;
@@ -73,6 +75,10 @@ static const absl::flat_hash_set<NamespaceString> globallyUniqueConfigDbCollecti
 
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
+}
+
+bool NamespaceString::isCollectionlessShardsvrParticipantBlockNS() const {
+    return coll() == collectionlessShardsvrParticipantBlockCollection;
 }
 
 bool NamespaceString::isCollectionlessAggregateNS() const {
@@ -186,6 +192,14 @@ NamespaceString NamespaceString::makeListCollectionsNSS(const DatabaseName& dbNa
     NamespaceString nss(dbName, listCollectionsCursorCol);
     dassert(nss.isValid());
     dassert(nss.isListCollectionsCursorNS());
+    return nss;
+}
+
+NamespaceString NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(
+    const DatabaseName& dbName) {
+    NamespaceString nss(dbName, collectionlessShardsvrParticipantBlockCollection);
+    dassert(nss.isValid());
+    dassert(nss.isCollectionlessShardsvrParticipantBlockNS());
     return nss;
 }
 
