@@ -31,19 +31,22 @@
 
 namespace mongo::ce {
 
-Cardinality HistogramEstimator::estimateCardinality(const stats::CEHistogram& hist,
-                                                    const Cardinality collectionSize,
-                                                    const mongo::Interval& interval,
-                                                    bool includeScalar) {
+
+CardinalityEstimate HistogramEstimator::estimateCardinality(
+    const stats::CEHistogram& hist,
+    const CardinalityEstimate collectionSize,
+    const mongo::Interval& interval,
+    bool includeScalar) {
 
     // Empty histogram.
     if (hist.getSampleSize() <= 0) {
-        return 0.0;
+        return CardinalityEstimate{CardinalityType{0.0}, EstimationSource::Histogram};
     }
 
     // Rescales the cardinality according to the current collection size.
-    return (estimateIntervalCardinality(hist, interval, includeScalar) / hist.getSampleSize()) *
-        collectionSize;
+    auto scaleFactor = collectionSize.toDouble() / hist.getSampleSize();
+    CardinalityEstimate card = estimateIntervalCardinality(hist, interval, includeScalar);
+    return card * scaleFactor;
 }
 
 bool HistogramEstimator::canEstimateInterval(const stats::CEHistogram& hist,

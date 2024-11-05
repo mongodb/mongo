@@ -31,13 +31,16 @@
 
 #include "mongo/db/query/stats/ce_histogram.h"
 
+#include "mongo/db/query/cost_based_ranker/estimates.h"
+
 namespace mongo::ce {
 
-using Cardinality = double;
-using Selectivity = double;
+using CardinalityType = cost_based_ranker::CardinalityType;
+using CardinalityEstimate = cost_based_ranker::CardinalityEstimate;
+using EstimationSource = cost_based_ranker::EstimationSource;
 
 struct EstimationResult {
-    Cardinality card;
+    double card;
     double ndv;
 
     EstimationResult operator-(const EstimationResult& other) const {

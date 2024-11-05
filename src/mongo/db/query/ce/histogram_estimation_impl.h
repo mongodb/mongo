@@ -117,9 +117,9 @@ EstimationResult estimateCardinalityRange(const stats::CEHistogram& ceHist,
  * Estimates the selectivity of a given interval if histogram estimation is possible. Otherwise,
  * throw an exception.
  */
-Cardinality estimateIntervalCardinality(const stats::CEHistogram& ceHist,
-                                        const mongo::Interval& interval,
-                                        bool includeScalar = true);
+CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist,
+                                                const mongo::Interval& interval,
+                                                bool includeScalar = true);
 
 /**
  * Checks if a given bound can be estimated via either histograms or type counts.

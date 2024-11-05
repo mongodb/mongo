@@ -41,10 +41,10 @@ public:
      * 'inputScalar' indicates whether or not the provided interval should include non-array values.
      * e.g., $elemMatch should exclude the non-array values when 'includeScalar' is set to false.
      */
-    static Cardinality estimateCardinality(const stats::CEHistogram& hist,
-                                           Cardinality collectionSize,
-                                           const mongo::Interval& interval,
-                                           bool includeScalar);
+    static CardinalityEstimate estimateCardinality(const stats::CEHistogram& hist,
+                                                   CardinalityEstimate collectionSize,
+                                                   const mongo::Interval& interval,
+                                                   bool includeScalar);
 
     /**
      * Checks if given interval can be estimated.

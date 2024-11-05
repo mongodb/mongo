@@ -480,11 +480,12 @@ bool canEstimateBound(const stats::CEHistogram& ceHist,
 }
 
 // TODO: SERVER-94855 Supports mixed type intervals with type counts.
-Cardinality estimateIntervalCardinality(const stats::CEHistogram& ceHist,
-                                        const mongo::Interval& interval,
-                                        bool includeScalar) {
+CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist,
+                                                const mongo::Interval& interval,
+                                                bool includeScalar) {
     if (interval.isFullyOpen()) {
-        return ceHist.getSampleSize();
+        return CardinalityEstimate{CardinalityType{ceHist.getSampleSize()},
+                                   EstimationSource::Histogram};
     }
 
     bool startInclusive = interval.startInclusive;
@@ -511,18 +512,22 @@ Cardinality estimateIntervalCardinality(const stats::CEHistogram& ceHist,
         // If start and end values are the same and both are inclusive in the interval then evaluate
         // as a point query. The interval has to be inclusive from both sides.
         if ((stats::compareValues(startTag, startVal, endTag, endVal) == 0)) {
-            return estimateCardinalityEq(ceHist, startTag, startVal, includeScalar).card;
+            return CardinalityEstimate{
+                CardinalityType{
+                    estimateCardinalityEq(ceHist, startTag, startVal, includeScalar).card},
+                EstimationSource::Histogram};
         }
 
-        return estimateCardinalityRange(ceHist,
-                                        startInclusive,
-                                        startTag,
-                                        startVal,
-                                        endInclusive,
-                                        endTag,
-                                        endVal,
-                                        includeScalar)
-            .card;
+        return CardinalityEstimate{CardinalityType{estimateCardinalityRange(ceHist,
+                                                                            startInclusive,
+                                                                            startTag,
+                                                                            startVal,
+                                                                            endInclusive,
+                                                                            endTag,
+                                                                            endVal,
+                                                                            includeScalar)
+                                                       .card},
+                                   EstimationSource::Histogram};
     }
 
     // Cardinality estimation for an interval should only be called if interval bounds are
