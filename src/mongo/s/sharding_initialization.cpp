@@ -311,7 +311,6 @@ void preCacheMongosRoutingInfo(OperationContext* opCtx) {
     for (auto& db : allDbs) {
         for (auto& nss : catalogClient->getCollectionNamespacesForDb(
                  opCtx, db.getDbName(), repl::ReadConcernLevel::kMajorityReadConcern)) {
-            catalogCache->onStaleCollectionVersion(nss, boost::none /* wantedVersion */);
             auto resp = catalogCache->getCollectionRoutingInfo(opCtx, nss);
             if (!resp.isOK()) {
                 LOGV2_WARNING(6203600,
