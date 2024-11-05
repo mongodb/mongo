@@ -43,6 +43,9 @@ namespace {
 
 using DocumentSourceScoreFusionTest = AggregationContextFixture;
 
+// TODO SERVER-94022: Adapt all the tests that "ASSERT_DOES_NOT_THROW" to confirm that the desugared
+// pipeline returns the correct list of stages when the $rankFusion implementation is complete.
+
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoInputsField) {
     auto spec = fromjson(R"({
         $scoreFusion: {
@@ -941,7 +944,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleAllowed) {
         DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()));
 }
 
-TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnionWith) {
+TEST_F(DocumentSourceScoreFusionTest, CheckUnionWithAllowed) {
     RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
     auto expCtx = getExpCtx();
     auto nsToUnionWith1 =
@@ -960,22 +963,73 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnionWith) {
                },
                {
                 pipeline: [
-                    { $unionWith: 
-                        { coll: "novels" } 
+                    { $unionWith:
+                        { coll: "novels" }
                     },
                     { $score: { score : 5.0 } }
                 ]
                }
-               
+
             ],
             inputNormalization: "none"
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), expCtx),
-                       AssertionException,
-                       9402502);
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()));
 }
+
+TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
+        {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
+    auto nsToUnionWith1 =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "novels");
+    expCtx->addResolvedNamespaces({nsToUnionWith1});
+    auto nsToUnionWith2 =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "shortstories");
+    expCtx->addResolvedNamespaces({nsToUnionWith2});
+
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $sample: { size: 10 } },
+                    { $score: { score : 5.0 } },
+                    { $limit: 10 }
+                ]
+               },
+               {
+                pipeline: [
+                    { $unionWith:
+                        {
+                            coll: "novels",
+                            pipeline: [
+                                { $limit: 3 },
+                                {
+                                    $unionWith: {
+                                        coll: "shortstories"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    { $score: { score : 5.0 } }
+                ]
+               }
+            ],
+            inputNormalization: "none"
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
+// TODO SERVER-94022: Add a test comparable to
+// DocumentSourceRankFusionTest::ErrorsIfNestedUnionWithModifiesFields
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfIncludeProject) {
     RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);

@@ -45,6 +45,8 @@ namespace mongo {
 /**
  * The $scoreFusion stage is syntactic sugar for generating an output of scored results by combining
  * the results of any number of scored subpipelines with relative score fusion.
+ * TODO SERVER-94022: Elaborate on this header comment with more details to what the stage gets
+ * desugared to.
  */
 class DocumentSourceScoreFusion final {
 public:

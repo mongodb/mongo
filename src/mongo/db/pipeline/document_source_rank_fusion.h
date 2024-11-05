@@ -39,14 +39,32 @@
 #include "mongo/db/pipeline/document_source_rank_fusion_gen.h"
 #include "mongo/db/pipeline/document_source_rank_fusion_inputs_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 namespace mongo {
 
 /**
  * The $rankFusion stage is syntactic sugar for generating an output of ranked results by combining
  * the results of any number of ranked subpipelines with reciprocal rank fusion.
- * TODO SERVER-92213: Elaborate on this header comment with more details to what the stage gets
- * desugared to.
+ *
+ * You can see an sample desugared pipeline in ranked_fusion_verbose_replace_root_test.js, but
+ * conceptually: $rankFusion, given input pipelines p1 to pX, desugars into the pipeline:
+ * - Score-generating stage from p1 (e.g., $vectorSearch).
+ * - Via $group and $unwind, for each document returned:
+ *     - Add a rank field: first_rank.
+ *     - Add a score field: first_score.
+ *         - Score is calculated via: 1 / (rank + (rankConstant = 60)).
+ * - For each additional pipeline pX add a:
+ *     - $unionWith {
+ *          The same steps that were run on p1, but for pipeline px:
+ *          thus, adding fields xth_score and xth_rank. }
+ *          TODO SERVER-95164: change note about naming if applicable.
+ * - $group the docs via ID.
+ * - Zero null scores.
+ * - Prepare the output:
+ *      - Add a new “score” field and nest first_score and second_score within it.
+ *      - Sort in descending score order.
  */
 class DocumentSourceRankFusion final {
 public:
@@ -63,15 +81,32 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, std::vector<LiteParsedPipeline> pipelines)
+        LiteParsed(std::string parseTimeName,
+                   const NamespaceString& nss,
+                   std::vector<LiteParsedPipeline> pipelines)
             : LiteParsedDocumentSourceNestedPipelines(
-                  std::move(parseTimeName), boost::none, std::move(pipelines)) {}
+                  std::move(parseTimeName), nss, std::move(pipelines)) {}
+
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
             return requiredPrivilegesBasic(isMongos, bypassDocumentValidation);
         };
     };
+
+    static StageConstraints constraints() {
+        StageConstraints constraints{DocumentSource::StreamType::kStreaming,
+                                     DocumentSource::PositionRequirement::kFirst,
+                                     DocumentSource::HostTypeRequirement::kLocalOnly,
+                                     DocumentSource::DiskUseRequirement::kNoDiskUse,
+                                     DocumentSource::FacetRequirement::kNotAllowed,
+                                     DocumentSource::TransactionRequirement::kAllowed,
+                                     DocumentSource::LookupRequirement::kAllowed,
+                                     DocumentSource::UnionRequirement::kAllowed};
+        // Tried to get rid of the 'has to be the first stage in the pipeline' error.
+        constraints.requiresInputDocSource = false;
+        return constraints;
+    }
 
 private:
     // It is illegal to construct a DocumentSourceRankFusion directly, use createFromBson() instead.

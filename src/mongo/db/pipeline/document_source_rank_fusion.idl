@@ -32,7 +32,7 @@ global:
 imports:
   - "mongo/db/pipeline/document_source_rank_fusion_inputs.idl"
 structs:
-  # The RankFusionSpec needs to be in a separate file because use of the 
+  # The RankFusionSpec needs to be in a separate file because use of the
   # validateRankFusionMinInputs callback will otherwise create a circular dependency.
   RankFusionSpec:
     description: Specification for a $rankFusion stage.

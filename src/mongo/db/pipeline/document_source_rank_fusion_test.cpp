@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "expression_context.h"
 #include "mongo/bson/json.h"
 
 #include "mongo/unittest/assert.h"
@@ -34,15 +35,14 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
 
+// This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceRankFusionTest = AggregationContextFixture;
-
-// TODO SERVER-92213: Adapt all the tests that "ASSERT_DOES_NOT_THROW" to confirm that the desugared
-// pipeline returns the correct list of stages when the $rankFusion implementation is complete.
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNoInputsField) {
     auto spec = fromjson(R"({
@@ -120,8 +120,62 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
         }
     })");
 
-    ASSERT_DOES_NOT_THROW(
-        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$const": null
+                        },
+                        "docs": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$docs",
+                        "includeArrayIndex": "first_rank"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "first_score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        "$first_rank",
+                                        {
+                                            "$const": 60
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        })",
+        asOneObj);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnknownFieldInsideInputs) {
@@ -196,6 +250,10 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNotRankedPipeline) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsAllowed) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
+        {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
+
     auto spec = fromjson(R"({
         $rankFusion: {
             inputs: [
@@ -238,8 +296,162 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
         }
     })");
 
-    ASSERT_DOES_NOT_THROW(
-        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$const": null
+                        },
+                        "docs": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$docs",
+                        "includeArrayIndex": "first_rank"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "first_score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        "$first_rank",
+                                        {
+                                            "$const": 60
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "index": "search_index",
+                                    "text": {
+                                        "query": "mystery",
+                                        "path": "genres"
+                                    }
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "second_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "second_score": {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$second_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "first_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$first_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "second_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$second_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$first_score",
+                                "$second_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchMetaUsed) {
@@ -314,6 +526,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchStoredSourceUsed) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
     auto spec = fromjson(R"({
         $rankFusion: {
             inputs: [
@@ -348,30 +561,16 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
                        16436);
 }
 
-TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleAllowed) {
-    auto spec = fromjson(R"({
-        $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $sample: { size: 10 } },
-                    { $sort: {author: 1} },
-                    { $limit: 10 }
-                ]
-               }
-            ]
-        }
-    })");
-
-    ASSERT_DOES_NOT_THROW(
-        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
-}
-
-TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnionWith) {
+TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
     auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
+        {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
     auto nsToUnionWith1 =
         NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
+    auto nsToUnionWith2 =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "shortstories");
+    expCtx->addResolvedNamespaces({nsToUnionWith2});
 
     auto spec = fromjson(R"({
         $rankFusion: {
@@ -385,13 +584,239 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnionWith) {
                },
                {
                 pipeline: [
-                    { $unionWith:
-                        { coll: "novels" }
+                    { $unionWith: {
+                        coll: "novels",
+                        pipeline: [
+                            { $limit: 3 },
+                            {
+                                $unionWith: {
+                                    coll: "shortstories"
+                                }
+                            }
+                        ]
+                        }
                     },
                     { $sort: {author: 1} }
                 ]
                }
 
+            ]
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$sample": {
+                        "size": 10
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1
+                    }
+                },
+                {
+                    "$limit": 10
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$const": null
+                        },
+                        "docs": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$docs",
+                        "includeArrayIndex": "first_rank"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "first_score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        "$first_rank",
+                                        {
+                                            "$const": 60
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$unionWith": {
+                                    "coll": "novels",
+                                    "pipeline": [
+                                        {
+                                            "$limit": 3
+                                        },
+                                        {
+                                            "$unionWith": {
+                                                "coll": "shortstories",
+                                                "pipeline": []
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "$sort": {
+                                    "author": 1
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "second_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "second_score": {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$second_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "first_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$first_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "second_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$second_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$first_score",
+                                "$second_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
+    auto expCtx = getExpCtx();
+    auto nsToUnionWith1 =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "novels");
+    expCtx->addResolvedNamespaces({nsToUnionWith1});
+    auto nsToUnionWith2 =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "shortstories");
+    expCtx->addResolvedNamespaces({nsToUnionWith2});
+
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $sample: { size: 10 } },
+                    { $sort: {author: 1} },
+                    { $limit: 10 }
+                ]
+               },
+               {
+                pipeline: [
+                    { $unionWith: {
+                        coll: "novels",
+                        pipeline: [
+                            {
+                                $project: {
+                                    _id: 1
+                                }
+                            },
+                            {
+                                $unionWith: {
+                                    coll: "shortstories"
+                                }
+                            }
+                        ]
+                        }
+                    },
+                    { $sort: {author: 1} }
+                ]
+               }
             ]
         }
     })");
@@ -402,6 +827,9 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnionWith) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
+        {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $rankFusion: {
             inputs: [
@@ -428,8 +856,178 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
         }
     })");
 
-    ASSERT_DOES_NOT_THROW(
-        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$const": null
+                        },
+                        "docs": {
+                            "$push": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$docs",
+                        "includeArrayIndex": "first_rank"
+                    }
+                },
+                {
+                    "$addFields": {
+                        "first_score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        "$first_rank",
+                                        {
+                                            "$const": 60
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$geoNear": {
+                                    "near": {
+                                        "type": {
+                                            "$const": "Point"
+                                        },
+                                        "coordinates": [
+                                            {
+                                                "$const": -73.99279
+                                            },
+                                            {
+                                                "$const": 40.719296
+                                            }
+                                        ]
+                                    },
+                                    "distanceField": "dist.calculated",
+                                    "maxDistance": 2,
+                                    "query": {
+                                        "category": {
+                                            "$eq": "Parks"
+                                        }
+                                    },
+                                    "spherical": true
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "second_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "second_score": {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$second_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "first_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$first_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "second_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$second_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$first_score",
+                                "$second_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfGeoNearIncludeLocs) {
