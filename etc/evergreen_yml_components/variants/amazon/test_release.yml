@@ -41,8 +41,14 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
-      - name: .development_critical !.incompatible_community
-      - name: .release_critical !.incompatible_community
+      - name: .development_critical !.incompatible_community !.requires_large_host
+      - name: .development_critical !.incompatible_community .requires_large_host
+        distros:
+          - amazon2-latest-large
+      - name: .release_critical !.incompatible_community !.requires_large_host
+      - name: .release_critical !.incompatible_community .requires_large_host
+        distros:
+          - amazon2-latest-large
 
   - name: enterprise-amazon2
     display_name: "Enterprise Amazon Linux 2"
