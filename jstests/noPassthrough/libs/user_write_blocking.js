@@ -210,6 +210,8 @@ export const UserWriteBlockHelpers = (function() {
 
         restart() {
             this.rst.stopSet(undefined, /* restart */ true);
+            // Setting the restart option to true when starting the set will proactively attempt to
+            // find a node to step up, rather than waiting for the election timeout.
             this.rst.startSet({}, /* restart */ true);
             this.rst.waitForPrimary();
 
@@ -249,9 +251,14 @@ export const UserWriteBlockHelpers = (function() {
     }
 
     class ShardingFixture extends Fixture {
-        constructor() {
-            const st =
-                new ShardingTest({shards: 1, rs: {nodes: 3}, auth: "", other: {keyFile: keyfile}});
+        constructor(initiateWithDefaultElectionTimeout = false) {
+            const st = new ShardingTest({
+                shards: 1,
+                rs: {nodes: 3},
+                auth: "",
+                other: {keyFile: keyfile},
+                initiateWithDefaultElectionTimeout: initiateWithDefaultElectionTimeout
+            });
 
             super(st.s.port);
             this.st = st;

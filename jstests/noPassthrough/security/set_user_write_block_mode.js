@@ -368,7 +368,11 @@ runTest(rst);
 rst.stop();
 
 // Test on a sharded cluster
-const st = new ShardingFixture();
+// By default, our test infrastructure sets the election timeout to a very high value (24
+// hours). For this test, we need a shorter election timeout because it relies on nodes
+// running an election when they do not detect an active primary after restarting nodes. Therefore,
+// we are setting the electionTimeoutMillis to its default value.
+const st = new ShardingFixture(true /*initiateWithDefaultElectionTimeout*/);
 runTest(st);
 
 st.stop();
