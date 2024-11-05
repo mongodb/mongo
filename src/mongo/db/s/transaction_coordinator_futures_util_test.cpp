@@ -834,15 +834,15 @@ TEST_F(DoWhileTest, LoopObeysBackoff) {
 TEST_F(DoWhileTest, LoopObeysShutdown) {
     AsyncWorkScheduler async(getServiceContext());
 
-    int numLoops = 0;
+    AtomicWord<int> numLoops{0};
     auto future = doWhile(
         async,
         boost::none,
         [](const StatusWith<int>& status) { return status != ErrorCodes::InternalError; },
-        [&numLoops] { return Future<int>::makeReady(++numLoops); });
+        [&numLoops] { return Future<int>::makeReady(numLoops.addAndFetch(1)); });
 
     // Wait for at least one loop
-    while (numLoops == 0)
+    while (numLoops.load() == 0)
         sleepFor(Milliseconds(25));
 
     ASSERT(!future.isReady());
