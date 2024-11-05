@@ -298,6 +298,8 @@ void tryPerformTimeseriesBucketCompression(OperationContext* opCtx,
         }
     }
 }
+}  // namespace
+namespace details {
 
 /**
  * Returns whether the request can continue.
@@ -316,7 +318,11 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
 
     auto metadata = getMetadata(bucketCatalog, batch->bucketId);
-    auto status = bucket_catalog::prepareCommit(bucketCatalog, batch);
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto nss = makeTimeseriesBucketsNamespace(ns(request));
+    auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, nss);
+    assertTimeseriesBucketsCollection(bucketsColl);
+    auto status = prepareCommit(bucketCatalog, batch, bucketsColl->getDefaultCollator());
     if (!status.isOK()) {
         invariant(bucket_catalog::isWriteBatchFinished(*batch));
         docsToRetry->push_back(index);
@@ -349,12 +355,8 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     } else {
         auto op = batch->generateCompressedDiff
             ? timeseries::makeTimeseriesCompressedDiffUpdateOp(
-                  opCtx, batch, makeTimeseriesBucketsNamespace(ns(request)), std::move(stmtIds))
-            : timeseries::makeTimeseriesUpdateOp(opCtx,
-                                                 batch,
-                                                 makeTimeseriesBucketsNamespace(ns(request)),
-                                                 metadata,
-                                                 std::move(stmtIds));
+                  opCtx, batch, nss, std::move(stmtIds))
+            : timeseries::makeTimeseriesUpdateOp(opCtx, batch, nss, metadata, std::move(stmtIds));
         auto const output = performTimeseriesUpdate(opCtx, metadata, op, request);
 
         if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
@@ -394,7 +396,9 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     abort(bucketCatalog, batch, ex.toStatus());
     throw;
 }
+}  // namespace details
 
+namespace {
 std::shared_ptr<bucket_catalog::WriteBatch>& extractFromPair(
     std::pair<std::shared_ptr<bucket_catalog::WriteBatch>, size_t>& pair) {
     return pair.first;
@@ -425,22 +429,21 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
     try {
         std::vector<mongo::write_ops::InsertCommandRequest> insertOps;
         std::vector<mongo::write_ops::UpdateCommandRequest> updateOps;
-
+        auto catalog = CollectionCatalog::get(opCtx);
+        auto nss = makeTimeseriesBucketsNamespace(ns(request));
+        auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, nss);
+        assertTimeseriesBucketsCollection(bucketsColl);
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(bucketCatalog, batch.get()->bucketId);
-            auto prepareCommitStatus = bucket_catalog::prepareCommit(bucketCatalog, batch);
+            auto prepareCommitStatus = bucket_catalog::prepareCommit(
+                bucketCatalog, batch, bucketsColl->getDefaultCollator());
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return false;
             }
 
-            timeseries::makeWriteRequest(opCtx,
-                                         batch,
-                                         metadata,
-                                         stmtIds,
-                                         makeTimeseriesBucketsNamespace(ns(request)),
-                                         &insertOps,
-                                         &updateOps);
+            timeseries::makeWriteRequest(
+                opCtx, batch, metadata, stmtIds, nss, &insertOps, &updateOps);
         }
 
         auto result = details::performAtomicTimeseriesWrites(opCtx, insertOps, updateOps);
@@ -897,17 +900,17 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
             auto stmtIds = isTimeseriesWriteRetryable(opCtx) ? std::move(bucketStmtIds[batch.get()])
                                                              : std::vector<StmtId>{};
             try {
-                canContinue = commitTimeseriesBucket(opCtx,
-                                                     batch,
-                                                     start,
-                                                     index,
-                                                     std::move(stmtIds),
-                                                     errors,
-                                                     opTime,
-                                                     electionId,
-                                                     &docsToRetry,
-                                                     retryAttemptsForDup,
-                                                     request);
+                canContinue = details::commitTimeseriesBucket(opCtx,
+                                                              batch,
+                                                              start,
+                                                              index,
+                                                              std::move(stmtIds),
+                                                              errors,
+                                                              opTime,
+                                                              electionId,
+                                                              &docsToRetry,
+                                                              retryAttemptsForDup,
+                                                              request);
             } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
                 auto bucketId = ex.extraInfo<timeseries::BucketCompressionFailure>()->bucketId();
                 auto keySignature =

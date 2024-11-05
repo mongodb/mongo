@@ -229,5 +229,32 @@ TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesWritesNoCollection) {
         timeseries::write_ops::performTimeseriesWrites(opCtx, request), DBException, 8555700);
 }
 
+TEST_F(TimeseriesWriteOpsTest, CommitTimeseriesBucketNoCollection) {
+    auto opCtx = operationContext();
+    auto uuid = UUID::gen();
+
+    TrackingContext trackingContext;
+    timeseries::bucket_catalog::TrackingContexts trackingContexts;
+    timeseries::bucket_catalog::BucketId bucketId{uuid, OID::gen(), 0};
+    timeseries::bucket_catalog::BucketKey key{uuid, {trackingContext, {}, boost::none}};
+    timeseries::bucket_catalog::ExecutionStatsController stats;
+
+    auto batch = std::make_shared<timeseries::bucket_catalog::WriteBatch>(
+        trackingContexts, bucketId, key, 0, stats, "");
+
+    absl::flat_hash_map<int, int> map;
+    auto nss =
+        NamespaceString::createNamespaceString_forTest("db_timeseries_write_ops_test", "dne");
+
+    write_ops::InsertCommandRequest insertCmdReq(nss.makeTimeseriesBucketsNamespace());
+    ASSERT(timeseries::bucket_catalog::claimWriteBatchCommitRights(*batch));
+
+    ASSERT_THROWS_CODE(
+        timeseries::write_ops::details::commitTimeseriesBucket(
+            opCtx, batch, 0, 0, {}, {}, nullptr, nullptr, nullptr, map, insertCmdReq),
+        DBException,
+        8555700);
+}
+
 }  // namespace
 }  // namespace mongo

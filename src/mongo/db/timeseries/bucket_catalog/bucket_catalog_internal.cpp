@@ -221,9 +221,8 @@ StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto key =
-        BucketKey{collectionUUID,
-                  BucketMetadata{trackingContext, metadata, comparator, options.getMetaField()}};
+    auto key = BucketKey{collectionUUID,
+                         BucketMetadata{trackingContext, metadata, options.getMetaField()}};
 
     return {std::make_pair(std::move(key), time)};
 }
@@ -278,12 +277,13 @@ Bucket* useBucket(BucketCatalog& catalog,
                   WithLock stripeLock,
                   InsertContext& info,
                   AllowBucketCreation mode,
-                  const Date_t& time) {
+                  const Date_t& time,
+                  const StringDataComparator* comparator) {
     auto it = stripe.openBucketsByKey.find(info.key);
     if (it == stripe.openBucketsByKey.end()) {
         // No open bucket for this metadata.
         return mode == AllowBucketCreation::kYes
-            ? &allocateBucket(catalog, stripe, stripeLock, info, time)
+            ? &allocateBucket(catalog, stripe, stripeLock, info, time, comparator)
             : nullptr;
     }
 
@@ -297,7 +297,7 @@ Bucket* useBucket(BucketCatalog& catalog,
     }
     if (!bucket) {
         return mode == AllowBucketCreation::kYes
-            ? &allocateBucket(catalog, stripe, stripeLock, info, time)
+            ? &allocateBucket(catalog, stripe, stripeLock, info, time, comparator)
             : nullptr;
     }
 
@@ -316,7 +316,7 @@ Bucket* useBucket(BucketCatalog& catalog,
           getTimeseriesBucketClearedError(bucket->bucketId.oid));
 
     return mode == AllowBucketCreation::kYes
-        ? &allocateBucket(catalog, stripe, stripeLock, info, time)
+        ? &allocateBucket(catalog, stripe, stripeLock, info, time, comparator)
         : nullptr;
 }
 
@@ -417,7 +417,6 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
                          BucketMetadata{getTrackingContext(catalog.trackingContexts,
                                                            TrackingScope::kOpenBucketsById),
                                         metadata,
-                                        comparator,
                                         options.getMetaField()}};
     if (expectedKey && key != *expectedKey) {
         return {ErrorCodes::BadValue, "Bucket metadata does not match (hash collision)"};
@@ -651,7 +650,8 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     InsertContext& insertContext,
     Bucket& existingBucket,
     const Date_t& time,
-    uint64_t storageCacheSize) {
+    uint64_t storageCacheSize,
+    const StringDataComparator* comparator) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     Sizes sizesToBeAdded;
 
@@ -669,15 +669,22 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                     sizesToBeAdded,
                                     mode,
                                     time,
-                                    storageCacheSize);
+                                    storageCacheSize,
+                                    comparator);
         if ((action == RolloverAction::kSoftClose || action == RolloverAction::kArchive) &&
             mode == AllowBucketCreation::kNo) {
             // We don't actually want to roll this bucket over yet, bail out.
             return reason;
         } else if (action != RolloverAction::kNone) {
             openedDueToMetadata = false;
-            bucketToUse =
-                rollover(catalog, stripe, stripeLock, existingBucket, insertContext, action, time);
+            bucketToUse = rollover(catalog,
+                                   stripe,
+                                   stripeLock,
+                                   existingBucket,
+                                   insertContext,
+                                   action,
+                                   time,
+                                   comparator);
             isNewlyOpenedBucket = true;
         }
     }
@@ -715,8 +722,8 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
             batch->openedDueToMetadata = true;
         }
 
-        auto updateStatus = bucket.schema.update(
-            doc, insertContext.options.getMetaField(), insertContext.key.metadata.getComparator());
+        auto updateStatus =
+            bucket.schema.update(doc, insertContext.options.getMetaField(), comparator);
         invariant(updateStatus == Schema::UpdateStatus::Updated);
     }
 
@@ -1187,7 +1194,8 @@ Bucket& allocateBucket(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
                        InsertContext& info,
-                       const Date_t& time) {
+                       const Date_t& time,
+                       const StringDataComparator* comparator) {
     expireIdleBuckets(
         catalog, stripe, stripeLock, info.key.collectionUUID, info.stats, info.closedBuckets);
 
@@ -1236,8 +1244,7 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     info.stats.incNumActiveBuckets();
     // Make sure we set the control.min time field to match the rounded _id timestamp.
     auto controlDoc = buildControlMinTimestampDoc(info.options.getTimeField(), roundedTime);
-    bucket->minmax.update(
-        controlDoc, /*metaField=*/boost::none, bucket->key.metadata.getComparator());
+    bucket->minmax.update(controlDoc, /*metaField=*/boost::none, comparator);
     return *bucket;
 }
 
@@ -1247,7 +1254,8 @@ Bucket& rollover(BucketCatalog& catalog,
                  Bucket& bucket,
                  InsertContext& info,
                  RolloverAction action,
-                 const Date_t& time) {
+                 const Date_t& time,
+                 const StringDataComparator* comparator) {
     invariant(action != RolloverAction::kNone);
     if (allCommitted(bucket)) {
         // The bucket does not contain any measurements that are yet to be committed, so we can take
@@ -1263,7 +1271,7 @@ Bucket& rollover(BucketCatalog& catalog,
         bucket.rolloverAction = action;
     }
 
-    return allocateBucket(catalog, stripe, stripeLock, info, time);
+    return allocateBucket(catalog, stripe, stripeLock, info, time, comparator);
 }
 
 std::pair<RolloverAction, RolloverReason> determineRolloverAction(
@@ -1276,7 +1284,8 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     Sizes& sizesToBeAdded,
     AllowBucketCreation mode,
     const Date_t& time,
-    uint64_t storageCacheSize) {
+    uint64_t storageCacheSize,
+    const StringDataComparator* comparator) {
     // If the mode is enabled to create new buckets, then we should update stats for soft closures
     // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
     // we want to soft close the bucket yet and should wait to update closure stats.
@@ -1356,8 +1365,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
         }
     }
 
-    if (schemaIncompatible(
-            bucket, doc, info.options.getMetaField(), info.key.metadata.getComparator())) {
+    if (schemaIncompatible(bucket, doc, info.options.getMetaField(), comparator)) {
         info.stats.incNumBucketsClosedDueToSchemaChange();
         return {RolloverAction::kHardClose, RolloverReason::kSchemaChange};
     }
