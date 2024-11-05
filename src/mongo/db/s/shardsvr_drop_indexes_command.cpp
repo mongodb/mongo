@@ -172,6 +172,9 @@ MONGO_REGISTER_COMMAND(ShardsvrDropIndexesCommand).forShard();
 ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Invocation::typedRun(
     OperationContext* opCtx) {
     ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
     CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName, opCtx->getWriteConcern());
 
     // Since this operation is not directly writing locally we need to force its db profile level

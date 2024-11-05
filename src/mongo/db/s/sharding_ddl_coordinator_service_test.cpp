@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr.hpp>
 #include <memory>
 #include <string>
-#include <tuple>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
@@ -45,14 +44,13 @@
 #include "mongo/db/s/sharding_ddl_coordinator_external_state_for_test.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -80,6 +78,8 @@ public:
     void setUp() override {
         PrimaryOnlyServiceMongoDTest::setUp();
         _testExecutor = makeTestExecutor();
+
+        DDLLockManager::get(getServiceContext())->setRecoverable(ddlService());
     }
 
     void tearDown() override {
@@ -202,7 +202,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StateTransitions) {
     auto opCtx = makeOperationContext();
 
     // Reaching a steady state to start the test
-    ddlService()->waitForRecoveryCompletion(opCtx.get());
+    ddlService()->waitForRecovery(opCtx.get());
     assertStateIsRecovered();
 
     // State must be `kPaused` after stepping down
@@ -211,16 +211,17 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StateTransitions) {
 
     // Check state is `kRecovered` once the recovery finishes
     stepUp(opCtx.get());
-    ddlService()->waitForRecoveryCompletion(opCtx.get());
+    ddlService()->waitForRecovery(opCtx.get());
     assertStateIsRecovered();
 }
 
 TEST_F(ShardingDDLCoordinatorServiceTest,
        DDLLocksCanOnlyBeAcquiredOnceShardingDDLCoordinatorServiceIsRecovered) {
     auto opCtx = makeOperationContext();
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Reaching a steady state to start the test
-    ddlService()->waitForRecoveryCompletion(opCtx.get());
+    ddlService()->waitForRecovery(opCtx.get());
 
     const std::string reason = "dummyReason";
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
@@ -248,7 +249,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
     pauseOnRecoveryFailPoint->waitForTimesEntered(fpCount + 1);
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10 /*timeoutMillisec*/),
         DBException,
         ErrorCodes::LockTimeout);
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
@@ -257,19 +258,20 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
     // 3- Ending Recovery and enter on Recovered state
     // Once ShardingDDLCoordinatorService is recovered, anyone can aquire a DDL lock
     pauseOnRecoveryFailPoint->setMode(FailPoint::off);
-    ddlService()->waitForRecoveryCompletion(opCtx.get());
+    ddlService()->waitForRecovery(opCtx.get());
 
     ASSERT_DOES_NOT_THROW(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10 /*timeoutMillisec*/));
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
         opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
 }
 
 TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStepUp) {
     auto opCtx = makeOperationContext();
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Reaching a steady state to start the test
-    ddlService()->waitForRecoveryCompletion(opCtx.get());
+    ddlService()->waitForRecovery(opCtx.get());
 
     const std::string reason = "dummyReason";
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
@@ -277,12 +279,14 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
     stepDown();
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10 /*timeoutMillisec*/),
         DBException,
-        ErrorCodes::LockTimeout);
+        ErrorCodes::NotWritablePrimary);
+
+    unittest::Barrier syncPoint{2};
 
     // Start an async task to step up
-    auto stepUpFuture = ExecutorFuture<void>(_testExecutor).then([this]() {
+    auto stepUpFuture = ExecutorFuture<void>(_testExecutor).then([this, &syncPoint]() {
         auto pauseOnRecoveryFailPoint =
             globalFailPointRegistry().find("pauseShardingDDLCoordinatorServiceOnRecovery");
         const auto fpCount = pauseOnRecoveryFailPoint->setMode(FailPoint::alwaysOn);
@@ -291,6 +295,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
         auto opCtx = makeOperationContext();
         stepUp(opCtx.get());
 
+        syncPoint.countDownAndWait();
         // Stay on recovery state for some time to ensure the lock is acquired before transition to
         // recovered state
         sleepFor(Milliseconds(30));
@@ -298,6 +303,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
         pauseOnRecoveryFailPoint->setMode(FailPoint::off);
     });
 
+    syncPoint.countDownAndWait();
     ASSERT_DOES_NOT_THROW(
         acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10000 /*timeoutMillisec*/));
 
@@ -309,7 +315,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, CoordinatorCreationMustFailOnSecondari
     auto opCtx = makeOperationContext();
 
     // Reaching a steady state to start the test
-    ddlService()->waitForRecoveryCompletion(opCtx.get());
+    ddlService()->waitForRecovery(opCtx.get());
 
     stepDown();
 
@@ -317,16 +323,15 @@ TEST_F(ShardingDDLCoordinatorServiceTest, CoordinatorCreationMustFailOnSecondari
                        DBException,
                        ErrorCodes::NotWritablePrimary);
 
-    ASSERT_THROWS_CODE(ddlService()->waitForRecoveryCompletion(opCtx.get()),
-                       DBException,
-                       ErrorCodes::NotWritablePrimary);
+    ASSERT_THROWS_CODE(
+        ddlService()->waitForRecovery(opCtx.get()), DBException, ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(ShardingDDLCoordinatorServiceTest, StepdownDuringServiceRebuilding) {
     auto opCtx = makeOperationContext();
 
     // Reaching a steady state to start the test
-    ddlService()->waitForRecoveryCompletion(opCtx.get());
+    ddlService()->waitForRecovery(opCtx.get());
 
     stepDown();
 
@@ -345,7 +350,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StepdownDuringServiceRebuilding) {
     stepUp(opCtx.get());
 
     // Reaching a steady state to start the test
-    ddlService()->waitForRecoveryCompletion(opCtx.get());
+    ddlService()->waitForRecovery(opCtx.get());
 }
 
 TEST_F(ShardingDDLCoordinatorServiceTest, StepdownStepupWhileCreatingCoordinator) {
@@ -359,36 +364,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StepdownStepupWhileCreatingCoordinator
         stepUp(opCtx.get());
     }
 
-    ddlService()->waitForRecoveryCompletion(opCtx.get());
+    ddlService()->waitForRecovery(opCtx.get());
 }
-
-TEST_F(ShardingDDLCoordinatorServiceTest, StepdownWhileRunningCoordinator) {
-    auto opCtx = makeOperationContext();
-
-    MigrationBlockingOperationCoordinator::getOrCreate(
-        opCtx.get(), ddlService(), createMBOCDoc(opCtx.get()).toBSON());
-
-    Atomic<bool> coordinatorCompleted{false};
-
-    auto waiterThread = stdx::thread([&]() {
-        try {
-            ddlService()->waitForCoordinatorsOfGivenTypeToComplete(
-                opCtx.get(), DDLCoordinatorTypeEnum::kMigrationBlockingOperation);
-            coordinatorCompleted.store(true);
-        } catch (ExceptionFor<ErrorCodes::Interrupted>&) {
-        }
-    });
-
-    for (size_t i = 0u; i < 10u; ++i) {
-        stepDown();
-        stepUp(opCtx.get());
-        ASSERT_FALSE(coordinatorCompleted.load());
-    }
-
-    opCtx->markKilled();
-
-    waiterThread.join();
-}
-
 
 }  // namespace mongo

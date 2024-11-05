@@ -41,7 +41,6 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
-#include <ratio>
 #include <set>
 #include <string>
 #include <utility>
@@ -67,7 +66,6 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/admission/execution_control_init.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/audit_interface.h"
 #include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -171,8 +169,8 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/migration_util.h"
@@ -200,7 +198,6 @@
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_killer.h"
-#include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/set_change_stream_state_coordinator.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/startup_warnings_mongod.h"
@@ -245,7 +242,6 @@
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/catalog_cache.h"
@@ -271,7 +267,6 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"
@@ -430,8 +425,12 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+        auto shardingDDLCoordinatorService =
+            std::make_unique<ShardingDDLCoordinatorService>(serviceContext);
+        DDLLockManager::get(serviceContext)->setRecoverable(shardingDDLCoordinatorService.get());
+
+        services.emplace_back(std::move(shardingDDLCoordinatorService));
         services.push_back(std::make_unique<RenameCollectionParticipantService>(serviceContext));
-        services.push_back(std::make_unique<ShardingDDLCoordinatorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
         services.push_back(std::make_unique<MultiUpdateCoordinatorService>(serviceContext));

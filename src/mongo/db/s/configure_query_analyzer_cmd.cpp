@@ -27,14 +27,12 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr.hpp>
-#include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -70,7 +68,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/client/shard.h"
@@ -158,6 +155,8 @@ public:
                     "Cannot run configureQueryAnalyzer command directly against a shardsvr mongod",
                     serverGlobalParams.clusterRole.has(ClusterRole::None) ||
                         isInternalClient(opCtx) || TestingProctor::instance().isEnabled());
+
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             const auto& nss = ns();
             const auto mode = request().getMode();

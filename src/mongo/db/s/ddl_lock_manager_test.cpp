@@ -27,21 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/ddl_lock_manager.h"
+#include <memory>
 
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/database_version.h"
 
 namespace mongo {
 
 class DDLLockManagerTest : public ShardServerTestFixture {
+    /**
+     * Implementation of the interface to inject to be able to wait for recovery
+     * The empty implementation means the recovering happened immediately.
+     */
+    class Recoverable : public DDLLockManager::Recoverable {
+    public:
+        void waitForRecovery(OperationContext*) const override {}
+    };
+
 public:
     void setUp() override {
         ShardServerTestFixture::setUp();
 
-        DDLLockManager::get(getServiceContext())
-            ->setState(DDLLockManager::State::kPrimaryAndRecovered);
+        operationContext()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+        DDLLockManager::get(getServiceContext())->setRecoverable(_recoverable.get());
 
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
@@ -52,6 +63,7 @@ public:
 protected:
     const DatabaseName _dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     const DatabaseVersion _dbVersion{UUID::gen(), Timestamp(1, 0)};
+    std::unique_ptr<Recoverable> _recoverable = std::make_unique<Recoverable>();
 };
 
 TEST_F(DDLLockManagerTest, LockNormalCollection) {

@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/sharding_ddl_coordinator_external_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/service_context.h"
@@ -56,7 +57,8 @@ namespace mongo {
 
 class ShardingDDLCoordinator;
 
-class ShardingDDLCoordinatorService final : public repl::PrimaryOnlyService {
+class ShardingDDLCoordinatorService final : public repl::PrimaryOnlyService,
+                                            public DDLLockManager::Recoverable {
 public:
     static constexpr StringData kServiceName = "ShardingDDLCoordinator"_sd;
 
@@ -66,6 +68,7 @@ public:
             std::make_unique<ShardingDDLCoordinatorExternalStateFactoryImpl>())
         : PrimaryOnlyService(serviceContext),
           _externalStateFactory(std::move(externalStateFactory)) {}
+
 
     ~ShardingDDLCoordinatorService() override = default;
 
@@ -117,7 +120,7 @@ public:
                 return true;
             }});
 
-    void waitForRecoveryCompletion(OperationContext* opCtx) const;
+    void waitForRecovery(OperationContext* opCtx) const override;
 
 private:
     friend class ShardingDDLCoordinatorServiceTest;

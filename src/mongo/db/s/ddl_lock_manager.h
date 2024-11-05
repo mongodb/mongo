@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
 #include <string>
+
+#include <absl/container/flat_hash_map.h>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -38,7 +39,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 
@@ -105,6 +105,18 @@ class DDLLockManager {
     };
 
 public:
+    /**
+     * Interface to inject to be able to wait for recovery
+     * If you try to lock with `waitForRecovery == true` the base lock will call the
+     * `waitForRecovery` funciton on this interface
+     */
+    class Recoverable {
+    public:
+        virtual ~Recoverable() = default;
+
+        virtual void waitForRecovery(OperationContext* opCtx) const = 0;
+    };
+
     // Timeout value, which specifies that if the lock is not available immediately, no attempt
     // should be made to wait for it to become free.
     static const Milliseconds kSingleLockAttemptTimeout;
@@ -180,28 +192,15 @@ public:
     static DDLLockManager* get(ServiceContext* service);
     static DDLLockManager* get(OperationContext* opCtx);
 
+    // Function to inject an instance of the Recoverable interface
+    void setRecoverable(Recoverable* recoverable);
+
 protected:
     stdx::mutex _mutex;
 
-    enum class State {
-        /**
-         * When the node become secondary the state is set to kPaused and all the lock acquisitions
-         * will be blocked except if the request comes from a DDLCoordinator.
-         */
-        kPaused,
-
-        /**
-         * After the node became primary and the ShardingDDLCoordinatorService already re-acquired
-         * all the previously acquired DDL locks for ongoing DDL coordinators the state transition
-         * to kPrimaryAndRecovered and the lock acquisitions are unblocked.
-         */
-        kPrimaryAndRecovered,
-    };
-
-    State _state = State::kPaused;
-    mutable stdx::condition_variable _stateCV;
-
-    void setState(const State& state);
+    // Stored Recoverable instance to use when we have to wait for recovery on locking
+    // For more information, check the documentation at Recoverable interface
+    Recoverable* _recoverable{nullptr};
 
     void _lock(OperationContext* opCtx,
                Locker* locker,
@@ -222,8 +221,8 @@ protected:
     /**
      * Register/Unregister a resourceName into the ResourceCatalog for debuggability purposes.
      */
-    void _registerResourceName(WithLock lk, ResourceId resId, StringData resName);
-    void _unregisterResourceNameIfNoLongerNeeded(WithLock lk, ResourceId resId, StringData resName);
+    void _registerResourceName(ResourceId resId, StringData resName);
+    void _unregisterResourceNameIfNoLongerNeeded(ResourceId resId, StringData resName);
 
 
     friend class DDLLockManagerTest;

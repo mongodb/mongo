@@ -34,17 +34,21 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
-#include "mongo/base/error_codes.h"
+#include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/resource_catalog.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
@@ -77,10 +81,8 @@ DDLLockManager* DDLLockManager::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-void DDLLockManager::setState(const State& state) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _state = state;
-    _stateCV.notify_all();
+void DDLLockManager::setRecoverable(Recoverable* recoverable) {
+    _recoverable = recoverable;
 }
 
 void DDLLockManager::_lock(OperationContext* opCtx,
@@ -91,33 +93,39 @@ void DDLLockManager::_lock(OperationContext* opCtx,
                            LockMode mode,
                            Date_t deadline,
                            bool waitForRecovery) {
-    Timer waitingTime;
+    tassert(9037198,
+            "Operation context must be interruptable on stepup/stepdown",
+            opCtx->shouldAlwaysInterruptAtStepDownOrUp());
 
-    {
-        stdx::unique_lock<stdx::mutex> lock{_mutex};
-        // Wait for primary and DDL recovered state
-        if (!opCtx->waitForConditionOrInterruptUntil(_stateCV, lock, deadline, [&] {
-                return _state == State::kPrimaryAndRecovered || !waitForRecovery;
-            })) {
+    Timer waitingTime;
+    if (waitForRecovery) {
+        tassert(9037199,
+                "Failed to wait for recovery on acquire DDL lock for namespace '{}' in mode {} with"
+                " reason '{}': No recoverable object set"_format(ns, modeName(mode), reason),
+                _recoverable);
+        try {
+            opCtx->runWithDeadline(
+                deadline, opCtx->getTimeoutError(), [_recoverable = this->_recoverable, &opCtx]() {
+                    _recoverable->waitForRecovery(opCtx);
+                });
+        } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
             uasserted(
                 ErrorCodes::LockTimeout,
                 "Failed to acquire DDL lock for namespace '{}' in mode {} after {} with reason "
                 "'{}' while waiting recovery of DDLCoordinatorService"_format(
                     ns, modeName(mode), waitingTime.elapsed().toString(), reason));
         }
-
-        tassert(7742100,
-                "No hierarchy lock (Global/DB/Coll) must be held when acquiring a DDL lock outside"
-                "a transaction (transactions hold at least the global lock in IX mode)",
-                opCtx->inMultiDocumentTransaction() || !locker->isLocked());
-
-        _registerResourceName(lock, resId, ns);
     }
 
-    ScopeGuard unregisterResourceExitGuard([&] {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
-        _unregisterResourceNameIfNoLongerNeeded(lock, resId, ns);
-    });
+    tassert(7742100,
+            "No hierarchy lock (Global/DB/Coll) must be held when acquiring a DDL lock outside"
+            "a transaction (transactions hold at least the global lock in IX mode)",
+            opCtx->inMultiDocumentTransaction() || !locker->isLocked());
+
+    _registerResourceName(resId, ns);
+
+    ScopeGuard unregisterResourceExitGuard(
+        [&] { _unregisterResourceNameIfNoLongerNeeded(resId, ns); });
 
     if (locker->getDebugInfo().empty()) {
         locker->setDebugInfo(reason.toString());
@@ -125,24 +133,6 @@ void DDLLockManager::_lock(OperationContext* opCtx,
 
     try {
         locker->lock(opCtx, resId, mode, deadline);
-
-        const auto state = [this]() {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
-            return _state;
-        }();
-        if (state != State::kPrimaryAndRecovered && waitForRecovery) {
-            // We must fail if the node has become secondary while we were waiting for the lock
-            // acquisition. It is not allowed to acquire a DDL lock once `_state` has changed from
-            // `kPrimaryAndRecovered` as we may be in the middle of a DDL operation that was
-            // interrupted during a step-down, leading to undefined behavior. Note that once a DDL
-            // operation takes a DDL lock, no one else should acquire that DDL lock until the
-            // operation completes.
-            locker->unlock(resId);
-            uasserted(
-                ErrorCodes::InterruptedDueToReplStateChange,
-                "Failed to acquire DDL lock for namespace '{}' in mode {} with reason {} "
-                "because this is not the primary anymore."_format(ns, modeName(mode), reason));
-        }
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
 
         std::vector<std::string> lockHoldersArr;
@@ -160,11 +150,6 @@ void DDLLockManager::_lock(OperationContext* opCtx,
                 modeName(mode),
                 duration_cast<Milliseconds>(waitingTime.elapsed()).toString(),
                 lockHoldersArr));
-
-    } catch (DBException& e) {
-        e.addContext("Failed to acquire DDL lock for '{}' in mode {} after {}"_format(
-            ns, modeName(mode), duration_cast<Milliseconds>(waitingTime.elapsed()).toString()));
-        throw;
     }
 
     unregisterResourceExitGuard.dismiss();
@@ -181,8 +166,7 @@ void DDLLockManager::_unlock(
     dassert(locker);
     locker->unlock(resId);
 
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _unregisterResourceNameIfNoLongerNeeded(lock, resId, ns);
+    _unregisterResourceNameIfNoLongerNeeded(resId, ns);
 
     LOGV2(6855302,
           "Released DDL lock",
@@ -191,16 +175,16 @@ void DDLLockManager::_unlock(
           "mode"_attr = modeName(mode));
 }
 
-void DDLLockManager::_registerResourceName(WithLock lk, ResourceId resId, StringData resName) {
+void DDLLockManager::_registerResourceName(ResourceId resId, StringData resName) {
+    stdx::lock_guard<stdx::mutex> guard{_mutex};
     const auto currentNumHolders = _numHoldersPerResource[resId]++;
     if (currentNumHolders == 0) {
         ResourceCatalog::get().add(resId, DDLResourceName(resName));
     }
 }
 
-void DDLLockManager::_unregisterResourceNameIfNoLongerNeeded(WithLock lk,
-                                                             ResourceId resId,
-                                                             StringData resName) {
+void DDLLockManager::_unregisterResourceNameIfNoLongerNeeded(ResourceId resId, StringData resName) {
+    stdx::lock_guard<stdx::mutex> guard{_mutex};
     const auto currentNumHolders = --_numHoldersPerResource[resId];
     if (currentNumHolders <= 0) {
         _numHoldersPerResource.erase(resId);
@@ -269,6 +253,7 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
       _lockManager(DDLLockManager::get(opCtx)) {
 
     invariant(_lockManager);
+
     _lockManager->_lock(opCtx,
                         _locker,
                         _resourceName,
