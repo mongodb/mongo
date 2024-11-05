@@ -105,6 +105,7 @@ const cmdResCollWithCollation = assert.commandWorked(runExactCommand(db, {
 }));
 csCursor = new DBCommandCursor(db, cmdResCollWithCollation);
 const hwmFromCollWithCollation = csCursor.getResumeToken();
+assert.eq(decodeResumeToken(hwmFromCollWithCollation).tokenType, highWaterMarkResumeTokenType);
 assert.neq(undefined, hwmFromCollWithCollation);
 csCursor.close();
 
@@ -164,9 +165,11 @@ assert.soon(() => {
     assert.eq(csCursor.objsLeftInBatch(), 0);
     hwmToken = csCursor.getResumeToken();
     assert.neq(undefined, hwmToken);
+
     return relatedEvent && bsonWoCompare(hwmToken, relatedEvent._id) > 0;
 });
 csCursor.close();
+assert.eq(decodeResumeToken(hwmToken).tokenType, highWaterMarkResumeTokenType);
 
 // Now write some further documents to the collection before attempting to resume.
 for (let i = 0; i < 5; ++i) {
@@ -261,4 +264,5 @@ assert.soon(() => {
 assert.soon(() => {
     return csCursor.hasNext() && csCursor.next().operationType === "invalidate";
 });
+
 csCursor.close();

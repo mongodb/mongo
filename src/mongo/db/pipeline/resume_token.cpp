@@ -89,23 +89,29 @@ bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
         fragmentNum == other.fragmentNum;
 }
 
+BSONObj ResumeTokenData::toBSON() const {
+    // TODO SERVER-96418: Make ResumeTokenData an IDL type so that this method is auto-generated.
+    BSONObjBuilder builder;
+    builder.append("clusterTime", clusterTime);
+    builder.append("tokenData", tokenType);
+    builder.append("version", version);
+    builder.append("txnOpIndex", static_cast<int64_t>(txnOpIndex));
+    if (version > 0) {
+        builder.append("tokenType", tokenType);
+        builder.append("fromInvalidate", static_cast<bool>(fromInvalidate));
+    }
+    if (uuid) {
+        builder.append("uuid", uuid->toBSON());
+    }
+    if (fragmentNum) {
+        builder.append("fragmentNum", static_cast<int64_t>(*fragmentNum));
+    }
+    eventIdentifier.addToBsonObj(&builder, "eventIdentifier");
+    return builder.obj();
+}
+
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
-    out << "{clusterTime: " << tokenData.clusterTime.toString();
-    out << ", version: " << tokenData.version;
-    if (tokenData.version > 0) {
-        out << ", tokenType: " << tokenData.tokenType;
-    }
-    out << ", txnOpIndex: " << tokenData.txnOpIndex;
-    if (tokenData.version > 0) {
-        out << ", fromInvalidate: " << static_cast<bool>(tokenData.fromInvalidate);
-    }
-    out << ", uuid: " << optional_io::Extension{tokenData.uuid};
-    out << ", eventIdentifier: " << tokenData.eventIdentifier;
-    if (tokenData.version >= 2) {
-        out << ", fragmentNum: " << optional_io::Extension{tokenData.fragmentNum};
-    }
-    out << "}";
-    return out;
+    return out << tokenData.toBSON();
 }
 
 ResumeToken::ResumeToken(const Document& resumeDoc) {

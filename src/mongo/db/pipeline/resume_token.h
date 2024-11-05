@@ -119,6 +119,8 @@ struct ResumeTokenData {
     // Index of the current fragment, for oversized events that have been split.
     boost::optional<size_t> fragmentNum;
 
+    BSONObj toBSON() const;
+
 private:
     // This private constructor should only ever be used internally or by the ResumeToken class.
     ResumeTokenData() = default;

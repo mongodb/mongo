@@ -48,6 +48,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"

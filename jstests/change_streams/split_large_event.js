@@ -83,6 +83,16 @@ let csCursor = testColl.watch([]);
 // Record a resume token marking the start point of the test.
 const testStartToken = csCursor.getResumeToken();
 
+const decodedToken = decodeResumeToken(testStartToken);
+assert.eq(decodedToken.tokenType, highWaterMarkResumeTokenType);
+assert.eq(decodedToken.version, 2);
+assert.eq(decodedToken.txnOpIndex, 0);
+assert.eq(decodedToken.tokenType, 0);
+assert.eq(decodedToken.fromInvalidate, false);
+assert.gt(decodedToken.clusterTime, new Timestamp(0, 0));
+assert.eq(decodedToken.uuid, undefined);
+assert.eq(decodedToken.fragmentNum, undefined);
+
 // Perform ~16MB updates which generate ~16MB change events and ~16MB post-images.
 assert.commandWorked(testColl.update({_id: "aaa"}, {$set: {a: "y".repeat(kLargeStringSize)}}));
 assert.commandWorked(testColl.update({_id: "bbb"}, {$set: {a: "y".repeat(kLargeStringSize)}}));
@@ -139,6 +149,23 @@ function validateReconstructedEvent(event, expectedId) {
     assert.eq(kLargeStringSize, event.updateDescription.updatedFields.a.length);
 }
 
+// Helper function to validate a collection of resume tokens.
+function validateResumeTokens(resumeTokens, numFragments) {
+    resumeTokens.forEach((resumeToken, idx) => {
+        const decodedToken = decodeResumeToken(resumeToken);
+        const eventIdentifier = {"operationType": "update", "documentKey": {"_id": "aaa"}};
+        assert.eq(decodedToken.eventIdentifier, eventIdentifier);
+        assert.eq(decodedToken.tokenType, eventResumeTokenType);
+        assert.eq(decodedToken.version, 2);
+        assert.eq(decodedToken.txnOpIndex, 0);
+        assert.eq(decodedToken.tokenType, 128);
+        assert.eq(decodedToken.fromInvalidate, false);
+        assert.gt(decodedToken.clusterTime, new Timestamp(0, 0));
+        assert.eq(decodedToken.fragmentNum, idx);
+        assert.neq(decodedToken.uuid, undefined);
+    });
+}
+
 // We declare 'resumeTokens' array outside of the for-scope to collect and share resume tokens
 // across several test-cases.
 let resumeTokens = [];
@@ -187,6 +214,7 @@ for (const postImageMode of ["required", "updateLookup"]) {
         var reconstructedEvent;
         [reconstructedEvent, resumeTokens] = reconstructSplitEvent(csCursor, 3);
         validateReconstructedEvent(reconstructedEvent, "aaa");
+        validateResumeTokens(resumeTokens, 3);
 
         const [reconstructedEvent2, _] = reconstructSplitEvent(csCursor, 3);
         validateReconstructedEvent(reconstructedEvent2, "bbb");
@@ -219,6 +247,7 @@ for (const postImageMode of ["required", "updateLookup"]) {
                 resumeAfter: testStartToken
             });
         assert.docEq(resumeTokens, reconstructSplitEvent(csCursor, 3)[1]);
+        validateResumeTokens(resumeTokens, 3);
     }
 
     {

@@ -59,6 +59,7 @@ assert(mongosColl.drop());
     });
 
     const invalidateResumeToken = changeStream.getResumeToken();
+    assert(decodeResumeToken(invalidateResumeToken).fromInvalidate);
 
     // Recreate and then immediately drop the collection again to make sure that change stream when
     // opened with the invalidate resume token sees this invalidate event.

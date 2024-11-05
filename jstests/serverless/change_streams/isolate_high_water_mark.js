@@ -49,6 +49,7 @@ assert.soon(() => {
     assert.neq(undefined, hwmToken);
     return bsonWoCompare(hwmToken, monitoredEvent._id) > 0;
 });
+assert.eq(decodeResumeToken(hwmToken).tokenType, highWaterMarkResumeTokenType);
 
 // Open a change stream on tenant 2 so we can observe a write that happens and verify that write
 // advanced the global oplog timestamp.
@@ -65,6 +66,7 @@ assert.soon(() => {
 // greater than the last resume token we got.
 assert.eq(csCursor.hasNext(), false);
 const hwmToken2 = csCursor.getResumeToken();
+assert.eq(decodeResumeToken(hwmToken2).tokenType, highWaterMarkResumeTokenType);
 assert.neq(undefined, hwmToken2);
 assert.eq(bsonWoCompare(hwmToken, hwmToken2), 0);
 

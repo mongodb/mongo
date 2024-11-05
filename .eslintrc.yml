@@ -147,6 +147,8 @@ globals:
   _resultSetsEqualUnordered: true
   getStringWidth: true
   _compareStringsWithCollation: true
+  eventResumeTokenType: true
+  highWaterMarkResumeTokenType: true
 
   # likely could be replaced with `path`
   _copyFileRange: true
@@ -200,6 +202,7 @@ globals:
   Timestamp: true
   MD5: true
   Geo: true
+  decodeResumeToken: true
   bsonWoCompare: true
   bsonUnorderedFieldsCompare: true
   bsonBinaryEqual: true

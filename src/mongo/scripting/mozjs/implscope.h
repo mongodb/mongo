@@ -89,6 +89,7 @@
 #include "mongo/scripting/mozjs/object.h"
 #include "mongo/scripting/mozjs/oid.h"
 #include "mongo/scripting/mozjs/regexp.h"
+#include "mongo/scripting/mozjs/resumetoken.h"
 #include "mongo/scripting/mozjs/session.h"
 #include "mongo/scripting/mozjs/status.h"
 #include "mongo/scripting/mozjs/timestamp.h"
@@ -329,6 +330,12 @@ public:
     }
 
     template <typename T>
+    typename std::enable_if<std::is_same<T, ResumeTokenDataUtility>::value, WrapType<T>&>::type
+    getProto() {
+        return _resumeTokenDataProto;
+    }
+
+    template <typename T>
     typename std::enable_if<std::is_same<T, SessionInfo>::value, WrapType<T>&>::type getProto() {
         return _sessionProto;
     }
@@ -543,6 +550,7 @@ private:
     WrapType<ObjectInfo> _objectProto;
     WrapType<OIDInfo> _oidProto;
     WrapType<RegExpInfo> _regExpProto;
+    WrapType<ResumeTokenDataUtility> _resumeTokenDataProto;
     WrapType<SessionInfo> _sessionProto;
     WrapType<MongoStatusInfo> _statusProto;
     WrapType<TimestampInfo> _timestampProto;

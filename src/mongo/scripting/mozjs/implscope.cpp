@@ -513,6 +513,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _objectProto(_context),
       _oidProto(_context),
       _regExpProto(_context),
+      _resumeTokenDataProto(_context),
       _sessionProto(_context),
       _statusProto(_context),
       _timestampProto(_context),
@@ -1134,6 +1135,7 @@ void MozJSImplScope::installBSONTypes() {
     _numberDecimalProto.install(_global);
     _oidProto.install(_global);
     _regExpProto.install(_global);
+    _resumeTokenDataProto.install(_global);
     _timestampProto.install(_global);
     _uriProto.install(_global);
     _statusProto.install(_global);

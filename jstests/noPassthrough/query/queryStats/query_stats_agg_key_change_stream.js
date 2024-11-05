@@ -99,6 +99,9 @@ function validateResumeTokenQueryShape(conn, coll) {
     assert.soon(() => changeStream.hasNext());
     changeStream.next();
     const invalidateResumeToken = changeStream.getResumeToken();
+    const decodedToken = decodeResumeToken(invalidateResumeToken);
+    assert.eq(decodedToken.tokenType, eventResumeTokenType);
+    assert.eq(decodedToken.fromInvalidate, false);
 
     // Resume the change stream using 'startAfter' field.
     coll.watch([], {startAfter: invalidateResumeToken});
