@@ -61,6 +61,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -79,6 +80,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -118,6 +120,59 @@ boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext*
         .bypassDocumentValidation(true)
         .build();
 }
+
+/**
+ * Packs the oplog entries in 'aggregateBatch' into insert batches based on the configured maximum
+ * insert batch size. Preserves the original oplog order.
+ */
+std::vector<std::vector<InsertStatement>> getOplogInsertBatches(
+    const std::vector<BSONObj>& aggregateBatch) {
+    size_t maxOperations = resharding::gReshardingOplogFetcherInsertBatchLimitOperations.load();
+    auto maxBytes = resharding::gReshardingOplogFetcherInsertBatchLimitBytes.load();
+    std::vector<std::vector<InsertStatement>> insertBatches;
+
+    size_t currentIndex = 0;
+    while (currentIndex < aggregateBatch.size()) {
+        std::vector<InsertStatement> insertBatch;
+        auto totalBytes = 0;
+
+        do {
+            const auto& currentDoc = aggregateBatch[currentIndex];
+            auto currentBytes = currentDoc.objsize();
+            if (totalBytes == 0 && currentBytes > maxBytes) {
+                LOGV2_WARNING(9656101,
+                              "Found a fetched oplog entry with size greater than the oplog "
+                              "fetcher insert batch size limit. Ignoring the limit.",
+                              "currentBytes"_attr = currentBytes,
+                              "maxBytes"_attr = maxBytes);
+            } else if (totalBytes + currentBytes > maxBytes) {
+                break;
+            }
+            insertBatch.emplace_back(InsertStatement(currentDoc));
+            totalBytes += currentBytes;
+        } while (++currentIndex < aggregateBatch.size() && insertBatch.size() < maxOperations &&
+                 totalBytes < maxBytes);
+
+        insertBatches.push_back(insertBatch);
+    }
+
+    return insertBatches;
+}
+
+/**
+ * Inserts the oplog entries in 'oplogBatch' into the oplog buffer collection atomically (in a
+ * single write unit of work).
+ */
+void insertOplogBatch(OperationContext* opCtx,
+                      const CollectionPtr& oplogBufferColl,
+                      const std::vector<InsertStatement>& oplogBatch) {
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+
+    uassertStatusOK(collection_internal::insertDocuments(
+        opCtx, oplogBufferColl, oplogBatch.begin(), oplogBatch.end(), nullptr));
+
+    wuow.commit();
+}
 }  // namespace
 
 const ReshardingDonorOplogId ReshardingOplogFetcher::kFinalOpAlreadyFetched{Timestamp::max(),
@@ -129,14 +184,14 @@ ReshardingOplogFetcher::ReshardingOplogFetcher(std::unique_ptr<Env> env,
                                                ReshardingDonorOplogId startAt,
                                                ShardId donorShard,
                                                ShardId recipientShard,
-                                               NamespaceString toWriteInto)
+                                               NamespaceString oplogBufferNss)
     : _env(std::move(env)),
       _reshardingUUID(reshardingUUID),
       _collUUID(collUUID),
       _startAt(startAt),
       _donorShard(donorShard),
       _recipientShard(recipientShard),
-      _toWriteInto(toWriteInto) {
+      _oplogBufferNss(oplogBufferNss) {
     auto [p, f] = makePromiseFuture<void>();
     stdx::lock_guard lk(_mutex);
     _onInsertPromise = std::move(p);
@@ -351,7 +406,7 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
 bool ReshardingOplogFetcher::consume(Client* client,
                                      CancelableOperationContextFactory factory,
                                      Shard* shard) {
-    _ensureCollection(client, factory, _toWriteInto);
+    _ensureCollection(client, factory, _oplogBufferNss);
 
     auto aggRequest = _makeAggregateCommandRequest(client, factory);
 
@@ -365,9 +420,9 @@ bool ReshardingOplogFetcher::consume(Client* client,
         opCtxRaii.get(),
         aggRequest,
         [this, &batchesProcessed, &moreToCome, &opCtxRaii, &batchFetchTimer, factory](
-            const std::vector<BSONObj>& batch,
+            const std::vector<BSONObj>& aggregateBatch,
             const boost::optional<BSONObj>& postBatchResumeToken) {
-            _env->metrics()->onOplogEntriesFetched(batch.size());
+            _env->metrics()->onOplogEntriesFetched(aggregateBatch.size());
             _env->metrics()->onBatchRetrievedDuringOplogFetching(
                 Milliseconds(batchFetchTimer.millis()));
 
@@ -387,34 +442,32 @@ bool ReshardingOplogFetcher::consume(Client* client,
 
             // Noting some possible optimizations:
             //
-            // * Batch more inserts into larger storage transactions.
             // * Parallize writing documents across multiple threads.
-            // * Doing either of the above while still using the underlying message buffer of bson
-            //   objects.
-            const auto toWriteTo =
+            // * Doing the above while still using the underlying message buffer of bson objects.
+            const auto oplogBufferColl =
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
-                                      _toWriteInto,
+                                      _oplogBufferNss,
                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kWrite),
                                   MODE_IX);
 
-            for (const BSONObj& doc : batch) {
-                WriteUnitOfWork wuow(opCtx);
-                auto nextOplog = uassertStatusOK(repl::OplogEntry::parse(doc));
-
-                auto startAt =
-                    ReshardingDonorOplogId::parse(IDLParserContext{"OplogFetcherParsing"},
-                                                  nextOplog.get_id()->getDocument().toBson());
+            const auto insertBatches = getOplogInsertBatches(aggregateBatch);
+            for (const auto& insertBatch : insertBatches) {
                 Timer insertTimer;
-                uassertStatusOK(Helpers::insert(opCtx, toWriteTo, doc));
-                wuow.commit();
+
+                insertOplogBatch(opCtx, oplogBufferColl.getCollectionPtr(), insertBatch);
 
                 _env->metrics()->onLocalInsertDuringOplogFetching(
                     Milliseconds(insertTimer.millis()));
+                _numOplogEntriesCopied += insertBatch.size();
 
-                ++_numOplogEntriesCopied;
+                const auto lastOplogEntry =
+                    uassertStatusOK(repl::OplogEntry::parse(insertBatch.back().doc));
+                const auto startAt =
+                    ReshardingDonorOplogId::parse(IDLParserContext{"OplogFetcherParsing"},
+                                                  lastOplogEntry.get_id()->getDocument().toBson());
 
                 auto [p, f] = makePromiseFuture<void>();
                 {
@@ -425,7 +478,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                     _onInsertFuture = std::move(f);
                 }
 
-                if (resharding::isFinalOplog(nextOplog, _reshardingUUID)) {
+                if (resharding::isFinalOplog(lastOplogEntry, _reshardingUUID)) {
                     moreToCome = false;
                     return false;
                 }
@@ -442,16 +495,14 @@ bool ReshardingOplogFetcher::consume(Client* client,
 
                     // If newStartAt == _startAt then inserting a reshardProgressMark is not needed.
                     // This is because:
-                    //   1. There is already an oplog with timestamp == newStartAt in the toWriteTo
-                    //      collection from which the fetcher knows to resume from.
+                    //   1. There is already an oplog with timestamp == newStartAt in the
+                    //      oplogBufferColl collection from which the fetcher knows to resume from.
                     //   2. Or newStartAt equals the initial value for _startAt (typically the
                     //      minFetchTimestamp) in which case, the fetcher is going to resume from
                     //      there anyways.
                     if (newStartAt != _startAt) {
-                        WriteUnitOfWork wuow(opCtx);
-
                         repl::MutableOplogEntry oplog;
-                        oplog.setNss(_toWriteInto);
+                        oplog.setNss(_oplogBufferNss);
                         oplog.setOpType(repl::OpTypeEnum::kNoop);
                         oplog.setUuid(_collUUID);
                         oplog.set_id(Value(newStartAt.toBSON()));
@@ -462,9 +513,9 @@ bool ReshardingOplogFetcher::consume(Client* client,
                         oplog.setWallClockTime(
                             opCtx->getServiceContext()->getFastClockSource()->now());
 
-                        uassertStatusOK(Helpers::insert(opCtx, toWriteTo, oplog.toBSON()));
-                        wuow.commit();
-
+                        insertOplogBatch(opCtx,
+                                         oplogBufferColl.getCollectionPtr(),
+                                         {InsertStatement{oplog.toBSON()}});
                         // Also include synthetic oplog in the fetched count
                         // so it can match up with the total oplog applied
                         // count in the end.
