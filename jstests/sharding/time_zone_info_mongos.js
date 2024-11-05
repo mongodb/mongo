@@ -42,8 +42,10 @@ function testWithGoodTimeZoneDir(tzGoodInfoDir) {
         [],
         "expected launching mongos with bad timezone rules to fail");
     // Look for either old or new error message
-    assert(rawMongoProgramOutput(".*").includes("Error creating service context") ||
-           rawMongoProgramOutput(".*").includes("Failed to create service context"));
+    var output =
+        rawMongoProgramOutput("(Error creating service context|Failed to create service context)");
+    assert(output.includes("Error creating service context") ||
+           output.includes("Failed to create service context"));
 
     // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
     assert.commandWorked(
