@@ -580,34 +580,40 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorAppliesToChangeStreamAgg
     auto aggRequest = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(cmdObj));
     ASSERT_TRUE(LiteParsedPipeline(aggRequest).hasChangeStream());
 
-    // The label applies to a $changeStream "aggregate" command.
-    std::string commandName = "aggregate";
-    setCommand(cmdObj);
-    ErrorLabelBuilder resumableAggBuilder(opCtx(),
-                                          sessionInfo,
-                                          commandName,
-                                          ErrorCodes::NetworkTimeout,
-                                          boost::none,
-                                          false /* isInternalClient */,
-                                          false /* isMongos */,
-                                          false /* isComingFromRouter  */,
-                                          repl::OpTime{},
-                                          repl::OpTime{});
-    ASSERT_TRUE(resumableAggBuilder.isResumableChangeStreamError());
-    // The label applies to a "getMore" command on a $changeStream cursor.
-    commandName = "getMore";
-    setGetMore(cmdObj);
-    ErrorLabelBuilder resumableGetMoreBuilder(opCtx(),
+    for (auto&& errorCode : {ErrorCodes::NetworkTimeout,
+                             ErrorCodes::QueryPlanKilled,
+                             ErrorCodes::ResumeTenantChangeStream,
+                             ErrorCodes::FailedToSatisfyReadPreference}) {
+        // The label applies to a $changeStream "aggregate" command.
+        std::string commandName = "aggregate";
+        setCommand(cmdObj);
+        ErrorLabelBuilder resumableAggBuilder(opCtx(),
                                               sessionInfo,
                                               commandName,
-                                              ErrorCodes::NetworkTimeout,
+                                              errorCode,
                                               boost::none,
                                               false /* isInternalClient */,
                                               false /* isMongos */,
                                               false /* isComingFromRouter  */,
                                               repl::OpTime{},
                                               repl::OpTime{});
-    ASSERT_TRUE(resumableGetMoreBuilder.isResumableChangeStreamError());
+        ASSERT_TRUE(resumableAggBuilder.isResumableChangeStreamError());
+
+        // The label applies to a "getMore" command on a $changeStream cursor.
+        commandName = "getMore";
+        setGetMore(cmdObj);
+        ErrorLabelBuilder resumableGetMoreBuilder(opCtx(),
+                                                  sessionInfo,
+                                                  commandName,
+                                                  errorCode,
+                                                  boost::none,
+                                                  false /* isInternalClient */,
+                                                  false /* isMongos */,
+                                                  false /* isComingFromRouter  */,
+                                                  repl::OpTime{},
+                                                  repl::OpTime{});
+        ASSERT_TRUE(resumableGetMoreBuilder.isResumableChangeStreamError());
+    }
 }
 
 TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorDoesNotApplyToNonResumableErrors) {
