@@ -524,6 +524,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/replsets/**/* @10gen/server-replication @svc-auto-approve-bot
 /jstests/replsets/**/*capped* @10gen/server-storage-execution @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/resmoke_selftest/OWNERS.yml
+/jstests/resmoke_selftest/**/* @10gen/devprod-correctness @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/sharding/OWNERS.yml
 /jstests/sharding/**/auto_split_vector_basic.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*fsync_lock* @10gen/server-cluster-scalability @svc-auto-approve-bot
