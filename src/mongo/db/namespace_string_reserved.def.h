@@ -154,6 +154,11 @@ NSS_CONSTANT(kReshardingApplierProgressNamespace,
              DatabaseName::kConfig,
              "localReshardingOperations.recipient.progress_applier"_sd)
 
+// Namespace for storing oplog fetcher progress for resharding.
+NSS_CONSTANT(kReshardingFetcherProgressNamespace,
+             DatabaseName::kConfig,
+             "localReshardingOperations.recipient.progress_fetcher"_sd)
+
 // Namespace for storing config.transactions cloner progress for resharding.
 NSS_CONSTANT(kReshardingTxnClonerProgressNamespace,
              DatabaseName::kConfig,

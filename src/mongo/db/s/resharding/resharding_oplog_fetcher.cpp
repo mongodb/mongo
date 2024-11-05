@@ -80,6 +80,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_oplog_fetcher_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/shard_role.h"
@@ -165,11 +166,28 @@ std::vector<std::vector<InsertStatement>> getOplogInsertBatches(
  */
 void insertOplogBatch(OperationContext* opCtx,
                       const CollectionPtr& oplogBufferColl,
-                      const std::vector<InsertStatement>& oplogBatch) {
+                      CollectionAcquisition& oplogFetcherProgressColl,
+                      const UUID& reshardingUUID,
+                      const ShardId& donorShard,
+                      const std::vector<InsertStatement>& oplogBatch,
+                      bool storeProgress) {
     WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
 
     uassertStatusOK(collection_internal::insertDocuments(
         opCtx, oplogBufferColl, oplogBatch.begin(), oplogBatch.end(), nullptr));
+
+
+    if (storeProgress) {
+        // Update the progress doc.
+        auto filter = BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName
+                           << (ReshardingSourceId{reshardingUUID, donorShard}).toBSON());
+        auto updateMod =
+            BSON("$inc" << BSON(ReshardingOplogFetcherProgress::kNumEntriesFetchedFieldName
+                                << static_cast<long long>(oplogBatch.size())));
+        auto updateResult = Helpers::upsert(
+            opCtx, oplogFetcherProgressColl, filter, updateMod, false /* fromMigrate */);
+        invariant(updateResult.numDocsModified == 1 || !updateResult.upsertedId.isEmpty());
+    }
 
     wuow.commit();
 }
@@ -184,14 +202,16 @@ ReshardingOplogFetcher::ReshardingOplogFetcher(std::unique_ptr<Env> env,
                                                ReshardingDonorOplogId startAt,
                                                ShardId donorShard,
                                                ShardId recipientShard,
-                                               NamespaceString oplogBufferNss)
+                                               NamespaceString oplogBufferNss,
+                                               bool storeProgress)
     : _env(std::move(env)),
       _reshardingUUID(reshardingUUID),
       _collUUID(collUUID),
       _startAt(startAt),
       _donorShard(donorShard),
       _recipientShard(recipientShard),
-      _oplogBufferNss(oplogBufferNss) {
+      _oplogBufferNss(oplogBufferNss),
+      _storeProgress(storeProgress) {
     auto [p, f] = makePromiseFuture<void>();
     stdx::lock_guard lk(_mutex);
     _onInsertPromise = std::move(p);
@@ -452,12 +472,26 @@ bool ReshardingOplogFetcher::consume(Client* client,
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kWrite),
                                   MODE_IX);
+            auto oplogFetcherProgressColl =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::kReshardingFetcherProgressNamespace,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
 
             const auto insertBatches = getOplogInsertBatches(aggregateBatch);
             for (const auto& insertBatch : insertBatches) {
                 Timer insertTimer;
 
-                insertOplogBatch(opCtx, oplogBufferColl.getCollectionPtr(), insertBatch);
+                insertOplogBatch(opCtx,
+                                 oplogBufferColl.getCollectionPtr(),
+                                 oplogFetcherProgressColl,
+                                 _reshardingUUID,
+                                 _donorShard,
+                                 insertBatch,
+                                 _storeProgress);
 
                 _env->metrics()->onLocalInsertDuringOplogFetching(
                     Milliseconds(insertTimer.millis()));
@@ -515,7 +549,11 @@ bool ReshardingOplogFetcher::consume(Client* client,
 
                         insertOplogBatch(opCtx,
                                          oplogBufferColl.getCollectionPtr(),
-                                         {InsertStatement{oplog.toBSON()}});
+                                         oplogFetcherProgressColl,
+                                         _reshardingUUID,
+                                         _donorShard,
+                                         {InsertStatement{oplog.toBSON()}},
+                                         _storeProgress);
                         // Also include synthetic oplog in the fetched count
                         // so it can match up with the total oplog applied
                         // count in the end.

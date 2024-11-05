@@ -72,6 +72,16 @@ idl_generator(
 )
 
 idl_generator(
+    name = "resharding_oplog_fetcher_progress_gen",
+    src = "resharding_oplog_fetcher_progress.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/s:sharding_types_gen",
+        "//src/mongo/s/resharding:common_types_gen",
+    ],
+)
+
+idl_generator(
     name = "resharding_txn_cloner_progress_gen",
     src = "resharding_txn_cloner_progress.idl",
     deps = [

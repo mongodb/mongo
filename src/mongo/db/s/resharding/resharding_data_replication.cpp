@@ -163,7 +163,8 @@ std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::
             std::move(idToResumeFrom),
             donor.getShardId(),
             myShardId,
-            std::move(oplogBufferNss)));
+            std::move(oplogBufferNss),
+            false /* storeOplogFetcherProgress */));
     }
 
     return oplogFetchers;

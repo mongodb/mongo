@@ -88,7 +88,8 @@ public:
                            ReshardingDonorOplogId startAt,
                            ShardId donorShard,
                            ShardId recipientShard,
-                           NamespaceString oplogBufferNss);
+                           NamespaceString oplogBufferNss,
+                           bool storeProgress);
 
     ~ReshardingOplogFetcher() override;
 
@@ -170,6 +171,7 @@ private:
     const ShardId _donorShard;
     const ShardId _recipientShard;
     const NamespaceString _oplogBufferNss;
+    const bool _storeProgress;
 
     int _numOplogEntriesCopied = 0;
 

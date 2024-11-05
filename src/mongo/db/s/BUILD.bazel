@@ -822,6 +822,7 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:resharding_oplog_batch_applier.cpp",
         "//src/mongo/db/s/resharding:resharding_oplog_batch_preparer.cpp",
         "//src/mongo/db/s/resharding:resharding_oplog_fetcher.cpp",
+        "//src/mongo/db/s/resharding:resharding_oplog_fetcher_progress_gen",
         "//src/mongo/db/s/resharding:resharding_oplog_session_application.cpp",
         "//src/mongo/db/s/resharding:resharding_recipient_service.cpp",
         "//src/mongo/db/s/resharding:resharding_recipient_service_external_state.cpp",
