@@ -4,6 +4,8 @@
  * @tags: [
  *  requires_fcv_53,
  *  assumes_read_concern_local,
+ *  # Makes checks about the number of shards in the collection.
+ *  assumes_balancer_off,
  * ]
  */
 
