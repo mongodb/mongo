@@ -56,7 +56,9 @@ function setUpData() {
 
     // Write a document with the same key directly to shard1. This simulates an orphaned
     // document, or the duplicate document which temporarily exists during a chunk migration.
-    shard1DB.test.insert({_id: -100, a: -100, msg: "not_updated"});
+    assert.commandWorked(shard1DB.test.insert({_id: -100, a: -100, msg: "not_updated"}));
+    assert.docEq([{_id: -100, a: -100, msg: "not_updated"}],
+                 shard1DB.test.find({_id: -100}).toArray());
 
     // Clear and restart the profiler on both shards.
     restartProfiling();
