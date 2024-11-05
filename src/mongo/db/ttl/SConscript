@@ -10,8 +10,8 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/index_build_entry_helpers",
-        "$BUILD_DIR/mongo/db/index_builds_coordinator_mongod",
+        "$BUILD_DIR/mongo/db/index_builds/index_build_entry_helpers",
+        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator_mongod",
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/db/shard_role",

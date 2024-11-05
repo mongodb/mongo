@@ -23,11 +23,6 @@ mongo_cc_library(
 )
 
 idl_generator(
-    name = "commit_quorum_gen",
-    src = "commit_quorum.idl",
-)
-
-idl_generator(
     name = "collection_options_gen",
     src = "collection_options.idl",
     deps = [
@@ -74,26 +69,8 @@ mongo_cc_library(
 )
 
 idl_generator(
-    name = "index_build_entry_gen",
-    src = "index_build_entry.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/catalog:commit_quorum_gen",
-        "//src/mongo/util/net:hostandport_gen",
-    ],
-)
-
-idl_generator(
     name = "health_log_gen",
     src = "health_log.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-idl_generator(
-    name = "multi_index_block_gen",
-    src = "multi_index_block.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
@@ -141,7 +118,6 @@ mongo_cc_library(
         "//src/mongo/db:shard_role_api_stor_ex",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/concurrency:lock_manager",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/index:index_access_method",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:bson_collection_catalog_entry",
@@ -205,38 +181,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "commit_quorum_options",
-    srcs = [
-        "commit_quorum_options.cpp",
-        ":commit_quorum_gen",
-    ],
-    hdrs = [
-        "commit_quorum_options.h",
-    ],
-    deps = [
-        "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/db:server_base",
-    ],
-)
-
-mongo_cc_library(
-    name = "index_build_oplog_entry",
-    srcs = [
-        "index_build_oplog_entry.cpp",
-    ],
-    hdrs = [
-        "index_build_oplog_entry.h",
-    ],
-    deps = [
-        ":commit_quorum_options",
-        "//src/mongo:base",
-        "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/db/repl:oplog_entry",
-        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
     name = "import_collection_oplog_entry",
     srcs = [
         ":import_collection_oplog_entry_gen",
@@ -267,7 +211,6 @@ mongo_cc_library(
         "//src/mongo/db:multitenancy_gen",
         "//src/mongo/db:namespace_spec_gen",
         "//src/mongo/db:read_write_concern_provenance_base_gen",
-        "//src/mongo/db:resumable_index_builds_gen",
         "//src/mongo/db:vector_clock_gen",
         "//src/mongo/db:write_concern_gen",
         "//src/mongo/db/auth:access_checks_gen",
@@ -321,18 +264,6 @@ mongo_cc_library(
         "//src/mongo/crypto:fle_fields",
         "//src/mongo/db:server_base",
         "//src/mongo/db/storage:storage_options",
-    ],
-)
-
-mongo_cc_library(
-    name = "index_build_entry_idl",
-    srcs = [
-        ":index_build_entry_gen",
-    ],
-    deps = [
-        ":commit_quorum_options",
-        "//src/mongo/db:server_base",
-        "//src/mongo/util/net:network",
     ],
 )
 
@@ -454,86 +385,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "index_build_block",
-    srcs = [
-        "index_build_block.cpp",
-    ],
-    hdrs = [
-        "index_build_block.h",
-    ],
-    deps = [
-        ":collection_catalog",
-        ":collection_query_info",
-        ":index_key_validate",
-        "//src/mongo/db:audit",
-        "//src/mongo/db:collection_index_usage_tracker",
-        "//src/mongo/db:common",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:vector_clock",
-        "//src/mongo/db/index:index_access_method",
-        "//src/mongo/db/repl:repl_coordinator_interface",
-        "//src/mongo/db/storage:durable_catalog",
-        "//src/mongo/db/ttl:ttl_collection_cache",
-    ],
-)
-
-mongo_cc_library(
-    name = "multi_index_block",
-    srcs = [
-        "multi_index_block.cpp",
-        ":multi_index_block_gen",
-    ],
-    hdrs = [
-        "multi_index_block.h",
-    ],
-    deps = [
-        ":collection_catalog",
-        ":collection_query_info",
-        ":index_build_block",
-        ":index_catalog",
-        "//src/mongo/db:multi_key_path_tracker",
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db:resumable_index_builds_idl",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/index:index_access_method",
-        "//src/mongo/db/query/query_stats",
-        "//src/mongo/db/repl:repl_coordinator_interface",
-        "//src/mongo/db/storage:storage_options",
-        "//src/mongo/db/timeseries:timeseries_conversion_util",
-        "//src/mongo/util:fail_point",
-        "//src/mongo/util:log_and_backoff",
-        "//src/mongo/util:progress_meter",
-    ],
-)
-
-mongo_cc_library(
-    name = "index_builds_manager",
-    srcs = [
-        "index_builds_manager.cpp",
-    ],
-    hdrs = [
-        "index_builds_manager.h",
-        "//src/mongo/db:rebuild_indexes.h",
-        "//src/mongo/db:repl_index_build_state.h",
-    ],
-    deps = [
-        ":index_repair",
-        ":multi_index_block",
-        "//src/mongo:base",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/query/query_stats",
-        "//src/mongo/db/storage:record_store_base",
-        "//src/mongo/db/storage:storage_options",
-        "//src/mongo/db/storage:storage_repair_observer",
-        "//src/mongo/util:progress_meter",
-    ],
-)
-
-mongo_cc_library(
     name = "catalog_helpers",
     srcs = [
         "backwards_compatible_collection_options_util.cpp",
@@ -576,12 +427,10 @@ mongo_cc_library(
         ":index_catalog",
         ":index_key_validate",
         ":local_oplog_info",
-        ":multi_index_block",
         ":throttle_cursor",
         "//src/mongo:base",
         "//src/mongo/db:audit",
         "//src/mongo/db:coll_mod_command_idl",
-        "//src/mongo/db:index_builds_coordinator_interface",
         "//src/mongo/db:index_commands_idl",
         "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:multitenancy",
@@ -593,6 +442,8 @@ mongo_cc_library(
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/index_builds:multi_index_block",
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:index_entry_comparison",
@@ -637,12 +488,12 @@ mongo_cc_library(
         ":catalog_stats",
         ":collection_catalog",
         ":database_holder",
-        "//src/mongo/db:index_builds_coordinator_interface",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/storage:write_unit_of_work",
         "//src/mongo/db/timeseries:timeseries_extended_range",
@@ -694,7 +545,6 @@ mongo_cc_library(
         "collection_query_info",
         "document_validation",
         "health_log_interface",
-        "index_build_block",
         "index_catalog",
         "index_key_validate",
         "index_repair",

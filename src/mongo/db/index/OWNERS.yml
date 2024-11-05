@@ -3,9 +3,6 @@ filters:
   - "index_access_method*":
     approvers:
       - 10gen/server-storage-execution
-  - "index_build_interceptor*":
-    approvers:
-      - 10gen/server-storage-execution
   - "key_gen_bm.cpp":
     approvers:
       - 10gen/query-execution

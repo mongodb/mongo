@@ -24,7 +24,6 @@ indexTestEnv.CppUnitTest(
         "2d_key_generator_test.cpp",
         "btree_key_generator_test.cpp",
         "hash_key_generator_test.cpp",
-        "index_build_interceptor_test.cpp",
         "multikey_paths_test.cpp",
         "s2_key_generator_test.cpp",
         "s2_bucket_key_generator_test.cpp",

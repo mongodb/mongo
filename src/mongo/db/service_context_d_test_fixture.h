@@ -34,7 +34,7 @@
 #include <utility>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/journal_listener.h"

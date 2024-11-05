@@ -160,7 +160,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/commands/create_command",
         "$BUILD_DIR/mongo/db/commands/list_collections_filter",
         "$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util",
-        "$BUILD_DIR/mongo/db/index_builds_coordinator_mock",
+        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator_mock",
         "$BUILD_DIR/mongo/db/index_commands_idl",
         "$BUILD_DIR/mongo/db/keys_collection_client_direct",
         "$BUILD_DIR/mongo/db/op_observer/op_observer",

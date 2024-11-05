@@ -80,6 +80,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/dbdirectclient",
         "$BUILD_DIR/mongo/db/fle_crud",
         "$BUILD_DIR/mongo/db/fle_mocks",
+        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator",
         "$BUILD_DIR/mongo/db/multitenancy",
         "$BUILD_DIR/mongo/db/op_observer/op_observer",
         "$BUILD_DIR/mongo/db/query/query_planner",

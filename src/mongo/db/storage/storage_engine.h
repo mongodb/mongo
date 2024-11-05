@@ -38,9 +38,9 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/index_builds.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/resumable_index_builds_gen.h"
+#include "mongo/db/index_builds/index_builds.h"
+#include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/util/str.h"
 

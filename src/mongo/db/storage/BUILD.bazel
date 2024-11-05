@@ -224,11 +224,6 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "two_phase_index_build_knobs_gen",
-    src = "two_phase_index_build_knobs.idl",
-)
-
 mongo_cc_library(
     name = "storage_file_util",
     srcs = [
@@ -295,7 +290,6 @@ mongo_cc_library(
         "//src/mongo/db:multitenancy_gen",
         "//src/mongo/db:namespace_spec_gen",
         "//src/mongo/db:read_write_concern_provenance_base_gen",
-        "//src/mongo/db:resumable_index_builds_gen",
         "//src/mongo/db:vector_clock_gen",
         "//src/mongo/db:write_concern_gen",
         "//src/mongo/db/auth:access_checks_gen",
@@ -306,6 +300,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:index_path_projection.h",
         "//src/mongo/db/exec:projection_executor.h",
         "//src/mongo/db/exec:projection_executor_builder.h",
+        "//src/mongo/db/index_builds:resumable_index_builds_gen",
         "//src/mongo/db/matcher/schema:encrypt_schema_gen",
         "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_gen",
         "//src/mongo/db/pipeline:document_source_change_stream_gen",
@@ -455,16 +450,6 @@ mongo_cc_library(
         ":backup_cursor_hooks",  # TODO(SERVER-93876): Remove.
         ":storage_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:server_status_core",
-    ],
-)
-
-mongo_cc_library(
-    name = "two_phase_index_build_knobs_idl",
-    srcs = [
-        ":two_phase_index_build_knobs_gen",
-    ],
-    deps = [
-        "//src/mongo/db:server_base",
     ],
 )
 
@@ -650,10 +635,8 @@ mongo_cc_library(
         ":storage_options",
         ":storage_repair_observer",
         ":storage_util",
-        ":two_phase_index_build_knobs_idl",
         "//src/mongo/db:audit",
         "//src/mongo/db:multitenancy",
-        "//src/mongo/db:resumable_index_builds_idl",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:shard_role",
@@ -662,6 +645,8 @@ mongo_cc_library(
         "//src/mongo/db/catalog:catalog_helpers",
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/index_builds:resumable_index_builds_idl",
+        "//src/mongo/db/index_builds:two_phase_index_build_knobs_idl",
         "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
     ],
 )

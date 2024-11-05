@@ -35,7 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/shutdown.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/transaction_coordinator_service.h"

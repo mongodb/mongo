@@ -1,0 +1,326 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "commit_quorum_options",
+    srcs = [
+        "commit_quorum_options.cpp",
+        ":commit_quorum_gen",
+    ],
+    hdrs = [
+        "commit_quorum_options.h",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_build_block",
+    srcs = [
+        "index_build_block.cpp",
+    ],
+    hdrs = [
+        "index_build_block.h",
+    ],
+    deps = [
+        "//src/mongo/db:audit",
+        "//src/mongo/db:collection_index_usage_tracker",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/catalog:collection_query_info",
+        "//src/mongo/db/catalog:index_key_validate",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/ttl:ttl_collection_cache",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_build_entry_helpers",
+    srcs = [
+        "index_build_entry_helpers.cpp",
+    ],
+    hdrs = [
+        "index_build_entry_helpers.h",
+    ],
+    deps = [
+        ":commit_quorum_options",
+        ":index_build_entry_idl",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:local_oplog_info",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/concurrency:exception_util",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_build_entry_idl",
+    srcs = [
+        ":index_build_entry_gen",
+    ],
+    deps = [
+        ":commit_quorum_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_build_oplog_entry",
+    srcs = [
+        "index_build_oplog_entry.cpp",
+    ],
+    hdrs = [
+        "index_build_oplog_entry.h",
+    ],
+    deps = [
+        ":commit_quorum_options",
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db/repl:oplog_entry",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_builds_coordinator",
+    srcs = [
+        "active_index_builds.cpp",
+        "index_builds_coordinator.cpp",
+        "index_builds_manager.cpp",
+        "rebuild_indexes.cpp",
+        "repl_index_build_state.cpp",
+    ],
+    hdrs = [
+        "active_index_builds.h",
+        "index_builds_coordinator.h",
+        "index_builds_manager.h",
+        "rebuild_indexes.h",
+        "repl_index_build_state.h",
+    ],
+    deps = [
+        ":commit_quorum_options",
+        ":index_build_entry_helpers",
+        ":index_build_entry_idl",
+        ":index_build_oplog_entry",
+        ":multi_index_block",
+        ":resumable_index_builds_idl",
+        ":two_phase_index_build_knobs_idl",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/catalog:index_repair",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/repl:cloner_utils",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:tenant_migration_access_blocker",
+        "//src/mongo/db/repl:timestamp_block",
+        "//src/mongo/db/storage:disk_space_monitor",
+        "//src/mongo/db/storage:disk_space_util",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage:storage_repair_observer",
+        "//src/mongo/db/storage:storage_util",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util:progress_meter",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_builds_coordinator_mock",
+    srcs = [
+        "index_builds_coordinator_mock.cpp",
+    ],
+    hdrs = [
+        "index_builds_coordinator_mock.h",
+    ],
+    header_deps = [
+        ":resumable_index_builds_idl",
+        ":index_build_entry_helpers",
+        ":two_phase_index_build_knobs_idl",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/repl:tenant_migration_access_blocker",
+        "//src/mongo/db/s:forwardable_operation_metadata",
+    ],
+    deps = [
+        ":index_builds_coordinator",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_build_interceptor",
+    srcs = [
+        "duplicate_key_tracker.cpp",
+        "index_build_interceptor.cpp",
+        "skipped_record_tracker.cpp",
+        ":index_build_interceptor_gen",
+        "//src/mongo/db/index:index_access_method.h",
+    ],
+    hdrs = [
+        "duplicate_key_tracker.h",
+        "index_build_interceptor.h",
+        "skipped_record_tracker.h",
+    ],
+    deps = [
+        ":two_phase_index_build_knobs_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/sorter:sorter_stats",
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:execution_context",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_builds_coordinator_mongod",
+    srcs = [
+        "index_builds_coordinator_mongod.cpp",
+    ],
+    hdrs = [
+        "index_builds_coordinator_mongod.h",
+    ],
+    deps = [
+        ":index_build_entry_helpers",
+        ":index_build_entry_idl",
+        ":index_builds_coordinator",
+        ":resumable_index_builds_idl",
+        ":two_phase_index_build_knobs_idl",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/repl:tenant_migration_access_blocker",
+        "//src/mongo/db/s:forwardable_operation_metadata",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util/concurrency:thread_pool",
+    ] + select({
+        "//bazel/config:enterprise_feature_audit_enabled": [
+            "//src/mongo/db/modules/enterprise/src/audit:audit_enterprise",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "multi_index_block",
+    srcs = [
+        "multi_index_block.cpp",
+        ":multi_index_block_gen",
+    ],
+    hdrs = [
+        "multi_index_block.h",
+    ],
+    deps = [
+        ":index_build_block",
+        ":resumable_index_builds_idl",
+        "//src/mongo/db:multi_key_path_tracker",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/catalog:collection_query_info",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util:log_and_backoff",
+        "//src/mongo/util:progress_meter",
+    ],
+)
+
+mongo_cc_library(
+    name = "resumable_index_builds_idl",
+    srcs = [
+        "resumable_index_builds_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/sorter:sorter_base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+idl_generator(
+    name = "commit_quorum_gen",
+    src = "commit_quorum.idl",
+)
+
+idl_generator(
+    name = "index_build_entry_gen",
+    src = "index_build_entry.idl",
+    deps = [
+        ":commit_quorum_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/util/net:hostandport_gen",
+    ],
+)
+
+idl_generator(
+    name = "index_build_interceptor_gen",
+    src = "index_build_interceptor.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "multi_index_block_gen",
+    src = "multi_index_block.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "resumable_index_builds_gen",
+    src = "resumable_index_builds.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:record_id_gen",
+        "//src/mongo/db/sorter:sorter_gen",
+    ],
+)
+
+idl_generator(
+    name = "two_phase_index_build_knobs_gen",
+    src = "two_phase_index_build_knobs.idl",
+)
+
+mongo_cc_library(
+    name = "two_phase_index_build_knobs_idl",
+    srcs = [
+        ":two_phase_index_build_knobs_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

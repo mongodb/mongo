@@ -32,35 +32,23 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "index_build_interceptor_gen",
-    src = "index_build_interceptor.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
 mongo_cc_library(
     name = "index_access_method",
     srcs = [
         "2d_access_method.cpp",
         "btree_access_method.cpp",
         "btree_key_generator.cpp",
-        "duplicate_key_tracker.cpp",
         "expression_keys_private.cpp",
         "fts_access_method.cpp",
         "hash_access_method.cpp",
         "index_access_method.cpp",
-        "index_build_interceptor.cpp",
         "index_descriptor.cpp",
         "multikey_paths.cpp",
         "s2_access_method.cpp",
-        "skipped_record_tracker.cpp",
         "sort_key_generator.cpp",
         "wildcard_access_method.cpp",
         "wildcard_key_generator.cpp",
         "wildcard_validation.cpp",
-        ":index_build_interceptor_gen",
         "//src/mongo/db/catalog:import_options.h",
         "//src/mongo/db/storage/kv:kv_engine.h",
     ],
@@ -69,18 +57,15 @@ mongo_cc_library(
         "btree_access_method.h",
         "btree_key_generator.h",
         "bulk_builder_common.h",
-        "duplicate_key_tracker.h",
         "expression_keys_private.h",
         "fts_access_method.h",
         "hash_access_method.h",
         "index_access_method.h",
-        "index_build_interceptor.h",
         "index_descriptor.h",
         "multikey_metadata_access_stats.h",
         "multikey_paths.h",
         "s2_access_method.h",
         "s2_bucket_access_method.h",
-        "skipped_record_tracker.h",
         "sort_key_generator.h",
         "wildcard_access_method.h",
         "wildcard_key_generator.h",
@@ -92,7 +77,6 @@ mongo_cc_library(
         "//src/mongo/db:multi_key_path_tracker",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:query_expressions",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:record_id_helpers",
-        "//src/mongo/db:resumable_index_builds_idl",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:shard_role_api",  # TODO(SERVER-93876): Remove.
@@ -103,6 +87,8 @@ mongo_cc_library(
         "//src/mongo/db/exec:working_set",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/geo:geoparser",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/index_builds:index_build_interceptor",
+        "//src/mongo/db/index_builds:resumable_index_builds_idl",
         "//src/mongo/db/pipeline:document_path_support",
         "//src/mongo/db/query:projection_ast",
         "//src/mongo/db/query:sort_pattern",  # TODO(SERVER-93876): Remove.

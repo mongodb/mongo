@@ -234,25 +234,6 @@ env.Library(
 )
 
 env.Library(
-    target="index_builds_coordinator_mock",
-    source=["index_builds_coordinator_mock.cpp"],
-    LIBDEPS=[
-        "index_builds_coordinator_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "catalog/collection_catalog",
-        "catalog/index_build_entry_idl",
-        "index_build_entry_helpers",
-        "repl/tenant_migration_access_blocker",
-        "resumable_index_builds_idl",
-        "s/forwardable_operation_metadata",
-        "shard_role",
-        "storage/two_phase_index_build_knobs_idl",
-    ],
-)
-
-env.Library(
     target="vector_clock_trivial",
     source=[
         "vector_clock_trivial.cpp",
@@ -271,6 +252,7 @@ env.Library(
         "service_context_test_fixture",
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator_mongod",
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "$BUILD_DIR/mongo/util/periodic_runner_factory",
@@ -278,7 +260,6 @@ env.Library(
         "auth/authserver",
         "catalog/catalog_impl",
         "commands/mongod",
-        "index_builds_coordinator_mongod",
         "op_observer/op_observer",
         "s/sharding_runtime_d",
         "service_context_d",
@@ -503,29 +484,6 @@ if wiredtiger:
             "repl/storage_interface_impl",
             "service_context_d_test_fixture",
             "service_context_test_fixture",
-        ],
-    )
-
-    envWithAsio.CppUnitTest(
-        target="index_build_test",
-        source=[
-            "index_build_entry_helpers_test.cpp",
-            "index_builds_coordinator_mongod_test.cpp",
-            "index_builds_coordinator_test.cpp",
-        ],
-        LIBDEPS=[
-            "catalog/catalog_test_fixture",
-            "catalog/index_build_entry_idl",
-            "collection_crud/collection_crud",
-            "index_build_entry_helpers",
-            "index_builds_coordinator_mongod",
-            "query_exec",
-            "repl/replmocks",
-            "repl/storage_interface_impl",
-            "server_base",
-            "service_context_d_test_fixture",
-            "service_context_test_fixture",
-            "shard_role",
         ],
     )
 
@@ -808,12 +766,12 @@ env.Benchmark(
         "service_entry_point_shard_role_bm.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator_mongod",
         "$BUILD_DIR/mongo/util/periodic_runner_factory",
         "auth/authserver",
         "catalog/catalog_impl",
         "commands/standalone",
         "dbdirectclient",
-        "index_builds_coordinator_mongod",
         "mongod_options_init",
         "op_observer/op_observer",
         "read_write_concern_defaults_mock",

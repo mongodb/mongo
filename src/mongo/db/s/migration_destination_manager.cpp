@@ -65,7 +65,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/list_indexes_gen.h"

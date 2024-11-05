@@ -52,7 +52,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/index_builds_coordinator_mock.h"
+#include "mongo/db/index_builds/index_builds_coordinator_mock.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_registry.h"

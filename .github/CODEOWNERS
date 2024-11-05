@@ -615,7 +615,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/crypto/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/OWNERS.yml
-/src/mongo/db/**/*index_build* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/**/client.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/client_context_test.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/client_out_of_line_executor* @10gen/server-programmability @svc-auto-approve-bot
@@ -661,7 +660,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/vector_clock* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/server_lifecycle_monitor* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/prepare_conflict_tracker* @10gen/server-storage-execution @svc-auto-approve-bot
-/src/mongo/db/**/rebuild_indexes* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/**/repl_set_member_in_standalone_mode* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/**/server_recovery* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/**/mongod_options_storage.idl @10gen/server-storage-execution @svc-auto-approve-bot
@@ -674,14 +672,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/catalog/OWNERS.yml
 /src/mongo/db/catalog/**/collection_compact* @10gen/server-rss-sydney @svc-auto-approve-bot
 /src/mongo/db/catalog/**/collection_validation* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
-/src/mongo/db/catalog/**/commit_quorum* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/health_log* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/import* @10gen/server-catalog-and-routing @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
-/src/mongo/db/catalog/**/index_build* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_key_validate* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_spec_validate* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_repair* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
-/src/mongo/db/catalog/**/multi_index_block* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/throttle_cursor* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/catalog/**/create* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/database* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -805,7 +800,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/index/OWNERS.yml
 /src/mongo/db/index/**/index_access_method* @10gen/server-storage-execution @svc-auto-approve-bot
-/src/mongo/db/index/**/index_build_interceptor* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/key_gen_bm.cpp @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/multikey_metadata_access_stats.h @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/*key_generator* @10gen/query-execution @svc-auto-approve-bot
@@ -813,6 +807,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/index/**/expression_params* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/wildcard_validation* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/multikey_paths* @10gen/query-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/index_builds/OWNERS.yml
+/src/mongo/db/index_builds/**/* @10gen/server-storage-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/matcher/OWNERS.yml
 /src/mongo/db/matcher/**/* @10gen/query @svc-auto-approve-bot

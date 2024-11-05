@@ -34,7 +34,7 @@ global:
         - "mongo/db/write_concern_options.h"
 
 imports:
-    - "mongo/db/catalog/commit_quorum.idl"
+    - "mongo/db/index_builds/commit_quorum.idl"
     - "mongo/db/basic_types.idl"
 
 commands:

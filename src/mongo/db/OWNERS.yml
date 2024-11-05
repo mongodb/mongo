@@ -1,8 +1,5 @@
 version: 1.0.0
 filters:
-  - "*index_build*":
-    approvers:
-      - 10gen/server-storage-execution
   - "client.*":
     approvers:
       - 10gen/server-programmability
@@ -140,9 +137,6 @@ filters:
     approvers:
       - 10gen/server-programmability
   - "prepare_conflict_tracker*":
-    approvers:
-      - 10gen/server-storage-execution
-  - "rebuild_indexes*":
     approvers:
       - 10gen/server-storage-execution
   - "repl_set_member_in_standalone_mode*":

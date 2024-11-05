@@ -51,7 +51,7 @@
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/client.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/all_database_cloner.h"
 #include "mongo/db/repl/collection_cloner.h"

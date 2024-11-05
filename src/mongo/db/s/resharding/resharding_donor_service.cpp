@@ -54,7 +54,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/write_ops/delete.h"
