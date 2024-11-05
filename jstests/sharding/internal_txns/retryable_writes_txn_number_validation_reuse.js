@@ -16,6 +16,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {
     makeAbortTransactionCmdObj,
     makeCommitTransactionCmdObj,
@@ -59,6 +60,8 @@ function setUpTestMode(mode) {
         assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
         shard0TestDB = st.rs0.getPrimary().getDB(kDbName);
     }
+
+    awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
 }
 
 function makeInsertCmdObj(docs, {lsid, txnNumber, isTransaction}) {
