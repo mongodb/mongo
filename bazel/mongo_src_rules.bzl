@@ -1977,7 +1977,7 @@ def idl_generator_impl(ctx):
         ),
     ]
 
-idl_generator = rule(
+idl_generator_rule = rule(
     idl_generator_impl,
     attrs = {
         "deps": attr.label_list(
@@ -2010,6 +2010,39 @@ idl_generator = rule(
     toolchains = ["@bazel_tools//tools/python:toolchain_type"],
     fragments = ["py"],
 )
+
+def write_target_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".gen_source_list")
+    ctx.actions.write(
+        out,
+        "//" + ctx.label.package + ":" + ctx.attr.target_name,
+    )
+    return [
+        DefaultInfo(
+            files = depset([out]),
+        ),
+    ]
+
+write_target = rule(
+    write_target_impl,
+    attrs = {
+        "target_name": attr.string(
+            doc = "the name of the target to record",
+        ),
+    },
+)
+
+def idl_generator(name, tags = [], **kwargs):
+    write_target(
+        name = name + "_gen_source_tag",
+        target_name = name,
+        tags = ["scons_link_lists"],
+    )
+    idl_generator_rule(
+        name = name,
+        tags = tags + ["gen_source"],
+        **kwargs
+    )
 
 def symlink_impl(ctx):
     ctx.actions.symlink(

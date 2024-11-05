@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "write_target")
+
 def render_template_impl(ctx):
     python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
     python_libs = [py_dep[PyInfo].transitive_sources for py_dep in ctx.attr.python_libs]
@@ -24,7 +26,7 @@ def render_template_impl(ctx):
 
     return [DefaultInfo(files = depset([ctx.outputs.output]))]
 
-render_template = rule(
+render_template_rule = rule(
     render_template_impl,
     attrs = {
         "srcs": attr.label_list(
@@ -46,3 +48,15 @@ render_template = rule(
     toolchains = ["@bazel_tools//tools/python:toolchain_type"],
     output_to_genfiles = True,
 )
+
+def render_template(name, tags = [], **kwargs):
+    write_target(
+        name = name + "_gen_source_tag",
+        target_name = name,
+        tags = ["scons_link_lists"],
+    )
+    render_template_rule(
+        name = name,
+        tags = tags + ["gen_source"],
+        **kwargs
+    )
