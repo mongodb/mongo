@@ -21,6 +21,7 @@ def generate_normal_wt_parameters(rng, value):
 
 def generate_special_eviction_configs(rng, ret, fuzzer_stress_mode, params):
     """Returns the value assigned the WiredTiger eviction parameters based on the fields of the parameters in config_fuzzer_wt_limits.py for special parameters (parameters with different assignment behaviors)."""
+    from buildscripts.resmokelib.config_fuzzer_wt_limits import min_trigger_bytes
 
     # eviction_trigger is relative to eviction_target, so you have to leave them excluded to ensure
     # eviction_trigger is fuzzed first.
@@ -32,45 +33,28 @@ def generate_special_eviction_configs(rng, ret, fuzzer_stress_mode, params):
         params["eviction_trigger"]["upper_bound"],
     )
 
-    # Fuzz eviction_dirty_target and trigger both as relative and absolute values.
-    ret["eviction_dirty_target"] = rng.choice(
-        [
-            rng.randint(
-                params["eviction_dirty_target_1"]["lower_bound"],
-                params["eviction_dirty_target_1"]["upper_bound"],
-            ),
-            rng.randint(
-                params["eviction_dirty_target_2"]["lower_bound"],
-                params["eviction_dirty_target_2"]["upper_bound"],
-            ),
-        ]
+    # Fuzz eviction_dirty_target and trigger as absolute values.
+    ret["eviction_dirty_target"] = rng.randint(
+        params["eviction_dirty_target"]["min"], params["eviction_dirty_target"]["max"]
     )
-    ret["trigger_max"] = (
-        params["trigger_max"]["min"]
-        if ret["eviction_dirty_target"] <= 50
-        else params["trigger_max"]["max"]
-    )
+
+    ret["trigger_max"] = params["trigger_max"]["default"]
     ret["eviction_dirty_trigger"] = rng.randint(
-        ret["eviction_dirty_target"] + 1, ret["trigger_max"]
+        max(ret["eviction_dirty_target"] + 1, min_trigger_bytes), ret["trigger_max"]
     )
 
     assert ret["eviction_dirty_trigger"] > ret["eviction_dirty_target"]
     assert ret["eviction_dirty_trigger"] <= ret["trigger_max"]
 
-    # Fuzz eviction_updates_target and eviction_updates_trigger. These are by default half the
-    # values of the corresponding eviction dirty target and trigger. They need to stay less than the
-    # dirty equivalents. The default updates target is 2.5% of the cache, so let's start fuzzing
-    # from 2%.
-    ret["updates_target_min"] = (
-        params["updates_target_min"]["min"]
-        if ret["eviction_dirty_target"] <= 100
-        else params["updates_target_min"]["max"]
-    )  # 2% of 1GB cache
+    ret["updates_target_min"] = params["updates_target_min"]["default"]
+
     ret["eviction_updates_target"] = rng.randint(
         ret["updates_target_min"], ret["eviction_dirty_target"] - 1
     )
+
     ret["eviction_updates_trigger"] = rng.randint(
-        ret["eviction_updates_target"] + 1, ret["eviction_dirty_trigger"] - 1
+        max(ret["eviction_updates_target"] + 1, min_trigger_bytes),
+        ret["eviction_dirty_trigger"] - 1,
     )
 
     # dbg_rollback_error rolls back every Nth transaction.

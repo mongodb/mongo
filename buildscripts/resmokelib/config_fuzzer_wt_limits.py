@@ -37,7 +37,9 @@ If the min/max is not inclusive, this is added as a note above the parameter.
 """
 
 target_bytes_min = 50 * 1024 * 1024  # 50MB # 5% of 1GB default cache size on Evergreen
-target_bytes_max = 256 * 1024 * 1024  # 256MB # 1GB default cache size on Evergreen
+target_bytes_max = 256 * 1024 * 1024  # 256MB # 25.6% of 1GB default cache size on Evergreen
+# We want eviction_dirty_trigger and eviction_updates_trigger >= 64MB. See SERVER-96683.
+min_trigger_bytes = 64 * 1024 * 1024  # 64MB # 6.4% of 1GB default cache size on Evergreen
 
 config_fuzzer_params = {
     # WiredTiger's debug_mode offers some settings to change internal behavior that could help
@@ -61,23 +63,23 @@ config_fuzzer_params = {
             "choices": [0],
         },
         "dbg_slow_checkpoint": {"choices": ["true", "false"]},
-        "eviction_checkpoint_target": {"min": 1, "max": 99},
-        "eviction_target": {"min": 50, "max": 95},
-        # eviction_trigger's true minimum value is (eviction_target + 1), but we have the min set to 1 because this is the value that we'll add to get the lower bound of the eviction_trigger.
+        # 1% of 1GB default cache size on Evergreen, 99% of 1GB default cache size on Evergreen
+        "eviction_checkpoint_target": {"min": 10 * 1024 * 1024, "max": 990 * 1024 * 1024},
+        # 50% of 1GB default cache size on Evergreen, 95% of 1GB default cache size on Evergreen
+        "eviction_target": {"min": 500 * 1024 * 1024, "max": 950 * 1024 * 1024},
         "eviction_trigger": {
             "lower_bound": 1,
-            "upper_bound": 99,
+            # 99% of 1GB default cache size on Evergreen
+            "upper_bound": 990 * 1024 * 1024,
             "min": "(eviction_target + 1)",
-            "max": 99,
+            "max": 990 * 1024 * 1024,
         },
-        # eviction_dirty_target has two different lower-/upper-bounds because it is found by doing a choice between the two eviction_dirty_target_* ranges.
-        "eviction_dirty_target_1": {"lower_bound": 5, "upper_bound": 50},
-        "eviction_dirty_target_2": {
-            "lower_bound": target_bytes_min,
-            "upper_bound": target_bytes_max,
+        "eviction_dirty_target": {
+            "min": target_bytes_min,
+            "max": target_bytes_max,
         },
         "eviction_dirty_trigger": {
-            "min": "eviction_dirty_target + 1",
+            "min": "max(eviction_dirty_target + 1, min_trigger_bytes)",
             "max": "trigger_max",
         },
         # eviction_updates_target/trigger are relative to previously fuzzed values.
@@ -86,12 +88,15 @@ config_fuzzer_params = {
             "max": "eviction_dirty_target - 1",
         },
         "eviction_updates_trigger": {
-            "min": "eviction_updates_target + 1",
+            "min": "max(eviction_updates_target + 1, min_trigger_bytes)",
             "max": "eviction_dirty_trigger - 1",
         },
-        "trigger_max": {"min": 75, "max": target_bytes_max},
-        # updates_target_min depends on the value of eviction_dirty_target.
-        "updates_target_min": {"min": 2, "max": 20 * 1024 * 1024},
+        "trigger_max": {"default": target_bytes_max},
+        # We fuzz eviction_updates_target and eviction_updates_trigger using updates_target_min. These are
+        # by default half the values of the corresponding eviction dirty target and trigger. They need to stay
+        # less than the dirty equivalents. The default updates target is 2.5% of the cache, so let's start fuzzing
+        # from 2%.
+        "updates_target_min": {"default": 20 * 1024 * 1024},
     },
     "wt_table": {
         "block_compressor": {"choices": ["none", "snappy", "zlib", "zstd"]},
@@ -124,15 +129,4 @@ config_fuzzer_params = {
         "prefix_compression": {"choices": ["true", "false"]},
         "split_pct": {"choices": [50, 60, 75, 100], "min": 50, "max": 100},
     },
-}
-# eviction_dirty_target is declared to store the true min/max of the eviction_dirty_target parameter, even though we use eviction_dirty_target_* above to generate the value.
-config_fuzzer_params["eviction_dirty_target"] = {
-    "min": min(
-        config_fuzzer_params["wt"]["eviction_dirty_target_1"]["lower_bound"],
-        config_fuzzer_params["wt"]["eviction_dirty_target_2"]["lower_bound"],
-    ),
-    "max": max(
-        config_fuzzer_params["wt"]["eviction_dirty_target_1"]["upper_bound"],
-        config_fuzzer_params["wt"]["eviction_dirty_target_2"]["upper_bound"],
-    ),
 }
