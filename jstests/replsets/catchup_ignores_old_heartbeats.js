@@ -45,6 +45,7 @@ const RBIDBeforeStepUp = assert.commandWorked(primary.adminCommand({replSetGetRB
 primary.disconnect(rst.nodes[2]);
 // Get a heartbeat from the original primary "stuck" in the new primary.
 const newPrimary = rst.nodes[1];
+assert.commandWorked(newPrimary.adminCommand({clearLog: "global"}));
 let hbfp =
     configureFailPoint(newPrimary, "pauseInHandleHeartbeatResponse", {"target": primary.host});
 hbfp.wait();
@@ -60,8 +61,21 @@ primary.reconnect(rst.nodes[2]);
 rst.awaitReplication();
 // The new primary should still be primary.
 assert.eq(newPrimary.host, rst.getPrimary().host);
-// No rollbacks should have happened.
+
+// Check if the new primary has any logs with "Member is now in state DOWN". This indicates that it
+// failed to connect to a secondary during catchup. If so, it is possible that catchup did not fully
+// succeed due to network flakiness.
+const newPrimaryFailedToConnect =
+    checkLog.checkContainsWithAtLeastCountJson(newPrimary, 21216, {}, 1);
 const RBIDAfterStepUp = assert.commandWorked(primary.adminCommand({replSetGetRBID: 1}));
-assert.eq(RBIDBeforeStepUp.rbid, RBIDAfterStepUp.rbid);
+
+if (newPrimaryFailedToConnect) {
+    // The new primary may not have fully succeeded in catchup.
+    assert.lte(RBIDBeforeStepUp.rbid, RBIDAfterStepUp.rbid);
+} else {
+    // The new primary received all heartbeats successfully. No rollbacks should have happened on
+    // the old primary.
+    assert.eq(RBIDBeforeStepUp.rbid, RBIDAfterStepUp.rbid);
+}
 forceSyncSource.off();
 rst.stopSet();
