@@ -141,10 +141,10 @@ function runCmd(makeCmdObjFunc, filter, explain, expectFilterCaptured = true) {
 
     assert.commandWorked(mongosColl.createIndex({x: "2dsphere"}));
 
-    const filter0 = {x: 9};
+    const filter0 = {x: {$eq: 9}};
     runCmd(makeCmdObjFunc, filter0, false /* explain */);
 
-    const filter2 = {x: 10};
+    const filter2 = {x: {$eq: 10}};
     runCmd(makeCmdObjFunc, filter2, true /* explain */);
 }
 

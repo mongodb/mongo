@@ -110,12 +110,7 @@ Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {
         result.setField("minDistance", serializeExpr(minDistance));
     }
 
-    if (opts.transformIdentifiers || opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, pExpCtx));
-        result.setField("query", Value(matchExpr->serialize(opts)));
-    } else {
-        result.setField("query", Value(query));
-    }
+    result.setField("query", query ? Value(query->getMatchExpression()->serialize(opts)) : Value());
     result.setField("spherical", opts.serializeLiteral(spherical));
     if (distanceMultiplier) {
         result.setField("distanceMultiplier", opts.serializeLiteral(*distanceMultiplier));
@@ -196,7 +191,7 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
     // here when an $_internalUnpackBucket stage precedes us.
     uassert(5860207,
             "Must not specify 'query' for $geoNear on a time-series collection; use $match instead",
-            query.isEmpty());
+            !query);
     uassert(
         5860208, "$geoNear 'includeLocs' is not supported on time-series metrics", !includeLocs);
 
@@ -432,7 +427,10 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
             uassert(ErrorCodes::TypeMismatch,
                     "query must be an object",
                     argument.type() == BSONType::Object);
-            query = argument.embeddedObject().getOwned();
+            auto queryObj = argument.embeddedObject();
+            if (!queryObj.isEmpty()) {
+                query = std::make_unique<Matcher>(queryObj.getOwned(), pExpCtx);
+            }
         } else if (argName == "spherical") {
             spherical = argument.trueValue();
         } else if (argName == "includeLocs") {
@@ -464,7 +462,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
 
 BSONObj DocumentSourceGeoNear::asNearQuery(StringData nearFieldName) {
     BSONObjBuilder queryBuilder;
-    queryBuilder.appendElements(query);
+    queryBuilder.appendElements(getQuery());
 
     BSONObjBuilder nearBuilder(queryBuilder.subobjStart(nearFieldName));
 

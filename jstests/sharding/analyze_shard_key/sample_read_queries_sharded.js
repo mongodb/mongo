@@ -186,7 +186,7 @@ function runCmd(makeCmdObjFunc, filter, shardNames, explain, expectFilterCapture
 
     assert.commandWorked(mongosColl.createIndex({x: "2dsphere"}));
 
-    const filter0 = {x: 17};
+    const filter0 = {x: {$eq: 17}};
     const shardNames0 = [st.rs1.name];
     runCmd(makeCmdObjFunc, filter0, shardNames0, false /* explain */);
 
@@ -194,7 +194,7 @@ function runCmd(makeCmdObjFunc, filter, shardNames, explain, expectFilterCapture
     const shardNames1 = [st.rs1.name, st.rs2.name];
     runCmd(makeCmdObjFunc, filter1, shardNames1, false /* explain */);
 
-    const filter2 = {x: 19};
+    const filter2 = {x: {$eq: 19}};
     const shardNames2 = [];
     runCmd(makeCmdObjFunc, filter2, shardNames2, true /* explain */);
 

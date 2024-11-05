@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
@@ -125,14 +126,14 @@ public:
      * A query predicate to apply to the documents in addition to the "near" predicate.
      */
     BSONObj getQuery() const override {
-        return query;
+        return query ? *query->getQuery() : BSONObj();
     };
 
     /**
      * Set the query predicate to apply to the documents in addition to the "near" predicate.
      */
     void setQuery(BSONObj newQuery) {
-        query = newQuery.getOwned();
+        query = std::make_unique<Matcher>(newQuery.getOwned(), pExpCtx);
     };
 
     /**
@@ -217,7 +218,7 @@ private:
     boost::intrusive_ptr<Expression> _nearGeometry;
 
     std::unique_ptr<FieldPath> distanceField;  // Using unique_ptr because FieldPath can't be empty
-    BSONObj query;
+    std::unique_ptr<Matcher> query;
     bool spherical;
     boost::intrusive_ptr<Expression> maxDistance;
     boost::intrusive_ptr<Expression> minDistance;

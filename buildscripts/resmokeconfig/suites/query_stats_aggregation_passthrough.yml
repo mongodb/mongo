@@ -14,6 +14,8 @@ selector:
   exclude_files:
     # Based on SERVER-81917
     - jstests/aggregation/query_limits_test.js
+    # TODO SERVER-96515 Re-enable this test.
+    - jstests/aggregation/expressions/expression_set_field_null_chars.js
   exclude_with_any_tags:
     # Running $queryStats will increment these counters which can screw up some test assertions.
     - inspects_command_opcounters
