@@ -121,10 +121,6 @@ public:
      */
     void updateMarkers(int64_t numBytes, RecordId recordId, Date_t wallTime, int64_t numRecords);
 
-    CollectionTruncateMarkers::MarkersCreationMethod markersCreationMethod() {
-        return _creationMethod;
-    }
-
 private:
     friend class PreImagesRemoverTest;
 
@@ -138,8 +134,6 @@ private:
      * When initialized, indicates this is a serverless environment.
      */
     boost::optional<TenantId> _tenantId;
-
-    CollectionTruncateMarkers::MarkersCreationMethod _creationMethod;
 };
 
 }  // namespace mongo

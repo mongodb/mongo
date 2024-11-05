@@ -671,6 +671,16 @@ public:
     virtual boost::optional<Timestamp> getOplogNeededForCrashRecovery() const = 0;
 
     /**
+     * Returns oplog that may not be truncated. This method is a function of oplog needed for
+     * rollback and oplog needed for crash recovery. This method considers different states the
+     * storage engine can be running in, such as running in in-memory mode.
+     *
+     * This method returning Timestamp::min() implies no oplog should be truncated and
+     * Timestamp::max() means oplog can be truncated freely based on user oplog size configuration.
+     */
+    virtual Timestamp getPinnedOplog() const = 0;
+
+    /**
      * Returns the path to the directory which has the data files of database with `dbName`.
      */
     virtual std::string getFilesystemPathForDb(const DatabaseName& dbName) const = 0;

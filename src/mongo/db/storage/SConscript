@@ -91,6 +91,7 @@ bmEnv.Library(
 env.Library(
     target="record_store_test_harness",
     source=[
+        "oplog_truncation_test.cpp",
         "record_store_test_datafor.cpp",
         "record_store_test_datasize.cpp",
         "record_store_test_deleterecord.cpp",
@@ -114,6 +115,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/shard_role_api",
         "$BUILD_DIR/mongo/db/update/update_document_diff",
         "$BUILD_DIR/mongo/unittest/unittest",
+        "oplog_truncation",
         "record_store_base",
     ],
     LIBDEPS_PRIVATE=[

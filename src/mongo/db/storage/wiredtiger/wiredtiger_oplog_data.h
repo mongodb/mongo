@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 namespace mongo {
@@ -41,16 +40,10 @@ class WiredTigerOplogData {
 public:
     WiredTigerOplogData(const WiredTigerRecordStore::Oplog::Params& params);
 
-    // Adds the truncation statistics for this oplog to the |builder| (for
-    // populating the ServerStatus).
-    void getTruncateStats(BSONObjBuilder& builder) const;
-
     std::shared_ptr<WiredTigerOplogTruncateMarkers> getTruncateMarkers() const;
     void setTruncateMarkers(std::shared_ptr<WiredTigerOplogTruncateMarkers> markers);
 
     int64_t getMaxSize() const;
-
-    AtomicWord<Timestamp>& getFirstRecordTimestamp();
 
     Status updateSize(int64_t newSize);
 
@@ -61,18 +54,9 @@ public:
 private:
     AtomicWord<int64_t> _maxSize;
 
-    // Lazily-evaluated, see WiredTigerRecordStore::{reclaimOplog,getEarliestOplogTimestamp}.
-    AtomicWord<Timestamp> _firstRecordTimestamp{Timestamp()};
-
     // Stores truncate markers for this oplog, can by nullptr e.g. when
     // the server is read-only.
     std::shared_ptr<WiredTigerOplogTruncateMarkers> _truncateMarkers;
-
-    // Cumulative amount of time spent truncating the oplog.
-    AtomicWord<int64_t> _totalTimeTruncating;
-
-    // Cumulative number of truncates of the oplog.
-    AtomicWord<int64_t> _truncateCount;
 };
 
 }  // namespace mongo

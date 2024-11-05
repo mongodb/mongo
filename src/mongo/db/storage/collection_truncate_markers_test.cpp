@@ -140,14 +140,24 @@ public:
                                                int64_t leftoverRecordsBytes,
                                                int64_t minBytesPerMarker)
         : CollectionTruncateMarkersWithPartialExpiration(
-              {}, leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
+              {},
+              leftoverRecordsCount,
+              leftoverRecordsBytes,
+              minBytesPerMarker,
+              Microseconds(0),
+              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
 
     TestCollectionMarkersWithPartialExpiration(std::deque<Marker> markers,
                                                int64_t leftoverRecordsCount,
                                                int64_t leftoverRecordsBytes,
                                                int64_t minBytesPerMarker)
         : CollectionTruncateMarkersWithPartialExpiration(
-              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
+              std::move(markers),
+              leftoverRecordsCount,
+              leftoverRecordsBytes,
+              minBytesPerMarker,
+              Microseconds(0),
+              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
 
     void setExpirePartialMarker(bool value) {
         _expirePartialMarker = value;
@@ -173,14 +183,24 @@ public:
                           int64_t leftoverRecordsBytes,
                           int64_t minBytesPerMarker)
         : CollectionTruncateMarkers(
-              {}, leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
+              {},
+              leftoverRecordsCount,
+              leftoverRecordsBytes,
+              minBytesPerMarker,
+              Microseconds(0),
+              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
 
     TestCollectionMarkers(std::deque<Marker> markers,
                           int64_t leftoverRecordsCount,
                           int64_t leftoverRecordsBytes,
                           int64_t minBytesPerMarker)
         : CollectionTruncateMarkers(
-              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
+              std::move(markers),
+              leftoverRecordsCount,
+              leftoverRecordsBytes,
+              minBytesPerMarker,
+              Microseconds(0),
+              CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection){};
 
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const override {

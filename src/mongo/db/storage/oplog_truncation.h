@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,48 +29,24 @@
 
 #pragma once
 
-#include "mongo/db/auth/cluster_auth_mode.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
+class RecordStore;
+class OperationContext;
+
+namespace oplog_truncation {
+
 /**
- * Responsible for deleting oplog truncate markers once their max capacity has been reached.
+ * Attempts to truncate oplog entries before the pinned oplog timestamp. Truncation will occur
+ * if the oplog is at capacity and the maximum retention time has elapsed.
+ *
+ * `mayTruncateUpTo` is the highest allowable record that will be truncated, inclusive.
+ *
+ * Returns the highest RecordId that was truncated, or a null RecordId if nothing was truncated.
  */
-class OplogCapMaintainerThread {
-public:
-    static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
+RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayTruncateUpTo);
 
-    /**
-     * Create the maintainer thread. Must be called at most once.
-     */
-    void start();
-
-    /**
-     * Waits until the maintainer thread finishes. Must not be called concurrently with start().
-     */
-    void shutdown();
-
-    bool running() const;
-
-    void appendStats(BSONObjBuilder& builder) const;
-
-private:
-    void _run();
-
-    /**
-     * Returns true iff there was an oplog to delete from.
-     */
-    bool _deleteExcessDocuments(OperationContext* opCtx);
-
-    stdx::thread _thread;
-
-    // Cumulative amount of time spent truncating the oplog.
-    AtomicWord<int64_t> _totalTimeTruncating;
-
-    // Cumulative number of truncates of the oplog.
-    AtomicWord<int64_t> _truncateCount;
-};
-
+}  // namespace oplog_truncation
 }  // namespace mongo

@@ -109,12 +109,13 @@ WiredTigerOplogTruncateMarkers::WiredTigerOplogTruncateMarkers(
     Microseconds totalTimeSpentBuilding,
     CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
     WiredTigerRecordStore* rs)
-    : CollectionTruncateMarkers(
-          std::move(markers), partialMarkerRecords, partialMarkerBytes, minBytesPerMarker),
-      _rs(rs),
-      _totalTimeProcessing(totalTimeSpentBuilding),
-      _processBySampling(creationMethod ==
-                         CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {}
+    : CollectionTruncateMarkers(std::move(markers),
+                                partialMarkerRecords,
+                                partialMarkerBytes,
+                                minBytesPerMarker,
+                                totalTimeSpentBuilding,
+                                creationMethod),
+      _rs(rs) {}
 
 bool WiredTigerOplogTruncateMarkers::isDead() {
     stdx::lock_guard<stdx::mutex> lk(_reclaimMutex);
@@ -169,14 +170,6 @@ void WiredTigerOplogTruncateMarkers::updateMarkersAfterCappedTruncateAfter(
             metrics.currentBytes->fetchAndAdd(bytesInMarkersToRemove - bytesRemoved);
         });
     });
-}
-
-void WiredTigerOplogTruncateMarkers::getOplogTruncateMarkersStats(BSONObjBuilder& builder) const {
-    builder.append("totalTimeProcessingMicros", _totalTimeProcessing.count());
-    builder.append("processingMethod", _processBySampling ? "sampling" : "scanning");
-    if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
-        builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
-    }
 }
 
 bool WiredTigerOplogTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* opCtx) {

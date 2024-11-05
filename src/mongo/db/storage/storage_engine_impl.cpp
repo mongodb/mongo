@@ -1200,6 +1200,10 @@ boost::optional<Timestamp> StorageEngineImpl::getOplogNeededForCrashRecovery() c
     return _engine->getOplogNeededForCrashRecovery();
 }
 
+Timestamp StorageEngineImpl::getPinnedOplog() const {
+    return _engine->getPinnedOplog();
+}
+
 void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
     auto catalogRs = _catalogRecordStore.get();
     auto cursor = catalogRs->getCursor(opCtx);

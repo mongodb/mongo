@@ -200,7 +200,7 @@ protected:
         CollectionTruncateMarkers::MarkersCreationMethod expectedCreationMethod) {
         auto nsUUIDTruncateMarkers = tenantMarkers->_markersMap.find(nsUUID);
         ASSERT(nsUUIDTruncateMarkers);
-        ASSERT_EQ(nsUUIDTruncateMarkers->markersCreationMethod(), expectedCreationMethod);
+        ASSERT_EQ(nsUUIDTruncateMarkers->getMarkersCreationMethod(), expectedCreationMethod);
     }
 
     void validateMarkersDontExistForNsUUID(std::shared_ptr<PreImagesTenantMarkers> tenantMarkers,

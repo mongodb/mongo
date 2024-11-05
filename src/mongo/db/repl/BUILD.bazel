@@ -1662,7 +1662,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:multi_index_block",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/storage:oplog_cap_maintainer_thread",
+        "//src/mongo/db/storage:oplog_truncation",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_control",
     ],

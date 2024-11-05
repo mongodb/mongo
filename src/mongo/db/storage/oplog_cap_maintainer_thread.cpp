@@ -35,10 +35,13 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/storage/oplog_truncation.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/platform/compiler.h"
@@ -57,6 +60,56 @@ namespace {
 const auto getMaintainerThread = ServiceContext::declareDecoration<OplogCapMaintainerThread>();
 
 MONGO_FAIL_POINT_DEFINE(hangOplogCapMaintainerThread);
+
+class OplogTruncateMarkersServerStatusSection : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
+    /**
+     * <ServerStatusSection>
+     */
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    /**
+     * <ServerStatusSection>
+     */
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        BSONObjBuilder builder;
+        auto& capMaintainer = getMaintainerThread(opCtx->getServiceContext());
+        if (!capMaintainer.running()) {
+            return BSONObj();
+        }
+
+        // Hold reference to the catalog for collection lookup without locks to be safe.
+        auto catalog = CollectionCatalog::get(opCtx);
+        auto oplogCollection =
+            catalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace);
+        if (oplogCollection) {
+            auto truncateMarkers =
+                oplogCollection->getRecordStore()->oplog()->getCollectionTruncateMarkers();
+            builder.append("totalTimeProcessingMicros",
+                           truncateMarkers->getCreationProcessingTime().count());
+            builder.append("processingMethod",
+                           truncateMarkers->getMarkersCreationMethod() ==
+                                   CollectionTruncateMarkers::MarkersCreationMethod::Sampling
+                               ? "sampling"
+                               : "scanning");
+        }
+
+        if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
+            builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
+        }
+
+        capMaintainer.appendStats(builder);
+        return builder.obj();
+    }
+};
+
+auto oplogTruncateMarkersStats =
+    *ServerStatusSectionBuilder<OplogTruncateMarkersServerStatusSection>("oplogTruncation")
+         .forShard();
 
 }  // namespace
 
@@ -104,7 +157,23 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             LOGV2_DEBUG(9064300, 2, "oplog collection does not exist");
             return false;
         }
-        rs->oplog()->reclaim(opCtx);
+
+        auto mayTruncateUpTo = opCtx->getServiceContext()->getStorageEngine()->getPinnedOplog();
+
+        Timer timer;
+        oplog_truncation::reclaimOplog(opCtx, *rs, RecordId(mayTruncateUpTo.asULL()));
+
+        auto elapsedMicros = timer.micros();
+        _totalTimeTruncating.fetchAndAdd(elapsedMicros);
+        _truncateCount.fetchAndAdd(1);
+
+        auto elapsedMillis = elapsedMicros / 1000;
+        LOGV2(22402,
+              "Oplog truncation finished",
+              "pinnedOplogTimestamp"_attr = mayTruncateUpTo,
+              "numRecords"_attr = rs->numRecords(),
+              "dataSize"_attr = rs->dataSize(),
+              "duration"_attr = Milliseconds(elapsedMillis));
     }
 
     return true;
@@ -177,6 +246,15 @@ void OplogCapMaintainerThread::_run() {
     }
 
     MONGO_UNREACHABLE;
+}
+
+void OplogCapMaintainerThread::appendStats(BSONObjBuilder& builder) const {
+    builder.append("totalTimeTruncatingMicros", _totalTimeTruncating.load());
+    builder.append("truncateCount", _truncateCount.load());
+}
+
+bool OplogCapMaintainerThread::running() const {
+    return _thread.joinable();
 }
 
 void OplogCapMaintainerThread::shutdown() {

@@ -110,15 +110,21 @@ public:
               wallTime(wallTime) {}
     };
 
+    // The method used for creating the initial set of markers.
+    enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling };
 
     CollectionTruncateMarkers(std::deque<Marker> markers,
                               int64_t leftoverRecordsCount,
                               int64_t leftoverRecordsBytes,
-                              int64_t minBytesPerMarker)
+                              int64_t minBytesPerMarker,
+                              Microseconds totalTimeSpentBuilding,
+                              MarkersCreationMethod creationMethod)
         : _minBytesPerMarker(minBytesPerMarker),
           _currentRecords(leftoverRecordsCount),
           _currentBytes(leftoverRecordsBytes),
-          _markers(std::move(markers)) {}
+          _markers(std::move(markers)),
+          _totalTimeProcessing(totalTimeSpentBuilding),
+          _creationMethod(creationMethod) {}
 
     virtual ~CollectionTruncateMarkers() = default;
 
@@ -147,9 +153,6 @@ public:
     virtual bool awaitHasExcessMarkersOrDead(OperationContext* opCtx) {
         MONGO_UNREACHABLE;
     }
-
-    // The method used for creating the initial set of markers.
-    enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling };
 
     static StringData toString(MarkersCreationMethod creationMethod);
 
@@ -257,6 +260,14 @@ public:
 
     static constexpr uint64_t kRandomSamplesPerMarker = 10;
 
+    Microseconds getCreationProcessingTime() const {
+        return _totalTimeProcessing;
+    }
+
+    MarkersCreationMethod getMarkersCreationMethod() const {
+        return _creationMethod;
+    }
+
     //
     // The following methods are public only for use in tests.
     //
@@ -347,6 +358,10 @@ protected:
         PartialMarkerMetrics metrics{&_currentRecords, &_currentBytes};
         return f(metrics);
     }
+
+    // Amount of time spent scanning and/or sampling the collection during start up, if any.
+    const Microseconds _totalTimeProcessing;
+    const CollectionTruncateMarkers::MarkersCreationMethod _creationMethod;
 };
 
 /**
@@ -384,19 +399,6 @@ public:
         MarkersCreationMethod methodUsed;
     };
 
-    // TODO SERVER-95714: Utilize constructor and InitialSetOfMarkers with highestRecordId and
-    // highestWallTime for PreImagesTruncateMarkersPerNsUUID.
-    CollectionTruncateMarkersWithPartialExpiration(std::deque<Marker> markers,
-                                                   int64_t leftoverRecordsCount,
-                                                   int64_t leftoverRecordsBytes,
-                                                   RecordId highestRecordId,
-                                                   Date_t highestWallTime,
-                                                   int64_t minBytesPerMarker)
-        : CollectionTruncateMarkers(
-              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker),
-          _highestRecordId(std::move(highestRecordId)),
-          _highestWallTime(highestWallTime) {}
-
     /**
      * Deprecated: Upon construction, records may be accounted for by the 'markers' or non-zero
      * 'leftoverRecordsCounts'/'leftoverRecordsBytes' despite uninitialized '_highestRecordId' and
@@ -406,9 +408,15 @@ public:
     CollectionTruncateMarkersWithPartialExpiration(std::deque<Marker> markers,
                                                    int64_t leftoverRecordsCount,
                                                    int64_t leftoverRecordsBytes,
-                                                   int64_t minBytesPerMarker)
-        : CollectionTruncateMarkers(
-              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker) {}
+                                                   int64_t minBytesPerMarker,
+                                                   Microseconds totalTimeSpentBuilding,
+                                                   MarkersCreationMethod creationMethod)
+        : CollectionTruncateMarkers(std::move(markers),
+                                    leftoverRecordsCount,
+                                    leftoverRecordsBytes,
+                                    minBytesPerMarker,
+                                    totalTimeSpentBuilding,
+                                    creationMethod) {}
 
     // Creates a partially filled marker if necessary. The criteria used is whether there is data in
     // the partial marker and whether the implementation's '_hasPartialMarkerExpired' returns true.

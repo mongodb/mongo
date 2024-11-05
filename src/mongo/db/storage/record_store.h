@@ -618,19 +618,11 @@ public:
     virtual Status updateSize(long long size) = 0;
 
     /**
-     * This should only be called if StorageEngine::supportsOplogTruncateMarkers() is true.
-     * Storage engines supporting oplog truncate markers must implement this function.
+     * Returns a new cursor on the oplog, ignoring any visibility semantics specific to forward
+     * cursors.
      */
-    virtual void reclaim(OperationContext*) = 0;
-
-    /**
-     * This should only be called if StorageEngine::supportsOplogTruncateMarkers() is true.
-     * Storage engines supporting oplog truncate markers must implement this function.
-     * Populates `builder` with various statistics pertaining to oplog truncate markers and oplog
-     * truncation.
-     */
-    virtual void getTruncateStats(BSONObjBuilder&) const = 0;
-
+    virtual std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
+                                                               bool forward = true) const = 0;
     /**
      * If supported, this method returns the timestamp value for the latest storage engine committed
      * oplog document. Note that this method should not be called within a UnitOfWork.

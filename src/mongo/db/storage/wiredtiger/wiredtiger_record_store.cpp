@@ -49,7 +49,6 @@
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -185,8 +184,6 @@ void setKey(WT_CURSOR* cursor, const WiredTigerRecordStore::CursorKey* key) {
         cursor->set_key(cursor, *longPtr);
     }
 }
-
-auto& boundRetries = *MetricBuilder<Counter64>("wiredTiger.recordStoreCursorBoundRetries");
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
@@ -1048,7 +1045,6 @@ Status WiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
     invariantWTOK(WT_OP_CHECK(session->truncate(session, nullptr, start, finish, nullptr)),
                   session);
     _changeNumRecordsAndDataSize(wtRu, hintNumRecordsDiff, hintDataSizeDiff);
-
     return Status::OK();
 }
 
@@ -1528,6 +1524,11 @@ WiredTigerRecordStore::Oplog::Oplog(WiredTigerKVEngine* engine,
         .markCollectionAsAlwaysNeedsSizeAdjustment(WiredTigerRecordStore::getIdent());
 }
 
+std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getRawCursor(
+    OperationContext* opCtx, bool forward) const {
+    return std::make_unique<WiredTigerRecordStoreCursor>(opCtx, *this, forward);
+}
+
 WiredTigerRecordStore::Oplog::~Oplog() {
     if (_oplog->getTruncateMarkers()) {
         _oplog->getTruncateMarkers()->kill();
@@ -1572,121 +1573,9 @@ bool WiredTigerRecordStore::Oplog::selfManagedTruncation() const {
     return true;
 }
 
-void WiredTigerRecordStore::Oplog::getTruncateStats(BSONObjBuilder& builder) const {
-    _oplog->getTruncateStats(builder);
-}
-
 std::shared_ptr<CollectionTruncateMarkers>
 WiredTigerRecordStore::Oplog::getCollectionTruncateMarkers() {
     return _oplog->getTruncateMarkers();
-}
-
-void WiredTigerRecordStore::Oplog::reclaim(OperationContext* opCtx) {
-    auto mayTruncateUpTo = _kvEngine->getPinnedOplog();
-    invariant(_keyFormat == KeyFormat::Long);
-    invariant(_oplog);
-
-    Timer timer;
-    for (auto getNextMarker = true; getNextMarker;) {
-        auto truncateMarker = _oplog->getTruncateMarkers()->peekOldestMarkerIfNeeded(opCtx);
-        if (!truncateMarker) {
-            break;
-        }
-        invariant(truncateMarker->lastRecord.isValid());
-
-        LOGV2_DEBUG(7420100,
-                    1,
-                    "Truncating the oplog",
-                    "firstRecord"_attr = _oplog->getTruncateMarkers()->firstRecord,
-                    "lastRecord"_attr = truncateMarker->lastRecord,
-                    "numRecords"_attr = truncateMarker->records,
-                    "numBytes"_attr = truncateMarker->bytes);
-
-        getNextMarker =
-            writeConflictRetry(opCtx, "reclaimOplog", NamespaceString::kRsOplogNamespace, [&] {
-                auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-                StorageWriteTransaction txn(ru);
-
-                auto seekableCursor =
-                    std::make_unique<WiredTigerRecordStoreCursor>(opCtx, *this, true);
-                auto firstRecordSeekable = seekableCursor->next();
-                if (!firstRecordSeekable) {
-                    LOGV2_WARNING(8841100, "The oplog is empty, there is nothing to truncate");
-                    return false;
-                }
-                auto firstRecordId = firstRecordSeekable.get().id;
-
-                // The first record in the oplog should be within the truncate range.
-                if (firstRecordId < _oplog->getTruncateMarkers()->firstRecord ||
-                    firstRecordId > truncateMarker->lastRecord) {
-                    LOGV2_WARNING(7420101,
-                                  "First oplog record is not in truncation range",
-                                  "firstRecord"_attr = firstRecordId,
-                                  "truncateRangeFirstRecord"_attr =
-                                      _oplog->getTruncateMarkers()->firstRecord,
-                                  "truncateRangeLastRecord"_attr = truncateMarker->lastRecord);
-                }
-
-                // It is necessary that there exists a record after the truncate marker but before
-                // or including the mayTruncateUpTo point.  Since the mayTruncateUpTo point may fall
-                // between records, the truncate marker check is not sufficient.
-                auto nextRecordAfterTruncateMarker = seekableCursor->seek(
-                    truncateMarker->lastRecord, SeekableRecordCursor::BoundInclusion::kExclude);
-                if (!nextRecordAfterTruncateMarker) {
-                    LOGV2_DEBUG(5140900, 0, "Will not truncate entire oplog");
-                    return false;
-                }
-
-                if (static_cast<std::uint64_t>(nextRecordAfterTruncateMarker->id.getLong()) >
-                    mayTruncateUpTo.asULL()) {
-                    LOGV2_DEBUG(5140901,
-                                0,
-                                "Cannot truncate as there are no oplog entries after the truncate "
-                                "marker but "
-                                "before the truncate-up-to point",
-                                "nextRecord"_attr =
-                                    Timestamp(nextRecordAfterTruncateMarker->id.getLong()),
-                                "mayTruncateUpTo"_attr = mayTruncateUpTo);
-                    return false;
-                }
-
-                auto status = WiredTigerRecordStore::_rangeTruncate(opCtx,
-                                                                    RecordId(),
-                                                                    truncateMarker->lastRecord,
-                                                                    -truncateMarker->bytes,
-                                                                    -truncateMarker->records);
-
-                if (!status.isOK()) {
-                    LOGV2_WARNING(8841101,
-                                  "Did not successfully perform range truncation ",
-                                  "truncateMarkerLastRecord"_attr =
-                                      truncateMarker->lastRecord.getLong(),
-                                  "error"_attr = status);
-                    return false;
-                }
-                txn.commit();
-
-                // Remove the truncate marker after a successful truncation.
-                _oplog->getTruncateMarkers()->popOldestMarker();
-
-                // Stash the truncate point for next time to cleanly skip over tombstones, etc.
-                _oplog->getTruncateMarkers()->firstRecord = truncateMarker->lastRecord;
-                Timestamp firstRecordTimestamp{
-                    static_cast<uint64_t>(truncateMarker->lastRecord.getLong())};
-                _oplog->getFirstRecordTimestamp().store(firstRecordTimestamp);
-                return true;
-            });
-    }
-
-    auto elapsedMicros = timer.micros();
-    auto elapsedMillis = elapsedMicros / 1000;
-    _oplog->trackTruncateCompletion(elapsedMicros);
-    LOGV2(22402,
-          "WiredTiger record store oplog truncation finished",
-          "pinnedOplogTimestamp"_attr = mayTruncateUpTo,
-          "numRecords"_attr = _sizeInfo->numRecords.load(),
-          "dataSize"_attr = _sizeInfo->dataSize.load(),
-          "duration"_attr = Milliseconds(elapsedMillis));
 }
 
 Status WiredTigerRecordStore::Oplog::updateSize(long long newOplogSize) {
@@ -1727,30 +1616,18 @@ StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getLatestTimestamp(RecoveryU
 }
 
 StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getEarliestTimestamp(RecoveryUnit& ru) {
-    // Using relaxed loads is fine here. The returned timestamp can be from a deleted oplog entry by
-    // the time we return from the method. Additionally we perform initialisation that uses strong
-    // memory ordering so initialisation will only work if we've actually never initialised the
-    // timestamp.
-    auto firstRecordTimestamp = _oplog->getFirstRecordTimestamp().loadRelaxed();
-    if (firstRecordTimestamp == Timestamp()) {
-        WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(ru).getSessionCache();
-        auto sessRaii = cache->getSession();
-        auto cachedCursor = sessRaii->getCachedCursor(_tableId, "");
-        auto cursor = cachedCursor ? cachedCursor : sessRaii->getNewCursor(_uri);
-        ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor, ""); });
-        auto ret = cursor->next(cursor);
-        if (ret == WT_NOTFOUND) {
-            return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
-        }
-        invariantWTOK(ret, cursor->session);
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
-        Timestamp ts{static_cast<uint64_t>(getKey(cursor, KeyFormat::Long).getLong())};
-        if (_oplog->getFirstRecordTimestamp().compareAndSwap(&firstRecordTimestamp, ts)) {
-            firstRecordTimestamp = ts;
-        }
+    WiredTigerCursor curwrap(wtRu, _uri, _tableId, true);
+    auto cursor = curwrap.get();
+    auto ret = cursor->next(cursor);
+    if (ret == WT_NOTFOUND) {
+        return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
     }
+    invariantWTOK(ret, cursor->session);
 
-    return firstRecordTimestamp;
+    auto firstRecord = getKey(cursor, KeyFormat::Long);
+    return Timestamp(static_cast<uint64_t>(firstRecord.getLong()));
 }
 
 int64_t WiredTigerRecordStore::Oplog::getMaxSize() const {

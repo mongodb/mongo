@@ -86,6 +86,7 @@ wtEnv.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/multitenancy",
+        "$BUILD_DIR/mongo/db/storage/oplog_truncation",
         "$BUILD_DIR/mongo/db/storage/sorted_data_interface_tests",
         "storage_wiredtiger_core",
         "wiredtiger_index_test_harness",

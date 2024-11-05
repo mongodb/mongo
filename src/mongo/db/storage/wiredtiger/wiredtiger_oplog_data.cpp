@@ -37,14 +37,6 @@ WiredTigerOplogData::WiredTigerOplogData(const WiredTigerRecordStore::Oplog::Par
     invariant(_maxSize.load());
 }
 
-void WiredTigerOplogData::getTruncateStats(BSONObjBuilder& builder) const {
-    if (_truncateMarkers) {
-        _truncateMarkers->getOplogTruncateMarkersStats(builder);
-    }
-    builder.append("totalTimeTruncatingMicros", _totalTimeTruncating.load());
-    builder.append("truncateCount", _truncateCount.load());
-}
-
 std::shared_ptr<WiredTigerOplogTruncateMarkers> WiredTigerOplogData::getTruncateMarkers() const {
     return _truncateMarkers;
 }
@@ -56,10 +48,6 @@ void WiredTigerOplogData::setTruncateMarkers(
 
 int64_t WiredTigerOplogData::getMaxSize() const {
     return _maxSize.load();
-}
-
-AtomicWord<Timestamp>& WiredTigerOplogData::getFirstRecordTimestamp() {
-    return _firstRecordTimestamp;
 }
 
 Status WiredTigerOplogData::updateSize(int64_t newSize) {
@@ -75,12 +63,4 @@ Status WiredTigerOplogData::updateSize(int64_t newSize) {
     _truncateMarkers->adjust(newSize);
     return Status::OK();
 }
-
-
-void WiredTigerOplogData::trackTruncateCompletion(int64_t micros) {
-    _totalTimeTruncating.fetchAndAdd(micros);
-    _truncateCount.fetchAndAdd(1);
-}
-
-
 }  // namespace mongo

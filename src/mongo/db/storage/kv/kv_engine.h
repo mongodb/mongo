@@ -443,6 +443,13 @@ public:
     virtual boost::optional<Timestamp> getOplogNeededForCrashRecovery() const = 0;
 
     /**
+     * See `StorageEngine::getPinnedOplog`
+     */
+    virtual Timestamp getPinnedOplog() const {
+        return Timestamp::min();
+    }
+
+    /**
      * See `StorageEngine::supportsReadConcernSnapshot`
      */
     virtual bool supportsReadConcernSnapshot() const {

@@ -498,16 +498,7 @@ public:
      */
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final;
 
-    /**
-     * Returns oplog that may not be truncated. This method is a function of oplog needed for
-     * rollback and oplog needed for crash recovery. This method considers different states the
-     * storage engine can be running in, such as running in in-memory mode.
-     *
-     * This method returning Timestamp::min() implies no oplog should be truncated and
-     * Timestamp::max() means oplog can be truncated freely based on user oplog size
-     * configuration.
-     */
-    Timestamp getPinnedOplog() const;
+    Timestamp getPinnedOplog() const final;
 
     ClockSource* getClockSource() const {
         return _clockSource;

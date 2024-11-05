@@ -156,6 +156,9 @@ public:
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
         return boost::none;
     }
+    Timestamp getPinnedOplog() const final {
+        return Timestamp();
+    }
     std::string getFilesystemPathForDb(const DatabaseName& dbName) const final {
         return "";
     }

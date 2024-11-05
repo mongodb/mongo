@@ -172,6 +172,8 @@ public:
 
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final;
 
+    Timestamp getPinnedOplog() const final;
+
     bool supportsReadConcernSnapshot() const final;
 
     bool supportsOplogTruncateMarkers() const final;

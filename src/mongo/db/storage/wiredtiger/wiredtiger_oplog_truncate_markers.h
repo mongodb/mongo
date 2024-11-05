@@ -83,8 +83,6 @@ public:
                                                int64_t bytesRemoved,
                                                const RecordId& firstRemovedId);
 
-    void getOplogTruncateMarkersStats(BSONObjBuilder& builder) const;
-
     // Resize oplog size
     void adjust(int64_t maxSize);
 
@@ -99,7 +97,8 @@ public:
     //
 
     bool processedBySampling() const {
-        return _processBySampling;
+        return getMarkersCreationMethod() ==
+            CollectionTruncateMarkers::MarkersCreationMethod::Sampling;
     }
 
 private:
@@ -117,10 +116,6 @@ private:
     bool _isDead = false;
 
     WiredTigerRecordStore* _rs;
-
-    Microseconds _totalTimeProcessing;  // Amount of time spent scanning and/or sampling the
-                                        // oplog during start up, if any.
-    bool _processBySampling;            // Whether the oplog was sampled or scanned.
 };
 
 }  // namespace mongo

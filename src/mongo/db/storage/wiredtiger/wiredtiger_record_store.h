@@ -382,13 +382,12 @@ public:
 
     bool selfManagedTruncation() const override;
 
-    void getTruncateStats(BSONObjBuilder&) const override;
-
     std::shared_ptr<CollectionTruncateMarkers> getCollectionTruncateMarkers() override;
 
-    void reclaim(OperationContext*) override;
-
     Status updateSize(long long size) override;
+
+    std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
+                                                       bool forward) const override;
 
     StatusWith<Timestamp> getLatestTimestamp(RecoveryUnit&) const override;
 

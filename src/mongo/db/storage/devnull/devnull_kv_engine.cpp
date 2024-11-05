@@ -272,9 +272,10 @@ public:
         return Status::OK();
     }
 
-    void reclaim(OperationContext*) override {}
-
-    void getTruncateStats(BSONObjBuilder&) const override {}
+    std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
+                                                       bool forward) const override {
+        return std::make_unique<EmptyRecordCursor>();
+    }
 
     StatusWith<Timestamp> getLatestTimestamp(RecoveryUnit&) const override {
         return Status::OK();

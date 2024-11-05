@@ -3452,7 +3452,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:disk_space_monitor",
         "//src/mongo/db/storage:flow_control",
         "//src/mongo/db/storage:flow_control_parameters",
-        "//src/mongo/db/storage:oplog_cap_maintainer_thread",
+        "//src/mongo/db/storage:oplog_truncation",
         "//src/mongo/db/storage:storage_control",
         "system_index",
         "//src/mongo/db/timeseries:timeseries_op_observer",

@@ -571,23 +571,24 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "oplog_cap_maintainer_thread",
+    name = "oplog_truncation",
     srcs = [
         "oplog_cap_maintainer_thread.cpp",
+        "oplog_truncation.cpp",
     ],
     hdrs = [
         "oplog_cap_maintainer_thread.h",
+        "oplog_truncation.h",
     ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/catalog:collection_catalog",
-        "//src/mongo/db/catalog:database_holder",
         "//src/mongo/db/catalog:local_oplog_info",
+        "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/util:background_job",
-        "//src/mongo/util/concurrency:spin_lock",
     ],
 )
 
