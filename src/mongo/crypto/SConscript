@@ -10,7 +10,7 @@ Import(
 )
 
 env = env.Clone()
-env.InjectThirdParty(libraries=["bson"])
+
 env.CppUnitTest(
     target="crypto_test",
     source=[
@@ -27,7 +27,6 @@ env.CppUnitTest(
         "sha256_block_test.cpp",
         "sha512_block_test.cpp",
         "symmetric_crypto_test.cpp",
-        "libbsonvalue_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
