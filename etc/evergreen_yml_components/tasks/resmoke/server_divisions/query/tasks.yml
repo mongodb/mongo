@@ -1766,6 +1766,8 @@ tasks:
         vars:
           suite: benchmarks_query
           resmoke_jobs_max: 1
+          exec_timeout_secs: 14400 # 4 hours
+          timeout_secs: 14400 # 4 hours
 
   - <<: *task_template
     name: query_stats_aggregation_passthrough

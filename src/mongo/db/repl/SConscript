@@ -739,7 +739,6 @@ env.Benchmark(
         "replmocks",
         "storage_interface_impl",
     ],
-    CONSOLIDATED_TARGET="repl_bm",
 )
 
 env.Benchmark(

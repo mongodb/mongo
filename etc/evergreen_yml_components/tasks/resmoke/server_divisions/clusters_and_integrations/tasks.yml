@@ -225,6 +225,7 @@ tasks:
         vars:
           suite: benchmarks_first_half
           exec_timeout_secs: 28800 # 8 hour timeout.
+          timeout_secs: 14400 # 4 hours
           resmoke_jobs_max: 1
 
   - <<: *benchmark_template
