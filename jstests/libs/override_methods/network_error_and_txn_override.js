@@ -95,7 +95,6 @@ const kNonRetryableCommands = new Set([
     "applyOps",
     "clone",
     "cloneCollectionAsCapped",
-    "create",
     "createIndexes",
     "deleteIndexes",
     "drop",
@@ -115,7 +114,6 @@ const kNonRetryableCommands = new Set([
 // completing (like IndexNotFound, NamespaceExists, etc.), but because they only take effect
 // once, and many tests use them to set up state, their errors on retries are handled specially.
 const kAcceptableNonRetryableCommands = new Set([
-    "create",
     "createIndexes",
     "createRole",
     "createUser",
@@ -142,8 +140,7 @@ function isAcceptableRetryFailedResponse(cmdName, res) {
     // These codes are uniquely returned from user_management_commands.cpp
     const kErrorCodeRoleAlreadyExists = 51002;
     const kErrorCodeUserAlreadyExists = 51003;
-    return ((cmdName === "create" && res.code === ErrorCodes.NamespaceExists) ||
-            (cmdName === "createIndexes" && res.code === ErrorCodes.IndexAlreadyExists) ||
+    return ((cmdName === "createIndexes" && res.code === ErrorCodes.IndexAlreadyExists) ||
             (cmdName === "drop" && res.code === ErrorCodes.NamespaceNotFound) ||
             ((cmdName == "createUser") && (res.code === kErrorCodeUserAlreadyExists)) ||
             ((cmdName == "createRole") && (res.code === kErrorCodeRoleAlreadyExists)) ||

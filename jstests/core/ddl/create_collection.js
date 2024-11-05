@@ -1,8 +1,6 @@
 // FCV4.4 is required for creating a collection with a long name.
 // @tags: [
 //   requires_capped,
-//   # TODO SERVER-73967: Remove this tag.
-//   does_not_support_stepdowns,
 // ]
 
 // Tests for the "create" command.

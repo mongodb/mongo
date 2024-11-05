@@ -3,8 +3,6 @@
  * configurations of options in conjunction with and within the timeseries option.
  *
  * @tags: [
- *   # TODO (SERVER-73967): Remove this tag.
- *   does_not_support_stepdowns,
  *   requires_timeseries,
  * ]
  */
