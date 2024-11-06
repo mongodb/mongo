@@ -2,7 +2,7 @@
  * Common utility functions variables for $group to DISTINCT_SCAN optimization.
  */
 
-import {getAggPlanStages, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getQueryPlanners} from "jstests/libs/query/analyze_plan.js";
 
 export let coll;
 
@@ -75,6 +75,41 @@ export function prepareCollection(database = null) {
     assert.commandWorked(coll.insert(documents));
 }
 
+// Shard the 'coll' collection and insert orphans to the primary shard and one non-primary shard.
+// Assumes 'st' has been set up with at least two shards.
+export function prepareShardedCollectionWithOrphans(st) {
+    const db = st.getDB("test");
+    const primaryShard = st.shard0.shardName;
+    const otherShard = st.shard1.shardName;
+    assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard}));
+
+    prepareCollection(db);
+
+    // Shard the collection and move all docs where 'a' >= 2 to the non-primary shard.
+    assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
+    assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {a: 2}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: coll.getFullName(), find: {a: 2}, to: otherShard}));
+
+    // Insert orphans to both shards.
+    const primaryShardOrphanDocs = [
+        {a: 2.1, b: "orphan", c: "orphan"},
+        {a: 2.2, b: "orphan", c: "orphan"},
+        {a: 2.3, b: "orphan", c: "orphan"},
+        {a: 999.1, b: "orphan", c: "orphan"},
+    ];
+    const otherShardOrphanDocs = [
+        {a: 0.1, b: "orphan", c: "orphan"},
+        {a: 1.1, b: "orphan", c: "orphan"},
+        {a: 1.2, b: "orphan", c: "orphan"},
+        {a: 1.3, b: "orphan", c: "orphan"},
+    ];
+    assert.commandWorked(
+        st.shard0.getCollection(coll.getFullName()).insert(primaryShardOrphanDocs));
+    assert.commandWorked(st.shard1.getCollection(coll.getFullName()).insert(otherShardOrphanDocs));
+    return db;
+}
+
 // Check that 'pipeline' returns the correct results with and without a hint added to the query.
 // We also test with and without indices to check all the possibilities. 'options' is the
 // options to pass to aggregate() and may be omitted. Similarly, the hint object can be omitted
@@ -99,7 +134,7 @@ export function assertResultsMatchWithAndWithoutHintandIndexes(pipeline,
     assert.sameMembers(resultsWithHint, expectedResults, "with hint != expected");
 }
 
-export function assertPlanUsesDistinctScan(explain, keyPattern) {
+export function assertPlanUsesDistinctScan(explain, keyPattern, shouldFetch) {
     assert.neq(0, getAggPlanStages(explain, "DISTINCT_SCAN").length, explain);
 
     if (keyPattern) {
@@ -108,6 +143,13 @@ export function assertPlanUsesDistinctScan(explain, keyPattern) {
 
     // Pipelines that use the DISTINCT_SCAN optimization should not also have a blocking sort.
     assert.eq(0, getAggPlanStages(explain, "SORT").length, explain);
+
+    if (shouldFetch) {
+        // TODO SERVER-95215: Check that FETCH is pushed into DISTINCT_SCAN iff
+        // featureFlagShardFilteringDistinctScan is enabled.
+        const hasFetch = getAggPlanStages(explain, "FETCH").length > 0;
+        assert(hasFetch || getAggPlanStages(explain, "DISTINCT_SCAN")[0].isFetching);
+    }
 }
 
 export function assertPlanDoesNotUseDistinctScan(explain) {
@@ -139,7 +181,8 @@ export function assertPipelineResultsAndExplain({
     const explain = coll.explain().aggregate(pipeline, passedOptions);
     validateExplain(explain);
     if (expectsIndexFilter) {
-        const queryPlanner = getQueryPlanner(explain);
-        assert.eq(true, queryPlanner.indexFilterSet, queryPlanner);
+        for (const queryPlanner of getQueryPlanners(explain)) {
+            assert.eq(true, queryPlanner.indexFilterSet, queryPlanner);
+        }
     }
 }

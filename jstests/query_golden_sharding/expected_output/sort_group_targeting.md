@@ -151,9 +151,6 @@
 						"stage" : "SORT_KEY_GENERATOR"
 					},
 					{
-						"stage" : "SHARDING_FILTER"
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"shardKey" : [
@@ -161,8 +158,10 @@
 							]
 						},
 						"indexName" : "shardKey_1",
+						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
+						"isShardFiltering" : true,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
@@ -171,7 +170,7 @@
 						"multiKeyPaths" : {
 							"shardKey" : [ ]
 						},
-						"stage" : "IXSCAN"
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -198,9 +197,6 @@
 						"stage" : "SORT_KEY_GENERATOR"
 					},
 					{
-						"stage" : "SHARDING_FILTER"
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"shardKey" : [
@@ -208,8 +204,10 @@
 							]
 						},
 						"indexName" : "shardKey_1",
+						"isFetching" : false,
 						"isMultiKey" : false,
 						"isPartial" : false,
+						"isShardFiltering" : true,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
@@ -218,7 +216,7 @@
 						"multiKeyPaths" : {
 							"shardKey" : [ ]
 						},
-						"stage" : "IXSCAN"
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -307,21 +305,7 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "PROJECTION_SIMPLE",
-						"transformBy" : {
-							"_id" : 0,
-							"otherField" : 1,
-							"shardKey" : 1
-						}
-					},
-					{
 						"stage" : "SORT_KEY_GENERATOR"
-					},
-					{
-						"stage" : "FETCH"
-					},
-					{
-						"stage" : "SHARDING_FILTER"
 					},
 					{
 						"direction" : "forward",
@@ -331,8 +315,10 @@
 							]
 						},
 						"indexName" : "shardKey_1",
+						"isFetching" : true,
 						"isMultiKey" : false,
 						"isPartial" : false,
+						"isShardFiltering" : true,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
@@ -341,7 +327,7 @@
 						"multiKeyPaths" : {
 							"shardKey" : [ ]
 						},
-						"stage" : "IXSCAN"
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -361,21 +347,7 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "PROJECTION_SIMPLE",
-						"transformBy" : {
-							"_id" : 0,
-							"otherField" : 1,
-							"shardKey" : 1
-						}
-					},
-					{
 						"stage" : "SORT_KEY_GENERATOR"
-					},
-					{
-						"stage" : "FETCH"
-					},
-					{
-						"stage" : "SHARDING_FILTER"
 					},
 					{
 						"direction" : "forward",
@@ -385,8 +357,10 @@
 							]
 						},
 						"indexName" : "shardKey_1",
+						"isFetching" : true,
 						"isMultiKey" : false,
 						"isPartial" : false,
+						"isShardFiltering" : true,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
@@ -395,7 +369,7 @@
 						"multiKeyPaths" : {
 							"shardKey" : [ ]
 						},
-						"stage" : "IXSCAN"
+						"stage" : "DISTINCT_SCAN"
 					}
 				]
 			}
@@ -854,6 +828,9 @@
 					},
 					{
 						"direction" : "forward",
+						"filter" : {
+							
+						},
 						"stage" : "COLLSCAN"
 					}
 				]
@@ -884,6 +861,9 @@
 					},
 					{
 						"direction" : "forward",
+						"filter" : {
+							
+						},
 						"stage" : "COLLSCAN"
 					}
 				]

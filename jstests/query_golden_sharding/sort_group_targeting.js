@@ -4,9 +4,6 @@
  *
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
- *   # TODO: SERVER-92459 Re-enable these tests when QueryPlannerAnalysis::analyzeDataAccess
- *   # correctly shard filters IXSCANs which _might_ have been possible to turn into distincts
- *   __TEMPORARILY_DISABLED__,
  * ]
  */
 

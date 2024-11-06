@@ -3,9 +3,7 @@
  * shard contains multiple (orphaned) chunks.
  *
  * @tags: [
- *   featureFlagShardFilteringDistinctScan,
- *   # TODO SERVER-92459: Remove this tag once we are filtering out orphans in all cases.
- *   tsan_incompatible
+ *   featureFlagShardFilteringDistinctScan
  * ]
  */
 
@@ -197,22 +195,22 @@ outputAggregationPlanAndResults(coll, [
     {$group: {_id: "$shardKey", l1: {$last: "$shardKey"}, l2: {$last: "$notShardKey"}}}
 ]);
 
-// TODO SERVER-92459: Uncomment these tests and ensure we get DISTINCT_SCAN with
-// isShardFiltering=true and isFetching=true.
-//
-// Currently, a DISTINCT_SCAN on 'shardKey_1' without shard filtering is chosen since the query also
-// requires fetching.
-//
-// subSection("without preceding $sort, output non-shard key field");
-// outputAggregationPlanAndResults(coll,
-//                                 [{$group: {_id: "$shardKey", accum: {$first: "$notShardKey"}}}]);
-// outputAggregationPlanAndResults(coll,
-//                                 [{$group: {_id: "$shardKey", accum: {$last: "$notShardKey"}}}]);
-//
-// outputAggregationPlanAndResults(coll, [{$sort: {shardKey: 1, notShardKey:
-// 1}}, {$match: {shardKey: {$gt: "chunk1_s0"}}}, {$group: {_id: "$shardKey", r: {$first:
-// "$$ROOT"}}}]); outputAggregationPlanAndResults(coll, [{$sort: {shardKey: 1, notShardKey:
-// 1}}, {$match: {shardKey: {$gt: "chunk1_s0"}}}, {$group: {_id: "$shardKey", r: {$last:
-// "$$ROOT"}}}]);
+subSection("without preceding $sort, output non-shard key field");
+outputAggregationPlanAndResults(coll,
+                                [{$group: {_id: "$shardKey", accum: {$first: "$notShardKey"}}}]);
+outputAggregationPlanAndResults(coll,
+                                [{$group: {_id: "$shardKey", accum: {$last: "$notShardKey"}}}]);
+
+// TODO SERVER-96234: Uncomment these tests.
+// outputAggregationPlanAndResults(coll, [
+//     {$sort: {shardKey: 1, notShardKey: 1}},
+//     {$match: {shardKey: {$gt: "chunk1_s0"}}},
+//     {$group: {_id: "$shardKey", r: {$first: "$$ROOT"}}}
+// ]);
+// outputAggregationPlanAndResults(coll, [
+//     {$sort: {shardKey: 1, notShardKey: 1}},
+//     {$match: {shardKey: {$gt: "chunk1_s0"}}},
+//     {$group: {_id: "$shardKey", r: {$last: "$$ROOT"}}}
+// ]);
 
 shardingTest.stop();

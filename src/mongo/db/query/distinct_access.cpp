@@ -403,7 +403,7 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
     // case, we have already filtered out indexes which are ineligible for conversion to
     // DISTINCT_SCAN, for e.g. if the distinct key is not part of the index. In the former case, we
     // have not done this check yet, so we filter out ineligible indexes here.
-    if (canonicalQuery.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled()) {
+    if (isShardFilteringDistinctScanEnabled) {
         if (!isIndexSuitableForDistinct(
                 canonicalQuery, indexEntry, field, flipDistinctScanDirection, strictDistinctOnly)) {
             return false;
@@ -526,50 +526,46 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
     distinctNode->bounds = flipDistinctScanDirection ? indexBounds.reverse() : indexBounds;
     distinctNode->queryCollator = queryCollator;
     distinctNode->fieldNo = fieldNo;
-    // TODO SERVER-92459: Support shard filtering when it requires fetching.
-    distinctNode->isShardFiltering = !fetchNode && shardFilterNode != nullptr;
+    distinctNode->isShardFiltering = shardFilterNode != nullptr;
+    distinctNode->isFetching = isShardFilteringDistinctScanEnabled && fetchNode != nullptr;
 
+    // The expected tree structure is (all nodes except IXSCAN can also be absent):
+    // PROJECT => SORT_KEY_GENERATOR => SHARDING_FILTER => FETCH => IXSCAN.
+    tassert(9245902, "Expected to have either PROJECT or FETCH", fetchNode || projectionNode);
+    tassert(
+        9245811, "Expected PROJECT to be the root node", !projectionNode || projectionNode == root);
     tassert(9245807,
             "Found SORT_KEY_GENERATOR in an unexpected location",
             !sortKeyGenNode || (!projectionNode && sortKeyGenNode == root) ||
                 (projectionNode && sortKeyGenNode == projectionNode->children[0].get()));
 
     if (fetchNode) {
-        // If the original plan had PROJECT and FETCH stages, we can get rid of the PROJECT
-        // transforming the plan from PROJECT=>FETCH=>IXSCAN to FETCH=>DISTINCT_SCAN.
+        // When fetching, everything in the tree except SORT_KEY_GENERATOR (i.e. PROJECT, FETCH,
+        // SHARDING_FILTER) can be replaced with a DISTINCT_SCAN.
         if (projectionNode) {
-            // TODO SERVER-92459: Remove since we can replace both PROJECT and FETCH in a single
-            // step.
-            tassert(9245811, "Expected PROJECT to be the root node", projectionNode == root);
-
-            // Make the FETCH or SORT_KEY_GENERATOR the new root. This destroys the project stage.
+            // Make the SORT_KEY_GENERATOR or FETCH the new root. This destroys the PROJECT
+            // stage.
             soln->setRoot(std::move(root->children[0]));
         }
-
-        // Attach the distinct node in the index scan's place.
-        //
-        // TODO SERVER-92459: Since DISTINCT_SCAN can also fetch, we can have the DISTINCT_SCAN
-        // replace the entire tree.
-        fetchNode->children[0] = std::move(distinctNode);
+        // If shard filtering for distinct scan is enabled, we can remove the FETCH.
+        if (isShardFilteringDistinctScanEnabled) {
+            if (sortKeyGenNode) {
+                // Replace FETCH (and possibly SHARDING_FILTER) with a DISTINCT_SCAN.
+                sortKeyGenNode->children[0] = std::move(distinctNode);
+            } else {
+                soln->setRoot(std::move(distinctNode));
+            }
+        } else {
+            // If shard filtering for distinct scan is disabled, maintain the old behavior. That is,
+            // don't push FETCH into the DISTINCT_SCAN stage.
+            fetchNode->children[0] = std::move(distinctNode);
+        }
     } else {
         // There is no fetch node. The PROJECT=>IXSCAN tree should become
-        // PROJECT=>DISTINCT_SCAN. If there is a shard filter, it will also be removed since shard
-        // filtering is implemented by DISTINCT_SCAN
-        tassert(9245812, "Expected PROJECT to be the root node", projectionNode == root);
-
-        // Attach the distinct node in the index scan's place.
+        // PROJECT=>DISTINCT_SCAN. If there is a shard filter, it will be pushed to the distinct
+        // scan itself.
         QuerySolutionNode* parent = sortKeyGenNode ? sortKeyGenNode : root;
         parent->children[0] = std::move(distinctNode);
-    }
-
-    if (isShardFilteringDistinctScanEnabled && soln->hasNode(STAGE_SHARDING_FILTER)) {
-        // We may end up here if we have SHARDING_FILTER=>FETCH=>DISTINCT_SCAN.
-        // TODO SERVER-92459: This case will be handled automatically once we allow DISTINCT_SCAN to
-        // absorb FETCH.
-        tassert(9245808,
-                "Unexpected SHARDING_FILTER location",
-                soln->root()->getType() == STAGE_SHARDING_FILTER);
-        soln->setRoot(std::move(soln->root()->children[0]));
     }
 
     return true;

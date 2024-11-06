@@ -218,9 +218,7 @@ TEST_F(QueryPlannerDistinctTest, DistinctScanWithProjection) {
     runDistinctQuery(
         "x", fromjson("{x: {$gt: 3}, y: {$lt: 5}}"), BSONObj(), fromjson("{_id: 0, x: 1, z: 1}"));
     assertNumSolutions(2);
-    assertCandidateExists(
-        "{fetch: {node: {distinct: {key: 'x', indexPattern: {x: 1, y: "
-        "1}}}}}");
+    assertCandidateExists("{distinct: {key: 'x', indexPattern: {x: 1, y: 1}, isFetching: true}}");
     assertCandidateExists(
         "{proj: {spec: {_id: 0, x: 1, z: 1}, node: {fetch: {node: {ixscan: {pattern: {x: 1, z: "
         "1}}}}}}}");

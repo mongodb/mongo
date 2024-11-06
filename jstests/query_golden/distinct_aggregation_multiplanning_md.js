@@ -2,6 +2,8 @@
  * Tests that the aggregation will go through the process of multiplanning when the pipeline can be
  * rewritten for the distinct case.
  *
+ * TODO SERVER-92468: Ensure we correctly pick covered plans over non-covered plans in these tests.
+ *
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
  * ]

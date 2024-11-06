@@ -486,7 +486,13 @@
 				"rejectedPlans" : [
 					[
 						{
-							"stage" : "FETCH"
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1,
+								"b" : 1,
+								"c" : 1
+							}
 						},
 						{
 							"direction" : "forward",
@@ -496,9 +502,12 @@
 								],
 								"b" : [
 									"[MinKey, MaxKey]"
+								],
+								"c" : [
+									"[MinKey, MaxKey]"
 								]
 							},
-							"indexName" : "a_1_b_1",
+							"indexName" : "a_1_b_1_c_1",
 							"isFetching" : false,
 							"isMultiKey" : false,
 							"isPartial" : false,
@@ -507,19 +516,18 @@
 							"isUnique" : false,
 							"keyPattern" : {
 								"a" : 1,
-								"b" : 1
+								"b" : 1,
+								"c" : 1
 							},
 							"multiKeyPaths" : {
 								"a" : [ ],
-								"b" : [ ]
+								"b" : [ ],
+								"c" : [ ]
 							},
 							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
-						{
-							"stage" : "FETCH"
-						},
 						{
 							"direction" : "forward",
 							"indexBounds" : {
@@ -534,7 +542,7 @@
 								]
 							},
 							"indexName" : "a_1_b_1_d_1",
-							"isFetching" : false,
+							"isFetching" : true,
 							"isMultiKey" : false,
 							"isPartial" : false,
 							"isShardFiltering" : false,
@@ -556,15 +564,6 @@
 				],
 				"winningPlan" : [
 					{
-						"stage" : "PROJECTION_COVERED",
-						"transformBy" : {
-							"_id" : 0,
-							"a" : 1,
-							"b" : 1,
-							"c" : 1
-						}
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
@@ -572,13 +571,10 @@
 							],
 							"b" : [
 								"[MinKey, MaxKey]"
-							],
-							"c" : [
-								"[MinKey, MaxKey]"
 							]
 						},
-						"indexName" : "a_1_b_1_c_1",
-						"isFetching" : false,
+						"indexName" : "a_1_b_1",
+						"isFetching" : true,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
@@ -586,13 +582,11 @@
 						"isUnique" : false,
 						"keyPattern" : {
 							"a" : 1,
-							"b" : 1,
-							"c" : 1
+							"b" : 1
 						},
 						"multiKeyPaths" : {
 							"a" : [ ],
-							"b" : [ ],
-							"c" : [ ]
+							"b" : [ ]
 						},
 						"stage" : "DISTINCT_SCAN"
 					}
@@ -644,7 +638,13 @@
 				"rejectedPlans" : [
 					[
 						{
-							"stage" : "FETCH"
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1,
+								"b" : 1,
+								"c" : 1
+							}
 						},
 						{
 							"direction" : "forward",
@@ -654,9 +654,12 @@
 								],
 								"b" : [
 									"[MinKey, MaxKey]"
+								],
+								"c" : [
+									"[MinKey, MaxKey]"
 								]
 							},
-							"indexName" : "a_1_b_1",
+							"indexName" : "a_1_b_1_c_1",
 							"isFetching" : false,
 							"isMultiKey" : false,
 							"isPartial" : false,
@@ -665,19 +668,18 @@
 							"isUnique" : false,
 							"keyPattern" : {
 								"a" : 1,
-								"b" : 1
+								"b" : 1,
+								"c" : 1
 							},
 							"multiKeyPaths" : {
 								"a" : [ ],
-								"b" : [ ]
+								"b" : [ ],
+								"c" : [ ]
 							},
 							"stage" : "DISTINCT_SCAN"
 						}
 					],
 					[
-						{
-							"stage" : "FETCH"
-						},
 						{
 							"direction" : "forward",
 							"indexBounds" : {
@@ -692,7 +694,7 @@
 								]
 							},
 							"indexName" : "a_1_b_1_d_1",
-							"isFetching" : false,
+							"isFetching" : true,
 							"isMultiKey" : false,
 							"isPartial" : false,
 							"isShardFiltering" : false,
@@ -714,15 +716,6 @@
 				],
 				"winningPlan" : [
 					{
-						"stage" : "PROJECTION_COVERED",
-						"transformBy" : {
-							"_id" : 0,
-							"a" : 1,
-							"b" : 1,
-							"c" : 1
-						}
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
@@ -730,13 +723,10 @@
 							],
 							"b" : [
 								"[MinKey, MaxKey]"
-							],
-							"c" : [
-								"[MinKey, MaxKey]"
 							]
 						},
-						"indexName" : "a_1_b_1_c_1",
-						"isFetching" : false,
+						"indexName" : "a_1_b_1",
+						"isFetching" : true,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
@@ -744,13 +734,11 @@
 						"isUnique" : false,
 						"keyPattern" : {
 							"a" : 1,
-							"b" : 1,
-							"c" : 1
+							"b" : 1
 						},
 						"multiKeyPaths" : {
 							"a" : [ ],
-							"b" : [ ],
-							"c" : [ ]
+							"b" : [ ]
 						},
 						"stage" : "DISTINCT_SCAN"
 					}
@@ -802,9 +790,6 @@
 				"rejectedPlans" : [
 					[
 						{
-							"stage" : "FETCH"
-						},
-						{
 							"direction" : "backward",
 							"indexBounds" : {
 								"a" : [
@@ -815,7 +800,7 @@
 								]
 							},
 							"indexName" : "a_1_b_-1",
-							"isFetching" : false,
+							"isFetching" : true,
 							"isMultiKey" : false,
 							"isPartial" : false,
 							"isShardFiltering" : false,
@@ -835,9 +820,6 @@
 				],
 				"winningPlan" : [
 					{
-						"stage" : "FETCH"
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
@@ -848,7 +830,7 @@
 							]
 						},
 						"indexName" : "a_-1_b_1",
-						"isFetching" : false,
+						"isFetching" : true,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
@@ -907,9 +889,6 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "FETCH"
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"_id" : [
@@ -917,7 +896,7 @@
 							]
 						},
 						"indexName" : "_id_",
-						"isFetching" : false,
+						"isFetching" : true,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
@@ -1715,9 +1694,6 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "FETCH"
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
@@ -1728,7 +1704,7 @@
 							]
 						},
 						"indexName" : "a_1_b_1",
-						"isFetching" : false,
+						"isFetching" : true,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
@@ -1796,9 +1772,6 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "FETCH"
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
@@ -1809,7 +1782,7 @@
 							]
 						},
 						"indexName" : "a_1_b_1",
-						"isFetching" : false,
+						"isFetching" : true,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
@@ -2506,9 +2479,6 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "FETCH"
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
@@ -2516,7 +2486,7 @@
 							]
 						},
 						"indexName" : "a_1",
-						"isFetching" : false,
+						"isFetching" : true,
 						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,

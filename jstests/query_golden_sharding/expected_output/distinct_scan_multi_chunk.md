@@ -5110,3 +5110,356 @@
 }
 ```
 
+### without preceding $sort, output non-shard key field
+### Pipeline
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$shardKey",
+			"accum" : {
+				"$first" : "$notShardKey"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : "chunk1_s0_0",  "accum" : "1notShardKey_chunk1_s0_0" }
+{  "_id" : "chunk1_s0_1",  "accum" : "1notShardKey_chunk1_s0_1" }
+{  "_id" : "chunk1_s0_2",  "accum" : "1notShardKey_chunk1_s0_2" }
+{  "_id" : "chunk1_s1_0",  "accum" : "1notShardKey_chunk1_s1_0" }
+{  "_id" : "chunk1_s1_1",  "accum" : "1notShardKey_chunk1_s1_1" }
+{  "_id" : "chunk1_s1_2",  "accum" : "1notShardKey_chunk1_s1_2" }
+{  "_id" : "chunk2_s0_0",  "accum" : "1notShardKey_chunk2_s0_0" }
+{  "_id" : "chunk2_s0_1",  "accum" : "1notShardKey_chunk2_s0_1" }
+{  "_id" : "chunk2_s0_2",  "accum" : "1notShardKey_chunk2_s0_2" }
+{  "_id" : "chunk2_s1_0",  "accum" : "1notShardKey_chunk2_s1_0" }
+{  "_id" : "chunk2_s1_1",  "accum" : "1notShardKey_chunk2_s1_1" }
+{  "_id" : "chunk2_s1_2",  "accum" : "1notShardKey_chunk2_s1_2" }
+{  "_id" : "chunk3_s0_0",  "accum" : "1notShardKey_chunk3_s0_0" }
+{  "_id" : "chunk3_s0_1",  "accum" : "1notShardKey_chunk3_s0_1" }
+{  "_id" : "chunk3_s0_2",  "accum" : "1notShardKey_chunk3_s0_2" }
+{  "_id" : "chunk3_s1_0",  "accum" : "1notShardKey_chunk3_s1_0" }
+{  "_id" : "chunk3_s1_1",  "accum" : "1notShardKey_chunk3_s1_1" }
+{  "_id" : "chunk3_s1_2",  "accum" : "1notShardKey_chunk3_s1_2" }
+```
+### Summarized explain
+```json
+{
+	"distinct_scan_multi_chunk-rs0" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"notShardKey" : 1,
+							"shardKey" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"notShardKey" : [
+								"[MinKey, MaxKey]"
+							],
+							"shardKey" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "shardKey_1_notShardKey_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : true,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"notShardKey" : 1,
+							"shardKey" : 1
+						},
+						"multiKeyPaths" : {
+							"notShardKey" : [ ],
+							"shardKey" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$shardKey",
+					"accum" : "$notShardKey"
+				}
+			}
+		}
+	],
+	"distinct_scan_multi_chunk-rs1" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"notShardKey" : 1,
+							"shardKey" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"notShardKey" : [
+								"[MinKey, MaxKey]"
+							],
+							"shardKey" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "shardKey_1_notShardKey_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : true,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"notShardKey" : 1,
+							"shardKey" : 1
+						},
+						"multiKeyPaths" : {
+							"notShardKey" : [ ],
+							"shardKey" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$shardKey",
+					"accum" : "$notShardKey"
+				}
+			}
+		}
+	],
+	"mergeType" : "router",
+	"mergerPart" : [
+		{
+			"$mergeCursors" : {
+				"allowPartialResults" : false,
+				"compareWholeSortKey" : false,
+				"nss" : "test.distinct_scan_multi_chunk",
+				"recordRemoteOpWaitTime" : false,
+				"requestQueryStatsFromRemotes" : false,
+				"tailableMode" : "normal"
+			}
+		},
+		{
+			"$group" : {
+				"$doingMerge" : true,
+				"_id" : "$$ROOT._id",
+				"accum" : {
+					"$first" : "$$ROOT.accum"
+				}
+			}
+		}
+	],
+	"shardsPart" : [
+		{
+			"$group" : {
+				"_id" : "$shardKey",
+				"accum" : {
+					"$first" : "$notShardKey"
+				}
+			}
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$shardKey",
+			"accum" : {
+				"$last" : "$notShardKey"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : "chunk1_s0_0",  "accum" : "3notShardKey_chunk1_s0_0" }
+{  "_id" : "chunk1_s0_1",  "accum" : "3notShardKey_chunk1_s0_1" }
+{  "_id" : "chunk1_s0_2",  "accum" : "3notShardKey_chunk1_s0_2" }
+{  "_id" : "chunk1_s1_0",  "accum" : "3notShardKey_chunk1_s1_0" }
+{  "_id" : "chunk1_s1_1",  "accum" : "3notShardKey_chunk1_s1_1" }
+{  "_id" : "chunk1_s1_2",  "accum" : "3notShardKey_chunk1_s1_2" }
+{  "_id" : "chunk2_s0_0",  "accum" : "3notShardKey_chunk2_s0_0" }
+{  "_id" : "chunk2_s0_1",  "accum" : "3notShardKey_chunk2_s0_1" }
+{  "_id" : "chunk2_s0_2",  "accum" : "3notShardKey_chunk2_s0_2" }
+{  "_id" : "chunk2_s1_0",  "accum" : "3notShardKey_chunk2_s1_0" }
+{  "_id" : "chunk2_s1_1",  "accum" : "3notShardKey_chunk2_s1_1" }
+{  "_id" : "chunk2_s1_2",  "accum" : "3notShardKey_chunk2_s1_2" }
+{  "_id" : "chunk3_s0_0",  "accum" : "3notShardKey_chunk3_s0_0" }
+{  "_id" : "chunk3_s0_1",  "accum" : "3notShardKey_chunk3_s0_1" }
+{  "_id" : "chunk3_s0_2",  "accum" : "3notShardKey_chunk3_s0_2" }
+{  "_id" : "chunk3_s1_0",  "accum" : "3notShardKey_chunk3_s1_0" }
+{  "_id" : "chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
+{  "_id" : "chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
+```
+### Summarized explain
+```json
+{
+	"distinct_scan_multi_chunk-rs0" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"notShardKey" : 1,
+							"shardKey" : 1
+						}
+					},
+					{
+						"direction" : "backward",
+						"indexBounds" : {
+							"notShardKey" : [
+								"[MaxKey, MinKey]"
+							],
+							"shardKey" : [
+								"[MaxKey, MinKey]"
+							]
+						},
+						"indexName" : "shardKey_1_notShardKey_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : true,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"notShardKey" : 1,
+							"shardKey" : 1
+						},
+						"multiKeyPaths" : {
+							"notShardKey" : [ ],
+							"shardKey" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$shardKey",
+					"accum" : "$notShardKey"
+				}
+			}
+		}
+	],
+	"distinct_scan_multi_chunk-rs1" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"notShardKey" : 1,
+							"shardKey" : 1
+						}
+					},
+					{
+						"direction" : "backward",
+						"indexBounds" : {
+							"notShardKey" : [
+								"[MaxKey, MinKey]"
+							],
+							"shardKey" : [
+								"[MaxKey, MinKey]"
+							]
+						},
+						"indexName" : "shardKey_1_notShardKey_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : true,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"notShardKey" : 1,
+							"shardKey" : 1
+						},
+						"multiKeyPaths" : {
+							"notShardKey" : [ ],
+							"shardKey" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$shardKey",
+					"accum" : "$notShardKey"
+				}
+			}
+		}
+	],
+	"mergeType" : "router",
+	"mergerPart" : [
+		{
+			"$mergeCursors" : {
+				"allowPartialResults" : false,
+				"compareWholeSortKey" : false,
+				"nss" : "test.distinct_scan_multi_chunk",
+				"recordRemoteOpWaitTime" : false,
+				"requestQueryStatsFromRemotes" : false,
+				"tailableMode" : "normal"
+			}
+		},
+		{
+			"$group" : {
+				"$doingMerge" : true,
+				"_id" : "$$ROOT._id",
+				"accum" : {
+					"$last" : "$$ROOT.accum"
+				}
+			}
+		}
+	],
+	"shardsPart" : [
+		{
+			"$group" : {
+				"_id" : "$shardKey",
+				"accum" : {
+					"$last" : "$notShardKey"
+				}
+			}
+		}
+	]
+}
+```
+

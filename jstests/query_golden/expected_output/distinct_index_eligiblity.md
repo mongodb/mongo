@@ -223,9 +223,6 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "FETCH"
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
@@ -236,7 +233,7 @@
 							]
 						},
 						"indexName" : "a_1_b_1",
-						"isFetching" : false,
+						"isFetching" : true,
 						"isMultiKey" : true,
 						"isPartial" : false,
 						"isShardFiltering" : false,

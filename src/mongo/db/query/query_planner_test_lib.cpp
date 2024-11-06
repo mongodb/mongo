@@ -873,6 +873,15 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             }
         }
 
+        BSONElement isFetching = distinctObj["isFetching"];
+        if (!isFetching.eoo() && isFetching.Bool() != node->isFetching) {
+            return {
+                ErrorCodes::Error{9245904},
+                str::stream()
+                    << "Provided JSON gave a 'distinct' stage with a different 'isFetching' field"
+                    << direction};
+        }
+
         return Status::OK();
     }
 

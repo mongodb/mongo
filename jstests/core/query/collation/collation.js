@@ -24,6 +24,7 @@ import {
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {
     getPlanStage,
+    getPlanStages,
     getSingleNodeExplain,
     getWinningPlan,
     isCollscan,
@@ -68,6 +69,20 @@ var getQueryCollation = function(explainRes) {
 
     return null;
 };
+
+function planHasFetch(winningPlan) {
+    // TODO SERVER-95215: Check that FETCH is pushed into DISTINCT_SCAN iff
+    // featureFlagShardFilteringDistinctScan is enabled.
+    if (planHasStage(testDb, winningPlan, "FETCH")) {
+        return true;
+    }
+
+    if (!planHasStage(testDb, winningPlan, "DISTINCT_SCAN")) {
+        return false;
+    }
+
+    return getPlanStages(winningPlan, "DISTINCT_SCAN")[0].isFetching;
+}
 
 //
 // Test using testDb.createCollection() to make a collection with a default collation.
@@ -556,13 +571,13 @@ assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "en_US"}}));
 var explain = coll.explain("queryPlanner").distinct("a");
 assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "DISTINCT_SCAN"));
-assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "FETCH"));
+assert(planHasFetch(getWinningPlan(explain.queryPlanner)));
 
 // Distinct scan on strings can be used over an index with a collation when the predicate has
 // exact bounds.
 explain = coll.explain("queryPlanner").distinct("a", {a: {$gt: "foo"}});
 assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "DISTINCT_SCAN"));
-assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "FETCH"));
+assert(planHasFetch(getWinningPlan(explain.queryPlanner)));
 assert(!planHasStage(testDb, getWinningPlan(explain.queryPlanner), "PROJECTION_COVERED"));
 
 // Distinct scan cannot be used over an index with a collation when the predicate has inexact
@@ -576,7 +591,7 @@ assert(!planHasStage(testDb, getWinningPlan(explain.queryPlanner), "DISTINCT_SCA
 explain = coll.explain("queryPlanner").distinct("a", {a: {$gt: 3}});
 assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "DISTINCT_SCAN"));
 assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "PROJECTION_COVERED"));
-assert(!planHasStage(testDb, getWinningPlan(explain.queryPlanner), "FETCH"));
+assert(!planHasFetch(getWinningPlan(explain.queryPlanner)));
 
 // Distinct should not use index when no collation specified and collection default collation is
 // incompatible with index collation.
