@@ -8350,6 +8350,8 @@ export const authCommandsLib = {
         },
         setup: function(db) {
           db.createCollection("foo");
+          assert.commandWorked(db.foo.createIndex({loc: "2d"}));
+          assert.commandWorked(db.foo.insert({loc: [45.32, 51.12]}));
         },
         skipSharded: false,
         disableSearch: true,
