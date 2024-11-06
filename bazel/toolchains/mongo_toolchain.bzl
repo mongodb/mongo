@@ -74,6 +74,9 @@ def _toolchain_download(ctx):
         }
 
     distro = get_host_distro_major_version(ctx)
+    if distro == None:
+        fail("Failed to get mongo toolchain supported distribution for os {}".format(os))
+
     toolchain_key = "{distro}_{arch}".format(distro = distro, arch = arch)
 
     if toolchain_key in TOOLCHAIN_MAP:

@@ -17,6 +17,7 @@ def get_host_distro_major_version(repository_ctx):
         "Ubuntu 18*": "ubuntu18",
         "Ubuntu 20*": "ubuntu20",
         "Ubuntu 22*": "ubuntu22",
+        "Pop!_OS 22*": "ubuntu22",
         "Ubuntu 24*": "ubuntu24",
         "Amazon Linux 2": "amazon_linux_2",
         "Amazon Linux 2023": "amazon_linux_2023",
