@@ -34,11 +34,9 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -47,34 +45,22 @@ namespace {
 
 // Insert multiple keys and verify that fullValidate() either sets
 // the `numKeysOut` as the number of entries in the index, or as -1.
-TEST(SortedDataInterface, FullValidate) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, FullValidate) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(sorted->isEmpty(opCtx.get()));
-    }
+    ASSERT(sorted->isEmpty(opCtx()));
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            BSONObj key = BSON("" << i);
-            RecordId loc(42, i * 2);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        BSONObj key = BSON("" << i);
+        RecordId loc(42, i * 2);
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), makeKeyString(sorted.get(), key, loc), true));
+        txn.commit();
     }
 
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
-    }
+    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx()));
 }
 
 }  // namespace

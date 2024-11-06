@@ -29,11 +29,9 @@
 
 #include <boost/move/utility_core.hpp>
 
-#include "mongo/db/service_context.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -43,53 +41,35 @@ namespace {
 // Verify that isEmpty() returns true when the index is empty,
 // returns false when a key is inserted, and returns true again
 // when that is unindex.
-TEST(SortedDataInterface, IsEmpty) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, IsEmpty) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
+
+    ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(sorted->isEmpty(opCtx.get()));
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), false));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), false));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc3), false));
+        txn.commit();
     }
 
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false));
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), false));
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), false));
-            txn.commit();
-        }
-    }
+    ASSERT(!sorted->isEmpty(opCtx()));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(!sorted->isEmpty(opCtx.get()));
+        StorageWriteTransaction txn(recoveryUnit());
+        sorted->unindex(opCtx(), makeKeyString(sorted.get(), key1, loc1), false);
+        sorted->unindex(opCtx(), makeKeyString(sorted.get(), key2, loc2), false);
+        sorted->unindex(opCtx(), makeKeyString(sorted.get(), key3, loc3), false);
+        ASSERT(sorted->isEmpty(opCtx()));
+        txn.commit();
     }
 
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false);
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), false);
-            sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), false);
-            ASSERT(sorted->isEmpty(opCtx.get()));
-            txn.commit();
-        }
-    }
-
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(sorted->isEmpty(opCtx.get()));
-    }
+    ASSERT(sorted->isEmpty(opCtx()));
 }
 
 }  // namespace

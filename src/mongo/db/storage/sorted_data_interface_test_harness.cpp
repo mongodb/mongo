@@ -39,7 +39,6 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo {
@@ -50,16 +49,16 @@ std::function<std::unique_ptr<SortedDataInterfaceHarnessHelper>()>
 
 }  // namespace
 
-auto SortedDataInterfaceHarnessHelper::newSortedDataInterface(
-    bool unique, bool partial, std::initializer_list<IndexKeyEntry> toInsert)
-    -> std::unique_ptr<SortedDataInterface> {
+std::unique_ptr<SortedDataInterface> SortedDataInterfaceHarnessHelper::newSortedDataInterface(
+    OperationContext* opCtx,
+    bool unique,
+    bool partial,
+    std::initializer_list<IndexKeyEntry> toInsert) {
     invariant(std::is_sorted(
         toInsert.begin(), toInsert.end(), IndexEntryComparison(Ordering::make(BSONObj()))));
 
-    auto index = newSortedDataInterface(unique, partial);
-    auto client = serviceContext()->getService()->makeClient("insertToIndex");
-    auto opCtx = newOperationContext(client.get());
-    insertToIndex(opCtx.get(), index.get(), toInsert);
+    auto index = newSortedDataInterface(opCtx, unique, partial);
+    insertToIndex(opCtx, index.get(), toInsert);
     return index;
 }
 

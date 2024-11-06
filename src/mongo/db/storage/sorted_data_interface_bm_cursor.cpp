@@ -61,9 +61,9 @@ struct Fixture {
           direction(direction),
           nToInsert(nToInsert),
           harness(newSortedDataInterfaceHarnessHelper()),
-          sorted(
-              harness->newSortedDataInterface(uniqueness == kUnique, /*partial*/ false, keyFormat)),
           opCtx(harness->newOperationContext()),
+          sorted(harness->newSortedDataInterface(
+              opCtx.get(), uniqueness == kUnique, /*partial*/ false, keyFormat)),
           cursor(sorted->newCursor(opCtx.get(), direction == kForward)),
           firstKey(makeKeyStringForSeek(sorted.get(),
                                         BSON("" << (direction == kForward ? 1 : nToInsert)),
@@ -94,8 +94,8 @@ struct Fixture {
     const int nToInsert;
 
     std::unique_ptr<SortedDataInterfaceHarnessHelper> harness;
-    std::unique_ptr<SortedDataInterface> sorted;
     ServiceContext::UniqueOperationContext opCtx;
+    std::unique_ptr<SortedDataInterface> sorted;
     std::unique_ptr<SortedDataInterface::Cursor> cursor;
     key_string::Builder firstKey;
     size_t itemsProcessed = 0;

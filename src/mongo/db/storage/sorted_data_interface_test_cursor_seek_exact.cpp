@@ -40,19 +40,19 @@ namespace {
 enum class IndexType { kUnique, kNonUnique, kId };
 
 // Tests findLoc when it hits something.
-void testFindLoc_Hit(IndexType type) {
-    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
+void testFindLoc_Hit(OperationContext* opCtx,
+                     SortedDataInterfaceHarnessHelper* harnessHelper,
+                     IndexType type) {
     std::unique_ptr<SortedDataInterface> sorted;
     if (IndexType::kId == type) {
-        sorted = harnessHelper->newIdIndexSortedDataInterface();
+        sorted = harnessHelper->newIdIndexSortedDataInterface(opCtx);
     } else {
-        sorted = harnessHelper->newSortedDataInterface(type == IndexType::kUnique,
+        sorted = harnessHelper->newSortedDataInterface(opCtx,
+                                                       type == IndexType::kUnique,
                                                        /*partial=*/false);
     }
 
-    auto opCtx = harnessHelper->newOperationContext();
-
-    insertToIndex(opCtx.get(),
+    insertToIndex(opCtx,
                   sorted.get(),
                   {
                       {key1, loc1},
@@ -62,35 +62,36 @@ void testFindLoc_Hit(IndexType type) {
                   /* dupsAllowed*/ false);
 
     auto loc =
-        sorted->findLoc(opCtx.get(), makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer());
+        sorted->findLoc(opCtx, makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer());
     ASSERT_EQ(loc, loc1);
 }
 
-TEST(SortedDataInterface, SeekExact_Hit_Unique) {
-    testFindLoc_Hit(IndexType::kUnique);
+TEST_F(SortedDataInterfaceTest, SeekExact_Hit_Unique) {
+    testFindLoc_Hit(opCtx(), harnessHelper(), IndexType::kUnique);
 }
 
-TEST(SortedDataInterface, SeekExact_Hit_Standard) {
-    testFindLoc_Hit(IndexType::kNonUnique);
+TEST_F(SortedDataInterfaceTest, SeekExact_Hit_Standard) {
+    testFindLoc_Hit(opCtx(), harnessHelper(), IndexType::kNonUnique);
 }
 
-TEST(SortedDataInterface, SeekExact_Hit_Id) {
-    testFindLoc_Hit(IndexType::kId);
+TEST_F(SortedDataInterfaceTest, SeekExact_Hit_Id) {
+    testFindLoc_Hit(opCtx(), harnessHelper(), IndexType::kId);
 }
 
 // Tests findLoc when it doesn't hit the query.
-void testFindLoc_Miss(IndexType type) {
-    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
+void testFindLoc_Miss(OperationContext* opCtx,
+                      SortedDataInterfaceHarnessHelper* harnessHelper,
+                      IndexType type) {
     std::unique_ptr<SortedDataInterface> sorted;
     if (IndexType::kId == type) {
-        sorted = harnessHelper->newIdIndexSortedDataInterface();
+        sorted = harnessHelper->newIdIndexSortedDataInterface(opCtx);
     } else {
-        sorted = harnessHelper->newSortedDataInterface(type == IndexType::kUnique,
+        sorted = harnessHelper->newSortedDataInterface(opCtx,
+                                                       type == IndexType::kUnique,
                                                        /*partial=*/false);
     }
 
-    auto opCtx = harnessHelper->newOperationContext();
-    insertToIndex(opCtx.get(),
+    insertToIndex(opCtx,
                   sorted.get(),
                   {
                       {key1, loc1},
@@ -99,21 +100,20 @@ void testFindLoc_Miss(IndexType type) {
                   },
                   /* dupsAllowed*/ false);
 
-    ASSERT_EQ(
-        sorted->findLoc(opCtx.get(), makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer()),
-        boost::none);
+    ASSERT_EQ(sorted->findLoc(opCtx, makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer()),
+              boost::none);
 }
 
-TEST(SortedDataInterface, SeekExact_Miss_Unique) {
-    testFindLoc_Miss(IndexType::kUnique);
+TEST_F(SortedDataInterfaceTest, SeekExact_Miss_Unique) {
+    testFindLoc_Miss(opCtx(), harnessHelper(), IndexType::kUnique);
 }
 
-TEST(SortedDataInterface, SeekExact_Miss_Standard) {
-    testFindLoc_Miss(IndexType::kNonUnique);
+TEST_F(SortedDataInterfaceTest, SeekExact_Miss_Standard) {
+    testFindLoc_Miss(opCtx(), harnessHelper(), IndexType::kNonUnique);
 }
 
-TEST(SortedDataInterface, SeekExact_Miss_Id) {
-    testFindLoc_Miss(IndexType::kId);
+TEST_F(SortedDataInterfaceTest, SeekExact_Miss_Id) {
+    testFindLoc_Miss(opCtx(), harnessHelper(), IndexType::kId);
 }
 
 }  // namespace

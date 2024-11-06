@@ -72,20 +72,18 @@ public:
         invariantWTOK(ret, nullptr);
 
         _fastClockSource = std::make_unique<SystemClockSource>();
-        _sessionCache = new WiredTigerSessionCache(_conn, _fastClockSource.get());
+        _sessionCache = std::make_unique<WiredTigerSessionCache>(_conn, _fastClockSource.get());
     }
 
     ~WiredTigerIndexHarnessHelper() final {
-        delete _sessionCache;
+        _sessionCache.reset();
         _conn->close(_conn, nullptr);
     }
 
-    std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
+    std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface(
+        OperationContext* opCtx) final {
         std::string ns = "test.wt";
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        auto opCtxHolder{newOperationContext()};
-        auto* const opCtx{opCtxHolder.get()};
-
         BSONObj spec = BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
                                   << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
                                   << "unique" << true);
@@ -115,13 +113,12 @@ public:
             opCtx, uri, UUID::gen(), "" /* ident */, &desc, isLogged);
     }
 
-    std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique,
+    std::unique_ptr<SortedDataInterface> newSortedDataInterface(OperationContext* opCtx,
+                                                                bool unique,
                                                                 bool partial,
                                                                 KeyFormat keyFormat) final {
         std::string ns = "test.wt";
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        auto opCtxHolder{newOperationContext()};
-        auto* const opCtx{opCtxHolder.get()};
 
         BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
                                   << "testIndex"
@@ -174,7 +171,7 @@ public:
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return std::make_unique<WiredTigerRecoveryUnit>(_sessionCache, &_oplogManager);
+        return std::make_unique<WiredTigerRecoveryUnit>(_sessionCache.get(), &_oplogManager);
     }
 
 private:
@@ -182,7 +179,7 @@ private:
     std::unique_ptr<ClockSource> _fastClockSource;
     std::vector<IndexDescriptor> _descriptors;
     WT_CONNECTION* _conn;
-    WiredTigerSessionCache* _sessionCache;
+    std::unique_ptr<WiredTigerSessionCache> _sessionCache;
     WiredTigerOplogManager _oplogManager;
 };
 

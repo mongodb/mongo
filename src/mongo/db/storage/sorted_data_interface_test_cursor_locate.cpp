@@ -35,15 +35,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -52,32 +48,23 @@ namespace {
 
 // Insert a key and try to locate it using a forward cursor
 // by specifying its exact key and RecordId.
-TEST(SortedDataInterface, Locate) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, Locate) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
+
+    const auto cursor(sorted->newCursor(opCtx()));
+    ASSERT(
+        !cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-        ASSERT(!cursor->seek(
-            makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()));
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            txn.commit();
-        }
-    }
-
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT_EQ(
             cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
@@ -88,34 +75,25 @@ TEST(SortedDataInterface, Locate) {
 
 // Insert a key and try to locate it using a reverse cursor
 // by specifying its exact key and RecordId.
-TEST(SortedDataInterface, LocateReversed) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateReversed) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), key1, false, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT_EQ(cursor->seek(
                       makeKeyStringForSeek(sorted.get(), key1, false, true).finishAndGetBuffer()),
@@ -126,32 +104,25 @@ TEST(SortedDataInterface, LocateReversed) {
 
 // Insert a compound key and try to locate it using a forward cursor
 // by specifying its exact key and RecordId.
-TEST(SortedDataInterface, LocateCompoundKey) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateCompoundKey) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), compoundKey1a, true, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT_EQ(
             cursor->seek(
@@ -163,34 +134,25 @@ TEST(SortedDataInterface, LocateCompoundKey) {
 
 // Insert a compound key and try to locate it using a reverse cursor
 // by specifying its exact key and RecordId.
-TEST(SortedDataInterface, LocateCompoundKeyReversed) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateCompoundKeyReversed) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), compoundKey1a, false, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), compoundKey1a, false, true)
                                    .finishAndGetBuffer()),
@@ -201,34 +163,27 @@ TEST(SortedDataInterface, LocateCompoundKeyReversed) {
 
 // Insert multiple keys and try to locate them using a forward cursor
 // by specifying their exact key and RecordId.
-TEST(SortedDataInterface, LocateMultiple) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateMultiple) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT_EQ(
             cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
@@ -238,19 +193,14 @@ TEST(SortedDataInterface, LocateMultiple) {
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc3), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT_EQ(
             cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
@@ -269,36 +219,27 @@ TEST(SortedDataInterface, LocateMultiple) {
 
 // Insert multiple keys and try to locate them using a reverse cursor
 // by specifying their exact key and RecordId.
-TEST(SortedDataInterface, LocateMultipleReversed) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateMultipleReversed) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), key3, true, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT_EQ(cursor->seek(
                       makeKeyStringForSeek(sorted.get(), key2, false, true).finishAndGetBuffer()),
@@ -308,20 +249,14 @@ TEST(SortedDataInterface, LocateMultipleReversed) {
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc3), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT_EQ(cursor->seek(
                       makeKeyStringForSeek(sorted.get(), key2, false, true).finishAndGetBuffer()),
@@ -340,36 +275,29 @@ TEST(SortedDataInterface, LocateMultipleReversed) {
 
 // Insert multiple compound keys and try to locate them using a forward cursor
 // by specifying their exact key and RecordId.
-TEST(SortedDataInterface, LocateMultipleCompoundKeys) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateMultipleCompoundKeys) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), compoundKey1a, true, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey2b, loc3), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey2b, loc3), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT_EQ(
             cursor->seek(
@@ -381,21 +309,16 @@ TEST(SortedDataInterface, LocateMultipleCompoundKeys) {
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1c, loc4), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey3a, loc5), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1c, loc4), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey3a, loc5), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT_EQ(
             cursor->seek(
@@ -411,38 +334,29 @@ TEST(SortedDataInterface, LocateMultipleCompoundKeys) {
 
 // Insert multiple compound keys and try to locate them using a reverse cursor
 // by specifying their exact key and RecordId.
-TEST(SortedDataInterface, LocateMultipleCompoundKeysReversed) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateMultipleCompoundKeysReversed) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), compoundKey3a, false, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey2b, loc3), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey2b, loc3), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), compoundKey2b, false, true)
                                    .finishAndGetBuffer()),
@@ -453,22 +367,16 @@ TEST(SortedDataInterface, LocateMultipleCompoundKeysReversed) {
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1c, loc4), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey3a, loc5), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1c, loc4), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey3a, loc5), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), compoundKey3a, false, true)
                                    .finishAndGetBuffer()),
@@ -483,34 +391,27 @@ TEST(SortedDataInterface, LocateMultipleCompoundKeysReversed) {
 
 // Insert multiple keys and try to locate them using a forward cursor
 // by specifying either a smaller key or RecordId.
-TEST(SortedDataInterface, LocateIndirect) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateIndirect) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT_EQ(cursor->seek(
                       makeKeyStringForSeek(sorted.get(), key1, true, false).finishAndGetBuffer()),
@@ -519,19 +420,14 @@ TEST(SortedDataInterface, LocateIndirect) {
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc3), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT_EQ(
             cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
@@ -544,36 +440,27 @@ TEST(SortedDataInterface, LocateIndirect) {
 
 // Insert multiple keys and try to locate them using a reverse cursor
 // by specifying either a larger key or RecordId.
-TEST(SortedDataInterface, LocateIndirectReversed) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateIndirectReversed) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), key3, false, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT_EQ(cursor->seek(
                       makeKeyStringForSeek(sorted.get(), key2, false, false).finishAndGetBuffer()),
@@ -582,20 +469,14 @@ TEST(SortedDataInterface, LocateIndirectReversed) {
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc3), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT_EQ(cursor->seek(
                       makeKeyStringForSeek(sorted.get(), key3, false, true).finishAndGetBuffer()),
@@ -608,36 +489,29 @@ TEST(SortedDataInterface, LocateIndirectReversed) {
 
 // Insert multiple compound keys and try to locate them using a forward cursor
 // by specifying either a smaller key or RecordId.
-TEST(SortedDataInterface, LocateIndirectCompoundKeys) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateIndirectCompoundKeys) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), compoundKey1a, true, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey2b, loc3), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey2b, loc3), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), compoundKey1a, true, false)
                                    .finishAndGetBuffer()),
@@ -647,21 +521,16 @@ TEST(SortedDataInterface, LocateIndirectCompoundKeys) {
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1c, loc4), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey3a, loc5), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1c, loc4), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey3a, loc5), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT_EQ(
             cursor->seek(
@@ -674,38 +543,29 @@ TEST(SortedDataInterface, LocateIndirectCompoundKeys) {
 
 // Insert multiple compound keys and try to locate them using a reverse cursor
 // by specifying either a larger key or RecordId.
-TEST(SortedDataInterface, LocateIndirectCompoundKeysReversed) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateIndirectCompoundKeysReversed) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), compoundKey3a, false, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey2b, loc3), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey2b, loc3), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT_EQ(
             cursor->seek(
@@ -716,22 +576,16 @@ TEST(SortedDataInterface, LocateIndirectCompoundKeysReversed) {
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey1c, loc4), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), compoundKey3a, loc5), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1c, loc4), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey3a, loc5), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT_EQ(
             cursor->seek(
@@ -745,19 +599,14 @@ TEST(SortedDataInterface, LocateIndirectCompoundKeysReversed) {
 
 // Call locate on a forward cursor of an empty index and verify that the cursor
 // is positioned at EOF.
-TEST(SortedDataInterface, LocateEmpty) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateEmpty) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
+
+    ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(sorted->isEmpty(opCtx.get()));
-    }
-
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
 
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), BSONObj(), true, true).finishAndGetBuffer()));
@@ -767,20 +616,14 @@ TEST(SortedDataInterface, LocateEmpty) {
 
 // Call locate on a reverse cursor of an empty index and verify that the cursor
 // is positioned at EOF.
-TEST(SortedDataInterface, LocateEmptyReversed) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, LocateEmptyReversed) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
+
+    ASSERT(sorted->isEmpty(opCtx()));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(sorted->isEmpty(opCtx.get()));
-    }
-
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
 
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), BSONObj(), false, true).finishAndGetBuffer()));
@@ -789,64 +632,50 @@ TEST(SortedDataInterface, LocateEmptyReversed) {
 }
 
 
-TEST(SortedDataInterface, Locate1) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, Locate1) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     BSONObj key = BSON("" << 1);
     RecordId loc(5, 16);
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
         ASSERT(!cursor->seek(
             makeKeyStringForSeek(sorted.get(), key, true, true).finishAndGetBuffer()));
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(
-                sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), makeKeyString(sorted.get(), key, loc), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
         ASSERT_EQ(
             cursor->seek(makeKeyStringForSeek(sorted.get(), key, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key, loc));
     }
 }
 
-TEST(SortedDataInterface, Locate2) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, Locate2) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(1, 2)), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 2), RecordId(1, 4)), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 3), RecordId(1, 6)), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(1, 2)), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), makeKeyString(sorted.get(), BSON("" << 2), RecordId(1, 4)), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), makeKeyString(sorted.get(), BSON("" << 3), RecordId(1, 6)), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
         ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("a" << 2), true, true)
                                    .finishAndGetBuffer()),
                   IndexKeyEntry(BSON("" << 2), RecordId(1, 4)));
@@ -856,29 +685,23 @@ TEST(SortedDataInterface, Locate2) {
     }
 }
 
-TEST(SortedDataInterface, Locate2Empty) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, Locate2Empty) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(1, 2)), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 2), RecordId(1, 4)), true));
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 3), RecordId(1, 6)), true));
-            txn.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(1, 2)), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), makeKeyString(sorted.get(), BSON("" << 2), RecordId(1, 4)), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), makeKeyString(sorted.get(), BSON("" << 3), RecordId(1, 6)), true));
+        txn.commit();
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        const auto cursor(sorted->newCursor(opCtx()));
         ASSERT_EQ(
             cursor->seek(
                 makeKeyStringForSeek(sorted.get(), BSONObj(), true, true).finishAndGetBuffer()),
@@ -886,9 +709,7 @@ TEST(SortedDataInterface, Locate2Empty) {
     }
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
+        const auto cursor(sorted->newCursor(opCtx(), false));
         ASSERT_EQ(
             cursor->seek(
                 makeKeyStringForSeek(sorted.get(), BSONObj(), false, false).finishAndGetBuffer()),
@@ -897,65 +718,61 @@ TEST(SortedDataInterface, Locate2Empty) {
 }
 
 
-TEST(SortedDataInterface, Locate3Descending) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, Locate3Descending) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
     auto buildEntry = [](int i) {
         return IndexKeyEntry(BSON("" << i), RecordId(1, i * 2));
     };
 
     {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         for (int i = 0; i < 10; i++) {
             if (i == 6)
                 continue;
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-            StorageWriteTransaction txn(ru);
+            StorageWriteTransaction txn(recoveryUnit());
             auto entry = buildEntry(i);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx.get(), makeKeyString(sorted.get(), entry.key, entry.loc), true));
+            ASSERT_SDI_INSERT_OK(
+                sorted->insert(opCtx(), makeKeyString(sorted.get(), entry.key, entry.loc), true));
             txn.commit();
         }
     }
 
-    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), true));
+    std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx(), true));
     ASSERT_EQ(
         cursor->seek(
             makeKeyStringForSeek(sorted.get(), BSON("" << 5), true, true).finishAndGetBuffer()),
         buildEntry(5));
     ASSERT_EQ(cursor->next(), buildEntry(7));
 
-    cursor = sorted->newCursor(opCtx.get(), /*forward*/ false);
+    cursor = sorted->newCursor(opCtx(), /*forward*/ false);
     ASSERT_EQ(
         cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("" << 5), false, /*inclusive*/ false)
                          .finishAndGetBuffer()),
         buildEntry(4));
 
-    cursor = sorted->newCursor(opCtx.get(), /*forward*/ false);
+    cursor = sorted->newCursor(opCtx(), /*forward*/ false);
     ASSERT_EQ(
         cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("" << 5), false, /*inclusive*/ true)
                          .finishAndGetBuffer()),
         buildEntry(5));
     ASSERT_EQ(cursor->next(), buildEntry(4));
 
-    cursor = sorted->newCursor(opCtx.get(), /*forward*/ false);
+    cursor = sorted->newCursor(opCtx(), /*forward*/ false);
     ASSERT_EQ(
         cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("" << 5), false, /*inclusive*/ false)
                          .finishAndGetBuffer()),
         buildEntry(4));
     ASSERT_EQ(cursor->next(), buildEntry(3));
 
-    cursor = sorted->newCursor(opCtx.get(), /*forward*/ false);
+    cursor = sorted->newCursor(opCtx(), /*forward*/ false);
     ASSERT_EQ(
         cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("" << 6), false, /*inclusive*/ true)
                          .finishAndGetBuffer()),
         buildEntry(5));
     ASSERT_EQ(cursor->next(), buildEntry(4));
 
-    cursor = sorted->newCursor(opCtx.get(), /*forward*/ false);
+    cursor = sorted->newCursor(opCtx(), /*forward*/ false);
     ASSERT_EQ(
         cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("" << 500), false, /*inclusive*/ true)
                          .finishAndGetBuffer()),
@@ -963,20 +780,19 @@ TEST(SortedDataInterface, Locate3Descending) {
     ASSERT_EQ(cursor->next(), buildEntry(8));
 }
 
-TEST(SortedDataInterface, Locate4) {
-    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto sorted = harnessHelper->newSortedDataInterface(/*unique=*/false,
-                                                        /*partial=*/false,
-                                                        {
-                                                            {BSON("" << 1), RecordId(1, 2)},
-                                                            {BSON("" << 1), RecordId(1, 4)},
-                                                            {BSON("" << 1), RecordId(1, 6)},
-                                                            {BSON("" << 2), RecordId(1, 8)},
-                                                        });
+TEST_F(SortedDataInterfaceTest, Locate4) {
+    auto sorted = harnessHelper()->newSortedDataInterface(opCtx(),
+                                                          /*unique=*/false,
+                                                          /*partial=*/false,
+                                                          {
+                                                              {BSON("" << 1), RecordId(1, 2)},
+                                                              {BSON("" << 1), RecordId(1, 4)},
+                                                              {BSON("" << 1), RecordId(1, 6)},
+                                                              {BSON("" << 2), RecordId(1, 8)},
+                                                          });
 
     {
-        auto opCtx = harnessHelper->newOperationContext();
-        auto cursor = sorted->newCursor(opCtx.get());
+        auto cursor = sorted->newCursor(opCtx());
         ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("a" << 1), true, true)
                                    .finishAndGetBuffer()),
                   IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));
@@ -988,8 +804,7 @@ TEST(SortedDataInterface, Locate4) {
     }
 
     {
-        auto opCtx = harnessHelper->newOperationContext();
-        auto cursor = sorted->newCursor(opCtx.get(), false);
+        auto cursor = sorted->newCursor(opCtx(), false);
         ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), BSON("a" << 1), false, true)
                                    .finishAndGetBuffer()),
                   IndexKeyEntry(BSON("" << 1), RecordId(1, 6)));
