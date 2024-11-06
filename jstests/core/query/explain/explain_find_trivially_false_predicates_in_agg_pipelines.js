@@ -59,8 +59,6 @@ const foreignColl = db[foreignCollName];
 assert.commandWorked(
     foreignColl.insert(Array.from({length: 10}, (_, i) => ({b: i, side: "foreign"}))));
 
-// TODO SERVER-82497. Add test with AlwaysFalse local branch and equality lookup condition.
-
 jsTestLog(
     "Testing trivially false optimization with $lookup stages. Always false local branch. Inequality lookup condition");
 
@@ -83,10 +81,26 @@ let query = [
 ];
 let explain = localColl.explain().aggregate(query);
 
-const localBranchPlan = getWinningPlanFromExplain(explain);
+let localBranchPlan = getWinningPlanFromExplain(explain);
 assert(isEofPlan(db, localBranchPlan));
 
 let queryResults = localColl.aggregate(query).toArray();
+assert.eq(queryResults.length, 0, "Expected empty resultset");
+
+jsTestLog(
+    "Testing trivially false optimization with $lookup stages. Always false local branch. Equality lookup condition");
+
+query = [
+    {$match: {$alwaysFalse: 1}},
+    {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "foreignSide"}}
+];
+explain = localColl.explain().aggregate(query);
+jsTestLog(explain);
+
+localBranchPlan = getWinningPlanFromExplain(explain);
+assert(isEofPlan(db, localBranchPlan));
+
+queryResults = localColl.aggregate(query).toArray();
 assert.eq(queryResults.length, 0, "Expected empty resultset");
 
 jsTestLog(
