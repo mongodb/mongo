@@ -4,6 +4,10 @@
  * and indexes for the collection, i.e. skip cloning documents and fetching/applying oplog entries
  * for it. In addition, test that after failover the skip is respected and the
  * 'approxDocumentsToCopy' and 'approxBytesToCopy' are restored correctly.
+ * @tags: [
+ *  featureFlagReshardingSkipCloningAndApplying,
+ *  requires_fcv_81,
+ *  ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
