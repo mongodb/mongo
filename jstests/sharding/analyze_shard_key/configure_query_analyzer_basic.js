@@ -6,6 +6,10 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {
+    testExistingCollection,
+    testNonExistingCollection
+} from "jstests/sharding/analyze_shard_key/libs/configure_query_analyzer_common.js";
 
 // This test requires running commands directly against the shard.
 TestData.replicaSetEndpointIncompatible = true;
@@ -14,89 +18,6 @@ TestData.replicaSetEndpointIncompatible = true;
 TestData.testingDiagnosticsEnabled = false;
 
 const dbNameBase = "testDb";
-
-function testNonExistingCollection(testCases, dbName = dbNameBase) {
-    const collName = "testCollNonExisting";
-    const ns = dbName + "." + collName;
-
-    testCases.forEach(testCase => {
-        jsTest.log(`Running configureQueryAnalyzer command against an non-existing collection: ${
-            tojson({testCase, ns})}`);
-        const cmdObj = {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1};
-        const res = testCase.conn.adminCommand(cmdObj);
-        const expectedErrorCode =
-            testCase.expectedErrorCode ? testCase.expectedErrorCode : ErrorCodes.NamespaceNotFound;
-        assert.commandFailedWithCode(res, expectedErrorCode);
-    });
-}
-
-function testExistingCollection(writeConn, testCases) {
-    const dbName = dbNameBase;
-    const collName = "testCollUnsharded";
-    const ns = dbName + "." + collName;
-    const db = writeConn.getDB(dbName);
-    assert.commandWorked(db.createCollection(collName));
-
-    testCases.forEach(testCase => {
-        if (testCase.conn.isConfigsvr) {
-            // The collection created below will not exist on the config server.
-            return;
-        }
-
-        jsTest.log(
-            `Running configureQueryAnalyzer command against an existing collection:
-        ${tojson(testCase)}`);
-
-        // Can set 'samplesPerSecond' to > 0.
-        const basicRes = testCase.conn.adminCommand(
-            {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 0.1});
-        if (testCase.expectedErrorCode) {
-            assert.commandFailedWithCode(basicRes, testCase.expectedErrorCode);
-            // There is no need to test the remaining cases.
-            return;
-        }
-        assert.commandWorked(basicRes);
-        assert.commandWorked(testCase.conn.adminCommand(
-            {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1}));
-        assert.commandWorked(testCase.conn.adminCommand(
-            {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 50}));
-
-        // Cannot set 'samplesPerSecond' to 0.
-        assert.commandFailedWithCode(
-            testCase.conn.adminCommand(
-                {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 0}),
-            ErrorCodes.InvalidOptions);
-
-        // Cannot set 'samplesPerSecond' to larger than 50.
-        assert.commandFailedWithCode(
-            testCase.conn.adminCommand(
-                {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 51}),
-            ErrorCodes.InvalidOptions);
-
-        // Cannot specify 'samplesPerSecond' when 'mode' is "off".
-        assert.commandFailedWithCode(
-            testCase.conn.adminCommand(
-                {configureQueryAnalyzer: ns, mode: "off", samplesPerSecond: 1}),
-            ErrorCodes.InvalidOptions);
-        assert.commandWorked(testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
-
-        // Cannot specify read/write concern.
-        assert.commandFailedWithCode(testCase.conn.adminCommand({
-            configureQueryAnalyzer: ns,
-            mode: "full",
-            samplesPerSecond: 1,
-            readConcern: {level: "available"}
-        }),
-                                     ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(testCase.conn.adminCommand({
-            configureQueryAnalyzer: ns,
-            mode: "full",
-            samplesPerSecond: 1,
-            writeConcern: {w: "majority"}
-        }),
-                                     ErrorCodes.InvalidOptions);
-    });
-}
 
 {
     const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
@@ -135,8 +56,8 @@ function testExistingCollection(writeConn, testCases) {
         });
     });
 
-    testNonExistingCollection(testCases);
-    testExistingCollection(st.s, testCases);
+    testNonExistingCollection(testCases, dbNameBase);
+    testExistingCollection(st.s, testCases, dbNameBase);
 
     st.stop();
 }
@@ -190,8 +111,8 @@ if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove t
         });
     });
 
-    testNonExistingCollection(testCases);
-    testExistingCollection(primary, testCases);
+    testNonExistingCollection(testCases, dbNameBase);
+    testExistingCollection(primary, testCases, dbNameBase);
 
     rst.stopSet();
 }
@@ -217,7 +138,7 @@ if (!TestData.auth) {
     const testCases = [];
     testCases.push(Object.assign(
         {conn: primary, isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation}));
-    testNonExistingCollection(testCases, "admin");
+    testNonExistingCollection(testCases, "admin", dbNameBase);
 
     rst.stopSet();
 }
@@ -228,7 +149,7 @@ if (!TestData.auth) {
     // The configureQueryAnalyzer command is not supported on standalone mongod.
     const testCases =
         [{conn: mongod, isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation}];
-    testNonExistingCollection(testCases);
+    testNonExistingCollection(testCases, dbNameBase);
 
     MongoRunner.stopMongod(mongod);
 }
