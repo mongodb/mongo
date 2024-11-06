@@ -167,9 +167,26 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
             uassertStatusOK(s);
         }
 
-        const bool isShardStale = !si->getVersionWanted() ||
-            si->getVersionWanted()->placementVersion().isOlderThan(
-                si->getVersionReceived().placementVersion());
+        const bool isShardStale = [&]() {
+            if (!si->getVersionWanted()) {
+                return true;
+            }
+
+            const auto& wanted = si->getVersionWanted()->placementVersion();
+            const auto& received = si->getVersionReceived().placementVersion();
+
+            // TODO (SERVER-96322): Remove this workaround once shard version {0,0} is considered a
+            // non-comparable shard version.
+            if (wanted.isSameCollection(received) && !wanted.isSet()) {
+                // When comparing the same incarnation of the collection, if the wanted version
+                // indicates the shard has no chunks (i.e. a chunk version with {0,0}), we can't
+                // reliably compare placement versions. Pessimistically, we'll assume the router is
+                // stale.
+                return false;
+            }
+
+            return wanted.isOlderThan(received);
+        }();
         if (isShardStale && !_retryOnStaleShard) {
             uassertStatusOK(s);
         }
