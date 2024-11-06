@@ -52,8 +52,6 @@ public:
      */
     void shutdown();
 
-    bool running() const;
-
     void appendStats(BSONObjBuilder& builder) const;
 
 private:
