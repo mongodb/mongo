@@ -376,7 +376,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
 
     uint64_t currentEpoch = _epoch.load();
     if (isShuttingDown() || session->_getEpoch() != currentEpoch) {
-        invariant(session->_getEpoch() < currentEpoch);
+        invariant(session->_getEpoch() <= currentEpoch);
         // There is a race condition with clean shutdown, where the storage engine is ripped from
         // underneath OperationContexts, which are not "active" (i.e., do not have any locks), but
         // are just about to delete the recovery unit. See SERVER-16031 for more information. Since
