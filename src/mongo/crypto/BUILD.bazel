@@ -74,15 +74,20 @@ mongo_cc_library(
 mongo_cc_library(
     name = "mongocryptutil",
     srcs = [
+        "libbsonvalue.cpp",
         "mongocryptbuffer.cpp",
         "mongocryptstatus.cpp",
     ],
     hdrs = [
+        "libbsonvalue.h",
         "mongocryptbuffer.h",
         "mongocryptstatus.h",
+        "//src/mongo/base:data_type_validated.h",  # Validated<BSONObj>
+        "//src/mongo/rpc:object_check.h",  # Validated<BSONObj>
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",  # Validated<BSONObj>
         "//src/third_party/libmongocrypt:mongocrypt",
     ],
 )
@@ -161,6 +166,7 @@ mongo_cc_library(
         ":fle_tokens_gen",
     ],
     deps = [
+        ":mongocryptutil",
         "//src/mongo:base",
         "//src/mongo/idl:idl_parser",
     ],
