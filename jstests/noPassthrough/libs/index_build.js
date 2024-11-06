@@ -395,7 +395,7 @@ export const ResumableIndexBuildTest = class {
     }
 
     /**
-     * Runs createIndexFn in a parellel shell to create indexes, modifying the collection with the
+     * Runs createIndexFn in a parallel shell to create indexes, modifying the collection with the
      * side writes table.
      *
      * 'createIndexFn' should take three parameters: collection name, index specifications, and

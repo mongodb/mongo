@@ -498,7 +498,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     } catch (...) {
         return exceptionToStatus().withContext(str::stream()
                                                << "Caught exception during index builder ("
-                                               << _buildUUID << ") initialization on namespace"
+                                               << _buildUUID << ") initialization on namespace "
                                                << collection->ns().toStringForErrorMsg() << " ("
                                                << _collectionUUID << "). " << indexSpecs.size()
                                                << " index specs provided. First index spec: "

@@ -558,7 +558,7 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
 // The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
 // this function into one single builder that records the time elapsed during startup. Its default
 // value is nullptr because we only want to time this function when it is called during startup.
-void reconcileCatalogAndRestartUnfinishedIndexeBuilds(
+void reconcileCatalogAndRestartUnfinishedIndexBuilds(
     OperationContext* opCtx,
     StorageEngine* storageEngine,
     StorageEngine::LastShutdownState lastShutdownState,
@@ -825,7 +825,7 @@ void startupRecovery(OperationContext* opCtx,
     }
 
     // Drops abandoned idents. Restarts incomplete two-phase index builds.
-    reconcileCatalogAndRestartUnfinishedIndexeBuilds(
+    reconcileCatalogAndRestartUnfinishedIndexBuilds(
         opCtx, storageEngine, lastShutdownState, startupTimeElapsedBuilder);
 
     const bool usingReplication =
@@ -844,8 +844,6 @@ void startupRecovery(OperationContext* opCtx,
             ensureCollectionProperties(opCtx, dbName, EnsureIndexPolicy::kBuildMissing));
 
         if (usingReplication) {
-            // We only care about _id indexes if we are in a replset.
-            checkForIdIndexes(opCtx, dbName);
             // Ensure oplog is capped (mongodb does not guarantee order of inserts on noncapped
             // collections)
             if (dbName == DatabaseName::kLocal) {
