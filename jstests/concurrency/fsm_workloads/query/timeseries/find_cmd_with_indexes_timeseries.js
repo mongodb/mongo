@@ -53,7 +53,8 @@ export const $config = (function() {
      * Checks that the dropIndex cmd result either succeeded or failed in an acceptible manner.
      */
     function processDropIndex(dropIndexRes, indexSpec) {
-        assert(dropIndexRes.ok == 1 || dropIndexRes.code == ErrorCodes.IndexNotFound,
+        assert(dropIndexRes.ok == 1 || dropIndexRes.code == ErrorCodes.IndexNotFound ||
+                   dropIndexRes.code === ErrorCodes.CannotDropShardKeyIndex,
                "Drop index for spec '" + indexSpec + "' failed: " + tojson(dropIndexRes));
     }
 

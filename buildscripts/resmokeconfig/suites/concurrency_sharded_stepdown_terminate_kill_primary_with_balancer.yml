@@ -83,6 +83,8 @@ executor:
     tests: true
   config:
     shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
       global_vars:
         TestData:
           runningWithConfigStepdowns: true
@@ -90,6 +92,7 @@ executor:
           killShards: true
           useActionPermittedFile: [ContinuousStepdown]
           runningWithBalancer: true
+          implicitlyShardOnCreateCollectionOnly: true
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousStepdown

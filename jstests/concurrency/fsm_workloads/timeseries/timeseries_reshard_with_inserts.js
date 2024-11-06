@@ -19,6 +19,9 @@ import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 export const $config = (function() {
+    // This test manually shards the collection.
+    TestData.shardCollectionProbability = 0;
+
     const timeField = 'ts';
     const metaField = 'meta';
 

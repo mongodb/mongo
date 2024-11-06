@@ -33,7 +33,9 @@ DB.prototype.createCollection = function() {
     const createCollResult = originalCreateCollection.apply(this, arguments);
 
     if (!createCollResult.ok || arguments.length < 2 || arguments[1] == null ||
-        !isObject(arguments[1]) || !arguments[1].timeseries || !arguments[1].timeseries.timeField) {
+        !isObject(arguments[1]) || !arguments[1].timeseries || !arguments[1].timeseries.timeField ||
+        (typeof TestData.shardCollectionProbability !== "undefined" &&
+         Math.random() >= TestData.shardCollectionProbability)) {
         return createCollResult;
     }
 
@@ -82,6 +84,10 @@ DB.prototype.getCollection = function() {
 
     // Attempt to enable sharding on database and collection if not already done.
     if (!TestData.implicitlyShardOnCreateCollectionOnly) {
+        if (typeof TestData.shardCollectionProbability !== "undefined") {
+            throw new Error(
+                "Must set implicitlyShardOnCreateCollectionOnly if using shardCollectionProbability");
+        }
         ShardingOverrideCommon.shardCollection(collection);
     }
 
@@ -93,6 +99,10 @@ DBCollection.prototype.drop = function() {
 
     // Attempt to enable sharding on database and collection if not already done.
     if (!TestData.implicitlyShardOnCreateCollectionOnly) {
+        if (typeof TestData.shardCollectionProbability !== "undefined") {
+            throw new Error(
+                "Must set implicitlyShardOnCreateCollectionOnly if using shardCollectionProbability");
+        }
         ShardingOverrideCommon.shardCollection(this);
     }
 

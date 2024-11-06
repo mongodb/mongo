@@ -14,6 +14,9 @@ import {
 } from 'jstests/concurrency/fsm_workloads/timeseries/timeseries_updates_and_inserts.js';
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
+    // TODO (SERVER-96700): Allow the collection to be sharded.
+    TestData.shardCollectionProbability = 0;
+
     $config.data.dateTime = new ISODate();
 
     // Update 'readingNo' for each sensor. If 'readingNo' doesn't exist yet, upsert one

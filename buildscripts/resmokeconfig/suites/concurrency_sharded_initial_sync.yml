@@ -110,6 +110,7 @@ executor:
         globalThis.testingReplication = true;
         await import("jstests/libs/override_methods/set_read_preference_secondary.js");
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
       global_vars:
         TestData:
           defaultReadPreference:
@@ -119,6 +120,7 @@ executor:
           # and generally retry operations.
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
+          implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousInitialSync]
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
 

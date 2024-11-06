@@ -16,10 +16,12 @@ executor:
     tests: true
   config:
     shell_options:
+      eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
       global_vars:
         TestData:
           defaultTransactionReadConcernLevel: local
           defaultTransactionWriteConcernW: 1
+          implicitlyShardOnCreateCollectionOnly: true
           runInsideTransaction: true
           runningWithBalancer: false
           runningWithCausalConsistency: false

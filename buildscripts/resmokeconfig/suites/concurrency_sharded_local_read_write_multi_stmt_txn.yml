@@ -85,6 +85,8 @@ executor:
     tests: true
   config:
     shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
       global_vars:
         TestData:
           # Reads and writes outside of transactions will not have their read or write concerns
@@ -100,6 +102,7 @@ executor:
           runningWithCausalConsistency: false
           runningWithSessions: true
           traceExceptions: false
+          implicitlyShardOnCreateCollectionOnly: true
 
   hooks:
     - class: CheckShardFilteringMetadata

@@ -22,6 +22,9 @@ import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
+    // This test manually shards the collection.
+    TestData.shardCollectionProbability = 0;
+
     $config.data.nonShardCollName = "unsharded";
 
     // A random non-round start value was chosen so that we can verify the rounding behavior that
