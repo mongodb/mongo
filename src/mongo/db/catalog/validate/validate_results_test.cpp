@@ -119,4 +119,29 @@ TEST(ValidateResultsTest, ErrorsAndWarningsAutomaticallyDeduplicated) {
     ASSERT_EQ(vr.getWarnings().size(), 2);
 }
 
+TEST(ValidateResultsTest, TestingSizeOfIndexDetailsEntries) {
+    ValidateResults vr;
+
+    IndexValidateResults& ivr = vr.getIndexValidateResult("index1");
+    std::string largeString(200 * 1024, 'a');
+
+    // We allocated 2MB for all warnings, and 2MB for all errors - these both surpass that amount.
+    for (int i = 0; i < 25; i++) {
+        ivr.addWarning(largeString);
+        ivr.addError(largeString);
+    }
+
+    BSONObjBuilder bob;
+    vr.appendToResultObj(&bob, /*debugging=*/false);
+    auto obj = bob.done();
+
+    // Check that we have not surpasssed 2MB, should be within 11 iterations.
+    std::vector<BSONElement> index_warns = getElements(
+        obj.getObjectField("indexDetails").getObjectField("index1").getObjectField("warnings"));
+    ASSERT_LESS_THAN(index_warns.size(), 11);
+    std::vector<BSONElement> index_errors = getElements(
+        obj.getObjectField("indexDetails").getObjectField("index1").getObjectField("errors"));
+    ASSERT_LESS_THAN(index_warns.size(), 11);
+}
+
 }  // namespace mongo
