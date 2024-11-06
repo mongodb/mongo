@@ -10,7 +10,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -22,6 +22,7 @@ assert.commandWorked(coll.insert({array: [[1]]}));
 assert.commandWorked(coll.insert({array: [[2]]}));
 const explain = assert.commandWorked(
     coll.find({array: {$all: [[1], [2]]}}).sort({num: 1}).explain('executionStats'));
-assert.gt(
-    getPlanStages(getWinningPlan(explain.queryPlanner), "SORT_MERGE").length, 0, tojson(explain));
+assert.gt(getPlanStages(getWinningPlanFromExplain(explain.queryPlanner), "SORT_MERGE").length,
+          0,
+          tojson(explain));
 assert.eq(1, explain.executionStats.nReturned, tojson(explain));

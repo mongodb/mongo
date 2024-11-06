@@ -6,7 +6,7 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.wildcard_nonblocking_sort;
 coll.drop();
@@ -26,7 +26,7 @@ function checkQueryHasSameResultsWhenUsingIdIndex(query, sort, projection) {
 function checkQueryUsesSortTypeAndGetsCorrectResults(
     query, sort, projection, isBlocking, isCompound = false) {
     const explain = assert.commandWorked(coll.find(query, projection).sort(sort).explain());
-    const plan = getWinningPlan(explain.queryPlanner);
+    const plan = getWinningPlanFromExplain(explain.queryPlanner);
 
     const ixScans = getPlanStages(plan, "IXSCAN");
     const sorts = getPlanStages(plan, "SORT");

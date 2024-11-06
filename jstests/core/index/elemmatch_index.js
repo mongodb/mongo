@@ -6,7 +6,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-import {getWinningPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.elemMatch_index;
 coll.drop();
@@ -21,7 +21,7 @@ assert.commandWorked(coll.createIndex({a: 1}, {sparse: true}));
 function assertIndexResults(coll, query, useIndex, nReturned) {
     const explainPlan = coll.find(query).explain("executionStats");
     // Assert the plan is using an index scan.
-    assert.eq(isIxscan(db, getWinningPlan(explainPlan.queryPlanner)), useIndex);
+    assert.eq(isIxscan(db, getWinningPlanFromExplain(explainPlan)), useIndex);
     assert.eq(explainPlan.executionStats.nReturned, nReturned);
 }
 

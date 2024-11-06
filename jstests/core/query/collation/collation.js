@@ -26,7 +26,7 @@ import {
     getPlanStage,
     getPlanStages,
     getSingleNodeExplain,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isCollscan,
     isIdhackOrExpress,
     isIxscan,
@@ -61,7 +61,7 @@ var getQueryCollation = function(explainRes) {
         return explainRes.queryPlanner.collation;
     }
 
-    const winningPlan = getWinningPlan(explainRes.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explainRes.queryPlanner);
     if (winningPlan.hasOwnProperty("shards") && winningPlan.shards.length > 0 &&
         winningPlan.shards[0].hasOwnProperty("collation")) {
         return winningPlan.shards[0].collation;
@@ -307,19 +307,19 @@ assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
 explainRes = coll.find({a: "foo"}).explain();
 assert.commandWorked(explainRes);
 explainRes = getSingleNodeExplain(explainRes);
-assert(planHasStage(testDb, getWinningPlan(explainRes.queryPlanner), "COLLSCAN"));
+assert(planHasStage(testDb, getWinningPlanFromExplain(explainRes.queryPlanner), "COLLSCAN"));
 
 // Query has en_US collation, but index has fr_CA collation.
 explainRes = coll.find({a: "foo"}).collation({locale: "en_US"}).explain();
 assert.commandWorked(explainRes);
 explainRes = getSingleNodeExplain(explainRes);
-assert(planHasStage(testDb, getWinningPlan(explainRes.queryPlanner), "COLLSCAN"));
+assert(planHasStage(testDb, getWinningPlanFromExplain(explainRes.queryPlanner), "COLLSCAN"));
 
 // Matching collations.
 explainRes = coll.find({a: "foo"}).collation({locale: "fr_CA"}).explain();
 assert.commandWorked(explainRes);
 explainRes = getSingleNodeExplain(explainRes);
-assert(planHasStage(testDb, getWinningPlan(explainRes.queryPlanner), "IXSCAN"));
+assert(planHasStage(testDb, getWinningPlanFromExplain(explainRes.queryPlanner), "IXSCAN"));
 
 // Should not be possible to create a text index with an explicit non-simple collation.
 coll = testDb.collation_index3;
@@ -385,7 +385,7 @@ assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "en_US"}}));
 var explain = coll.explain("queryPlanner").aggregate([{$match: {a: "foo"}}]);
 explain = getSingleNodeExplain(explain);
-assert(isIxscan(testDb, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(testDb, getWinningPlanFromExplain(explain.queryPlanner)));
 
 // Aggregation should not use index when no collation specified and collection default
 // collation is incompatible with index collation.
@@ -395,7 +395,7 @@ assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.explain("queryPlanner").aggregate([{$match: {a: "foo"}}]);
 explain = getSingleNodeExplain(explain);
-assert(isCollscan(testDb, getWinningPlan(explain.queryPlanner)));
+assert(isCollscan(testDb, getWinningPlanFromExplain(explain.queryPlanner)));
 
 // Explain of aggregation with collation should succeed.
 assert.commandWorked(coll.explain().aggregate([], {collation: {locale: "fr"}}));
@@ -570,28 +570,29 @@ coll.drop();
 assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "en_US"}}));
 var explain = coll.explain("queryPlanner").distinct("a");
-assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "DISTINCT_SCAN"));
-assert(planHasFetch(getWinningPlan(explain.queryPlanner)));
+assert(planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "DISTINCT_SCAN"));
+assert(planHasFetch(getWinningPlanFromExplain(explain.queryPlanner)));
 
 // Distinct scan on strings can be used over an index with a collation when the predicate has
 // exact bounds.
 explain = coll.explain("queryPlanner").distinct("a", {a: {$gt: "foo"}});
-assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "DISTINCT_SCAN"));
-assert(planHasFetch(getWinningPlan(explain.queryPlanner)));
-assert(!planHasStage(testDb, getWinningPlan(explain.queryPlanner), "PROJECTION_COVERED"));
+assert(planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "DISTINCT_SCAN"));
+assert(planHasFetch(getWinningPlanFromExplain(explain.queryPlanner)));
+assert(
+    !planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "PROJECTION_COVERED"));
 
 // Distinct scan cannot be used over an index with a collation when the predicate has inexact
 // bounds.
 explain = coll.explain("queryPlanner").distinct("a", {a: {$exists: true}});
-assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "IXSCAN"));
-assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "FETCH"));
-assert(!planHasStage(testDb, getWinningPlan(explain.queryPlanner), "DISTINCT_SCAN"));
+assert(planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "IXSCAN"));
+assert(planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "FETCH"));
+assert(!planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "DISTINCT_SCAN"));
 
 // Distinct scan can be used without a fetch when predicate has exact non-string bounds.
 explain = coll.explain("queryPlanner").distinct("a", {a: {$gt: 3}});
-assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "DISTINCT_SCAN"));
-assert(planHasStage(testDb, getWinningPlan(explain.queryPlanner), "PROJECTION_COVERED"));
-assert(!planHasFetch(getWinningPlan(explain.queryPlanner)));
+assert(planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "DISTINCT_SCAN"));
+assert(planHasStage(testDb, getWinningPlanFromExplain(explain.queryPlanner), "PROJECTION_COVERED"));
+assert(!planHasFetch(getWinningPlanFromExplain(explain.queryPlanner)));
 
 // Distinct should not use index when no collation specified and collection default collation is
 // incompatible with index collation.
@@ -600,7 +601,7 @@ coll.drop();
 assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.explain("queryPlanner").distinct("a");
-assert(isCollscan(testDb, getWinningPlan(explain.queryPlanner)));
+assert(isCollscan(testDb, getWinningPlanFromExplain(explain.queryPlanner)));
 
 // Explain of DISTINCT_SCAN stage should include index collation.
 coll = testDb.collation_distinct7;
@@ -793,7 +794,7 @@ if (!isClustered) {
     assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
     explainRes = coll.explain("executionStats").find({_id: "foo"}).finish();
     assert.commandWorked(explainRes);
-    assert(isIdhackOrExpress(testDb, getWinningPlan(explainRes.queryPlanner)));
+    assert(isIdhackOrExpress(testDb, getWinningPlanFromExplain(explainRes.queryPlanner)));
 
     // Find on _id should use fastpath when explicitly given query collation matches
     // collection default.
@@ -803,7 +804,7 @@ if (!isClustered) {
     explainRes =
         coll.explain("executionStats").find({_id: "foo"}).collation({locale: "en_US"}).finish();
     assert.commandWorked(explainRes);
-    assert(isIdhackOrExpress(testDb, getWinningPlan(explainRes.queryPlanner)));
+    assert(isIdhackOrExpress(testDb, getWinningPlanFromExplain(explainRes.queryPlanner)));
 
     // Find on _id should not use fastpath when query collation does not match
     // collection default.
@@ -813,7 +814,7 @@ if (!isClustered) {
     explainRes =
         coll.explain("executionStats").find({_id: "foo"}).collation({locale: "fr_CA"}).finish();
     assert.commandWorked(explainRes);
-    assert(!isIdhackOrExpress(testDb, getWinningPlan(explainRes.queryPlanner)));
+    assert(!isIdhackOrExpress(testDb, getWinningPlanFromExplain(explainRes.queryPlanner)));
 }
 
 // Find should select compatible index when no collation specified and collection has a default
@@ -825,7 +826,7 @@ assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "en_US"}}));
 var explain = coll.find({a: "foo"}).explain("queryPlanner");
 
 // Assert the plan is using an index scan.
-assert(isIxscan(testDb, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(testDb, getWinningPlanFromExplain(explain.queryPlanner)));
 
 // Find should select compatible index when no collation specified and collection default
 // collation is "simple".
@@ -836,7 +837,7 @@ assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.find({a: "foo"}).explain("queryPlanner");
 
 // Assert the plan is using an index scan.
-assert(isIxscan(testDb, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(testDb, getWinningPlanFromExplain(explain.queryPlanner)));
 
 // Find should not use index when no collation specified, index collation is "simple", and
 // collection has a non-"simple" default collation.
@@ -845,7 +846,7 @@ coll.drop();
 assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.find({a: "foo"}).explain("queryPlanner");
-assert(isCollscan(testDb, getWinningPlan(explain.queryPlanner)));
+assert(isCollscan(testDb, getWinningPlanFromExplain(explain.queryPlanner)));
 
 // Find should select compatible index when "simple" collation specified and collection has a
 // non-"simple" default collation.
@@ -854,7 +855,7 @@ coll.drop();
 assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.find({a: "foo"}).collation({locale: "simple"}).explain("queryPlanner");
-assert(isIxscan(testDb, getWinningPlan(explain.queryPlanner)));
+assert(isIxscan(testDb, getWinningPlanFromExplain(explain.queryPlanner)));
 
 // Find should return correct results when collation specified and run with explain.
 coll = testDb.collation_find17;
@@ -916,7 +917,7 @@ assert.commandWorked(coll.createIndex({str: 1}, {collation: {locale: "fr_CA"}}))
 explainRes =
     coll.explain("executionStats").find({str: "foo"}).collation({locale: "fr_CA"}).finish();
 assert.commandWorked(explainRes);
-planStage = getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+planStage = getPlanStage(getWinningPlanFromExplain(explainRes.queryPlanner), "IXSCAN");
 assert.neq(null, planStage);
 assert.eq(planStage.collation, {
     locale: "fr_CA",
@@ -939,7 +940,7 @@ assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale
 assert.commandWorked(coll.createIndex({str: 1}));
 explainRes = coll.explain("executionStats").find({str: "foo"}).finish();
 assert.commandWorked(explainRes);
-planStage = getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+planStage = getPlanStage(getWinningPlanFromExplain(explainRes.queryPlanner), "IXSCAN");
 assert.neq(null, planStage);
 assert.eq(planStage.collation, {
     locale: "fr_CA",
@@ -1919,7 +1920,7 @@ explainRes = coll.find({}, {_id: 0})
                  .sort({a: 1, b: 1})
                  .explain();
 assert.commandWorked(explainRes);
-assert(planHasStage(testDb, getWinningPlan(explainRes.queryPlanner), "SORT"));
+assert(planHasStage(testDb, getWinningPlanFromExplain(explainRes.queryPlanner), "SORT"));
 
 // This query should fail since min has a string as one of it's boundaries, and the
 // collation doesn't match that of the index.

@@ -9,7 +9,7 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
@@ -106,11 +106,13 @@ function assertWildcardQuery(query, expectedPath, explainStats = {}) {
     // If we expect the current path to have been excluded based on the $** keyPattern
     // or projection, confirm that no indexed solution was found.
     if (!expectedPath) {
-        assert.gt(getPlanStages(getWinningPlan(explainOutput.queryPlanner), "COLLSCAN").length, 0);
+        assert.gt(
+            getPlanStages(getWinningPlanFromExplain(explainOutput.queryPlanner), "COLLSCAN").length,
+            0);
         return;
     }
     // Verify that the winning plan uses the $** index with the expected path.
-    const ixScans = getPlanStages(getWinningPlan(explainOutput.queryPlanner), "IXSCAN");
+    const ixScans = getPlanStages(getWinningPlanFromExplain(explainOutput.queryPlanner), "IXSCAN");
     assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
     assert.docEq(Object.assign({"$_path": 1}, expectedPath), ixScans[0].keyPattern);
     // Verify that the results obtained from the $** index are identical to a COLLSCAN.
@@ -297,7 +299,8 @@ for (const indexSpec of wildcardIndexes) {
     // Verify that the expected number of documents were matched, and the $** index was used.
     // Matched documents: [_id:2, _id:3, _id:5, _id:6]
     assert.eq(trimTestExplain.executionStats.nReturned, 4);
-    const trimTestIxScans = getPlanStages(getWinningPlan(trimTestExplain.queryPlanner), "IXSCAN");
+    const trimTestIxScans =
+        getPlanStages(getWinningPlanFromExplain(trimTestExplain.queryPlanner), "IXSCAN");
     for (let ixScan of trimTestIxScans) {
         assert.eq(ixScan.keyPattern["$_path"], 1);
     }

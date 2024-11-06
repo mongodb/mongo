@@ -1,7 +1,7 @@
 // Test oplog queries that can be optimized with oplogReplay.
 // @tags: [requires_replication, requires_capped]
 
-import {getPlanStage, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let replSet = new ReplSetTest({nodes: 1});
@@ -95,7 +95,7 @@ let res = oplog.find({ns: collNs, ts: {$eq: timestamps[10]}}).explain("execution
 assert.commandWorked(res);
 // We expect to be able to seek directly to the entry with a 'ts' of 10.
 assert.lte(res.executionStats.totalDocsExamined, 2, res);
-let collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
+let collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), res);
 
@@ -104,7 +104,7 @@ res = oplog.find({$and: [{ts: {$gte: timestamps[51]}}, {ts: {$lt: timestamps[60]
           .explain("executionStats");
 assert.commandWorked(res);
 assert.lte(res.executionStats.totalDocsExamined, res.executionStats.nReturned + 2, res);
-collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
+collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(timestamps[60], longToTs(collScanStage.maxRecord), res);
 assert.eq(timestamps[51], longToTs(collScanStage.minRecord), res);
@@ -114,7 +114,7 @@ res = oplog.find({$and: [{ts: {$gte: timestamps[51]}}, {ts: {$lte: timestamps[60
           .explain("executionStats");
 assert.commandWorked(res);
 assert.lte(res.executionStats.totalDocsExamined, res.executionStats.nReturned + 2, res);
-collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
+collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(timestamps[60], longToTs(collScanStage.maxRecord), res);
 assert.eq(timestamps[51], longToTs(collScanStage.minRecord), res);
@@ -124,7 +124,7 @@ assert.eq(timestamps[51], longToTs(collScanStage.minRecord), res);
 res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[0]}}, {ts: {$lte: timestamps[10]}}]})
           .explain("executionStats");
 assert.commandWorked(res);
-collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
+collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), res);
 
@@ -143,7 +143,7 @@ res = oplog
           .explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the entry with a 'ts' of 5.
-collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
+collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(timestamps[5], longToTs(collScanStage.maxRecord), res);
 assert.eq(timestamps[5], longToTs(collScanStage.minRecord), res);
@@ -152,7 +152,7 @@ assert.eq(timestamps[5], longToTs(collScanStage.minRecord), res);
 res = oplog.find({ns: collNs, ts: {$eq: makeTS(200)}}).explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the end of the oplog.
-collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
+collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(makeTS(200), longToTs(collScanStage.maxRecord), res);
 
@@ -162,7 +162,7 @@ res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[4]}}, {ts: {$lte: 
           .explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the start of the 'ts' range.
-collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
+collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(timestamps[8], longToTs(collScanStage.maxRecord), res);
 
@@ -170,7 +170,7 @@ assert.eq(timestamps[8], longToTs(collScanStage.maxRecord), res);
 // passing the max timestamp.
 res = oplog.find({ns: collNs, ts: {$lt: timestamps[4]}}).explain("executionStats");
 assert.commandWorked(res);
-collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
+collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(timestamps[4], longToTs(collScanStage.maxRecord), res);
 
@@ -230,7 +230,7 @@ res = oplog.find({ns: collNs, ts: {$lt: timestamps[4]}})
           .explain("executionStats");
 assert.commandWorked(res);
 assert.gte(res.executionStats.totalDocsExamined, 100, res);
-collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
+collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 
 replSet.stopSet();

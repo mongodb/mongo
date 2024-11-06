@@ -12,7 +12,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getPlanStages,
     getRejectedPlans,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     planHasStage
 } from "jstests/libs/query/analyze_plan.js";
 
@@ -40,7 +40,7 @@ function assertWildcardQuery(query, expectedPath, isCompound) {
 
     // Explain the query, and determine whether an indexed solution is available.
     const explainOutput = coll.find(query).explain("executionStats");
-    const ixScans = getPlanStages(getWinningPlan(explainOutput.queryPlanner), "IXSCAN");
+    const ixScans = getPlanStages(getWinningPlanFromExplain(explainOutput.queryPlanner), "IXSCAN");
     // Verify that the winning plan uses the $** index with the expected path.
     assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
     for (const key in expectedPath) {
@@ -90,7 +90,8 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
     // when the query filter contains a compound field in the $text index.
     const textQuery = Object.assign(textIndex.a ? {a: 1} : {}, {$text: {$search: 'banana'}});
     let explainOut = assert.commandWorked(coll.find(textQuery).explain("executionStats"));
-    assert(planHasStage(coll.getDB(), getWinningPlan(explainOut.queryPlanner), "TEXT_MATCH"));
+    assert(planHasStage(
+        coll.getDB(), getWinningPlanFromExplain(explainOut.queryPlanner), "TEXT_MATCH"));
     assert.eq(getRejectedPlans(explainOut).length, 0);
     assert.eq(explainOut.executionStats.nReturned, 2);
 
@@ -98,7 +99,8 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
     // where the query filter contains a field which is not present in the text index.
     explainOut = assert.commandWorked(
         coll.find(Object.assign({_fts: {$gt: 0, $lt: 4}}, textQuery)).explain("executionStats"));
-    assert(planHasStage(coll.getDB(), getWinningPlan(explainOut.queryPlanner), "TEXT_MATCH"));
+    assert(planHasStage(
+        coll.getDB(), getWinningPlanFromExplain(explainOut.queryPlanner), "TEXT_MATCH"));
     assert.eq(getRejectedPlans(explainOut).length, 0);
     assert.eq(explainOut.executionStats.nReturned, 2);
 
@@ -107,7 +109,8 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
         assert.commandWorked(coll.find({$or: [{_fts: 3}, textQuery]}).explain("executionStats"));
     assert.eq(explainOut.executionStats.nReturned, 3);
 
-    const textOrWildcard = getPlanStages(getWinningPlan(explainOut.queryPlanner), "OR").shift();
+    const textOrWildcard =
+        getPlanStages(getWinningPlanFromExplain(explainOut.queryPlanner), "OR").shift();
     assert.eq(textOrWildcard.inputStages.length, 2);
     const textBranch = (textOrWildcard.inputStages[0].stage === "TEXT_MATCH" ? 0 : 1);
     const wildcardBranch = (textBranch + 1) % 2;

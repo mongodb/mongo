@@ -144,7 +144,10 @@ export function getWinningPlanFromExplain(explain, isSBEPlan = false) {
         }
     }
 
-    let queryPlanner = getQueryPlanner(explain);
+    let queryPlanner = explain;
+    if (explain.hasOwnProperty("queryPlanner") || explain.hasOwnProperty("stages")) {
+        queryPlanner = getQueryPlanner(explain);
+    }
     return isSBEPlan ? getWinningSBEPlan(queryPlanner) : getWinningPlan(queryPlanner);
 }
 
