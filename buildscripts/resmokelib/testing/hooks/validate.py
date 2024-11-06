@@ -11,7 +11,8 @@ import pymongo.mongo_client
 from pymongo.collection import Collection
 from pymongo.database import Database
 
-from buildscripts.resmokelib.testing.fixtures.interface import MultiClusterFixture, build_client
+from buildscripts.resmokelib.testing.fixtures.external import ExternalFixture
+from buildscripts.resmokelib.testing.fixtures.interface import build_client
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
 from buildscripts.resmokelib.testing.hooks import jsfile
 
@@ -87,12 +88,14 @@ class ValidateCollectionsTestCase(jsfile.DynamicJSTestCase):
             with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
                 futures = []
                 for node in self.fixture._all_mongo_d_s_t():
-                    if not isinstance(node, MongoDFixture):
+                    if not isinstance(node, MongoDFixture) and not isinstance(
+                        node, ExternalFixture
+                    ):
                         continue
 
                     if not validate_node(node, self.shell_options, self.logger, executor, futures):
                         raise RuntimeError(
-                            f"Internal error while trying to validate node: {node.get_internal_connection_string()}"
+                            f"Internal error while trying to validate node: {node.get_driver_connection_url()}"
                         )
 
                 if not all(
@@ -152,7 +155,7 @@ def validate_node(
         return True
     except:
         logger.exception(
-            f"Unknown exception while validating node {node.get_internal_connection_string()}"
+            f"Unknown exception while validating node {node.get_driver_connection_url()}"
         )
         return False
 

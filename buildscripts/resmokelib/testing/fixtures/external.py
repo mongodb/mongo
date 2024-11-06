@@ -32,3 +32,6 @@ class ExternalFixture(interface.Fixture):
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
         return self.shell_conn_string
+
+    def _all_mongo_d_s_t(self):
+        return [self]
