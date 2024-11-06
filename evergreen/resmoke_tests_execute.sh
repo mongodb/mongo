@@ -122,6 +122,10 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     extra_args="$extra_args --mozjsJsGcZeal='${mongo_mozjs_options}'"
   fi
 
+  if [ "${is_patch}" = "true" ]; then
+    extra_args="$extra_args --patchBuild"
+  fi
+
   path_value="$PATH:/data/multiversion"
 
   # Set the suite name to be the task name by default; unless overridden with the `suite` expansion.
