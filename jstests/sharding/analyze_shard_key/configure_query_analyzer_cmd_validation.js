@@ -5,28 +5,13 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {ValidationTest} from "jstests/sharding/analyze_shard_key/libs/validation_common.js";
-
-function runTest(conn) {
-    const validationTest = ValidationTest(conn);
-    for (let {dbName, collName, isView} of validationTest.invalidNamespaceTestCases) {
-        jsTest.log(
-            `Testing that the configureQueryAnalyzer command fails if the namespace is invalid ${
-                tojson({dbName, collName})}`);
-        const aggCmdObj = {
-            configureQueryAnalyzer: dbName + "." + collName,
-            mode: "full",
-            samplesPerSecond: 1
-        };
-        assert.commandFailedWithCode(
-            conn.adminCommand(aggCmdObj),
-            isView ? ErrorCodes.CommandNotSupportedOnView : ErrorCodes.IllegalOperation);
-    }
-}
+import {
+    runInvalidNamespaceTestsForConfigure
+} from "jstests/sharding/analyze_shard_key/libs/validation_common.js";
 
 {
     const st = new ShardingTest({shards: 1});
-    runTest(st.s);
+    runInvalidNamespaceTestsForConfigure(st.s);
     st.stop();
 }
 
@@ -35,6 +20,6 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove 
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
-    runTest(primary);
+    runInvalidNamespaceTestsForConfigure(primary);
     rst.stopSet();
 }

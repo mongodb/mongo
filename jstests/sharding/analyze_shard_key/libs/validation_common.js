@@ -4,8 +4,8 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
  * Utilities for testing validation within the analyzeShardKey command and configureQueryAnalyzer
  * command. Defines test cases for namespace, shard key and index validation.
  */
-export function ValidationTest(conn) {
-    const dbName = "testDb-" + extractUUIDFromObject(UUID());
+export function ValidationTest(conn, _dbName) {
+    const dbName = _dbName ? _dbName : "testDb-" + extractUUIDFromObject(UUID());
     const db = conn.getDB(dbName);
 
     // Create a regular collection.
@@ -133,4 +133,24 @@ export function ValidationTest(conn) {
         invalidShardKeyTestCases,
         noCompatibleIndexTestCases
     };
+}
+
+/**
+ * Runs the invalidNamespaceTestCases from ValidationTest for the configureQueryAnalyzer command.
+ */
+export function runInvalidNamespaceTestsForConfigure(conn, optionalDbName) {
+    const validationTest = ValidationTest(conn, optionalDbName);
+    for (let {dbName, collName, isView} of validationTest.invalidNamespaceTestCases) {
+        jsTest.log(
+            `Testing that the configureQueryAnalyzer command fails if the namespace is invalid ${
+                tojson({dbName, collName})}`);
+        const aggCmdObj = {
+            configureQueryAnalyzer: dbName + "." + collName,
+            mode: "full",
+            samplesPerSecond: 1
+        };
+        assert.commandFailedWithCode(
+            conn.adminCommand(aggCmdObj),
+            isView ? ErrorCodes.CommandNotSupportedOnView : ErrorCodes.IllegalOperation);
+    }
 }
