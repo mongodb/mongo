@@ -1,7 +1,6 @@
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load("//bazel/config:configs.bzl", "developer_dir_provider")
-load("//bazel:mongo_src_rules.bzl", "write_target")
 
 def generate_config_header_impl(ctx):
     cc_toolchain = find_cpp_toolchain(ctx)
@@ -99,7 +98,7 @@ def generate_config_header_impl(ctx):
 
     return [DefaultInfo(files = depset([ctx.outputs.output]))]
 
-generate_config_header_rule = rule(
+generate_config_header = rule(
     generate_config_header_impl,
     attrs = {
         "output": attr.output(
@@ -147,15 +146,3 @@ generate_config_header_rule = rule(
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type", "@bazel_tools//tools/python:toolchain_type"],
     output_to_genfiles = True,
 )
-
-def generate_config_header(name, tags = [], **kwargs):
-    write_target(
-        name = name + "_gen_source_tag",
-        target_name = name,
-        tags = ["scons_link_lists"],
-    )
-    generate_config_header_rule(
-        name = name,
-        tags = tags + ["gen_source"],
-        **kwargs
-    )
