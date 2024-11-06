@@ -227,18 +227,16 @@ public:
      * Run the event loop of the reactor until stop() is called.
      */
     virtual void run() noexcept = 0;
-    virtual void runFor(Milliseconds time) noexcept = 0;
     virtual void stop() = 0;
     virtual void drain() = 0;
 
     void schedule(Task task) override = 0;
-    virtual void dispatch(Task task) = 0;
 
     virtual bool onReactorThread() const = 0;
 
     /*
      * Makes a timer tied to this reactor's event loop. Timeout callbacks will be
-     * executed in a thread calling run() or runFor().
+     * executed in a thread calling run().
      */
     virtual std::unique_ptr<ReactorTimer> makeTimer() = 0;
     virtual Date_t now() = 0;

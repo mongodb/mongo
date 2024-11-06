@@ -104,16 +104,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void runFor(Milliseconds time) noexcept final {
-        asio::io_context::work work(_ioContext);
-
-        try {
-            _ioContext.run_for(time.toSystemDuration());
-        } catch (...) {
-            LOGV2_FATAL(50476, "Uncaught exception in reactor", "error"_attr = exceptionToStatus());
-        }
-    }
-
     void stop() final {
         _ioContext.stop();
     }
@@ -136,10 +126,6 @@ public:
 
     void schedule(Task task) final {
         asio::post(_ioContext, [task = std::move(task)] { task(Status::OK()); });
-    }
-
-    void dispatch(Task task) final {
-        asio::dispatch(_ioContext, [task = std::move(task)] { task(Status::OK()); });
     }
 
     bool onReactorThread() const final {

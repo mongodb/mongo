@@ -191,12 +191,6 @@ public:
         _ioContext.run();
     }
 
-    void runFor(Milliseconds time) noexcept override {
-        ThreadIdGuard threadIdGuard(this);
-        asio::io_context::work work(_ioContext);
-        _ioContext.run_for(time.toSystemDuration());
-    }
-
     void stop() override {
         _ioContext.stop();
     }
@@ -234,11 +228,6 @@ public:
             asio::post(_ioContext,
                        [task = _stats.wrapTask(std::move(task))] { task(Status::OK()); });
         }
-    }
-
-    void dispatch(Task task) override {
-        asio::dispatch(_ioContext,
-                       [task = _stats.wrapTask(std::move(task))] { task(Status::OK()); });
     }
 
     bool onReactorThread() const override {
