@@ -98,10 +98,6 @@ config_fuzzer_params = {
             "period": 5,
             "fuzz_at": ["startup", "runtime"],
         },
-        "initialServiceExecutorUseDedicatedThread": {
-            "choices": [True, False],
-            "fuzz_at": ["startup"],
-        },
         "initialSyncMethod": {"choices": ["fileCopyBased", "logical"], "fuzz_at": ["startup"]},
         # For `initialSyncSourceReadPreference`, the option `secondary` is excluded from the fuzzer
         # because the generated mongod parameters are used for every node in the replica set, so the
@@ -365,10 +361,6 @@ config_fuzzer_params = {
     "mongos": {
         # We need a higher timeout to account for test slowness
         "defaultConfigCommandTimeoutMS": {"default": 90_000, "fuzz_at": ["startup"]},
-        "initialServiceExecutorUseDedicatedThread": {
-            "choices": [True, False],
-            "fuzz_at": ["startup"],
-        },
         "internalQueryFindCommandBatchSize": {"min": 1, "max": 500, "fuzz_at": ["startup"]},
         "opportunisticSecondaryTargeting": {"choices": [True, False], "fuzz_at": ["startup"]},
         "ShardingTaskExecutorPoolReplicaSetMatching": {

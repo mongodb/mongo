@@ -110,11 +110,6 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "service_executor_gen",
-    src = "service_executor.idl",
-)
-
 mongo_cc_library(
     name = "service_executor",
     srcs = [
@@ -122,7 +117,6 @@ mongo_cc_library(
         "service_executor_reserved.cpp",
         "service_executor_synchronous.cpp",
         "service_executor_utils.cpp",
-        ":service_executor_gen",
     ],
     hdrs = [
         "service_executor.h",
