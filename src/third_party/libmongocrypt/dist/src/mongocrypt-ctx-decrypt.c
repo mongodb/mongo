@@ -406,7 +406,7 @@ static bool _replace_ciphertext_with_plaintext(void *ctx,
 
 static bool _finalize(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out) {
     bson_t as_bson, final_bson;
-    bson_iter_t iter;
+    bson_iter_t iter = {0};
     _mongocrypt_ctx_decrypt_t *dctx;
     bool res;
 
@@ -504,6 +504,7 @@ static bool _collect_K_KeyID_from_FLE2IndexedEncryptedValueV2(void *ctx,
                 || (in->data[0] == MC_SUBTYPE_FLE2IndexedRangeEncryptedValueV2));
 
     mc_FLE2IndexedEncryptedValueV2_t *iev = mc_FLE2IndexedEncryptedValueV2_new();
+    _mongocrypt_buffer_t S_Key = {0};
     CHECK_AND_RETURN(iev);
     CHECK_AND_RETURN(mc_FLE2IndexedEncryptedValueV2_parse(iev, in, status));
 
@@ -511,7 +512,6 @@ static bool _collect_K_KeyID_from_FLE2IndexedEncryptedValueV2(void *ctx,
     CHECK_AND_RETURN(S_KeyId);
 
     _mongocrypt_key_broker_t *kb = ctx;
-    _mongocrypt_buffer_t S_Key = {0};
     CHECK_AND_RETURN_KB_STATUS(_mongocrypt_key_broker_decrypted_key_by_id(kb, S_KeyId, &S_Key));
 
     /* Decrypt InnerEncrypted to get K_KeyId. */
@@ -537,6 +537,7 @@ static bool _collect_K_KeyID_from_FLE2IndexedEncryptedValue(void *ctx,
     BSON_ASSERT_PARAM(in);
     BSON_ASSERT(in->data);
     bool ret = false;
+    _mongocrypt_buffer_t S_Key = {0};
 
     BSON_ASSERT((in->data[0] == MC_SUBTYPE_FLE2IndexedEqualityEncryptedValue)
                 || (in->data[0] == MC_SUBTYPE_FLE2IndexedRangeEncryptedValue));
@@ -549,7 +550,6 @@ static bool _collect_K_KeyID_from_FLE2IndexedEncryptedValue(void *ctx,
     CHECK_AND_RETURN(S_KeyId);
 
     _mongocrypt_key_broker_t *kb = ctx;
-    _mongocrypt_buffer_t S_Key = {0};
     CHECK_AND_RETURN_KB_STATUS(_mongocrypt_key_broker_decrypted_key_by_id(kb, S_KeyId, &S_Key));
 
     /* Decrypt InnerEncrypted to get K_KeyId. */
@@ -604,7 +604,7 @@ static bool _check_for_K_KeyId(mongocrypt_ctx_t *ctx) {
     }
 
     bson_t as_bson;
-    bson_iter_t iter;
+    bson_iter_t iter = {0};
     _mongocrypt_ctx_decrypt_t *dctx = (_mongocrypt_ctx_decrypt_t *)ctx;
     if (!_mongocrypt_buffer_to_bson(&dctx->original_doc, &as_bson)) {
         return _mongocrypt_ctx_fail_w_msg(ctx, "error converting original_doc to bson");
@@ -843,7 +843,7 @@ static bool _kms_done(mongocrypt_ctx_t *ctx) {
 bool mongocrypt_ctx_decrypt_init(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *doc) {
     _mongocrypt_ctx_decrypt_t *dctx;
     bson_t as_bson;
-    bson_iter_t iter;
+    bson_iter_t iter = {0};
     _mongocrypt_ctx_opts_spec_t opts_spec;
 
     memset(&opts_spec, 0, sizeof(opts_spec));

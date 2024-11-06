@@ -37,4 +37,10 @@ kms_kmip_response_get_unique_identifier (kms_response_t *res);
 KMS_MSG_EXPORT (uint8_t *)
 kms_kmip_response_get_secretdata (kms_response_t *res, size_t *secretdatalen);
 
+KMS_MSG_EXPORT (uint8_t *)
+kms_kmip_response_get_data (kms_response_t *res, size_t *datalen);
+
+KMS_MSG_EXPORT (uint8_t *)
+kms_kmip_response_get_iv (kms_response_t *res, size_t *datalen);
+
 #endif /* KMS_KMIP_RESPONSE_H */

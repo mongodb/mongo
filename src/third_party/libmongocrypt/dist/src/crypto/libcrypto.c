@@ -61,7 +61,7 @@ void _native_crypto_init(void) {
 static bool _encrypt_with_cipher(const EVP_CIPHER *cipher, aes_256_args_t args) {
     EVP_CIPHER_CTX *ctx;
     bool ret = false;
-    int intermediate_bytes_written;
+    int intermediate_bytes_written = 0;
     mongocrypt_status_t *status = args.status;
 
     ctx = EVP_CIPHER_CTX_new();
@@ -71,8 +71,8 @@ static bool _encrypt_with_cipher(const EVP_CIPHER *cipher, aes_256_args_t args) 
     BSON_ASSERT(args.out);
     BSON_ASSERT(ctx);
     BSON_ASSERT(cipher);
-    BSON_ASSERT(NULL == args.iv || EVP_CIPHER_iv_length(cipher) == args.iv->len);
-    BSON_ASSERT(EVP_CIPHER_key_length(cipher) == args.key->len);
+    BSON_ASSERT(NULL == args.iv || (uint32_t)EVP_CIPHER_iv_length(cipher) == args.iv->len);
+    BSON_ASSERT((uint32_t)EVP_CIPHER_key_length(cipher) == args.key->len);
     BSON_ASSERT(args.in->len <= INT_MAX);
 
     if (!EVP_EncryptInit_ex(ctx, cipher, NULL /* engine */, args.key->data, NULL == args.iv ? NULL : args.iv->data)) {
@@ -89,6 +89,7 @@ static bool _encrypt_with_cipher(const EVP_CIPHER *cipher, aes_256_args_t args) 
         goto done;
     }
 
+    BSON_ASSERT(intermediate_bytes_written >= 0 && (uint64_t)intermediate_bytes_written <= UINT32_MAX);
     /* intermediate_bytes_written cannot be negative, so int -> uint32_t is OK */
     *args.bytes_written = (uint32_t)intermediate_bytes_written;
 
@@ -97,7 +98,7 @@ static bool _encrypt_with_cipher(const EVP_CIPHER *cipher, aes_256_args_t args) 
         goto done;
     }
 
-    BSON_ASSERT(UINT32_MAX - *args.bytes_written >= intermediate_bytes_written);
+    BSON_ASSERT(UINT32_MAX - *args.bytes_written >= (uint32_t)intermediate_bytes_written);
     *args.bytes_written += (uint32_t)intermediate_bytes_written;
 
     ret = true;
@@ -116,18 +117,19 @@ done:
 static bool _decrypt_with_cipher(const EVP_CIPHER *cipher, aes_256_args_t args) {
     EVP_CIPHER_CTX *ctx;
     bool ret = false;
-    int intermediate_bytes_written;
+    int intermediate_bytes_written = 0;
     mongocrypt_status_t *status = args.status;
 
     ctx = EVP_CIPHER_CTX_new();
+    BSON_ASSERT(ctx);
 
     BSON_ASSERT_PARAM(cipher);
     BSON_ASSERT(args.iv);
     BSON_ASSERT(args.key);
     BSON_ASSERT(args.in);
     BSON_ASSERT(args.out);
-    BSON_ASSERT(EVP_CIPHER_iv_length(cipher) == args.iv->len);
-    BSON_ASSERT(EVP_CIPHER_key_length(cipher) == args.key->len);
+    BSON_ASSERT((uint32_t)EVP_CIPHER_iv_length(cipher) == args.iv->len);
+    BSON_ASSERT((uint32_t)EVP_CIPHER_key_length(cipher) == args.key->len);
     BSON_ASSERT(args.in->len <= INT_MAX);
 
     if (!EVP_DecryptInit_ex(ctx, cipher, NULL /* engine */, args.key->data, args.iv->data)) {
@@ -145,6 +147,7 @@ static bool _decrypt_with_cipher(const EVP_CIPHER *cipher, aes_256_args_t args) 
         goto done;
     }
 
+    BSON_ASSERT(intermediate_bytes_written >= 0 && (uint64_t)intermediate_bytes_written <= UINT32_MAX);
     /* intermediate_bytes_written cannot be negative, so int -> uint32_t is OK */
     *args.bytes_written = (uint32_t)intermediate_bytes_written;
 
@@ -153,7 +156,7 @@ static bool _decrypt_with_cipher(const EVP_CIPHER *cipher, aes_256_args_t args) 
         goto done;
     }
 
-    BSON_ASSERT(UINT32_MAX - *args.bytes_written >= intermediate_bytes_written);
+    BSON_ASSERT(UINT32_MAX - *args.bytes_written >= (uint32_t)intermediate_bytes_written);
     *args.bytes_written += (uint32_t)intermediate_bytes_written;
 
     ret = true;
@@ -203,9 +206,9 @@ static bool _hmac_with_hash(const EVP_MD *hash,
 
     ctx = HMAC_CTX_new();
 
-    if (out->len != EVP_MD_size(hash)) {
+    if (out->len != (uint32_t)EVP_MD_size(hash)) {
         CLIENT_ERR("out does not contain %d bytes", EVP_MD_size(hash));
-        return false;
+        goto done;
     }
 
     if (!HMAC_Init_ex(ctx, key->data, (int)key->len, hash, NULL /* engine */)) {

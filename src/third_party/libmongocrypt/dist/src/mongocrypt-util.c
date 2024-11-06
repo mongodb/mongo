@@ -81,7 +81,7 @@ current_module_result current_module_path(void) {
 #elif defined(_GNU_SOURCE) || defined(_DARWIN_C_SOURCE) || defined(__FreeBSD__)
     // Darwin/BSD/glibc define extensions for finding dynamic library info from
     // the address of a symbol.
-    Dl_info info;
+    Dl_info info = {0};
     int rc = dladdr((const void *)current_module_path, &info);
     if (rc == 0) {
         // Failed to resolve the symbol
@@ -90,7 +90,8 @@ current_module_result current_module_path(void) {
         ret_str = mstr_copy_cstr(info.dli_fname);
     }
 #else
-#error "Don't know how to get the module path on this platform"
+    // Not supported on this system.
+    ret_error = ENOSYS;
 #endif
     return (current_module_result){.path = ret_str, .error = ret_error};
 }

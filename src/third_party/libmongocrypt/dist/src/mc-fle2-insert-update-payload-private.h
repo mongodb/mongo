@@ -36,9 +36,9 @@
  * } FLE2InsertUpdatePayload;
  *
  * bson is a BSON document of this form:
- * d: <binary> // EDCDerivedFromDataTokenAndCounter
- * s: <binary> // ESCDerivedFromDataTokenAndCounter
- * c: <binary> // ECCDerivedFromDataTokenAndCounter
+ * d: <binary> // EDCDerivedFromDataTokenAndContentionFactor
+ * s: <binary> // ESCDerivedFromDataTokenAndContentionFactor
+ * c: <binary> // ECCDerivedFromDataTokenAndContentionFactor
  * p: <binary> // Encrypted Tokens
  * u: <UUID>   // Index KeyId
  * t: <int32>  // Encrypted type
@@ -50,8 +50,8 @@
  * Encrypt(
  * key=ECOCToken,
  * plaintext=(
- *    ESCDerivedFromDataTokenAndCounter ||
- *    ECCDerivedFromDataTokenAndCounter)
+ *    ESCDerivedFromDataTokenAndContentionFactor ||
+ *    ECCDerivedFromDataTokenAndContentionFactor)
  * )
  *
  * v is the result of:
@@ -77,9 +77,9 @@ typedef struct {
 
 /**
  * EdgeTokenSet is the following BSON document:
- * d: <binary> // EDCDerivedFromDataTokenAndCounter
- * s: <binary> // ESCDerivedFromDataTokenAndCounter
- * c: <binary> // ECCDerivedFromDataTokenAndCounter
+ * d: <binary> // EDCDerivedFromDataTokenAndContentionFactor
+ * s: <binary> // ESCDerivedFromDataTokenAndContentionFactor
+ * c: <binary> // ECCDerivedFromDataTokenAndContentionFactor
  * p: <binary> // Encrypted Tokens
  *
  * Instances of mc_EdgeTokenSet_t are expected to be owned by

@@ -90,6 +90,7 @@ mongo_cc_library(
         "dist/src/mc-fle2-payload-uev-common.c",
         "dist/src/mc-fle2-payload-uev-v2.c",
         "dist/src/mc-fle2-rfds.c",
+        "dist/src/mc-fle2-tag-and-encrypted-metadata-block.c",
         "dist/src/mc-range-edge-generation.c",
         "dist/src/mc-range-encoding.c",
         "dist/src/mc-range-mincover.c",

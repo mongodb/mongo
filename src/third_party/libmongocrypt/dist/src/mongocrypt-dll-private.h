@@ -83,7 +83,14 @@ typedef struct mcr_dll_path_result {
  * library, or an error string.
  *
  * @note Caller must free both `retval.path` and `retval.error_string`.
+ * @note Returns an error if not supported on this platform. Use
+ * `mcr_dll_path_supported` to check before calling.
  */
 mcr_dll_path_result mcr_dll_path(mcr_dll dll);
+
+/**
+ * @brief Return true if `mcr_dll_path` is supported on this platform.
+ */
+bool mcr_dll_path_supported(void);
 
 #endif // MONGOCRYPT_DLL_PRIVATE_H

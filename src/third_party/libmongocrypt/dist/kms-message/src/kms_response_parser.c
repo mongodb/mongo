@@ -38,6 +38,14 @@ _parser_init (kms_response_parser_t *parser)
    parser->kmip = NULL;
 }
 
+void
+kms_response_parser_reset (kms_response_parser_t *parser)
+{
+   KMS_ASSERT(!parser->kmip); // KMIP is not-yet supported.  
+   _parser_destroy(parser);  
+   _parser_init(parser);  
+}
+
 kms_response_parser_t *
 kms_response_parser_new (void)
 {

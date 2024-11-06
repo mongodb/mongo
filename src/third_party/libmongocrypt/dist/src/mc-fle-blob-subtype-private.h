@@ -19,7 +19,7 @@
 
 /* FLE Blob Subtype is the first byte of a BSON Binary Subtype 6.
  * FLE1 Blob Subtypes are defined in:
- * https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/subtype6.rst
+ * https://github.com/mongodb/specifications/blob/master/source/bson-binary-encrypted/binary-encrypted.md
  * FLE2 Blob Subtypes are currently defined in:
  * https://github.com/markbenvenuto/mongo-enterprise-modules/blob/fle2/fle_protocol.md#reference-bindata-6-subtypes.
  */

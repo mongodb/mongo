@@ -20,7 +20,7 @@
 #include "mongocrypt-mutex-private.h"
 #include "mongocrypt-status-private.h"
 
-#define CACHE_EXPIRATION_MS 60000
+#define CACHE_EXPIRATION_MS_DEFAULT 60000
 
 /* A generic simple cache.
  * To avoid overusing the names "key" or "id", the cache contains

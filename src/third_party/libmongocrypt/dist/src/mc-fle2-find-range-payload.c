@@ -108,7 +108,7 @@ bool mc_FLE2FindRangePayload_serialize(const mc_FLE2FindRangePayload_t *payload,
 
         // Append "payload.e" and "payload.cm".
         APPEND_BINDATA(&payload_bson, "e", payload->payload.value.serverEncryptionToken);
-        if (!BSON_APPEND_INT64(&payload_bson, "cm", payload->payload.value.maxContentionCounter)) {
+        if (!BSON_APPEND_INT64(&payload_bson, "cm", payload->payload.value.maxContentionFactor)) {
             return false;
         }
 

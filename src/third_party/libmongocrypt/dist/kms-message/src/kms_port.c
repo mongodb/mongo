@@ -18,7 +18,8 @@
 #if defined(_WIN32)
 #include <stdlib.h>
 #include <string.h>
-char * kms_strndup (const char *src, size_t len)
+char *
+kms_strndup (const char *src, size_t len)
 {
    char *dst = (char *) malloc (len + 1);
    if (!dst) {

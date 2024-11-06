@@ -20,6 +20,7 @@
 #include <bson/bson.h>
 
 #include "mc-array-private.h"
+#include "mc-optional-private.h"
 #include "mongocrypt-buffer-private.h"
 #include "mongocrypt-private.h"
 #include "mongocrypt.h"
@@ -36,8 +37,8 @@
  * } FLE2InsertUpdatePayloadV2;
  *
  * bson is a BSON document of this form:
- * d: <binary> // EDCDerivedFromDataTokenAndCounter
- * s: <binary> // ESCDerivedFromDataTokenAndCounter
+ * d: <binary> // EDCDerivedFromDataTokenAndContentionFactor
+ * s: <binary> // ESCDerivedFromDataTokenAndContentionFactor
  * p: <binary> // Encrypted Tokens
  * u: <UUID>   // Index KeyId
  * t: <int32>  // Encrypted type
@@ -45,13 +46,18 @@
  * e: <binary> // ServerDataEncryptionLevel1Token
  * l: <binary> // ServerDerivedFromDataToken
  * k: <int64> // Randomly sampled contention factor value
- * g: array<EdgeTokenSetV2> // Array of Edges
+ * g: array<EdgeTokenSetV2> // Array of Edges. Only included for range payloads.
+ * sp: optional<int64> // Sparsity. Only included for range payloads.
+ * pn: optional<int32> // Precision. Only included for range payloads.
+ * tf: optional<int32> // Trim Factor. Only included for range payloads.
+ * mn: optional<any> // Index Min. Only included for range payloads.
+ * mx: optional<any> // Index Max. Only included for range payloads.
  *
  * p is the result of:
  * Encrypt(
  * key=ECOCToken,
  * plaintext=(
- *    ESCDerivedFromDataTokenAndCounter)
+ *    ESCDerivedFromDataTokenAndContentionFactor)
  * )
  *
  * v is the result of:
@@ -72,14 +78,24 @@ typedef struct {
     _mongocrypt_buffer_t serverDerivedFromDataToken; // l
     int64_t contentionFactor;                        // k
     mc_array_t edgeTokenSetArray;                    // g
+    mc_optional_int64_t sparsity;                    // sp
+    mc_optional_int32_t precision;                   // pn
+    mc_optional_int32_t trimFactor;                  // tf
+    bson_value_t indexMin;                           // mn
+    bson_value_t indexMax;                           // mx
     _mongocrypt_buffer_t plaintext;
     _mongocrypt_buffer_t userKeyId;
 } mc_FLE2InsertUpdatePayloadV2_t;
 
+// `mc_FLE2InsertUpdatePayloadV2_t` inherits extended alignment from libbson. To dynamically allocate, use
+// aligned allocation (e.g. BSON_ALIGNED_ALLOC)
+BSON_STATIC_ASSERT2(alignof_mc_FLE2InsertUpdatePayloadV2_t,
+                    BSON_ALIGNOF(mc_FLE2InsertUpdatePayloadV2_t) >= BSON_ALIGNOF(bson_value_t));
+
 /**
  * EdgeTokenSetV2 is the following BSON document:
- * d: <binary> // EDCDerivedFromDataTokenAndCounter
- * s: <binary> // ESCDerivedFromDataTokenAndCounter
+ * d: <binary> // EDCDerivedFromDataTokenAndContentionFactor
+ * s: <binary> // ESCDerivedFromDataTokenAndContentionFactor
  * l: <binary> // ServerDerivedFromDataToken
  * p: <binary> // Encrypted Tokens
  *
@@ -110,7 +126,9 @@ const _mongocrypt_buffer_t *mc_FLE2InsertUpdatePayloadV2_decrypt(_mongocrypt_cry
 
 bool mc_FLE2InsertUpdatePayloadV2_serialize(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out);
 
-bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out);
+bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePayloadV2_t *payload,
+                                                    bson_t *out,
+                                                    bool use_range_v2);
 
 void mc_FLE2InsertUpdatePayloadV2_cleanup(mc_FLE2InsertUpdatePayloadV2_t *payload);
 

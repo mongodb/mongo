@@ -101,7 +101,7 @@ bool mc_FLE2FindEqualityPayload_parse(mc_FLE2FindEqualityPayload_t *out,
                 CLIENT_ERR("Field 'cm' expected to hold an int64");
                 goto fail;
             }
-            out->maxContentionCounter = bson_iter_int64(&iter);
+            out->maxContentionFactor = bson_iter_int64(&iter);
         }
         END_IF_FIELD
     }
@@ -130,7 +130,7 @@ bool mc_FLE2FindEqualityPayload_serialize(const mc_FLE2FindEqualityPayload_t *pa
     PAYLOAD_APPEND_BINDATA("s", payload->escDerivedToken);
     PAYLOAD_APPEND_BINDATA("c", payload->eccDerivedToken);
     PAYLOAD_APPEND_BINDATA("e", payload->serverEncryptionToken);
-    if (!BSON_APPEND_INT64(out, "cm", payload->maxContentionCounter)) {
+    if (!BSON_APPEND_INT64(out, "cm", payload->maxContentionFactor)) {
         return false;
     }
     return true;

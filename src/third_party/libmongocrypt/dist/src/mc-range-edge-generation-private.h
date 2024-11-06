@@ -37,49 +37,59 @@ size_t mc_edges_len(mc_edges_t *edges);
 // mc_edges_destroys frees `edges`.
 void mc_edges_destroy(mc_edges_t *edges);
 
+// mc_edges_is_leaf returns whether the given edge is the leaf node of the edge set.
+bool mc_edges_is_leaf(const mc_edges_t *edges, const char *edge);
+
+// Return the trimFactor that was used to generate these edges.
+int32_t mc_edges_get_used_trimFactor(const mc_edges_t *edges);
+
 typedef struct {
     int32_t value;
     mc_optional_int32_t min;
     mc_optional_int32_t max;
     size_t sparsity;
+    mc_optional_int32_t trimFactor;
 } mc_getEdgesInt32_args_t;
 
 // mc_getEdgesInt32 implements the Edge Generation algorithm described in
 // SERVER-67751 for int32_t.
-mc_edges_t *mc_getEdgesInt32(mc_getEdgesInt32_args_t args, mongocrypt_status_t *status);
+mc_edges_t *mc_getEdgesInt32(mc_getEdgesInt32_args_t args, mongocrypt_status_t *status, bool use_range_v2);
 
 typedef struct {
     int64_t value;
     mc_optional_int64_t min;
     mc_optional_int64_t max;
     size_t sparsity;
+    mc_optional_int32_t trimFactor;
 } mc_getEdgesInt64_args_t;
 
 // mc_getEdgesInt64 implements the Edge Generation algorithm described in
 // SERVER-67751 for int64_t.
-mc_edges_t *mc_getEdgesInt64(mc_getEdgesInt64_args_t args, mongocrypt_status_t *status);
+mc_edges_t *mc_getEdgesInt64(mc_getEdgesInt64_args_t args, mongocrypt_status_t *status, bool use_range_v2);
 
 typedef struct {
     double value;
     size_t sparsity;
     mc_optional_double_t min;
     mc_optional_double_t max;
-    mc_optional_uint32_t precision;
+    mc_optional_int32_t precision;
+    mc_optional_int32_t trimFactor;
 } mc_getEdgesDouble_args_t;
 
 // mc_getEdgesDouble implements the Edge Generation algorithm described in
 // SERVER-67751 for double.
-mc_edges_t *mc_getEdgesDouble(mc_getEdgesDouble_args_t args, mongocrypt_status_t *status);
+mc_edges_t *mc_getEdgesDouble(mc_getEdgesDouble_args_t args, mongocrypt_status_t *status, bool use_range_v2);
 
 #if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 typedef struct {
     mc_dec128 value;
     size_t sparsity;
     mc_optional_dec128_t min, max;
-    mc_optional_uint32_t precision;
+    mc_optional_int32_t precision;
+    mc_optional_int32_t trimFactor;
 } mc_getEdgesDecimal128_args_t;
 
-mc_edges_t *mc_getEdgesDecimal128(mc_getEdgesDecimal128_args_t args, mongocrypt_status_t *status);
+mc_edges_t *mc_getEdgesDecimal128(mc_getEdgesDecimal128_args_t args, mongocrypt_status_t *status, bool use_range_v2);
 #endif // MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 
 BSON_STATIC_ASSERT2(ull_is_u64, sizeof(uint64_t) == sizeof(unsigned long long));

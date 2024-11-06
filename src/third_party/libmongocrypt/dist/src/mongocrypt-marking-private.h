@@ -45,6 +45,10 @@ typedef struct {
     };
 } _mongocrypt_marking_t;
 
+// `_mongocrypt_marking_t` inherits extended alignment from libbson. To dynamically allocate, use aligned allocation
+// (e.g. BSON_ALIGNED_ALLOC)
+BSON_STATIC_ASSERT2(alignof__mongocrypt_marking_t, BSON_ALIGNOF(_mongocrypt_marking_t) >= BSON_ALIGNOF(bson_iter_t));
+
 void _mongocrypt_marking_init(_mongocrypt_marking_t *marking);
 
 void _mongocrypt_marking_cleanup(_mongocrypt_marking_t *marking);
@@ -63,6 +67,7 @@ bool _mongocrypt_marking_to_ciphertext(void *ctx,
 
 mc_mincover_t *mc_get_mincover_from_FLE2RangeFindSpec(mc_FLE2RangeFindSpec_t *findSpec,
                                                       size_t sparsity,
-                                                      mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
+                                                      mongocrypt_status_t *status,
+                                                      bool use_range_v2) MONGOCRYPT_WARN_UNUSED_RESULT;
 
 #endif /* MONGOCRYPT_MARKING_PRIVATE_H */

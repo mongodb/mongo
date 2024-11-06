@@ -19,6 +19,11 @@
 #include "mongocrypt-util-private.h"
 #include <bson/bson.h>
 
+// Require libbson 1.16.0 or newer. Fix for CDRIVER-3360 is needed.
+#if !BSON_CHECK_VERSION(1, 16, 0)
+#error "libbson 1.16.0 or newer is required."
+#endif
+
 #define INT32_LEN 4
 #define TYPE_LEN 1
 #define NULL_BYTE_LEN 1
@@ -305,13 +310,6 @@ bool _mongocrypt_buffer_to_bson_value(_mongocrypt_buffer_t *plaintext, uint8_t t
         goto fail;
     }
     bson_value_copy(bson_iter_value(&iter), out);
-
-    /* Due to an open libbson bug (CDRIVER-3340), give an empty
-     * binary payload a real address. TODO: remove this after
-     * CDRIVER-3340 is fixed. */
-    if (out->value_type == BSON_TYPE_BINARY && 0 == out->value.v_binary.data_len) {
-        out->value.v_binary.data = bson_malloc(1); /* Freed in bson_value_destroy */
-    }
 
     ret = true;
 fail:

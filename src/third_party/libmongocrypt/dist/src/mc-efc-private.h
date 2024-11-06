@@ -19,8 +19,19 @@
 #include "mongocrypt-buffer-private.h"
 #include <bson/bson.h>
 
+typedef enum _supported_query_type_flags {
+    // No queries supported
+    SUPPORTS_NO_QUERIES = 0,
+    // Equality query supported
+    SUPPORTS_EQUALITY_QUERIES = 1 << 0,
+    // Range query supported
+    SUPPORTS_RANGE_QUERIES = 1 << 1,
+    // Range preview query supported
+    SUPPORTS_RANGE_PREVIEW_DEPRECATED_QUERIES = 1 << 2,
+} supported_query_type_flags;
+
 typedef struct _mc_EncryptedField_t {
-    bool has_queries;
+    supported_query_type_flags supported_queries;
     _mongocrypt_buffer_t keyId;
     const char *path;
     struct _mc_EncryptedField_t *next;
@@ -37,7 +48,10 @@ typedef struct {
  * into @efc. Fields are copied from @efc_bson. It is OK to free efc_bson after
  * this call. Fields are appended in reverse order to @efc->fields. Extra
  * unrecognized fields are not considered an error for forward compatibility. */
-bool mc_EncryptedFieldConfig_parse(mc_EncryptedFieldConfig_t *efc, const bson_t *efc_bson, mongocrypt_status_t *status);
+bool mc_EncryptedFieldConfig_parse(mc_EncryptedFieldConfig_t *efc,
+                                   const bson_t *efc_bson,
+                                   mongocrypt_status_t *status,
+                                   bool use_range_v2);
 
 void mc_EncryptedFieldConfig_cleanup(mc_EncryptedFieldConfig_t *efc);
 

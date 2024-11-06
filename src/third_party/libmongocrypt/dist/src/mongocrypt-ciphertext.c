@@ -92,7 +92,7 @@ bool _mongocrypt_ciphertext_parse_unowned(_mongocrypt_buffer_t *in,
     ciphertext->original_bson_type = in->data[offset];
     offset += 1;
 
-    memset(&ciphertext->data, 0, sizeof(ciphertext->data));
+    _mongocrypt_buffer_init(&ciphertext->data);
     ciphertext->data.data = in->data + offset;
     ciphertext->data.len = in->len - offset;
 

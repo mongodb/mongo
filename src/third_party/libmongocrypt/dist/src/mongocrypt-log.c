@@ -37,7 +37,6 @@ void _mongocrypt_log_cleanup(_mongocrypt_log_t *log) {
     }
 
     _mongocrypt_mutex_cleanup(&log->mutex);
-    memset(log, 0, sizeof(*log));
 }
 
 void _mongocrypt_stdout_log_fn(mongocrypt_log_level_t level, const char *message, uint32_t message_len, void *ctx) {

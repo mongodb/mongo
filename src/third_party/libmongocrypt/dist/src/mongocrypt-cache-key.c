@@ -85,6 +85,7 @@ static void _dump_attr(void *attr_in) {
     for (altname = attr->alt_names; NULL != altname; altname = altname->next) {
         printf("%s\n", _mongocrypt_key_alt_name_get_string(altname));
     }
+    bson_free(hex);
 }
 
 _mongocrypt_cache_key_value_t *_mongocrypt_cache_key_value_new(_mongocrypt_key_doc_t *key_doc,
@@ -128,7 +129,7 @@ void _mongocrypt_cache_key_init(_mongocrypt_cache_t *cache) {
     cache->dump_attr = _dump_attr;
     _mongocrypt_mutex_init(&cache->mutex);
     cache->pair = NULL;
-    cache->expiration = CACHE_EXPIRATION_MS;
+    cache->expiration = CACHE_EXPIRATION_MS_DEFAULT;
 }
 
 /* Since key cache may be looked up by either _id or keyAltName,

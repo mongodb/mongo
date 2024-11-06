@@ -312,7 +312,8 @@
    KMS_X (AlwaysSensitive, 0x420121)                                                        \
    KMS_X (Extractable, 0x420122)                                                            \
    KMS_X (NeverExtractable, 0x420123)                                                       \
-   KMS_X_LAST (ReplaceExisting, 0x420124)
+   KMS_X (ReplaceExisting, 0x420124)                                                        \
+   KMS_X_LAST (Attributes, 0x420125)
 /* clang-format on */
 
 /* Generate an enum with each tag value. */

@@ -14,6 +14,11 @@
 // Old GCC and old MSVC have partially-broken constexpr that prevents us from
 // properly using static_assert with from_string()
 #define BROKEN_CONSTEXPR
+#elif (defined(_MSC_VER) && _MSC_VER >= 1930)
+// Avoid internal compiler error on VS 2022 versions 17.0 and newer when
+// evaluating mlib_int128_from_string via operator""_i128. Assumed to be related
+// to: https://developercommunity.visualstudio.com/t/User-defined-literals-cause-ICEs/10259122
+#define BROKEN_CONSTEXPR
 #endif
 
 #ifndef BROKEN_CONSTEXPR

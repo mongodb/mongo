@@ -76,4 +76,8 @@ mcr_dll_path_result mcr_dll_path(mcr_dll dll) {
     };
 }
 
+bool mcr_dll_path_supported(void) {
+    return true;
+}
+
 #endif

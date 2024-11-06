@@ -181,10 +181,12 @@ kms_request_set_date (kms_request_t *request, const struct tm *tm)
       /* use current time */
       time_t t;
       time (&t);
-#ifdef _WIN32
+#if defined(KMS_MESSAGE_HAVE_GMTIME_R)
+      gmtime_r (&t, &tmp_tm);
+#elif defined(_MSC_VER)
       gmtime_s (&tmp_tm, &t);
 #else
-      gmtime_r (&t, &tmp_tm);
+      tmp_tm = *gmtime (&t);
 #endif
       tm = &tmp_tm;
    }

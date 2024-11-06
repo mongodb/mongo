@@ -200,6 +200,13 @@ static mlib_constexpr_fn mlib_int128 mlib_int128_bitor(mlib_int128 l, mlib_int12
     return MLIB_INIT(mlib_int128) MLIB_INT128_FROM_PARTS(l.r.lo | r.r.lo, l.r.hi | r.r.hi);
 }
 
+/**
+ * @brief Bitwise-and two 128-bit integers
+ */
+static mlib_constexpr_fn mlib_int128 mlib_int128_bitand(mlib_int128 l, mlib_int128 r) {
+    return MLIB_INIT(mlib_int128) MLIB_INT128_FROM_PARTS(l.r.lo & r.r.lo, l.r.hi & r.r.hi);
+}
+
 // Multiply two 64bit integers to get a 128-bit result without overflow
 static mlib_constexpr_fn mlib_int128 _mlibUnsignedMult128(uint64_t left, uint64_t right) {
     // Perform a Knuth 4.3.1M multiplication
@@ -243,6 +250,16 @@ static mlib_constexpr_fn int _mlibCountLeadingZeros_u64(uint64_t bits) {
         bits <<= 1;
     }
     return n;
+}
+
+static mlib_constexpr_fn int _mlibCountLeadingZeros_u128(mlib_int128 r) {
+    int clz_l = _mlibCountLeadingZeros_u64(r.r.hi);
+    if (clz_l != 64) {
+        return clz_l;
+    }
+
+    int clz_r = _mlibCountLeadingZeros_u64(r.r.lo);
+    return clz_l + clz_r;
 }
 
 /// Implementation of Knuth's algorithm 4.3.1 D for unsigned integer division

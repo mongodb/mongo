@@ -21,11 +21,6 @@
 
 #include "mongocrypt.h"
 
-struct _mongocrypt_binary_t {
-    uint8_t *data;
-    uint32_t len;
-};
-
 bool _mongocrypt_binary_to_bson(mongocrypt_binary_t *binary, bson_t *out) MONGOCRYPT_WARN_UNUSED_RESULT;
 
 #endif /* MONGOCRYPT_BINARY_PRIVATE_H */

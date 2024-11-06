@@ -127,7 +127,7 @@ bool _mongocrypt_key_alt_name_from_iter(const bson_iter_t *iter_in,
 
 /* Takes ownership of all fields. */
 bool _mongocrypt_key_parse_owned(const bson_t *bson, _mongocrypt_key_doc_t *out, mongocrypt_status_t *status) {
-    bson_iter_t iter;
+    bson_iter_t iter = {0};
     bool has_id = false, has_key_material = false, has_status = false, has_creation_date = false,
          has_update_date = false, has_master_key = false;
 
@@ -271,7 +271,10 @@ bool _mongocrypt_key_parse_owned(const bson_t *bson, _mongocrypt_key_doc_t *out,
 _mongocrypt_key_doc_t *_mongocrypt_key_new(void) {
     _mongocrypt_key_doc_t *key_doc;
 
-    key_doc = (_mongocrypt_key_doc_t *)bson_malloc0(sizeof *key_doc);
+    key_doc = BSON_ALIGNED_ALLOC(_mongocrypt_key_doc_t);
+    // Use two sets of braces to avoid erroneous missing-braces warning in GCC. Refer:
+    // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53119
+    *key_doc = (_mongocrypt_key_doc_t){{0}};
     bson_init(&key_doc->bson);
 
     return key_doc;
@@ -389,7 +392,8 @@ _mongocrypt_key_alt_name_t *_mongocrypt_key_alt_name_create(const char *name, ..
 _mongocrypt_key_alt_name_t *_mongocrypt_key_alt_name_new(const bson_value_t *value) {
     BSON_ASSERT_PARAM(value);
 
-    _mongocrypt_key_alt_name_t *name = bson_malloc0(sizeof(*name));
+    _mongocrypt_key_alt_name_t *name = BSON_ALIGNED_ALLOC(_mongocrypt_key_alt_name_t);
+    *name = (_mongocrypt_key_alt_name_t){0};
     BSON_ASSERT(name);
 
     bson_value_copy(value, &name->value);

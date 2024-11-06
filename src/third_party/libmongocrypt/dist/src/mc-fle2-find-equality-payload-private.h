@@ -26,7 +26,7 @@ typedef struct {
     _mongocrypt_buffer_t escDerivedToken;       // s
     _mongocrypt_buffer_t eccDerivedToken;       // c
     _mongocrypt_buffer_t serverEncryptionToken; // e
-    int64_t maxContentionCounter;               // cm
+    int64_t maxContentionFactor;                // cm
 } mc_FLE2FindEqualityPayload_t;
 
 void mc_FLE2FindEqualityPayload_init(mc_FLE2FindEqualityPayload_t *payload);

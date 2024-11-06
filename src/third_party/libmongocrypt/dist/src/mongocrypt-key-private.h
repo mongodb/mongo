@@ -27,6 +27,11 @@ typedef struct __mongocrypt_key_alt_name_t {
     bson_value_t value;
 } _mongocrypt_key_alt_name_t;
 
+// `_mongocrypt_key_alt_name_t` inherits extended alignment from libbson. To dynamically allocate, use aligned
+// allocation (e.g. BSON_ALIGNED_ALLOC)
+BSON_STATIC_ASSERT2(alignof__mongocrypt_key_alt_name_t,
+                    BSON_ALIGNOF(_mongocrypt_key_alt_name_t) >= BSON_ALIGNOF(bson_value_t));
+
 typedef struct {
     bson_t bson; /* original BSON for this key. */
     _mongocrypt_buffer_t id;
@@ -36,6 +41,10 @@ typedef struct {
     int64_t update_date;
     _mongocrypt_kek_t kek;
 } _mongocrypt_key_doc_t;
+
+// `_mongocrypt_key_doc_t` inherits extended alignment from libbson. To dynamically allocate, use aligned allocation
+// (e.g. BSON_ALIGNED_ALLOC)
+BSON_STATIC_ASSERT2(alignof__mongocrypt_key_doc_t, BSON_ALIGNOF(_mongocrypt_key_doc_t) >= BSON_ALIGNOF(bson_t));
 
 _mongocrypt_key_alt_name_t *_mongocrypt_key_alt_name_new(const bson_value_t *value);
 

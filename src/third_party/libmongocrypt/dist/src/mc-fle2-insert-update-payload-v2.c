@@ -18,6 +18,7 @@
 
 #include "mc-fle2-insert-update-payload-private-v2.h"
 #include "mongocrypt-buffer-private.h"
+#include "mongocrypt-util-private.h" // mc_bson_type_to_string
 #include "mongocrypt.h"
 
 void mc_FLE2InsertUpdatePayloadV2_init(mc_FLE2InsertUpdatePayloadV2_t *payload) {
@@ -53,6 +54,8 @@ void mc_FLE2InsertUpdatePayloadV2_cleanup(mc_FLE2InsertUpdatePayloadV2_t *payloa
         mc_EdgeTokenSetV2_cleanup(&entry);
     }
     _mc_array_destroy(&payload->edgeTokenSetArray);
+    bson_value_destroy(&payload->indexMin);
+    bson_value_destroy(&payload->indexMax);
 }
 
 #define IF_FIELD(Name)                                                                                                 \
@@ -104,6 +107,7 @@ bool mc_FLE2InsertUpdatePayloadV2_parse(mc_FLE2InsertUpdatePayloadV2_t *out,
     bool has_d = false, has_s = false, has_p = false;
     bool has_u = false, has_t = false, has_v = false;
     bool has_e = false, has_l = false, has_k = false;
+    bool has_sp = false, has_pn = false, has_tf = false, has_mn = false, has_mx = false;
     bson_t in_bson;
 
     BSON_ASSERT_PARAM(out);
@@ -163,6 +167,57 @@ bool mc_FLE2InsertUpdatePayloadV2_parse(mc_FLE2InsertUpdatePayloadV2_t *out,
         PARSE_BINARY(v, value)
         PARSE_BINARY(e, serverEncryptionToken)
         PARSE_BINARY(l, serverDerivedFromDataToken)
+
+        IF_FIELD(sp) {
+            if (!BSON_ITER_HOLDS_INT64(&iter)) {
+                CLIENT_ERR("Field 'sp' expected to hold an int64, got: %s",
+                           mc_bson_type_to_string(bson_iter_type(&iter)));
+                goto fail;
+            }
+            int64_t sparsity = bson_iter_int64(&iter);
+            out->sparsity = OPT_I64(sparsity);
+        }
+        END_IF_FIELD
+
+        IF_FIELD(pn) {
+            if (!BSON_ITER_HOLDS_INT32(&iter)) {
+                CLIENT_ERR("Field 'pn' expected to hold an int32, got: %s",
+                           mc_bson_type_to_string(bson_iter_type(&iter)));
+                goto fail;
+            }
+            int32_t precision = bson_iter_int32(&iter);
+            if (precision < 0) {
+                CLIENT_ERR("Field 'pn' must be non-negative, got: %" PRId32, precision);
+                goto fail;
+            }
+            out->precision = OPT_I32(precision);
+        }
+        END_IF_FIELD
+
+        IF_FIELD(tf) {
+            if (!BSON_ITER_HOLDS_INT32(&iter)) {
+                CLIENT_ERR("Field 'tf' expected to hold an int32, got: %s",
+                           mc_bson_type_to_string(bson_iter_type(&iter)));
+                goto fail;
+            }
+            int32_t trimFactor = bson_iter_int32(&iter);
+            if (trimFactor < 0) {
+                CLIENT_ERR("Field 'tf' must be non-negative, got: %" PRId32, trimFactor);
+                goto fail;
+            }
+            out->trimFactor = OPT_I32(trimFactor);
+        }
+        END_IF_FIELD
+
+        IF_FIELD(mn) {
+            bson_value_copy(bson_iter_value(&iter), &out->indexMin);
+        }
+        END_IF_FIELD
+
+        IF_FIELD(mx) {
+            bson_value_copy(bson_iter_value(&iter), &out->indexMax);
+        }
+        END_IF_FIELD
     }
 
     CHECK_HAS(d);
@@ -174,6 +229,7 @@ bool mc_FLE2InsertUpdatePayloadV2_parse(mc_FLE2InsertUpdatePayloadV2_t *out,
     CHECK_HAS(e);
     CHECK_HAS(l);
     CHECK_HAS(k);
+    // The fields `sp`, `pn`, `tf`, `mn`, and `mx` are only set for "range" payloads.
 
     if (!_mongocrypt_buffer_from_subrange(&out->userKeyId, &out->value, 0, UUID_LEN)) {
         CLIENT_ERR("failed to create userKeyId buffer");
@@ -213,7 +269,9 @@ bool mc_FLE2InsertUpdatePayloadV2_serialize(const mc_FLE2InsertUpdatePayloadV2_t
     return true;
 }
 
-bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out) {
+bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePayloadV2_t *payload,
+                                                    bson_t *out,
+                                                    bool use_range_v2) {
     BSON_ASSERT_PARAM(out);
     BSON_ASSERT_PARAM(payload);
 
@@ -255,6 +313,36 @@ bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePay
 
     if (!bson_append_array_end(out, &g_bson)) {
         return false;
+    }
+
+    if (use_range_v2) {
+        // Encode parameters that were used to generate the payload.
+        BSON_ASSERT(payload->sparsity.set);
+        if (!BSON_APPEND_INT64(out, "sp", payload->sparsity.value)) {
+            return false;
+        }
+
+        // Precision may be unset.
+        if (payload->precision.set) {
+            if (!BSON_APPEND_INT32(out, "pn", payload->precision.value)) {
+                return false;
+            }
+        }
+
+        BSON_ASSERT(payload->trimFactor.set);
+        if (!BSON_APPEND_INT32(out, "tf", payload->trimFactor.value)) {
+            return false;
+        }
+
+        BSON_ASSERT(payload->indexMin.value_type != BSON_TYPE_EOD);
+        if (!BSON_APPEND_VALUE(out, "mn", &payload->indexMin)) {
+            return false;
+        }
+
+        BSON_ASSERT(payload->indexMax.value_type != BSON_TYPE_EOD);
+        if (!BSON_APPEND_VALUE(out, "mx", &payload->indexMax)) {
+            return false;
+        }
     }
 
     return true;

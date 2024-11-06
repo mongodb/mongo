@@ -19,14 +19,16 @@
 #include "mc-check-conversions-private.h"
 
 #include "mc-array-private.h"
+#include "mc-cmp-private.h"
 #include "mc-range-edge-generation-private.h" // mc_count_leading_zeros_u32
-#include "mc-range-encoding-private.h"        // mc_getTypeInfo32
+#include "mc-range-encoding-private.h"        // mc_getTypeInfo32, trimFactorDefault
 #include "mc-range-mincover-private.h"
 #include "mongocrypt-private.h"
 
 struct _mc_mincover_t {
     /* mincover is an array of `char*` edge strings. */
     mc_array_t mincover;
+    int32_t usedTrimFactor; // The `trimFactor` that was used to produce this mincover.
 };
 
 static mc_mincover_t *mc_mincover_new(void) {
@@ -46,6 +48,10 @@ const char *mc_mincover_get(mc_mincover_t *mincover, size_t index) {
 size_t mc_mincover_len(mc_mincover_t *mincover) {
     BSON_ASSERT_PARAM(mincover);
     return mincover->mincover.len;
+}
+
+int32_t mc_mincover_get_used_trimFactor(const mc_mincover_t *mincover) {
+    return mincover->usedTrimFactor;
 }
 
 void mc_mincover_destroy(mc_mincover_t *mincover) {
@@ -127,7 +133,7 @@ void mc_mincover_destroy(mc_mincover_t *mincover) {
     } else                                                                                                             \
         (void)0
 
-mc_mincover_t *mc_getMincoverInt32(mc_getMincoverInt32_args_t args, mongocrypt_status_t *status) {
+mc_mincover_t *mc_getMincoverInt32(mc_getMincoverInt32_args_t args, mongocrypt_status_t *status, bool use_range_v2) {
     BSON_ASSERT_PARAM(status);
     CHECK_BOUNDS(args, PRId32, IDENTITY, LESSTHAN);
     mc_OSTType_Int32 a, b;
@@ -149,16 +155,18 @@ mc_mincover_t *mc_getMincoverInt32(mc_getMincoverInt32_args_t args, mongocrypt_s
         return NULL;
     }
 
-    MinCoverGenerator_u32 *mcg = MinCoverGenerator_new_u32(a.value, b.value, a.max, args.sparsity, status);
+    MinCoverGenerator_u32 *mcg =
+        MinCoverGenerator_new_u32(a.value, b.value, a.max, args.sparsity, args.trimFactor, status, use_range_v2);
     if (!mcg) {
         return NULL;
     }
     mc_mincover_t *mc = MinCoverGenerator_minCover_u32(mcg);
+    mc->usedTrimFactor = MinCoverGenerator_usedTrimFactor_u32(mcg);
     MinCoverGenerator_destroy_u32(mcg);
     return mc;
 }
 
-mc_mincover_t *mc_getMincoverInt64(mc_getMincoverInt64_args_t args, mongocrypt_status_t *status) {
+mc_mincover_t *mc_getMincoverInt64(mc_getMincoverInt64_args_t args, mongocrypt_status_t *status, bool use_range_v2) {
     BSON_ASSERT_PARAM(status);
     CHECK_BOUNDS(args, PRId64, IDENTITY, LESSTHAN);
     mc_OSTType_Int64 a, b;
@@ -180,18 +188,20 @@ mc_mincover_t *mc_getMincoverInt64(mc_getMincoverInt64_args_t args, mongocrypt_s
         return NULL;
     }
 
-    MinCoverGenerator_u64 *mcg = MinCoverGenerator_new_u64(a.value, b.value, a.max, args.sparsity, status);
+    MinCoverGenerator_u64 *mcg =
+        MinCoverGenerator_new_u64(a.value, b.value, a.max, args.sparsity, args.trimFactor, status, use_range_v2);
     if (!mcg) {
         return NULL;
     }
     mc_mincover_t *mc = MinCoverGenerator_minCover_u64(mcg);
+    mc->usedTrimFactor = MinCoverGenerator_usedTrimFactor_u64(mcg);
     MinCoverGenerator_destroy_u64(mcg);
     return mc;
 }
 
 // mc_getMincoverDouble implements the Mincover Generation algorithm described
 // in SERVER-68600 for double.
-mc_mincover_t *mc_getMincoverDouble(mc_getMincoverDouble_args_t args, mongocrypt_status_t *status) {
+mc_mincover_t *mc_getMincoverDouble(mc_getMincoverDouble_args_t args, mongocrypt_status_t *status, bool use_range_v2) {
     BSON_ASSERT_PARAM(status);
     CHECK_BOUNDS(args, "g", IDENTITY, LESSTHAN);
 
@@ -201,7 +211,8 @@ mc_mincover_t *mc_getMincoverDouble(mc_getMincoverDouble_args_t args, mongocrypt
                                                             .max = args.max,
                                                             .precision = args.precision},
                               &a,
-                              status)) {
+                              status,
+                              use_range_v2)) {
         return NULL;
     }
     if (!mc_getTypeInfoDouble((mc_getTypeInfoDouble_args_t){.value = args.upperBound,
@@ -209,7 +220,8 @@ mc_mincover_t *mc_getMincoverDouble(mc_getMincoverDouble_args_t args, mongocrypt
                                                             .max = args.max,
                                                             .precision = args.precision},
                               &b,
-                              status)) {
+                              status,
+                              use_range_v2)) {
         return NULL;
     }
 
@@ -220,17 +232,20 @@ mc_mincover_t *mc_getMincoverDouble(mc_getMincoverDouble_args_t args, mongocrypt
         return NULL;
     }
 
-    MinCoverGenerator_u64 *mcg = MinCoverGenerator_new_u64(a.value, b.value, a.max, args.sparsity, status);
+    MinCoverGenerator_u64 *mcg =
+        MinCoverGenerator_new_u64(a.value, b.value, a.max, args.sparsity, args.trimFactor, status, use_range_v2);
     if (!mcg) {
         return NULL;
     }
     mc_mincover_t *mc = MinCoverGenerator_minCover_u64(mcg);
+    mc->usedTrimFactor = MinCoverGenerator_usedTrimFactor_u64(mcg);
     MinCoverGenerator_destroy_u64(mcg);
     return mc;
 }
 
 #if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
-mc_mincover_t *mc_getMincoverDecimal128(mc_getMincoverDecimal128_args_t args, mongocrypt_status_t *status) {
+mc_mincover_t *
+mc_getMincoverDecimal128(mc_getMincoverDecimal128_args_t args, mongocrypt_status_t *status, bool use_range_v2) {
     BSON_ASSERT_PARAM(status);
 #define ToString(Dec) (mc_dec128_to_string(Dec).str)
     CHECK_BOUNDS(args, "s", ToString, mc_dec128_less);
@@ -241,7 +256,8 @@ mc_mincover_t *mc_getMincoverDecimal128(mc_getMincoverDecimal128_args_t args, mo
                                                                     .max = args.max,
                                                                     .precision = args.precision},
                                   &a,
-                                  status)) {
+                                  status,
+                                  use_range_v2)) {
         return NULL;
     }
     if (!mc_getTypeInfoDecimal128((mc_getTypeInfoDecimal128_args_t){.value = args.upperBound,
@@ -249,7 +265,8 @@ mc_mincover_t *mc_getMincoverDecimal128(mc_getMincoverDecimal128_args_t args, mo
                                                                     .max = args.max,
                                                                     .precision = args.precision},
                                   &b,
-                                  status)) {
+                                  status,
+                                  use_range_v2)) {
         return NULL;
     }
 
@@ -260,11 +277,13 @@ mc_mincover_t *mc_getMincoverDecimal128(mc_getMincoverDecimal128_args_t args, mo
         return NULL;
     }
 
-    MinCoverGenerator_u128 *mcg = MinCoverGenerator_new_u128(a.value, b.value, a.max, args.sparsity, status);
+    MinCoverGenerator_u128 *mcg =
+        MinCoverGenerator_new_u128(a.value, b.value, a.max, args.sparsity, args.trimFactor, status, use_range_v2);
     if (!mcg) {
         return NULL;
     }
     mc_mincover_t *mc = MinCoverGenerator_minCover_u128(mcg);
+    mc->usedTrimFactor = MinCoverGenerator_usedTrimFactor_u128(mcg);
     MinCoverGenerator_destroy_u128(mcg);
     return mc;
 }

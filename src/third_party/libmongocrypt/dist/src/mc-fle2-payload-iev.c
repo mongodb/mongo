@@ -100,7 +100,6 @@ bool mc_FLE2IndexedEncryptedValue_write(_mongocrypt_crypto_t *crypto,
         goto cleanup;                                                                                                  \
     }
 
-    const _mongocrypt_value_encryption_algorithm_t *fle2alg = _mcFLE2Algorithm();
     bool ok = false;
 
     BSON_ASSERT_PARAM(crypto);
@@ -130,27 +129,6 @@ bool mc_FLE2IndexedEncryptedValue_write(_mongocrypt_crypto_t *crypto,
                                                         index_tokens,
                                                         &encryption_out,
                                                         status));
-    uint32_t expected_plaintext_size = 0;
-    CHECK_AND_GOTO(safe_uint32_t_sum(ClientEncryptedValue->len,
-                                     (uint32_t)(sizeof(uint64_t) * 2 + sizeof(uint32_t) * 3),
-                                     &expected_plaintext_size,
-                                     status));
-
-    uint32_t expected_cipher_size = fle2alg->get_ciphertext_len(expected_plaintext_size, status);
-
-    if (expected_cipher_size == 0) {
-        CHECK_AND_GOTO(false);
-    }
-
-    uint32_t expected_buf_size = 0;
-    CHECK_AND_RETURN(
-        safe_uint32_t_sum(expected_cipher_size, (uint32_t)(1 + sizeof(S_KeyId)), &expected_buf_size, status));
-
-    if (buf->len < expected_buf_size) {
-        CLIENT_ERR("mc_FLE2IndexedEncryptedValue_write buf is not large enough for iev");
-        CHECK_AND_GOTO(false);
-    }
-
     mc_writer_t writer;
     mc_writer_init_from_buffer(&writer, buf, __FUNCTION__);
 

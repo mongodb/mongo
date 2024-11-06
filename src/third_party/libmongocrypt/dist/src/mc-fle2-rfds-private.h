@@ -41,6 +41,11 @@ typedef struct {
     mc_FLE2RangeOperator_t secondOp;
 } mc_FLE2RangeFindDriverSpec_t;
 
+// `mc_FLE2RangeFindDriverSpec_t` inherits extended alignment from libbson. To dynamically allocate, use
+// aligned allocation (e.g. BSON_ALIGNED_ALLOC)
+BSON_STATIC_ASSERT2(alignof_mc_FLE2RangeFindDriverSpec_t,
+                    BSON_ALIGNOF(mc_FLE2RangeFindDriverSpec_t) >= BSON_ALIGNOF(bson_iter_t));
+
 // mc_FLE2RangeFindDriverSpec_parse parses a FLE2RangeFindDriverSpec document.
 bool mc_FLE2RangeFindDriverSpec_parse(mc_FLE2RangeFindDriverSpec_t *spec,
                                       const bson_t *in,
@@ -52,7 +57,7 @@ bool mc_FLE2RangeFindDriverSpec_parse(mc_FLE2RangeFindDriverSpec_t *spec,
 // `out` must be initialized by caller.
 bool mc_FLE2RangeFindDriverSpec_to_placeholders(mc_FLE2RangeFindDriverSpec_t *spec,
                                                 const mc_RangeOpts_t *range_opts,
-                                                int64_t maxContentionCounter,
+                                                int64_t maxContentionFactor,
                                                 const _mongocrypt_buffer_t *user_key_id,
                                                 const _mongocrypt_buffer_t *index_key_id,
                                                 int32_t payloadId,
@@ -73,10 +78,16 @@ typedef struct {
     mc_FLE2RangeOperator_t secondOp;
     bson_iter_t indexMin;
     bson_iter_t indexMax;
-    int64_t maxContentionCounter;
+    int64_t maxContentionFactor;
     int64_t sparsity;
-    mc_optional_uint32_t precision;
+    mc_optional_int32_t precision;
+    mc_optional_int32_t trimFactor;
 } mc_makeRangeFindPlaceholder_args_t;
+
+// `mc_makeRangeFindPlaceholder_args_t` inherits extended alignment from libbson. To dynamically allocate, use
+// aligned allocation (e.g. BSON_ALIGNED_ALLOC)
+BSON_STATIC_ASSERT2(alignof_mc_makeRangeFindPlaceholder_args_t,
+                    BSON_ALIGNOF(mc_makeRangeFindPlaceholder_args_t) >= BSON_ALIGNOF(bson_iter_t));
 
 // mc_makeRangeFindPlaceholder creates a placeholder to be consumed by
 // libmongocrypt to encrypt a range find query. It is included in the header to

@@ -36,19 +36,26 @@ typedef struct {
     } max;
 
     int64_t sparsity;
-    mc_optional_uint32_t precision;
+    mc_optional_int32_t precision;
+    mc_optional_int32_t trimFactor;
 } mc_RangeOpts_t;
+
+// `mc_RangeOpts_t` inherits extended alignment from libbson. To dynamically allocate, use
+// aligned allocation (e.g. BSON_ALIGNED_ALLOC)
+BSON_STATIC_ASSERT2(alignof_mc_RangeOpts_t,
+                    BSON_ALIGNOF(mc_RangeOpts_t) >= BSON_MAX(BSON_ALIGNOF(bson_t), BSON_ALIGNOF(bson_iter_t)));
 
 /* mc_RangeOpts_parse parses a BSON document into mc_RangeOpts_t.
  * The document is expected to have the form:
  * {
  *    "min": BSON value,
  *    "max": BSON value,
- *    "sparsity": Int64,
- *    "precision": Optional<Int32>
+ *    "sparsity": Optional<Int64>,
+ *    "precision": Optional<Int32>,
+ *    "trimFactor": Optional<Int32>,
  * }
  */
-bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, mongocrypt_status_t *status);
+bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, bool use_range_v2, mongocrypt_status_t *status);
 
 /*
  * mc_RangeOpts_to_FLE2RangeInsertSpec creates a placeholder value to be
@@ -69,6 +76,7 @@ bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, mongocrypt_status_
 bool mc_RangeOpts_to_FLE2RangeInsertSpec(const mc_RangeOpts_t *ro,
                                          const bson_t *v,
                                          bson_t *out,
+                                         bool use_range_v2,
                                          mongocrypt_status_t *status);
 
 /* mc_RangeOpts_appendMin appends the minimum value of the range for a given
@@ -88,6 +96,16 @@ bool mc_RangeOpts_appendMax(const mc_RangeOpts_t *ro,
                             const char *fieldName,
                             bson_t *out,
                             mongocrypt_status_t *status);
+
+/* mc_RangeOpts_appendTrimFactor appends the trim factor of the field. If `ro->trimFactor` is unset,
+ * defaults to 0. Errors if `ro->trimFactor` is out of bounds based on the size of the domain
+ * computed from `valueType`, `ro->min` and `ro->max`. */
+bool mc_RangeOpts_appendTrimFactor(const mc_RangeOpts_t *ro,
+                                   bson_type_t valueType,
+                                   const char *fieldName,
+                                   bson_t *out,
+                                   mongocrypt_status_t *status,
+                                   bool use_range_v2);
 
 void mc_RangeOpts_cleanup(mc_RangeOpts_t *ro);
 

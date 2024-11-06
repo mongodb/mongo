@@ -20,21 +20,19 @@
 #include "mongocrypt-mutex-private.h"
 #include "mongocrypt-status-private.h"
 
-typedef struct {
-    bson_t *entry;
-    char *access_token;
-    int64_t expiration_time_us;
-    mongocrypt_mutex_t mutex; /* global lock of cache. */
-} _mongocrypt_cache_oauth_t;
+// `mc_mapof_kmsid_to_token_t` maps a KMS ID (e.g. `azure` or `azure:myname`) to an OAuth token.
+typedef struct _mc_mapof_kmsid_to_token_t mc_mapof_kmsid_to_token_t;
 
-_mongocrypt_cache_oauth_t *_mongocrypt_cache_oauth_new(void);
-
-void _mongocrypt_cache_oauth_destroy(_mongocrypt_cache_oauth_t *cache);
-
-bool _mongocrypt_cache_oauth_add(_mongocrypt_cache_oauth_t *cache, bson_t *oauth_response, mongocrypt_status_t *status);
-
-/* Returns a copy of the base64 encoded oauth token, or NULL if nothing is
- * cached. */
-char *_mongocrypt_cache_oauth_get(_mongocrypt_cache_oauth_t *cache);
+mc_mapof_kmsid_to_token_t *mc_mapof_kmsid_to_token_new(void);
+void mc_mapof_kmsid_to_token_destroy(mc_mapof_kmsid_to_token_t *k2t);
+// `mc_mapof_kmsid_to_token_get_token` returns a copy of the base64 encoded oauth token, or NULL.
+// Thread-safe.
+char *mc_mapof_kmsid_to_token_get_token(mc_mapof_kmsid_to_token_t *k2t, const char *kmsid);
+// `mc_mapof_kmsid_to_token_add_response` overwrites an entry if `kms_id` exists.
+// Thread-safe.
+bool mc_mapof_kmsid_to_token_add_response(mc_mapof_kmsid_to_token_t *k2t,
+                                          const char *kmsid,
+                                          bson_t *response,
+                                          mongocrypt_status_t *status);
 
 #endif /* MONGOCRYPT_CACHE_OAUTH_PRIVATE_H */

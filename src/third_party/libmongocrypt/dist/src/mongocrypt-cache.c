@@ -28,7 +28,7 @@ static bool _pair_expired(_mongocrypt_cache_t *cache, _mongocrypt_cache_pair_t *
     current = bson_get_monotonic_time() / 1000;
     BSON_ASSERT(current >= INT64_MIN + pair->last_updated);
     BSON_ASSERT(cache->expiration <= INT64_MAX);
-    return (current - pair->last_updated) > (int64_t)cache->expiration;
+    return cache->expiration > 0 && (current - pair->last_updated) > (int64_t)cache->expiration;
 }
 
 /* Return the pair after the one being destroyed. */

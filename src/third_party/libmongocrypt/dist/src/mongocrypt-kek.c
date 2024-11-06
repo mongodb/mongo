@@ -18,6 +18,126 @@
 #include "mongocrypt-opts-private.h"
 #include "mongocrypt-private.h"
 
+static bool _mongocrypt_azure_kek_parse(_mongocrypt_azure_kek_t *azure,
+                                        const char *kmsid,
+                                        const bson_t *def,
+                                        mongocrypt_status_t *status) {
+    if (!_mongocrypt_parse_required_endpoint(def,
+                                             "keyVaultEndpoint",
+                                             &azure->key_vault_endpoint,
+                                             NULL /* opts */,
+                                             status)) {
+        return false;
+    }
+
+    if (!_mongocrypt_parse_required_utf8(def, "keyName", &azure->key_name, status)) {
+        return false;
+    }
+
+    if (!_mongocrypt_parse_optional_utf8(def, "keyVersion", &azure->key_version, status)) {
+        return false;
+    }
+
+    if (!_mongocrypt_check_allowed_fields(def,
+                                          NULL /* root */,
+                                          status,
+                                          "provider",
+                                          "keyVaultEndpoint",
+                                          "keyName",
+                                          "keyVersion")) {
+        return false;
+    }
+    return true;
+}
+
+static bool _mongocrypt_gcp_kek_parse(_mongocrypt_gcp_kek_t *gcp,
+                                      const char *kmsid,
+                                      const bson_t *def,
+                                      mongocrypt_status_t *status) {
+    if (!_mongocrypt_parse_optional_endpoint(def, "endpoint", &gcp->endpoint, NULL /* opts */, status)) {
+        return false;
+    }
+
+    if (!_mongocrypt_parse_required_utf8(def, "projectId", &gcp->project_id, status)) {
+        return false;
+    }
+
+    if (!_mongocrypt_parse_required_utf8(def, "location", &gcp->location, status)) {
+        return false;
+    }
+
+    if (!_mongocrypt_parse_required_utf8(def, "keyRing", &gcp->key_ring, status)) {
+        return false;
+    }
+
+    if (!_mongocrypt_parse_required_utf8(def, "keyName", &gcp->key_name, status)) {
+        return false;
+    }
+
+    if (!_mongocrypt_parse_optional_utf8(def, "keyVersion", &gcp->key_version, status)) {
+        return false;
+    }
+    if (!_mongocrypt_check_allowed_fields(def,
+                                          NULL,
+                                          status,
+                                          "provider",
+                                          "endpoint",
+                                          "projectId",
+                                          "location",
+                                          "keyRing",
+                                          "keyName",
+                                          "keyVersion")) {
+        return false;
+    }
+    return true;
+}
+
+static bool _mongocrypt_aws_kek_parse(_mongocrypt_aws_kek_t *aws,
+                                      const char *kmsid,
+                                      const bson_t *def,
+                                      mongocrypt_status_t *status) {
+    if (!_mongocrypt_parse_required_utf8(def, "key", &aws->cmk, status)) {
+        return false;
+    }
+    if (!_mongocrypt_parse_required_utf8(def, "region", &aws->region, status)) {
+        return false;
+    }
+    if (!_mongocrypt_parse_optional_endpoint(def, "endpoint", &aws->endpoint, NULL /* opts */, status)) {
+        return false;
+    }
+    if (!_mongocrypt_check_allowed_fields(def, NULL, status, "provider", "key", "region", "endpoint")) {
+        return false;
+    }
+
+    return true;
+}
+
+static bool _mongocrypt_kmip_kek_parse(_mongocrypt_kmip_kek_t *kmip,
+                                       const char *kmsid,
+                                       const bson_t *def,
+                                       mongocrypt_status_t *status) {
+    _mongocrypt_endpoint_parse_opts_t opts = {0};
+
+    opts.allow_empty_subdomain = true;
+    if (!_mongocrypt_parse_optional_endpoint(def, "endpoint", &kmip->endpoint, &opts, status)) {
+        return false;
+    }
+
+    if (!_mongocrypt_parse_optional_utf8(def, "keyId", &kmip->key_id, status)) {
+        return false;
+    }
+
+    kmip->delegated = false;
+    if (!_mongocrypt_parse_optional_bool(def, "delegated", &kmip->delegated, status)) {
+        return false;
+    }
+
+    if (!_mongocrypt_check_allowed_fields(def, NULL, status, "provider", "endpoint", "keyId", "delegated")) {
+        return false;
+    }
+    return true;
+}
+
 /* Possible documents to parse:
  * AWS
  *    provider: "aws"
@@ -55,116 +175,50 @@ bool _mongocrypt_kek_parse_owned(const bson_t *bson, _mongocrypt_kek_t *kek, mon
         goto done;
     }
 
-    if (0 == strcmp(kms_provider, "aws")) {
-        kek->kms_provider = MONGOCRYPT_KMS_PROVIDER_AWS;
-        if (!_mongocrypt_parse_required_utf8(bson, "key", &kek->provider.aws.cmk, status)) {
+    kek->kmsid = bson_strdup(kms_provider);
+
+    _mongocrypt_kms_provider_t type;
+    if (!mc_kmsid_parse(kek->kmsid, &type, &kek->kmsid_name, status)) {
+        goto done;
+    }
+
+    kek->kms_provider = type;
+    switch (type) {
+    default:
+    case MONGOCRYPT_KMS_PROVIDER_NONE: {
+        CLIENT_ERR("Unexpected parsing KMS type: none");
+        goto done;
+    }
+    case MONGOCRYPT_KMS_PROVIDER_AWS: {
+        if (!_mongocrypt_aws_kek_parse(&kek->provider.aws, kek->kmsid, bson, status)) {
             goto done;
         }
-        if (!_mongocrypt_parse_required_utf8(bson, "region", &kek->provider.aws.region, status)) {
-            goto done;
-        }
-        if (!_mongocrypt_parse_optional_endpoint(bson,
-                                                 "endpoint",
-                                                 &kek->provider.aws.endpoint,
-                                                 NULL /* opts */,
-                                                 status)) {
-            goto done;
-        }
-        if (!_mongocrypt_check_allowed_fields(bson, NULL, status, "provider", "key", "region", "endpoint")) {
-            goto done;
-        }
-    } else if (0 == strcmp(kms_provider, "local")) {
-        kek->kms_provider = MONGOCRYPT_KMS_PROVIDER_LOCAL;
+        break;
+    }
+    case MONGOCRYPT_KMS_PROVIDER_LOCAL: {
         if (!_mongocrypt_check_allowed_fields(bson, NULL, status, "provider")) {
             goto done;
         }
-    } else if (0 == strcmp(kms_provider, "azure")) {
-        kek->kms_provider = MONGOCRYPT_KMS_PROVIDER_AZURE;
-        if (!_mongocrypt_parse_required_endpoint(bson,
-                                                 "keyVaultEndpoint",
-                                                 &kek->provider.azure.key_vault_endpoint,
-                                                 NULL /* opts */,
-                                                 status)) {
+        break;
+    }
+    case MONGOCRYPT_KMS_PROVIDER_AZURE: {
+        if (!_mongocrypt_azure_kek_parse(&kek->provider.azure, kek->kmsid, bson, status)) {
             goto done;
         }
-
-        if (!_mongocrypt_parse_required_utf8(bson, "keyName", &kek->provider.azure.key_name, status)) {
+        break;
+    }
+    case MONGOCRYPT_KMS_PROVIDER_GCP: {
+        if (!_mongocrypt_gcp_kek_parse(&kek->provider.gcp, kek->kmsid, bson, status)) {
             goto done;
         }
-
-        if (!_mongocrypt_parse_optional_utf8(bson, "keyVersion", &kek->provider.azure.key_version, status)) {
+        break;
+    }
+    case MONGOCRYPT_KMS_PROVIDER_KMIP: {
+        if (!_mongocrypt_kmip_kek_parse(&kek->provider.kmip, kek->kmsid, bson, status)) {
             goto done;
         }
-
-        if (!_mongocrypt_check_allowed_fields(bson,
-                                              NULL,
-                                              status,
-                                              "provider",
-                                              "keyVaultEndpoint",
-                                              "keyName",
-                                              "keyVersion")) {
-            goto done;
-        }
-    } else if (0 == strcmp(kms_provider, "gcp")) {
-        kek->kms_provider = MONGOCRYPT_KMS_PROVIDER_GCP;
-        if (!_mongocrypt_parse_optional_endpoint(bson,
-                                                 "endpoint",
-                                                 &kek->provider.gcp.endpoint,
-                                                 NULL /* opts */,
-                                                 status)) {
-            goto done;
-        }
-
-        if (!_mongocrypt_parse_required_utf8(bson, "projectId", &kek->provider.gcp.project_id, status)) {
-            goto done;
-        }
-
-        if (!_mongocrypt_parse_required_utf8(bson, "location", &kek->provider.gcp.location, status)) {
-            goto done;
-        }
-
-        if (!_mongocrypt_parse_required_utf8(bson, "keyRing", &kek->provider.gcp.key_ring, status)) {
-            goto done;
-        }
-
-        if (!_mongocrypt_parse_required_utf8(bson, "keyName", &kek->provider.gcp.key_name, status)) {
-            goto done;
-        }
-
-        if (!_mongocrypt_parse_optional_utf8(bson, "keyVersion", &kek->provider.gcp.key_version, status)) {
-            goto done;
-        }
-        if (!_mongocrypt_check_allowed_fields(bson,
-                                              NULL,
-                                              status,
-                                              "provider",
-                                              "endpoint",
-                                              "projectId",
-                                              "location",
-                                              "keyRing",
-                                              "keyName",
-                                              "keyVersion")) {
-            goto done;
-        }
-    } else if (0 == strcmp(kms_provider, "kmip")) {
-        kek->kms_provider = MONGOCRYPT_KMS_PROVIDER_KMIP;
-        _mongocrypt_endpoint_parse_opts_t opts = {0};
-
-        opts.allow_empty_subdomain = true;
-        if (!_mongocrypt_parse_optional_endpoint(bson, "endpoint", &kek->provider.kmip.endpoint, &opts, status)) {
-            goto done;
-        }
-
-        if (!_mongocrypt_parse_optional_utf8(bson, "keyId", &kek->provider.kmip.key_id, status)) {
-            goto done;
-        }
-
-        if (!_mongocrypt_check_allowed_fields(bson, NULL, status, "provider", "endpoint", "keyId")) {
-            goto done;
-        }
-    } else {
-        CLIENT_ERR("unrecognized KMS provider: %s", kms_provider);
-        goto done;
+        break;
+    }
     }
 
     ret = true;
@@ -177,24 +231,22 @@ bool _mongocrypt_kek_append(const _mongocrypt_kek_t *kek, bson_t *bson, mongocry
     BSON_ASSERT_PARAM(kek);
     BSON_ASSERT_PARAM(bson);
 
+    BSON_APPEND_UTF8(bson, "provider", kek->kmsid);
     if (kek->kms_provider == MONGOCRYPT_KMS_PROVIDER_AWS) {
-        BSON_APPEND_UTF8(bson, "provider", "aws");
         BSON_APPEND_UTF8(bson, "region", kek->provider.aws.region);
         BSON_APPEND_UTF8(bson, "key", kek->provider.aws.cmk);
         if (kek->provider.aws.endpoint) {
             BSON_APPEND_UTF8(bson, "endpoint", kek->provider.aws.endpoint->host_and_port);
         }
     } else if (kek->kms_provider == MONGOCRYPT_KMS_PROVIDER_LOCAL) {
-        BSON_APPEND_UTF8(bson, "provider", "local");
+        // Only `provider` is needed.
     } else if (kek->kms_provider == MONGOCRYPT_KMS_PROVIDER_AZURE) {
-        BSON_APPEND_UTF8(bson, "provider", "azure");
         BSON_APPEND_UTF8(bson, "keyVaultEndpoint", kek->provider.azure.key_vault_endpoint->host_and_port);
         BSON_APPEND_UTF8(bson, "keyName", kek->provider.azure.key_name);
         if (kek->provider.azure.key_version) {
             BSON_APPEND_UTF8(bson, "keyVersion", kek->provider.azure.key_version);
         }
     } else if (kek->kms_provider == MONGOCRYPT_KMS_PROVIDER_GCP) {
-        BSON_APPEND_UTF8(bson, "provider", "gcp");
         BSON_APPEND_UTF8(bson, "projectId", kek->provider.gcp.project_id);
         BSON_APPEND_UTF8(bson, "location", kek->provider.gcp.location);
         BSON_APPEND_UTF8(bson, "keyRing", kek->provider.gcp.key_ring);
@@ -206,9 +258,12 @@ bool _mongocrypt_kek_append(const _mongocrypt_kek_t *kek, bson_t *bson, mongocry
             BSON_APPEND_UTF8(bson, "endpoint", kek->provider.gcp.endpoint->host_and_port);
         }
     } else if (kek->kms_provider == MONGOCRYPT_KMS_PROVIDER_KMIP) {
-        BSON_APPEND_UTF8(bson, "provider", "kmip");
         if (kek->provider.kmip.endpoint) {
             BSON_APPEND_UTF8(bson, "endpoint", kek->provider.kmip.endpoint->host_and_port);
+        }
+
+        if (kek->provider.kmip.delegated) {
+            BSON_APPEND_BOOL(bson, "delegated", kek->provider.kmip.delegated);
         }
 
         /* "keyId" is required in the final data key document for the "kmip" KMS
@@ -249,11 +304,13 @@ void _mongocrypt_kek_copy_to(const _mongocrypt_kek_t *src, _mongocrypt_kek_t *ds
     } else if (src->kms_provider == MONGOCRYPT_KMS_PROVIDER_KMIP) {
         dst->provider.kmip.endpoint = _mongocrypt_endpoint_copy(src->provider.kmip.endpoint);
         dst->provider.kmip.key_id = bson_strdup(src->provider.kmip.key_id);
+        dst->provider.kmip.delegated = src->provider.kmip.delegated;
     } else {
         BSON_ASSERT(src->kms_provider == MONGOCRYPT_KMS_PROVIDER_NONE
                     || src->kms_provider == MONGOCRYPT_KMS_PROVIDER_LOCAL);
     }
     dst->kms_provider = src->kms_provider;
+    dst->kmsid = bson_strdup(src->kmsid);
 }
 
 void _mongocrypt_kek_cleanup(_mongocrypt_kek_t *kek) {
@@ -283,5 +340,6 @@ void _mongocrypt_kek_cleanup(_mongocrypt_kek_t *kek) {
         BSON_ASSERT(kek->kms_provider == MONGOCRYPT_KMS_PROVIDER_NONE
                     || kek->kms_provider == MONGOCRYPT_KMS_PROVIDER_LOCAL);
     }
+    bson_free(kek->kmsid);
     return;
 }

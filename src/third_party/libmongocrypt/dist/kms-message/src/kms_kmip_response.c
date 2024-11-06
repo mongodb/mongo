@@ -1,5 +1,7 @@
 #include "kms_message/kms_kmip_response.h"
 
+#include "kms_kmip_item_type_private.h"
+#include "kms_kmip_tag_type_private.h"
 #include "kms_message_private.h"
 #include "kms_kmip_reader_writer_private.h"
 #include "kms_kmip_result_reason_private.h"
@@ -207,6 +209,167 @@ kms_kmip_response_get_unique_identifier (kms_response_t *res)
 fail:
    kmip_reader_destroy (reader);
    return kms_request_str_detach (nullterminated);
+}
+
+/*
+Example of a successful response to an Encrypt request:
+<ResponseMessage tag="0x42007b" type="Structure">
+ <ResponseHeader tag="0x42007a" type="Structure">
+  <ProtocolVersion tag="0x420069" type="Structure">
+   <ProtocolVersionMajor tag="0x42006a" type="Integer" value="1"/>
+   <ProtocolVersionMinor tag="0x42006b" type="Integer" value="2"/>
+  </ProtocolVersion>
+  <TimeStamp tag="0x420092" type="DateTime" value="2021-10-12T14:09:25-0500"/>
+  <BatchCount tag="0x42000d" type="Integer" value="1"/>
+ </ResponseHeader>
+ <BatchItem tag="0x42000f" type="Structure">
+  <Operation tag="0x42005c" type="Enumeration" value="31"/>
+  <ResultStatus tag="0x42007f" type="Enumeration" value="0"/>
+  <ResponsePayload tag="0x42007c" type="Structure">
+   <UniqueIdentifier tag="0x420094" type="TextString" value="39"/>
+   <Data tag="0x4200c2" type="ByteString" value="..."/>
+   <IVCounterNonce tag="0x42003d" type="ByteString" value="..."/>
+  </ResponsePayload>
+ </BatchItem>
+</ResponseMessage>
+*/
+uint8_t *
+kms_kmip_response_get_iv (kms_response_t *res, size_t *datalen) {
+   kmip_reader_t *reader = NULL;
+   size_t pos;
+   size_t len;
+   uint8_t *data = NULL;
+   uint8_t *tmp;
+
+   if (!check_and_require_kmip (res)) {
+      goto fail;
+   }
+
+   if (!kms_kmip_response_ok (res)) {
+      goto fail;
+   }
+
+   reader = kmip_reader_new (res->kmip.data, res->kmip.len);
+
+   if (!kmip_reader_find_and_recurse (reader, KMIP_TAG_ResponseMessage)) {
+      KMS_ERROR (res,
+                 "unable to find tag: %s",
+                 kmip_tag_to_string (KMIP_TAG_ResponseMessage));
+      goto fail;
+   }
+
+   if (!kmip_reader_find_and_recurse (reader, KMIP_TAG_BatchItem)) {
+      KMS_ERROR (res,
+                 "unable to find tag: %s",
+                 kmip_tag_to_string (KMIP_TAG_BatchItem));
+      goto fail;
+   }
+
+   if (!kmip_reader_find_and_recurse (reader, KMIP_TAG_ResponsePayload)) {
+      KMS_ERROR (res,
+                 "unable to find tag: %s",
+                 kmip_tag_to_string (KMIP_TAG_ResponsePayload));
+      goto fail;
+   }
+
+   if (!kmip_reader_find (reader, KMIP_TAG_IVCounterNonce, KMIP_ITEM_TYPE_ByteString, &pos, &len)) {
+      KMS_ERROR (res,
+                 "unable to find tag: %s",
+                 kmip_tag_to_string (KMIP_TAG_Data));
+      goto fail;
+   }
+
+   if (!kmip_reader_read_bytes (reader, &tmp, len)) {
+      KMS_ERROR (res, "unable to read data bytes");
+      goto fail;
+   }
+   data = malloc (len);
+   memcpy (data, tmp, len);
+   *datalen = len;
+
+   fail:
+   kmip_reader_destroy (reader);
+   return data;
+}
+
+/*
+Example of a successful response to a Decrypt request:
+<ResponseMessage tag="0x42007b" type="Structure">
+ <ResponseHeader tag="0x42007a" type="Structure">
+  <ProtocolVersion tag="0x420069" type="Structure">
+   <ProtocolVersionMajor tag="0x42006a" type="Integer" value="1"/>
+   <ProtocolVersionMinor tag="0x42006b" type="Integer" value="2"/>
+  </ProtocolVersion>
+  <TimeStamp tag="0x420092" type="DateTime" value="2021-10-12T14:09:25-0500"/>
+  <BatchCount tag="0x42000d" type="Integer" value="1"/>
+ </ResponseHeader>
+ <BatchItem tag="0x42000f" type="Structure">
+  <Operation tag="0x42005c" type="Enumeration" value="32"/>
+  <ResultStatus tag="0x42007f" type="Enumeration" value="0"/>
+  <ResponsePayload tag="0x42007c" type="Structure">
+   <UniqueIdentifier tag="0x420094" type="TextString" value="39"/>
+   <Data tag="0x4200c2" type="ByteString" value="..."/>
+  </ResponsePayload>
+ </BatchItem>
+</ResponseMessage>
+*/
+uint8_t *
+kms_kmip_response_get_data (kms_response_t *res, size_t *datalen) {
+   kmip_reader_t *reader = NULL;
+   size_t pos;
+   size_t len;
+   uint8_t *data = NULL;
+   uint8_t *tmp;
+
+   if (!check_and_require_kmip (res)) {
+      goto fail;
+   }
+
+   if (!kms_kmip_response_ok (res)) {
+      goto fail;
+   }
+
+   reader = kmip_reader_new (res->kmip.data, res->kmip.len);
+
+   if (!kmip_reader_find_and_recurse (reader, KMIP_TAG_ResponseMessage)) {
+      KMS_ERROR (res,
+                 "unable to find tag: %s",
+                 kmip_tag_to_string (KMIP_TAG_ResponseMessage));
+      goto fail;
+   }
+
+   if (!kmip_reader_find_and_recurse (reader, KMIP_TAG_BatchItem)) {
+      KMS_ERROR (res,
+                 "unable to find tag: %s",
+                 kmip_tag_to_string (KMIP_TAG_BatchItem));
+      goto fail;
+   }
+
+   if (!kmip_reader_find_and_recurse (reader, KMIP_TAG_ResponsePayload)) {
+      KMS_ERROR (res,
+                 "unable to find tag: %s",
+                 kmip_tag_to_string (KMIP_TAG_ResponsePayload));
+      goto fail;
+   }
+
+   if (!kmip_reader_find (reader, KMIP_TAG_Data, KMIP_ITEM_TYPE_ByteString, &pos, &len)) {
+      KMS_ERROR (res,
+                 "unable to find tag: %s",
+                 kmip_tag_to_string (KMIP_TAG_Data));
+      goto fail;
+   }
+
+   if (!kmip_reader_read_bytes (reader, &tmp, len)) {
+      KMS_ERROR (res, "unable to read data bytes");
+      goto fail;
+   }
+   data = malloc (len);
+   memcpy (data, tmp, len);
+   *datalen = len;
+
+   fail:
+   kmip_reader_destroy (reader);
+   return data;
 }
 
 /*

@@ -69,6 +69,7 @@ typedef struct {
 typedef struct {
     char *key_id;                     /* optional on parsing, required on appending. */
     _mongocrypt_endpoint_t *endpoint; /* optional. */
+    bool delegated;
 } _mongocrypt_kmip_kek_t;
 
 typedef struct {
@@ -80,6 +81,9 @@ typedef struct {
         _mongocrypt_aws_kek_t aws;
         _mongocrypt_kmip_kek_t kmip;
     } provider;
+
+    char *kmsid;
+    const char *kmsid_name;
 } _mongocrypt_kek_t;
 
 /* Parse a document describing a key encryption key.

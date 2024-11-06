@@ -25,6 +25,17 @@
 
 typedef struct {
     bool set;
+    bool value;
+} mc_optional_bool_t;
+
+#define OPT_BOOL(val)                                                                                                  \
+    (mc_optional_bool_t) { .set = true, .value = val }
+
+#define OPT_BOOL_C(val)                                                                                                \
+    { .set = true, .value = val }
+
+typedef struct {
+    bool set;
     int32_t value;
 } mc_optional_int32_t;
 

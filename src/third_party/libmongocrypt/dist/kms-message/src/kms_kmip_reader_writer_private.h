@@ -60,6 +60,9 @@ void
 kmip_writer_write_enumeration (kmip_writer_t *writer, kmip_tag_type_t tag, int32_t value);
 
 void
+kmip_writer_write_bool (kmip_writer_t *writer, kmip_tag_type_t tag, bool value);
+
+void
 kmip_writer_write_datetime (kmip_writer_t *writer, kmip_tag_type_t tag, int64_t value);
 
 void
@@ -111,6 +114,9 @@ kmip_reader_read_type (kmip_reader_t *reader, kmip_item_type_t *type);
 
 bool
 kmip_reader_read_enumeration (kmip_reader_t *reader, uint32_t *enum_value);
+
+bool
+kmip_reader_read_bool (kmip_reader_t *reader, bool *value);
 
 bool
 kmip_reader_read_integer (kmip_reader_t *reader, int32_t *value);

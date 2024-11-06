@@ -14,8 +14,86 @@
  * limitations under the License.
  */
 
+#include "mc-array-private.h"
 #include "mongocrypt-key-broker-private.h"
 #include "mongocrypt-private.h"
+
+typedef struct _auth_request_t {
+    mongocrypt_kms_ctx_t kms;
+    bool returned;
+    char *kmsid;
+} auth_request_t;
+
+auth_request_t *auth_request_new() {
+    return bson_malloc0(sizeof(auth_request_t));
+}
+
+void auth_request_destroy(auth_request_t *ar) {
+    if (!ar) {
+        return;
+    }
+    _mongocrypt_kms_ctx_cleanup(&ar->kms);
+    bson_free(ar->kmsid);
+    bson_free(ar);
+}
+
+struct _mc_mapof_kmsid_to_authrequest_t {
+    mc_array_t entries;
+};
+
+mc_mapof_kmsid_to_authrequest_t *mc_mapof_kmsid_to_authrequest_new(void) {
+    mc_mapof_kmsid_to_authrequest_t *k2a = bson_malloc0(sizeof(mc_mapof_kmsid_to_authrequest_t));
+    _mc_array_init(&k2a->entries, sizeof(auth_request_t *));
+    return k2a;
+}
+
+void mc_mapof_kmsid_to_authrequest_destroy(mc_mapof_kmsid_to_authrequest_t *k2a) {
+    if (!k2a) {
+        return;
+    }
+    for (size_t i = 0; i < k2a->entries.len; i++) {
+        auth_request_t *ar = _mc_array_index(&k2a->entries, auth_request_t *, i);
+        auth_request_destroy(ar);
+    }
+    _mc_array_destroy(&k2a->entries);
+    bson_free(k2a);
+}
+
+bool mc_mapof_kmsid_to_authrequest_has(const mc_mapof_kmsid_to_authrequest_t *k2a, const char *kmsid) {
+    BSON_ASSERT_PARAM(k2a);
+    BSON_ASSERT_PARAM(kmsid);
+    for (size_t i = 0; i < k2a->entries.len; i++) {
+        auth_request_t *ar = _mc_array_index(&k2a->entries, auth_request_t *, i);
+        if (0 == strcmp(ar->kmsid, kmsid)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+size_t mc_mapof_kmsid_to_authrequest_len(const mc_mapof_kmsid_to_authrequest_t *k2a) {
+    BSON_ASSERT_PARAM(k2a);
+    return k2a->entries.len;
+}
+
+bool mc_mapof_kmsid_to_authrequest_empty(const mc_mapof_kmsid_to_authrequest_t *k2a) {
+    BSON_ASSERT_PARAM(k2a);
+    return k2a->entries.len == 0;
+}
+
+// `mc_mapof_kmsid_to_authrequest_put` moves `to_put` into the map and takes ownership of `to_put`.
+// No checking is done to prohibit duplicate entries.
+void mc_mapof_kmsid_to_authrequest_put(mc_mapof_kmsid_to_authrequest_t *k2a, auth_request_t *to_put) {
+    BSON_ASSERT_PARAM(k2a);
+
+    _mc_array_append_val(&k2a->entries, to_put);
+}
+
+auth_request_t *mc_mapof_kmsid_to_authrequest_at(mc_mapof_kmsid_to_authrequest_t *k2a, size_t i) {
+    BSON_ASSERT_PARAM(k2a);
+
+    return _mc_array_index(&k2a->entries, auth_request_t *, i);
+}
 
 void _mongocrypt_key_broker_init(_mongocrypt_key_broker_t *kb, mongocrypt_t *crypt) {
     BSON_ASSERT_PARAM(kb);
@@ -25,6 +103,7 @@ void _mongocrypt_key_broker_init(_mongocrypt_key_broker_t *kb, mongocrypt_t *cry
     kb->crypt = crypt;
     kb->state = KB_REQUESTING;
     kb->status = mongocrypt_status_new();
+    kb->auth_requests = mc_mapof_kmsid_to_authrequest_new();
 }
 
 /*
@@ -481,8 +560,12 @@ bool _mongocrypt_key_broker_add_doc(_mongocrypt_key_broker_t *kb,
 
     /* Check that the returned key doc's provider matches. */
     kek_provider = key_doc->kek.kms_provider;
-    if (0 == ((int)kek_provider & kms_providers->configured_providers)) {
-        _key_broker_fail_w_msg(kb, "client not configured with KMS provider necessary to decrypt");
+
+    mc_kms_creds_t kc;
+    if (!_mongocrypt_opts_kms_providers_lookup(kms_providers, key_doc->kek.kmsid, &kc)) {
+        mongocrypt_status_t *status = kb->status;
+        CLIENT_ERR("KMS provider `%s` is not configured", key_doc->kek.kmsid);
+        _key_broker_fail(kb);
         goto done;
     }
 
@@ -490,8 +573,9 @@ bool _mongocrypt_key_broker_add_doc(_mongocrypt_key_broker_t *kb,
      * HTTP KMS request. */
     BSON_ASSERT(kb->crypt);
     if (kek_provider == MONGOCRYPT_KMS_PROVIDER_LOCAL) {
+        BSON_ASSERT(kc.type == MONGOCRYPT_KMS_PROVIDER_LOCAL);
         if (!_mongocrypt_unwrap_key(kb->crypt->crypto,
-                                    &kms_providers->local.key,
+                                    &kc.value.local.key,
                                     &key_returned->doc->key_material,
                                     &key_returned->decrypted_key_material,
                                     kb->status)) {
@@ -506,38 +590,45 @@ bool _mongocrypt_key_broker_add_doc(_mongocrypt_key_broker_t *kb,
         if (!_mongocrypt_kms_ctx_init_aws_decrypt(&key_returned->kms,
                                                   kms_providers,
                                                   key_doc,
-                                                  &kb->crypt->log,
-                                                  kb->crypt->crypto)) {
+                                                  kb->crypt->crypto,
+                                                  key_doc->kek.kmsid,
+                                                  &kb->crypt->log)) {
             mongocrypt_kms_ctx_status(&key_returned->kms, kb->status);
             _key_broker_fail(kb);
             goto done;
         }
     } else if (kek_provider == MONGOCRYPT_KMS_PROVIDER_AZURE) {
-        if (kms_providers->azure.access_token) {
-            access_token = bson_strdup(kms_providers->azure.access_token);
+        BSON_ASSERT(kc.type == MONGOCRYPT_KMS_PROVIDER_AZURE);
+        if (kc.value.azure.access_token) {
+            access_token = bson_strdup(kc.value.azure.access_token);
         } else {
-            access_token = _mongocrypt_cache_oauth_get(kb->crypt->cache_oauth_azure);
+            access_token = mc_mapof_kmsid_to_token_get_token(kb->crypt->cache_oauth, key_doc->kek.kmsid);
         }
         if (!access_token) {
             key_returned->needs_auth = true;
             /* Create an oauth request if one does not exist. */
-            if (!kb->auth_request_azure.initialized) {
-                if (!_mongocrypt_kms_ctx_init_azure_auth(&kb->auth_request_azure.kms,
-                                                         &kb->crypt->log,
-                                                         kms_providers,
+            if (!mc_mapof_kmsid_to_authrequest_has(kb->auth_requests, key_doc->kek.kmsid)) {
+                auth_request_t *ar = auth_request_new();
+                if (!_mongocrypt_kms_ctx_init_azure_auth(&ar->kms,
+                                                         &kc,
                                                          /* The key vault endpoint is used to determine the scope. */
-                                                         key_doc->kek.provider.azure.key_vault_endpoint)) {
-                    mongocrypt_kms_ctx_status(&kb->auth_request_azure.kms, kb->status);
+                                                         key_doc->kek.provider.azure.key_vault_endpoint,
+                                                         key_doc->kek.kmsid,
+                                                         &kb->crypt->log)) {
+                    mongocrypt_kms_ctx_status(&ar->kms, kb->status);
                     _key_broker_fail(kb);
+                    auth_request_destroy(ar);
                     goto done;
                 }
-                kb->auth_request_azure.initialized = true;
+                ar->kmsid = bson_strdup(key_doc->kek.kmsid);
+                mc_mapof_kmsid_to_authrequest_put(kb->auth_requests, ar);
             }
         } else {
             if (!_mongocrypt_kms_ctx_init_azure_unwrapkey(&key_returned->kms,
                                                           kms_providers,
                                                           access_token,
                                                           key_doc,
+                                                          key_returned->doc->kek.kmsid,
                                                           &kb->crypt->log)) {
                 mongocrypt_kms_ctx_status(&key_returned->kms, kb->status);
                 _key_broker_fail(kb);
@@ -545,31 +636,37 @@ bool _mongocrypt_key_broker_add_doc(_mongocrypt_key_broker_t *kb,
             }
         }
     } else if (kek_provider == MONGOCRYPT_KMS_PROVIDER_GCP) {
-        if (NULL != kms_providers->gcp.access_token) {
-            access_token = bson_strdup(kms_providers->gcp.access_token);
+        BSON_ASSERT(kc.type == MONGOCRYPT_KMS_PROVIDER_GCP);
+        if (NULL != kc.value.gcp.access_token) {
+            access_token = bson_strdup(kc.value.gcp.access_token);
         } else {
-            access_token = _mongocrypt_cache_oauth_get(kb->crypt->cache_oauth_gcp);
+            access_token = mc_mapof_kmsid_to_token_get_token(kb->crypt->cache_oauth, key_doc->kek.kmsid);
         }
         if (!access_token) {
             key_returned->needs_auth = true;
             /* Create an oauth request if one does not exist. */
-            if (!kb->auth_request_gcp.initialized) {
-                if (!_mongocrypt_kms_ctx_init_gcp_auth(&kb->auth_request_gcp.kms,
-                                                       &kb->crypt->log,
+            if (!mc_mapof_kmsid_to_authrequest_has(kb->auth_requests, key_doc->kek.kmsid)) {
+                auth_request_t *ar = auth_request_new();
+                if (!_mongocrypt_kms_ctx_init_gcp_auth(&ar->kms,
                                                        &kb->crypt->opts,
-                                                       kms_providers,
-                                                       key_doc->kek.provider.gcp.endpoint)) {
-                    mongocrypt_kms_ctx_status(&kb->auth_request_gcp.kms, kb->status);
+                                                       &kc,
+                                                       key_doc->kek.provider.gcp.endpoint,
+                                                       key_doc->kek.kmsid,
+                                                       &kb->crypt->log)) {
+                    mongocrypt_kms_ctx_status(&ar->kms, kb->status);
                     _key_broker_fail(kb);
+                    auth_request_destroy(ar);
                     goto done;
                 }
-                kb->auth_request_gcp.initialized = true;
+                ar->kmsid = bson_strdup(key_doc->kek.kmsid);
+                mc_mapof_kmsid_to_authrequest_put(kb->auth_requests, ar);
             }
         } else {
             if (!_mongocrypt_kms_ctx_init_gcp_decrypt(&key_returned->kms,
                                                       kms_providers,
                                                       access_token,
                                                       key_doc,
+                                                      key_returned->doc->kek.kmsid,
                                                       &kb->crypt->log)) {
                 mongocrypt_kms_ctx_status(&key_returned->kms, kb->status);
                 _key_broker_fail(kb);
@@ -577,6 +674,7 @@ bool _mongocrypt_key_broker_add_doc(_mongocrypt_key_broker_t *kb,
             }
         }
     } else if (kek_provider == MONGOCRYPT_KMS_PROVIDER_KMIP) {
+        BSON_ASSERT(kc.type == MONGOCRYPT_KMS_PROVIDER_KMIP);
         char *unique_identifier;
         _mongocrypt_endpoint_t *endpoint;
 
@@ -589,17 +687,33 @@ bool _mongocrypt_key_broker_add_doc(_mongocrypt_key_broker_t *kb,
 
         if (key_returned->doc->kek.provider.kmip.endpoint) {
             endpoint = key_returned->doc->kek.provider.kmip.endpoint;
-        } else if (kms_providers->kmip.endpoint) {
-            endpoint = kms_providers->kmip.endpoint;
+        } else if (kc.value.kmip.endpoint) {
+            endpoint = kc.value.kmip.endpoint;
         } else {
             _key_broker_fail_w_msg(kb, "endpoint not set for KMIP request");
             goto done;
         }
 
-        if (!_mongocrypt_kms_ctx_init_kmip_get(&key_returned->kms, endpoint, unique_identifier, &kb->crypt->log)) {
-            mongocrypt_kms_ctx_status(&key_returned->kms, kb->status);
-            _key_broker_fail(kb);
-            goto done;
+        if (key_returned->doc->kek.provider.kmip.delegated) {
+            if (!_mongocrypt_kms_ctx_init_kmip_decrypt(&key_returned->kms,
+                                                       endpoint,
+                                                       key_doc->kek.kmsid,
+                                                       key_doc,
+                                                       &kb->crypt->log)) {
+                mongocrypt_kms_ctx_status(&key_returned->kms, kb->status);
+                _key_broker_fail(kb);
+                goto done;
+            }
+        } else {
+            if (!_mongocrypt_kms_ctx_init_kmip_get(&key_returned->kms,
+                                                   endpoint,
+                                                   unique_identifier,
+                                                   key_doc->kek.kmsid,
+                                                   &kb->crypt->log)) {
+                mongocrypt_kms_ctx_status(&key_returned->kms, kb->status);
+                _key_broker_fail(kb);
+                goto done;
+            }
         }
     } else {
         _key_broker_fail_w_msg(kb, "unrecognized kms provider");
@@ -683,25 +797,40 @@ mongocrypt_kms_ctx_t *_mongocrypt_key_broker_next_kms(_mongocrypt_key_broker_t *
     }
 
     if (kb->state == KB_AUTHENTICATING) {
-        if (!kb->auth_request_azure.initialized && !kb->auth_request_gcp.initialized) {
+        if (mc_mapof_kmsid_to_authrequest_empty(kb->auth_requests)) {
             _key_broker_fail_w_msg(kb,
                                    "unexpected, attempting to authenticate but "
                                    "KMS request not initialized");
             return NULL;
         }
-        if (kb->auth_request_azure.initialized && !kb->auth_request_azure.returned) {
-            kb->auth_request_azure.returned = true;
-            return &kb->auth_request_azure.kms;
-        }
 
-        if (kb->auth_request_gcp.initialized && !kb->auth_request_gcp.returned) {
-            kb->auth_request_gcp.returned = true;
-            return &kb->auth_request_gcp.kms;
+        // Return the first not-yet-returned auth request.
+        for (size_t i = 0; i < mc_mapof_kmsid_to_authrequest_len(kb->auth_requests); i++) {
+            auth_request_t *ar = mc_mapof_kmsid_to_authrequest_at(kb->auth_requests, i);
+
+            if (ar->kms.should_retry) {
+                ar->kms.should_retry = false;
+                ar->returned = true;
+                return &ar->kms;
+            }
+
+            if (ar->returned) {
+                continue;
+            }
+            ar->returned = true;
+            return &ar->kms;
         }
 
         return NULL;
     }
 
+    // Check if any requests need retry
+    for (key_returned_t *ptr = kb->keys_returned; ptr != NULL; ptr = ptr->next) {
+        if (ptr->kms.should_retry) {
+            ptr->kms.should_retry = false;
+            return &ptr->kms;
+        }
+    }
     while (kb->decryptor_iter) {
         if (!kb->decryptor_iter->decrypted) {
             key_returned_t *key_returned;
@@ -731,29 +860,19 @@ bool _mongocrypt_key_broker_kms_done(_mongocrypt_key_broker_t *kb, _mongocrypt_o
         bson_t oauth_response;
         _mongocrypt_buffer_t oauth_response_buf;
 
-        if (kb->auth_request_azure.initialized) {
-            if (!_mongocrypt_kms_ctx_result(&kb->auth_request_azure.kms, &oauth_response_buf)) {
-                mongocrypt_kms_ctx_status(&kb->auth_request_azure.kms, kb->status);
+        // Apply tokens from oauth responses to oauth token cache.
+        for (size_t i = 0; i < mc_mapof_kmsid_to_authrequest_len(kb->auth_requests); i++) {
+            auth_request_t *ar = mc_mapof_kmsid_to_authrequest_at(kb->auth_requests, i);
+
+            if (!_mongocrypt_kms_ctx_result(&ar->kms, &oauth_response_buf)) {
+                mongocrypt_kms_ctx_status(&ar->kms, kb->status);
                 return _key_broker_fail(kb);
             }
 
             /* Cache returned tokens. */
             BSON_ASSERT(_mongocrypt_buffer_to_bson(&oauth_response_buf, &oauth_response));
-            if (!_mongocrypt_cache_oauth_add(kb->crypt->cache_oauth_azure, &oauth_response, kb->status)) {
-                return false;
-            }
-        }
-
-        if (kb->auth_request_gcp.initialized) {
-            if (!_mongocrypt_kms_ctx_result(&kb->auth_request_gcp.kms, &oauth_response_buf)) {
-                mongocrypt_kms_ctx_status(&kb->auth_request_gcp.kms, kb->status);
+            if (!mc_mapof_kmsid_to_token_add_response(kb->crypt->cache_oauth, ar->kmsid, &oauth_response, kb->status)) {
                 return _key_broker_fail(kb);
-            }
-
-            /* Cache returned tokens. */
-            BSON_ASSERT(_mongocrypt_buffer_to_bson(&oauth_response_buf, &oauth_response));
-            if (!_mongocrypt_cache_oauth_add(kb->crypt->cache_oauth_gcp, &oauth_response, kb->status)) {
-                return false;
             }
         }
 
@@ -765,11 +884,20 @@ bool _mongocrypt_key_broker_kms_done(_mongocrypt_key_broker_t *kb, _mongocrypt_o
                 continue;
             }
 
+            mc_kms_creds_t kc;
+            if (!_mongocrypt_opts_kms_providers_lookup(kms_providers, key_returned->doc->kek.kmsid, &kc)) {
+                mongocrypt_status_t *status = kb->status;
+                CLIENT_ERR("KMS provider `%s` is not configured", key_returned->doc->kek.kmsid);
+                return _key_broker_fail(kb);
+            }
+
             if (key_returned->doc->kek.kms_provider == MONGOCRYPT_KMS_PROVIDER_AZURE) {
-                if (kms_providers->azure.access_token) {
-                    access_token = bson_strdup(kms_providers->azure.access_token);
+                BSON_ASSERT(kc.type == MONGOCRYPT_KMS_PROVIDER_AZURE);
+                if (kc.value.azure.access_token) {
+                    access_token = bson_strdup(kc.value.azure.access_token);
                 } else {
-                    access_token = _mongocrypt_cache_oauth_get(kb->crypt->cache_oauth_azure);
+                    access_token =
+                        mc_mapof_kmsid_to_token_get_token(kb->crypt->cache_oauth, key_returned->doc->kek.kmsid);
                 }
 
                 if (!access_token) {
@@ -780,6 +908,7 @@ bool _mongocrypt_key_broker_kms_done(_mongocrypt_key_broker_t *kb, _mongocrypt_o
                                                               kms_providers,
                                                               access_token,
                                                               key_returned->doc,
+                                                              key_returned->doc->kek.kmsid,
                                                               &kb->crypt->log)) {
                     mongocrypt_kms_ctx_status(&key_returned->kms, kb->status);
                     bson_free(access_token);
@@ -789,10 +918,12 @@ bool _mongocrypt_key_broker_kms_done(_mongocrypt_key_broker_t *kb, _mongocrypt_o
                 key_returned->needs_auth = false;
                 bson_free(access_token);
             } else if (key_returned->doc->kek.kms_provider == MONGOCRYPT_KMS_PROVIDER_GCP) {
-                if (NULL != kms_providers->gcp.access_token) {
-                    access_token = bson_strdup(kms_providers->gcp.access_token);
+                BSON_ASSERT(kc.type == MONGOCRYPT_KMS_PROVIDER_GCP);
+                if (kc.value.gcp.access_token) {
+                    access_token = bson_strdup(kc.value.gcp.access_token);
                 } else {
-                    access_token = _mongocrypt_cache_oauth_get(kb->crypt->cache_oauth_gcp);
+                    access_token =
+                        mc_mapof_kmsid_to_token_get_token(kb->crypt->cache_oauth, key_returned->doc->kek.kmsid);
                 }
 
                 if (!access_token) {
@@ -803,6 +934,7 @@ bool _mongocrypt_key_broker_kms_done(_mongocrypt_key_broker_t *kb, _mongocrypt_o
                                                           kms_providers,
                                                           access_token,
                                                           key_returned->doc,
+                                                          key_returned->doc->kek.kmsid,
                                                           &kb->crypt->log)) {
                     mongocrypt_kms_ctx_status(&key_returned->kms, kb->status);
                     bson_free(access_token);
@@ -850,11 +982,16 @@ bool _mongocrypt_key_broker_kms_done(_mongocrypt_key_broker_t *kb, _mongocrypt_o
                 return _key_broker_fail(kb);
             }
 
-            if (!_mongocrypt_unwrap_key(kb->crypt->crypto,
-                                        &kek,
-                                        &key_returned->doc->key_material,
-                                        &key_returned->decrypted_key_material,
-                                        kb->status)) {
+            if (key_returned->doc->kek.provider.kmip.delegated) {
+                if (!_mongocrypt_kms_ctx_result(&key_returned->kms, &key_returned->decrypted_key_material)) {
+                    mongocrypt_kms_ctx_status(&key_returned->kms, kb->status);
+                    return _key_broker_fail(kb);
+                }
+            } else if (!_mongocrypt_unwrap_key(kb->crypt->crypto,
+                                               &kek,
+                                               &key_returned->doc->key_material,
+                                               &key_returned->decrypted_key_material,
+                                               kb->status)) {
                 _key_broker_fail(kb);
                 _mongocrypt_buffer_cleanup(&kek);
                 return false;
@@ -1008,8 +1145,7 @@ void _mongocrypt_key_broker_cleanup(_mongocrypt_key_broker_t *kb) {
     _destroy_keys_returned(kb->keys_returned);
     _destroy_keys_returned(kb->keys_cached);
     _destroy_key_requests(kb->key_requests);
-    _mongocrypt_kms_ctx_cleanup(&kb->auth_request_azure.kms);
-    _mongocrypt_kms_ctx_cleanup(&kb->auth_request_gcp.kms);
+    mc_mapof_kmsid_to_authrequest_destroy(kb->auth_requests);
 }
 
 void _mongocrypt_key_broker_add_test_key(_mongocrypt_key_broker_t *kb, const _mongocrypt_buffer_t *key_id) {
@@ -1026,6 +1162,7 @@ void _mongocrypt_key_broker_add_test_key(_mongocrypt_key_broker_t *kb, const _mo
     key_returned->decrypted = true;
     _mongocrypt_buffer_init(&key_returned->decrypted_key_material);
     _mongocrypt_buffer_resize(&key_returned->decrypted_key_material, MONGOCRYPT_KEY_LEN);
+    // Initialize test key material with all zeros.
     memset(key_returned->decrypted_key_material.data, 0, MONGOCRYPT_KEY_LEN);
     _mongocrypt_key_destroy(key_doc);
     /* Hijack state and move directly to DONE. */

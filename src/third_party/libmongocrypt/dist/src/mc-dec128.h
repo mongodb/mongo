@@ -607,7 +607,7 @@ static inline char *mc_dec128_to_new_decimal_string(mc_dec128 d) {
     }
 }
 
-static inline mc_dec128 mc_dec128_from_bson_iter(bson_iter_t *it) {
+static inline mc_dec128 mc_dec128_from_bson_iter(const bson_iter_t *it) {
     bson_decimal128_t b;
     if (!bson_iter_decimal128(it, &b)) {
         mc_dec128 nan = MC_DEC128_POSITIVE_NAN;

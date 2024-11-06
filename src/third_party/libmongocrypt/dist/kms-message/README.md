@@ -11,7 +11,7 @@ implements the request format.
 - `test_kms_azure_online` makes live requests, and has additional requirements (must have working credentials).
 
 ### Requirements
-- A complete installation of the C driver. (libbson is needed for parsing JSON, and libmongoc is used for creating TLS streams). See http://mongoc.org/libmongoc/current/installing.html for installation instructions. For macOS, `brew install mongo-c-driver` will suffice.
+- A complete installation of the C driver. (libbson is needed for parsing JSON, and libmongoc is used for creating TLS streams). See the [C Driver Manual](https://www.mongodb.com/docs/languages/c/c-driver/current/libmongoc/tutorials/obtaining-libraries/) for installation instructions. For macOS, `brew install mongo-c-driver` will suffice.
 - An Azure key vault, and a service principal with an access policy allowing encrypt / decrypt key operations. The following environment variables must be set:
     - AZURE_TENANT_ID
     - AZURE_CLIENT_ID

@@ -51,6 +51,23 @@ kms_kmip_request_activate_new (void *reserved, const char *unique_identifier);
 KMS_MSG_EXPORT (kms_request_t *)
 kms_kmip_request_get_new (void *reserved, const char *unique_identifier);
 
+KMS_MSG_EXPORT (kms_request_t *)
+kms_kmip_request_create_new (void *reserved);
+
+KMS_MSG_EXPORT (kms_request_t *)
+kms_kmip_request_encrypt_new (void *reserved,
+                          const char *unique_identifier,
+                          const uint8_t *plaintext,
+                          size_t len);
+
+KMS_MSG_EXPORT (kms_request_t *)
+kms_kmip_request_decrypt_new (void *reserved,
+                          const char *unique_identifier,
+                          const uint8_t *ciphertext,
+                          size_t len,
+                          const uint8_t *iv,
+                          size_t iv_len);
+
 #ifdef __cplusplus
 }
 #endif

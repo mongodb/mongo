@@ -17,18 +17,6 @@
 // mc-range-mincover-generator.template.h is meant to be included in another
 // source file.
 
-// TODO: replace `CONCAT` with `BSON_CONCAT` after libbson dependency is
-// upgraded to 1.20.0 or higher.
-#ifndef CONCAT
-#define CONCAT_1(a, b) a##b
-#define CONCAT(a, b) CONCAT_1(a, b)
-#endif
-// TODO: replace `CONCAT3` with `BSON_CONCAT3` after libbson dependency is
-// upgraded to 1.20.0 or higher.
-#ifndef CONCAT3
-#define CONCAT3(a, b, c) CONCAT(a, CONCAT(b, c))
-#endif
-
 #if !(defined(UINT_T) && defined(UINT_C) && defined(UINT_FMT_S) && defined(DECORATE_NAME))
 #ifdef __INTELLISENSE__
 #define UINT_T uint32_t
@@ -101,6 +89,7 @@ typedef struct {
     UINT_T _rangeMin;
     UINT_T _rangeMax;
     size_t _sparsity;
+    int32_t _trimFactor;
     // _maxlen is the maximum bit length of edges in the mincover.
     size_t _maxlen;
 } DECORATE_NAME(MinCoverGenerator);
@@ -110,7 +99,9 @@ static inline DECORATE_NAME(MinCoverGenerator)
                                            UINT_T rangeMax,
                                            UINT_T max,
                                            size_t sparsity,
-                                           mongocrypt_status_t *status) {
+                                           mc_optional_int32_t opt_trimFactor,
+                                           mongocrypt_status_t *status,
+                                           bool use_range_v2) {
     BSON_ASSERT_PARAM(status);
 
     if (UINT_COMPARE(rangeMin, rangeMax) > 0) {
@@ -131,11 +122,25 @@ static inline DECORATE_NAME(MinCoverGenerator)
         CLIENT_ERR("Sparsity must be > 0");
         return NULL;
     }
+    size_t maxlen = (size_t)BITS - DECORATE_NAME(mc_count_leading_zeros)(max);
+    int32_t trimFactor = trimFactorDefault(maxlen, opt_trimFactor, use_range_v2);
+    if (trimFactor != 0 && mc_cmp_greater_equal_su(trimFactor, maxlen)) {
+        CLIENT_ERR("Trim factor must be less than the number of bits (%ld) used to represent an element of the domain, "
+                   "but got %" PRId32,
+                   maxlen,
+                   trimFactor);
+        return NULL;
+    }
+    if (trimFactor < 0) {
+        CLIENT_ERR("Trim factor must be >= 0, but got (%" PRId32 ")", trimFactor);
+        return NULL;
+    }
     DECORATE_NAME(MinCoverGenerator) *mcg = bson_malloc0(sizeof(DECORATE_NAME(MinCoverGenerator)));
     mcg->_rangeMin = rangeMin;
     mcg->_rangeMax = rangeMax;
     mcg->_maxlen = (size_t)BITS - DECORATE_NAME(mc_count_leading_zeros)(max);
     mcg->_sparsity = sparsity;
+    mcg->_trimFactor = trimFactor;
     return mcg;
 }
 
@@ -164,7 +169,9 @@ static inline bool DECORATE_NAME(MinCoverGenerator_isLevelStored)(DECORATE_NAME(
                                                                   size_t maskedBits) {
     BSON_ASSERT_PARAM(mcg);
     size_t level = mcg->_maxlen - maskedBits;
-    return 0 == maskedBits || 0 == (level % mcg->_sparsity);
+    BSON_ASSERT(mc_in_range_size_t_signed(mcg->_trimFactor));
+    size_t trimFactor_sz = (size_t)mcg->_trimFactor;
+    return 0 == maskedBits || (level >= trimFactor_sz && 0 == (level % mcg->_sparsity));
 }
 
 char *
@@ -217,6 +224,11 @@ static inline mc_mincover_t *DECORATE_NAME(MinCoverGenerator_minCover)(DECORATE_
     DECORATE_NAME(MinCoverGenerator_minCoverRec)
     (mcg, &mc->mincover, ZERO, mcg->_maxlen);
     return mc;
+}
+
+static inline int32_t DECORATE_NAME(MinCoverGenerator_usedTrimFactor)(DECORATE_NAME(MinCoverGenerator) * mcg) {
+    BSON_ASSERT_PARAM(mcg);
+    return mcg->_trimFactor;
 }
 
 // adjustBounds increments *lowerBound if includeLowerBound is false and
