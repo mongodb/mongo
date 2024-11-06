@@ -2149,3 +2149,34 @@ def mongo_cc_grpc_library(
         cc_deps = [":" + cc_proto_target],
         **kwargs
     )
+
+def mongo_idl_library(
+        name,
+        src,
+        idl_deps = [],
+        idl_hdrs = [],
+        deps = [],
+        **kwargs):
+    """
+    Args:
+      name: The name of the IDL library.
+      src: The IDL src.
+      idl_deps: The idl_generator deps.
+      idl_hdrs: The idl_generator hdrs.
+      deps: The mongo_cc_library deps.
+    """
+
+    idl_gen_name = name + "_gen"
+    idl_generator(
+        name = idl_gen_name,
+        src = src,
+        hdrs = idl_hdrs,
+        deps = idl_deps,
+    )
+
+    mongo_cc_library(
+        name = name,
+        srcs = [idl_gen_name],
+        deps = deps,
+        **kwargs
+    )

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_idl_library")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@poetry//:dependencies.bzl", "dependency")
 
@@ -180,22 +180,23 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "server_options_helpers_gen",
+mongo_idl_library(
+    name = "server_options_helpers_idl",
     src = "server_options_helpers.idl",
+    deps = [":server_base"],
 )
 
 mongo_cc_library(
     name = "server_options",
     srcs = [
         "server_options_helpers.cpp",
-        "server_options_helpers_gen",
     ],
     hdrs = [
         "server_options_helpers.h",
     ],
     deps = [
         ":server_base",
+        ":server_options_helpers_idl",
         "//src/mongo/util:fail_point",  #  TODO(SERVER-93876): Remove.
         "//src/mongo/util/cmdline_utils",
     ],
