@@ -541,14 +541,13 @@ void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
     auto ranges = flattenBounds(cm.getShardKeyPattern(), bounds);
 
     for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
-        // We need to know which endpoint is the min/max to call getShardIdsForRange(). Normally,
-        // the index bounds should look like [min, max]. If the query was specified with a sort,
-        // however, the index bounds may be out of order, like [max, min].
-        const bool minFirst = !query.getSortPattern() ||
-            SimpleBSONObjComparator::kInstance.evaluate(it->first < it->second);
-        const auto& min = minFirst ? it->first : it->second;
-        const auto& max = minFirst ? it->second : it->first;
+        const auto& min = it->first;
+        const auto& max = it->second;
 
+        // 'getShardIdsForRange()' will only target the correct shards if min < max.
+        tassert(9607300,
+                "Shard targeting index bounds are not in the expected order",
+                SimpleBSONObjComparator::kInstance.evaluate(min <= max));
         cm.getShardIdsForRange(min, max, shardIds, info ? &info->chunkRanges : nullptr);
 
         // Once we know we need to visit all shards no need to keep looping.
