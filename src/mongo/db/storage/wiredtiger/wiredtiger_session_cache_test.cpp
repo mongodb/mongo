@@ -131,6 +131,32 @@ TEST(WiredTigerSessionCacheTest, ReleaseCursorDuringShutdown) {
     session->releaseCursor(tableIdWeDontCareAbout, cursor, "");
 }
 
+// Test that, in the event that we tried to release a session back into the session cache after
+// the storage engine had shut down, we do not invariant and did not actually release the session
+// back into the cache.
+TEST(WiredTigerSessionCacheTest, ReleaseSessionAfterShutdown) {
+    WiredTigerSessionCacheHarnessHelper harnessHelper("");
+    WiredTigerSessionCache* sessionCache = harnessHelper.getSessionCache();
+    // Assert that there are no idle sessions in the cache to start off with.
+    ASSERT_EQ(sessionCache->getIdleSessionsCount(), 0);
+    {
+        UniqueWiredTigerSession session = sessionCache->getSession();
+        WT_CURSOR* cursor = nullptr;
+
+        sessionCache->shuttingDown();
+        ASSERT(sessionCache->isShuttingDown());
+        sessionCache->restart();
+
+        // After the sessionCache shut down, the outstanding session's epoch should be older than
+        // the cache's current epoch. So, when we go to release it, we should see this and not
+        // release it back into the cache. We should also not release its cursor.
+        auto tableIdWeDontCareAbout = WiredTigerSession::genTableId();
+        session->releaseCursor(tableIdWeDontCareAbout, cursor, "");
+    }
+    // Check that the session was not added back into the cache.
+    ASSERT_EQ(sessionCache->getIdleSessionsCount(), 0);
+}
+
 // Test that, if a recovery unit reconfigures its session, the session will have its configuration
 // reset to default values before it is released to the session cache where it can be used by
 // another recovery unit.

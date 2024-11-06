@@ -363,6 +363,7 @@ public:
     }
 
 private:
+    friend class WiredTigerSession;
     WT_CONNECTION* _conn;             // not owned
     ClockSource* const _clockSource;  // not owned
     WiredTigerKVEngine* _engine;      // not owned, might be NULL
