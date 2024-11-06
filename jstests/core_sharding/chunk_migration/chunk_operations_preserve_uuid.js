@@ -12,7 +12,7 @@ const config = db.getSiblingDB('config');
 const shardNames = db.adminCommand({listShards: 1}).shards.map(shard => shard._id);
 
 if (shardNames.length < 2) {
-    print(jsTestName() + " will not run; at least 3 shards are required.");
+    print(jsTestName() + " will not run; at least 2 shards are required.");
     quit();
 }
 

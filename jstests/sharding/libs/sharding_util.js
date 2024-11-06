@@ -6,6 +6,27 @@ export function getShardNames(db) {
     return db.adminCommand({listShards: 1}).shards.map(shard => shard._id);
 }
 
+export function getPrimaryShardNameForDB(db) {
+    const config = db.getSiblingDB("config");
+    const dbdoc = config.databases.findOne({_id: db.getName()});
+    if (dbdoc) {
+        return dbdoc.primary;
+    } else {
+        throw Error("Database " + db.getName() + " not found in config.databases.");
+    }
+}
+
+export function getNonPrimaryShardName(db) {
+    const shardNames = getShardNames(db);
+    const primary = getPrimaryShardNameForDB(db);
+    for (let i = 0; i < shardNames.length; ++i) {
+        if (shardNames[i] !== primary) {
+            return shardNames[i];
+        }
+    }
+    return null;
+}
+
 /**
  * Returns an array of chunks such that each shard has a chunk range that roughly equally covers
  * [min, max]
