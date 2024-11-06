@@ -42,6 +42,8 @@ public:
     void setUp() override {
         ShardServerTestFixture::setUp();
 
+        getServiceContext()->registerClientObserver(std::make_unique<ClientObserver>());
+
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _network = network.get();
         executor::ThreadPoolMock::Options thread_pool_options;
@@ -59,8 +61,6 @@ public:
             std::make_unique<ShardingDDLCoordinatorExternalStateFactoryForTest>());
 
         DDLLockManager::get(getServiceContext())->setRecoverable(_service.get());
-
-        getServiceContext()->registerClientObserver(std::make_unique<ClientObserver>());
     }
 
     void tearDown() override {
