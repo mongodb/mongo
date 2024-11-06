@@ -34,31 +34,9 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
-
-// Reserving 4MB for index details' error and warning messages.
-static constexpr std::size_t kMaxIndexDetailsSizeBytes = 4 * 1024 * 1024;
-
-// Builds an array inside output containing the entries up to a given max size per entry.
-void buildFixedSizedArray(BSONObjBuilder& output,
-                          const std::string& fieldname,
-                          const StringSet& entries,
-                          size_t maxSizePerEntry) {
-
-    std::size_t usedSize = 0;
-    BSONArrayBuilder arr(output.subarrayStart(fieldname));
-
-    for (const auto& value : entries) {
-        if (usedSize >= maxSizePerEntry) {
-            return;
-        }
-        arr.append(value);
-        usedSize += value.size();
-    }
-}
 
 void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
                                         bool debugging,
@@ -129,15 +107,17 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
     BSONObjBuilder keysPerIndex;
     BSONObjBuilder indexDetails;
     int nIndexes = getIndexResultsMap().size();
-
-    // Each list has a size based on the number of indexes, split between error/warning fields.
-    size_t maxSizePerEntry = (kMaxIndexDetailsSizeBytes / std::max(nIndexes, 1)) / 2;
     for (auto& [indexName, ivr] : getIndexResultsMap()) {
         BSONObjBuilder bob(indexDetails.subobjStart(indexName));
         bob.appendBool("valid", ivr.isValid());
 
-        buildFixedSizedArray(bob, "warnings", ivr.getWarnings(), maxSizePerEntry);
-        buildFixedSizedArray(bob, "errors", ivr.getErrors(), maxSizePerEntry);
+        if (!ivr.getWarnings().empty()) {
+            bob.append("warnings", ivr.getWarnings().begin(), ivr.getWarnings().end());
+        }
+
+        if (!ivr.getErrors().empty()) {
+            bob.append("errors", ivr.getErrors().begin(), ivr.getErrors().end());
+        }
 
         keysPerIndex.appendNumber(indexName, static_cast<long long>(ivr.getKeysTraversed()));
     }
