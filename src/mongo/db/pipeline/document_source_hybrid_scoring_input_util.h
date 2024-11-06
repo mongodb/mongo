@@ -27,22 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/util/str.h"
+#pragma once
+
+#include "mongo/base/status.h"
+#include "mongo/db/pipeline/document_source_rank_fusion_inputs_gen.h"
+#include "mongo/db/pipeline/document_source_score_fusion_inputs_gen.h"
 
 namespace mongo {
 
-template <typename T>
-Status requireNonEmpty(const std::vector<T>& inputs) {
-    if (inputs.empty()) {
-        return {ErrorCodes::BadValue,
-                "A hybrid scoring stage should be run with at least one pipeline."};
-    }
-    return Status::OK();
-}
+/**
+ * Validates that:
+ *  (a) there is at least one pipeline,
+ *  (b) that each element in the object is an array of objects.
+ *  (c) the names don't contain any special characters.
+ */
+Status validatePipelinesObject(const BSONObj& pipelines);
 
-Status validateScoreFusionMinInputs(const std::vector<ScoreFusionInputsSpec>& inputs) {
-    return requireNonEmpty(inputs);
-}
 }  // namespace mongo

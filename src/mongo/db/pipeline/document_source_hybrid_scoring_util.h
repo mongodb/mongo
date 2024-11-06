@@ -43,12 +43,6 @@ Status requireNonEmpty(const std::vector<T>& inputs);
 
 /**
  * Helper function to validate that there is at least one input pipeline for a hybrid scoring
- * $rankFusion stage.
- */
-Status validateRankFusionMinInputs(const std::vector<RankFusionInputsSpec>& inputs);
-
-/**
- * Helper function to validate that there is at least one input pipeline for a hybrid scoring
  * $scoreFusion stage.
  */
 Status validateScoreFusionMinInputs(const std::vector<ScoreFusionInputsSpec>& inputs);

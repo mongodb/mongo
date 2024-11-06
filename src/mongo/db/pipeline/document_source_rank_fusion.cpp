@@ -46,7 +46,6 @@
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
@@ -57,7 +56,6 @@
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -124,22 +122,11 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
         }
     });
 }
-}  // namespace
 
-std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
-    std::vector<LiteParsedPipeline> liteParsedPipelines;
-
-    auto parsedSpec = RankFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
-
-    // Ensure that all pipelines are valid ranked selection pipelines.
-    for (const auto& input : parsedSpec.getInputs()) {
-        liteParsedPipelines.emplace_back(LiteParsedPipeline(nss, input.getPipeline()));
-    }
-
-    return std::make_unique<DocumentSourceRankFusion::LiteParsed>(
-        spec.fieldName(), nss, std::move(liteParsedPipelines));
+std::vector<BSONObj> getPipeline(BSONElement inputPipeElem) {
+    return parsePipelineFromBSON(inputPipeElem);
 }
+
 BSONObj group() {
     return fromjson(R"({
         $group: {
@@ -182,27 +169,47 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     return {groupStage, unwindStage, addFields};
 }
 
-BSONObj groupEachScore(const std::string& prefixOne, const std::string& prefixTwo) {
-    std::string scoreOne = prefixOne + "_score";
-    std::string scoreTwo = prefixTwo + "_score";
+BSONObj groupEachScore(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines) {
+    const auto allScores = [&]() {
+        StringBuilder sb;
+        for (auto it = pipelines.begin(); it != pipelines.end(); it++) {
+            sb << ", ";
+            const auto scoreName = it->first + "_score";
+            sb << scoreName << R"(: {$max: {$ifNull: ["$)" + scoreName + R"(", 0]}})";
+        }
+        return sb.str();
+    };
     return fromjson(R"({
         $group: {
                 _id: "$docs._id",
-                docs: {$first: "$docs"},
-                )" + scoreOne +
-                    R"(: {$max: {$ifNull: ["$)" + scoreOne + R"(", 0]}},
-                )" + scoreTwo +
-                    R"(: {$max: {$ifNull: ["$)" + scoreTwo + R"(", 0]}}
-            }
+                docs: {$first: "$docs"}
+                )" + allScores() +
+                    R"(}
     })");
 }
 
-BSONObj calculateFinalScore(const std::string& prefixOne, const std::string& prefixTwo) {
+BSONObj calculateFinalScore(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs) {
+    const auto& allInputs = [&] {
+        StringBuilder sb;
+        sb << "[";
+        bool first = true;
+        for (auto it = inputs.begin(); it != inputs.end(); it++) {
+            if (!first) {
+                sb << ", ";
+            }
+            first = false;
+            sb << "\"$" << it->first << "_score\"";
+        }
+        sb << "]";
+        return sb.str();
+    };
     BSONObj finalScore = fromjson(R"({
         $addFields: {
             score: {
-                $add: ["$)" + prefixOne +
-                                  R"(_score", "$)" + prefixTwo + R"(_score"]
+                $add: )" + allInputs() +
+                                  R"(
             }
         }
     })");
@@ -212,27 +219,27 @@ BSONObj calculateFinalScore(const std::string& prefixOne, const std::string& pre
 boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     const std::string& prefix,
     const int& rankConstant,
-    std::vector<mongo::BSONObj> pipeline,
+    std::unique_ptr<Pipeline, PipelineDeleter> oneInputPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    pipeline.push_back(group());
-    pipeline.push_back(unwind(prefix));
-    pipeline.push_back(addScoreField(prefix, rankConstant));
+    std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson();
+    bsonPipeline.push_back(group());
+    bsonPipeline.push_back(unwind(prefix));
+    bsonPipeline.push_back(addScoreField(prefix, rankConstant));
 
     auto collName = expCtx->ns.coll();
 
     BSONObj inputToUnionWith =
-        BSON("$unionWith" << BSON("coll" << collName << "pipeline" << pipeline));
+        BSON("$unionWith" << BSON("coll" << collName << "pipeline" << bsonPipeline));
     return DocumentSourceUnionWith::createFromBson(inputToUnionWith.firstElement(), expCtx);
 }
 
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
-    const std::string& prefixOne,
-    const std::string& prefixTwo,
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto group = DocumentSourceGroup::createFromBson(
-        groupEachScore(prefixOne, prefixTwo).firstElement(), expCtx);
+    auto group =
+        DocumentSourceGroup::createFromBson(groupEachScore(inputPipelines).firstElement(), expCtx);
     auto addFields = DocumentSourceAddFields::createFromBson(
-        calculateFinalScore(prefixOne, prefixTwo).firstElement(), expCtx);
+        calculateFinalScore(inputPipelines).firstElement(), expCtx);
 
     BSONObj sortObj = fromjson(R"({
         $sort: { score: -1, _id: 1}
@@ -247,6 +254,24 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     return {group, addFields, sort, replaceRoot};
 }
 
+}  // namespace
+
+std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::LiteParsed::parse(
+    const NamespaceString& nss, const BSONElement& spec) {
+    std::vector<LiteParsedPipeline> liteParsedPipelines;
+
+    auto parsedSpec = RankFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
+    auto inputPipesObj = parsedSpec.getInput().getPipelines();
+    // TODO SERVER-94603 will need to validate that weights shares the names.
+
+    // Ensure that all pipelines are valid ranked selection pipelines.
+    for (const auto& elem : inputPipesObj) {
+        liteParsedPipelines.emplace_back(LiteParsedPipeline(nss, getPipeline(elem)));
+    }
+
+    return std::make_unique<DocumentSourceRankFusion::LiteParsed>(
+        spec.fieldName(), nss, std::move(liteParsedPipelines));
+}
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
@@ -258,51 +283,48 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
 
     auto spec = RankFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
-    std::list<std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
-    std::list<std::vector<mongo::BSONObj>> inputPipelinesBsonObj;
+    // It's important to use an ordered map here, so that we get stability in the desugaring =>
+    // stability in the query shape.
+    std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
 
     // Ensure that all pipelines are valid ranked selection pipelines.
-    for (const auto& input : spec.getInputs()) {
-        inputPipelinesBsonObj.push_back(input.getPipeline());
-        inputPipelines.push_back(
-            Pipeline::parse(input.getPipeline(), pExpCtx, rankFusionPipelineValidator));
+    for (const auto& elem : spec.getInput().getPipelines()) {
+        auto pipeline = Pipeline::parse(getPipeline(elem), pExpCtx);
+        rankFusionPipelineValidator(*pipeline);
+        inputPipelines[elem.fieldName()] = std::move(pipeline);
     }
 
     auto rankConstant = 60;
-    std::list<boost::intrusive_ptr<DocumentSource>> rankFusionPipeline;
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+    auto takePipeline = [&outputStages](auto& pipeline) {
+        while (!pipeline->getSources().empty()) {
+            outputStages.push_back(pipeline->popFront());
+        }
+    };
 
-    // Add the first input pipeline to our final output.
-    const std::string& pipelinePrefixOne = "first";
-    std::unique_ptr<Pipeline, PipelineDeleter> inputPipelineOne = std::move(inputPipelines.front());
-    inputPipelines.pop_front();
-    inputPipelinesBsonObj.pop_front();
-
-    rankFusionPipeline = inputPipelineOne->getSources();
-    auto firstPipelineStages = buildFirstPipelineStages(pipelinePrefixOne, rankConstant, pExpCtx);
-    for (const auto& stage : firstPipelineStages) {
-        rankFusionPipeline.push_back(stage);
+    for (auto it = inputPipelines.begin(); it != inputPipelines.end(); it++) {
+        const auto& name = it->first;
+        auto& pipeline = it->second;
+        if (outputStages.empty()) {
+            // First pipeline.
+            takePipeline(pipeline);
+            auto firstPipelineStages = buildFirstPipelineStages(name, rankConstant, pExpCtx);
+            for (const auto& stage : firstPipelineStages) {
+                outputStages.push_back(std::move(stage));
+            }
+        } else {
+            auto unionWithStage =
+                buildUnionWithPipeline(name, rankConstant, std::move(pipeline), pExpCtx);
+            outputStages.push_back(unionWithStage);
+        }
     }
-
-    if (inputPipelines.empty()) {
-        return rankFusionPipeline;
-    }
-
-    // Add all secondary input pipelines to our final output.
-    const std::string& pipelinePrefixTwo = "second";
-    std::unique_ptr<Pipeline, PipelineDeleter> inputPipelineTwo = std::move(inputPipelines.front());
-    std::vector<mongo::BSONObj> inputPipelineTwoBson = inputPipelinesBsonObj.front();
-    inputPipelinesBsonObj.pop_front();
-
-    auto unionWithStages =
-        buildUnionWithPipeline(pipelinePrefixTwo, rankConstant, inputPipelineTwoBson, pExpCtx);
-    rankFusionPipeline.push_back(unionWithStages);
 
     // Build all remaining stages to perform the fusion.
-    auto finalStages = buildScoreAndMergeStages(pipelinePrefixOne, pipelinePrefixTwo, pExpCtx);
+    auto finalStages = buildScoreAndMergeStages(inputPipelines, pExpCtx);
     for (const auto& stage : finalStages) {
-        rankFusionPipeline.push_back(stage);
+        outputStages.push_back(stage);
     }
 
-    return rankFusionPipeline;
+    return outputStages;
 }
 }  // namespace mongo

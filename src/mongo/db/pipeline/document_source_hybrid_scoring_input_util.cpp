@@ -27,22 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
+#include "mongo/db/pipeline/document_source_hybrid_scoring_input_util.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/util/str.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 
 namespace mongo {
 
-template <typename T>
-Status requireNonEmpty(const std::vector<T>& inputs) {
-    if (inputs.empty()) {
+Status validatePipelinesObject(const BSONObj& pipelines) {
+    if (pipelines.isEmpty()) {
         return {ErrorCodes::BadValue,
                 "A hybrid scoring stage should be run with at least one pipeline."};
     }
-    return Status::OK();
-}
 
-Status validateScoreFusionMinInputs(const std::vector<ScoreFusionInputsSpec>& inputs) {
-    return requireNonEmpty(inputs);
+    for (auto&& elem : pipelines) {
+        // Validate the name.
+        for (auto&& character : elem.fieldNameStringData()) {
+            if (!isalpha(character)) {
+                // TODO SERVER-96154 - need some more careful validation here.
+                return {ErrorCodes::Error{9612700},
+                        "Cannot use special characters in hybrid search pipeline names"};
+            }
+        }
+        if (auto status = attemptToParsePipelineFromBSON(elem).getStatus(); !status.isOK()) {
+            return status.withContext("Error parsing $rankFusion.input.pipelines");
+        }
+    }
+
+    return Status::OK();
 }
 }  // namespace mongo

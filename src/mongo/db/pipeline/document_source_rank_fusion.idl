@@ -38,9 +38,7 @@ structs:
     description: Specification for a $rankFusion stage.
     strict: true
     fields:
-      inputs:
+      input:
         description: The set of sub-pipelines' results to be merged with rank fusion.
-        type: array<RankFusionInputsSpec>
+        type: RankFusionInputSpec
         optional: false
-        validator:
-            {callback: "validateRankFusionMinInputs"}

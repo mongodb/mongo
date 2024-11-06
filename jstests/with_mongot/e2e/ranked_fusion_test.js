@@ -43,9 +43,9 @@ const vectorSearchOverrequestFactor = 10;
 let testQuery = [
     {
         $rankFusion: {
-            inputs: [
-                {
-                    pipeline: [{
+            input: {
+                pipelines: {
+                    vector: [{
                         $vectorSearch: {
                             // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
                             queryVector: getPlotEmbeddingById(6),
@@ -55,9 +55,7 @@ let testQuery = [
                             limit: limit,
                         }
                     }],
-                },
-                {
-                    pipeline: [
+                    search: [
                         {
                             $search: {
                                 index: "search_movie_block",
@@ -66,8 +64,8 @@ let testQuery = [
                         },
                         {$limit: limit}
                     ]
-                },
-            ]
+                }
+            }
         },
     },
     {$limit: limit}

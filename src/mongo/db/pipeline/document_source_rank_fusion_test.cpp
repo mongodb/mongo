@@ -70,7 +70,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnknownField) {
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfInputsIsNotArray) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: "not an array"
+            input: {pipelines: "not an array"}
         }
     })");
 
@@ -82,22 +82,21 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfInputsIsNotArray) {
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNoPipeline) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-            ]
+            input: {
+                pipelines: []
+            }
         }
     })");
 
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::BadValue);
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfMissingPipeline) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-                {}
-            ]
+            input: {}
         }
     })");
 
@@ -109,14 +108,14 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfMissingPipeline) {
 TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ]
-               }
-            ]
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ]
+                }
+            }
         }
     })");
 
@@ -151,19 +150,19 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
                 {
                     "$unwind": {
                         "path": "$docs",
-                        "includeArrayIndex": "first_rank"
+                        "includeArrayIndex": "agatha_rank"
                     }
                 },
                 {
                     "$addFields": {
-                        "first_score": {
+                        "agatha_score": {
                             "$divide": [
                                 {
                                     "$const": 1
                                 },
                                 {
                                     "$add": [
-                                        "$first_rank",
+                                        "$agatha_rank",
                                         {
                                             "$const": 60
                                         }
@@ -171,6 +170,44 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
                                 }
                             ]
                         }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "agatha_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$agatha_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 }
             ]
@@ -181,15 +218,15 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnknownFieldInsideInputs) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ],
+            input: {
+                pipelines: {
+                    authorMatch: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ]
+                },
                 unknown: "bad field"
-               }
-            ]
+            }
         }
     })");
 
@@ -199,48 +236,20 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnknownFieldInsideInputs) {
 }
 
 
-TEST_F(DocumentSourceRankFusionTest, ErrorsIfAsIsNotString) {
-    auto spec = fromjson(R"({
-        $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ],
-                as: 1
-               },
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ]
-               }
-            ]
-        }
-    })");
-
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       ErrorCodes::TypeMismatch);
-}
-
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNotRankedPipeline) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ]
-               },
-               {
-                pipeline: [
-                    { $match : { age : 50 } }
-                ]
-               }
-            ]
+            input: {
+                pipelines: {
+                    pipeOne: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    pipeTwo: [
+                        { $match : { age : 50 } }
+                    ]
+                }
+            }
         }
     })");
 
@@ -256,43 +265,36 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
 
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ],
-                as: "matchAuthor"
-               },
-               {
-                pipeline: [
-                    {
-                        $search: {
-                            index: "search_index",
-                            text: {
-                                query: "mystery",
-                                path: "genres"
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
                             }
                         }
-                    }
-                ],
-                as: "matchGenres"
-               },
-               {
-                pipeline: [
-                    {
-                        $vectorSearch: {
-                            queryVector: [1.0, 2.0, 3.0],
-                            path: "plot_embedding",
-                            numCandidates: 300,
-                            index: "vector_index",
-                            limit: 10
+                    ],
+                    matchPlot: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
                         }
-                    }
-                ],
-                as: "matchPlot"
-               }
-            ]
+                    ]
+                }
+            }
         }
     })");
 
@@ -327,19 +329,19 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                 {
                     "$unwind": {
                         "path": "$docs",
-                        "includeArrayIndex": "first_rank"
+                        "includeArrayIndex": "matchAuthor_rank"
                     }
                 },
                 {
                     "$addFields": {
-                        "first_score": {
+                        "matchAuthor_score": {
                             "$divide": [
                                 {
                                     "$const": 1
                                 },
                                 {
                                     "$add": [
-                                        "$first_rank",
+                                        "$matchAuthor_rank",
                                         {
                                             "$const": 60
                                         }
@@ -375,19 +377,74 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                             {
                                 "$unwind": {
                                     "path": "$docs",
-                                    "includeArrayIndex": "second_rank"
+                                    "includeArrayIndex": "matchGenres_rank"
                                 }
                             },
                             {
                                 "$addFields": {
-                                    "second_score": {
+                                    "matchGenres_score": {
                                         "$divide": [
                                             {
                                                 "$const": 1
                                             },
                                             {
                                                 "$add": [
-                                                    "$second_rank",
+                                                    "$matchGenres_rank",
+                                                    {
+                                                        "$const": 60
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "$const": null
+                                    },
+                                    "docs": {
+                                        "$push": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$unwind": {
+                                    "path": "$docs",
+                                    "includeArrayIndex": "matchPlot_rank"
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchPlot_score": {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    "$matchPlot_rank",
                                                     {
                                                         "$const": 60
                                                     }
@@ -406,20 +463,30 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                         "docs": {
                             "$first": "$docs"
                         },
-                        "first_score": {
+                        "matchAuthor_score": {
                             "$max": {
                                 "$ifNull": [
-                                    "$first_score",
+                                    "$matchAuthor_score",
                                     {
                                         "$const": 0
                                     }
                                 ]
                             }
                         },
-                        "second_score": {
+                        "matchGenres_score": {
                             "$max": {
                                 "$ifNull": [
-                                    "$second_score",
+                                    "$matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchPlot_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchPlot_score",
                                     {
                                         "$const": 0
                                     }
@@ -432,8 +499,9 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                     "$addFields": {
                         "score": {
                             "$add": [
-                                "$first_score",
-                                "$second_score"
+                                "$matchAuthor_score",
+                                "$matchGenres_score",
+                                "$matchPlot_score"
                             ]
                         }
                     }
@@ -457,30 +525,26 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchMetaUsed) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ],
-                as: "matchAuthor"
-               },
-               {
-                pipeline: [
-                    {
-                        $searchMeta: {
-                            index: "search_index",
-                            text: {
-                                query: "mystery",
-                                path: "genres"
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenre: [
+                        {
+                            $searchMeta: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
                             }
-                        }
-                    },
-                    { $sort: {genres: 1} }
-                ],
-                as: "matchGenres"
-               }
-            ]
+                        },
+                        { $sort: {genres: 1} }
+                    ]
+                }
+            }
         }
     })");
 
@@ -492,31 +556,27 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchMetaUsed) {
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchStoredSourceUsed) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ],
-                as: "matchAuthor"
-               },
-               {
-                pipeline: [
-                    {
-                        $search: {
-                            index: "search_index",
-                            text: {
-                                query: "mystery",
-                                path: "genres"
-                            },
-                            "returnStoredSource": true
-                        }
-                    },
-                    { $sort: {genres: 1} }
-                ],
-                as: "matchGenres"
-               }
-            ]
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenre: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                },
+                                "returnStoredSource": true
+                            }
+                        },
+                        { $sort: {genres: 1} }
+                    ]
+                }
+            }
         }
     })");
 
@@ -526,39 +586,34 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchStoredSourceUsed) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ],
-                as: "matchAuthor"
-               },
-               {
-                pipeline: [
-                    {
-                        $_internalSearchMongotRemote: {
-                            index: "search_index",
-                            text: {
-                                query: "mystery",
-                                path: "genres"
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    matchGenre: [
+                        {
+                            $_internalSearchMongotRemote: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
                             }
-                        }
-                    },
-                    { $sort: {genres: 1} }
-                ],
-                as: "matchGenres"
-               }
-            ]
+                        },
+                        { $sort: {genres: 1} }
+                    ]
+                }
+            }
         }
     })");
 
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       16436);
+                       16436);  // Unrecognized stage.
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
@@ -574,33 +629,30 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
 
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $sample: { size: 10 } },
-                    { $sort: {author: 1} },
-                    { $limit: 10 }
-                ]
-               },
-               {
-                pipeline: [
-                    { $unionWith: {
-                        coll: "novels",
-                        pipeline: [
-                            { $limit: 3 },
-                            {
-                                $unionWith: {
-                                    coll: "shortstories"
+            input: {
+                pipelines: {
+                    sample: [
+                        { $sample: { size: 10 } },
+                        { $sort: {author: 1} },
+                        { $limit: 10 }
+                    ],
+                    unionWith: [
+                        { $unionWith: {
+                            coll: "novels",
+                            pipeline: [
+                                { $limit: 3 },
+                                {
+                                    $unionWith: {
+                                        coll: "shortstories"
+                                    }
                                 }
+                            ]
                             }
-                        ]
-                        }
-                    },
-                    { $sort: {author: 1} }
-                ]
-               }
-
-            ]
+                        },
+                        { $sort: {author: 1} }
+                    ]
+                }
+            }
         }
     })");
 
@@ -638,19 +690,19 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
                 {
                     "$unwind": {
                         "path": "$docs",
-                        "includeArrayIndex": "first_rank"
+                        "includeArrayIndex": "sample_rank"
                     }
                 },
                 {
                     "$addFields": {
-                        "first_score": {
+                        "sample_score": {
                             "$divide": [
                                 {
                                     "$const": 1
                                 },
                                 {
                                     "$add": [
-                                        "$first_rank",
+                                        "$sample_rank",
                                         {
                                             "$const": 60
                                         }
@@ -698,19 +750,19 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
                             {
                                 "$unwind": {
                                     "path": "$docs",
-                                    "includeArrayIndex": "second_rank"
+                                    "includeArrayIndex": "unionWith_rank"
                                 }
                             },
                             {
                                 "$addFields": {
-                                    "second_score": {
+                                    "unionWith_score": {
                                         "$divide": [
                                             {
                                                 "$const": 1
                                             },
                                             {
                                                 "$add": [
-                                                    "$second_rank",
+                                                    "$unionWith_rank",
                                                     {
                                                         "$const": 60
                                                     }
@@ -729,20 +781,20 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
                         "docs": {
                             "$first": "$docs"
                         },
-                        "first_score": {
+                        "sample_score": {
                             "$max": {
                                 "$ifNull": [
-                                    "$first_score",
+                                    "$sample_score",
                                     {
                                         "$const": 0
                                     }
                                 ]
                             }
                         },
-                        "second_score": {
+                        "unionWith_score": {
                             "$max": {
                                 "$ifNull": [
-                                    "$second_score",
+                                    "$unionWith_score",
                                     {
                                         "$const": 0
                                     }
@@ -755,8 +807,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
                     "$addFields": {
                         "score": {
                             "$add": [
-                                "$first_score",
-                                "$second_score"
+                                "$sample_score",
+                                "$unionWith_score"
                             ]
                         }
                     }
@@ -779,6 +831,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
     auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
+        {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
     auto nsToUnionWith1 =
         NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
@@ -788,36 +842,34 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
 
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $sample: { size: 10 } },
-                    { $sort: {author: 1} },
-                    { $limit: 10 }
-                ]
-               },
-               {
-                pipeline: [
-                    { $unionWith: {
-                        coll: "novels",
-                        pipeline: [
-                            {
-                                $project: {
-                                    _id: 1
+            input: {
+                pipelines: {
+                    sample: [
+                        { $sample: { size: 10 } },
+                        { $sort: {author: 1} },
+                        { $limit: 10 }
+                    ],
+                    unionWith: [
+                        { $unionWith: {
+                            coll: "novels",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        _id: 1
+                                    }
+                                },
+                                {
+                                    $unionWith: {
+                                        coll: "shortstories"
+                                    }
                                 }
-                            },
-                            {
-                                $unionWith: {
-                                    coll: "shortstories"
-                                }
+                            ]
                             }
-                        ]
-                        }
-                    },
-                    { $sort: {author: 1} }
-                ]
-               }
-            ]
+                        },
+                        { $sort: {author: 1} }
+                    ]
+                }
+            }
         }
     })");
 
@@ -832,27 +884,25 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
         {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ]
-               },
-               {
-                pipeline: [
-                    {
-                        $geoNear: {
-                            near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
-                            distanceField: "dist.calculated",
-                            maxDistance: 2,
-                            query: { category: "Parks" },
-                            spherical: true
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    geo: [
+                        {
+                            $geoNear: {
+                                near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                distanceField: "dist.calculated",
+                                maxDistance: 2,
+                                query: { category: "Parks" },
+                                spherical: true
+                            }
                         }
-                    }
-                ]
-               }
-            ]
+                    ]
+                }
+            }
         }
     })");
 
@@ -887,19 +937,19 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
                 {
                     "$unwind": {
                         "path": "$docs",
-                        "includeArrayIndex": "first_rank"
+                        "includeArrayIndex": "agatha_rank"
                     }
                 },
                 {
                     "$addFields": {
-                        "first_score": {
+                        "agatha_score": {
                             "$divide": [
                                 {
                                     "$const": 1
                                 },
                                 {
                                     "$add": [
-                                        "$first_rank",
+                                        "$agatha_rank",
                                         {
                                             "$const": 60
                                         }
@@ -931,9 +981,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
                                     "distanceField": "dist.calculated",
                                     "maxDistance": 2,
                                     "query": {
-                                        "category": {
-                                            "$eq": "Parks"
-                                        }
+                                        "category": {$eq: "Parks"}
                                     },
                                     "spherical": true
                                 }
@@ -951,19 +999,19 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
                             {
                                 "$unwind": {
                                     "path": "$docs",
-                                    "includeArrayIndex": "second_rank"
+                                    "includeArrayIndex": "geo_rank"
                                 }
                             },
                             {
                                 "$addFields": {
-                                    "second_score": {
+                                    "geo_score": {
                                         "$divide": [
                                             {
                                                 "$const": 1
                                             },
                                             {
                                                 "$add": [
-                                                    "$second_rank",
+                                                    "$geo_rank",
                                                     {
                                                         "$const": 60
                                                     }
@@ -982,20 +1030,20 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
                         "docs": {
                             "$first": "$docs"
                         },
-                        "first_score": {
+                        "agatha_score": {
                             "$max": {
                                 "$ifNull": [
-                                    "$first_score",
+                                    "$agatha_score",
                                     {
                                         "$const": 0
                                     }
                                 ]
                             }
                         },
-                        "second_score": {
+                        "geo_score": {
                             "$max": {
                                 "$ifNull": [
-                                    "$second_score",
+                                    "$geo_score",
                                     {
                                         "$const": 0
                                     }
@@ -1008,8 +1056,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
                     "$addFields": {
                         "score": {
                             "$add": [
-                                "$first_score",
-                                "$second_score"
+                                "$agatha_score",
+                                "$geo_score"
                             ]
                         }
                     }
@@ -1033,28 +1081,26 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfGeoNearIncludeLocs) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ]
-               },
-               {
-                pipeline: [
-                    {
-                        $geoNear: {
-                            near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
-                            distanceField: "dist.calculated",
-                            maxDistance: 2,
-                            query: { category: "Parks" },
-                            includeLocs: "dist.location",
-                            spherical: true
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    geo: [
+                        {
+                            $geoNear: {
+                                near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                                distanceField: "dist.calculated",
+                                maxDistance: 2,
+                                query: { category: "Parks" },
+                                includeLocs: "dist.location",
+                                spherical: true
+                            }
                         }
-                    }
-                ]
-               }
-            ]
+                    ]
+                }
+            }
         }
     })");
 
@@ -1066,21 +1112,19 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfGeoNearIncludeLocs) {
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfIncludeProject) {
     auto spec = fromjson(R"({
         $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ]
-               },
-               {
-                pipeline: [
-                    { $match : { age : 50 } },
-                    { $sort: {author: 1} },
-                    { $project: { author: 1 } }
-                ]
-               }
-            ]
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    elderAuthors: [
+                        { $match : { age : 50 } },
+                        { $sort: {author: 1} },
+                        { $project: { author: 1 } }
+                    ]
+                }
+            }
         }
     })");
 
