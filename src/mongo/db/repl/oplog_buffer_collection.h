@@ -144,9 +144,6 @@ public:
                            const Timestamp& ts,
                            SeekStrategy exact = SeekStrategy::kExact) final;
 
-    // Only currently used by the TenantMigrationRecipientService, so not part of a parent API.
-    Timestamp getLastPushedTimestamp() const;
-
     // ---- Testing API ----
     Timestamp getLastPoppedTimestamp_forTest() const;
     std::queue<BSONObj> getPeekCache_forTest() const;

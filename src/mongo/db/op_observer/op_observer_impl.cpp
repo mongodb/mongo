@@ -520,20 +520,6 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     invariant(std::distance(fromMigrate.begin(), fromMigrate.end()) == std::distance(begin, end),
               oplogEntryTemplate->toReplOperation().toBSON().toString());
 
-    // If this oplog entry is from a tenant migration, include the tenant migration
-    // UUID and optional donor timeline metadata.
-    if (const auto& recipientInfo = repl::tenantMigrationInfo(opCtx)) {
-        oplogEntryTemplate->setFromTenantMigration(recipientInfo->uuid);
-        if (oplogEntryTemplate->getTid() &&
-            change_stream_serverless_helpers::isChangeStreamEnabled(
-                opCtx, *oplogEntryTemplate->getTid()) &&
-            recipientInfo->donorOplogEntryData) {
-            oplogEntryTemplate->setDonorOpTime(recipientInfo->donorOplogEntryData->donorOpTime);
-            oplogEntryTemplate->setDonorApplyOpsIndex(
-                recipientInfo->donorOplogEntryData->applyOpsIndex);
-        }
-    }
-
     const size_t count = end - begin;
     // Either no recordIds were passed in, or the number passed in is equal to the number
     // of inserts that happened.

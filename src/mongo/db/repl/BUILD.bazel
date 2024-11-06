@@ -1687,33 +1687,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "tenant_oplog_processing",
-    srcs = [
-        "tenant_oplog_applier.cpp",
-        "tenant_oplog_batcher.cpp",
-    ],
-    hdrs = [
-        "tenant_all_database_cloner.h",
-        "tenant_base_cloner.h",
-        "tenant_collection_cloner.h",
-        "tenant_database_cloner.h",
-        "tenant_oplog_applier.h",
-        "tenant_oplog_batcher.h",
-    ],
-    deps = [
-        ":abstract_async_component",
-        ":cloner_utils",
-        ":oplog",
-        ":oplog_application",
-        ":oplog_application_interface",
-        ":repl_server_parameters",
-        "//src/mongo:base",
-        "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/session:session_catalog_mongod",
-    ],
-)
-
-mongo_cc_library(
     name = "isself",
     srcs = [
         "isself.cpp",

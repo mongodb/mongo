@@ -724,18 +724,6 @@ bool OplogEntry::getCheckExistenceForDiffInsert() const& {
     return _entry.getCheckExistenceForDiffInsert().get_value_or(false);
 }
 
-const boost::optional<mongo::UUID>& OplogEntry::getFromTenantMigration() const& {
-    return _entry.getFromTenantMigration();
-}
-
-const boost::optional<mongo::repl::OpTime>& OplogEntry::getDonorOpTime() const& {
-    return _entry.getDonorOpTime();
-}
-
-boost::optional<std::int64_t> OplogEntry::getDonorApplyOpsIndex() const& {
-    return _entry.getDonorApplyOpsIndex();
-}
-
 const boost::optional<mongo::repl::OpTime>& OplogEntry::getPrevWriteOpTimeInTransaction() const& {
     return _entry.getPrevWriteOpTimeInTransaction();
 }

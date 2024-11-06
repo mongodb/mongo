@@ -427,19 +427,6 @@ void logOplogRecords(OperationContext* opCtx,
         uasserted(ErrorCodes::NotWritablePrimary, ss);
     }
 
-    // Throw TenantMigrationConflict error if the database for 'nss' is being migrated. The oplog
-    // entry for renameCollection has 'nss' set to the fromCollection's ns. renameCollection can be
-    // across databases, but a tenant will never be able to rename into a database with a different
-    // prefix, so it is safe to use the fromCollection's db's prefix for this check.
-    //
-    // Skip the check if this is an "abortIndexBuild" oplog entry since it is safe to the abort an
-    // index build on the donor after the blockTimestamp, plus if an index build fails to commit due
-    // to TenantMigrationConflict, we need to be able to abort the index build and clean up.
-    if (!isAbortIndexBuild) {
-        tenant_migration_access_blocker::checkIfCanWriteOrThrow(
-            opCtx, nss.dbName(), timestamps.back());
-    }
-
     Status result = insertDocumentsForOplog(opCtx, oplogCollection, records, timestamps);
     if (!result.isOK()) {
         LOGV2_FATAL(17322, "Write to oplog failed", "error"_attr = result.toString());
@@ -495,18 +482,6 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
                 oplogEntry->getStatementIds().empty());
         return {};
     }
-    // If this oplog entry is from a tenant migration, include the tenant migration
-    // UUID and optional donor timeline metadata.
-    if (const auto& recipientInfo = tenantMigrationInfo(opCtx)) {
-        oplogEntry->setFromTenantMigration(recipientInfo->uuid);
-        if (oplogEntry->getTid() &&
-            change_stream_serverless_helpers::isChangeStreamEnabled(opCtx, *oplogEntry->getTid()) &&
-            recipientInfo->donorOplogEntryData) {
-            oplogEntry->setDonorOpTime(recipientInfo->donorOplogEntryData->donorOpTime);
-            oplogEntry->setDonorApplyOpsIndex(recipientInfo->donorOplogEntryData->applyOpsIndex);
-        }
-    }
-
 
     // TODO SERVER-51301 to remove this block.
     if (oplogEntry->getOpType() == repl::OpTypeEnum::kNoop) {
@@ -1215,17 +1190,9 @@ void writeChangeStreamPreImage(OperationContext* opCtx,
                                const BSONObj& preImage) {
     Timestamp timestamp;
     int64_t applyOpsIndex;
-    // If donorOpTime is set on the oplog entry, this is a write that is being applied on a
-    // secondary during the oplog catchup phase of a tenant migration. Otherwise, we are either
-    // applying a steady state write operation on a secondary or applying a write on the primary
-    // during tenant migration oplog catchup.
-    if (const auto& donorOpTime = oplogEntry.getDonorOpTime()) {
-        timestamp = donorOpTime->getTimestamp();
-        applyOpsIndex = oplogEntry.getDonorApplyOpsIndex().get_value_or(0);
-    } else {
-        timestamp = oplogEntry.getTimestampForPreImage();
-        applyOpsIndex = oplogEntry.getApplyOpsIndex();
-    }
+
+    timestamp = oplogEntry.getTimestampForPreImage();
+    applyOpsIndex = oplogEntry.getApplyOpsIndex();
 
     ChangeStreamPreImageId preImageId{collection->uuid(), timestamp, applyOpsIndex};
     ChangeStreamPreImage preImageDocument{
@@ -1507,15 +1474,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
             !requestNss.isTemporaryReshardingCollection();
     };
 
-
-    // We are applying this entry on the primary during tenant oplog application. Decorate the opCtx
-    // with donor timeline metadata so that it will be available in the op observer and available
-    // for use here when oplog entries are logged.
-    if (auto& recipientInfo = tenantMigrationInfo(opCtx)) {
-        recipientInfo->donorOplogEntryData =
-            DonorOplogEntryData(op.getOpTime(), op.getApplyOpsIndex());
-    }
-
     switch (opType) {
         case OpTypeEnum::kInsert: {
             uassert(ErrorCodes::NamespaceNotFound,
@@ -1529,7 +1487,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // inserts on primary as part of a tenant migration.
                 uassert(ErrorCodes::OperationFailed,
                         "Cannot apply an array insert with applyOps",
-                        !opCtx->writesAreReplicated() || tenantMigrationInfo(opCtx));
+                        !opCtx->writesAreReplicated());
 
                 std::vector<InsertStatement> insertObjs;
                 const auto insertOps = opOrGroupedInserts.getGroupedInserts();
@@ -1777,7 +1735,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // guarantee, which then means we shouldn't apply these optimizations.
             write_ops::UpdateModification::DiffOptions options;
             if (mode == OplogApplication::Mode::kSecondary && collection->getTimeseriesOptions() &&
-                !op.getCheckExistenceForDiffInsert() && !op.getFromTenantMigration()) {
+                !op.getCheckExistenceForDiffInsert()) {
                 options.mustCheckExistenceForInsertOperations = false;
             }
             auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(o, options);

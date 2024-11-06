@@ -481,15 +481,6 @@ void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {
     uassertStatusOK(_storageInterface->dropCollection(opCtx, _nss));
 }
 
-Timestamp OplogBufferCollection::getLastPushedTimestamp() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    uassert(8359601,
-            "preload() might have failed. So clear() should be called before reading "
-            "'lastPushedTimestamp'",
-            _lastPushedTimestamp != kInvalidLastPushedTimestamp);
-    return _lastPushedTimestamp;
-}
-
 Timestamp OplogBufferCollection::getLastPoppedTimestamp_forTest() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _lastPoppedKey.isEmpty() ? Timestamp()

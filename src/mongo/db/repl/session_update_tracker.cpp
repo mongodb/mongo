@@ -131,41 +131,9 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
         entry.getWallClockTime());
 }
 
-/**
- * A tenant migrations transaction entry will:
- *
- * 1) Have the 'fromTenantMigration' field set
- * 2) Be a no-op entry
- * 3) Have sessionId and txnNumber
- */
-bool isTransactionEntryFromTenantMigrations(const OplogEntry& entry) {
-    if (!entry.getFromTenantMigration()) {
-        return false;
-    }
-
-    if (entry.getFromMigrate()) {
-        // Retryable writes have fromMigrate set.
-        return false;
-    }
-
-    if (entry.getOpType() != repl::OpTypeEnum::kNoop) {
-        return false;
-    }
-
-    if (!entry.getSessionId() || !entry.getTxnNumber()) {
-        return false;
-    }
-
-    return true;
-}
-
 }  // namespace
 
 bool SessionUpdateTracker::isTransactionEntry(const OplogEntry& entry) {
-    if (isTransactionEntryFromTenantMigrations(entry)) {
-        return true;
-    }
-
     return entry.isInTransaction();
 }
 
@@ -334,7 +302,7 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());
         newTxnRecord.setLastWriteDate(entry.getWallClockTime());
 
-        if (entry.getFromTenantMigration() && entry.getOpType() == OpTypeEnum::kNoop) {
+        if (entry.getOpType() == OpTypeEnum::kNoop) {
             newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
             return newTxnRecord.toBSON();
         }

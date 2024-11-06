@@ -375,44 +375,6 @@ TEST_F(OplogTest, ConcurrentLogOpRevertLastOplogEntry) {
     _checkOplogEntry(oplogEntries[0], *(opTimeNssMap.cbegin()));
 }
 
-TEST_F(OplogTest, MigrationIdAddedToOplog) {
-    auto opCtx = cc().makeOperationContext();
-    auto migrationUuid = UUID::gen();
-    tenantMigrationInfo(opCtx.get()) = boost::make_optional<TenantMigrationInfo>(migrationUuid);
-
-    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto msgObj = BSON("msg"
-                       << "hello, world!");
-
-    // Write to the oplog.
-    OpTime opTime;
-    {
-        MutableOplogEntry oplogEntry;
-        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-        oplogEntry.setNss(nss);
-        oplogEntry.setObject(msgObj);
-        oplogEntry.setWallClockTime(Date_t::now());
-        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
-        WriteUnitOfWork wunit(opCtx.get());
-        opTime = logOp(opCtx.get(), &oplogEntry);
-        ASSERT_FALSE(opTime.isNull());
-        wunit.commit();
-    }
-
-    OplogEntry oplogEntry = _getSingleOplogEntry(opCtx.get());
-
-    // Ensure that msg fields were properly added to the oplog entry.
-    ASSERT_EQUALS(opTime, oplogEntry.getOpTime())
-        << "OpTime returned from logOp() did not match that in the oplog entry written to the "
-           "oplog: "
-        << oplogEntry.toBSONForLogging();
-    ASSERT(OpTypeEnum::kNoop == oplogEntry.getOpType())
-        << "Expected 'n' op type but found '" << OpType_serializer(oplogEntry.getOpType())
-        << "' instead: " << oplogEntry.toBSONForLogging();
-    ASSERT_BSONOBJ_EQ(msgObj, oplogEntry.getObject());
-    ASSERT_EQ(migrationUuid, oplogEntry.getFromTenantMigration());
-}
-
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

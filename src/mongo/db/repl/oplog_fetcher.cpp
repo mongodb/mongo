@@ -418,13 +418,6 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
 
     _setMetadataWriterAndReader();
     auto cursorStatus = _createNewCursor(true /* initialFind */);
-    if (!cursorStatus.isOK()) {
-        invariant(_config.forTenantMigration);
-        // If we are a TenantOplogFetcher, we never retry as we will always restart the entire
-        // TenantMigrationRecipient state machine on failure. So instead, we just fail and exit.
-        _finishCallback(cursorStatus);
-        return;
-    }
     while (true) {
         Status status{Status::OK()};
         {
@@ -454,10 +447,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
                 ChangeSyncSourceAction::kContinueSyncing;
 
             // Recreate a cursor if we have enough retries left.
-            // If we are a TenantOplogFetcher, we never retry as we will always restart the
-            // TenantMigrationRecipient state machine on failure. So instead, we just fail and exit.
-            if (!stopFetching && _oplogFetcherRestartDecision->shouldContinue(this, brStatus) &&
-                !_config.forTenantMigration) {
+            if (!stopFetching && _oplogFetcherRestartDecision->shouldContinue(this, brStatus)) {
                 hangBeforeOplogFetcherRetries.pauseWhileSet();
                 _cursor.reset();
                 continue;
@@ -680,27 +670,9 @@ Status OplogFetcher::_createNewCursor(bool initialFind) {
                                                              : _getRetriedFindMaxTime());
     _setSocketTimeout(maxTimeMs);
 
-    if (_config.forTenantMigration) {
-        // We set 'secondaryOk'=false here to avoid duplicating OP_MSG fields since we already
-        // set the request metadata readPreference to `secondaryPreferred`.
-        auto ret = DBClientCursor::fromAggregationRequest(
-            _conn.get(),
-            _makeAggregateCommandRequest(maxTimeMs, _getLastOpTimeFetched().getTimestamp()),
-            false /* secondaryOk */,
-            oplogFetcherUsesExhaust);
-        if (!ret.isOK()) {
-            LOGV2_DEBUG(5761701,
-                        2,
-                        "Failed to create aggregation cursor in TenantOplogFetcher",
-                        "status"_attr = ret.getStatus());
-            return ret.getStatus();
-        }
-        _cursor = std::move(ret.getValue());
-    } else {
-        auto findCmd = _makeFindCmdRequest(maxTimeMs);
-        _cursor = std::make_unique<DBClientCursor>(
-            _conn.get(), std::move(findCmd), ReadPreferenceSetting{}, oplogFetcherUsesExhaust);
-    }
+    auto findCmd = _makeFindCmdRequest(maxTimeMs);
+    _cursor = std::make_unique<DBClientCursor>(
+        _conn.get(), std::move(findCmd), ReadPreferenceSetting{}, oplogFetcherUsesExhaust);
 
     _firstBatch = true;
 
@@ -717,8 +689,7 @@ StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
             // The OplogFetcher uses an aggregation command in tenant migrations, which does not
             // support tailable cursors. When recreating the cursor, use the longer initial max time
             // to avoid timing out.
-            const bool initialFind = _config.forTenantMigration;
-            auto status = _createNewCursor(initialFind /* initialFind */);
+            auto status = _createNewCursor(false);
             if (!status.isOK()) {
                 return status;
             }
@@ -731,18 +702,15 @@ StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
             // indicate a problem with the sync source.
             // We can't call `init()` when using an aggregate command because
             // `DBClientCursor::fromAggregationRequest` will already have processed the `cursorId`.
-            if (!_config.forTenantMigration && !_cursor->init()) {
+            if (!_cursor->init()) {
                 _cursor.reset();
                 return {ErrorCodes::InvalidSyncSource,
                         str::stream() << "Oplog fetcher could not create cursor on source: "
                                       << _config.source};
             }
 
-            // Aggregate commands do not support tailable cursors outside of change streams.
-            if (!_config.forTenantMigration) {
-                // This will also set maxTimeMS on the generated getMore command.
-                _cursor->setAwaitDataTimeoutMS(_awaitDataTimeout);
-            }
+            // This will also set maxTimeMS on the generated getMore command.
+            _cursor->setAwaitDataTimeoutMS(_awaitDataTimeout);
 
             // The 'find' command has already been executed, so reset the socket timeout to reflect
             // the awaitData timeout with a network buffer.

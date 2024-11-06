@@ -4975,35 +4975,5 @@ private:
     }
 };
 
-TEST_F(OpObserverServerlessTest, OnInsertChecksIfTenantMigrationIsBlockingWrites) {
-    auto opCtx = cc().makeOperationContext();
-
-    // Add a tenant migration access blocker on donor for blocking writes.
-    auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), uuid);
-    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
-    donorMtab->startBlockingWrites();
-
-    std::vector<InsertStatement> insert;
-    insert.emplace_back(BSON("_id" << 0 << "data"
-                                   << "x"));
-
-    {
-        AutoGetCollection autoColl(opCtx.get(), kNssUnderTenantId, MODE_IX);
-        OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-        ASSERT_THROWS_CODE(
-            opObserver.onInserts(opCtx.get(),
-                                 *autoColl,
-                                 insert.begin(),
-                                 insert.end(),
-                                 /*recordIds=*/{},
-                                 /*fromMigrate=*/std::vector<bool>(insert.size(), false),
-                                 /*defaultFromMigrate=*/false),
-            DBException,
-            ErrorCodes::TenantMigrationConflict);
-    }
-
-    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).shutDown();
-}
-
 }  // namespace
 }  // namespace mongo

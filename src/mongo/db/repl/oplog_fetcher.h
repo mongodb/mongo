@@ -186,14 +186,12 @@ public:
                ReplSetConfig replSetConfigIn,
                int batchSizeIn,
                RequireFresherSyncSource requireFresherSyncSourceIn =
-                   RequireFresherSyncSource::kRequireFresherSyncSource,
-               bool forTenantMigrationIn = false)
+                   RequireFresherSyncSource::kRequireFresherSyncSource)
             : initialLastFetched(initialLastFetchedIn),
               source(sourceIn),
               replSetConfig(replSetConfigIn),
               batchSize(batchSizeIn),
-              requireFresherSyncSource(requireFresherSyncSourceIn),
-              forTenantMigration(forTenantMigrationIn) {}
+              requireFresherSyncSource(requireFresherSyncSourceIn) {}
         // The OpTime, last oplog entry fetched in a previous run, or the optime to start fetching
         // from, depending on the startingPoint (below.).  If the startingPoint is kSkipFirstDoc,
         // this entry will be verified to exist, then discarded. If it is kEnqueueFirstDoc, it will
@@ -228,10 +226,6 @@ public:
         bool requestResumeToken = false;
 
         std::string name = "oplog fetcher";
-
-        // If true, the oplog fetcher will use an aggregation request with '$match' rather than
-        // a 'find' query.
-        bool forTenantMigration;
     };
 
     /**
@@ -369,11 +363,8 @@ private:
     void _setMetadataWriterAndReader();
 
     /**
-     * Does one of:
-     * 1. Executes a `find` query on the sync source's oplog and establishes a tailable, awaitData,
+     * Executes a `find` query on the sync source's oplog and establishes a tailable, awaitData,
      * exhaust cursor.
-     * 2. Executes a 'aggregate' query on the sync source's oplog. This is currently used in
-     * tenant migrations.
      *
      * Before running the query, it will set a RequestMetadataWriter to modify the request to
      * include $oplogQueryData and $replData. If will also set a ReplyMetadataReader to parse the

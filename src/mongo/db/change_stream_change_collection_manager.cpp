@@ -174,42 +174,11 @@ boost::optional<BSONObj> createChangeCollectionEntryFromOplog(const BSONObj& opl
         return boost::none;
     }
 
-    const auto isFromTenantMigration =
-        oplogEntry.hasField(repl::OplogEntry::kFromTenantMigrationFieldName);
-    const auto isNoop = oplogEntry.getStringField(repl::OplogEntry::kOpTypeFieldName) ==
-        repl::OpType_serializer(repl::OpTypeEnum::kNoop);
+    const Document oplogDoc{oplogEntry};
 
-    // Skip CRUD writes on user DBs from Tenant Migrations. Instead, extract that nested 'o2' from
-    // the corresponding noop write to ensure that change events for user DB writes that took place
-    // during a Tenant Migration are on the Donor timeline.
-    const auto oplogDoc = [&]() -> boost::optional<Document> {
-        if (!isFromTenantMigration) {
-            return Document(oplogEntry);
-        }
-
-        if (!isNoop) {
-            return boost::none;
-        }
-
-        const auto o2 = oplogEntry.getObjectField(repl::OplogEntry::kObject2FieldName);
-        if (o2.isEmpty()) {
-            return boost::none;
-        }
-
-        if (shouldSkipOplogEntry(o2)) {
-            return boost::none;
-        }
-
-        return Document(o2);
-    }();
-
-    if (!oplogDoc) {
-        return boost::none;
-    }
-
-    MutableDocument changeCollDoc(oplogDoc.get());
+    MutableDocument changeCollDoc(oplogDoc);
     changeCollDoc[repl::OplogEntry::k_idFieldName] =
-        Value(oplogDoc->getField(repl::OplogEntry::kTimestampFieldName));
+        Value(oplogDoc.getField(repl::OplogEntry::kTimestampFieldName));
 
     auto readyChangeCollDoc = changeCollDoc.freeze();
     return readyChangeCollDoc.toBson();

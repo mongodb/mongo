@@ -276,33 +276,6 @@ server_parameters:
                 expr: 100 * 1024 * 1024
         redact: false
 
-    # From tenant_oplog_applier.cpp
-    tenantApplierBatchSizeBytes:
-        description: The maximum tenant oplog applier batch size in bytes.
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: tenantApplierBatchSizeBytes
-        default:
-            expr: 16 * 1024 * 1024
-        validator:
-            gte:
-                expr: 16 * 1024 * 1024
-            lte:
-                expr: 100 * 1024 * 1024
-        redact: false
-
-    tenantApplierBatchSizeOps:
-        description: The maximum number of operations in a tenant oplog applier batch.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: tenantApplierBatchSizeOps
-        default: 500
-        validator:
-            gte: 1
-            lte:
-                expr: 100 * 1000
-        redact: false
-
     minOplogEntriesPerThread:
         description: >-
             The minimum number of operations allotted to a tenant oplog applier worker thread.
