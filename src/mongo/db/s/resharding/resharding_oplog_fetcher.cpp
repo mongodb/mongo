@@ -122,24 +122,34 @@ boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext*
         .build();
 }
 
+struct OplogInsertBatch {
+    std::vector<InsertStatement> statements;
+    ReshardingDonorOplogId startAt;
+    bool moreToCome = true;
+};
+
 /**
  * Packs the oplog entries in 'aggregateBatch' into insert batches based on the configured maximum
- * insert batch size. Preserves the original oplog order.
+ * insert batch count and bytes while preserving the original oplog order. If there is an oplog
+ * entry whose size exceeds the max batch bytes, packs it into its own batch instead of throwing.
  */
-std::vector<std::vector<InsertStatement>> getOplogInsertBatches(
-    const std::vector<BSONObj>& aggregateBatch) {
+std::vector<OplogInsertBatch> getOplogInsertBatches(const std::vector<BSONObj>& aggregateBatch) {
     size_t maxOperations = resharding::gReshardingOplogFetcherInsertBatchLimitOperations.load();
     auto maxBytes = resharding::gReshardingOplogFetcherInsertBatchLimitBytes.load();
-    std::vector<std::vector<InsertStatement>> insertBatches;
+
+    std::vector<OplogInsertBatch> insertBatches;
+    size_t totalOperations = 0;
 
     size_t currentIndex = 0;
     while (currentIndex < aggregateBatch.size()) {
-        std::vector<InsertStatement> insertBatch;
+        OplogInsertBatch insertBatch;
         auto totalBytes = 0;
 
-        do {
+        while (currentIndex < aggregateBatch.size() &&
+               insertBatch.statements.size() < maxOperations) {
             const auto& currentDoc = aggregateBatch[currentIndex];
-            auto currentBytes = currentDoc.objsize();
+            const auto currentBytes = currentDoc.objsize();
+
             if (totalBytes == 0 && currentBytes > maxBytes) {
                 LOGV2_WARNING(9656101,
                               "Found a fetched oplog entry with size greater than the oplog "
@@ -149,14 +159,32 @@ std::vector<std::vector<InsertStatement>> getOplogInsertBatches(
             } else if (totalBytes + currentBytes > maxBytes) {
                 break;
             }
-            insertBatch.emplace_back(InsertStatement(currentDoc));
+            insertBatch.statements.emplace_back(InsertStatement(currentDoc));
             totalBytes += currentBytes;
-        } while (++currentIndex < aggregateBatch.size() && insertBatch.size() < maxOperations &&
-                 totalBytes < maxBytes);
+            ++currentIndex;
 
+            const auto currentOplogEntry = uassertStatusOK(repl::OplogEntry::parse(currentDoc));
+            insertBatch.startAt =
+                ReshardingDonorOplogId::parse(IDLParserContext{"OplogFetcherParsing"},
+                                              currentOplogEntry.get_id()->getDocument().toBson());
+            if (resharding::isFinalOplog(currentOplogEntry)) {
+                insertBatch.moreToCome = false;
+                break;
+            }
+        }
+
+        invariant(!insertBatch.statements.empty());
         insertBatches.push_back(insertBatch);
+        totalOperations += insertBatch.statements.size();
+
+        if (!insertBatch.moreToCome) {
+            break;
+        }
     }
 
+    invariant(totalOperations == currentIndex,
+              str::stream() << "Packed " << totalOperations << " after iterating upto index "
+                            << currentIndex);
     return insertBatches;
 }
 
@@ -442,7 +470,6 @@ bool ReshardingOplogFetcher::consume(Client* client,
         [this, &batchesProcessed, &moreToCome, &opCtxRaii, &batchFetchTimer, factory](
             const std::vector<BSONObj>& aggregateBatch,
             const boost::optional<BSONObj>& postBatchResumeToken) {
-            _env->metrics()->onOplogEntriesFetched(aggregateBatch.size());
             _env->metrics()->onBatchRetrievedDuringOplogFetching(
                 Milliseconds(batchFetchTimer.millis()));
 
@@ -490,29 +517,24 @@ bool ReshardingOplogFetcher::consume(Client* client,
                                  oplogFetcherProgressColl,
                                  _reshardingUUID,
                                  _donorShard,
-                                 insertBatch,
+                                 insertBatch.statements,
                                  _storeProgress);
 
                 _env->metrics()->onLocalInsertDuringOplogFetching(
                     Milliseconds(insertTimer.millis()));
-                _numOplogEntriesCopied += insertBatch.size();
-
-                const auto lastOplogEntry =
-                    uassertStatusOK(repl::OplogEntry::parse(insertBatch.back().doc));
-                const auto startAt =
-                    ReshardingDonorOplogId::parse(IDLParserContext{"OplogFetcherParsing"},
-                                                  lastOplogEntry.get_id()->getDocument().toBson());
+                _env->metrics()->onOplogEntriesFetched(insertBatch.statements.size());
+                _numOplogEntriesCopied += insertBatch.statements.size();
 
                 auto [p, f] = makePromiseFuture<void>();
                 {
                     stdx::lock_guard lk(_mutex);
-                    _startAt = startAt;
+                    _startAt = insertBatch.startAt;
                     _onInsertPromise.emplaceValue();
                     _onInsertPromise = std::move(p);
                     _onInsertFuture = std::move(f);
                 }
 
-                if (resharding::isFinalOplog(lastOplogEntry, _reshardingUUID)) {
+                if (!insertBatch.moreToCome) {
                     moreToCome = false;
                     return false;
                 }

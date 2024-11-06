@@ -363,14 +363,18 @@ public:
         return future.timed_get(Seconds(5));
     }
 
-    // Generates `numInsertOplogEntries` insert oplog entries and a final no-op oplog entry that
-    // signals the last oplog entry needed to be applied for resharding to move to the next stage.
-    // Makes all oplog entries have a `destinedRecipient` field.
+    // Generates the following oplog entries with `destinedRecipient` field attached:
+    // - `numInsertOplogEntriesBeforeFinalOplogEntry` insert oplog entries.
+    // - one no-op oplog entry indicating that fetching is complete and resharding should move to
+    //   the next stage.
+    // - `numNoopOplogEntriesAfterFinalOplogEntry` no-op oplog entries. The fetcher should discard
+    //   all of these oplog entries.
     void setupBasic(NamespaceString outputCollectionNss,
                     NamespaceString dataCollectionNss,
                     ShardId destinedRecipient,
-                    boost::optional<int> numInsertOplogEntries = 5,
-                    boost::optional<int> insertOplogEntrySize = 1) {
+                    int numInsertOplogEntriesBeforeFinalOplogEntry = 5,
+                    int approxInsertOplogEntrySizeBytes = 1,
+                    int numNoopOplogEntriesAfterFinalOplogEntry = 0) {
         create(outputCollectionNss);
         create(dataCollectionNss);
         _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
@@ -385,19 +389,21 @@ public:
                                     << "data"
                                     << BSON("destinedRecipient" << destinedRecipient.toString())));
 
-            // Generate insert oplog entries by inserting documents. Advance the majority point.
+            // Generate insert oplog entries by inserting documents.
             {
-                for (std::int32_t num = 0; num < numInsertOplogEntries; ++num) {
+                for (std::int32_t num = 0; num < numInsertOplogEntriesBeforeFinalOplogEntry;
+                     ++num) {
                     WriteUnitOfWork wuow(_opCtx);
                     insertDocument(
                         dataColl.getCollection(),
                         InsertStatement(
-                            BSON("_id" << num << std::string(*insertOplogEntrySize, 'a') << num)));
+                            BSON("_id" << num << std::string(approxInsertOplogEntrySizeBytes, 'a')
+                                       << num)));
                     wuow.commit();
                 }
             }
 
-            // Write an entry saying that fetching is complete.
+            // Generate an noop entry indicating that fetching is complete.
             {
                 WriteUnitOfWork wuow(_opCtx);
                 _opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(
@@ -414,6 +420,25 @@ public:
                     boost::none,
                     boost::none);
                 wuow.commit();
+            }
+
+            // Generate noop oplog entries.
+            {
+                for (std::int32_t num = 0; num < numNoopOplogEntriesAfterFinalOplogEntry; ++num) {
+                    WriteUnitOfWork wuow(_opCtx);
+                    _opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(
+                        _opCtx,
+                        dataColl.getCollection()->ns(),
+                        dataColl.getCollection()->uuid(),
+                        BSON("msg"
+                             << "other noop"),
+                        boost::none /* o2 */,
+                        boost::none,
+                        boost::none,
+                        boost::none,
+                        boost::none);
+                    wuow.commit();
+                }
             }
         }
 
@@ -535,7 +560,7 @@ TEST_F(ReshardingOplogFetcherTest, TestBasicSingleApplyOps) {
 
         auto numInsertOplogEntries = 5;
         auto initialAggregateBatchSize = 2;
-        // Add 1 to account for the sentinel noop oplog entry.
+        // Add 1 to account for the sentinel final noop oplog entry.
         auto numFetchedOplogEntries = numInsertOplogEntries + 1;
         // The oplog entries come in 2 separate aggregate batches, each requires an applyOps oplog
         // entry.
@@ -568,7 +593,7 @@ TEST_F(ReshardingOplogFetcherTest, TestBasicMultipleApplyOps_BatchLimitOperation
             "reshardingOplogFetcherInsertBatchLimitOperations", batchLimitOperations);
         auto numInsertOplogEntries = 8;
         auto initialAggregateBatchSize = boost::none;
-        // Add 1 to account for the sentinel noop oplog entry.
+        // Add 1 to account for the sentinel final noop oplog entry.
         auto numFetchedOplogEntries = numInsertOplogEntries + 1;
         // The oplog entries come in one aggregate batch. However, each applyOps oplog entry can
         // only have 'batchLimitOperations' oplog entries.
@@ -601,20 +626,20 @@ TEST_F(ReshardingOplogFetcherTest, TestBasicMultipleApplyOps_BatchLimitBytes) {
         RAIIServerParameterControllerForTest featureFlagController(
             "reshardingOplogFetcherInsertBatchLimitBytes", batchLimitBytes);
         auto numInsertOplogEntries = 8;
-        auto insertOplogEntrySize = 3 * 1024;
+        auto approxInsertOplogEntrySizeBytes = 3 * 1024;
         auto initialAggregateBatchSize = boost::none;
-        // Add 1 to account for the sentinel noop oplog entry.
+        // Add 1 to account for the sentinel final noop oplog entry.
         auto numFetchedOplogEntries = numInsertOplogEntries + 1;
         // The oplog entries come in one aggregate batch. However, each applyOps oplog entry can
         // only have 'batchLimitBytes'.
-        auto numApplyOpsOplogEntries =
-            std::ceil((double)insertOplogEntrySize * numInsertOplogEntries / batchLimitBytes);
+        auto numApplyOpsOplogEntries = std::ceil((double)approxInsertOplogEntrySizeBytes *
+                                                 numInsertOplogEntries / batchLimitBytes);
 
         setupBasic(outputCollectionNss,
                    dataCollectionNss,
                    _destinationShard,
                    numInsertOplogEntries,
-                   insertOplogEntrySize);
+                   approxInsertOplogEntrySizeBytes);
         testFetcherBasic(outputCollectionNss,
                          dataCollectionNss,
                          storeProgress,
@@ -640,9 +665,9 @@ TEST_F(ReshardingOplogFetcherTest,
         RAIIServerParameterControllerForTest featureFlagController(
             "reshardingOplogFetcherInsertBatchLimitBytes", batchLimitBytes);
         auto numInsertOplogEntries = 2;
-        auto insertOplogEntrySize = 3 * 1024;
+        auto approxInsertOplogEntrySizeBytes = 3 * 1024;
         auto initialAggregateBatchSize = boost::none;
-        // Add 1 to account for the sentinel noop oplog entry.
+        // Add 1 to account for the sentinel final noop oplog entry.
         auto numFetchedOplogEntries = numInsertOplogEntries + 1;
         // The oplog entries come in one aggregate batch. However, the size of each insert oplog
         // entry exceeds the 'batchLimitBytes'. They should still get inserted successfully but each
@@ -653,7 +678,48 @@ TEST_F(ReshardingOplogFetcherTest,
                    dataCollectionNss,
                    _destinationShard,
                    numInsertOplogEntries,
-                   insertOplogEntrySize);
+                   approxInsertOplogEntrySizeBytes);
+        testFetcherBasic(outputCollectionNss,
+                         dataCollectionNss,
+                         storeProgress,
+                         initialAggregateBatchSize,
+                         numFetchedOplogEntries,
+                         numApplyOpsOplogEntries);
+
+        resetResharding();
+    }
+}
+
+TEST_F(ReshardingOplogFetcherTest, TestBasicMultipleApplyOps_FinalOplogEntry) {
+    for (bool storeProgress : {false, true}) {
+        LOGV2(9678001, "Running case", "storeProgress"_attr = storeProgress);
+
+        const NamespaceString outputCollectionNss = NamespaceString::createNamespaceString_forTest(
+            "dbtests.outputCollection" + std::to_string(storeProgress));
+        const NamespaceString dataCollectionNss = NamespaceString::createNamespaceString_forTest(
+            "dbtests.runFetchIteration" + std::to_string(storeProgress));
+
+        auto batchLimitOperations = 5;
+        RAIIServerParameterControllerForTest featureFlagController(
+            "reshardingOplogFetcherInsertBatchLimitOperations", batchLimitOperations);
+        auto numInsertOplogEntriesBeforeFinal = 8;
+        auto approxInsertOplogEntrySizeBytes = 1;
+        auto numNoopOplogEntriesAfterFinal = 3;
+        auto initialAggregateBatchSize = boost::none;
+        // Add 1 to account for the sentinel final noop oplog entry. The oplog entries after the
+        // final oplog entries should be discarded.
+        auto numFetchedOplogEntries = numInsertOplogEntriesBeforeFinal + 1;
+        // The oplog entries come in one aggregate batch. However, each applyOps oplog entry can
+        // only have 'batchLimitOperations' oplog entries.
+        auto numApplyOpsOplogEntries =
+            std::ceil((double)numFetchedOplogEntries / batchLimitOperations);
+
+        setupBasic(outputCollectionNss,
+                   dataCollectionNss,
+                   _destinationShard,
+                   numInsertOplogEntriesBeforeFinal,
+                   approxInsertOplogEntrySizeBytes,
+                   numNoopOplogEntriesAfterFinal);
         testFetcherBasic(outputCollectionNss,
                          dataCollectionNss,
                          storeProgress,
