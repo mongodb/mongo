@@ -1086,6 +1086,16 @@ def generate(env: SCons.Environment.Environment) -> None:
         minimum_macos_version = "11.0" if normalized_arch == "arm64" else "10.14"
         bazel_internal_flags.append(f"--macos_minimum_os={minimum_macos_version}")
 
+    if normalized_os == "windows":
+        windows_temp_dir = "Z:/bazel_tmp"
+        if os.path.isdir(windows_temp_dir):
+            bazel_internal_flags.append(f"--action_env=TMP={windows_temp_dir}")
+            bazel_internal_flags.append(f"--action_env=TEMP={windows_temp_dir}")
+        else:
+            print(
+                f"Tried to use {windows_temp_dir} as TMP and TEMP environment variables but it did not exist. This will lead to a low cache hit rate."
+            )
+
     http_client_option = env.GetOption("enable-http-client")
     if http_client_option is not None:
         if http_client_option in ["on", "auto"]:
