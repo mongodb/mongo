@@ -186,7 +186,7 @@ def generate(env):
     else:
         setupEnv["ICECC_COMPILER_TYPE"] = setupEnv.get(
             "ICECC_COMPILER_TYPE",
-            os.path.basename(setupEnv.WhereIs("${CC}")),
+            os.path.basename(env["CC"]),
         )
 
         # This is what we are going to call the file names as known to SCons on disk. We do the

@@ -1,4 +1,5 @@
 import argparse
+import glob
 import json
 import os
 import shutil
@@ -55,6 +56,48 @@ except OSError as exc:
     )
     raise exc
 
+
+# flip the targets map for optimized use later
+bazel_out_to_bazel_target = dict()
+for bazel_t in ninja_build_info["targets"].values():
+    bazel_out_to_bazel_target[bazel_t["bazel_output"]] = bazel_t["bazel_target"]
+
+# run ninja and get the deps from the passed command line targets so we can check if any deps are bazel targets
+ninja_inputs_cmd = ["ninja", "-f", args.ninja_file, "-t", "inputs"] + ninja_command_line_targets
+print_debug(f"NINJA GET INPUTS CMD: {' '.join(ninja_inputs_cmd)}")
+
+ninja_proc = subprocess.run(ninja_inputs_cmd, capture_output=True, text=True, check=True)
+deps = [dep.replace("\\", "/") for dep in ninja_proc.stdout.split("\n") if dep]
+print_debug(f"COMMAND LINE DEPS:{os.linesep}{os.linesep.join(deps)}")
+os.unlink(ninja_last_cmd_file)
+
+# isolate just the raw output files for the list intersection
+bazel_outputs = [bazel_t["bazel_output"] for bazel_t in ninja_build_info["targets"].values()]
+print_debug(f"BAZEL OUTPUTS:{os.linesep}{os.linesep.join(bazel_outputs)}")
+
+# now out of possible bazel outputs find which are deps of the requested command line targets
+outputs_to_build = list(set(deps).intersection(bazel_outputs))
+print_debug(f"BAZEL OUTPUTS TO BUILD: {outputs_to_build}")
+
+# convert from outputs (raw files) to bazel targets (bazel labels i.e //src/db/mongo:target)
+targets_to_build = [bazel_out_to_bazel_target[out] for out in outputs_to_build]
+
+if (
+    not targets_to_build
+    and "compiledb" not in ninja_command_line_targets
+    and "compile_commands.json" not in ninja_command_line_targets
+):
+    print(
+        "WARNING: Did not resolve any bazel specific targets to build, this might not be correct."
+    )
+
+list_files = glob.glob("bazel-out/**/*.gen_source_list", recursive=True)
+gen_source_targets = []
+for list_file in list_files:
+    with open(list_file) as f:
+        gen_source_targets.append(f.read().strip())
+targets_to_build += gen_source_targets
+
 # ninja will automatically create directories for any outputs, but in this case
 # bazel will be creating a symlink for the bazel-out dir to its cache. We don't want
 # ninja to interfere so delete the dir if it was not a link (made by bazel)
@@ -69,20 +112,17 @@ else:
     if not os.path.islink("bazel-out"):
         shutil.rmtree("bazel-out")
 
-# now we are ready to build all bazel buildable files
-targets_to_build = ["//src/..."]
 if args.verbose:
     extra_args = []
 else:
     extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
-
 bazel_env = os.environ.copy()
 if ninja_build_info.get("USE_NATIVE_TOOLCHAIN"):
     bazel_env["CC"] = ninja_build_info.get("CC")
     bazel_env["CXX"] = ninja_build_info.get("CXX")
     bazel_env["USE_NATIVE_TOOLCHAIN"] = "1"
 sys.stderr.write(
-    f"Running bazel command:\n{' '.join(ninja_build_info['bazel_cmd'] + extra_args + targets_to_build)}\n"
+    f"Running bazel command:\n{' '.join(ninja_build_info['bazel_cmd'] + extra_args)} [{len(targets_to_build)} targets...]\n"
 )
 bazel_proc = subprocess.run(
     ninja_build_info["bazel_cmd"] + extra_args + targets_to_build, env=bazel_env

@@ -1,6 +1,7 @@
 import atexit
 import errno
 import getpass
+import glob
 import hashlib
 import json
 import os
@@ -411,6 +412,8 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
         extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
 
     if ninja_generate:
+        for file in glob.glob("bazel-out/**/*.gen_source_list", recursive=True):
+            os.remove(file)
         extra_args += ["--build_tag_filters=scons_link_lists"]
 
     bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
