@@ -691,6 +691,15 @@ private:
                                                            DDLCoordinatorTypeEnum::kCreateDatabase);
         }
 
+        // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
+        if (isDowngrading &&
+            feature_flags::gCreateDatabaseDDLCoordinator
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
+                                                           DDLCoordinatorTypeEnum::kDropDatabase);
+        }
+
         if (isUpgrading) {
             _createShardingIndexCatalogIndexes(
                 opCtx, requestedVersion, NamespaceString::kShardIndexCatalogNamespace);
@@ -1617,6 +1626,14 @@ private:
                 requestedVersion)) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(opCtx, DDLCoordinatorTypeEnum::kCollMod);
+        }
+
+        // TODO SERVER-94362: Remove once create database coordinator becomes last lts.
+        if (role && role->has(ClusterRole::ShardServer) &&
+            feature_flags::gCreateDatabaseDDLCoordinator.isEnabledOnVersion(requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
+                                                           DDLCoordinatorTypeEnum::kDropDatabase);
         }
     }
 };
