@@ -114,6 +114,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/aggregation/OWNERS.yml
 /jstests/aggregation/**/* @10gen/query @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/auth/OWNERS.yml
+/jstests/auth/**/* @10gen/server-security @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/client_encrypt/OWNERS.yml
 /jstests/client_encrypt/**/* @10gen/query-integration-fle @svc-auto-approve-bot
 
@@ -126,6 +129,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads/**/timeseries_agg* @10gen/query-integration @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads/**/timeseries_deletes_and_inserts.js @10gen/query-integration @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads/crud/crud_clustered_collection.js @10gen/server-storage-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/auth/OWNERS.yml
+/jstests/concurrency/fsm_workloads/auth/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/convert_to_capped_collection/OWNERS.yml
 /jstests/concurrency/fsm_workloads/convert_to_capped_collection/**/* @10gen/server-storage-execution @svc-auto-approve-bot
@@ -287,6 +293,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/fail_point/OWNERS.yml
 /jstests/fail_point/**/* @10gen/server-programmability @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/fle2/OWNERS.yml
+/jstests/fle2/**/* @10gen/query-integration-fle @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/hooks/OWNERS.yml
 /jstests/hooks/**/run_analyze_shard_key_background.js @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -514,6 +523,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/noPassthroughWithMongod/validate/OWNERS.yml
 /jstests/noPassthroughWithMongod/validate/**/* @10gen/server-rss-sydney @10gen/server-storage-execution @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/ocsp/OWNERS.yml
+/jstests/ocsp/**/* @10gen/server-security @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/query_golden/OWNERS.yml
 /jstests/query_golden/**/* @10gen/query-optimization @svc-auto-approve-bot
 
@@ -585,6 +597,18 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/updateOne_without_shard_key/OWNERS.yml
 /jstests/sharding/updateOne_without_shard_key/**/* @10gen/query-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/ssl/OWNERS.yml
+/jstests/ssl/**/* @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/sslSpecial/OWNERS.yml
+/jstests/sslSpecial/**/* @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/ssl_linear/OWNERS.yml
+/jstests/ssl_linear/**/* @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/ssl_x509/OWNERS.yml
+/jstests/ssl_x509/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/watchdog/OWNERS.yml
 /jstests/watchdog/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
@@ -834,8 +858,32 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/docs/testing/OWNERS.yml
 /src/mongo/db/modules/enterprise/docs/testing/**/* @10gen/devprod-correctness @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/audit/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/audit/**/* @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/encryptdb/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/encryptdb/**/* @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/external_auth/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/external_auth/**/* @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/external_auth_aws/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/external_auth_aws/**/* @10gen/server-security @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/fcbis/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/fcbis/**/* @10gen/server-replication @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/fips/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/fips/**/* @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/fle/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/fle/**/* @10gen/query-integration-fle @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/fle2/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/fle2/**/* @10gen/query-integration-fle @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/fle2_query_analysis/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/fle2_query_analysis/**/* @10gen/query-integration-fle @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/hot_backups/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/hot_backups/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
@@ -847,8 +895,14 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/live_import/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/live_import/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/no_passthrough/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/no_passthrough/**/* @10gen/query-integration-fle @10gen/server-security @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/queryable_wt/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/queryable_wt/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/sasl/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/sasl/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/streams/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/streams/**/* @10gen/streams-engine @svc-auto-approve-bot
