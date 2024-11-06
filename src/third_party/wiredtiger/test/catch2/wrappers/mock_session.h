@@ -31,6 +31,7 @@ struct event_handler_wrap {
 class mock_session {
 public:
     ~mock_session();
+
     WT_SESSION_IMPL *
     get_wt_session_impl()
     {
@@ -54,7 +55,9 @@ public:
     {
         return _messages.back();
     }
+
     static std::shared_ptr<mock_session> build_test_mock_session();
+
     WT_BLOCK_MGR_SESSION *setup_block_manager_session();
 
     // Allocate the necessary structures to perform write/read operations in block manager.

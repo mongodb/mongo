@@ -45,11 +45,27 @@ validate_block_contents(WT_BM *bm, const std::shared_ptr<mock_session> &session,
     // Using the non-block manager read function read the file where the block should've been
     // written. Then compare that with the original write buffer.
     WT_ITEM read_buf;
+    int64_t before_read_io;
+    int64_t after_read_io;
+
     WT_CLEAR(read_buf);
     REQUIRE(__wt_buf_initsize(session->get_wt_session_impl(), &read_buf, write_buf->memsize) == 0);
+
+    before_read_io =
+      WT_STAT_CONN_READ(session->get_mock_connection()->get_wt_connection_impl()->stats, read_io);
+
     REQUIRE(
       __wt_read(session->get_wt_session_impl(), bm->block->fh, offset, size, read_buf.mem) == 0);
     CHECK(memcmp(write_buf->mem, read_buf.mem, write_buf->size) == 0);
+
+    after_read_io =
+      WT_STAT_CONN_READ(session->get_mock_connection()->get_wt_connection_impl()->stats, read_io);
+
+    /*
+     * Check that statistics are working. Check that the read_io statistic has been incremented
+     * correctly.
+     */
+    CHECK((after_read_io - before_read_io) == 1);
 
     /*
      * Using the block manager read function read in the block using the address cookie. Testing the

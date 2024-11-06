@@ -31,7 +31,7 @@ public:
         return reinterpret_cast<WT_CONNECTION *>(_connection_impl);
     };
 
-    static std::shared_ptr<mock_connection> build_test_mock_connection();
+    static std::shared_ptr<mock_connection> build_test_mock_connection(WT_SESSION_IMPL *session);
     int setup_chunk_cache(WT_SESSION_IMPL *, uint64_t, size_t, WT_CHUNKCACHE *&);
     // Initialize the data structures, in-memory file system and variables used for file handles and
     // blocks. The block manager requires both to perform file type operations.
@@ -39,6 +39,7 @@ public:
 
 private:
     explicit mock_connection(WT_CONNECTION_IMPL *connection_impl);
+    int setup_stats(WT_SESSION_IMPL *session);
 
     // This class is implemented such that it owns, and is responsible for freeing,
     // this pointer

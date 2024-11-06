@@ -24,16 +24,24 @@ mock_connection::~mock_connection()
     if (_connection_impl->block_lock.initialized == 1)
         __wt_spin_destroy(nullptr, &_connection_impl->block_lock);
     __wt_free(nullptr, _connection_impl->chunkcache.free_bitmap);
+    /* setup_stats() used nullptr to allocate so use nullptr to free. */
+    __wt_stat_connection_discard(nullptr, _connection_impl);
     __wt_free(nullptr, _connection_impl);
 }
 
 std::shared_ptr<mock_connection>
-mock_connection::build_test_mock_connection()
+mock_connection::build_test_mock_connection(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *connection_impl = nullptr;
+    mock_connection *mock_conn;
     utils::throw_if_non_zero(__wt_calloc(nullptr, 1, sizeof(WT_CONNECTION_IMPL), &connection_impl));
-    // Construct a Session object that will now own session.
-    return std::shared_ptr<mock_connection>(new mock_connection(connection_impl));
+
+    // Construct a mock_connection object that will now own connection_impl.
+    mock_conn = new mock_connection(connection_impl);
+
+    mock_conn->setup_stats(session);
+
+    return std::shared_ptr<mock_connection>(mock_conn);
 }
 
 int
@@ -85,4 +93,15 @@ mock_connection::setup_block_manager(WT_SESSION_IMPL *session)
     WT_RET(__wt_os_posix(session));
 #endif
     return 0;
+}
+
+int
+mock_connection::setup_stats(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+    WT_RET(__wt_stat_connection_init(nullptr, _connection_impl));
+    _connection_impl->stat_flags =
+      (WT_STAT_TYPE_ALL | WT_STAT_TYPE_CACHE_WALK | WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK);
+    _connection_impl->default_session = session;
+    return (ret);
 }
