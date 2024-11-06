@@ -211,7 +211,10 @@ class TestSuiteExecutor(object):
                 # are many of them.  Both the 5 and the 10 are arbitrary.
                 # Currently only enabled on Evergreen.
                 if _config.STAGGER_JOBS and len(threads) >= 5:
-                    time.sleep(10)
+                    # If there are no more tests to be executed, we should stop creating new
+                    # jobs. Otherwise, wait 10 seconds before creating the next job.
+                    if test_queue.join(10):
+                        break
 
             joined = False
             while not joined:
