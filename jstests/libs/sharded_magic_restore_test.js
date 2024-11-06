@@ -79,6 +79,7 @@ export class ShardedMagicRestoreTest {
         // the config server to remove metadata about unrestored collections. Used for selective
         // restore.
         this.collectionsToRestore = [];
+        this.balancerSettings = undefined;
     }
 
     /**
@@ -191,6 +192,15 @@ export class ShardedMagicRestoreTest {
     }
 
     /**
+     * Sets the balancer settings field that is passed into restore via the restore configuration.
+     * The balancer settings specify whether the balancer should be enabled or disabled after
+     * restore completes.
+     */
+    setBalancerSettings(stopped) {
+        this.balancerSettings = {stopped: stopped};
+    }
+
+    /**
      * Runs magic restore on each replica set in the sharded cluster. Appends fields to the
      * 'restoreConfiguration' as needed.
      */
@@ -221,6 +231,9 @@ export class ShardedMagicRestoreTest {
                     "Passing in --restore to mongod invocation and setting 'collectionsToRestore' on restore configuration for selective magic restore");
                 restoreConfiguration.collectionsToRestore = this.collectionsToRestore;
                 rstOptions.restore = '';
+            }
+            if (this.balancerSettings) {
+                restoreConfiguration.balancerSettings = this.balancerSettings;
             }
             restoreConfiguration =
                 magicRestoreTest.appendRestoreToHigherTermThanIfNeeded(restoreConfiguration);
