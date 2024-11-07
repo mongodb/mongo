@@ -184,8 +184,10 @@ check_docs_data()
     }
 }
 
-build()
+setup_doxygen()
 {
+    [[ -n "$doxyfile" ]] && return
+
     # We require doxygen which may not be installed.
     type doxygen > /dev/null 2>&1 || {
         echo "$0 skipped: doxygen not found"
@@ -203,6 +205,11 @@ build()
             echo "$0 skipped: unsupported version of doxygen: $v, not 1.8.17, 1.9.1, 1.9.3 or 1.11.*"
             exit 0
     esac
+}
+
+build()
+{
+    setup_doxygen
 
     # Build from scratch on demand.
     [ "$1" -eq 0 ] || (cd .. && rm -rf docs && mkdir docs)
@@ -268,6 +275,7 @@ while :
         shift;;
     -l)    # Generate the top-level landing page in ../docs/top
         filter="$filter| sed '/GENERATE_MAN/s,=.*,=NO,';"
+        setup_doxygen
         filter="$filter cat top/$doxyfile"
         additional_languages=0
         shift;;
