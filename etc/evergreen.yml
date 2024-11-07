@@ -302,6 +302,7 @@ buildvariants:
   expansions: &linux-64-required-duroff-expansions
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off --link-model=dynamic --use-diagnostic-latches=on --modules=
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: targeted
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
@@ -464,6 +465,7 @@ buildvariants:
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     # The gcov instrumentation saves the path the .gcno files were created in as the default path
@@ -545,6 +547,7 @@ buildvariants:
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --link-model=dynamic --use-diagnostic-latches=on
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     # The gcov instrumentation saves the path the .gcno files were created in as the default path
@@ -576,6 +579,7 @@ buildvariants:
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     # The gcov instrumentation saves the path the .gcno files were created in as the default path
@@ -604,6 +608,7 @@ buildvariants:
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars --link-model=dynamic --use-diagnostic-latches=on
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     # The gcov instrumentation saves the path the .gcno files were created in as the default path
@@ -628,6 +633,7 @@ buildvariants:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     has_packages: false
     scons_cache_scope: shared
@@ -769,6 +775,7 @@ buildvariants:
   - rhel80-small
   expansions:
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
   stepback: false
   tasks:
@@ -1097,7 +1104,7 @@ buildvariants:
   display_name: "* macOS DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
-  - macos-1100
+  - macos-11
   expansions: &macos-debug-expansions
     test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
     resmoke_jobs_max: 6
@@ -1125,7 +1132,7 @@ buildvariants:
   display_name: "Enterprise macOS Via Rosetta 2"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100-arm64
+  - macos-11-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
@@ -1151,7 +1158,7 @@ buildvariants:
   display_name: "Enterprise macOS C++20 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100
+  - macos-11
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
@@ -1175,7 +1182,7 @@ buildvariants:
 - name: enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"
   run_on:
-  - macos-1100-arm64
+  - macos-11-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
@@ -1206,7 +1213,7 @@ buildvariants:
 - name: embedded-sdk-macos
   display_name: "Embedded SDK - macOS"
   run_on:
-  - macos-1100
+  - macos-11
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos --enableEnterpriseTests=off
@@ -1269,6 +1276,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     has_packages: false
     scons_cache_scope: shared
@@ -1417,6 +1425,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     has_packages: false
     scons_cache_scope: shared
@@ -1560,6 +1569,7 @@ buildvariants:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     has_packages: false
     scons_cache_scope: shared
@@ -1686,6 +1696,7 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_mode: all
@@ -1767,6 +1778,7 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
@@ -1829,6 +1841,7 @@ buildvariants:
       --link-model=dynamic
       --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
@@ -1870,6 +1883,7 @@ buildvariants:
 #      MONGO_DISTMOD=rhel80
 #      --link-model=dynamic
 #    multiversion_platform: rhel80
+#    multiversion_platform_50_or_later: rhel8
 #    multiversion_edition: enterprise
 #    scons_cache_scope: shared
 #    scons_cache_mode: all
@@ -1898,6 +1912,7 @@ buildvariants:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
@@ -2162,59 +2177,6 @@ buildvariants:
   - name: compile_benchmarks
   - name: .benchmarks
 
-- name: linux-64-ephemeralForTest
-  display_name: Linux (ephemeralForTest)
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-medium
-  expansions:
-    # Transactions are not explicitly supported on the ephemeralForTest storage engine.
-    # Speculative majority reads are currently only allowed for change streams, which are only supported on WiredTiger.
-    # We also relax oplog constraints so that applying oplog entries after a rollbackViaRefetch works correctly.
-    # TODO (SERVER-47022): Re-enable oplog constraint enforcement once we set the application mode
-    # correctly after rollbackViaRefetch.
-    test_flags: >-
-      --storageEngine=ephemeralForTest
-      --excludeWithAnyTags=requires_persistence,requires_fsync,requires_journaling,requires_wiredtiger,uses_transactions,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern,uses_change_streams,requires_sharding,incompatible_with_eft
-      --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false}"
-      --enableEnterpriseTests=off
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --modules= --use-diagnostic-latches=on
-    multiversion_platform: rhel80
-    multiversion_edition: targeted
-    scons_cache_mode: all
-    scons_cache_scope: shared
-    num_scons_link_jobs_available: 0.99
-  tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    # TODO (SERVER-58125): Re-enable the timeseries fuzzer for EFT
-  - name: .aggfuzzer .common !.timeseries
-  - name: aggregation
-  - name: .auth !.multiversion !.audit !.sharding
-  # SERVER-58597: Re-enable parallel
-  - name: .misc_js !.parallel
-  # SERVER-50296: Investigate concurrency test failures.
-  # - name: concurrency_gen
-  # - name: concurrency_replication_gen
-  # - name: concurrency_replication_causal_consistency_gen
-  # - name: concurrency_simultaneous_gen
-  # - name: concurrency_simultaneous_replication
-  - name: .integration !.audit
-  - name: .jscore .common !.txns !.decimal
-  # SERVER-50295: Investigate jstestfuzz time outs.
-  # - name: .jstestfuzz .common
-  # SERVER-59095: Investigate the EFT failure and re-enable the failing jstest suite on evergreen.
-  # - name: .logical_session_cache .one_sec
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
-  - name: .read_write_concern .linearize
-  - name: replica_sets_gen
-  - name: .replica_sets .common
-  # SERVER-49428: Disabled due to writeConcernMajorityJournalDefault is not off
-  # rollback_fuzzer_gen
-  - name: .updatefuzzer
-
 ###########################################
 #     Experimental buildvariants          #
 ###########################################
@@ -2233,6 +2195,7 @@ buildvariants:
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --modules= --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
@@ -2315,6 +2278,7 @@ buildvariants:
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
       --enableEnterpriseTests=off
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
@@ -2389,6 +2353,7 @@ buildvariants:
       --additionalFeatureFlagsFile all_feature_flags.txt
       --enableEnterpriseTests=off
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
@@ -2457,6 +2422,7 @@ buildvariants:
       --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
       --enableEnterpriseTests=off
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
@@ -2638,6 +2604,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="{initialServiceExecutorThreadingModel: borrowed}"
@@ -2676,6 +2643,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
@@ -2713,6 +2681,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: |- # Set the taskExecutorPoolSize for all tests
       --mongosSetParameters="taskExecutorPoolSize: 4"
@@ -2748,6 +2717,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\""
@@ -2784,6 +2754,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\""
@@ -2820,6 +2791,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\""
@@ -2854,6 +2826,7 @@ buildvariants:
     scons_cache_scope: shared
     compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=on
     multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
     multiversion_edition: enterprise
     test_flags: >-
         --mongosSetParameters="joinIngressSessionsOnShutdown: \"true\""

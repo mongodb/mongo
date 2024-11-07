@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/hasher.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -51,7 +52,7 @@ namespace {
 
 const NamespaceString kNss = NamespaceString("foo", "bar");
 const std::string kShardKey = "_id";
-const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
+const BSONObj kRangeBasedShardKeyPattern = BSON(kShardKey << 1);
 
 class RangeDeleterTest : public ShardServerTestFixture {
 public:
@@ -96,13 +97,14 @@ public:
         ShardServerTestFixture::tearDown();
     }
 
-    void setFilteringMetadataWithUUID(const UUID& uuid) {
+    void setFilteringMetadataWithUUID(const UUID& uuid,
+                                      const BSONObj& shardKeyPattern = kRangeBasedShardKeyPattern) {
         const OID epoch = OID::gen();
 
         auto rt = RoutingTableHistory::makeNew(
             kNss,
             uuid,
-            kShardKeyPattern,
+            shardKeyPattern,
             nullptr,
             false,
             epoch,
@@ -228,7 +230,7 @@ TEST_F(RangeDeleterTest,
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
@@ -257,7 +259,7 @@ TEST_F(RangeDeleterTest,
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
@@ -280,7 +282,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeInsertsDocumentToNotifySecondarie
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
@@ -313,7 +315,7 @@ TEST_F(
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
@@ -346,7 +348,7 @@ TEST_F(RangeDeleterTest,
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
@@ -378,7 +380,7 @@ TEST_F(RangeDeleterTest,
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
@@ -407,7 +409,7 @@ TEST_F(RangeDeleterTest,
                                kNss,
                                // Use a different UUID from the collection UUID.
                                UUID::gen(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
@@ -429,7 +431,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeThrowsErrorWhenCollectionDoesNotE
                                std::move(queriesComplete),
                                NamespaceString("someFake", "namespace"),
                                UUID::gen(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)),
                                task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
@@ -472,7 +474,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeLeavesDocumentsWhenTaskDocumentDo
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                UUID::gen(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
@@ -522,7 +524,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingS
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
@@ -572,7 +574,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationOnlyOnceAfterS
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
@@ -618,7 +620,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotWaitForReplicationIfErrorD
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
@@ -648,7 +650,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnWriteConflictException) 
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
@@ -679,7 +681,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnUnexpectedError) {
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
@@ -720,7 +722,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsDelayInBetweenBatches) {
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
@@ -752,7 +754,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsOrphanCleanupDelay) {
                                                   std::move(queriesComplete),
                                                   kNss,
                                                   uuid(),
-                                                  kShardKeyPattern,
+                                                  kRangeBasedShardKeyPattern,
                                                   range,
                                                   task.getId(),
                                                   orphanCleanupDelay);
@@ -790,7 +792,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRemovesRangeDeletionTaskOnSuccess
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
@@ -820,7 +822,7 @@ TEST_F(RangeDeleterTest,
                                std::move(queriesComplete),
                                kNss,
                                fakeUuid,
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
@@ -857,7 +859,7 @@ TEST_F(RangeDeleterTest,
                                std::move(queriesComplete),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
@@ -888,7 +890,7 @@ DEATH_TEST_F(RangeDeleterTest, RemoveDocumentsInRangeCrashesIfInputFutureHasErro
                                std::move((queriesCompletePf.future)).semi(),
                                kNss,
                                uuid(),
-                               kShardKeyPattern,
+                               kRangeBasedShardKeyPattern,
                                range,
                                t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
@@ -1025,8 +1027,9 @@ TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
     ASSERT_EQ(0, forRenameStore.count(_opCtx, BSONObj()));
 }
 
-TEST_F(RangeDeleterTest,
-       setOrphanCountersOnRangeDeletionTasksUpdatesTaskWithExpectedNumberOfOrphans) {
+TEST_F(
+    RangeDeleterTest,
+    setOrphanCountersOnRangeDeletionTasksUpdatesTaskForCollectionWithRangeShardKeyWithExpectedNumberOfOrphans) {
     const auto numOrphansInRange = 5;
     setFilteringMetadataWithUUID(uuid());
 
@@ -1037,6 +1040,44 @@ TEST_F(RangeDeleterTest,
         dbClient.insert(kNss.toString(), BSON(kShardKey << i));  // orphaned documents
         dbClient.insert(kNss.toString(), BSON(kShardKey << -i));
     }
+
+    setOrphanCountersOnRangeDeletionTasks(_opCtx);
+
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    ASSERT_EQ(
+        store.count(_opCtx, BSON(RangeDeletionTask::kNumOrphanDocsFieldName << numOrphansInRange)),
+        1);
+}
+
+TEST_F(
+    RangeDeleterTest,
+    setOrphanCountersOnRangeDeletionTasksUpdatesTaskForCollectionWithHashedShardKeyWithExpectedNumberOfOrphans) {
+    const BSONObj kHashedShardKeyPattern = BSON(kShardKey << "hashed");
+
+    DBDirectClient dbClient(_opCtx);
+    dbClient.createIndex(kNss.ns(),
+                         BSON("_id"
+                              << "hashed"));
+
+    setFilteringMetadataWithUUID(uuid(), kHashedShardKeyPattern);
+
+    const auto orphanedRangeLowerBoud = std::numeric_limits<int64_t>::max() / 2;
+    const ChunkRange orphansRange(BSON(kShardKey << orphanedRangeLowerBoud),
+                                  BSON(kShardKey << MAXKEY));
+
+    auto t = insertRangeDeletionTask(_opCtx, uuid(), orphansRange);
+    const auto numDocInserted = 10;
+    auto numOrphansInRange = 0;
+    for (auto i = 0; i < numDocInserted; ++i) {
+        dbClient.insert(kNss.toString(), BSON(kShardKey << i));
+        const auto hashedDocId = BSONElementHasher::hash64(BSON("_id" << i).firstElement(),
+                                                           BSONElementHasher::DEFAULT_HASH_SEED);
+        if (hashedDocId >= orphanedRangeLowerBoud) {
+            ++numOrphansInRange;
+        }
+    }
+
+    ASSERT(numOrphansInRange > 0);
 
     setOrphanCountersOnRangeDeletionTasks(_opCtx);
 

@@ -52,6 +52,8 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -668,45 +670,59 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
         opCtx,
         BSONObj(),
         [opCtx, &store, &setNumOrphansOnTask](const RangeDeletionTask& deletionTask) {
-            AutoGetCollection collection(opCtx, deletionTask.getNss(), MODE_IX);
-            if (!collection || collection->uuid() != deletionTask.getCollectionUuid()) {
-                // The deletion task is referring to a collection that has been dropped
-                setNumOrphansOnTask(deletionTask, 0);
-                return true;
+            // The operation context is not bound to any specific namespace; acquire the shard role
+            // to ensure that the collection key pattern may be retrieved through the
+            // AutoGetCollection object.
+            ScopedSetShardRole scopedRole(
+                opCtx, deletionTask.getNss(), ChunkVersion::IGNORED(), boost::none);
+            while (true) {
+                try {
+                    AutoGetCollection collection(opCtx, deletionTask.getNss(), MODE_IX);
+                    if (!collection || collection->uuid() != deletionTask.getCollectionUuid()) {
+                        // The deletion task is referring to a collection that has been dropped
+                        setNumOrphansOnTask(deletionTask, 0);
+                        return true;
+                    }
+
+
+                    const auto keyPattern = collection.getCollection().getShardKeyPattern();
+                    auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                                 *collection,
+                                                                 collection->getIndexCatalog(),
+                                                                 keyPattern,
+                                                                 /*requireSingleKey=*/false);
+
+                    uassert(ErrorCodes::IndexNotFound,
+                            str::stream() << "couldn't find index over shard key " << keyPattern
+                                          << " for collection " << deletionTask.getNss()
+                                          << " (uuid: " << deletionTask.getCollectionUuid() << ")",
+                            shardKeyIdx);
+
+                    const auto& range = deletionTask.getRange();
+                    auto forwardIdxScanner =
+                        InternalPlanner::shardKeyIndexScan(opCtx,
+                                                           &(*collection),
+                                                           *shardKeyIdx,
+                                                           range.getMin(),
+                                                           range.getMax(),
+                                                           BoundInclusion::kIncludeStartKeyOnly,
+                                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                           InternalPlanner::FORWARD);
+                    int64_t numOrphansInRange = 0;
+                    BSONObj indexEntry;
+                    while (forwardIdxScanner->getNext(&indexEntry, nullptr) !=
+                           PlanExecutor::IS_EOF) {
+                        ++numOrphansInRange;
+                    }
+
+                    setNumOrphansOnTask(deletionTask, numOrphansInRange);
+                    return true;
+
+                } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {
+                    onShardVersionMismatchNoExcept(opCtx, e->getNss(), e->getVersionReceived())
+                        .ignore();
+                }
             }
-
-            KeyPattern keyPattern;
-            uassertStatusOK(deletionTask.getRange().extractKeyPattern(&keyPattern));
-            auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                         *collection,
-                                                         collection->getIndexCatalog(),
-                                                         keyPattern.toBSON(),
-                                                         /*requireSingleKey=*/false);
-
-            uassert(ErrorCodes::IndexNotFound,
-                    str::stream() << "couldn't find index over shard key " << keyPattern.toBSON()
-                                  << " for collection " << deletionTask.getNss()
-                                  << " (uuid: " << deletionTask.getCollectionUuid() << ")",
-                    shardKeyIdx);
-
-            const auto& range = deletionTask.getRange();
-            auto forwardIdxScanner =
-                InternalPlanner::shardKeyIndexScan(opCtx,
-                                                   &(*collection),
-                                                   *shardKeyIdx,
-                                                   range.getMin(),
-                                                   range.getMax(),
-                                                   BoundInclusion::kIncludeStartKeyOnly,
-                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                   InternalPlanner::FORWARD);
-            int64_t numOrphansInRange = 0;
-            BSONObj indexEntry;
-            while (forwardIdxScanner->getNext(&indexEntry, nullptr) != PlanExecutor::IS_EOF) {
-                ++numOrphansInRange;
-            }
-
-            setNumOrphansOnTask(deletionTask, numOrphansInRange);
-            return true;
         });
 }
 

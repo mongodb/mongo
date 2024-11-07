@@ -72,6 +72,7 @@ public:
                              std::vector<ShardId> recipientShards,
                              TaskExecutorPtr executor,
                              CancellationToken cancelToken,
+                             int delayBeforeInitialQueryMillis,
                              Milliseconds maxDelayBetweenQueries = kMaxDelayBetweenQueries);
 
     SemiFuture<void> waitUntilRecipientsAreWithinCommitThreshold() const;
@@ -88,7 +89,7 @@ public:
     RemainingOperationTimes queryRemainingOperationTimeForRecipients() const;
 
 private:
-    ExecutorFuture<void> _makeFuture() const;
+    ExecutorFuture<void> _makeFuture(Milliseconds delayBetweenQueries) const;
 
     static constexpr auto kDiagnosticLogLevel = 0;
     static constexpr auto kMaxDelayBetweenQueries = Seconds(30);
@@ -98,6 +99,8 @@ private:
     const TaskExecutorPtr _executor;
     const CancellationToken _cancelToken;
     const Milliseconds _threshold;
+
+    const Milliseconds _delayBeforeInitialQueryMillis;
     const Milliseconds _maxDelayBetweenQueries;
 
     TaskExecutorPtr _networkExecutor;
