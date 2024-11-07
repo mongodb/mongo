@@ -116,7 +116,7 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
                                             std::shared_ptr<bucket_catalog::WriteBatch> batch,
                                             OperationSource source) {
     return [sortedMeasurements = std::move(sortedMeasurements), batch, source](
-               const BSONObj& docToWrite) {
+               const BSONObj& docToWrite, const BSONObj& pre) {
         timeseriesDataIntegrityCheckFailureUpdate.executeIf(
             [&](const BSONObj&) {
                 uasserted(  // In testing, we want any failures within this check to invariant.
@@ -129,41 +129,43 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
             [&source](const BSONObj&) { return source == OperationSource::kTimeseriesUpdate; });
 
         using AddAttrsFn = std::function<void(logv2::DynamicAttributes&)>;
-        auto failed = [&sortedMeasurements, &batch, &docToWrite](StringData reason,
-                                                                 AddAttrsFn addAttrsWithoutData,
-                                                                 AddAttrsFn addAttrsWithData) {
-            logv2::DynamicAttributes attrs;
-            attrs.add("reason", reason);
-            attrs.add("bucketId", batch->bucketId.oid);
-            attrs.add("collectionUUID", batch->bucketId.collectionUUID);
-            addAttrsWithoutData(attrs);
+        auto failed =
+            [&sortedMeasurements, &batch, &docToWrite, &pre](
+                StringData reason, AddAttrsFn addAttrsWithoutData, AddAttrsFn addAttrsWithData) {
+                logv2::DynamicAttributes attrs;
+                attrs.add("reason", reason);
+                attrs.add("bucketId", batch->bucketId.oid);
+                attrs.add("collectionUUID", batch->bucketId.collectionUUID);
+                addAttrsWithoutData(attrs);
 
-            LOGV2_WARNING(
-                8807500, "Failed data verification inserting into compressed column", attrs);
+                LOGV2_WARNING(
+                    8807500, "Failed data verification inserting into compressed column", attrs);
 
-            attrs = {};
-            auto seqLogDataFields = [](const details::Measurement& measurement) {
-                return logv2::seqLog(measurement.dataFields);
+                attrs = {};
+                auto seqLogDataFields = [](const details::Measurement& measurement) {
+                    return logv2::seqLog(measurement.dataFields);
+                };
+                auto measurementsAttr = logv2::seqLog(
+                    boost::make_transform_iterator(sortedMeasurements.begin(), seqLogDataFields),
+                    boost::make_transform_iterator(sortedMeasurements.end(), seqLogDataFields));
+                attrs.add("measurements", measurementsAttr);
+                auto preAttr = base64::encode(pre.objdata(), pre.objsize());
+                attrs.add("pre", preAttr);
+                auto bucketAttr = base64::encode(docToWrite.objdata(), docToWrite.objsize());
+                attrs.add("bucket", bucketAttr);
+                addAttrsWithData(attrs);
+
+                LOGV2_WARNING_OPTIONS(8807501,
+                                      logv2::LogTruncation::Disabled,
+                                      "Failed data verification inserting into compressed column",
+                                      attrs);
+
+                invariant(!TestingProctor::instance().isEnabled());
+                tasserted(timeseries::BucketCompressionFailure(batch->bucketId.collectionUUID,
+                                                               batch->bucketId.oid,
+                                                               batch->bucketId.keySignature),
+                          "Failed data verification inserting into compressed column");
             };
-            auto measurementsAttr = logv2::seqLog(
-                boost::make_transform_iterator(sortedMeasurements.begin(), seqLogDataFields),
-                boost::make_transform_iterator(sortedMeasurements.end(), seqLogDataFields));
-            attrs.add("measurements", measurementsAttr);
-            auto bucketAttr = base64::encode(docToWrite.objdata(), docToWrite.objsize());
-            attrs.add("bucket", bucketAttr);
-            addAttrsWithData(attrs);
-
-            LOGV2_WARNING_OPTIONS(8807501,
-                                  logv2::LogTruncation::Disabled,
-                                  "Failed data verification inserting into compressed column",
-                                  attrs);
-
-            invariant(!TestingProctor::instance().isEnabled());
-            tasserted(timeseries::BucketCompressionFailure(batch->bucketId.collectionUUID,
-                                                           batch->bucketId.oid,
-                                                           batch->bucketId.keySignature),
-                      "Failed data verification inserting into compressed column");
-        };
 
         auto actualMeta = docToWrite.getField(kBucketMetaFieldName);
         auto expectedMeta = batch->bucketKey.metadata.element();
@@ -1018,7 +1020,7 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
         if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load()) {
             auto verifierFunction =
                 makeVerifierFunction(sortedMeasurements, batch, OperationSource::kTimeseriesInsert);
-            verifierFunction(bucketToInsert);
+            verifierFunction(bucketToInsert, BSONObj());
         }
     } else {
         bucketDoc = makeNewDocumentForWrite(bucketsNs, batch, metadata);

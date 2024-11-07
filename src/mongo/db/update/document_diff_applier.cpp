@@ -752,7 +752,7 @@ BSONObj applyDiff(const BSONObj& pre,
     applier.applyDiffToObject(pre, &path, &reader, &out);
     auto obj = out.obj();
     if (verifierFunction) {
-        verifierFunction(obj);
+        verifierFunction(obj, pre);
     }
     return obj;
 }
