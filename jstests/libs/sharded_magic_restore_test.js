@@ -208,9 +208,23 @@ export class ShardedMagicRestoreTest {
         this.magicRestoreTests.forEach((magicRestoreTest, idx) => {
             const rstOptions = {"replSet": magicRestoreTest.rst.name};
 
+            // When performing a shard rename, we must replace the replica set '_id' field on the
+            // config. Cloud will determine the new config to insert into a node during restore, so
+            // we don't have to do this replacement in the server.
+            const replicaSetConfig = magicRestoreTest.getExpectedConfig();
+            if (this.shardingRename) {
+                for (let i = 0; i < this.numShards; i++) {
+                    if (replicaSetConfig._id == this.shardingRename[i].sourceShardName) {
+                        replicaSetConfig._id = this.shardingRename[i].destinationShardName;
+                        break;
+                    }
+                }
+                this.expectedConfig = replicaSetConfig;
+            }
+
             let restoreConfiguration = {
                 "nodeType": idx > 0 ? "shard" : "configServer",
-                "replicaSetConfig": magicRestoreTest.getExpectedConfig(),
+                "replicaSetConfig": replicaSetConfig,
                 "maxCheckpointTs": this.maxCheckpointTs
             };
 
