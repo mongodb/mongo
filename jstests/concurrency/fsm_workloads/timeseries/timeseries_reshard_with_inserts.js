@@ -71,17 +71,17 @@ export const $config = (function() {
                 });
             }
 
-            assert.soon(() => {
+            retryOnRetryableError(() => {
                 const res = db[collName].insert(docs);
-
-                if (res.code == ErrorCodes.NoProgressMade) {
-                    print(`No progress made while inserting documents. Retrying.`);
-                    return false;
+                if (res.writeErrors) {
+                    for (let writeError of res.writeErrors) {
+                        if (writeError.code == ErrorCodes.NoProgressMade) {
+                            throw res;
+                        }
+                    }
                 }
-
                 TimeseriesTest.assertInsertWorked(res);
-                return true;
-            });
+            }, 100 /* numRetries */, undefined /* sleepMs */, [ErrorCodes.NoProgressMade]);
 
             print(`Finished Inserting documents.`);
         },
