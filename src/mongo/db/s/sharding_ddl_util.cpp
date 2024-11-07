@@ -34,6 +34,7 @@
 #include <array>
 #include <boost/cstdint.hpp>
 #include <boost/smart_ptr.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <ostream>
@@ -90,6 +91,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
+#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_collection_gen.h"
@@ -378,17 +380,51 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
                                              << nss.toStringForErrorMsg());
 }
 
-void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONObj& filter) {
+void removeQueryAnalyzerMetadata(OperationContext* opCtx,
+                                 const std::vector<UUID>& collectionUUIDs) {
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    std::vector<mongo::write_ops::DeleteOpEntry> deleteOps;
+    for (size_t i = 0; i < collectionUUIDs.size(); ++i) {
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(BSON(analyze_shard_key::QueryAnalyzerDocument::kCollectionUuidFieldName
+                        << collectionUUIDs[i]));
+        entry.setMulti(false);
+        deleteOps.push_back(std::move(entry));
+        // Ensure that a single batch request does not exceed the maximum BSON size. Considering
+        // that each UUID is encoded using 16 bytes, using kMaxWriteBatchSize ensures that each
+        // command will weigh around 1.6MB.
+        if (deleteOps.size() == write_ops::kMaxWriteBatchSize || i + 1 == collectionUUIDs.size()) {
+            write_ops::DeleteCommandRequest deleteCmd(
+                NamespaceString::kConfigQueryAnalyzersNamespace);
+            generic_argument_util::setMajorityWriteConcern(deleteCmd);
+            deleteCmd.setDeletes(std::move(deleteOps));
+            const auto deleteResult = configShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                DatabaseName::kConfig,
+                deleteCmd.toBSON(),
+                Shard::RetryPolicy::kIdempotent);
+
+            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(deleteResult),
+                                       str::stream()
+                                           << "Failed to remove query analyzer documents");
+            deleteOps.clear();
+        }
+    }
+}
+
+void removeQueryAnalyzerMetadata(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 const OperationSessionInfo& osi) {
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     write_ops::DeleteCommandRequest deleteCmd(NamespaceString::kConfigQueryAnalyzersNamespace);
-    deleteCmd.setDeletes({[&] {
-        write_ops::DeleteOpEntry entry;
-        entry.setQ(filter);
-        entry.setMulti(true);
-        return entry;
-    }()});
+    generic_argument_util::setOperationSessionInfo(deleteCmd, osi);
     generic_argument_util::setMajorityWriteConcern(deleteCmd);
-
+    write_ops::DeleteOpEntry entry;
+    entry.setQ(BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName
+                    << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
+    entry.setMulti(false);
+    deleteCmd.setDeletes({std::move(entry)});
     const auto deleteResult = configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -396,10 +432,8 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONOb
         deleteCmd.toBSON(),
         Shard::RetryPolicy::kIdempotent);
 
-    uassertStatusOKWithContext(
-        Shard::CommandResponse::getEffectiveStatus(deleteResult),
-        str::stream() << "Failed to remove query analyzer documents that match the filter"
-                      << filter);
+    uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(deleteResult),
+                               str::stream() << "Failed to remove query analyzer documents");
 }
 
 void removeCollAndChunksMetadataFromConfig(

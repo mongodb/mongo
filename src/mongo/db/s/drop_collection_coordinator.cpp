@@ -71,7 +71,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
@@ -322,10 +321,10 @@ void DropCollectionCoordinator::_commitDropCollection(
     LOGV2_DEBUG(5390504, 2, "Dropping collection", logAttrs(nss()), "sharded"_attr = collIsSharded);
 
     // Remove the query sampling configuration document for this collection, if it exists.
-    sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
-        opCtx,
-        BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName
-             << NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault())));
+    {
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::removeQueryAnalyzerMetadata(opCtx, nss(), session);
+    }
 
     if (collIsSharded) {
         invariant(_doc.getCollInfo());

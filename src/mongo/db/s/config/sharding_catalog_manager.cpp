@@ -104,6 +104,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -819,6 +820,15 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
         if (!result.isOK()) {
             return result;
         }
+    }
+
+    result = createIndexOnConfigCollection(
+        opCtx,
+        NamespaceString::kConfigQueryAnalyzersNamespace,
+        BSON(analyze_shard_key::QueryAnalyzerDocument::kCollectionUuidFieldName << 1),
+        unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create collUuid_1 index on config.queryAnalyzers");
     }
 
     auto status = createIndexOnConfigCollection(

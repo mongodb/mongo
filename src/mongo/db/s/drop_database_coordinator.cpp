@@ -47,6 +47,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
@@ -244,7 +245,13 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         useClusterTransaction,
         **executor);
 
-    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, getNewSession(opCtx));
+    {
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, session);
+    }
+
+    // Remove the query sampling configuration documents for the collection, if it exists.
+    sharding_ddl_util::removeQueryAnalyzerMetadata(opCtx, {coll.getUuid()});
 
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
@@ -388,15 +395,22 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         opCtx, nss, getNewSession(opCtx));
                 }
 
-                // Remove the query sampling configuration documents for all collections in this
-                // database, if they exist.
-                auto db = DatabaseNameUtil::serialize(_dbName,
-                                                      SerializationContext::stateCommandRequest());
-                const std::string regex = "^" + pcre_util::quoteMeta(db) + "\\..*";
-                sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
-                    opCtx,
-                    BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName
-                         << BSON("$regex" << regex)));
+                // Remove the query sampling configuration documents for all unsharded collections
+                // in this database, if they exist.
+                {
+                    std::vector<UUID> unshardedCollUUIDs;
+                    DBDirectClient dbClient(opCtx);
+                    // NOTE: UUIDs are retrieved through a filter that excludes timeseries
+                    // collections; this is fine, since no query analyzer can be configured on them.
+                    const auto collInfos = dbClient.getCollectionInfos(
+                        _dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+                    for (const auto& collInfo : collInfos) {
+                        unshardedCollUUIDs.push_back(UUID::parse(collInfo.getObjectField("info")));
+                    }
+
+                    sharding_ddl_util::removeQueryAnalyzerMetadata(opCtx,
+                                                                   std::move(unshardedCollUUIDs));
+                }
 
                 const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
                 {

@@ -189,9 +189,18 @@ void removeCollAndChunksMetadataFromConfig(
     const std::shared_ptr<executor::TaskExecutor>& executor = nullptr);
 
 /**
- * Delete the query analyzer documents that match the given filter.
+ * Delete the query analyzer document associated to the passed in namespace.
  */
-void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONObj& filter);
+void removeQueryAnalyzerMetadata(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 const OperationSessionInfo& osi);
+
+/**
+ * Delete the query analyzer documents associated to the passed in collection UUIDs
+ * (note: using such a type instead of NamespaceString guarantees replay protection in step down
+ * scenarios).
+ */
+void removeQueryAnalyzerMetadata(OperationContext* opCtx, const std::vector<UUID>& collectionUUIDs);
 
 /**
  * Ensures rename preconditions for collections are met:

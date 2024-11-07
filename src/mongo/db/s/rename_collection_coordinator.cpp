@@ -85,7 +85,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -1109,14 +1108,17 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 // Remove the query sampling configuration documents for the source and destination
                 // collections, if they exist.
-                sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
-                    opCtx,
-                    BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName << BSON(
-                             "$in" << BSON_ARRAY(
-                                 NamespaceStringUtil::serialize(
-                                     nss(), SerializationContext::stateDefault())
-                                 << NamespaceStringUtil::serialize(
-                                        _request.getTo(), SerializationContext::stateDefault())))));
+                {
+                    auto getCollUuidsToRemove = [&] {
+                        std::vector<UUID> collectionUUIDs;
+                        collectionUUIDs.push_back(_doc.getSourceUUID().value());
+                        if (auto targetUUID = _doc.getTargetUUID()) {
+                            collectionUUIDs.push_back(targetUUID.value());
+                        }
+                        return collectionUUIDs;
+                    };
+                    sharding_ddl_util::removeQueryAnalyzerMetadata(opCtx, getCollUuidsToRemove());
+                }
 
                 // For an untracked collection the CSRS server can not verify the targetUUID.
                 // Use the session ID + txnNumber to ensure no stale requests get through.
