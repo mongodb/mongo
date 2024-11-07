@@ -357,6 +357,48 @@ config_fuzzer_params = {
             "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
             "fuzz_at": ["startup"],
         },
+        "logLevel": {
+            "min": 0,
+            "max": 5,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "enableDetailedConnectionHealthMetricLogLines": {
+            "choices": [True, False],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "tcpFastOpenServer": {
+            "choices": [True, False],
+            "fuzz_at": ["startup"],
+        },
+        "tcpFastOpenClient": {
+            "choices": [True, False],
+            "fuzz_at": ["startup"],
+        },
+        "tcpFastOpenQueueSize": {
+            "min": 1,
+            "max": 4096,
+            "fuzz_at": ["startup"],
+        },
+        "warmMinConnectionsInShardingTaskExecutorPoolOnStartup": {
+            "choices": [True, False],
+            "fuzz_at": ["startup"],
+        },
+        "diagnosticDataCollectionEnabled": {
+            "choices": [True, False],
+            "fuzz_at": ["startup"],
+        },
+        "diagnosticDataCollectionVerboseTCMalloc": {
+            "choices": [True, False],
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "diagnosticDataCollectionEnableLatencyHistograms": {
+            "choices": [True, False],
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
     },
     "mongos": {
         # We need a higher timeout to account for test slowness
@@ -372,6 +414,52 @@ config_fuzzer_params = {
             "max": 86400,
             "period": 5,
             "fuzz_at": ["runtime"],
+        },
+        "replicaSetMonitorProtocol": {
+            "choices": ["streamable", "sdam"],
+            "fuzz_at": ["startup"],
+        },
+        "logLevel": {
+            "min": 0,
+            "max": 5,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "enableDetailedConnectionHealthMetricLogLines": {
+            "choices": [True, False],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "tcpFastOpenServer": {
+            "choices": [True, False],
+            "fuzz_at": ["startup"],
+        },
+        "tcpFastOpenClient": {
+            "choices": [True, False],
+            "fuzz_at": ["startup"],
+        },
+        "tcpFastOpenQueueSize": {
+            "min": 1,
+            "max": 4096,
+            "fuzz_at": ["startup"],
+        },
+        "warmMinConnectionsInShardingTaskExecutorPoolOnStartup": {
+            "choices": [True, False],
+            "fuzz_at": ["startup"],
+        },
+        "diagnosticDataCollectionEnabled": {
+            "choices": [True, False],
+            "fuzz_at": ["startup"],
+        },
+        "diagnosticDataCollectionVerboseTCMalloc": {
+            "choices": [True, False],
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "diagnosticDataCollectionEnableLatencyHistograms": {
+            "choices": [True, False],
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
         },
     },
 }
