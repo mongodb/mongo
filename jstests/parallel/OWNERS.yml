@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "insert.js":
+    approvers:
+      - 10gen/server-storage-execution
+  - "del.js":
+    approvers:
+      - 10gen/server-storage-execution

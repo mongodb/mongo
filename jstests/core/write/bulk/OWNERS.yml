@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "bulk_insert*.js":
+    approvers:
+      - 10gen/server-storage-execution
+  - "bulk_write_timeseries*.js":
+    approvers:
+      - 10gen/server-storage-execution
