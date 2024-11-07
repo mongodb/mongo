@@ -535,77 +535,84 @@ public:
             }
             FieldRef::FieldRefTempAppend tempAppend(*path, elt.fieldNameStringData());
 
-            visit(OverloadedVisitor{
-                      [this, &path](Delete) {
-                          // Do not append anything.
-                      },
+            visit(
+                OverloadedVisitor{
+                    [this, &path](Delete) {
+                        // Do not append anything.
+                    },
 
-                      [this, &path, &builder, &elt, &fieldsToSkipInserting](const Update& update) {
-                          builder->append(update.newElt);
-                          fieldsToSkipInserting.insert(elt.fieldNameStringData());
-                      },
+                    [this, &path, &builder, &elt, &fieldsToSkipInserting](const Update& update) {
+                        builder->append(update.newElt);
+                        fieldsToSkipInserting.insert(elt.fieldNameStringData());
+                    },
 
-                      [](const Insert&) {
-                          // Skip the pre-image version of the field. We'll add it at the end.
-                      },
+                    [](const Insert&) {
+                        // Skip the pre-image version of the field. We'll add it at the end.
+                    },
 
-                      [this, &path, &builder, &elt, &fieldsToSkipInserting](const Binary& binary) {
-                          // Applies the binary diff to the BSONColumn.
-                          invariant(elt.binDataType() == BinDataType::Column);
-                          invariant(binary.newElt.isABSONObj());
+                    [this, &path, &builder, &elt, &fieldsToSkipInserting](const Binary& binary) {
+                        // Applies the binary diff to the BSONColumn.
+                        invariant(elt.binDataType() == BinDataType::Column);
+                        invariant(binary.newElt.isABSONObj());
 
-                          const BSONObj diffObj = binary.newElt.Obj();
-                          const int diffOffset = diffObj.getIntField("o");
+                        const BSONObj diffObj = binary.newElt.Obj();
+                        const int diffOffset = diffObj.getIntField("o");
 
-                          int diffLen = 0;
-                          const char* diffData = diffObj.getField("d").binData(diffLen);
+                        int diffLen = 0;
+                        const char* diffData = diffObj.getField("d").binData(diffLen);
 
-                          int currLen = 0;
-                          const char* currData = elt.binData(currLen);
-                          invariant(currLen >= diffOffset);
+                        int currLen = 0;
+                        const char* currData = elt.binData(currLen);
 
-                          int newLen = diffOffset + diffLen;
-                          std::vector<char> newData;
-                          newData.reserve(newLen);
+                        if (currLen >= diffOffset) {
+                            int newLen = diffOffset + diffLen;
+                            std::vector<char> newData;
+                            newData.reserve(newLen);
 
-                          std::copy(currData, currData + diffOffset, std::back_inserter(newData));
-                          std::copy(diffData, diffData + diffLen, std::back_inserter(newData));
+                            std::copy(currData, currData + diffOffset, std::back_inserter(newData));
+                            std::copy(diffData, diffData + diffLen, std::back_inserter(newData));
 
-                          BSONBinData postBinData(&newData[0], newLen, BinDataType::Column);
-                          builder->append(binary.newElt.fieldName(), postBinData);
+                            BSONBinData postBinData(&newData[0], newLen, BinDataType::Column);
+                            builder->append(binary.newElt.fieldName(), postBinData);
+                        } else {
+                            // Offset is larger than the length of the preimage. This means that we
+                            // are re-applying this diff and some future oplog entry will shrink
+                            // this binary. It is not possible to apply this diff. We make this a
+                            // no-op for idempotency.
+                            builder->append(elt);
+                        }
 
-                          fieldsToSkipInserting.insert(elt.fieldNameStringData());
-                      },
+                        fieldsToSkipInserting.insert(elt.fieldNameStringData());
+                    },
 
-                      [this, &builder, &elt, &path](const SubDiff& subDiff) {
-                          const auto type = subDiff.type();
-                          if (elt.type() == BSONType::Object && type == DiffType::kDocument) {
-                              BSONObjBuilder subBob(
-                                  builder->subobjStart(elt.fieldNameStringData()));
-                              auto reader = get<DocumentDiffReader>(subDiff.reader);
-                              applyDiffToObject(elt.embeddedObject(), path, &reader, &subBob);
-                          } else if (elt.type() == BSONType::Array && type == DiffType::kArray) {
-                              BSONArrayBuilder subBob(
-                                  builder->subarrayStart(elt.fieldNameStringData()));
-                              auto reader = get<ArrayDiffReader>(subDiff.reader);
-                              applyDiffToArray(elt.embeddedObject(), path, &reader, &subBob);
-                          } else {
-                              // There's a type mismatch. The diff was expecting one type but the
-                              // pre image contains a value of a different type. This means we are
-                              // re-applying a diff.
+                    [this, &builder, &elt, &path](const SubDiff& subDiff) {
+                        const auto type = subDiff.type();
+                        if (elt.type() == BSONType::Object && type == DiffType::kDocument) {
+                            BSONObjBuilder subBob(builder->subobjStart(elt.fieldNameStringData()));
+                            auto reader = get<DocumentDiffReader>(subDiff.reader);
+                            applyDiffToObject(elt.embeddedObject(), path, &reader, &subBob);
+                        } else if (elt.type() == BSONType::Array && type == DiffType::kArray) {
+                            BSONArrayBuilder subBob(
+                                builder->subarrayStart(elt.fieldNameStringData()));
+                            auto reader = get<ArrayDiffReader>(subDiff.reader);
+                            applyDiffToArray(elt.embeddedObject(), path, &reader, &subBob);
+                        } else {
+                            // There's a type mismatch. The diff was expecting one type but the
+                            // pre image contains a value of a different type. This means we are
+                            // re-applying a diff.
 
-                              // There must be some future operation which changed the type of this
-                              // field from object/array to something else. So we set this field to
-                              // null and expect the future value to overwrite the value here.
+                            // There must be some future operation which changed the type of this
+                            // field from object/array to something else. So we set this field to
+                            // null and expect the future value to overwrite the value here.
 
-                              builder->appendNull(elt.fieldNameStringData());
-                          }
+                            builder->appendNull(elt.fieldNameStringData());
+                        }
 
-                          // Note: There's no need to update 'fieldsToSkipInserting' here, because a
-                          // field cannot appear in both the sub-diff and insert section.
-                      },
-                  },
-                  it->second);
+                        // Note: There's no need to update 'fieldsToSkipInserting' here, because a
+                        // field cannot appear in both the sub-diff and insert section.
+                    },
+                },
+                it->second);
         }
 
         // Whether we have already determined whether indexes are affected for the base path; that
