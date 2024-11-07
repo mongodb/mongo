@@ -61,6 +61,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/validate/collection_validation.h"
+#include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_serverless_helpers.h"

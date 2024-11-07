@@ -527,7 +527,6 @@ mongo_cc_library(
         "index_catalog_entry_impl.cpp",
         "index_catalog_impl.cpp",
         "virtual_collection_impl.cpp",
-        "//src/mongo/db/catalog/validate:index_consistency.cpp",
     ],
     hdrs = [
         "collection_impl.h",
@@ -536,7 +535,6 @@ mongo_cc_library(
         "index_catalog_entry_impl.h",
         "index_catalog_impl.h",
         "virtual_collection_impl.h",
-        "//src/mongo/db/catalog/validate:index_consistency.h",
     ],
     deps = [
         "catalog_helpers",

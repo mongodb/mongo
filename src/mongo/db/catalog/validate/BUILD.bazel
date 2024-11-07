@@ -54,12 +54,14 @@ mongo_cc_library(
     name = "collection_validation",
     srcs = [
         "collection_validation.cpp",
+        "index_consistency.cpp",
+        "index_consistency.h",
         "validate_adaptor.cpp",
+        "validate_adaptor.h",
         "validate_results.cpp",
     ],
     hdrs = [
         "collection_validation.h",
-        "validate_adaptor.h",
         "validate_results.h",
     ],
     deps = [

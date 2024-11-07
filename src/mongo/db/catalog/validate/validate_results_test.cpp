@@ -29,6 +29,7 @@
 
 #include "mongo/db/catalog/validate/validate_results.h"
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/assert.h"
@@ -117,6 +118,84 @@ TEST(ValidateResultsTest, ErrorsAndWarningsAutomaticallyDeduplicated) {
     ASSERT_TRUE(vr.addWarning("w2"));
     ASSERT_FALSE(vr.addWarning("w2"));
     ASSERT_EQ(vr.getWarnings().size(), 2);
+}
+
+TEST(ValidateResultsTest, MissingAndExtraEntriesSizeLimited) {
+    ValidateResults vr;
+
+    for (int i = 0; i < 10; i++) {
+        // Each string is (200 - i)KB in size, so the *larger* i will be kept.
+        auto obj = BSON("i" << i << "s" << std::string((200 - i) * 1024, 'a'));
+        vr.addMissingIndexEntry(obj);
+        vr.addExtraIndexEntry(obj);
+    }
+
+    // We can't fit all 10 elements in.
+    ASSERT_NE(10, vr.getMissingIndexEntries().size());
+    ASSERT_NE(10, vr.getExtraIndexEntries().size());
+
+    // Since "i==0" is the largest, they will definitely have been evicted.
+    auto isNotZero = [](const BSONObj& obj) {
+        const auto& i = obj.getField("i");
+        return i.isNumber() && i.numberInt() != 0;
+    };
+    ASSERT_TRUE(std::all_of(
+        vr.getMissingIndexEntries().begin(), vr.getMissingIndexEntries().end(), isNotZero));
+    ASSERT_TRUE(
+        std::all_of(vr.getExtraIndexEntries().begin(), vr.getExtraIndexEntries().end(), isNotZero));
+}
+
+TEST(ValidateResultsTest, MissingAndExtraEntriesKeepsAtLeastOne) {
+    ValidateResults vr;
+
+    // Definitely larger than the limit.
+    auto obj = BSON("x" << std::string(2 * 1024 * 1024, 'a'));
+    vr.addMissingIndexEntry(obj);
+    vr.addExtraIndexEntry(obj);
+
+    ASSERT_EQ(1, vr.getMissingIndexEntries().size());
+    ASSERT_EQ(1, vr.getExtraIndexEntries().size());
+
+    // Much smaller.
+    auto obj2 = BSON("x"
+                     << "a");
+    vr.addMissingIndexEntry(obj2);
+    vr.addExtraIndexEntry(obj2);
+
+    ASSERT_EQ(1, vr.getMissingIndexEntries().size());
+    ASSERT_EQ(1, vr.getExtraIndexEntries().size());
+
+    // Prefers to keep the smaller entries.
+    ASSERT_BSONOBJ_EQ(obj2, vr.getMissingIndexEntries().front());
+    ASSERT_BSONOBJ_EQ(obj2, vr.getExtraIndexEntries().front());
+}
+
+TEST(ValidateResultsTest, MissingAndExtraEntriesCreateErrorsWhenSizeExceeded) {
+    ValidateResults vr;
+    auto obj = BSON("x" << std::string(2 * 1024 * 1024, 'a'));
+
+    // First addition, no evictions.
+    vr.addMissingIndexEntry(obj);
+    vr.addExtraIndexEntry(obj);
+    ASSERT_TRUE(vr.getErrors().empty());
+
+    // Now we evict something.
+    vr.addMissingIndexEntry(obj);
+    ASSERT_EQ(1, vr.getErrors().size());
+    ASSERT_TRUE(vr.getErrors().contains(
+        "Not all missing index entry inconsistencies are listed due to size limitations."));
+
+    // Multiple evictions -> still 1 error.
+    vr.addMissingIndexEntry(obj);
+    ASSERT_EQ(1, vr.getErrors().size());
+
+    // But 1 for each missing/extra
+    vr.addExtraIndexEntry(obj);
+    ASSERT_EQ(2, vr.getErrors().size());
+    ASSERT_TRUE(vr.getErrors().contains(
+        "Not all missing index entry inconsistencies are listed due to size limitations."));
+    ASSERT_TRUE(vr.getErrors().contains(
+        "Not all extra index entry inconsistencies are listed due to size limitations."));
 }
 
 TEST(ValidateResultsTest, TestingSizeOfIndexDetailsEntries) {

@@ -281,37 +281,11 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
                                                     ValidateResults* results) {
     invariant(!_firstPhase);
 
-    // We'll report up to 1MB for extra index entry errors and missing index entry errors.
-    const int kErrorSizeBytes = 1 * 1024 * 1024;
-    long numMissingIndexEntriesSizeBytes = 0;
-    long numExtraIndexEntriesSizeBytes = 0;
-
-    int numMissingIndexEntryErrors = _missingIndexEntries.size();
-    int numExtraIndexEntryErrors = 0;
-    for (const auto& item : _extraIndexEntries) {
-        numExtraIndexEntryErrors += item.second.size();
-    }
-
-    // Sort missing index entries by size so we can process in order of increasing size and return
-    // as many as possible within memory limits.
-    using MissingIt = decltype(_missingIndexEntries)::const_iterator;
-    std::vector<MissingIt> missingIndexEntriesBySize;
-    missingIndexEntriesBySize.reserve(_missingIndexEntries.size());
-    for (auto it = _missingIndexEntries.begin(); it != _missingIndexEntries.end(); ++it) {
-        missingIndexEntriesBySize.push_back(it);
-    }
-    std::sort(missingIndexEntriesBySize.begin(),
-              missingIndexEntriesBySize.end(),
-              [](const MissingIt& a, const MissingIt& b) {
-                  return a->second.keyString.getSize() < b->second.keyString.getSize();
-              });
-
     // Inform which indexes have inconsistencies and add the BSON objects of the inconsistent index
     // entries to the results vector.
-    bool missingIndexEntrySizeLimitWarning = false;
-    bool first = true;
-    for (const auto& missingIndexEntry : missingIndexEntriesBySize) {
-        const IndexEntryInfo& entryInfo = missingIndexEntry->second;
+    int numMissingIndexEntryErrors = _missingIndexEntries.size();
+    for (const auto& missingIndexEntry : _missingIndexEntries) {
+        const IndexEntryInfo& entryInfo = missingIndexEntry.second;
         key_string::Value ks = entryInfo.keyString;
         auto indexKey =
             key_string::toBsonSafe(ks.getBuffer(), ks.getSize(), entryInfo.ord, ks.getTypeBits());
@@ -320,18 +294,7 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
                                             entryInfo.recordId,
                                             indexKey,
                                             entryInfo.idKey);
-
-        numMissingIndexEntriesSizeBytes += entry.objsize();
-        if (first || numMissingIndexEntriesSizeBytes <= kErrorSizeBytes) {
-            results->addMissingIndexEntry(entry);
-            first = false;
-        } else if (!missingIndexEntrySizeLimitWarning) {
-            StringBuilder ss;
-            ss << "Not all missing index entry inconsistencies are listed due to size limitations.";
-            results->addError(ss.str(), false);
-
-            missingIndexEntrySizeLimitWarning = true;
-        }
+        results->addMissingIndexEntry(entry);
 
         _printMetadata(opCtx, results, entryInfo);
 
@@ -345,56 +308,21 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
         results->getIndexResultsMap().at(indexName).addError(ss.str());
     }
 
-    // Sort extra index entries by size so we can process in order of increasing size and return as
-    // many as possible within memory limits.
-    using ExtraIt = SimpleBSONObjSet::const_iterator;
-    std::vector<ExtraIt> extraIndexEntriesBySize;
-    // Since the extra entries are stored in a map of sets, we have to iterate the entries in the
-    // map and sum the size of the sets in order to get the total number. Given that we can have at
-    // most 64 indexes per collection, and the total number of entries could potentially be in the
-    // millions, we expect that iterating the map will be much less costly than the additional
-    // allocations and copies that could result from not calling 'reserve' on the vector.
-    size_t totalExtraIndexEntriesCount =
-        std::accumulate(_extraIndexEntries.begin(),
-                        _extraIndexEntries.end(),
-                        0,
-                        [](size_t total, const std::pair<IndexKey, SimpleBSONObjSet>& set) {
-                            return total + set.second.size();
-                        });
-    extraIndexEntriesBySize.reserve(totalExtraIndexEntriesCount);
-    for (const auto& extraIndexEntry : _extraIndexEntries) {
-        const SimpleBSONObjSet& entries = extraIndexEntry.second;
-        for (auto it = entries.begin(); it != entries.end(); ++it) {
-            extraIndexEntriesBySize.push_back(it);
-        }
-    }
-    std::sort(extraIndexEntriesBySize.begin(),
-              extraIndexEntriesBySize.end(),
-              [](const ExtraIt& a, const ExtraIt& b) { return a->objsize() < b->objsize(); });
+    int numExtraIndexEntryErrors = 0;
+    for (const auto& item : _extraIndexEntries) {
+        numExtraIndexEntryErrors += item.second.size();
+        for (const auto& entry : item.second) {
+            results->addExtraIndexEntry(entry);
 
-    bool extraIndexEntrySizeLimitWarning = false;
-    for (const auto& entry : extraIndexEntriesBySize) {
-        numExtraIndexEntriesSizeBytes += entry->objsize();
-        if (first || numExtraIndexEntriesSizeBytes <= kErrorSizeBytes) {
-            results->addExtraIndexEntry(*entry);
-            first = false;
-        } else if (!extraIndexEntrySizeLimitWarning) {
+            std::string indexName = entry["indexName"].String();
+            if (!results->getIndexResultsMap().at(indexName).isValid()) {
+                continue;
+            }
+
             StringBuilder ss;
-            ss << "Not all extra index entry inconsistencies are listed due to size "
-                  "limitations.";
-            results->addError(ss.str(), false);
-
-            extraIndexEntrySizeLimitWarning = true;
+            ss << "Index with name '" << indexName << "' has inconsistencies.";
+            results->getIndexResultsMap().at(indexName).addError(ss.str());
         }
-
-        std::string indexName = (*entry)["indexName"].String();
-        if (!results->getIndexResultsMap().at(indexName).isValid()) {
-            continue;
-        }
-
-        StringBuilder ss;
-        ss << "Index with name '" << indexName << "' has inconsistencies.";
-        results->getIndexResultsMap().at(indexName).addError(ss.str());
     }
 
     // Inform how many inconsistencies were detected.

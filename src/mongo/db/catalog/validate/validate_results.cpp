@@ -39,8 +39,34 @@
 
 namespace mongo {
 
+namespace {
+
+// Up to 1MB of "inconsistency" errors will be kept, i.e. missing/extra index fields.
+const int kMaxIndexInconsistencySize = 1 * 1024 * 1024;
 // Reserving 4MB for index details' error and warning messages.
 static constexpr std::size_t kMaxIndexDetailsSizeBytes = 4 * 1024 * 1024;
+
+struct LargestObjsPopFirstCmp {
+    bool operator()(const BSONObj& l, const BSONObj& r) {
+        return l.objsize() < r.objsize();
+    }
+};
+
+// Helper for adding |obj| to a list of bson objs, where only the smallest objects up to a limit
+// will be kept. At least 1 object will always be kept. Returns true if an element was removed.
+bool addWithSizeLimit(BSONObj obj, std::vector<BSONObj>& list, size_t& usedBytes) {
+    usedBytes += static_cast<size_t>(obj.objsize());
+    list.push_back(std::move(obj));
+    std::push_heap(list.begin(), list.end(), LargestObjsPopFirstCmp{});
+    if (usedBytes <= kMaxIndexInconsistencySize || list.size() <= 1) {
+        return false;
+    }
+    std::pop_heap(list.begin(), list.end(), LargestObjsPopFirstCmp{});
+    usedBytes -= list.back().objsize();
+    list.pop_back();
+    return true;
+}
+
 
 // Builds an array inside output containing the entries up to a given max size per entry.
 void buildFixedSizedArray(BSONObjBuilder& output,
@@ -57,6 +83,22 @@ void buildFixedSizedArray(BSONObjBuilder& output,
         }
         arr.append(value);
         usedSize += value.size();
+    }
+}
+
+}  // namespace
+
+void ValidateResults::addExtraIndexEntry(BSONObj entry) {
+    if (addWithSizeLimit(std::move(entry), _extraIndexEntries, _extraIndexEntriesUsedBytes)) {
+        addError("Not all extra index entry inconsistencies are listed due to size limitations.",
+                 false);
+    }
+}
+
+void ValidateResults::addMissingIndexEntry(BSONObj entry) {
+    if (addWithSizeLimit(std::move(entry), _missingIndexEntries, _missingIndexEntriesUsedBytes)) {
+        addError("Not all missing index entry inconsistencies are listed due to size limitations.",
+                 false);
     }
 }
 

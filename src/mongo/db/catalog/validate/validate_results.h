@@ -150,16 +150,12 @@ public:
     const std::vector<BSONObj>& getExtraIndexEntries() const {
         return _extraIndexEntries;
     }
-    void addExtraIndexEntry(BSONObj entry) {
-        _extraIndexEntries.push_back(std::move(entry));
-    }
+    void addExtraIndexEntry(BSONObj entry);
 
     const std::vector<BSONObj>& getMissingIndexEntries() const {
         return _missingIndexEntries;
     }
-    void addMissingIndexEntry(BSONObj entry) {
-        _missingIndexEntries.push_back(std::move(entry));
-    }
+    void addMissingIndexEntry(BSONObj entry);
 
     const std::vector<RecordId>& getCorruptRecords() const {
         return _corruptRecords;
@@ -262,6 +258,8 @@ private:
     boost::optional<UUID> _uuid;
     boost::optional<NamespaceString> _nss;
 
+    size_t _extraIndexEntriesUsedBytes = 0;
+    size_t _missingIndexEntriesUsedBytes = 0;
     std::vector<BSONObj> _extraIndexEntries;
     std::vector<BSONObj> _missingIndexEntries;
     std::vector<RecordId> _corruptRecords;
