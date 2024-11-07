@@ -77,31 +77,30 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder builder;
-        auto& capMaintainer = getMaintainerThread(opCtx->getServiceContext());
-        if (!capMaintainer.running()) {
-            return BSONObj();
-        }
 
         // Hold reference to the catalog for collection lookup without locks to be safe.
         auto catalog = CollectionCatalog::get(opCtx);
         auto oplogCollection =
             catalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace);
         if (oplogCollection) {
-            auto truncateMarkers =
-                oplogCollection->getRecordStore()->oplog()->getCollectionTruncateMarkers();
-            builder.append("totalTimeProcessingMicros",
-                           truncateMarkers->getCreationProcessingTime().count());
-            builder.append("processingMethod",
-                           truncateMarkers->getMarkersCreationMethod() ==
-                                   CollectionTruncateMarkers::MarkersCreationMethod::Sampling
-                               ? "sampling"
-                               : "scanning");
+            // In certain modes, like read-only, no truncate markers are created.
+            if (auto truncateMarkers =
+                    oplogCollection->getRecordStore()->oplog()->getCollectionTruncateMarkers()) {
+                builder.append("totalTimeProcessingMicros",
+                               truncateMarkers->getCreationProcessingTime().count());
+                builder.append("processingMethod",
+                               truncateMarkers->getMarkersCreationMethod() ==
+                                       CollectionTruncateMarkers::MarkersCreationMethod::Sampling
+                                   ? "sampling"
+                                   : "scanning");
+            }
         }
 
         if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
             builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
         }
 
+        auto& capMaintainer = getMaintainerThread(opCtx->getServiceContext());
         capMaintainer.appendStats(builder);
         return builder.obj();
     }
@@ -251,10 +250,6 @@ void OplogCapMaintainerThread::_run() {
 void OplogCapMaintainerThread::appendStats(BSONObjBuilder& builder) const {
     builder.append("totalTimeTruncatingMicros", _totalTimeTruncating.load());
     builder.append("truncateCount", _truncateCount.load());
-}
-
-bool OplogCapMaintainerThread::running() const {
-    return _thread.joinable();
 }
 
 void OplogCapMaintainerThread::shutdown() {
