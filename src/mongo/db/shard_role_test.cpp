@@ -44,6 +44,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -934,6 +935,45 @@ TEST_F(ShardRoleTest, ConflictIsThrownWhenShardVersionUnshardedButStashedCatalog
                 MODE_IX),
             DBException,
             ErrorCodes::SnapshotUnavailable);
+    }
+}
+
+TEST_F(ShardRoleTest, NoExceptionIsThrownWhenShardVersionUnshardedButStashedIsEquivalentToLatest) {
+    operationContext()->setInMultiDocumentTransaction();
+    shard_role_details::getRecoveryUnit(operationContext())->preallocateSnapshot();
+    CollectionCatalog::stash(operationContext(), CollectionCatalog::get(operationContext()));
+
+    // Re-open the local catalog at its latest version, simulating a rollback event that has no
+    // effects on the metadata of the unsharded collection (although it does force the creation of a
+    // new instance for the "most recent collection snapshot" held by the catalog).
+    {
+        auto* storageEngine = getServiceContext()->getStorageEngine();
+        const auto stableTimestamp = repl::ReplicationCoordinator::get(operationContext())
+                                         ->getMyLastAppliedOpTime()
+                                         .getTimestamp();
+        storageEngine->setStableTimestamp(stableTimestamp);
+
+        auto newClient = getServiceContext()->getService()->makeClient("AlternativeClient");
+        AlternativeClientRegion acr(newClient);
+        auto newOpCtx = cc().makeOperationContext();
+
+        Lock::GlobalLock globalLk(newOpCtx.get(), MODE_X);
+        auto catalogState = catalog::closeCatalog(newOpCtx.get());
+        catalog::openCatalog(newOpCtx.get(), catalogState, stableTimestamp);
+    }
+
+    // The acquisition of the unsharded collection is expected to succeed, even though the stashed
+    // snapshot points to a different object than the one kept by the catalog.
+    {
+        ScopedSetShardRole setShardRole(
+            operationContext(), nssUnshardedCollection1, ShardVersion::UNSHARDED(), boost::none);
+        auto acquisition = acquireCollectionOrView(
+            operationContext(),
+            CollectionOrViewAcquisitionRequest::fromOpCtx(
+                operationContext(), nssUnshardedCollection1, AcquisitionPrerequisites::kRead),
+            MODE_IX);
+
+        ASSERT_TRUE(acquisition.collectionExists());
     }
 }
 

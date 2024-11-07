@@ -427,6 +427,13 @@ public:
     bool isLatestCollection(OperationContext* opCtx, const Collection* collection) const;
 
     /**
+     * Checks if the provided UUID is compatible with the latest version for this catalog version
+     * (plus uncommitted catalog updates). The method is exclusively meant to support the ShardRole
+     * API in the resource acquisition for unsharded collection.
+     */
+    bool checkIfUUIDExistsAtLatest(OperationContext* opCtx, UUID uuid) const;
+
+    /**
      * Verifies that the provided collection name doesn't exist in the catalog and is exclusively
      * present in the uncommitted updates of the operation. For the check to be meaningful it should
      * be performed against CollectionCatalog::latest.

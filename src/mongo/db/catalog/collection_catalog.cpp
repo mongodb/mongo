@@ -1856,6 +1856,30 @@ boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx
     return boost::none;
 }
 
+bool CollectionCatalog::checkIfUUIDExistsAtLatest(OperationContext* opCtx, UUID uuid) const {
+    // First look within uncommitted collection creations performed under the currently open storage
+    // transaction (if any)...
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+    const auto& entries = uncommittedCatalogUpdates.entries();
+    auto entriesIt = std::find_if(
+        entries.begin(), entries.end(), [&uuid](const UncommittedCatalogUpdates::Entry& entry) {
+            return (entry.collection && entry.collection->uuid() == uuid);
+        });
+    if (entriesIt != entries.end()) {
+        return true;
+    }
+
+    // Then within the catalog instance itself...
+    auto* coll = _catalog.find(uuid);
+    if (coll) {
+        return true;
+    }
+
+    // ... and finally within not-yet flushed past commits.
+    coll = _pendingCommitUUIDs.find(uuid);
+    return coll != nullptr;
+}
+
 bool CollectionCatalog::isLatestCollection(OperationContext* opCtx,
                                            const Collection* collection) const {
     // Any writable Collection instance created under MODE_X lock is considered to belong to this

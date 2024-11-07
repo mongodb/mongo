@@ -1770,7 +1770,7 @@ void shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
             // The transaction sees a collection exists.
             uassert(ErrorCodes::SnapshotUnavailable,
                     makeErrorMessage(),
-                    latestCatalog->isLatestCollection(opCtx, collectionPtr.get()));
+                    latestCatalog->checkIfUUIDExistsAtLatest(opCtx, collectionPtr->uuid()));
         } else if (const auto currentView = stashedCatalog.lookupView(opCtx, nss)) {
             // The transaction sees a view exists.
             uassert(ErrorCodes::SnapshotUnavailable,

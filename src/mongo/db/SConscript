@@ -609,6 +609,7 @@ if wiredtiger:
             "catalog_raii_test.cpp",
         ],
         LIBDEPS=[
+            "$BUILD_DIR/mongo/db/catalog/catalog_control",
             "$BUILD_DIR/mongo/db/query/client_cursor/client_cursor",
             "$BUILD_DIR/mongo/util/concurrency/ticketholder",
             "$BUILD_DIR/mongo/util/progress_meter",
