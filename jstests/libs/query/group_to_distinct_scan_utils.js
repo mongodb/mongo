@@ -2,6 +2,7 @@
  * Common utility functions variables for $group to DISTINCT_SCAN optimization.
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages, getQueryPlanners} from "jstests/libs/query/analyze_plan.js";
 
 export let coll;
@@ -134,21 +135,26 @@ export function assertResultsMatchWithAndWithoutHintandIndexes(pipeline,
     assert.sameMembers(resultsWithHint, expectedResults, "with hint != expected");
 }
 
-export function assertPlanUsesDistinctScan(explain, keyPattern, shouldFetch) {
-    assert.neq(0, getAggPlanStages(explain, "DISTINCT_SCAN").length, explain);
+export function assertPlanUsesDistinctScan(testDB, explain, keyPattern, shouldFetch) {
+    const distinctScanStages = getAggPlanStages(explain, "DISTINCT_SCAN");
+    assert.neq(0, distinctScanStages.length, explain);
+    const distinctScan = distinctScanStages[0];
 
     if (keyPattern) {
-        assert.eq(keyPattern, getAggPlanStages(explain, "DISTINCT_SCAN")[0].keyPattern, explain);
+        assert.eq(keyPattern, distinctScan.keyPattern, explain);
     }
 
     // Pipelines that use the DISTINCT_SCAN optimization should not also have a blocking sort.
     assert.eq(0, getAggPlanStages(explain, "SORT").length, explain);
 
     if (shouldFetch) {
-        // TODO SERVER-95215: Check that FETCH is pushed into DISTINCT_SCAN iff
-        // featureFlagShardFilteringDistinctScan is enabled.
-        const hasFetch = getAggPlanStages(explain, "FETCH").length > 0;
-        assert(hasFetch || getAggPlanStages(explain, "DISTINCT_SCAN")[0].isFetching);
+        // Check that FETCH is pushed into DISTINCT_SCAN iff featureFlagShardFilteringDistinctScan
+        // is enabled.
+        if (!FeatureFlagUtil.isEnabled(testDB, "ShardFilteringDistinctScan")) {
+            assert(getAggPlanStages(explain, "FETCH").length > 0);
+        } else {
+            assert(distinctScan.isFetching);
+        }
     }
 }
 

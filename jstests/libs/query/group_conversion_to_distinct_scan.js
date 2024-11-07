@@ -25,8 +25,9 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // $group on a non-shard key field with $first and $last is currently not eligible for a
     // DISTINCT_SCAN.
     // TODO SERVER-96134: Investigate if this is the desired behavior.
-    const assertPlanUsesDistinctScanOnlyOnStandalone =
-        isSharded ? assertPlanDoesNotUseDistinctScan : assertPlanUsesDistinctScan;
+    const assertPlanUsesDistinctScanOnlyOnStandalone = isSharded
+        ? assertPlanDoesNotUseDistinctScan
+        : (explain, keyPattern) => assertPlanUsesDistinctScan(database, explain, keyPattern);
 
     //
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when the sort is available from an
@@ -35,7 +36,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     assertPipelineResultsAndExplain({
         pipeline: [{$sort: {a: 1}}, {$group: {_id: "$a"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -50,7 +52,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         assertPipelineResultsAndExplain({
             pipeline,
             expectedOutput,
-            validateExplain: (explain) => assertPlanUsesDistinctScan(explain, keyPattern),
+            validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, keyPattern),
         });
 
         //
@@ -70,7 +72,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             pipeline,
             expectedOutput,
             hint: "a_1_b_1_c_1",
-            validateExplain: (explain) => assertPlanUsesDistinctScan(explain, keyPattern),
+            validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, keyPattern),
         });
 
         //
@@ -80,7 +82,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             pipeline,
             expectedOutput,
             hint: {a: 1, b: 1, c: 1},
-            validateExplain: (explain) => assertPlanUsesDistinctScan(explain, keyPattern),
+            validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, keyPattern),
         });
 
         //
@@ -106,7 +108,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         assertPipelineResultsAndExplain({
             pipeline,
             expectedOutput,
-            validateExplain: (explain) => assertPlanUsesDistinctScan(explain, keyPattern),
+            validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, keyPattern),
         });
 
         //
@@ -124,7 +126,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
                 ((TestData.isHintsToQuerySettingsSuite &&
                   FeatureFlagUtil.isPresentAndEnabled(database, "ShardFilteringDistinctScan"))
                      ? assertPlanUsesCollScan(explain)
-                     : assertPlanUsesDistinctScan(explain, keyPattern)),
+                     : assertPlanUsesDistinctScan(database, explain, keyPattern)),
         });
 
         //
@@ -136,7 +138,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             expectedOutput,
             hint: {_id: 1},
             expectsIndexFilter: !TestData.isHintsToQuerySettingsSuite,
-            validateExplain: (explain) => assertPlanUsesDistinctScan(explain, keyPattern),
+            validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, keyPattern),
         });
 
         assert.commandWorked(database.runCommand({planCacheClearFilters: coll.getName()}));
@@ -158,7 +160,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     assertPipelineResultsAndExplain({
         pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -168,7 +171,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     assertPipelineResultsAndExplain({
         pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -183,7 +187,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             {_id: 1, accum: {_id: 3, a: 1, b: 3, c: 2}},
             {_id: 2, accum: {_id: 4, a: 2, b: 2, c: 2}}
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -197,7 +202,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             {_id: 1, accum: {_id: 3, a: 1, b: 3, c: 2}},
             {_id: 2, accum: {_id: 4, a: 2, b: 2, c: 2}}
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -237,7 +243,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     assertPipelineResultsAndExplain({
         pipeline: [{$group: {_id: "$foo.a"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}],
-        validateExplain: assertPlanUsesDistinctScan,
+        validateExplain: (explain, keyPattern) =>
+            assertPlanUsesDistinctScan(database, explain, keyPattern),
     });
 
     // TODO SERVER-96134: We shouldn't use DISTINCT_SCAN here.
@@ -469,7 +476,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             pipeline: [{$sort: {"foo.a": 1}}, {$group: {_id: "$foo.a"}}],
             expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}],
             validateExplain: (explain) =>
-                assertPlanUsesDistinctScan(explain, {"foo.a": 1, "mkFoo.b": 1}),
+                assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "mkFoo.b": 1}),
         });
     }
 
@@ -505,7 +512,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         pipeline:
             [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: {$add: ["$b", "$c"]}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: 4}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -523,7 +531,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             {$project: {_id: "$_id", accum: {$round: [{$add: ["$accum", 0.6]}, 0]}}}
         ],
         expectedOutput: [{_id: null, accum: 3.0}, {_id: 1, accum: 6}, {_id: 2, accum: 5}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -534,7 +543,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     assertPipelineResultsAndExplain({
         pipeline: [{$match: {a: 1}}, {$sort: {b: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -545,7 +555,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     assertPipelineResultsAndExplain({
         pipeline: [{$match: {a: 1}}, {$sort: {a: 1, b: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -554,7 +565,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     assertPipelineResultsAndExplain({
         pipeline: [{$match: {a: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -604,13 +616,15 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     assertPipelineResultsAndExplain({
         pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
         expectedOutput: [{_id: null, accum: 1}, {_id: 1, accum: 3}, {_id: 2, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplain({
         pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -643,7 +657,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             {$group: {_id: "$a", f1: {$first: "$b"}, f2: {$first: "$b"}}}
         ],
         expectedOutput: [{_id: null, f1: 1, f2: 1}, {_id: 1, f1: 3, f2: 3}, {_id: 2, f1: 2, f2: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplain({
@@ -653,7 +668,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         ],
         expectedOutput:
             [{_id: null, fb: 1, fc: 1.5}, {_id: 1, fb: 3, fc: 2}, {_id: 2, fb: 2, fc: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -664,7 +680,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", l1: {$last: "$b"}, l2: {$last: "$b"}}}],
         expectedOutput:
             [{_id: null, l1: null, l2: null}, {_id: 1, l1: 1, l2: 1}, {_id: 2, l1: 2, l2: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplain({
@@ -674,7 +691,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         ],
         expectedOutput:
             [{_id: null, lb: null, lc: null}, {_id: 1, lb: 1, lc: 1}, {_id: 2, lb: 2, lc: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -712,7 +730,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: {v: "$a"}, accum: {$first: "$b"}}}],
         expectedOutput:
             [{_id: {v: null}, accum: null}, {_id: {v: 1}, accum: 1}, {_id: {v: 2}, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -723,7 +742,8 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: {v: "$a"}, accum: {$last: "$b"}}}],
         expectedOutput:
             [{_id: {v: null}, accum: 1}, {_id: {v: 1}, accum: 3}, {_id: {v: 2}, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -815,7 +835,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     assertPipelineResultsAndExplain({
         pipeline: [{$group: {_id: "$str"}}],
         expectedOutput: [{_id: null}, {_id: "FoO"}, {_id: "bAr"}, {_id: "bar"}, {_id: "foo"}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {str: 1, d: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {str: 1, d: 1}),
     });
 
     //

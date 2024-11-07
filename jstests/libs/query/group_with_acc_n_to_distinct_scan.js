@@ -20,7 +20,8 @@ export function runGroupWithAccNToDistinctScanTests(database) {
         pipeline:
             [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$firstN: {n: 1, input: "$b"}}}}],
         expectedOutput: [{_id: null, accum: [null]}, {_id: 1, accum: [1]}, {_id: 2, accum: [2]}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -31,7 +32,8 @@ export function runGroupWithAccNToDistinctScanTests(database) {
         pipeline:
             [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$lastN: {n: 1, input: "$b"}}}}],
         expectedOutput: [{_id: null, accum: [null]}, {_id: 1, accum: [1]}, {_id: 2, accum: [2]}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -42,7 +44,8 @@ export function runGroupWithAccNToDistinctScanTests(database) {
         pipeline:
             [{$group: {_id: "$a", accum: {$topN: {n: 1, output: "$b", sortBy: {a: 1, b: 1}}}}}],
         expectedOutput: [{_id: null, accum: [null]}, {_id: 1, accum: [1]}, {_id: 2, accum: [2]}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -53,7 +56,8 @@ export function runGroupWithAccNToDistinctScanTests(database) {
         pipeline:
             [{$group: {_id: "$a", accum: {$bottomN: {n: 1, output: "$b", sortBy: {a: 1, b: 1}}}}}],
         expectedOutput: [{_id: null, accum: [1]}, {_id: 1, accum: [3]}, {_id: 2, accum: [2]}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -76,7 +80,8 @@ export function runGroupWithAccNToDistinctScanTests(database) {
             {_id: 1, f1: [1], f2: [1]},
             {_id: 2, f1: [2], f2: [2]}
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -99,7 +104,8 @@ export function runGroupWithAccNToDistinctScanTests(database) {
             {_id: 1, f1: [1], f2: [1]},
             {_id: 2, f1: [2], f2: [2]}
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -116,7 +122,8 @@ export function runGroupWithAccNToDistinctScanTests(database) {
         }],
         expectedOutput:
             [{_id: null, t1: [1], t2: [1]}, {_id: 1, t1: [3], t2: [3]}, {_id: 2, t1: [2], t2: [2]}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -133,7 +140,8 @@ export function runGroupWithAccNToDistinctScanTests(database) {
         }],
         expectedOutput:
             [{_id: null, b1: [1], b2: [1]}, {_id: 1, b1: [3], b2: [3]}, {_id: 2, b1: [2], b2: [2]}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -147,7 +155,8 @@ export function runGroupWithAccNToDistinctScanTests(database) {
         ],
         expectedOutput:
             [{_id: null, f1: null, f2: [null]}, {_id: 1, f1: 1, f2: [1]}, {_id: 2, f1: 2, f2: [2]}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -164,7 +173,8 @@ export function runGroupWithAccNToDistinctScanTests(database) {
         }],
         expectedOutput:
             [{_id: null, t1: [null], t2: null}, {_id: 1, t1: [1], t2: 1}, {_id: 2, t1: [2], t2: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //

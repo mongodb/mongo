@@ -498,6 +498,8 @@ struct DistinctScanStats : public SpecificStats {
     bool isUnique = false;
     bool isShardFiltering = false;
     bool isFetching = false;
+    // TODO SERVER-92983: Remove once feature flag is removed.
+    bool isShardFilteringDistinctScanEnabled = false;
 
     // >1 if we're traversing the index forwards and <1 if we're traversing it backwards.
     int direction = 1;

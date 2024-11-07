@@ -86,6 +86,8 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
                                    .getOwned();
     _specificStats.isShardFiltering = _shardFilterer != nullptr;
     _specificStats.isFetching = _needsFetch;
+    _specificStats.isShardFilteringDistinctScanEnabled =
+        expCtx->isFeatureFlagShardFilteringDistinctScanEnabled();
 
     // Set up our initial seek. If there is no valid data, just mark as EOF.
     _commonStats.isEOF = !_checker.getStartSeekPoint(&_seekPoint);

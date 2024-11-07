@@ -30,7 +30,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
     assertPipelineResultsAndExplain({
         pipeline: [{$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     // Verifies that a $group pipeline can use DISTINCT_SCAN when the sort within a $bottom
@@ -38,7 +39,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
     assertPipelineResultsAndExplain({
         pipeline: [{$group: {_id: "$a", accum: {$bottom: {output: "$b", sortBy: {a: 1, b: 1}}}}}],
         expectedOutput: [{_id: null, accum: 1}, {_id: 1, accum: 3}, {_id: 2, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -56,7 +58,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             {_id: 2, accum: 2},
             {_id: 3, accum: null}
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {"foo.a": 1, "foo.b": 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "foo.b": 1}),
     });
 
     assertPipelineResultsAndExplain({
@@ -68,7 +71,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
         }],
         expectedOutput:
             [{_id: null, accum: 1}, {_id: 1, accum: 2}, {_id: 2, accum: 2}, {_id: 3, accum: null}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {"foo.a": 1, "foo.b": 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "foo.b": 1}),
     });
 
     // Verifies that we _do not_ attempt to use a DISTINCT_SCAN on a multikey dotted-path field.
@@ -105,7 +109,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             [{$group: {_id: "$aa", accum: {$top: {sortBy: {aa: 1, mkB: 1}, output: "$mkB"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
         validateExplain: (explain) => {
-            assertPlanUsesDistinctScan(explain, {aa: 1, mkB: 1, c: 1}, true);
+            assertPlanUsesDistinctScan(database, explain, {aa: 1, mkB: 1, c: 1}, true);
         }
     });
 
@@ -114,7 +118,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             [{$group: {_id: "$aa", accum: {$top: {sortBy: {aa: -1, mkB: -1}, output: "$mkB"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
         validateExplain: (explain) => {
-            assertPlanUsesDistinctScan(explain, {aa: 1, mkB: 1, c: 1}, true);
+            assertPlanUsesDistinctScan(database, explain, {aa: 1, mkB: 1, c: 1}, true);
         }
     });
 
@@ -147,7 +151,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             {_id: 3, accum: [4, 3]}
         ],
         validateExplain: (explain) => {
-            assertPlanUsesDistinctScan(explain, {"foo.a": 1, "mkFoo.b": 1}, true);
+            assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "mkFoo.b": 1}, true);
         },
     });
 
@@ -267,7 +271,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
     assertPipelineResultsAndExplain({
         pipeline: [{$group: {_id: "$aa", accum: {$top: {sortBy: {aa: 1, bb: 1}, output: "$mkB"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {aa: 1, bb: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {aa: 1, bb: 1, c: 1}),
     });
 
     //
@@ -278,7 +283,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
         pipeline:
             [{$group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: 1, bb: 1}, output: "$mkB"}}}}],
         expectedOutput: [{_id: 1, accum: 2}, {_id: 2, accum: []}, {_id: null, accum: null}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {aa: 1, bb: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {aa: 1, bb: 1, c: 1}),
     });
 
     //
@@ -291,7 +297,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
                 {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: {$add: ["$b", "$c"]}}}}
         }],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: 4}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -313,7 +320,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             {$project: {_id: "$_id", accum: {$round: [{$add: ["$accum", 0.6]}, 0]}}}
         ],
         expectedOutput: [{_id: null, accum: 3.0}, {_id: 1, accum: 6}, {_id: 2, accum: 5}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -323,13 +331,15 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
     assertPipelineResultsAndExplain({
         pipeline: [{$group: {_id: "$a", accum: {$top: {sortBy: {a: -1, b: -1}, output: "$b"}}}}],
         expectedOutput: [{_id: null, accum: 1}, {_id: 1, accum: 3}, {_id: 2, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplain({
         pipeline: [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$b"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -360,7 +370,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             }
         }],
         expectedOutput: [{_id: null, f1: 1, f2: 1}, {_id: 1, f1: 3, f2: 3}, {_id: 2, f1: 2, f2: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplain({
@@ -373,7 +384,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
         }],
         expectedOutput:
             [{_id: null, fb: 1, fc: 1.5}, {_id: 1, fb: 3, fc: 2}, {_id: 2, fb: 2, fc: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -389,7 +401,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
         }],
         expectedOutput:
             [{_id: null, l1: null, l2: null}, {_id: 1, l1: 1, l2: 1}, {_id: 2, l1: 2, l2: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplain({
@@ -402,7 +415,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
         }],
         expectedOutput:
             [{_id: null, lb: null, lc: null}, {_id: 1, lb: 1, lc: 1}, {_id: 2, lb: 2, lc: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -509,7 +523,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
         pipeline: [{$group: {_id: {v: "$a"}, accum: {$top: {sortBy: {a: 1, b: 1}, output: "$b"}}}}],
         expectedOutput:
             [{_id: {v: null}, accum: null}, {_id: {v: 1}, accum: 1}, {_id: {v: 2}, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -521,7 +536,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             [{$group: {_id: {v: "$a"}, accum: {$bottom: {sortBy: {a: 1, b: 1}, output: "$b"}}}}],
         expectedOutput:
             [{_id: {v: null}, accum: 1}, {_id: {v: 1}, accum: 3}, {_id: {v: 2}, accum: 2}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -611,7 +627,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             {_id: "bar", accum: 4},
             {_id: "foo", accum: 1}
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {str: 1, d: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {str: 1, d: 1}),
     });
 
     assertPipelineResultsAndExplain({
@@ -624,7 +640,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             {_id: "bar", accum: 4},
             {_id: "foo", accum: 1}
         ],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {str: 1, d: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {str: 1, d: 1}),
     });
 
     //
@@ -710,7 +726,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             {$addFields: {_id: {$toLower: "$_id"}}}
         ],
         expectedOutput: [{_id: "", accum: null}, {_id: "bar", accum: 3}, {_id: "foo", accum: 1}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {str: 1, d: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {str: 1, d: 1}),
         options: collationOption
     });
 
@@ -727,7 +743,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
             {$addFields: {_id: {$toLower: "$_id"}}}
         ],
         expectedOutput: [{_id: "foo", accum: 2}, {_id: "", accum: null}, {_id: "bar", accum: 4}],
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {str: 1, d: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {str: 1, d: 1}),
         options: collationOption
     });
 
