@@ -824,7 +824,7 @@ std::vector<Measurement> sortMeasurementsOnTimeField(
     std::sort(measurements.begin(),
               measurements.end(),
               [](const Measurement& lhs, const Measurement& rhs) {
-                  return lhs.timeField.timestamp() < rhs.timeField.timestamp();
+                  return lhs.timeField.date() < rhs.timeField.date();
               });
 
     return measurements;

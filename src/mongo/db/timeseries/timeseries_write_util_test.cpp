@@ -29,6 +29,8 @@
 
 #include <boost/cstdint.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/posix_time/time_parsers.hpp>
 #include <boost/move/utility_core.hpp>
 #include <cstdint>
 #include <string>
@@ -1121,6 +1123,54 @@ TEST_F(TimeseriesWriteUtilTest, SortMeasurementsOnTimeField) {
         m.dataFields.push_back(sortedMeasurements[i].getField("b"));
         ASSERT_EQ(m, testMeasurements[i]);
     }
+}
+
+TEST_F(TimeseriesWriteUtilTest, SortMeasurementsOnTimeFieldExtendedRange) {
+    const BSONObj metaField = fromjson(R"({"meta":{"tag":1}})");
+
+    // TODO SERVER-94228: Support ISO 8601 date parsing and formatting of dates prior to 1970.
+    static constexpr auto epoch = boost::posix_time::ptime(boost::gregorian::date(1970, 1, 1));
+    auto parse = [](const std::string& input) {
+        auto ptime = boost::posix_time::from_iso_extended_string(input);
+        return (ptime - epoch).total_milliseconds();
+    };
+
+    // Two measurements in reverse order at different side of the epoch
+    const std::vector<BSONObj> measurements = {
+        fromjson(fmt::format(
+            R"({{"time":{{"$date":{{"$numberLong": "{}"}}}},"meta":{{"tag":1}},"a":1,"b":1}})",
+            parse("1970-01-01T00:15:00.001"))),
+        fromjson(fmt::format(
+            R"({{"time":{{"$date":{{"$numberLong": "{}"}}}},"meta":{{"tag":1}},"a":2,"b":2}})",
+            parse("1969-12-31T23:30:30.001")))};
+
+    auto batch =
+        generateBatch(UUID::gen(),
+                      {bucket_catalog::getTrackingContext(
+                           _trackingContexts, bucket_catalog::TrackingScope::kOpenBucketsByKey),
+                       metaField.getField("meta"),
+                       nullptr,
+                       boost::none});
+    batch->measurements = {measurements.begin(), measurements.end()};
+    batch->min = measurements[1];
+    batch->max = measurements[0];
+    batch->timeField = kTimeseriesOptions.getTimeField();
+
+    const std::vector testMeasurements = details::sortMeasurementsOnTimeField(batch);
+
+    ASSERT_EQ(testMeasurements.size(), measurements.size());
+
+    auto compare = [&](int inputIdx, int outputIdx) {
+        details::Measurement m;
+        m.timeField = measurements[inputIdx].getField("time");
+        m.dataFields.push_back(measurements[inputIdx].getField("time"));
+        m.dataFields.push_back(measurements[inputIdx].getField("a"));
+        m.dataFields.push_back(measurements[inputIdx].getField("b"));
+        ASSERT_EQ(m, testMeasurements[outputIdx]);
+    };
+
+    compare(1, 0);
+    compare(0, 1);
 }
 
 }  // namespace

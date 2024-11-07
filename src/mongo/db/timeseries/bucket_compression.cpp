@@ -186,7 +186,7 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
     std::sort(measurements.begin(),
               measurements.end(),
               [](const details::Measurement& lhs, const details::Measurement& rhs) {
-                  return lhs.timeField.timestamp() < rhs.timeField.timestamp();
+                  return lhs.timeField.date() < rhs.timeField.date();
               });
 
     // Write _id unless EOO which it can be in some unittests

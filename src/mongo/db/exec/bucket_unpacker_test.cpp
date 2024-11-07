@@ -198,7 +198,7 @@ TEST_F(BucketUnpackerTest, UnpackBasicIncludeAllMeasurementFields) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto unpacker = makeBucketUnpacker(std::move(fields),
@@ -208,11 +208,12 @@ TEST_F(BucketUnpackerTest, UnpackBasicIncludeAllMeasurementFields) {
 
     ASSERT_TRUE(unpacker.hasNext());
     assertGetNext(unpacker,
-                  Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")});
+                  Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")});
 
     ASSERT_TRUE(unpacker.hasNext());
-    assertGetNext(unpacker,
-                  Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")});
+    assertGetNext(
+        unpacker,
+        Document{fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")});
     ASSERT_FALSE(unpacker.hasNext());
 }
 
@@ -221,7 +222,7 @@ TEST_F(BucketUnpackerTest, ExcludeASingleField) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto test = [&](BSONObj bucket) {
@@ -231,12 +232,14 @@ TEST_F(BucketUnpackerTest, ExcludeASingleField) {
                                            kUserDefinedMetaName.toString());
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker,
-                      Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")});
+        assertGetNext(
+            unpacker,
+            Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker,
-                      Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, a: 2}")});
+        assertGetNext(
+            unpacker,
+            Document{fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, a: 2}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -249,7 +252,7 @@ TEST_F(BucketUnpackerTest, EmptyIncludeGetsEmptyMeasurements) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto test = [&](BSONObj bucket) {
@@ -275,7 +278,7 @@ TEST_F(BucketUnpackerTest, EmptyExcludeMaterializesAllFields) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto test = [&](BSONObj bucket) {
@@ -284,13 +287,14 @@ TEST_F(BucketUnpackerTest, EmptyExcludeMaterializesAllFields) {
                                            std::move(bucket),
                                            kUserDefinedMetaName.toString());
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker,
-                      Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")});
+        assertGetNext(
+            unpacker,
+            Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")});
 
         ASSERT_TRUE(unpacker.hasNext());
         assertGetNext(
             unpacker,
-            Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")});
+            Document{fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -303,7 +307,7 @@ TEST_F(BucketUnpackerTest, SparseColumnsWhereOneColumnIsExhaustedBeforeTheOther)
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "a:{'0':1}, b:{'1':1}}}");
 
     auto test = [&](BSONObj bucket) {
@@ -312,11 +316,13 @@ TEST_F(BucketUnpackerTest, SparseColumnsWhereOneColumnIsExhaustedBeforeTheOther)
                                            std::move(bucket),
                                            kUserDefinedMetaName.toString());
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker,
-                      Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")});
+        assertGetNext(
+            unpacker,
+            Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")});
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker,
-                      Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, b: 1}")});
+        assertGetNext(
+            unpacker,
+            Document{fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, b: 1}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -330,7 +336,7 @@ TEST_F(BucketUnpackerTest, UnpackBasicIncludeWithDollarPrefix) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "$a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto test = [&](BSONObj bucket) {
@@ -339,13 +345,14 @@ TEST_F(BucketUnpackerTest, UnpackBasicIncludeWithDollarPrefix) {
                                            std::move(bucket),
                                            kUserDefinedMetaName.toString());
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker,
-                      Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, $a: 1}")});
-
-        ASSERT_TRUE(unpacker.hasNext());
         assertGetNext(
             unpacker,
-            Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, $a: 2, b: 1}")});
+            Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, $a: 1}")});
+
+        ASSERT_TRUE(unpacker.hasNext());
+        assertGetNext(unpacker,
+                      Document{fromjson(
+                          "{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, $a: 2, b: 1}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -358,7 +365,7 @@ TEST_F(BucketUnpackerTest, BucketsWithMetadataOnly) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}}}");
+        "time: {'0':Date(1), '1':Date(2)}}}");
 
     auto test = [&](BSONObj bucket) {
         auto unpacker = makeBucketUnpacker(fields,
@@ -367,10 +374,10 @@ TEST_F(BucketUnpackerTest, BucketsWithMetadataOnly) {
                                            kUserDefinedMetaName.toString());
         ASSERT_TRUE(unpacker.hasNext());
         assertGetNext(unpacker,
-                      Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1}")});
+                      Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1}")});
         ASSERT_TRUE(unpacker.hasNext());
         assertGetNext(unpacker,
-                      Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2}")});
+                      Document{fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -383,8 +390,8 @@ TEST_F(BucketUnpackerTest, UnorderedRowKeysDoesntAffectMaterialization) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'1':1, '0':2, '2': "
-        "3}, time: {'1':1, '0': 2, "
-        "'2': 3}}}");
+        "3}, time: {'1':Date(1), '0': Date(2), "
+        "'2': Date(3)}}}");
 
     auto test = [&](BSONObj bucket) {
         auto unpacker = makeBucketUnpacker(fields,
@@ -393,15 +400,15 @@ TEST_F(BucketUnpackerTest, UnorderedRowKeysDoesntAffectMaterialization) {
                                            kUserDefinedMetaName.toString());
         ASSERT_TRUE(unpacker.hasNext());
         assertGetNext(unpacker,
-                      Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1}")});
+                      Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1}")});
 
         ASSERT_TRUE(unpacker.hasNext());
         assertGetNext(unpacker,
-                      Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2}")});
+                      Document{fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2}")});
 
         ASSERT_TRUE(unpacker.hasNext());
         assertGetNext(unpacker,
-                      Document{fromjson("{time: 3, myMeta: {m1: 999, m2: 9999}, _id: 3}")});
+                      Document{fromjson("{time: Date(3), myMeta: {m1: 999, m2: 9999}, _id: 3}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -413,8 +420,9 @@ TEST_F(BucketUnpackerTest, MissingMetaFieldDoesntMaterializeMetadata) {
     std::set<std::string> fields{};
 
     auto bucket = fromjson(
-        "{control: {'version': 1}, data: {_id: {'0':1, '1':2, '2': 3}, time: {'0':1, '1': 2, '2': "
-        "3}}}");
+        "{control: {'version': 1}, data: {_id: {'0':1, '1':2, '2': 3}, time: {'0':Date(1), '1': "
+        "Date(2), '2': "
+        "Date(3)}}}");
 
     auto test = [&](BSONObj bucket) {
         auto unpacker = makeBucketUnpacker(fields,
@@ -422,13 +430,13 @@ TEST_F(BucketUnpackerTest, MissingMetaFieldDoesntMaterializeMetadata) {
                                            std::move(bucket),
                                            kUserDefinedMetaName.toString());
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 1, _id: 1}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(1), _id: 1}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 2, _id: 2}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(2), _id: 2}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 3, _id: 3}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(3), _id: 3}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -440,8 +448,9 @@ TEST_F(BucketUnpackerTest, MissingMetaFieldDoesntMaterializeMetadataUnorderedKey
     std::set<std::string> fields{};
 
     auto bucket = fromjson(
-        "{control: {'version': 1}, data: {_id: {'1':1, '0':2, '2': 3}, time: {'1':1, '0': 2, '2': "
-        "3}}}");
+        "{control: {'version': 1}, data: {_id: {'1':1, '0':2, '2': 3}, time: {'1':Date(1), '0': "
+        "Date(2), '2': "
+        "Date(3)}}}");
 
     auto test = [&](BSONObj bucket) {
         auto unpacker = makeBucketUnpacker(fields,
@@ -449,13 +458,13 @@ TEST_F(BucketUnpackerTest, MissingMetaFieldDoesntMaterializeMetadataUnorderedKey
                                            std::move(bucket),
                                            kUserDefinedMetaName.toString());
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 1, _id: 1}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(1), _id: 1}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 2, _id: 2}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(2), _id: 2}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 3, _id: 3}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(3), _id: 3}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -468,8 +477,8 @@ TEST_F(BucketUnpackerTest, ExcludedMetaFieldDoesntMaterializeMetadataWhenBucketH
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2, '2': "
-        "3}, time: {'0':1, '1': 2, "
-        "'2': 3}}}");
+        "3}, time: {'0':Date(1), '1': Date(2), "
+        "'2': Date(3)}}}");
 
     auto test = [&](BSONObj bucket) {
         auto unpacker = makeBucketUnpacker(fields,
@@ -477,13 +486,13 @@ TEST_F(BucketUnpackerTest, ExcludedMetaFieldDoesntMaterializeMetadataWhenBucketH
                                            std::move(bucket),
                                            kUserDefinedMetaName.toString());
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 1, _id: 1}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(1), _id: 1}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 2, _id: 2}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(2), _id: 2}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 3, _id: 3}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(3), _id: 3}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -496,7 +505,7 @@ TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUndefinedMeta) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: undefined, data: {_id: {'0':1, '1':2, '2': 3}, time: "
-        "{'0':1, '1': 2, '2': 3}}}");
+        "{'0':Date(1), '1': Date(2), '2': Date(3)}}}");
 
     auto test = [&](BSONObj bucket) {
         assertUnpackerThrowsCode(fields,
@@ -515,8 +524,8 @@ TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUnexpectedMeta) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2, '2': "
-        "3}, time: {'0':1, '1': 2, "
-        "'2': 3}}}");
+        "3}, time: {'0':Date(1), '1': Date(2), "
+        "'2': Date(3)}}}");
 
     auto test = [&](BSONObj bucket) {
         assertUnpackerThrowsCode(fields,
@@ -534,8 +543,9 @@ TEST_F(BucketUnpackerTest, NullMetaInBucketMaterializesAsNull) {
     std::set<std::string> fields{};
 
     auto bucket = fromjson(
-        "{control: {'version': 1}, meta: null, data: {_id: {'0':4, '1':5, '2':6}, time: {'0':4, "
-        "'1': 5, '2': 6}}}");
+        "{control: {'version': 1}, meta: null, data: {_id: {'0':4, '1':5, '2':6}, time: "
+        "{'0':Date(4), "
+        "'1': Date(5), '2': Date(6)}}}");
 
     auto test = [&](BSONObj bucket) {
         auto unpacker = makeBucketUnpacker(fields,
@@ -543,13 +553,13 @@ TEST_F(BucketUnpackerTest, NullMetaInBucketMaterializesAsNull) {
                                            std::move(bucket),
                                            kUserDefinedMetaName.toString());
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 4, myMeta: null, _id: 4}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(4), myMeta: null, _id: 4}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 5, myMeta: null, _id: 5}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(5), myMeta: null, _id: 5}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 6, myMeta: null, _id: 6}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(6), myMeta: null, _id: 6}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -565,7 +575,7 @@ TEST_F(BucketUnpackerTest, GetNextHandlesMissingMetaInBucket) {
     control: {version: 1},
     data: {
         _id: {'0':4, '1':5, '2':6},
-        time: {'0':4, '1': 5, '2': 6}
+        time: {'0':Date(4), '1': Date(5), '2': Date(6)}
     }
 })");
 
@@ -575,13 +585,13 @@ TEST_F(BucketUnpackerTest, GetNextHandlesMissingMetaInBucket) {
                                            std::move(bucket),
                                            kUserDefinedMetaName.toString());
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 4, _id: 4}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(4), _id: 4}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 5, _id: 5}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(5), _id: 5}")});
 
         ASSERT_TRUE(unpacker.hasNext());
-        assertGetNext(unpacker, Document{fromjson("{time: 6, _id: 6}")});
+        assertGetNext(unpacker, Document{fromjson("{time: Date(6), _id: 6}")});
         ASSERT_FALSE(unpacker.hasNext());
     };
 
@@ -627,7 +637,7 @@ TEST_F(BucketUnpackerTest, EraseMetaFromFieldSetAndDetermineIncludeMeta) {
     control: {version: 1},
     data: {
         _id: {'0':4, '1':5, '2':6},
-        time: {'0':4, '1': 5, '2': 6}
+        time: {'0':Date(4), '1': Date(5), '2': Date(6)}
     }
 })");
     auto unpacker = makeBucketUnpacker(empFields,
@@ -686,7 +696,7 @@ TEST_F(BucketUnpackerTest, EraseUnneededComputedMetaProjFieldsWithInclusiveProje
     control: {version: 1},
     data: {
         _id: {'0':4, '1':5, '2':6},
-        time: {'0':4, '1': 5, '2': 6}
+        time: {'0':Date(4), '1': Date(5), '2': Date(6)}
     }
 })");
     std::set<std::string> unpackerFields{kUserDefinedTimeName.toString()};
@@ -719,7 +729,7 @@ TEST_F(BucketUnpackerTest, EraseUnneededComputedMetaProjFieldsWithExclusiveProje
     control: {version: 1},
     data: {
         _id: {'0':4, '1':5, '2':6},
-        time: {'0':4, '1': 5, '2': 6}
+        time: {'0':Date(4), '1': Date(5), '2': Date(6)}
     }
 })");
     std::set<std::string> unpackerFields{kUserDefinedTimeName.toString()};
@@ -752,7 +762,7 @@ TEST_F(BucketUnpackerTest, DetermineIncludeTimeField) {
     control: {version: 1},
     data: {
         _id: {'0':4, '1':5, '2':6},
-        time: {'0':4, '1': 5, '2': 6}
+        time: {'0':Date(4), '1': Date(5), '2': Date(6)}
     }
 })");
     std::set<std::string> unpackerFields{kUserDefinedTimeName.toString()};
@@ -989,7 +999,7 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountLess) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto compressedBucket =
@@ -1002,8 +1012,9 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountLess) {
                                        std::move(modifiedCompressedBucket),
                                        kUserDefinedMetaName.toString());
 
-    auto doc0 = Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
-    auto doc1 = Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")};
+    auto doc0 = Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
+    auto doc1 =
+        Document{fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")};
 
     // 1 is reported when asking for numberOfMeasurements()
     ASSERT_EQ(unpacker.numberOfMeasurements(), 1);
@@ -1024,7 +1035,7 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountMore) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto compressedBucket =
@@ -1037,8 +1048,9 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountMore) {
                                        std::move(modifiedCompressedBucket),
                                        kUserDefinedMetaName.toString());
 
-    auto doc0 = Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
-    auto doc1 = Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")};
+    auto doc0 = Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
+    auto doc1 =
+        Document{fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")};
 
     ASSERT_EQ(unpacker.numberOfMeasurements(), 3);
     ASSERT_DOCUMENT_EQ(unpacker.extractSingleMeasurement(0), doc0);
@@ -1059,7 +1071,7 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountMissing) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto compressedBucket =
@@ -1072,8 +1084,9 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountMissing) {
                                        std::move(modifiedCompressedBucket),
                                        kUserDefinedMetaName.toString());
 
-    auto doc0 = Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
-    auto doc1 = Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")};
+    auto doc0 = Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
+    auto doc1 =
+        Document{fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")};
 
     // Missing count field will make the unpacker measure the number of time fields for an accurate
     // count
@@ -1095,7 +1108,7 @@ TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchDataField) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto compressedBucket =
@@ -1109,7 +1122,7 @@ TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchDataField) {
                                        std::move(modifiedCompressedBucket),
                                        kUserDefinedMetaName.toString());
 
-    auto doc0 = Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
+    auto doc0 = Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
 
     ASSERT_EQ(unpacker.numberOfMeasurements(), 2);
     ASSERT_DOCUMENT_EQ(unpacker.extractSingleMeasurement(0), doc0);
@@ -1130,7 +1143,7 @@ TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchTimeField) {
 
     auto bucket = fromjson(
         "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
-        "time: {'0':1, '1':2}, "
+        "time: {'0':Date(1), '1':Date(2)}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
     auto compressedBucket =
@@ -1144,7 +1157,7 @@ TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchTimeField) {
                                        std::move(modifiedCompressedBucket),
                                        kUserDefinedMetaName.toString());
 
-    auto doc0 = Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
+    auto doc0 = Document{fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
 
     ASSERT_EQ(unpacker.numberOfMeasurements(), 2);
     ASSERT_DOCUMENT_EQ(unpacker.extractSingleMeasurement(0), doc0);
