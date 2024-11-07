@@ -35,7 +35,8 @@ SUITE_HIERARCHY = {
     "concurrency_multitenancy_replication_with_atlas_proxy": {},
     "simulate_crash_concurrency_replication": {},
     "concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard": {
-        "concurrency_sharded_with_balancer_and_auto_bootstrap": {}
+        "concurrency_sharded_with_balancer_and_auto_bootstrap": {},
+        "concurrency_sharded_replication_with_balancer": {},
     },
     "concurrency_sharded_replication_with_balancer_and_config_transitions": {
         # The auto_bootstrap suites maintain a static config shard and so the config_transitions
@@ -43,7 +44,8 @@ SUITE_HIERARCHY = {
         # replica set.
         "concurrency_sharded_with_balancer_and_auto_bootstrap": {
             "concurrency_sharded_with_auto_bootstrap": {}
-        }
+        },
+        "concurrency_sharded_replication_with_balancer": {"concurrency_sharded_replication": {}},
     },
     "concurrency_sharded_causal_consistency_and_balancer": {
         "concurrency_sharded_causal_consistency": {}
