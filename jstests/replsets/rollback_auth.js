@@ -121,6 +121,8 @@ assert.commandFailedWithCode(B_test.runCommand({collStats: 'bar'}), authzErrorCo
 assert.commandFailedWithCode(B_test.runCommand({collStats: 'baz'}), authzErrorCode);
 assert.commandFailedWithCode(B_test.runCommand({collStats: 'foobar'}), authzErrorCode);
 
+replTest.awaitLastOpCommitted();
+
 jsTestLog("Doing writes that will eventually be rolled back");
 
 // down A and wait for B to become primary
