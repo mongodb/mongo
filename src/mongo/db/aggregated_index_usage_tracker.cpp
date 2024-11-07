@@ -55,6 +55,7 @@ static const std::string kHashed = "hashed";
 static const std::string kId = "id";
 static const std::string kNormal = "normal";
 static const std::string kPartial = "partial";
+static const std::string kPrepareUnique = "prepareUnique";
 static const std::string kSingle = "single";
 static const std::string kSparse = "sparse";
 static const std::string kText = "text";
@@ -93,6 +94,10 @@ void _updateStatsForEachFeature(const IndexFeatures& features,
         update(featureStats[static_cast<size_t>(FeatureStatType::kPartial)]);
     }
 
+    if (features.prepareUnique) {
+        update(featureStats[static_cast<size_t>(FeatureStatType::kPrepareUnique)]);
+    }
+
     if (features.sparse) {
         update(featureStats[static_cast<size_t>(FeatureStatType::kSparse)]);
     }
@@ -124,6 +129,7 @@ IndexFeatures IndexFeatures::make(const IndexDescriptor* desc, bool internal) {
     features.id = desc->isIdIndex();
     features.internal = internal;
     features.partial = desc->isPartial();
+    features.prepareUnique = desc->prepareUnique();
     features.sparse = desc->isSparse();
     features.ttl = desc->infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName);
     features.type = indexType;
@@ -174,6 +180,7 @@ void AggregatedIndexUsageTracker::forEachFeature(OnFeatureFn&& onFeature) const 
     onFeature(kId, _featureStats[static_cast<size_t>(FeatureStatType::kId)]);
     onFeature(kNormal, _indexTypeStats[INDEX_BTREE]);
     onFeature(kPartial, _featureStats[static_cast<size_t>(FeatureStatType::kPartial)]);
+    onFeature(kPrepareUnique, _featureStats[static_cast<size_t>(FeatureStatType::kPrepareUnique)]);
     onFeature(kSingle, _featureStats[static_cast<size_t>(FeatureStatType::kSingle)]);
     onFeature(kSparse, _featureStats[static_cast<size_t>(FeatureStatType::kSparse)]);
     onFeature(kText, _indexTypeStats[INDEX_TEXT]);
