@@ -540,12 +540,11 @@ void TsBlock::deblockFromBsonObj() {
                 auto tagVal = enumerator.getViewOfValue();
                 enumerator.advance();
                 // Always makes a copy to match the behavior to the BSONColumn case's and simplify
-                // the SBE value ownership model. The underlying buffer for the BSON object block is
-                // owned by this TsBlock or not so we would not necessarily need to always copy the
-                // values out of it.
-                //
-                // TODO SERVER-79612: Avoid copying values out of the BSON object block if
-                // necessary.
+                // the SBE value ownership model. The underlying buffer for the BSON object block
+                // is only _sometimes_ owned by this TsBlock so we do not necessarily need to
+                // always copy the values out of it. Since deblocking from a BSONObj is the
+                // uncommon case compared to deblocking from a BSONColumn, we don't bother with
+                // that optimization.
                 return copyValue(tagVal.first, tagVal.second);
             }
         }();
