@@ -40,6 +40,10 @@ namespace mongo {
 // TODO (SERVER-94362): Inline these util functions in create_database_coordinator.cpp.
 namespace create_database_util {
 
+void logCommitCreateDatabaseFailed(const DatabaseName& dbName, const std::string& reason);
+
+void logCreateDatabaseRetryExhausted(const DatabaseName& dbName);
+
 /**
  * Throws an error if the requested dbName to be created violates the constraints.
  * If 'config' database is requested, simply returns 'config' database on the config server.

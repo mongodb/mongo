@@ -60,3 +60,9 @@ structs:
                     Resolved primary shard from the received parameter which may encode either a
                     shard ID or a connection string.
                 optional: true
+            availableRetries:
+                type: int
+                description: >-
+                    Number of retries the coordinator can perform when getting 'ShardNotFound'
+                    errors.
+                default: 10
