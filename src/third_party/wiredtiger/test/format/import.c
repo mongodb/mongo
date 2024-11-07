@@ -47,6 +47,7 @@ static void verify_import(WT_SESSION *);
 #define IMPORT_URI "table:import"
 #define IMPORT_URI_FILE "file:import.wt"
 
+#define MAX_RETRY_DROP 10
 /*
  * import --
  *     Periodically import table.
@@ -55,9 +56,10 @@ WT_THREAD_RET
 import(void *arg)
 {
     WT_CONNECTION *conn, *import_conn;
+    WT_DECL_RET;
     WT_SESSION *import_session, *session;
     uint32_t import_value;
-    u_int period;
+    u_int drop_cnt, period;
     char buf[2048];
     const char *file_config, *table_config;
 
@@ -94,13 +96,54 @@ import(void *arg)
         copy_file_into_directory(import_session, "import.wt");
 
         /* Perform import with either repair or file metadata. */
-        import_value = mmrand(&g.extra_rnd, 0, 1);
-        if (import_value == 0)
-            testutil_snprintf(buf, sizeof(buf), "import=(enabled,repair=true)");
-        else
+        import_value = mmrand(&g.extra_rnd, 0, 3);
+        if (import_value == 0 || import_value == 1) {
+            if (import_value == 0)
+                testutil_snprintf(buf, sizeof(buf), "import=(enabled,repair=true)");
+            else
+                testutil_snprintf(buf, sizeof(buf),
+                  "%s,import=(enabled,repair=false,file_metadata=(%s))", table_config, file_config);
+            testutil_check(session->create(session, IMPORT_URI, buf));
+        } else {
+            /*
+             * Perform import in a manner similar to MongoDB with a 'dry run', alter, drop with
+             * keeping the file and then importing again. If the second import fails then don't
+             * panic the system and call a third time with repair.
+             */
             testutil_snprintf(buf, sizeof(buf),
               "%s,import=(enabled,repair=false,file_metadata=(%s))", table_config, file_config);
-        testutil_check(session->create(session, IMPORT_URI, buf));
+            testutil_check(session->create(session, IMPORT_URI, buf));
+            testutil_check(session->checkpoint(session, NULL));
+            /* Set random access pattern hint as an innocent alter command. */
+            testutil_check(session->alter(session, IMPORT_URI, "access_pattern_hint=random"));
+            if (import_value == 2)
+                testutil_check(session->checkpoint(session, NULL));
+            else
+                testutil_check(session->checkpoint(session, "force=true"));
+            /* Checkpoint before drop. Sometimes with force. */
+            drop_cnt = 0;
+            while ((ret = session->drop(session, IMPORT_URI, "remove_files=false")) != 0) {
+                if (ret == EBUSY)
+                    testutil_check(session->checkpoint(session, "force=true"));
+                else
+                    testutil_check(ret);
+                testutil_assert(++drop_cnt < MAX_RETRY_DROP);
+            }
+            /*
+             * Try the import again. It may work or it may fail. It is expected to fail if we forced
+             * checkpoints. When it fails, we retry the import with repair set to true. We only do
+             * that on failure because it is less efficient as it must read the entire table to find
+             * the latest checkpoint.
+             */
+            testutil_snprintf(buf, sizeof(buf),
+              "%s,import=(enabled,repair=false,panic_corrupt=false,file_metadata=(%s))t",
+              table_config, file_config);
+            ret = session->create(session, IMPORT_URI, buf);
+            if (ret != 0) {
+                testutil_snprintf(buf, sizeof(buf), "import=(enabled,repair=true)");
+                testutil_check(session->create(session, IMPORT_URI, buf));
+            }
+        }
 
         verify_import(session);
 
