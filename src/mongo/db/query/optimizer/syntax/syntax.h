@@ -58,48 +58,7 @@ using ABT = algebra::PolyValue<Blackhole,
                                LambdaAbstraction,
                                LambdaApplication,
                                FunctionCall,
-                               EvalPath,
-                               EvalFilter,
                                Source,
-                               PathConstant,  // path elements
-                               PathLambda,
-                               PathIdentity,
-                               PathDefault,
-                               PathCompare,
-                               PathDrop,
-                               PathKeep,
-                               PathObj,
-                               PathArr,
-                               PathTraverse,
-                               PathField,
-                               PathGet,
-                               PathComposeM,
-                               PathComposeA,
-                               ScanNode,  // nodes
-                               PhysicalScanNode,
-                               ValueScanNode,
-                               CoScanNode,
-                               IndexScanNode,
-                               SeekNode,
-                               FilterNode,
-                               EvaluationNode,
-                               RIDIntersectNode,
-                               RIDUnionNode,
-                               BinaryJoinNode,
-                               HashJoinNode,
-                               MergeJoinNode,
-                               SortedMergeNode,
-                               NestedLoopJoinNode,
-                               UnionNode,
-                               GroupByNode,
-                               UnwindNode,
-                               UniqueNode,
-                               SpoolProducerNode,
-                               SpoolConsumerNode,
-                               CollationNode,
-                               LimitSkipNode,
-                               ExchangeNode,
-                               RootNode,
                                References,  // utilities
                                ExpressionBinder>;
 
@@ -131,10 +90,6 @@ inline auto makeSeq(Args&&... args) {
 
 inline void assertExprSort(const ABT& e) {
     tassert(6624058, "expression syntax sort expected", e.is<ExpressionSyntaxSort>());
-}
-
-inline void assertPathSort(const ABT& e) {
-    tassert(6624059, "path syntax sort expected", e.is<PathSyntaxSort>());
 }
 
 inline bool operator!=(const ABT& left, const ABT& right) {

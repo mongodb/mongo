@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
 

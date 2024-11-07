@@ -37,6 +37,7 @@
 #include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/unittest/assert.h"

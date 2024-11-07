@@ -31,7 +31,7 @@
 
 #include <type_traits>
 
-#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_def.h"
 

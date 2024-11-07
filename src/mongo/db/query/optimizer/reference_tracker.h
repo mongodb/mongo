@@ -36,7 +36,6 @@
 
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
@@ -48,8 +47,8 @@ namespace mongo::optimizer {
  */
 struct Definition {
     /**
-     * Pointer to ABT that defines the variable. It can be any Node (e.g. ScanNode, EvaluationNode,
-     * etc.) or Expr (e.g. let expression, lambda expression).
+     * Pointer to ABT that defines the variable. It can be any Expr (e.g. let expression, lambda
+     * expression).
      */
     ABT::reference_type definedBy;
 
@@ -105,22 +104,6 @@ public:
             [](const ProjectionName&) {});
 
     ~VariableEnvironment();
-
-    /**
-     * Return the projections available to the ancestors of 'node' and the defintions for those
-     * projections.
-     */
-    const DefinitionsMap& getDefinitions(ABT::reference_type node) const;
-    const DefinitionsMap& getDefinitions(const Node& node) const;
-
-    bool hasDefinitions(ABT::reference_type node) const;
-    bool hasDefinitions(const Node& node) const;
-
-    /**
-     * Returns the projections available to the ancestors of 'node'.
-     */
-    ProjectionNameSet getProjections(const Node& node) const;
-    ProjectionNameSet getProjections(ABT::reference_type node) const;
 
     /**
      * Returns the projections produced by the root of the ABT.

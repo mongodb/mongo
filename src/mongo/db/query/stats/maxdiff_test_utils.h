@@ -36,7 +36,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/ce/histogram_common.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
