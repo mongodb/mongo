@@ -8356,7 +8356,7 @@ export const authCommandsLib = {
         skipSharded: false,
         disableSearch: true,
         skipTest: (conn) => {
-          return !TestData.setParameters.featureFlagSearchHybridScoring;
+          return !TestData.setParameters.featureFlagSearchHybridScoringPrerequisites;
         },
         testcases: [
           {

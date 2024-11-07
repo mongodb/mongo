@@ -1,6 +1,6 @@
 /*
  * Tests hybrid search with the rank fusion using the $rankFusion stage.
- * @tags: [ featureFlagSearchHybridScoring, requires_fcv_81 ]
+ * @tags: [ featureFlagSearchHybridScoringPrerequisites, requires_fcv_81 ]
  */
 
 import {stringifyArray} from "jstests/aggregation/extras/utils.js";
