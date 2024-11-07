@@ -3153,7 +3153,7 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchScore) {
 
 TEST(ExpressionMetaTest, ExpressionMetaSearchScoreAPIStrict) {
     auto expCtx = ExpressionContextForTest{};
-    APIParameters::get(expCtx.opCtx).setAPIStrict(true);
+    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(true);
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: \"searchScore\"}");
     ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
@@ -3177,7 +3177,7 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchHighlights) {
 
 TEST(ExpressionMetaTest, ExpressionMetasearchHighlightsAPIStrict) {
     auto expCtx = ExpressionContextForTest{};
-    APIParameters::get(expCtx.opCtx).setAPIStrict(true);
+    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(true);
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: \"searchHighlights\"}");
     ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
@@ -3225,7 +3225,7 @@ TEST(ExpressionMetaTest, ExpressionMetaIndexKey) {
 
 TEST(ExpressionMetaTest, ExpressionMetaIndexKeyAPIStrict) {
     auto expCtx = ExpressionContextForTest{};
-    APIParameters::get(expCtx.opCtx).setAPIStrict(true);
+    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(true);
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: \"indexKey\"}");
     ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
@@ -3284,7 +3284,7 @@ TEST(ExpressionMetaTest, ExpressionMetaTextScore) {
 
 TEST(ExpressionMetaTest, ExpressionMetaTextScoreAPIStrict) {
     auto expCtx = ExpressionContextForTest{};
-    APIParameters::get(expCtx.opCtx).setAPIStrict(true);
+    APIParameters::get(expCtx.getOperationContext()).setAPIStrict(true);
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: \"textScore\"}");
     ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),

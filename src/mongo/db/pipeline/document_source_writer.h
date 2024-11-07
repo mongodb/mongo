@@ -112,8 +112,8 @@ public:
                          NamespaceString outputNs,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(stageName, expCtx),
-          _writeSizeEstimator(
-              expCtx->mongoProcessInterface->getWriteSizeEstimator(expCtx->opCtx, outputNs)),
+          _writeSizeEstimator(expCtx->getMongoProcessInterface()->getWriteSizeEstimator(
+              expCtx->getOperationContext(), outputNs)),
           _outputNs(std::move(outputNs)) {}
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
@@ -158,8 +158,8 @@ protected:
     virtual void flush(BatchedCommandRequest bcr, BatchedObjects batch) = 0;
 
     boost::optional<ShardId> computeMergeShardId() const final {
-        return pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx,
-                                                                           getOutputNs());
+        return pExpCtx->getMongoProcessInterface()->determineSpecificMergeShard(
+            pExpCtx->getOperationContext(), getOutputNs());
     }
 
     /**
@@ -214,7 +214,7 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
     }
 
     // Ignore writes and exhaust input if we are in explain mode.
-    if (pExpCtx->explain) {
+    if (pExpCtx->getExplain()) {
         auto nextInput = pSource->getNext();
         for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         }
@@ -223,8 +223,10 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
     } else {
         // Ensure that the client's operationTime reflects the latest write even if the command
         // fails.
-        ON_BLOCK_EXIT(
-            [&] { pExpCtx->mongoProcessInterface->updateClientOperationTime(pExpCtx->opCtx); });
+        ON_BLOCK_EXIT([&] {
+            pExpCtx->getMongoProcessInterface()->updateClientOperationTime(
+                pExpCtx->getOperationContext());
+        });
 
         if (!_initialized) {
             initialize();
@@ -239,7 +241,7 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
         // BSONObjMaxUserSize's overhead plus the value from the server parameter:
         // internalQueryDocumentSourceWriterBatchExtraReservedBytes.
         const auto estimatedMetadataSizeBytes =
-            rpc::estimateImpersonatedUserMetadataSize(pExpCtx->opCtx);
+            rpc::estimateImpersonatedUserMetadataSize(pExpCtx->getOperationContext());
 
         BatchedCommandRequest batchWrite = makeBatchedWriteRequest();
         const auto writeHeaderSize = estimateWriteHeaderSize(batchWrite);
@@ -298,8 +300,8 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
             // check whether the database still exists to distinguish between a movePrimary and drop
             // database, we should re-throw a non-retriable error in the latter case.
             auto targetDatabaseVersion =
-                pExpCtx->mongoProcessInterface->refreshAndGetDatabaseVersion(pExpCtx,
-                                                                             pExpCtx->ns.dbName());
+                pExpCtx->getMongoProcessInterface()->refreshAndGetDatabaseVersion(
+                    pExpCtx, pExpCtx->getNamespaceString().dbName());
 
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "database involved in aggregation write no longer exists: "

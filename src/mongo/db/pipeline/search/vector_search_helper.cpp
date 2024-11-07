@@ -35,23 +35,23 @@ namespace {
 executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& request) {
     BSONObjBuilder cmdBob;
-    cmdBob.append(mongot_cursor::kVectorSearchCmd, expCtx->ns.coll());
+    cmdBob.append(mongot_cursor::kVectorSearchCmd, expCtx->getNamespaceString().coll());
     uassert(7828001,
             str::stream()
                 << "A uuid is required for a vector search query, but was missing. Got namespace "
-                << expCtx->ns.toStringForErrorMsg(),
-            expCtx->uuid);
-    expCtx->uuid.value().appendToBuilder(&cmdBob, mongot_cursor::kCollectionUuidField);
-    if (expCtx->explain) {
+                << expCtx->getNamespaceString().toStringForErrorMsg(),
+            expCtx->getUUID());
+    expCtx->getUUID().value().appendToBuilder(&cmdBob, mongot_cursor::kCollectionUuidField);
+    if (expCtx->getExplain()) {
         cmdBob.append("explain",
-                      BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->explain)));
+                      BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->getExplain())));
     }
 
     auto commandObj = cmdBob.obj();
 
     // Copy over all fields from the original object for passthrough.
     return mongot_cursor::getRemoteCommandRequest(
-        expCtx->opCtx, expCtx->ns, commandObj.addFields(request));
+        expCtx->getOperationContext(), expCtx->getNamespaceString(), commandObj.addFields(request));
 }
 }  // namespace
 

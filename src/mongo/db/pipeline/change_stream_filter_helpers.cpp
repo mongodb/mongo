@@ -99,7 +99,7 @@ std::unique_ptr<MatchExpression> buildNotFromMigrateFilter(
         backingBsonObjs.emplace_back(BSON("fromMigrate" << NE << true)), expCtx);
 
     // If 'showSystemEvents' is set, however, we do return some specific 'fromMigrate' events.
-    if (expCtx->changeStreamSpec->getShowSystemEvents()) {
+    if (expCtx->getChangeStreamSpec()->getShowSystemEvents()) {
         auto orMigrateEvents = std::make_unique<OrMatchExpression>(std::move(fromMigrateFilter));
         orMigrateEvents->add(buildFromMigrateSystemOpFilter(expCtx, userMatch, backingBsonObjs));
         fromMigrateFilter = std::move(orMigrateEvents);
@@ -117,7 +117,7 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx);
     auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx);
 
-    auto streamType = DocumentSourceChangeStream::getChangeStreamType(expCtx->ns);
+    auto streamType = DocumentSourceChangeStream::getChangeStreamType(expCtx->getNamespaceString());
 
     /**
      * IMPORTANT: Any new operationType added here must also add corresponding oplog rewrites in the
@@ -182,7 +182,7 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(dropIndexesEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(collModEvent, expCtx));
 
-    if (expCtx->changeStreamSpec->getShowSystemEvents()) {
+    if (expCtx->getChangeStreamSpec()->getShowSystemEvents()) {
         orCmdEvents->add(MatchExpressionParser::parseAndNormalize(
             backingBsonObjs.emplace_back(BSON("o.startIndexBuild" << BSONRegEx{collRegex})),
             expCtx));
@@ -245,7 +245,7 @@ std::unique_ptr<MatchExpression> buildInvalidationFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MatchExpression* userMatch,
     std::vector<BSONObj>& backingBsonObjs) {
-    auto nss = expCtx->ns;
+    auto nss = expCtx->getNamespaceString();
     auto streamType = DocumentSourceChangeStream::getChangeStreamType(nss);
 
     // A whole-cluster change stream is not invalidated by anything.
@@ -360,12 +360,12 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
 
     // Noop change events that are only applicable when merging results on router:
     //   - migrateChunkToNewShard: A chunk migrated to a shard that didn't have any chunks.
-    if (expCtx->inRouter || expCtx->needsMerge) {
+    if (expCtx->getInRouter() || expCtx->getNeedsMerge()) {
         internalOpTypes.push_back("migrateChunkToNewShard"_sd);
     }
 
     // Only return the 'migrateLastChunkFromShard' event if 'showSystemEvents' is set.
-    if (expCtx->changeStreamSpec->getShowSystemEvents()) {
+    if (expCtx->getChangeStreamSpec()->getShowSystemEvents()) {
         internalOpTypes.push_back("migrateLastChunkFromShard"_sd);
     }
 

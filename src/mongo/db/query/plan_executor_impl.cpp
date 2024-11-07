@@ -121,7 +121,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                                   std::move(cbrRejectedPlanStages))),
       _mustReturnOwnedBson(returnOwnedBson),
       _nss(std::move(nss)) {
-    invariant(!_expCtx || _expCtx->opCtx == _opCtx);
+    invariant(!_expCtx || _expCtx->getOperationContext() == _opCtx);
     invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
 
     const CollectionPtr* collectionPtr = &collection.getCollectionPtr();
@@ -242,7 +242,7 @@ void PlanExecutorImpl::detachFromOperationContext() {
     _opCtx = nullptr;
     _root->detachFromOperationContext();
     if (_expCtx) {
-        _expCtx->opCtx = nullptr;
+        _expCtx->setOperationContext(nullptr);
     }
     _currentState = kDetached;
 }
@@ -257,7 +257,7 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
     _opCtx = opCtx;
     _root->reattachToOperationContext(opCtx);
     if (_expCtx) {
-        _expCtx->opCtx = opCtx;
+        _expCtx->setOperationContext(opCtx);
     }
     _currentState = kSaved;
 }
@@ -299,7 +299,7 @@ void doYield(OperationContext* opCtx) {
 PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlOut) {
     const auto state = getNextDocument(&_docOutput, dlOut);
     if (objOut && state == ExecState::ADVANCED) {
-        const bool includeMetadata = _expCtx && _expCtx->needsMerge;
+        const bool includeMetadata = _expCtx && _expCtx->getNeedsMerge();
         *objOut = includeMetadata ? _docOutput.toBsonWithMetaData() : _docOutput.toBson();
     }
     return state;
@@ -509,7 +509,7 @@ bool PlanExecutorImpl::_handleEOFAndExit(PlanStage::StageState code,
 }
 
 size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) {
-    const bool includeMetadata = _expCtx && _expCtx->needsMerge;
+    const bool includeMetadata = _expCtx && _expCtx->getNeedsMerge();
     const bool hasAppendFn = static_cast<bool>(append);
     if (batchSize == 0) {
         return 0;

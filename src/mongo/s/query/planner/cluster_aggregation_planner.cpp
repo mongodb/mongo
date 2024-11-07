@@ -293,7 +293,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                         targetedShards.size() == 1 && targetedShards[0] == cm.dbPrimary() &&
                             hasSpecificMergeShard);
                 if (auto untrackedDefaultCollation =
-                        getUntrackedCollectionCollation(mergeCtx->opCtx, cm, nss);
+                        getUntrackedCollectionCollation(mergeCtx->getOperationContext(), cm, nss);
                     !untrackedDefaultCollation.isEmpty()) {
                     return Value(untrackedDefaultCollation);
                 }
@@ -302,7 +302,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
         }();
     }
 
-    const auto txnRouter = TransactionRouter::get(mergeCtx->opCtx);
+    const auto txnRouter = TransactionRouter::get(mergeCtx->getOperationContext());
     if (txnRouter && mergingShardContributesData) {
         // Don't include a readConcern since we can only include read concerns on the _first_
         // command sent to a participant per transaction. Assuming the merging shard is a
@@ -353,9 +353,9 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     }
 
     // Attach the read and write concerns if needed, and return the final command object.
-    return applyReadWriteConcern(mergeCtx->opCtx,
+    return applyReadWriteConcern(mergeCtx->getOperationContext(),
                                  !(txnRouter && mergingShardContributesData), /* appendRC */
-                                 !mergeCtx->explain,                          /* appendWC */
+                                 !mergeCtx->getExplain(),                     /* appendWC */
                                  mergeCmdObj);
 }
 
@@ -377,7 +377,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     tassert(6525901,
             "tried to dispatch merge pipeline but there was no merge portion of the split pipeline",
             mergePipeline);
-    auto* opCtx = expCtx->opCtx;
+    auto* opCtx = expCtx->getOperationContext();
 
     std::vector<ShardId> targetedShards;
     targetedShards.reserve(shardDispatchResults.remoteCursors.size());
@@ -446,7 +446,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                             Grid::get(opCtx)->getCursorManager(),
                             privileges,
-                            expCtx->tailableMode));
+                            expCtx->getTailableMode()));
 
     // If the mergingShard returned an error and did not accept ownership it is our responsibility
     // to kill the cursors.
@@ -484,7 +484,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
                                      }());
 
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
-    params.tailableMode = pipelineForMerging->getContext()->tailableMode;
+    params.tailableMode = pipelineForMerging->getContext()->getTailableMode();
     // A batch size of 0 is legal for the initial aggregate, but not valid for getMores, the batch
     // size we pass here is used for getMores, so do not specify a batch size if the initial request
     // had a batch size of 0.
@@ -611,8 +611,8 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     bool requestQueryStatsFromRemotes) {
     tassert(7163600,
             "dispatchExchangeConsumerPipeline() must not be called for explain operation",
-            !expCtx->explain);
-    auto opCtx = expCtx->opCtx;
+            !expCtx->getExplain());
+    auto opCtx = expCtx->getOperationContext();
 
     if (MONGO_unlikely(shardedAggregateFailToDispatchExchangeConsumerPipeline.shouldFail())) {
         LOGV2(22836, "shardedAggregateFailToDispatchExchangeConsumerPipeline fail point enabled");
@@ -702,7 +702,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
 
 ClusterClientCursorGuard convertPipelineToRouterStages(
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline, ClusterClientCursorParams&& cursorParams) {
-    auto* opCtx = pipeline->getContext()->opCtx;
+    auto* opCtx = pipeline->getContext()->getOperationContext();
 
     // We expect the pipeline to be fully executable at this point, so if the pipeline was all skips
     // and limits we expect it to start with a $mergeCursors stage.
@@ -795,7 +795,7 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
     auto expCtx = pipeline->getContext();
 
     // We should never receive a pipeline which cannot run on router.
-    invariant(!expCtx->explain);
+    invariant(!expCtx->getExplain());
     uassertStatusOKWithContext(pipeline->canRunOnRouter(),
                                "pipeline is required to run on router, but cannot");
 
@@ -808,7 +808,7 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
             !pipeline->getSources().front()->constraints().requiresInputDocSource);
 
     // Register the new mongoS cursor, and retrieve the initial batch of results.
-    auto cursorResponse = establishMergingMongosCursor(expCtx->opCtx,
+    auto cursorResponse = establishMergingMongosCursor(expCtx->getOperationContext(),
                                                        batchSize,
                                                        namespaces.requestedNss,
                                                        std::move(pipeline),
@@ -839,7 +839,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                                    pipelineDataSource,
                                                    eligibleForSampling,
                                                    std::move(targeter.pipeline),
-                                                   expCtx->explain,
+                                                   expCtx->getExplain(),
                                                    requestQueryStatsFromRemotes,
                                                    targeter.cri);
 
@@ -864,7 +864,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
 
     // If the operation is an explain, then we verify that it succeeded on all targeted
     // shards, write the results to the output builder, and return immediately.
-    if (expCtx->explain) {
+    if (expCtx->getExplain()) {
         return sharded_agg_helpers::appendExplainResults(
             std::move(shardDispatchResults), expCtx, result);
     }
@@ -884,7 +884,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                                                namespaces.requestedNss,
                                                                std::move(remoteCursor),
                                                                privileges,
-                                                               expCtx->tailableMode));
+                                                               expCtx->getTailableMode()));
         return appendCursorResponseToCommandResult(shardId, reply, result);
     }
 
@@ -949,11 +949,11 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                       ShardId shardId,
                                       BSONObjBuilder* out,
                                       bool requestQueryStatsFromRemotes) {
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
 
     tassert(6273804,
             "Per shard cursors are supposed to pass fromRouter: false to shards",
-            !expCtx->inRouter);
+            !expCtx->getInRouter());
     // By using an initial batchSize of zero all of the events will get returned through
     // the getMore path and have metadata stripped out.
     boost::optional<int> overrideBatchSize = 0;
@@ -1006,7 +1006,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
             Grid::get(opCtx)->getCursorManager(),
             privileges,
-            expCtx->tailableMode,
+            expCtx->getTailableMode(),
             boost::optional<BSONObj>(change_stream_constants::kSortSpec) /* routerSort */));
     }
 

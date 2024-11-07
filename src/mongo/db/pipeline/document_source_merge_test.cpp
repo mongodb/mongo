@@ -80,7 +80,7 @@ public:
 };
 
 TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfMergeSpecIsString) {
-    const auto& defaultDb = getExpCtx()->ns.db_forTest();
+    const auto& defaultDb = getExpCtx()->getNamespaceString().db_forTest();
     const std::string targetColl = "target_collection";
     auto spec = BSON("$merge" << targetColl);
     auto mergeStage = createMergeStage(spec);
@@ -90,7 +90,7 @@ TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfMergeSpecIsString) {
 }
 
 TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfIntoIsString) {
-    const auto& defaultDb = getExpCtx()->ns.db_forTest();
+    const auto& defaultDb = getExpCtx()->getNamespaceString().db_forTest();
     const std::string targetColl = "target_collection";
     auto spec = BSON("$merge" << BSON("into" << targetColl));
     auto mergeStage = createMergeStage(spec);
@@ -100,7 +100,7 @@ TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfIntoIsString) {
 }
 
 TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfIntoIsObject) {
-    const auto& defaultDb = getExpCtx()->ns.db_forTest();
+    const auto& defaultDb = getExpCtx()->getNamespaceString().db_forTest();
     const std::string targetDb = "target_db";
     const std::string targetColl = "target_collection";
     auto spec = BSON("$merge" << BSON("into" << BSON("coll" << targetColl)));
@@ -130,7 +130,7 @@ TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfWhenMatchedIsStringOrArray) {
 }
 
 TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfTargetAndAggregationNamespacesAreSame) {
-    const auto targetNsSameAsAggregationNs = getExpCtx()->ns;
+    const auto targetNsSameAsAggregationNs = getExpCtx()->getNamespaceString();
     const auto targetColl = targetNsSameAsAggregationNs.coll();
     const auto targetDb = targetNsSameAsAggregationNs.db_forTest();
 
@@ -380,7 +380,7 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfOnFieldIsNotStringOrArrayOfStrings
 }
 
 TEST_F(DocumentSourceMergeTest, CorrectlyUsesTargetDbThatMatchesAggregationDb) {
-    const auto targetDbSameAsAggregationDb = getExpCtx()->ns.db_forTest();
+    const auto targetDbSameAsAggregationDb = getExpCtx()->getNamespaceString().db_forTest();
     const auto targetColl = "target_collection";
     auto spec = BSON("$merge" << BSON("into" << BSON("coll" << targetColl << "db"
                                                             << targetDbSameAsAggregationDb)));
@@ -473,7 +473,7 @@ TEST_F(DocumentSourceMergeTest, SerializeDottedPathOnFieldsSharedPrefix) {
 }
 
 TEST_F(DocumentSourceMergeTest, SerializeIntoWhenMergeSpecIsStringNotDotted) {
-    const auto aggregationDb = getExpCtx()->ns.db_forTest();
+    const auto aggregationDb = getExpCtx()->getNamespaceString().db_forTest();
     auto spec = BSON("$merge"
                      << "target_collection");
     auto mergeStage = createMergeStage(spec);
@@ -483,7 +483,7 @@ TEST_F(DocumentSourceMergeTest, SerializeIntoWhenMergeSpecIsStringNotDotted) {
 }
 
 TEST_F(DocumentSourceMergeTest, SerializeIntoWhenMergeSpecIsStringDotted) {
-    const auto aggregationDb = getExpCtx()->ns.db_forTest();
+    const auto aggregationDb = getExpCtx()->getNamespaceString().db_forTest();
     auto spec = BSON("$merge"
                      << "my.target_collection");
     auto mergeStage = createMergeStage(spec);
@@ -493,7 +493,7 @@ TEST_F(DocumentSourceMergeTest, SerializeIntoWhenMergeSpecIsStringDotted) {
 }
 
 TEST_F(DocumentSourceMergeTest, SerializeIntoWhenIntoIsStringNotDotted) {
-    const auto aggregationDb = getExpCtx()->ns.db_forTest();
+    const auto aggregationDb = getExpCtx()->getNamespaceString().db_forTest();
     auto spec = BSON("$merge" << BSON("into"
                                       << "target_collection"));
     auto mergeStage = createMergeStage(spec);
@@ -503,7 +503,7 @@ TEST_F(DocumentSourceMergeTest, SerializeIntoWhenIntoIsStringNotDotted) {
 }
 
 TEST_F(DocumentSourceMergeTest, SerializeIntoWhenIntoIsStringDotted) {
-    const auto aggregationDb = getExpCtx()->ns.db_forTest();
+    const auto aggregationDb = getExpCtx()->getNamespaceString().db_forTest();
     auto spec = BSON("$merge" << BSON("into"
                                       << "my.target_collection"));
     auto mergeStage = createMergeStage(spec);
@@ -513,7 +513,7 @@ TEST_F(DocumentSourceMergeTest, SerializeIntoWhenIntoIsStringDotted) {
 }
 
 TEST_F(DocumentSourceMergeTest, SerializeIntoWhenIntoIsObjectWithCollNotDotted) {
-    const auto aggregationDb = getExpCtx()->ns.db_forTest();
+    const auto aggregationDb = getExpCtx()->getNamespaceString().db_forTest();
     auto spec = BSON("$merge" << BSON("into" << BSON("coll"
                                                      << "target_collection")));
     auto mergeStage = createMergeStage(spec);
@@ -523,7 +523,7 @@ TEST_F(DocumentSourceMergeTest, SerializeIntoWhenIntoIsObjectWithCollNotDotted) 
 }
 
 TEST_F(DocumentSourceMergeTest, SerializeIntoWhenIntoIsObjectWithCollDotted) {
-    const auto aggregationDb = getExpCtx()->ns.db_forTest();
+    const auto aggregationDb = getExpCtx()->getNamespaceString().db_forTest();
     auto spec = BSON("$merge" << BSON("into" << BSON("coll"
                                                      << "my.target_collection")));
     auto mergeStage = createMergeStage(spec);
@@ -1130,7 +1130,7 @@ TEST_F(DocumentSourceMergeServerlessTest,
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
-    ASSERT(expCtx->ns.tenantId());
+    ASSERT(expCtx->getNamespaceString().tenantId());
 
     for (bool flagStatus : {false, true}) {
         RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
@@ -1142,11 +1142,12 @@ TEST_F(DocumentSourceMergeServerlessTest,
         auto mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
         ASSERT(mergeStage);
         ASSERT(mergeSource->getOutputNs().tenantId());
-        ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+        ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->getNamespaceString().tenantId());
 
         // Assert the tenantId is not included in the serialized namespace.
-        auto dbField = flagStatus ? expCtx->ns.dbName().toString_forTest()
-                                  : expCtx->ns.dbName().toStringWithTenantId_forTest();
+        auto dbField = flagStatus
+            ? expCtx->getNamespaceString().dbName().toString_forTest()
+            : expCtx->getNamespaceString().dbName().toStringWithTenantId_forTest();
         auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
 
         auto serialized = mergeSource->serialize().getDocument();
@@ -1159,7 +1160,7 @@ TEST_F(DocumentSourceMergeServerlessTest,
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
-    ASSERT(expCtx->ns.tenantId());
+    ASSERT(expCtx->getNamespaceString().tenantId());
 
     for (bool flagStatus : {false, true}) {
         RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
@@ -1171,10 +1172,11 @@ TEST_F(DocumentSourceMergeServerlessTest,
         auto mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
         ASSERT(mergeSource);
         ASSERT(mergeSource->getOutputNs().tenantId());
-        ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+        ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->getNamespaceString().tenantId());
 
-        auto dbField = flagStatus ? expCtx->ns.dbName().toString_forTest()
-                                  : expCtx->ns.dbName().toStringWithTenantId_forTest();
+        auto dbField = flagStatus
+            ? expCtx->getNamespaceString().dbName().toString_forTest()
+            : expCtx->getNamespaceString().dbName().toStringWithTenantId_forTest();
         auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
 
         auto serialized = mergeSource->serialize().getDocument();
@@ -1187,7 +1189,7 @@ TEST_F(DocumentSourceMergeServerlessTest,
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
-    ASSERT(expCtx->ns.tenantId());
+    ASSERT(expCtx->getNamespaceString().tenantId());
 
     for (bool flagStatus : {false, true}) {
         RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
@@ -1200,11 +1202,11 @@ TEST_F(DocumentSourceMergeServerlessTest,
         auto mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
         ASSERT(mergeSource);
         ASSERT(mergeSource->getOutputNs().tenantId());
-        ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+        ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->getNamespaceString().tenantId());
 
-        auto dbField = flagStatus
-            ? _targetDb
-            : str::stream() << (*expCtx).ns.tenantId()->toString() << '_' << _targetDb;
+        auto dbField = flagStatus ? _targetDb
+                                  : str::stream()
+                << (*expCtx).getNamespaceString().tenantId()->toString() << '_' << _targetDb;
         auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
 
         auto serialized = mergeSource->serialize().getDocument();
@@ -1217,12 +1219,13 @@ TEST_F(DocumentSourceMergeServerlessTest,
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
-    ASSERT(expCtx->ns.tenantId());
+    ASSERT(expCtx->getNamespaceString().tenantId());
 
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
 
     // We're expecting a prefix given gFeatureFlagRequireTenantId is false.
-    std::string dbField = str::stream() << (*expCtx).ns.tenantId()->toString() << '_' << _targetDb;
+    std::string dbField = str::stream()
+        << (*expCtx).getNamespaceString().tenantId()->toString() << '_' << _targetDb;
 
     // Pass collection name as a db + coll object.
     auto spec = BSON("$merge" << BSON("into" << BSON("db" << dbField << "coll" << _targetColl)));
@@ -1230,7 +1233,7 @@ TEST_F(DocumentSourceMergeServerlessTest,
     auto mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
     ASSERT(mergeSource);
     ASSERT(mergeSource->getOutputNs().tenantId());
-    ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+    ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->getNamespaceString().tenantId());
 
     auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
 

@@ -43,7 +43,7 @@ using InternalSearchMongotRemoteTest = AggregationContextFixture;
 boost::intrusive_ptr<DocumentSource> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto specObj = elem.embeddedObject();
-    auto serviceContext = expCtx->opCtx->getServiceContext();
+    auto serviceContext = expCtx->getOperationContext()->getServiceContext();
     auto executor = executor::getMongotTaskExecutor(serviceContext);
     // The serialization for unsharded search does not contain a 'mongotQuery' field.
     InternalSearchMongotRemoteSpec spec = InternalSearchMongotRemoteSpec::parse(
@@ -53,8 +53,8 @@ boost::intrusive_ptr<DocumentSource> createFromBson(
 
 TEST_F(InternalSearchMongotRemoteTest, SearchMongotRemoteNotAllowedInTransaction) {
     auto expCtx = getExpCtx();
-    expCtx->uuid = UUID::gen();
-    expCtx->opCtx->setInMultiDocumentTransaction();
+    expCtx->setUUID(UUID::gen());
+    expCtx->getOperationContext()->setInMultiDocumentTransaction();
     globalMongotParams.host = "localhost:27027";
     globalMongotParams.enabled = true;
 

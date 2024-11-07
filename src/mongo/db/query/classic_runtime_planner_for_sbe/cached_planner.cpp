@@ -52,10 +52,10 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
         std::unique_ptr<CanonicalQuery> canonicalQuery) override {
         auto nss = cq()->nss();
-        auto remoteCursors = cq()->getExpCtx()->explain
+        auto remoteCursors = cq()->getExpCtx()->getExplain()
             ? nullptr
             : search_helpers::getSearchRemoteCursors(cq()->cqPipeline());
-        auto remoteExplains = cq()->getExpCtx()->explain
+        auto remoteExplains = cq()->getExpCtx()->getExplain()
             ? search_helpers::getSearchRemoteExplains(cq()->getExpCtxRaw(), cq()->cqPipeline())
             : nullptr;
         return uassertStatusOK(
@@ -82,7 +82,7 @@ private:
  */
 void recoverWhereExpression(CanonicalQuery* canonicalQuery,
                             sbe::plan_ranker::CandidatePlan&& candidate) {
-    if (canonicalQuery->getExpCtxRaw()->hasWhereClause) {
+    if (canonicalQuery->getExpCtxRaw()->getHasWhereClause()) {
         input_params::recoverWhereExprPredicate(canonicalQuery->getPrimaryMatchExpression(),
                                                 candidate.data.stageData);
     }

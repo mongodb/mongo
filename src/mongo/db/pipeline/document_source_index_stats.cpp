@@ -63,10 +63,10 @@ intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(
     // Get the index stats for the current shard and map them over a deferred queue. The queue won't
     // be populated until reaching the shards due to the host type requirement.
     DocumentSourceQueue::DeferredQueue deferredQueue{[pExpCtx]() {
-        auto indexStats = pExpCtx->mongoProcessInterface->getIndexStats(
-            pExpCtx->opCtx,
-            pExpCtx->ns,
-            prettyHostNameAndPort(pExpCtx->opCtx->getClient()->getLocalPort()),
+        auto indexStats = pExpCtx->getMongoProcessInterface()->getIndexStats(
+            pExpCtx->getOperationContext(),
+            pExpCtx->getNamespaceString(),
+            prettyHostNameAndPort(pExpCtx->getOperationContext()->getClient()->getLocalPort()),
             !serverGlobalParams.clusterRole.has(ClusterRole::None));
         std::deque<DocumentSource::GetNextResult> queue;
         std::copy(std::make_move_iterator(indexStats.begin()),

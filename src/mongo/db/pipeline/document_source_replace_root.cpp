@@ -220,10 +220,9 @@ REGISTER_DOCUMENT_SOURCE(replaceWith,
 intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     const auto stageName = elem.fieldNameStringData();
-
     SbeCompatibility originalSbeCompatibility =
-        std::exchange(expCtx->sbeCompatibility, SbeCompatibility::noRequirements);
-    ON_BLOCK_EXIT([&] { expCtx->sbeCompatibility = originalSbeCompatibility; });
+        expCtx->sbeCompatibilityExchange(SbeCompatibility::noRequirements);
+    ON_BLOCK_EXIT([&] { expCtx->setSbeCompatibility(originalSbeCompatibility); });
     auto newRootExpression = [&]() {
         if (stageName == kAliasNameReplaceWith) {
             return Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState);
@@ -257,7 +256,7 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
             expCtx,
             newRootExpression,
             (stageName == kStageName) ? "'newRoot' expression " : "'replacement document' ",
-            expCtx->sbeCompatibility),
+            expCtx->getSbeCompatibility()),
         kStageName.rawData(),
         isIndependentOfAnyCollection);
 }
@@ -273,7 +272,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::create(
         std::make_unique<ReplaceRootTransformation>(expCtx,
                                                     newRootExpression,
                                                     std::move(errMsgContextForNonObjects),
-                                                    expCtx->sbeCompatibility),
+                                                    expCtx->getSbeCompatibility()),
         kStageName.rawData(),
         isIndependentOfAnyCollection);
 }

@@ -370,9 +370,10 @@ DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution
 
     _finished = true;
 
-    auto collUuid = uassertStatusOK(validateCollectionOptions(pExpCtx->opCtx, pExpCtx->ns));
-    auto targeter = makeCollectionRoutingInfoTargeter(pExpCtx->opCtx,
-                                                      pExpCtx->ns,
+    auto collUuid = uassertStatusOK(
+        validateCollectionOptions(pExpCtx->getOperationContext(), pExpCtx->getNamespaceString()));
+    auto targeter = makeCollectionRoutingInfoTargeter(pExpCtx->getOperationContext(),
+                                                      pExpCtx->getNamespaceString(),
                                                       _spec.getKey(),
                                                       _spec.getSplitPointsFilter(),
                                                       _spec.getSplitPointsAfterClusterTime(),
@@ -380,13 +381,15 @@ DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution
     ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
     WriteDistributionMetricsCalculator writeDistributionCalculator(targeter);
 
-    processSampledDiffs(pExpCtx->opCtx,
+    processSampledDiffs(pExpCtx->getOperationContext(),
                         &readDistributionCalculator,
                         &writeDistributionCalculator,
                         collUuid,
                         _spec.getKey());
-    processSampledQueries(
-        pExpCtx->opCtx, &readDistributionCalculator, &writeDistributionCalculator, collUuid);
+    processSampledQueries(pExpCtx->getOperationContext(),
+                          &readDistributionCalculator,
+                          &writeDistributionCalculator,
+                          collUuid);
 
     // The config.sampledQueries and config.sampleQueriesDiff collections are not written to (and
     // read from) transactionally so it is possible for the number of shard key updates found above

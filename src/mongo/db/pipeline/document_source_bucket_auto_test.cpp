@@ -382,8 +382,8 @@ TEST_F(BucketAutoTests, ShouldPropagatePauses) {
 TEST_F(BucketAutoTests, ShouldBeAbleToCorrectlySpillToDisk) {
     auto expCtx = getExpCtx();
     unittest::TempDir tempDir("DocumentSourceBucketAutoTest");
-    expCtx->tempDir = tempDir.path();
-    expCtx->allowDiskUse = true;
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
     const size_t maxMemoryUsageBytes = 1000;
 
     VariablesParseState vps = expCtx->variablesParseState;
@@ -419,8 +419,8 @@ TEST_F(BucketAutoTests, ShouldBeAbleToPauseLoadingWhileSpilled) {
 
     // Allow the $sort stage to spill to disk.
     unittest::TempDir tempDir("DocumentSourceBucketAutoTest");
-    expCtx->tempDir = tempDir.path();
-    expCtx->allowDiskUse = true;
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
     const size_t maxMemoryUsageBytes = 1000;
 
     VariablesParseState vps = expCtx->variablesParseState;
@@ -702,22 +702,22 @@ void assertCannotSpillToDisk(const boost::intrusive_ptr<ExpressionContext>& expC
 TEST_F(BucketAutoTests, ShouldFailIfBufferingTooManyDocuments) {
     auto expCtx = getExpCtx();
 
-    expCtx->allowDiskUse = false;
-    expCtx->inRouter = false;
+    expCtx->setAllowDiskUse(false);
+    expCtx->setInRouter(false);
     assertCannotSpillToDisk(expCtx);
 
-    expCtx->allowDiskUse = true;
-    expCtx->inRouter = true;
+    expCtx->setAllowDiskUse(true);
+    expCtx->setInRouter(true);
     assertCannotSpillToDisk(expCtx);
 
-    expCtx->allowDiskUse = false;
-    expCtx->inRouter = true;
+    expCtx->setAllowDiskUse(false);
+    expCtx->setInRouter(true);
     assertCannotSpillToDisk(expCtx);
 }
 
 TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto expCtx = getExpCtx();
-    expCtx->allowDiskUse = false;
+    expCtx->setAllowDiskUse(false);
     const size_t maxMemoryUsageBytes = 2000;
 
     VariablesParseState vps = expCtx->variablesParseState;

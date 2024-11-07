@@ -102,8 +102,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQuerySettings::createFromBson
     DocumentSourceQueue::DeferredQueue deferredQueue{[expCtx, includeDebugQueryShape]() {
         // Get all query shape configurations owned by 'tenantId' and map them over a queue of
         // results.
-        auto tenantId = expCtx->ns.tenantId();
-        auto& manager = QuerySettingsManager::get(expCtx->opCtx);
+        auto tenantId = expCtx->getNamespaceString().tenantId();
+        auto& manager = QuerySettingsManager::get(expCtx->getOperationContext());
         auto settingsArray =
             std::move(manager.getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations);
         std::deque<DocumentSource::GetNextResult> queue;
@@ -111,8 +111,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQuerySettings::createFromBson
                        std::make_move_iterator(settingsArray.end()),
                        std::back_inserter(queue),
                        [&](auto&& config) {
-                           return createResult(
-                               expCtx->opCtx, tenantId, std::move(config), includeDebugQueryShape);
+                           return createResult(expCtx->getOperationContext(),
+                                               tenantId,
+                                               std::move(config),
+                                               includeDebugQueryShape);
                        });
         return queue;
     }};

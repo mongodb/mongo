@@ -178,7 +178,7 @@ void DocumentSourceFacet::setSource(DocumentSource* source) {
 void DocumentSourceFacet::doDispose() {
     for (auto&& facet : _facets) {
         facet.pipeline.get_deleter().dismissDisposal();
-        facet.pipeline->dispose(pExpCtx->opCtx);
+        facet.pipeline->dispose(pExpCtx->getOperationContext());
     }
 }
 
@@ -260,7 +260,7 @@ void DocumentSourceFacet::reattachToOperationContext(OperationContext* opCtx) {
 }
 
 bool DocumentSourceFacet::validateOperationContext(const OperationContext* opCtx) const {
-    return getContext()->opCtx == opCtx &&
+    return getContext()->getOperationContext() == opCtx &&
         std::all_of(_facets.begin(), _facets.end(), [opCtx](const auto& f) {
                return f.pipeline->validateOperationContext(opCtx);
            });
@@ -398,7 +398,7 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
         // These checks potentially require that we check the catalog to determine where our data
         // lives. In circumstances where we aren't actually running the query, we don't need to do
         // this (and it can erroneously error - SERVER-83912).
-        if (expCtx->mongoProcessInterface->isExpectedToExecuteQueries()) {
+        if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
             // Validate that none of the facet pipelines have any conflicting HostTypeRequirements.
             // This verifies both that all stages within each pipeline are consistent, and that the
             // pipelines are consistent with one another.

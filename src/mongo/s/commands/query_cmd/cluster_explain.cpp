@@ -402,9 +402,9 @@ Status ClusterExplain::buildExplainResult(
         return ex.toStatus();
     }
 
-    buildPlannerInfo(expCtx->opCtx, shardResponses, mongosStageName, out);
+    buildPlannerInfo(expCtx->getOperationContext(), shardResponses, mongosStageName, out);
     buildExecStats(shardResponses, mongosStageName, millisElapsed, out);
-    explain_common::generateQueryShapeHash(expCtx->opCtx, out);
+    explain_common::generateQueryShapeHash(expCtx->getOperationContext(), out);
     explain_common::generateServerInfo(out);
     explain_common::generateServerParameters(expCtx, out);
     appendIfRoom(out, command, "command");

@@ -86,7 +86,7 @@ Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
         // We've redacted the interesting parts of the stage, return early.
         return innerSpecVal;
     }
-    if ((!opts.verbosity || pExpCtx->inRouter) &&
+    if ((!opts.verbosity || pExpCtx->getInRouter()) &&
         _spec.getMetadataMergeProtocolVersion().has_value() && _mergingPipeline) {
         MutableDocument innerSpec{innerSpecVal.getDocument()};
         innerSpec[InternalSearchMongotRemoteSpec::kMergingPipelineFieldName] =
@@ -99,7 +99,7 @@ Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
 Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
     const SerializationOptions& opts) const {
     // Though router can generate explain output, it should never make a remote call to the mongot.
-    if (!opts.verbosity || pExpCtx->inRouter) {
+    if (!opts.verbosity || pExpCtx->getInRouter()) {
         if (_spec.getMetadataMergeProtocolVersion().has_value()) {
             // TODO SERVER-90941 The IDL should be able to handle this serialization once we
             // populate the query_shape field.
@@ -193,7 +193,7 @@ Value DocumentSourceInternalSearchMongotRemote::serialize(const SerializationOpt
 
 boost::optional<BSONObj> DocumentSourceInternalSearchMongotRemote::_getNext() {
     try {
-        return _cursor->getNext(pExpCtx->opCtx);
+        return _cursor->getNext(pExpCtx->getOperationContext());
     } catch (DBException& ex) {
         ex.addContext("Remote error from mongot");
         throw;
@@ -214,14 +214,14 @@ bool DocumentSourceInternalSearchMongotRemote::shouldReturnEOF() {
         return true;
     }
 
-    // Return EOF if pExpCtx->uuid is unset here; the collection we are searching over has not been
-    // created yet.
-    if (!pExpCtx->uuid) {
+    // Return EOF if pExpCtx->getUUID() is unset here; the collection we are searching over has not
+    // been created yet.
+    if (!pExpCtx->getUUID()) {
         LOGV2_DEBUG(8569402, 4, "Returning EOF due to lack of UUID");
         return true;
     }
 
-    if (pExpCtx->explain &&
+    if (pExpCtx->getExplain() &&
         !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return true;
@@ -246,12 +246,12 @@ void DocumentSourceInternalSearchMongotRemote::tryToSetSearchMetaVar() {
             if (metaVal.isObject()) {
                 auto metaValDoc = metaVal.getDocument();
                 if (!metaValDoc.getField("count").missing()) {
-                    auto& opDebug = CurOp::get(pExpCtx->opCtx)->debug();
+                    auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
                     opDebug.mongotCountVal = metaValDoc.getField("count").wrap("count");
                 }
 
                 if (!metaValDoc.getField(mongot_cursor::kSlowQueryLogFieldName).missing()) {
-                    auto& opDebug = CurOp::get(pExpCtx->opCtx)->debug();
+                    auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
                     opDebug.mongotSlowQueryLog =
                         metaValDoc.getField(mongot_cursor::kSlowQueryLogFieldName)
                             .wrap(mongot_cursor::kSlowQueryLogFieldName);
@@ -264,7 +264,7 @@ void DocumentSourceInternalSearchMongotRemote::tryToSetSearchMetaVar() {
 DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextAfterSetup() {
     auto response = _getNext();
     LOGV2_DEBUG(8569401, 5, "getting next after setup", "response"_attr = response);
-    auto& opDebug = CurOp::get(pExpCtx->opCtx)->debug();
+    auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
 
     if (opDebug.msWaitingForMongot) {
         *opDebug.msWaitingForMongot += durationCount<Milliseconds>(_cursor->resetWaitingTime());
@@ -287,7 +287,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextA
 
     ++_docsReturned;
     // Populate $sortKey metadata field so that mongos can properly merge sort the document stream.
-    if (pExpCtx->needsMerge) {
+    if (pExpCtx->getNeedsMerge()) {
         // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
         MutableDocument output(Document::fromBsonWithMetaData(response.value()));
 

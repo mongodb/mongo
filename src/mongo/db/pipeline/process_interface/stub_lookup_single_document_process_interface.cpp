@@ -52,7 +52,7 @@ std::unique_ptr<Pipeline, PipelineDeleter>
 StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRead(
     Pipeline* ownedPipeline, boost::optional<const AggregateCommandRequest&> aggRequest) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-        ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
+        ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
     pipeline->addInitialSource(
         DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
     return pipeline;

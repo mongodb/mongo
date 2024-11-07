@@ -199,10 +199,10 @@ public:
         // collection placement version. This is done here instead of parse time since it requires
         // that locks are not held.
         const auto& collectionPlacementVersion = _mergeProcessor->getCollectionPlacementVersion();
-        if (!pExpCtx->inRouter && collectionPlacementVersion) {
+        if (!pExpCtx->getInRouter() && collectionPlacementVersion) {
             // If a router has sent us a target placement version, we need to be sure we are
             // prepared to act as a router which is at least as recent as that router.
-            pExpCtx->mongoProcessInterface->checkRoutingInfoEpochOrThrow(
+            pExpCtx->getMongoProcessInterface()->checkRoutingInfoEpochOrThrow(
                 pExpCtx, getOutputNs(), *collectionPlacementVersion);
         }
     }

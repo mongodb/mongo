@@ -129,8 +129,9 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext()
 boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
     boost::intrusive_ptr<ExpressionContext> pExpCtx, const Document& preImageId) {
     // Look up the pre-image document on the local node by id.
-    const auto tenantId = change_stream_serverless_helpers::resolveTenantId(pExpCtx->ns.tenantId());
-    auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocumentLocally(
+    const auto tenantId =
+        change_stream_serverless_helpers::resolveTenantId(pExpCtx->getNamespaceString().tenantId());
+    auto lookedUpDoc = pExpCtx->getMongoProcessInterface()->lookupSingleDocumentLocally(
         pExpCtx,
         NamespaceString::makePreImageCollectionNSS(tenantId),
         Document{{ChangeStreamPreImage::kIdFieldName, preImageId}});

@@ -286,7 +286,7 @@ std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSiz
     // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
     // recipient spent waiting for documents from the donor shards. It doing so requires the CurOp
     // to be marked as having started.
-    auto opCtx = pipeline.getContext()->opCtx;
+    auto opCtx = pipeline.getContext()->getOperationContext();
     auto* curOp = CurOp::get(opCtx);
     curOp->ensureStarted();
     ON_BLOCK_EXIT([curOp] { curOp->done(); });

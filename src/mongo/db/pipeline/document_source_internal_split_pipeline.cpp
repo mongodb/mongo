@@ -87,7 +87,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
                         specificShardObj.nFields() == 1 &&
                             specificShardElem.type() == BSONType::String);
 
-                auto* opCtx = expCtx->opCtx;
+                auto* opCtx = expCtx->getOperationContext();
                 auto* grid = Grid::get(opCtx);
                 uassert(
                     7958301,

@@ -51,7 +51,7 @@
 namespace mongo {
 
 RouterStagePipeline::RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline)
-    : RouterExecStage(mergePipeline->getContext()->opCtx),
+    : RouterExecStage(mergePipeline->getContext()->getOperationContext()),
       _mergePipeline(std::move(mergePipeline)) {
     invariant(!_mergePipeline->getSources().empty());
     _mergeCursorsStage =

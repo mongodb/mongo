@@ -69,7 +69,7 @@ public:
     }
 
     int getRandomBetweenBounds(int lower, int upper) {
-        auto& prng = expCtx->opCtx->getClient()->getPrng();
+        auto& prng = expCtx->getOperationContext()->getClient()->getPrng();
         return lower + int(double(upper - lower) * (prng.nextCanonicalDouble()));
     }
 

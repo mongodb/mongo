@@ -125,9 +125,9 @@ public:
     }
 
     /**
-     * Spills all documents currently in memory to disk. Throws if '_expCtx->allowDiskUse' is false.
-     *This is also called automatically as part of 'addDocument', but call this to spill without
-     * adding.
+     * Spills all documents currently in memory to disk. Throws if '_expCtx->getAllowDiskUse()' is
+     *false. This is also called automatically as part of 'addDocument', but call this to spill
+     *without adding.
      */
     void spillToDisk();
 

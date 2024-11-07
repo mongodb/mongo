@@ -103,7 +103,7 @@ ExpressionInternalJsEmit::ExpressionInternalJsEmit(ExpressionContext* const expC
       _emitState{{}, internalQueryMaxJsEmitBytes.load(), 0},
       _thisRef(_children[0]),
       _funcSource(std::move(funcSource)) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
 boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(ExpressionContext* const expCtx,
@@ -112,7 +112,7 @@ boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(ExpressionConte
 
     uassert(4660801,
             str::stream() << kExpressionName << " cannot be used inside a validator.",
-            !expCtx->isParsingCollectionValidator);
+            !expCtx->getIsParsingCollectionValidator());
 
     uassert(31221,
             str::stream() << kExpressionName

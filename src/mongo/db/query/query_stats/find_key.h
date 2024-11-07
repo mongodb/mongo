@@ -104,7 +104,7 @@ public:
     FindKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
             const ParsedFindCommand& request,
             query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
-        : Key(expCtx->opCtx,
+        : Key(expCtx->getOperationContext(),
               std::make_unique<query_shape::FindCmdShape>(request, expCtx),
               request.findCommandRequest->getHint(),
               request.findCommandRequest->getReadConcern(),

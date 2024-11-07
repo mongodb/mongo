@@ -347,7 +347,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, FailIfCannotSpillAndExceedMemoryLimit)
                 }
             }
         })");
-    getExpCtx()->allowDiskUse = false;
+    getExpCtx()->setAllowDiskUse(false);
     internalDocumentSourceSetWindowFieldsMaxMemoryBytes.store(50);
     auto pipelineStages =
         document_source_set_window_fields::createFromBson(wfSpec.firstElement(), getExpCtx());

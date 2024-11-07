@@ -88,17 +88,18 @@ TEST_F(ProcessInterfaceStandaloneTest,
     auto processInterface = makeProcessInterface();
 
     // Test that 'targetCollectionPlacementVersion' is not accepted if not from router.
-    expCtx->fromRouter = false;
-    ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-                           expCtx, {{"_id"}}, targetCollectionPlacementVersion, expCtx->ns),
-                       AssertionException,
-                       51123);
+    expCtx->setFromRouter(false);
+    ASSERT_THROWS_CODE(
+        processInterface->ensureFieldsUniqueOrResolveDocumentKey(
+            expCtx, {{"_id"}}, targetCollectionPlacementVersion, expCtx->getNamespaceString()),
+        AssertionException,
+        51123);
 
     // Test that 'targetCollectionPlacementVersion' is accepted if from router.
-    expCtx->fromRouter = true;
+    expCtx->setFromRouter(true);
     auto [joinKey, chunkVersion, supportingUniqueIndex] =
         processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-            expCtx, {{"_id"}}, targetCollectionPlacementVersion, expCtx->ns);
+            expCtx, {{"_id"}}, targetCollectionPlacementVersion, expCtx->getNamespaceString());
     ASSERT_EQ(joinKey.size(), 1UL);
     ASSERT_EQ(joinKey.count(FieldPath("_id")), 1UL);
     ASSERT(chunkVersion);
@@ -112,11 +113,12 @@ TEST_F(ProcessInterfaceStandaloneTest, FailsToEnsureFieldsUniqueIfJoinFieldsAreN
         boost::make_optional(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {0, 0}));
     auto processInterface = makeProcessInterface();
 
-    expCtx->fromRouter = true;
-    ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-                           expCtx, boost::none, targetCollectionPlacementVersion, expCtx->ns),
-                       AssertionException,
-                       51124);
+    expCtx->setFromRouter(true);
+    ASSERT_THROWS_CODE(
+        processInterface->ensureFieldsUniqueOrResolveDocumentKey(
+            expCtx, boost::none, targetCollectionPlacementVersion, expCtx->getNamespaceString()),
+        AssertionException,
+        51124);
 }
 
 TEST_F(ProcessInterfaceStandaloneTest,
@@ -125,13 +127,14 @@ TEST_F(ProcessInterfaceStandaloneTest,
     auto targetCollectionPlacementVersion = boost::none;
     auto processInterface = makeProcessInterface();
 
-    expCtx->fromRouter = false;
+    expCtx->setFromRouter(false);
     processInterface->hasSupportingIndexForFields =
         MongoProcessInterface::SupportingUniqueIndex::None;
-    ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-                           expCtx, {{"x"}}, targetCollectionPlacementVersion, expCtx->ns),
-                       AssertionException,
-                       51183);
+    ASSERT_THROWS_CODE(
+        processInterface->ensureFieldsUniqueOrResolveDocumentKey(
+            expCtx, {{"x"}}, targetCollectionPlacementVersion, expCtx->getNamespaceString()),
+        AssertionException,
+        51183);
 }
 }  // namespace
 }  // namespace mongo

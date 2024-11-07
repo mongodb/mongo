@@ -86,7 +86,7 @@ protected:
         NamespaceString testNss =
             NamespaceString::createNamespaceString_forTest("test", "collection");
         AggregateCommandRequest request(testNss, rawPipeline);
-        getExpCtx()->ns = testNss;
+        getExpCtx()->setNamespaceString(testNss);
 
         return Pipeline::parse(request.getPipeline(), getExpCtx());
     }

@@ -258,9 +258,12 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
 
     // Fill out the rest of the BSONObj with opCtx specific details.
     infoBuilder->appendBool("active", client->hasAnyActiveCurrentOp());
-    infoBuilder->append(
-        "currentOpTime",
-        expCtx->opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
+    infoBuilder->append("currentOpTime",
+                        expCtx->getOperationContext()
+                            ->getServiceContext()
+                            ->getPreciseClockSource()
+                            ->now()
+                            .toString());
 
     auto authSession = AuthorizationSession::get(client);
     // Depending on whether the authenticated user is the same user which ran the command,
@@ -310,11 +313,11 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
 
         tassert(7663403,
                 str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
-                              << expCtx->ns.toStringForErrorMsg(),
-                expCtx->serializationCtxt != SerializationContext::stateDefault());
+                              << expCtx->getNamespaceString().toStringForErrorMsg(),
+                expCtx->getSerializationContext() != SerializationContext::stateDefault());
 
         // reportState is used to generate a command reply
-        auto sc = SerializationContext::stateCommandReply(expCtx->serializationCtxt);
+        auto sc = SerializationContext::stateCommandReply(expCtx->getSerializationContext());
         CurOp::get(clientOpCtx)->reportState(infoBuilder, sc, truncateOps);
 
         if (const auto& queryShapeHash = CurOp::get(clientOpCtx)->getQueryShapeHash()) {
@@ -322,7 +325,7 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
         }
     }
 
-    if (expCtx->opCtx->routedByReplicaSetEndpoint()) {
+    if (expCtx->getOperationContext()->routedByReplicaSetEndpoint()) {
         // On the replica set endpoint, currentOp reports both router and shard operations so it
         // should label each op with its associated role.
         infoBuilder->append("role", toString(client->getService()->role()));

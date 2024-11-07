@@ -55,7 +55,7 @@ ClassicPlannerInterface::ClassicPlannerInterface(
         const auto nssOrUuid = cq()->getFindCommandRequest().getNamespaceOrUUID();
         _nss = nssOrUuid.isNamespaceString() ? nssOrUuid.nss() : NamespaceString::kEmpty;
     }
-    if (cq()->getExpCtx()->explain.has_value()) {
+    if (cq()->getExpCtx()->getExplain().has_value()) {
         // Translate CBR rejected plans into PlanStages so they can be explained
         for (auto&& solution : _costBasedRankerResult.rejectedPlans) {
             _cbrRejectedPlanStages.push_back(buildExecutableTree(*solution));

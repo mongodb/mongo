@@ -76,7 +76,7 @@ const char* SpoolStage::kStageType = "SPOOL";
 SpoolStage::SpoolStage(ExpressionContext* expCtx, WorkingSet* ws, std::unique_ptr<PlanStage> child)
     : PlanStage(expCtx, std::move(child), kStageType),
       _ws(ws),
-      _memTracker(expCtx->allowDiskUse, internalQueryMaxSpoolMemoryUsageBytes.load()) {
+      _memTracker(expCtx->getAllowDiskUse(), internalQueryMaxSpoolMemoryUsageBytes.load()) {
 
     _specificStats.maxMemoryUsageBytes = _memTracker.maxAllowedMemoryUsageBytes();
     _specificStats.maxDiskUsageBytes = internalQueryMaxSpoolDiskUsageBytes.load();
@@ -107,10 +107,10 @@ void SpoolStage::spill() {
     if (!_file) {
         _spillStats = std::make_unique<SorterFileStats>(nullptr /* sorterTracker */);
         _file = std::make_shared<Sorter<RecordId, NullValue>::File>(
-            expCtx()->tempDir + "/" + nextFileName(), _spillStats.get());
+            expCtx()->getTempDir() + "/" + nextFileName(), _spillStats.get());
     }
 
-    auto opts = SortOptions().TempDir(expCtx()->tempDir);
+    auto opts = SortOptions().TempDir(expCtx()->getTempDir());
     opts.FileStats(_spillStats.get());
 
     SortedFileWriter<RecordId, NullValue> writer(opts, _file);

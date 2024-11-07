@@ -81,7 +81,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListLocalSessions::createFrom
         ErrorCodes::InvalidNamespace,
         str::stream() << kStageName
                       << " must be run against the database with {aggregate: 1}, not a collection",
-        pExpCtx->ns.isCollectionlessAggregateNS());
+        pExpCtx->getNamespaceString().isCollectionlessAggregateNS());
 
     return new DocumentSourceListLocalSessions(pExpCtx, listSessionsParseSpec(kStageName, spec));
 }
@@ -89,7 +89,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListLocalSessions::createFrom
 DocumentSourceListLocalSessions::DocumentSourceListLocalSessions(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx, const ListSessionsSpec& spec)
     : DocumentSource(kStageName, pExpCtx), _spec(spec) {
-    const auto& opCtx = pExpCtx->opCtx;
+    const auto& opCtx = pExpCtx->getOperationContext();
     _cache = LogicalSessionCache::get(opCtx);
     if (_spec.getAllUsers()) {
         invariant(!_spec.getUsers() || _spec.getUsers()->empty());

@@ -111,7 +111,7 @@ private:
     DocumentSourceChangeStreamOplogMatch(BSONObj filter,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceInternalChangeStreamMatch(filter, expCtx), _optimizedEndOfPipeline(true) {
-        expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
+        expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     }
 
     // Needed for re-creating the filter during optimization. Note that we do not serialize these

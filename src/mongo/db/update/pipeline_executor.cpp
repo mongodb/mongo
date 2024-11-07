@@ -71,7 +71,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
     // $lookups, etc. will not fail instantiation. They will not be used for execution as these
     // stages are not allowed within an update context.
     LiteParsedPipeline liteParsedPipeline(
-        NamespaceString::makeDummyNamespace(expCtx->ns.tenantId()), pipeline);
+        NamespaceString::makeDummyNamespace(expCtx->getNamespaceString().tenantId()), pipeline);
     StringMap<ResolvedNamespace> resolvedNamespaces;
     for (const auto& nss : liteParsedPipeline.getInvolvedNamespaces()) {
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});

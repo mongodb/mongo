@@ -119,7 +119,7 @@ long long computeInitialBatchSize(const boost::intrusive_ptr<ExpressionContext>&
         oversubscriptionFactor =
             ServerParameterSet::getClusterParameterSet()
                 ->get<ClusterParameterWithStorage<InternalSearchOptions>>("internalSearchOptions")
-                ->getValue(expCtx->ns.tenantId())
+                ->getValue(expCtx->getNamespaceString().tenantId())
                 .getOversubscriptionFactor();
     }
 
@@ -183,13 +183,13 @@ std::unique_ptr<executor::TaskExecutorCursor> makeTaskExecutorCursorForExplain(
     // causes an error within makeTaskExecutorCursor() as it expects a cursor. We catch that error
     // here and then create a dummy TEC to continue execution.
     try {
-        return makeTaskExecutorCursor(expCtx->opCtx,
+        return makeTaskExecutorCursor(expCtx->getOperationContext(),
                                       taskExecutor,
                                       command,
                                       {std::move(getMoreStrategy), std::move(yieldPolicy)},
                                       makeRetryOnNetworkErrorPolicy());
     } catch (ExceptionFor<ErrorCodes::IDLFailedToParse>&) {
-        auto nss = expCtx->ns;
+        auto nss = expCtx->getNamespaceString();
         BSONObjBuilder createdResponse;
         createdResponse.append("ok", 1);
 
@@ -225,12 +225,12 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     std::unique_ptr<executor::TaskExecutorCursor> initialCursor;
     std::vector<std::unique_ptr<executor::TaskExecutorCursor>> additionalCursors;
 
-    if (expCtx->explain) {
+    if (expCtx->getExplain()) {
         initialCursor = makeTaskExecutorCursorForExplain(
             expCtx, command, taskExecutor, std::move(getMoreStrategy), std::move(yieldPolicy));
 
     } else {
-        initialCursor = makeTaskExecutorCursor(expCtx->opCtx,
+        initialCursor = makeTaskExecutorCursor(expCtx->getOperationContext(),
                                                taskExecutor,
                                                command,
                                                {std::move(getMoreStrategy), std::move(yieldPolicy)},
@@ -257,7 +257,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
         searchIdLookupMetrics) {
     // UUID is required for mongot queries. If not present, no results for the query as the
     // collection has not been created yet.
-    if (!expCtx->uuid) {
+    if (!expCtx->getUUID()) {
         return {};
     }
 
@@ -298,27 +298,27 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
         batchSize,
         bounds.value_or(
             DocsNeededBounds(docs_needed_bounds::Unknown(), docs_needed_bounds::Unknown())),
-        expCtx->ns.tenantId(),
+        expCtx->getNamespaceString().tenantId(),
         searchIdLookupMetrics);
 
     // If it turns out that this stage is not running on a sharded collection, we don't want
     // to send the protocol version to mongot. If the protocol version is sent, mongot will
     // generate unmerged metadata documents that we won't be set up to merge.
     const auto& protocolVersion =
-        expCtx->needsMerge ? spec.getMetadataMergeProtocolVersion() : boost::none;
+        expCtx->getNeedsMerge() ? spec.getMetadataMergeProtocolVersion() : boost::none;
 
     return establishCursors(
         expCtx,
-        getRemoteCommandRequestForSearchQuery(expCtx->opCtx,
-                                              expCtx->ns,
-                                              expCtx->uuid,
-                                              expCtx->explain,
+        getRemoteCommandRequestForSearchQuery(expCtx->getOperationContext(),
+                                              expCtx->getNamespaceString(),
+                                              expCtx->getUUID(),
+                                              expCtx->getExplain(),
                                               query,
                                               protocolVersion,
                                               docsRequested,
                                               batchSize,
                                               spec.getRequiresSearchSequenceToken(),
-                                              expCtx->viewNS),
+                                              expCtx->getViewNS()),
         taskExecutor,
         std::move(getMoreStrategy),
         std::move(yieldPolicy));
@@ -332,20 +332,23 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
     // UUID is required for mongot queries. If not present, no results for the query as the
     // collection has not been created yet.
-    if (!expCtx->uuid) {
+    if (!expCtx->getUUID()) {
         return {};
     }
 
     auto getMoreStrategy = std::make_unique<executor::DefaultTaskExecutorCursorGetMoreStrategy>(
         /*batchSize*/ boost::none,
         /*preFetchNextBatch*/ false);
-    return establishCursors(
-        expCtx,
-        getRemoteCommandRequestForSearchQuery(
-            expCtx->opCtx, expCtx->ns, expCtx->uuid, expCtx->explain, query, protocolVersion),
-        taskExecutor,
-        std::move(getMoreStrategy),
-        std::move(yieldPolicy));
+    return establishCursors(expCtx,
+                            getRemoteCommandRequestForSearchQuery(expCtx->getOperationContext(),
+                                                                  expCtx->getNamespaceString(),
+                                                                  expCtx->getUUID(),
+                                                                  expCtx->getExplain(),
+                                                                  query,
+                                                                  protocolVersion),
+                            taskExecutor,
+                            std::move(getMoreStrategy),
+                            std::move(yieldPolicy));
 }
 
 
@@ -363,7 +366,7 @@ BSONObj getExplainResponse(const ExpressionContext* expCtx,
         // with the executor's thread.
         promisePtr->setError(scheduleResult.getStatus());
     }
-    auto response = future.getNoThrow(expCtx->opCtx);
+    auto response = future.getNoThrow(expCtx->getOperationContext());
     uassertStatusOK(response.getStatus());
     uassertStatusOK(response.getValue().response.status);
     BSONObj responseData = response.getValue().response.data;
@@ -378,8 +381,11 @@ BSONObj getExplainResponse(const ExpressionContext* expCtx,
 BSONObj getSearchExplainResponse(const ExpressionContext* expCtx,
                                  const BSONObj& query,
                                  executor::TaskExecutor* taskExecutor) {
-    const auto request = getRemoteCommandRequestForSearchQuery(
-        expCtx->opCtx, expCtx->ns, expCtx->uuid, expCtx->explain, query);
+    const auto request = getRemoteCommandRequestForSearchQuery(expCtx->getOperationContext(),
+                                                               expCtx->getNamespaceString(),
+                                                               expCtx->getUUID(),
+                                                               expCtx->getExplain(),
+                                                               query);
     return getExplainResponse(expCtx, request, taskExecutor);
 }
 
@@ -388,7 +394,8 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
     const BSONObj& cmdObj,
     std::function<bool(Status)> retryPolicy) {
     using namespace fmt::literals;
-    auto taskExecutor = executor::getMongotTaskExecutor(expCtx->opCtx->getServiceContext());
+    auto taskExecutor =
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
     executor::RemoteCommandResponse response = {
         getMongotAddress(),
         Status(ErrorCodes::InternalError, "Internal error running search command")};
@@ -396,7 +403,8 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
         Status err = Status::OK();
         do {
             auto swCbHnd = taskExecutor->scheduleRemoteCommand(
-                getRemoteCommandRequest(expCtx->opCtx, expCtx->ns, cmdObj),
+                getRemoteCommandRequest(
+                    expCtx->getOperationContext(), expCtx->getNamespaceString(), cmdObj),
                 [&](const auto& args) { response = args.response; });
             err = swCbHnd.getStatus();
             if (!err.isOK()) {
@@ -405,7 +413,7 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
                 break;
             }
             if (MONGO_likely(shardedSearchOpCtxDisconnect.shouldFail())) {
-                expCtx->opCtx->markKilled();
+                expCtx->getOperationContext()->markKilled();
             }
             // It is imperative to wrap the wait() call in a try/catch. If an exception is thrown
             // and not caught, planShardedSearch will exit and all stack-allocated variables will be
@@ -418,7 +426,7 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
             // ensure that planShardedSearch isn't exited (and the `response` object isn't
             // destroyed) before the callbackFn (which has a reference to `response`) executes.
             try {
-                taskExecutor->wait(swCbHnd.getValue(), expCtx->opCtx);
+                taskExecutor->wait(swCbHnd.getValue(), expCtx->getOperationContext());
             } catch (const DBException& exception) {
                 LOGV2_ERROR(8049900,
                             "An interruption occured while the MongotTaskExecutor was waiting for "
@@ -473,7 +481,7 @@ void throwIfNotRunningWithMongotHostConfigured(
     //
     // This validation should occur before parsing so in the case of a parse and configuration
     // error, the configuration error is thrown.
-    if (expCtx->mongoProcessInterface->isExpectedToExecuteQueries()) {
+    if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
         doThrowIfNotRunningWithMongotHostConfigured();
     }
 }

@@ -83,7 +83,7 @@ public:
         }
 
         // Resolve the active OperationContext and set it on the ExpressionContextForTest.
-        opCtx = _testOpCtx ? _testOpCtx.get() : Client::getCurrent()->getOperationContext();
+        _params.opCtx = _testOpCtx ? _testOpCtx.get() : Client::getCurrent()->getOperationContext();
         // As we don't have an OperationContext or TimeZoneDatabase prior to base class
         // ExpressionContext construction, we must resolve one. If there exists a TimeZoneDatabase
         // associated with the current ServiceContext, adopt it. Otherwise, create a
@@ -178,7 +178,7 @@ public:
      * Sets the resolved definition for an involved namespace.
      */
     void setResolvedNamespace(const NamespaceString& nss, ResolvedNamespace resolvedNamespace) {
-        _resolvedNamespaces[nss.coll()] = std::move(resolvedNamespace);
+        _params.resolvedNamespaces[nss.coll()] = std::move(resolvedNamespace);
     }
 
     ServiceContext* getServiceContext() {
@@ -201,7 +201,7 @@ private:
         if (!TimeZoneDatabase::get(serviceContext)) {
             TimeZoneDatabase::set(serviceContext, std::make_unique<TimeZoneDatabase>());
         }
-        timeZoneDatabase = TimeZoneDatabase::get(serviceContext);
+        _params.timeZoneDatabase = TimeZoneDatabase::get(serviceContext);
     }
 
     std::variant<ServiceContext*, std::unique_ptr<QueryTestServiceContext>> _serviceContext;

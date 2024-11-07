@@ -220,13 +220,13 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
 
     // Check for server-side javascript usage after parsing is complete and the flags have been set
     // on the expression context.
-    if (expCtx->hasServerSideJs.where && _samplerWhereClause.tick()) {
+    if (expCtx->getServerSideJsConfig().where && _samplerWhereClause.tick()) {
         LOGV2_WARNING(8996500,
                       "$where is deprecated. For more information, see "
                       "https://www.mongodb.com/docs/manual/reference/operator/query/where/");
     }
 
-    if (expCtx->hasServerSideJs.function && _samplerFunctionJs.tick()) {
+    if (expCtx->getServerSideJsConfig().function && _samplerFunctionJs.tick()) {
         LOGV2_WARNING(
             8996501,
             "$function is deprecated. For more information, see "

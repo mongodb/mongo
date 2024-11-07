@@ -127,8 +127,8 @@ TEST_F(DocumentSourceFacetTest, ShouldSucceedWhenNamespaceIsCollectionless) {
     auto ctx = getExpCtx();
     auto spec = fromjson("{$facet: {a: [{$match: {}}]}}");
 
-    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS(
-        DatabaseName::createDatabaseName_forTest(boost::none, "unittests"));
+    ctx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "unittests")));
 
     ASSERT_TRUE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx).get());
 }
@@ -209,8 +209,8 @@ class ExecutableStubMongoProcessInterface : public StubMongoProcessInterface {
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithinSinglePipeline) {
     auto ctx = getExpCtx();
-    ctx->inRouter = true;
-    ctx->mongoProcessInterface = std::make_unique<ExecutableStubMongoProcessInterface>();
+    ctx->setInRouter(true);
+    ctx->setMongoProcessInterface(std::make_unique<ExecutableStubMongoProcessInterface>());
 
     auto spec = fromjson(
         "{$facet: {badPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}, "
@@ -223,8 +223,8 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithi
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcrossPipelines) {
     auto ctx = getExpCtx();
-    ctx->inRouter = true;
-    ctx->mongoProcessInterface = std::make_unique<ExecutableStubMongoProcessInterface>();
+    ctx->setInRouter(true);
+    ctx->setMongoProcessInterface(std::make_unique<ExecutableStubMongoProcessInterface>());
 
     auto spec = fromjson(
         "{$facet: {shardPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}], mongosPipe: "
@@ -590,7 +590,7 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     auto ctx = getExpCtx();
     // We're going to be changing the OperationContext, so we need to use a MongoProcessInterface
     // that won't throw when we do so.
-    ctx->mongoProcessInterface = std::make_unique<StubMongoProcessInterface>();
+    ctx->setMongoProcessInterface(std::make_unique<StubMongoProcessInterface>());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({firstDummy}, ctx);
@@ -611,7 +611,7 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     ASSERT_TRUE(secondDummy->isDetachedFromOpCtx);
 
     // Test reattaching.
-    facetStage->reattachToOperationContext(ctx->opCtx);
+    facetStage->reattachToOperationContext(ctx->getOperationContext());
     ASSERT_FALSE(firstDummy->isDetachedFromOpCtx);
     ASSERT_FALSE(secondDummy->isDetachedFromOpCtx);
 }

@@ -663,7 +663,7 @@ class ExpressionFromAccumulator
 public:
     explicit ExpressionFromAccumulator(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final {
@@ -721,7 +721,7 @@ public:
                                         boost::intrusive_ptr<Expression> n,
                                         boost::intrusive_ptr<Expression> output)
         : Expression(expCtx, {n, output}), _n(n), _output(output) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     const char* getOpName() const {
@@ -980,8 +980,9 @@ protected:
                               << ")",
                 timeZoneId.getType() == BSONType::String);
 
-        invariant(getExpressionContext()->timeZoneDatabase);
-        return getExpressionContext()->timeZoneDatabase->getTimeZone(timeZoneId.getStringData());
+        invariant(getExpressionContext()->getTimeZoneDatabase());
+        return getExpressionContext()->getTimeZoneDatabase()->getTimeZone(
+            timeZoneId.getStringData());
     }
 
 private:
@@ -1063,11 +1064,11 @@ class ExpressionAllElementsTrue final : public ExpressionFixedArity<ExpressionAl
 public:
     explicit ExpressionAllElementsTrue(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     ExpressionAllElementsTrue(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx, std::move(children)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1171,12 +1172,12 @@ class ExpressionArrayElemAt final : public ExpressionFixedArity<ExpressionArrayE
 public:
     explicit ExpressionArrayElemAt(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     ExpressionArrayElemAt(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx, std::move(children)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1195,12 +1196,12 @@ class ExpressionFirst final : public ExpressionFixedArity<ExpressionFirst, 1> {
 public:
     explicit ExpressionFirst(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionFirst, 1>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     ExpressionFirst(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionFirst, 1>(expCtx, std::move(children)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1219,7 +1220,7 @@ class ExpressionLast final : public ExpressionFixedArity<ExpressionLast, 1> {
 public:
     explicit ExpressionLast(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionLast, 1>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -2201,7 +2202,7 @@ class ExpressionIndexOfArray : public ExpressionRangedArity<ExpressionIndexOfArr
 public:
     explicit ExpressionIndexOfArray(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     ExpressionIndexOfArray(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -2360,11 +2361,11 @@ class ExpressionLog final : public ExpressionFixedArity<ExpressionLog, 2> {
 public:
     explicit ExpressionLog(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionLog, 2>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     ExpressionLog(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionLog, 2>(expCtx, std::move(children)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -2804,7 +2805,7 @@ public:
         : Expression(expCtx, {std::move(input), std::move(initial), std::move(in)}),
           _thisVar(thisVar),
           _valueVar(valueVar) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -2892,7 +2893,7 @@ public:
                          boost::intrusive_ptr<Expression> find,
                          boost::intrusive_ptr<Expression> replacement)
         : ExpressionReplaceBase(expCtx, input, find, replacement) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -3076,7 +3077,7 @@ class ExpressionSize final : public ExpressionFixedArity<ExpressionSize, 1> {
 public:
     explicit ExpressionSize(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSize, 1>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -3147,7 +3148,7 @@ class ExpressionSlice final : public ExpressionRangedArity<ExpressionSlice, 2, 3
 public:
     explicit ExpressionSlice(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     ExpressionSlice(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx, std::move(children)) {}
@@ -3204,14 +3205,14 @@ class ExpressionInternalFindAllValuesAtPath final
 public:
     explicit ExpressionInternalFindAllValuesAtPath(ExpressionContext* expCtx)
         : ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     explicit ExpressionInternalFindAllValuesAtPath(ExpressionContext* expCtx,
                                                    ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1>(expCtx,
                                                                          std::move(children)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const override {
@@ -3272,11 +3273,11 @@ class ExpressionSplit final : public ExpressionFixedArity<ExpressionSplit, 2> {
 public:
     explicit ExpressionSplit(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSplit, 2>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     ExpressionSplit(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSplit, 2>(expCtx, std::move(children)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -3397,7 +3398,7 @@ class ExpressionBinarySize final : public ExpressionFixedArity<ExpressionBinaryS
 public:
     ExpressionBinarySize(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionBinarySize, 1>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -3646,7 +3647,7 @@ class ExpressionType final : public ExpressionFixedArity<ExpressionType, 1> {
 public:
     explicit ExpressionType(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionType, 1>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     ExpressionType(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -3803,7 +3804,7 @@ public:
           _useLongestLength(useLongestLength),
           _inputs(std::move(inputs)),
           _defaults(std::move(defaults)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -4161,7 +4162,7 @@ public:
     ExpressionToHashedIndexKey(ExpressionContext* const expCtx,
                                boost::intrusive_ptr<Expression> inputExpression)
         : Expression(expCtx, {inputExpression}) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     };
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -4469,7 +4470,7 @@ public:
                        boost::intrusive_ptr<Expression> field,
                        boost::intrusive_ptr<Expression> input)
         : Expression(expCtx, {std::move(field), std::move(input)}) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value serialize(const SerializationOptions& options = {}) const final;
@@ -4509,7 +4510,7 @@ public:
                        boost::intrusive_ptr<Expression> value)
         : Expression(expCtx, {std::move(field), std::move(input), std::move(value)}),
           _fieldName(getValidFieldName(_children[_kField])) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value serialize(const SerializationOptions& options = {}) const final;
@@ -4657,12 +4658,12 @@ public:
 
     explicit ExpressionBitAnd(ExpressionContext* const expCtx)
         : ExpressionBitwise<ExpressionBitAnd>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     ExpressionBitAnd(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionBitwise<ExpressionBitAnd>(expCtx, std::move(children)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -4690,12 +4691,12 @@ public:
 
     explicit ExpressionBitOr(ExpressionContext* const expCtx)
         : ExpressionBitwise<ExpressionBitOr>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     ExpressionBitOr(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionBitwise<ExpressionBitOr>(expCtx, std::move(children)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -4722,12 +4723,12 @@ public:
 
     explicit ExpressionBitXor(ExpressionContext* const expCtx)
         : ExpressionBitwise<ExpressionBitXor>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     ExpressionBitXor(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionBitwise<ExpressionBitXor>(expCtx, std::move(children)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -4742,11 +4743,11 @@ class ExpressionBitNot final : public ExpressionSingleNumericArg<ExpressionBitNo
 public:
     explicit ExpressionBitNot(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionBitNot>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     explicit ExpressionBitNot(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionBitNot>(expCtx, std::move(children)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluateNumericArg(const Value& numericArg) const final;
@@ -4810,7 +4811,7 @@ public:
                                      boost::intrusive_ptr<Expression> input,
                                      boost::intrusive_ptr<Expression> collation)
         : Expression(expCtx, {input, collation}) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,

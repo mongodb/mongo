@@ -175,7 +175,7 @@ std::unique_ptr<FindCommandRequest> createFindCommand(
     const AggregateCommandRequest* aggRequest) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
 
-    query_request_helper::setTailableMode(expCtx->tailableMode, findCommand.get());
+    query_request_helper::setTailableMode(expCtx->getTailableMode(), findCommand.get());
     findCommand->setFilter(queryObj.getOwned());
     findCommand->setProjection(projectionObj.getOwned());
     findCommand->setSort(sortObj.getOwned());
@@ -389,7 +389,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     long long sampleSize,
     long long numRecords,
     boost::optional<timeseries::BucketUnpacker> bucketUnpacker) {
-    OperationContext* opCtx = expCtx->opCtx;
+    OperationContext* opCtx = expCtx->getOperationContext();
 
     // Verify that we are already under a collection lock or in a lock-free read. We avoid taking
     // locks ourselves in this function because double-locking forces any PlanExecutor we create to
@@ -404,11 +404,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
                 "internalQueryCutoffForSampleFromRandomCursor");
 
     auto maxSampleRatioClusterParameter =
-        randomCursorSampleRatioParam->getValue(expCtx->ns.tenantId());
+        randomCursorSampleRatioParam->getValue(expCtx->getNamespaceString().tenantId());
 
     const double kMaxSampleRatioForRandCursor = maxSampleRatioClusterParameter.getSampleCutoff();
 
-    if (!expCtx->ns.isTimeseriesBucketsCollection()) {
+    if (!expCtx->getNamespaceString().isTimeseriesBucketsCollection()) {
         if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
             return nullptr;
         }
@@ -459,7 +459,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     // to a collection scan if the ratio of orphaned to owned documents encountered over the first
     // 100 works() is such that we would have chosen not to optimize.
     static const size_t kMaxPresampleSize = 100;
-    if (expCtx->ns.isTimeseriesBucketsCollection()) {
+    if (expCtx->getNamespaceString().isTimeseriesBucketsCollection()) {
         // We can't take ARHASH optimization path for a direct $sample on the system.buckets
         // collection because data is in compressed form. If we did have a direct $sample on the
         // system.buckets collection, then the 'bucketUnpacker' would not be set up properly. We
@@ -591,7 +591,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
 
     constexpr auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
     if (trialStage) {
-        auto classicTrialPolicy = makeClassicYieldPolicy(expCtx->opCtx,
+        auto classicTrialPolicy = makeClassicYieldPolicy(expCtx->getOperationContext(),
                                                          coll->ns(),
                                                          static_cast<PlanStage*>(trialStage),
                                                          yieldPolicy,
@@ -1024,7 +1024,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
             // The $match stage manages its own state for SBE compatibility without modifying the
             // ExpressionContext. Instead of re-parsing the MatchExpression to set the
             // compatibility we manually set it here.
-            expCtx->sbeCompatibility = leadingMatch->sbeCompatibility();
+            expCtx->setSbeCompatibility(leadingMatch->sbeCompatibility());
             tassert(8897900,
                     "Expected non-empty query for pushing down leading $match stage",
                     !queryObj.isEmpty());
@@ -1038,12 +1038,13 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
             // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially
             // allow SBE to execute the portion of the query that's pushed down, even if the portion
             // of the query that is not pushed down contains expressions not supported by SBE.
-            expCtx->sbeCompatibility = SbeCompatibility::noRequirements;
+            expCtx->setSbeCompatibility(SbeCompatibility::noRequirements);
             return uassertStatusOK(parsed_find_command::parse(
                 expCtx,
                 ParsedFindCommandParams{
                     .findCommand = std::move(findCommand),
-                    .extensionsCallback = ExtensionsCallbackReal(expCtx->opCtx, &nss),
+                    .extensionsCallback =
+                        ExtensionsCallbackReal(expCtx->getOperationContext(), &nss),
                     .allowedFeatures = matcherFeatures,
                     .projectionPolicies = ProjectionPolicies::aggregateProjectionPolicies()}));
         }
@@ -1195,7 +1196,7 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         // up with non-distinct scan solutions which otherwise could have been executed with SBE.
         auto plannerParams =
             std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForDistinct{
-                cq->getExpCtx()->opCtx,
+                cq->getExpCtx()->getOperationContext(),
                 *cq,
                 collections,
                 plannerOpts | QueryPlannerParams::IGNORE_QUERY_SETTINGS,
@@ -1203,7 +1204,7 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
             });
 
         // If the results need to be merged, we need to generate sort key metadata.
-        if (sortPattern && cq->getExpCtx()->needsMerge) {
+        if (sortPattern && cq->getExpCtx()->getNeedsMerge()) {
             auto sortKeyMetadataDeps = sortPattern->metadataDeps();
             sortKeyMetadataDeps.set(DocumentMetadataFields::kSortKey);
             cq->requestAdditionalMetadata(sortKeyMetadataDeps);
@@ -1355,13 +1356,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     // 'pipeline' is empty. The 'extractAndAttachPipelineStages' is a no-op when there are no
     // pipeline stages, so we can save some work by skipping it. The 'getExecutorFind()' function is
     // responsible for checking that the callback is non-null before calling it.
-    auto executor = getExecutorFind(expCtx->opCtx,
+    auto executor = getExecutorFind(expCtx->getOperationContext(),
                                     collections,
                                     std::move(cq),
                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                     plannerOpts,
                                     pipeline,
-                                    expCtx->needsMerge,
+                                    expCtx->getNeedsMerge(),
                                     unavailableMetadata,
                                     std::move(traversalPreference));
 
@@ -1656,9 +1657,9 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
 
     DocumentSource* searchStage = pipeline->peekFront();
     auto yieldPolicy = PlanYieldPolicyRemoteCursor::make(
-        expCtx->opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);
+        expCtx->getOperationContext(), PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);
 
-    if (!expCtx->explain) {
+    if (!expCtx->getExplain()) {
         if (search_helpers::isSearchPipeline(pipeline)) {
             search_helpers::establishSearchCursorsSBE(expCtx, searchStage, std::move(yieldPolicy));
         } else if (search_helpers::isSearchMetaPipeline(pipeline)) {
@@ -1679,12 +1680,15 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
         // The $search is pushed down into SBE executor.
         if (auto cursor = search_helpers::getSearchMetadataCursor(searchStage)) {
             // Create a yield policy for metadata cursor.
-            auto metadataYieldPolicy = PlanYieldPolicyRemoteCursor::make(
-                expCtx->opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);
+            auto metadataYieldPolicy =
+                PlanYieldPolicyRemoteCursor::make(expCtx->getOperationContext(),
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  collections,
+                                                  nss);
             cursor->updateYieldPolicy(std::move(metadataYieldPolicy));
 
             additionalExecutors.push_back(uassertStatusOK(getSearchMetadataExecutorSBE(
-                expCtx->opCtx, collections, nss, *cq, std::move(cursor))));
+                expCtx->getOperationContext(), collections, nss, *cq, std::move(cursor))));
         }
     }
     return {std::move(executor), callback, std::move(additionalExecutors)};
@@ -1740,7 +1744,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     auto sort = (su.sort && su.sort->isBoundedSortStage()) ? nullptr : su.sort;
     auto unpack = su.unpack;
     if (unpack && !unpack->isSbeCompatible()) {
-        expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbePipelineCompatibility(SbeCompatibility::notCompatible);
     }
 
     // But in classic it may be eligible for a post-planning sort optimization. We check eligibility
@@ -1762,14 +1766,14 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
         for (const auto& sortKey : sort->getSortKeyPattern()) {
             if (sortKey.fieldPath &&
                 *(sortKey.fieldPath) == unpack->bucketUnpacker().getTimeField()) {
-                expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
+                expCtx->setSbePipelineCompatibility(SbeCompatibility::notCompatible);
                 break;
             }
         }
     }
 
     if (isChangeStream) {
-        invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);
+        invariant(expCtx->getTailableMode() == TailableModeEnum::kTailableAndAwaitData);
         plannerOpts |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
                         QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
     }
@@ -1853,8 +1857,9 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
     // If the user specified a "key" field, use that field to satisfy the "near" query. Otherwise,
     // look for a geo-indexed field in 'collection' that can.
     auto nearFieldName =
-        (geoNearStage->getKeyField() ? geoNearStage->getKeyField()->fullPath()
-                                     : extractGeoNearFieldFromIndexes(expCtx->opCtx, collection))
+        (geoNearStage->getKeyField()
+             ? geoNearStage->getKeyField()->fullPath()
+             : extractGeoNearFieldFromIndexes(expCtx->getOperationContext(), collection))
             .toString();
 
     // Create a PlanExecutor whose query is the "near" predicate on 'nearFieldName' combined with

@@ -60,7 +60,7 @@ AccumulationExpression AccumulatorInternalJsReduce::parseInternalJsReduce(
             elem.type() == BSONType::Object);
     BSONObj obj = elem.embeddedObject();
 
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
     std::string funcSource;
     boost::intrusive_ptr<Expression> argument;
 
@@ -269,7 +269,7 @@ Document AccumulatorJs::serialize(boost::intrusive_ptr<Expression> initializer,
 AccumulationExpression AccumulatorJs::parse(ExpressionContext* const expCtx,
                                             BSONElement elem,
                                             VariablesParseState vps) {
-    expCtx->hasServerSideJs.accumulator = true;
+    expCtx->setServerSideJsConfigAccumulator(true);
     /*
      * {$accumulator: {
      *   init: <code>,
@@ -290,7 +290,7 @@ AccumulationExpression AccumulatorJs::parse(ExpressionContext* const expCtx,
             elem.type() == BSONType::Object);
     BSONObj obj = elem.embeddedObject();
 
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
     std::string init, accumulate, merge;
     boost::optional<std::string> finalize;
     boost::intrusive_ptr<Expression> initArgs, accumulateArgs;

@@ -123,9 +123,9 @@ class RecordId;
 class PlanStage {
 public:
     PlanStage(const char* typeName, ExpressionContext* expCtx)
-        : _commonStats(typeName, this), _opCtx(expCtx->opCtx), _expCtx(expCtx) {
+        : _commonStats(typeName, this), _opCtx(expCtx->getOperationContext()), _expCtx(expCtx) {
         invariant(expCtx);
-        if (expCtx->explain || expCtx->mayDbProfile) {
+        if (expCtx->getExplain() || expCtx->getMayDbProfile()) {
             markShouldCollectTimingInfo();
         }
     }

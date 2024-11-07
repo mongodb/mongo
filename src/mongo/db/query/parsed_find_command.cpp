@@ -337,7 +337,8 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parse(
     // A collator can enter through both the FindCommandRequest and ExpressionContext arguments.
     // This invariant ensures that both collators are the same because downstream we
     // pull the collator from only one of the ExpressionContext carrier.
-    auto collator = resolveCollator(expCtx->opCtx, params.findCommand->getCollation());
+    auto collator =
+        resolveCollator(expCtx->getOperationContext(), params.findCommand->getCollation());
     if (collator.get() && expCtx->getCollator()) {
         invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
     }
@@ -353,7 +354,8 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parseFromCount(
     const CountCommandRequest& countCommand,
     const ExtensionsCallback& extensionsCallback,
     const NamespaceString& nss) {
-    auto collator = resolveCollator(expCtx->opCtx, countCommand.getCollation().get_value_or({}));
+    auto collator = resolveCollator(expCtx->getOperationContext(),
+                                    countCommand.getCollation().get_value_or({}));
     if (collator.get() && expCtx->getCollator()) {
         invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
     }

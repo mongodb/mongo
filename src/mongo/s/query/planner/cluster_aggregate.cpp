@@ -189,7 +189,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     // reconstructed for dispatch to a new shard, which is sometimes necessary for change streams
     // pipelines.
     if (hasChangeStream) {
-        mergeCtx->originalAggregateCommand = serializeForPassthrough(mergeCtx, request).toBson();
+        mergeCtx->setOriginalAggregateCommand(serializeForPassthrough(mergeCtx, request).toBson());
     }
 
     return mergeCtx;
@@ -573,7 +573,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // TODO SERVER-81991: Determine whether this is necessary once all unsharded collections are
         // tracked as unsplittable collections in the sharding catalog.
         if ((cri && cri->cm.hasRoutingTable()) || requiresCollationForParsingUnshardedAggregate ||
-            hasChangeStream || shouldDoFLERewrite || expCtx->ns.isCollectionlessAggregateNS()) {
+            hasChangeStream || shouldDoFLERewrite ||
+            expCtx->getNamespaceString().isCollectionlessAggregateNS()) {
             pipeline->optimizePipeline();
 
             // Validate the pipeline post-optimization.
@@ -637,14 +638,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // We might need 'inRouter' temporarily set to true for query stats parsing, but we don't
         // want to modify the value of 'expCtx' for future code execution so we will set it back to
         // its original value.
-        ON_BLOCK_EXIT([&expCtx, originalInRouterVal = expCtx->inRouter]() {
-            expCtx->inRouter = originalInRouterVal;
+        ON_BLOCK_EXIT([&expCtx, originalInRouterVal = expCtx->getInRouter()]() {
+            expCtx->setInRouter(originalInRouterVal);
         });
 
         // In order to parse a change stream request for query stats, 'inRouter' needs
         // to be set to true.
         if (hasChangeStream) {
-            expCtx->inRouter = true;
+            expCtx->setInRouter(true);
         }
 
         // Skip query stats recording for queryable encryption queries.
@@ -684,22 +685,23 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }
 
     auto status = [&]() {
-        bool requestQueryStatsFromRemotes =
-            query_stats::shouldRequestRemoteMetrics(CurOp::get(expCtx->opCtx)->debug());
+        bool requestQueryStatsFromRemotes = query_stats::shouldRequestRemoteMetrics(
+            CurOp::get(expCtx->getOperationContext())->debug());
         try {
             switch (targeter.policy) {
                 case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
                     kMongosRequired: {
                     // If this is an explain write the explain output and return.
                     auto expCtx = targeter.pipeline->getContext();
-                    if (expCtx->explain) {
+                    if (expCtx->getExplain()) {
                         auto opts =
                             SerializationOptions{.verbosity = boost::make_optional(
                                                      ExplainOptions::Verbosity::kQueryPlanner)};
                         *result << "splitPipeline" << BSONNULL << "mongos"
                                 << Document{{"host",
-                                             prettyHostNameAndPort(
-                                                 expCtx->opCtx->getClient()->getLocalPort())},
+                                             prettyHostNameAndPort(expCtx->getOperationContext()
+                                                                       ->getClient()
+                                                                       ->getLocalPort())},
                                             {"stages", targeter.pipeline->writeExplainOps(opts)}};
                         return Status::OK();
                     }
@@ -732,7 +734,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
                     kSpecificShardOnly: {
                     // Mark expCtx as tailable and await data so CCC behaves accordingly.
-                    expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
+                    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
 
                     uassert(6273801,
                             "per shard cursor pipeline must contain $changeStream",
@@ -766,14 +768,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // and namespace.
         liteParsedPipeline.tickGlobalStageCounters();
 
-        if (expCtx->hasServerSideJs.accumulator && _samplerAccumulatorJs.tick()) {
+        if (expCtx->getServerSideJsConfig().accumulator && _samplerAccumulatorJs.tick()) {
             LOGV2_WARNING(
                 8996506,
                 "$accumulator is deprecated. For more information, see "
                 "https://www.mongodb.com/docs/manual/reference/operator/aggregation/accumulator/");
         }
 
-        if (expCtx->hasServerSideJs.function && _samplerFunctionJs.tick()) {
+        if (expCtx->getServerSideJsConfig().function && _samplerFunctionJs.tick()) {
             LOGV2_WARNING(
                 8996507,
                 "$function is deprecated. For more information, see "
@@ -787,8 +789,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                    cri ? boost::make_optional(cri->cm) : boost::none,
                                    involvedNamespaces);
         // Add 'command' object to explain output.
-        if (expCtx->explain) {
-            explain_common::generateQueryShapeHash(expCtx->opCtx, result);
+        if (expCtx->getExplain()) {
+            explain_common::generateQueryShapeHash(expCtx->getOperationContext(), result);
             explain_common::appendIfRoom(
                 serializeForPassthrough(expCtx, request).toBson(), "command", result);
             collectQueryStatsMongos(opCtx,

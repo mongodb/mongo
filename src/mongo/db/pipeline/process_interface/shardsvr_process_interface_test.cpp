@@ -68,7 +68,7 @@ class ShardsvrProcessInterfaceTest : public ShardedAggTestFixture {
 public:
     void setUp() override {
         ShardedAggTestFixture::setUp();
-        auto service = expCtx()->opCtx->getServiceContext();
+        auto service = expCtx()->getOperationContext()->getServiceContext();
         repl::ReplSettings settings;
 
         settings.setReplSetString("lookupTestSet/node1:12345");
@@ -93,9 +93,9 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
     WriteConcernOptions wco{WriteConcernOptions::kMajority,
                             WriteConcernOptions::SyncMode::UNSET,
                             WriteConcernOptions::kNoTimeout};
-    expCtx()->opCtx->setWriteConcern(wco);
+    expCtx()->getOperationContext()->setWriteConcern(wco);
 
-    expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
+    expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
     outStage->setSource(queue.get());
 

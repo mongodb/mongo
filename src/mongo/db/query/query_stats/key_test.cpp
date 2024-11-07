@@ -114,11 +114,12 @@ TEST_F(UniversalKeyTest, SizeOfUniversalComponents) {
 
     // Gather sizes and create universalComponents.
     const auto shapeSize = shape->size();
-    auto clientMetadata = ClientMetadata::get(expCtx->opCtx->getClient());
+    auto clientMetadata = ClientMetadata::get(expCtx->getOperationContext()->getClient());
     const auto clientMetadataSize =
         static_cast<size_t>(clientMetadata ? clientMetadata->documentWithoutMongosInfo().objsize()
                                            : BSONObj().objsize());
-    auto apiParams = std::make_unique<APIParameters>(APIParameters::get(expCtx->opCtx));
+    auto apiParams =
+        std::make_unique<APIParameters>(APIParameters::get(expCtx->getOperationContext()));
     const auto apiParamsSize = static_cast<size_t>(
         apiParams ? sizeof(*apiParams) + shape_helpers::optionalSize(apiParams->getAPIVersion())
                   : 0);
@@ -165,7 +166,7 @@ TEST_F(UniversalKeyTest, SizeOfKey) {
 
     auto keyComponents = std::make_unique<DummyKeyComponents>();
 
-    auto key = std::make_unique<DummyKey>(expCtx->opCtx,
+    auto key = std::make_unique<DummyKey>(expCtx->getOperationContext(),
                                           std::move(shape),
                                           BSONObj(),
                                           repl::ReadConcernArgs(),

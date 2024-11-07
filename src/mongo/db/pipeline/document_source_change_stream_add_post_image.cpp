@@ -128,10 +128,10 @@ NamespaceString DocumentSourceChangeStreamAddPostImage::assertValidNamespace(
             .getDocument();
     auto dbName = assertFieldHasType(namespaceObject, "db"_sd, BSONType::String);
     auto collectionName = assertFieldHasType(namespaceObject, "coll"_sd, BSONType::String);
-    NamespaceString nss(NamespaceStringUtil::deserialize(pExpCtx->ns.tenantId(),
+    NamespaceString nss(NamespaceStringUtil::deserialize(pExpCtx->getNamespaceString().tenantId(),
                                                          dbName.getString(),
                                                          collectionName.getString(),
-                                                         pExpCtx->serializationCtxt));
+                                                         pExpCtx->getSerializationContext()));
 
     // Change streams on an entire database only need to verify that the database names match. If
     // the database is 'admin', then this is a cluster-wide $changeStream and we are permitted to
@@ -139,8 +139,8 @@ NamespaceString DocumentSourceChangeStreamAddPostImage::assertValidNamespace(
     uassert(40579,
             str::stream() << "unexpected namespace during post image lookup: "
                           << nss.toStringForErrorMsg() << ", expected "
-                          << pExpCtx->ns.toStringForErrorMsg(),
-            nss == pExpCtx->ns ||
+                          << pExpCtx->getNamespaceString().toStringForErrorMsg(),
+            nss == pExpCtx->getNamespaceString() ||
                 (pExpCtx->isClusterAggregation() || pExpCtx->isDBAggregation(nss)));
 
     return nss;
@@ -193,7 +193,7 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::generatePostIm
 
     // Compute post-image.
     mutablebson::Document postImage(preImage->toBson());
-    uassertStatusOK(updateDriver.update(pExpCtx->opCtx,
+    uassertStatusOK(updateDriver.update(pExpCtx->getOperationContext(),
                                         StringData(),
                                         &postImage,
                                         false /* validateForStorage */,
@@ -224,7 +224,7 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
     // reads. Even if the lookup itself succeeded, it may not have returned any results if the
     // document was deleted in the time since the update op.
     invariant(resumeTokenData.uuid);
-    return pExpCtx->mongoProcessInterface->lookupSingleDocument(
+    return pExpCtx->getMongoProcessInterface()->lookupSingleDocument(
         pExpCtx, nss, *resumeTokenData.uuid, documentKey, std::move(readConcern));
 }
 

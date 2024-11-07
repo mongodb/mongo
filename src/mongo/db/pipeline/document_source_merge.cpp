@@ -253,18 +253,19 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "{} cannot be used in a transaction"_format(kStageName),
-            !expCtx->opCtx->inMultiDocumentTransaction());
+            !expCtx->getOperationContext()->inMultiDocumentTransaction());
 
-    uassert(
-        31319,
-        "Cannot {} to special collection: {}"_format(kStageName, outputNs.coll()),
-        !outputNs.isSystem() ||
-            (outputNs.isSystemStatsCollection() && isInternalClient(expCtx->opCtx->getClient())));
+    uassert(31319,
+            "Cannot {} to special collection: {}"_format(kStageName, outputNs.coll()),
+            !outputNs.isSystem() ||
+                (outputNs.isSystemStatsCollection() &&
+                 isInternalClient(expCtx->getOperationContext()->getClient())));
 
     uassert(31320,
             "Cannot {} to internal database: {}"_format(kStageName,
                                                         outputNs.dbName().toStringForErrorMsg()),
-            !outputNs.isOnInternalDb() || isInternalClient(expCtx->opCtx->getClient()));
+            !outputNs.isOnInternalDb() ||
+                isInternalClient(expCtx->getOperationContext()->getClient()));
 
     if (whenMatched == WhenMatched::kPipeline) {
         // If unspecified, 'letVariables' defaults to {new: "$$ROOT"}.
@@ -304,7 +305,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
             spec.type() == BSONType::String || spec.type() == BSONType::Object);
 
     auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(
-        spec, expCtx->ns.dbName(), expCtx->serializationCtxt);
+        spec, expCtx->getNamespaceString().dbName(), expCtx->getSerializationContext());
     auto targetNss = mergeSpec.getTargetNss();
     auto whenMatched =
         mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->mode : kDefaultWhenMatched;
@@ -312,7 +313,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
     auto pipeline = mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->pipeline : boost::none;
     auto fieldPaths = convertToFieldPaths(mergeSpec.getOn());
     auto [mergeOnFields, collectionPlacementVersion, supportingUniqueIndex] =
-        expCtx->mongoProcessInterface->ensureFieldsUniqueOrResolveDocumentKey(
+        expCtx->getMongoProcessInterface()->ensureFieldsUniqueOrResolveDocumentKey(
             expCtx, std::move(fieldPaths), mergeSpec.getTargetCollectionVersion(), targetNss);
 
     bool allowMergeOnNullishValues = false;
@@ -421,7 +422,7 @@ std::pair<DocumentSourceMerge::BatchObject, int> DocumentSourceMerge::makeBatchO
 
 void DocumentSourceMerge::flush(BatchedCommandRequest bcr, BatchedObjects batch) {
     try {
-        DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
+        DocumentSourceWriteBlock writeBlock(pExpCtx->getOperationContext());
         _mergeProcessor->flush(getOutputNs(), std::move(bcr), std::move(batch));
     } catch (const ExceptionFor<ErrorCodes::ImmutableField>& ex) {
         uassertStatusOKWithContext(ex.toStatus(),
@@ -459,7 +460,7 @@ BatchedCommandRequest DocumentSourceMerge::makeBatchedWriteRequest() const {
 void DocumentSourceMerge::waitWhileFailPointEnabled() {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWhileBuildingDocumentSourceMergeBatch,
-        pExpCtx->opCtx,
+        pExpCtx->getOperationContext(),
         "hangWhileBuildingDocumentSourceMergeBatch",
         []() {
             LOGV2(

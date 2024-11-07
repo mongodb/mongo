@@ -104,6 +104,9 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
                       .collator(CollatorInterface::cloneCollator(viewDef.defaultCollator()))
                       .resolvedNamespace(std::move(resolvedNamespaces))
                       .mayDbProfile(true)
+                      // The pipeline parser needs to know that we're parsing a pipeline for a view
+                      // definition to apply some additional checks.
+                      .isParsingViewDefinition(true)
                       .build();
     // If the feature compatibility version is not kLatest, and we are validating features as
     // primary, ban the use of new agg features introduced in kLatest to prevent them from being
@@ -113,12 +116,8 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
     if (serverGlobalParams.validateFeaturesAsPrimary.load() &&
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isLessThan(
             multiversion::GenericFCV::kLatest, &fcv)) {
-        expCtx->maxFeatureCompatibilityVersion = fcv;
+        expCtx->setMaxFeatureCompatibilityVersion(fcv);
     }
-
-    // The pipeline parser needs to know that we're parsing a pipeline for a view definition
-    // to apply some additional checks.
-    expCtx->isParsingViewDefinition = true;
 
     try {
         auto pipeline =

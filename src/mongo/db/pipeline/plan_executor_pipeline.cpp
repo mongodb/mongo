@@ -159,8 +159,8 @@ boost::optional<Document> PlanExecutorPipeline::_tryGetNext() try {
 
 BSONObj PlanExecutorPipeline::_trySerializeToBson(const Document& doc) try {
     // Include metadata if the output will be consumed by a merging node.
-    return _expCtx->needsMerge || _expCtx->forPerShardCursor ? doc.toBsonWithMetaData()
-                                                             : doc.toBson();
+    return _expCtx->getNeedsMerge() || _expCtx->getForPerShardCursor() ? doc.toBsonWithMetaData()
+                                                                       : doc.toBson();
 } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
     // If in a change stream pipeline, increment change stream large event failed error
     // count metric.
@@ -208,7 +208,7 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
         auto highWaterMark = PipelineD::getLatestOplogTimestamp(_pipeline.get());
         if (highWaterMark > _latestOplogTimestamp) {
             auto token = ResumeToken::makeHighWaterMarkToken(
-                highWaterMark, _pipeline->getContext()->changeStreamTokenVersion);
+                highWaterMark, _pipeline->getContext()->getChangeStreamTokenVersion());
             _postBatchResumeToken = token.toDocument().toBson();
             _latestOplogTimestamp = highWaterMark;
             _setSpeculativeReadTimestamp();
@@ -255,7 +255,7 @@ void PlanExecutorPipeline::_performResumableNaturalOrderScanAccounting() {
 
 void PlanExecutorPipeline::_setSpeculativeReadTimestamp() {
     repl::SpeculativeMajorityReadInfo& speculativeMajorityReadInfo =
-        repl::SpeculativeMajorityReadInfo::get(_expCtx->opCtx);
+        repl::SpeculativeMajorityReadInfo::get(_expCtx->getOperationContext());
     if (speculativeMajorityReadInfo.isSpeculativeRead() && !_latestOplogTimestamp.isNull()) {
         speculativeMajorityReadInfo.setSpeculativeReadTimestampForward(_latestOplogTimestamp);
     }
@@ -269,8 +269,8 @@ void PlanExecutorPipeline::_initializeResumableScanState() {
             // _latestOplogTimestamp.
             tassert(5353403,
                     "expected initialPostBatchResumeToken to be not empty",
-                    !_expCtx->initialPostBatchResumeToken.isEmpty());
-            _postBatchResumeToken = _expCtx->initialPostBatchResumeToken.getOwned();
+                    !_expCtx->getInitialPostBatchResumeToken().isEmpty());
+            _postBatchResumeToken = _expCtx->getInitialPostBatchResumeToken().getOwned();
             _latestOplogTimestamp = ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
             break;
         case ResumableScanType::kOplogScan:

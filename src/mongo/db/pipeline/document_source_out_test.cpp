@@ -86,7 +86,7 @@ public:
 class DocumentSourceOutTest : public AggregationContextFixture {
 public:
     DocumentSourceOutTest() : AggregationContextFixture() {
-        getExpCtx()->mongoProcessInterface = std::make_shared<MongoProcessInterfaceForTest>();
+        getExpCtx()->setMongoProcessInterface(std::make_shared<MongoProcessInterfaceForTest>());
     }
 
     boost::intrusive_ptr<DocumentSourceOut> createOutStage(BSONObj spec) {
@@ -218,8 +218,8 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
-    ASSERT(expCtx->ns.tenantId());
-    auto defaultDb = expCtx->ns.dbName();
+    ASSERT(expCtx->getNamespaceString().tenantId());
+    auto defaultDb = expCtx->getNamespaceString().dbName();
 
     const std::string targetColl = "target_collection";
     auto spec = BSON("$out" << targetColl);
@@ -234,14 +234,15 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
     // expCtx, and manipulate before calling outSource->serialize().
     // Assert the tenantId is not included in the serialized namespace.
     auto serialized = outSource->serialize().getDocument();
-    auto expectedDoc =
-        Document{{"coll", targetColl}, {"db", expCtx->ns.dbName().toString_forTest()}};
+    auto expectedDoc = Document{{"coll", targetColl},
+                                {"db", expCtx->getNamespaceString().dbName().toString_forTest()}};
     ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
 
     // TODO SERVER-77000: uncomment the below
-    // expCtx->serializationCtxt.setPrefixState(true);
+    // expCtx->getSerializationContext().setPrefixState(true);
     // std::string targetDb = str::stream()
-    //     << expCtx->ns.tenantId()->toString() << "_" << expCtx->ns.dbName().toString_forTest();
+    //     << expCtx->getNamespaceString().tenantId()->toString() << "_" <<
+    //     expCtx->getNamespaceString().dbName().toString_forTest();
     // serialized = outSource->serialize().getDocument();
     // expectedDoc = Document{{"coll", targetColl}, {"db", targetDb}};
     // ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
@@ -254,7 +255,7 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
     outSource = static_cast<DocumentSourceOut*>(outStage.get());
     ASSERT(outSource);
     ASSERT(outSource->getOutputNs().tenantId());
-    ASSERT_EQ(*outSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+    ASSERT_EQ(*outSource->getOutputNs().tenantId(), *expCtx->getNamespaceString().tenantId());
     ASSERT_EQ(outSource->getOutputNs().dbName().toString_forTest(), targetDb);
 
     // Assert the tenantId is not included in the serialized namespace.

@@ -267,7 +267,7 @@ public:
 
     boost::optional<ExplainOptions::Verbosity> getExplain() const {
         invariant(_expCtx);
-        return _expCtx->explain;
+        return _expCtx->getExplain();
     }
 
     void setSbeCompatible(bool sbeCompatible) {
@@ -316,7 +316,7 @@ public:
 
     OperationContext* getOpCtx() const {
         tassert(6508300, "'CanonicalQuery' does not have an 'ExpressionContext'", _expCtx);
-        return _expCtx->opCtx;
+        return _expCtx->getOperationContext();
     }
 
     auto& getExpCtx() const {
@@ -401,7 +401,7 @@ public:
     }
 
     bool isExplainAndCacheIneligible() const {
-        return getExplain() && !getExpCtxRaw()->inLookup;
+        return getExplain() && !getExpCtxRaw()->getInLookup();
     }
 
     void optimizeProjection() {

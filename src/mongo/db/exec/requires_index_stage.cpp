@@ -55,7 +55,8 @@ void RequiresIndexStage::doSaveStateRequiresCollection() {
 }
 
 void RequiresIndexStage::doRestoreStateRequiresCollection() {
-    auto desc = collectionPtr()->getIndexCatalog()->findIndexByIdent(expCtx()->opCtx, _indexIdent);
+    auto desc = collectionPtr()->getIndexCatalog()->findIndexByIdent(
+        expCtx()->getOperationContext(), _indexIdent);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
             desc);

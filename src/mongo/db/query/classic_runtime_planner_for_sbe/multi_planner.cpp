@@ -113,7 +113,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
 bool MultiPlanner::_shouldUseEofOptimization() const {
     return _multiPlanStage->bestSolutionEof() &&
         // We show SBE plan in explain.
-        !cq()->getExpCtxRaw()->explain &&
+        !cq()->getExpCtxRaw()->getExplain() &&
         // We can't use EOF optimization if pipeline is present. Because we need to execute the
         // pipeline part in SBE, we have to rebuild and rerun the whole query.
         cq()->cqPipeline().empty() &&

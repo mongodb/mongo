@@ -61,7 +61,7 @@ class MapReduceFixture : public ServiceContextMongoDTest {
 protected:
     MapReduceFixture()
         : _expCtx((new ExpressionContextForTest())), _vps(_expCtx->variablesParseState) {
-        _expCtx->mongoProcessInterface = std::make_shared<StandaloneProcessInterface>(nullptr);
+        _expCtx->setMongoProcessInterface(std::make_shared<StandaloneProcessInterface>(nullptr));
     }
 
     auto& getExpCtx() {

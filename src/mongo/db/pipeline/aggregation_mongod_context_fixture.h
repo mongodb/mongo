@@ -52,7 +52,7 @@ public:
     AggregationMongoDContextFixture(NamespaceString nss)
         : _expCtx(new ExpressionContextForTest(_opCtx.get(), nss)) {
         unittest::TempDir tempDir("AggregationMongoDContextFixture");
-        _expCtx->tempDir = tempDir.path();
+        _expCtx->setTempDir(tempDir.path());
     }
 
     auto getExpCtx() {

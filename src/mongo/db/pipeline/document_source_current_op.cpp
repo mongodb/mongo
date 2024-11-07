@@ -123,7 +123,7 @@ const char* DocumentSourceCurrentOp::getSourceName() const {
 
 DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
     if (_ops.empty()) {
-        _ops = pExpCtx->mongoProcessInterface->getCurrentOps(
+        _ops = pExpCtx->getMongoProcessInterface()->getCurrentOps(
             pExpCtx,
             _includeIdleConnections.value_or(kDefaultConnMode),
             _includeIdleSessions.value_or(kDefaultSessionMode),
@@ -133,8 +133,9 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
 
         _opsIter = _ops.begin();
 
-        if (pExpCtx->fromRouter) {
-            _shardName = pExpCtx->mongoProcessInterface->getShardName(pExpCtx->opCtx);
+        if (pExpCtx->getFromRouter()) {
+            _shardName =
+                pExpCtx->getMongoProcessInterface()->getShardName(pExpCtx->getOperationContext());
 
             uassert(40465,
                     "Aggregation request specified 'fromRouter' but unable to retrieve shard name "
@@ -144,7 +145,7 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
     }
 
     if (_opsIter != _ops.end()) {
-        if (!pExpCtx->fromRouter) {
+        if (!pExpCtx->getFromRouter()) {
             return Document(*_opsIter++);
         }
 
@@ -195,7 +196,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                           << typeName(spec.type()),
             spec.type() == BSONType::Object);
 
-    const NamespaceString& nss = pExpCtx->ns;
+    const NamespaceString& nss = pExpCtx->getNamespaceString();
 
     uassert(ErrorCodes::InvalidNamespace,
             "$currentOp must be run against the 'admin' database with {aggregate: 1}",
@@ -255,7 +256,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
         if (targetAllNodesVal) {
             uassert(ErrorCodes::FailedToParse,
                     "$currentOp supports targetAllNodes parameter only for sharded clusters",
-                    pExpCtx->fromRouter || pExpCtx->inRouter);
+                    pExpCtx->getFromRouter() || pExpCtx->getInRouter());
         }
     }
     if (currentOpSpec.getTruncateOps().has_value()) {

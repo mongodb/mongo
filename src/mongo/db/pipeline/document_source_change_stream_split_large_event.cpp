@@ -85,10 +85,10 @@ DocumentSourceChangeStreamSplitLargeEvent::createFromBson(
 
     // If there is no change stream spec set on the expression context, then this cannot be a change
     // stream pipeline. Pipeline validation will catch this issue later during parsing.
-    if (!expCtx->changeStreamSpec) {
+    if (!expCtx->getChangeStreamSpec()) {
         return new DocumentSourceChangeStreamSplitLargeEvent(expCtx, boost::none);
     }
-    return create(expCtx, *expCtx->changeStreamSpec);
+    return create(expCtx, *expCtx->getChangeStreamSpec());
 }
 
 DocumentSourceChangeStreamSplitLargeEvent::DocumentSourceChangeStreamSplitLargeEvent(
@@ -144,7 +144,8 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamSplitLargeEvent::doGetNe
     // perform this check, but the helper will also produce a new 'Document' which - if it is small
     // enough to be returned - will not need to be re-serialized by the plan executor.
     auto [eventDoc, eventBsonSize] = change_stream_split_event::processChangeEventBeforeSplit(
-        input.getDocument(), this->pExpCtx->needsMerge || this->pExpCtx->forPerShardCursor);
+        input.getDocument(),
+        this->pExpCtx->getNeedsMerge() || this->pExpCtx->getForPerShardCursor());
 
     // Make sure to leave some space for the postBatchResumeToken in the cursor response object.
     size_t tokenSize = eventDoc.metadata().getSortKey().getDocument().toBson().objsize();

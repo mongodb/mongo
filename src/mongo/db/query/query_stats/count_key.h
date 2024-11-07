@@ -49,7 +49,7 @@ public:
              const boost::optional<repl::ReadConcernArgs>& readConcern,
              bool hasMaxTimeMS,
              query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
-        : Key(expCtx->opCtx,
+        : Key(expCtx->getOperationContext(),
               std::make_unique<query_shape::CountCmdShape>(findCommand, hasLimit, hasSkip),
               findCommand.findCommandRequest->getHint(),
               readConcern,

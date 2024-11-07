@@ -106,7 +106,8 @@ public:
             opts.transformIdentifiers = false;
             opts.transformIdentifiersCallback = defaultHmacStrategy;
         }
-        return findKey.toBson(expCtx->opCtx, opts, SerializationContext::stateDefault());
+        return findKey.toBson(
+            expCtx->getOperationContext(), opts, SerializationContext::stateDefault());
     }
 
     BSONObj makeQueryStatsKeyAggregateRequest(AggregateCommandRequest acr,
@@ -129,7 +130,8 @@ public:
             opts.transformIdentifiers = false;
             opts.transformIdentifiersCallback = defaultHmacStrategy;
         }
-        return aggKey->toBson(expCtx->opCtx, opts, SerializationContext::stateDefault());
+        return aggKey->toBson(
+            expCtx->getOperationContext(), opts, SerializationContext::stateDefault());
     }
 };
 
@@ -521,7 +523,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                                                   << "tag")
                                              << BSON("some"
                                                      << "other tag")));
-    ReadPreferenceSetting::get(expCtx->opCtx) =
+    ReadPreferenceSetting::get(expCtx->getOperationContext()) =
         uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(readPreference));
     key = makeQueryStatsKeyFindRequest(fcr, expCtx, true);
 
@@ -1140,8 +1142,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     acr.setCursor(cursorOptions);
     acr.setMaxTimeMS(500);
     acr.setBypassDocumentValidation(true);
-    expCtx->opCtx->setComment(BSON("comment"
-                                   << "note to self"));
+    expCtx->getOperationContext()->setComment(BSON("comment"
+                                                   << "note to self"));
     shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1347,8 +1349,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields
 TEST_F(QueryStatsStoreTest,
        CorrectlyTokenizesAggregateCommandRequestPipelineWithSecondaryNamespaces) {
     auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
-    auto nsToUnionWith =
-        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "otherColl");
+    auto nsToUnionWith = NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "otherColl");
     expCtx->addResolvedNamespaces({nsToUnionWith});
 
     AggregateCommandRequest acr(kDefaultTestNss.nss());

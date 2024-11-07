@@ -249,14 +249,15 @@ void DocumentSourceGraphLookUp::doDispose() {
 boost::optional<ShardId> DocumentSourceGraphLookUp::computeMergeShardId() const {
     // Note that we can only check sharding state when we're on router as we may be holding
     // locks on mongod (which would inhibit looking up sharding state in the catalog cache).
-    if (pExpCtx->inRouter) {
+    if (pExpCtx->getInRouter()) {
         // Only nominate a merging shard if the outer collection is unsharded.
-        if (!pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, pExpCtx->ns)) {
-            return pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx,
-                                                                               _from);
+        if (!pExpCtx->getMongoProcessInterface()->isSharded(pExpCtx->getOperationContext(),
+                                                            pExpCtx->getNamespaceString())) {
+            return pExpCtx->getMongoProcessInterface()->determineSpecificMergeShard(
+                pExpCtx->getOperationContext(), _from);
         }
     } else {
-        auto shardId = ShardingState::get(pExpCtx->opCtx)->shardId();
+        auto shardId = ShardingState::get(pExpCtx->getOperationContext())->shardId();
         // If the command is executed on a mongos, we might get an empty shardId. We should return a
         // shardId only if it is valid (non-empty).
         if (shardId.isValid()) {
@@ -270,7 +271,7 @@ boost::optional<ShardId> DocumentSourceGraphLookUp::computeMergeShardId() const 
 
 bool DocumentSourceGraphLookUp::foreignShardedGraphLookupAllowed() const {
     const auto fcvSnapshot = serverGlobalParams.mutableFCV.acquireFCVSnapshot();
-    return !pExpCtx->opCtx->inMultiDocumentTransaction() ||
+    return !pExpCtx->getOperationContext()->inMultiDocumentTransaction() ||
         gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot);
 }
 
@@ -278,7 +279,7 @@ boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceGraphLookUp::distributedPlanLogic() {
     // If $graphLookup into a sharded foreign collection is allowed, top-level $graphLookup
     // stages can run in parallel on the shards.
-    if (foreignShardedGraphLookupAllowed() && pExpCtx->subPipelineDepth == 0) {
+    if (foreignShardedGraphLookupAllowed() && pExpCtx->getSubPipelineDepth() == 0) {
         if (getMergeShardId()) {
             return DistributedPlanLogic{nullptr, this, boost::none};
         }
@@ -297,11 +298,13 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             expectUnshardedCollectionInScope;
 
         const auto allowForeignSharded = foreignShardedGraphLookupAllowed();
-        if (!allowForeignSharded && !_fromExpCtx->inRouter) {
+        if (!allowForeignSharded && !_fromExpCtx->getInRouter()) {
             // Enforce that the foreign collection must be unsharded for $graphLookup.
             expectUnshardedCollectionInScope =
-                _fromExpCtx->mongoProcessInterface->expectUnshardedCollectionInScope(
-                    _fromExpCtx->opCtx, _fromExpCtx->ns, boost::none);
+                _fromExpCtx->getMongoProcessInterface()->expectUnshardedCollectionInScope(
+                    _fromExpCtx->getOperationContext(),
+                    _fromExpCtx->getNamespaceString(),
+                    boost::none);
         }
 
         shouldPerformAnotherQuery = false;
@@ -641,7 +644,7 @@ void DocumentSourceGraphLookUp::checkMemoryUsage() {
 void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
                                                  const SerializationOptions& opts) const {
     // Do not include tenantId in serialized 'from' namespace.
-    auto fromValue = pExpCtx->ns.isEqualDb(_from)
+    auto fromValue = pExpCtx->getNamespaceString().isEqualDb(_from)
         ? Value(opts.serializeIdentifier(_from.coll()))
         : Value(Document{
               {"db",
@@ -695,15 +698,16 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
 }
 
 void DocumentSourceGraphLookUp::detachFromOperationContext() {
-    _fromExpCtx->opCtx = nullptr;
+    _fromExpCtx->setOperationContext(nullptr);
 }
 
 void DocumentSourceGraphLookUp::reattachToOperationContext(OperationContext* opCtx) {
-    _fromExpCtx->opCtx = opCtx;
+    _fromExpCtx->setOperationContext(opCtx);
 }
 
 bool DocumentSourceGraphLookUp::validateOperationContext(const OperationContext* opCtx) const {
-    return getContext()->opCtx == opCtx && _fromExpCtx->opCtx == opCtx;
+    return getContext()->getOperationContext() == opCtx &&
+        _fromExpCtx->getOperationContext() == opCtx;
 }
 
 DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
@@ -738,7 +742,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
 
     const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_from);
     _fromExpCtx = pExpCtx->copyForSubPipeline(resolvedNamespace.ns, resolvedNamespace.uuid);
-    _fromExpCtx->inLookup = true;
+    _fromExpCtx->setInLookup(true);
 
     // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
     // we'll eventually construct from the input document.
@@ -862,7 +866,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
         }
 
         if (argName == "from") {
-            from = parseGraphLookupFromAndResolveNamespace(argument, expCtx->ns.dbName());
+            from = parseGraphLookupFromAndResolveNamespace(argument,
+                                                           expCtx->getNamespaceString().dbName());
         } else if (argName == "as") {
             as = argument.String();
         } else if (argName == "connectFromField") {
@@ -908,7 +913,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::clone(
 
 void DocumentSourceGraphLookUp::addInvolvedCollections(
     stdx::unordered_set<NamespaceString>* collectionNames) const {
-    collectionNames->insert(_fromExpCtx->ns);
+    collectionNames->insert(_fromExpCtx->getNamespaceString());
     auto introspectionPipeline = Pipeline::parse(_fromPipeline, _fromExpCtx);
     for (auto&& stage : introspectionPipeline->getSources()) {
         stage->addInvolvedCollections(collectionNames);

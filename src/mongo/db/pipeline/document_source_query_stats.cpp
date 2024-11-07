@@ -122,7 +122,7 @@ BSONObj DocumentSourceQueryStats::computeQueryStatsKey(
             return sha256HmacStringDataHasher(_hmacKey, sd);
         };
     }
-    return key->toBson(pExpCtx->opCtx, opts, serializationContext);
+    return key->toBson(pExpCtx->getOperationContext(), opts, serializationContext);
 }
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
@@ -135,7 +135,7 @@ std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    const NamespaceString& nss = pExpCtx->ns;
+    const NamespaceString& nss = pExpCtx->getNamespaceString();
 
     uassert(ErrorCodes::InvalidNamespace,
             "$queryStats must be run against the 'admin' database with {aggregate: 1}",
@@ -184,7 +184,7 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
      * We iterate over a copied container (CopiedParitition) containing the entries in
      * the partition to reduce the time under which the partition lock is held.
      */
-    auto& queryStatsStore = getQueryStatsStore(getContext()->opCtx);
+    auto& queryStatsStore = getQueryStatsStore(getContext()->getOperationContext());
 
     while (_currentCopiedPartition.isValidPartitionId(queryStatsStore.numPartitions())) {
         if (!_currentCopiedPartition.isLoaded()) {
@@ -233,7 +233,7 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
         // returning duplicate hashes if we have bugs that cause two different representative shapes
         // to re-parse into the same debug shape.
         auto representativeShapeKey =
-            key->toBson(pExpCtx->opCtx,
+            key->toBson(pExpCtx->getOperationContext(),
                         SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                         SerializationContext::stateDefault());
         // This SHA256 version of the hash is output to aid in data analytics use cases. In these
@@ -244,9 +244,9 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
         auto keyHash = SHA256Block::computeHash((const uint8_t*)representativeShapeKey.objdata(),
                                                 representativeShapeKey.objsize())
                            .toString();
-        auto queryShapeHash =
-            key->getQueryShapeHash(pExpCtx->opCtx, SerializationContext::stateDefault())
-                .toHexString();
+        auto queryShapeHash = key->getQueryShapeHash(pExpCtx->getOperationContext(),
+                                                     SerializationContext::stateDefault())
+                                  .toHexString();
         return Document{
             {"key", std::move(queryStatsKey)},
             {"keyHash", keyHash},
@@ -259,7 +259,7 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
         queryStatsHmacApplicationErrors.increment();
         const auto& hash = absl::HashOf(key);
         const auto queryShape = key->universalComponents()._queryShape->toBson(
-            pExpCtx->opCtx,
+            pExpCtx->getOperationContext(),
             SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
             SerializationContext::stateDefault());
         LOGV2_DEBUG(7349403,

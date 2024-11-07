@@ -130,7 +130,7 @@ DocumentSource::GetModPathsReturn DocumentSourceReshardingAddResumeId::getModifi
 DocumentSource::GetNextResult DocumentSourceReshardingAddResumeId::doGetNext() {
     uassert(6387804,
             str::stream() << kStageName << " cannot be executed from router",
-            !pExpCtx->inRouter);
+            !pExpCtx->getInRouter());
 
     // Get the next input document.
     auto input = pSource->getNext();

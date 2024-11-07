@@ -142,7 +142,7 @@ std::vector<double> parseP(ExpressionContext* const expCtx,
 AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const expCtx,
                                                         BSONElement elem,
                                                         VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
 
     uassert(7429703,
             str::stream() << "specification must be an object; found " << elem,
@@ -178,7 +178,7 @@ AccumulatorPercentile::parsePercentileAndMethod(ExpressionContext* expCtx,
 
 boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
     uassert(7436200,
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::Object);
@@ -310,7 +310,7 @@ intrusive_ptr<AccumulatorState> AccumulatorPercentile::create(ExpressionContext*
 AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const expCtx,
                                                     BSONElement elem,
                                                     VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
 
     uassert(7436100,
             str::stream() << "specification must be an object; found " << elem,
@@ -343,7 +343,7 @@ AccumulatorMedian::parsePercentileAndMethod(ExpressionContext* /*expCtx*/,
 boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionContext* const expCtx,
                                                                     BSONElement elem,
                                                                     VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
     uassert(7436201,
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::Object);

@@ -93,13 +93,14 @@ boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
               (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps));
     const auto sessionId = *oplogEntry.getSessionId();
 
-    auto localImageCollInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
-        pExpCtx->opCtx, NamespaceString::kConfigImagesNamespace);
+    auto localImageCollInfo = pExpCtx->getMongoProcessInterface()->getCollectionOptions(
+        pExpCtx->getOperationContext(), NamespaceString::kConfigImagesNamespace);
 
     // Extract the UUID from the collection information. We should always have a valid uuid here.
     auto imageCollUUID = invariantStatusOK(UUID::parse(localImageCollInfo["uuid"]));
-    const auto& readConcernBson = repl::ReadConcernArgs::get(pExpCtx->opCtx).toBSON();
-    auto imageDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
+    const auto& readConcernBson =
+        repl::ReadConcernArgs::get(pExpCtx->getOperationContext()).toBSON();
+    auto imageDoc = pExpCtx->getMongoProcessInterface()->lookupSingleDocument(
         pExpCtx,
         NamespaceString::kConfigImagesNamespace,
         imageCollUUID,
@@ -240,7 +241,7 @@ DocumentSource::GetModPathsReturn DocumentSourceFindAndModifyImageLookup::getMod
 DocumentSource::GetNextResult DocumentSourceFindAndModifyImageLookup::doGetNext() {
     uassert(5806001,
             str::stream() << kStageName << " cannot be executed from router",
-            !pExpCtx->inRouter);
+            !pExpCtx->getInRouter());
     if (_stashedDownconvertedDoc) {
         // Return the stashed downconverted document. This indicates that the previous document
         // returned was a forged noop image document.

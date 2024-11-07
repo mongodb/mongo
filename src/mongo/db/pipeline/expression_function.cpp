@@ -56,7 +56,7 @@ ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
       _assignFirstArgToThis(assignFirstArgToThis),
       _funcSource(std::move(funcSource)),
       _lang(std::move(lang)) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
 Value ExpressionFunction::serialize(const SerializationOptions& options) const {
@@ -76,11 +76,11 @@ Value ExpressionFunction::serialize(const SerializationOptions& options) const {
 boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* const expCtx,
                                                            BSONElement expr,
                                                            const VariablesParseState& vps) {
-    expCtx->hasServerSideJs.function = true;
+    expCtx->setServerSideJsConfigFunction(true);
 
     uassert(4660800,
             str::stream() << kExpressionName << " cannot be used inside a validator.",
-            !expCtx->isParsingCollectionValidator);
+            !expCtx->getIsParsingCollectionValidator());
 
     uassert(31260,
             str::stream() << kExpressionName

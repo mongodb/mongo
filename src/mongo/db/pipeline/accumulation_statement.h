@@ -217,7 +217,7 @@ AccumulationExpression genericParseSingleExpressionAccumulator(ExpressionContext
 template <class AccName>
 AccumulationExpression genericParseSBEUnsupportedSingleExpressionAccumulator(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
-    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
     return genericParseSingleExpressionAccumulator<AccName>(expCtx, elem, vps);
 }
 

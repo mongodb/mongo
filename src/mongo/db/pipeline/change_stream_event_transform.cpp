@@ -200,7 +200,7 @@ ResumeTokenData ChangeStreamEventTransformation::makeResumeToken(Value tsVal,
     // have surpassed all events against which it may have been compared in the original stream, at
     // which point we can begin generating tokens with our default version.
     auto version = (clusterTime > _resumeToken.clusterTime || txnOpIndex > _resumeToken.txnOpIndex)
-        ? _expCtx->changeStreamTokenVersion
+        ? _expCtx->getChangeStreamTokenVersion()
         : _resumeToken.version;
 
     // Construct and return the final resume token.
@@ -663,7 +663,8 @@ ChangeStreamEventTransformer::ChangeStreamEventTransformer(
     _defaultEventBuilder = std::make_unique<ChangeStreamDefaultEventTransformation>(expCtx, spec);
     _viewNsEventBuilder =
         std::make_unique<ChangeStreamViewDefinitionEventTransformation>(expCtx, spec);
-    _isSingleCollStream = DocumentSourceChangeStream::getChangeStreamType(expCtx->ns) ==
+    _isSingleCollStream =
+        DocumentSourceChangeStream::getChangeStreamType(expCtx->getNamespaceString()) ==
         DocumentSourceChangeStream::ChangeStreamType::kSingleCollection;
 }
 

@@ -156,13 +156,13 @@ DocumentSource::GetModPathsReturn DocumentSourceReshardingIterateTransaction::ge
 DocumentSource::GetNextResult DocumentSourceReshardingIterateTransaction::doGetNext() {
     uassert(5730301,
             str::stream() << kStageName << " cannot be executed from router",
-            !pExpCtx->inRouter);
+            !pExpCtx->getInRouter());
 
     while (true) {
         // If we're unwinding an 'applyOps' from a transaction, check if there are any documents
         // we have stored that can be returned.
         if (_txnIterator) {
-            if (auto next = _txnIterator->getNextApplyOpsTxnEntry(pExpCtx->opCtx)) {
+            if (auto next = _txnIterator->getNextApplyOpsTxnEntry(pExpCtx->getOperationContext())) {
                 return std::move(*next);
             }
 
@@ -197,8 +197,8 @@ DocumentSource::GetNextResult DocumentSourceReshardingIterateTransaction::doGetN
         // call 'getNextTransactionOp' on it. Note that is possible for the transaction iterator
         // to be empty of any relevant operations, meaning that this loop may need to execute
         // multiple times before it encounters a relevant change to return.
-        _txnIterator.emplace(pExpCtx->opCtx,
-                             pExpCtx->mongoProcessInterface,
+        _txnIterator.emplace(pExpCtx->getOperationContext(),
+                             pExpCtx->getMongoProcessInterface(),
                              doc,
                              _includeCommitTransactionTimestamp);
     }

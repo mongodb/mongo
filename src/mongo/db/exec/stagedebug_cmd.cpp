@@ -232,7 +232,7 @@ public:
                           const NamespaceString& nss,
                           std::vector<std::unique_ptr<MatchExpression>>* exprs) {
         const auto& collectionPtr = collection.getCollectionPtr();
-        OperationContext* opCtx = expCtx->opCtx;
+        OperationContext* opCtx = expCtx->getOperationContext();
 
         BSONElement firstElt = obj.firstElement();
         if (!firstElt.isABSONObj()) {

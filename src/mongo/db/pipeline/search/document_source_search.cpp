@@ -63,7 +63,7 @@ const char* DocumentSourceSearch::getSourceName() const {
 }
 
 Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {
-    if (!opts.verbosity || pExpCtx->inRouter) {
+    if (!opts.verbosity || pExpCtx->getInRouter()) {
         // When serializing $search, we only need to serialize the full mongot remote spec when
         // in a sharded scenario (i.e., when we have a metadata merge protocol verison), regardless
         // of whether we're on a router or a data-bearing node. Otherwise, we only need the mongot
@@ -100,7 +100,8 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
 }
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
-    auto executor = executor::getMongotTaskExecutor(pExpCtx->opCtx->getServiceContext());
+    auto executor =
+        executor::getMongotTaskExecutor(pExpCtx->getOperationContext()->getServiceContext());
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline;
     // 'getBoolField' returns false if the field is not present.
     bool storedSource = _spec.getMongotQuery().getBoolField(mongot_cursor::kReturnStoredSourceArg);

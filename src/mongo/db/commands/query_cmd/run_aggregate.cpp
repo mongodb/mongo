@@ -266,7 +266,7 @@ ClientCursorPin registerCursor(const AggExState& aggExState,
         ReadPreferenceSetting::get(opCtx),
         *aggExState.getDeferredCmd(),
         aggExState.getPrivileges());
-    cursorParams.setTailableMode(expCtx->tailableMode);
+    cursorParams.setTailableMode(expCtx->getTailableMode());
 
     auto pin = CursorManager::get(opCtx)->registerCursor(opCtx, std::move(cursorParams));
 
@@ -551,7 +551,7 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
     const AggExState& aggExState, std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
     std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
 
-    if (aggExState.getRequest().getExchange() && !pipeline->getContext()->explain) {
+    if (aggExState.getRequest().getExchange() && !pipeline->getContext()->getExplain()) {
         auto expCtx = pipeline->getContext();
         // The Exchange constructor deregisters the pipeline from the context. Since we need a valid
         // opCtx for the makeExpressionContext call below, store the pointer ahead of the Exchange()
@@ -572,12 +572,12 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
                                       aggExState.getRequest(),
                                       allowDiskUseByDefault.load())
                          .collator(std::move(collator))
-                         .collUUID(expCtx->uuid)
+                         .collUUID(expCtx->getUUID())
                          .mongoProcessInterface(MongoProcessInterface::create(opCtx))
                          .mayDbProfile(CurOp::get(aggExState.getOpCtx())->dbProfileLevel() > 0)
                          .resolvedNamespace(uassertStatusOK(aggExState.resolveInvolvedNamespaces()))
                          .tmpDir(storageGlobalParams.dbpath + "/_tmp")
-                         .collationMatchesDefault(expCtx->collationMatchesDefault)
+                         .collationMatchesDefault(expCtx->getCollationMatchesDefault())
                          .build();
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.
@@ -1180,14 +1180,14 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         // Start the query planning timer right after parsing.
         CurOp::get(aggExState.getOpCtx())->beginQueryPlanningTimer();
 
-        if (expCtx->hasServerSideJs.accumulator && _samplerAccumulatorJs.tick()) {
+        if (expCtx->getServerSideJsConfig().accumulator && _samplerAccumulatorJs.tick()) {
             LOGV2_WARNING(
                 8996502,
                 "$accumulator is deprecated. For more information, see "
                 "https://www.mongodb.com/docs/manual/reference/operator/aggregation/accumulator/");
         }
 
-        if (expCtx->hasServerSideJs.function && _samplerFunctionJs.tick()) {
+        if (expCtx->getServerSideJsConfig().function && _samplerFunctionJs.tick()) {
             LOGV2_WARNING(
                 8996503,
                 "$function is deprecated. For more information, see "
@@ -1198,7 +1198,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         uassert(463840,
                 "Manually setting 'runtimeConstants' is not supported. Use 'let' for user-defined "
                 "constants.",
-                expCtx->fromRouter || !aggExState.getRequest().getLegacyRuntimeConstants());
+                expCtx->getFromRouter() || !aggExState.getRequest().getLegacyRuntimeConstants());
 
         if (!aggExState.getRequest().getAllowDiskUse().value_or(true)) {
             allowDiskUseFalseCounter.increment();
@@ -1233,12 +1233,12 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
 
         if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
                 aggExState.getOpCtx(),
-                expCtx->ns,
+                expCtx->getNamespaceString(),
                 analyze_shard_key::SampledCommandNameEnum::kAggregate,
                 aggExState.getRequest())) {
             analyze_shard_key::QueryAnalysisWriter::get(aggExState.getOpCtx())
                 ->addAggregateQuery(*sampleId,
-                                    expCtx->ns,
+                                    expCtx->getNamespaceString(),
                                     pipeline->getInitialQuery(),
                                     expCtx->getCollatorBSON(),
                                     aggExState.getRequest().getLet())
@@ -1270,13 +1270,13 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     aggExState.tickGlobalStageCounters();
 
     // If both explain and cursor are specified, explain wins.
-    if (expCtx->explain) {
+    if (expCtx->getExplain()) {
         auto explainExecutor = execs[0].get();
         auto bodyBuilder = result->getBodyBuilder();
         if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
             Explain::explainPipeline(pipelineExec,
                                      true /* executePipeline */,
-                                     *(expCtx->explain),
+                                     *(expCtx->getExplain()),
                                      *aggExState.getDeferredCmd(),
                                      &bodyBuilder);
         } else {
@@ -1288,7 +1288,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
             invariant(ctx);
             Explain::explainStages(explainExecutor,
                                    collections,
-                                   *(expCtx->explain),
+                                   *(expCtx->getExplain()),
                                    BSON("optimizedPipeline" << true),
                                    SerializationContext::stateCommandReply(
                                        aggExState.getRequest().getSerializationContext()),

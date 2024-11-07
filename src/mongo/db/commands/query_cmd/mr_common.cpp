@@ -455,7 +455,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     // than _id.
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
         std::tie(shardKey, targetCollectionPlacementVersion, std::ignore) =
-            expCtx->mongoProcessInterface->ensureFieldsUniqueOrResolveDocumentKey(
+            expCtx->getMongoProcessInterface()->ensureFieldsUniqueOrResolveDocumentKey(
                 expCtx, boost::none, boost::none, outNss);
         uassert(31313,
                 "The mapReduce target collection must either be unsharded or sharded by {_id: 1} "

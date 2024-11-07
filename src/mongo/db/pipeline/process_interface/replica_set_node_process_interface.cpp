@@ -89,7 +89,7 @@ Status ReplicaSetNodeProcessInterface::insert(
     std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
     const WriteConcernOptions& wc,
     boost::optional<OID> targetEpoch) {
-    auto&& opCtx = expCtx->opCtx;
+    auto&& opCtx = expCtx->getOperationContext();
     if (_canWriteLocally(opCtx, ns)) {
         return NonShardServerProcessInterface::insert(
             expCtx, ns, std::move(insertCommand), wc, targetEpoch);
@@ -108,7 +108,7 @@ StatusWith<MongoProcessInterface::UpdateResult> ReplicaSetNodeProcessInterface::
     UpsertType upsert,
     bool multi,
     boost::optional<OID> targetEpoch) {
-    auto&& opCtx = expCtx->opCtx;
+    auto&& opCtx = expCtx->getOperationContext();
     if (_canWriteLocally(opCtx, ns)) {
         return NonShardServerProcessInterface::update(
             expCtx, ns, std::move(updateCommand), wc, upsert, multi, targetEpoch);
@@ -160,7 +160,7 @@ Status ReplicaSetNodeProcessInterface::insertTimeseries(
     std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
     const WriteConcernOptions& wc,
     boost::optional<OID> targetEpoch) {
-    if (_canWriteLocally(expCtx->opCtx, ns)) {
+    if (_canWriteLocally(expCtx->getOperationContext(), ns)) {
         return NonShardServerProcessInterface::insertTimeseries(
             expCtx, ns, std::move(insertCommand), wc, targetEpoch);
     } else {

@@ -208,11 +208,13 @@ unique_ptr<PlanStage> getIxScanPlan(ExpressionContext* expCtx,
                                     WorkingSet* sharedWs,
                                     int desiredFooValue) {
     std::vector<const IndexDescriptor*> indexes;
-    coll->getIndexCatalog()->findIndexesByKeyPattern(
-        expCtx->opCtx, BSON("foo" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
+    coll->getIndexCatalog()->findIndexesByKeyPattern(expCtx->getOperationContext(),
+                                                     BSON("foo" << 1),
+                                                     IndexCatalog::InclusionPolicy::kReady,
+                                                     &indexes);
     ASSERT_EQ(indexes.size(), 1U);
 
-    IndexScanParams ixparams(expCtx->opCtx, coll, indexes[0]);
+    IndexScanParams ixparams(expCtx->getOperationContext(), coll, indexes[0]);
     ixparams.bounds.isSimpleRange = true;
     ixparams.bounds.startKey = BSON("" << desiredFooValue);
     ixparams.bounds.endKey = BSON("" << desiredFooValue);
@@ -268,19 +270,22 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(ExpressionContext* expCtx,
         getCollScanPlan(expCtx, coll, sharedWs.get(), filter.get());
 
     // Hand the plans off to the MPS.
-    auto cq = makeCanonicalQuery(expCtx->opCtx, nss, BSON("foo" << desiredFooValue));
+    auto cq =
+        makeCanonicalQuery(expCtx->getOperationContext(), nss, BSON("foo" << desiredFooValue));
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
         expCtx,
         &coll,
         cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{expCtx->opCtx, &coll, false /* executeInSbe */});
+        plan_cache_util::ClassicPlanCacheWriter{
+            expCtx->getOperationContext(), &coll, false /* executeInSbe */});
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
     // Plan 0 aka the first plan aka the index scan should be the best.
-    NoopYieldPolicy yieldPolicy(expCtx->opCtx,
-                                expCtx->opCtx->getServiceContext()->getFastClockSource());
+    NoopYieldPolicy yieldPolicy(
+        expCtx->getOperationContext(),
+        expCtx->getOperationContext()->getServiceContext()->getFastClockSource());
     ASSERT_OK(mps->pickBestPlan(&yieldPolicy));
     ASSERT(mps->bestPlanChosen());
     ASSERT_EQUALS(getBestPlanRoot(mps.get()), ixScanRootPtr);
@@ -508,7 +513,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     }
 
     // This sets a backup plan.
-    NoopYieldPolicy yieldPolicy(_expCtx->opCtx, _clock);
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
     ASSERT_OK(mps->pickBestPlan(&yieldPolicy));
     ASSERT(mps->bestPlanChosen());
     ASSERT(mps->hasBackupPlan());
@@ -736,7 +741,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
     multiPlanStage.addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
-    AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(_expCtx->opCtx,
+    AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(_expCtx->getOperationContext(),
                                                  serviceContext()->getFastClockSource());
     const auto status = multiPlanStage.pickBestPlan(&alwaysTimeOutPolicy);
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, status);
@@ -780,7 +785,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
     multiPlanStage.addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
-    AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(_expCtx->opCtx,
+    AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(_expCtx->getOperationContext(),
                                                             serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::QueryPlanKilled,
               multiPlanStage.pickBestPlan(&alwaysPlanKilledYieldPolicy));
@@ -831,7 +836,7 @@ TEST_F(QueryStageMultiPlanTest, AddsContextDuringException) {
     multiPlanStage.addPlan(
         createQuerySolution(), std::make_unique<ThrowyPlanStage>(_expCtx.get()), sharedWs.get());
 
-    NoopYieldPolicy yieldPolicy(_expCtx->opCtx, _clock);
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
     auto status = multiPlanStage.pickBestPlan(&yieldPolicy);
     ASSERT_EQ(ErrorCodes::InternalError, status);
     ASSERT_STRING_CONTAINS(status.reason(), "error while multiplanner was selecting best plan");

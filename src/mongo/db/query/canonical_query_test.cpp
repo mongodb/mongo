@@ -312,8 +312,10 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
         "{find:'bogusns', filter:{$or:[{a:1,b:1},{a:1,c:1}]}, projection:{a:1}, sort:{b:1}, '$db': "
         "'test'}";
     auto findCommand = query_request_helper::makeFromFindCommandForTests(fromjson(cmdStr));
-    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build();
-    expCtx->explain = explain::VerbosityEnum::kQueryPlanner;
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(opCtx.get(), *findCommand)
+                      .explain(explain::VerbosityEnum::kQueryPlanner)
+                      .build();
     auto baseCq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = std::move(expCtx),
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)},
@@ -349,8 +351,10 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQueryWithSpecialFeature) {
         $db: 'test'
     })";
     auto findCommand = query_request_helper::makeFromFindCommandForTests(fromjson(cmdStr));
-    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build();
-    expCtx->explain = explain::VerbosityEnum::kQueryPlanner;
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(opCtx.get(), *findCommand)
+                      .explain(explain::VerbosityEnum::kQueryPlanner)
+                      .build();
     auto baseCq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = std::move(expCtx),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),

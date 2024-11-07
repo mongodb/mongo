@@ -65,7 +65,7 @@ void SpillableCache::verifyInCache(int id) {
 void SpillableCache::addDocument(Document input) {
     _memCache.emplace_back(MemoryUsageToken{input.getApproximateSize(), &_memTracker},
                            std::move(input));
-    if (!_memTracker.withinMemoryLimit() && _expCtx->allowDiskUse) {
+    if (!_memTracker.withinMemoryLimit() && _expCtx->getAllowDiskUse()) {
         spillToDisk();
     }
     uassert(
@@ -99,7 +99,7 @@ void SpillableCache::freeUpTo(int id) {
 }
 void SpillableCache::clear() {
     if (_diskCache) {
-        _expCtx->mongoProcessInterface->truncateRecordStore(_expCtx, _diskCache->rs());
+        _expCtx->getMongoProcessInterface()->truncateRecordStore(_expCtx, _diskCache->rs());
     }
     _memCache.clear();
     _diskWrittenIndex = 0;
@@ -112,7 +112,7 @@ void SpillableCache::writeBatchToDisk(std::vector<Record>& records) {
     // rather with the timestamp of the owning operation. We don't care about the timestamps.
     std::vector<Timestamp> timestamps(records.size());
 
-    _expCtx->mongoProcessInterface->writeRecordsToRecordStore(
+    _expCtx->getMongoProcessInterface()->writeRecordsToRecordStore(
         _expCtx, _diskCache->rs(), &records, timestamps);
 }
 void SpillableCache::spillToDisk() {
@@ -120,18 +120,18 @@ void SpillableCache::spillToDisk() {
         tassert(5643008,
                 "Exceeded memory limit and can't spill to disk. Set allowDiskUse: true to allow "
                 "spilling",
-                _expCtx->allowDiskUse);
+                _expCtx->getAllowDiskUse());
         tassert(5872800,
                 "SpillableCache attempted to write to disk in an environment which is not prepared "
                 "to do so",
-                _expCtx->opCtx->getServiceContext());
+                _expCtx->getOperationContext()->getServiceContext());
         tassert(5872801,
                 "SpillableCache attempted to write to disk in an environment without a storage "
                 "engine configured",
-                _expCtx->opCtx->getServiceContext()->getStorageEngine());
+                _expCtx->getOperationContext()->getServiceContext()->getStorageEngine());
         _usedDisk = true;
-        _diskCache =
-            _expCtx->mongoProcessInterface->createTemporaryRecordStore(_expCtx, KeyFormat::Long);
+        _diskCache = _expCtx->getMongoProcessInterface()->createTemporaryRecordStore(
+            _expCtx, KeyFormat::Long);
     }
 
     // Ensure there is sufficient disk space for spilling
@@ -182,7 +182,7 @@ Document SpillableCache::readDocumentFromDiskById(int desired) {
             str::stream() << "Attempted to read id " << desired
                           << "from disk in SpillableCache before writing",
             _diskCache && desired < _diskWrittenIndex);
-    return _expCtx->mongoProcessInterface->readRecordFromRecordStore(
+    return _expCtx->getMongoProcessInterface()->readRecordFromRecordStore(
         _expCtx, _diskCache->rs(), RecordId(desired + 1));
 }
 Document SpillableCache::readDocumentFromMemCacheById(int desired) {

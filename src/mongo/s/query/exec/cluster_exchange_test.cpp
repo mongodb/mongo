@@ -111,9 +111,9 @@ TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineEndsWithOut) {
     setupNShards(2);
 
     // For this test pretend 'kTestTargetNss' is not sharded so that we can use $out.
-    const auto originalMongoProcessInterface = expCtx()->mongoProcessInterface;
-    expCtx()->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>();
-    ON_BLOCK_EXIT([&]() { expCtx()->mongoProcessInterface = originalMongoProcessInterface; });
+    const auto originalMongoProcessInterface = expCtx()->getMongoProcessInterface();
+    expCtx()->setMongoProcessInterface(std::make_shared<StubMongoProcessInterface>());
+    ON_BLOCK_EXIT([&]() { expCtx()->setMongoProcessInterface(originalMongoProcessInterface); });
 
     auto mergePipe =
         Pipeline::create({DocumentSourceOut::create(kTestTargetNss, expCtx())}, expCtx());

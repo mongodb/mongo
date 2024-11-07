@@ -82,13 +82,13 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
     const MatchExpression* userMatch = nullptr) {
     tassert(6394401,
             "Expected changeStream spec to be present while building the oplog match filter",
-            expCtx->changeStreamSpec);
+            expCtx->getChangeStreamSpec());
 
     // Start building the oplog filter by adding predicates that apply to every entry.
     auto oplogFilter = std::make_unique<AndMatchExpression>();
     oplogFilter->add(buildTsFilter(expCtx, startFromInclusive, userMatch, backingBsonObjs));
 
-    if (!expCtx->changeStreamSpec->getShowMigrationEvents()) {
+    if (!expCtx->getChangeStreamSpec()->getShowMigrationEvents()) {
         oplogFilter->add(buildNotFromMigrateFilter(expCtx, userMatch, backingBsonObjs));
     }
 
@@ -101,8 +101,8 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
 
     // We currently do not support opening a change stream on a view namespace. So we only need to
     // add this filter when the change stream type is whole-db or whole cluster.
-    if (expCtx->changeStreamSpec->getShowExpandedEvents() &&
-        expCtx->ns.isCollectionlessAggregateNS()) {
+    if (expCtx->getChangeStreamSpec()->getShowExpandedEvents() &&
+        expCtx->getNamespaceString().isCollectionlessAggregateNS()) {
         eventFilter->add(buildViewDefinitionEventFilter(expCtx, userMatch, backingBsonObjs));
     }
 
@@ -123,7 +123,7 @@ DocumentSourceChangeStreamOplogMatch::DocumentSourceChangeStreamOplogMatch(
     : DocumentSourceInternalChangeStreamMatch(std::move(opLogMatchFilter), expCtx),
       _backingBsonObjs(std::move(backingBsonObjs)) {
     _clusterTime = clusterTime;
-    expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
+    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
 }
 
 boost::intrusive_ptr<DocumentSourceChangeStreamOplogMatch>
@@ -167,7 +167,7 @@ StageConstraints DocumentSourceChangeStreamOplogMatch::constraints(
                                  UnionRequirement::kNotAllowed,
                                  ChangeStreamRequirement::kChangeStreamStage);
     constraints.isIndependentOfAnyCollection =
-        pExpCtx->ns.isCollectionlessAggregateNS() ? true : false;
+        pExpCtx->getNamespaceString().isCollectionlessAggregateNS() ? true : false;
     return constraints;
 }
 

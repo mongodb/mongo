@@ -144,7 +144,7 @@ CollectionScanParams createCollectionScanParams(
 
     CollectionScanParams params;
     params.shouldWaitForOplogVisibility =
-        shouldWaitForOplogVisibility(expCtx->opCtx, collection, false);
+        shouldWaitForOplogVisibility(expCtx->getOperationContext(), collection, false);
     params.resumeAfterRecordId = resumeAfterRecordId;
     params.minRecord = minRecord;
     params.maxRecord = maxRecord;
@@ -540,13 +540,14 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
     invariant(collection);
     invariant(descriptor);
 
-    IndexScanParams params(expCtx->opCtx, collection, descriptor);
+    IndexScanParams params(expCtx->getOperationContext(), collection, descriptor);
     params.direction = direction;
     params.bounds.isSimpleRange = true;
     params.bounds.startKey = startKey;
     params.bounds.endKey = endKey;
     params.bounds.boundInclusion = boundInclusion;
-    params.shouldDedup = descriptor->getEntry()->isMultikey(expCtx->opCtx, collection);
+    params.shouldDedup =
+        descriptor->getEntry()->isMultikey(expCtx->getOperationContext(), collection);
 
     std::unique_ptr<PlanStage> root =
         std::make_unique<IndexScan>(expCtx.get(), coll, std::move(params), ws, nullptr);

@@ -226,7 +226,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     bsonPipeline.push_back(unwind(prefix));
     bsonPipeline.push_back(addScoreField(prefix, rankConstant));
 
-    auto collName = expCtx->ns.coll();
+    auto collName = expCtx->getNamespaceString().coll();
 
     BSONObj inputToUnionWith =
         BSON("$unionWith" << BSON("coll" << collName << "pipeline" << bsonPipeline));

@@ -62,7 +62,7 @@ REGISTER_DOCUMENT_SOURCE(listSampledQueries,
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFromBson(
     BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    const NamespaceString& nss = pExpCtx->ns;
+    const NamespaceString& nss = pExpCtx->getNamespaceString();
     uassert(ErrorCodes::InvalidNamespace,
             "$listSampledQueries must be run against the 'admin' database with {aggregate: 1}",
             nss.isAdminDB() && nss.isCollectionlessAggregateNS());

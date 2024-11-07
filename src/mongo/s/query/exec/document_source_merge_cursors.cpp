@@ -111,14 +111,14 @@ void DocumentSourceMergeCursors::populateMerger() {
     tassert(9535002, "_armParams must be set", _armParams);
 
     _blockingResultsMerger.emplace(
-        pExpCtx->opCtx,
+        pExpCtx->getOperationContext(),
         std::move(*_armParams),
-        pExpCtx->mongoProcessInterface->taskExecutor,
+        pExpCtx->getMongoProcessInterface()->taskExecutor,
         // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code which
         // relies on this parameter does not distinguish/care about the difference so we simply
         // always pass 'aggregate'.
-        ResourceYielderFactory::get(*pExpCtx->opCtx->getService())
-            .make(pExpCtx->opCtx, "aggregate"_sd));
+        ResourceYielderFactory::get(*pExpCtx->getOperationContext()->getService())
+            .make(pExpCtx->getOperationContext(), "aggregate"_sd));
     _armParams = boost::none;
     // '_blockingResultsMerger' now owns the cursors.
     _ownCursors = false;
@@ -126,8 +126,9 @@ void DocumentSourceMergeCursors::populateMerger() {
 
 std::unique_ptr<RouterStageMerge> DocumentSourceMergeCursors::convertToRouterStage() {
     tassert(9535003, "Expected conversion to happen before execution", !_blockingResultsMerger);
-    return std::make_unique<RouterStageMerge>(
-        pExpCtx->opCtx, pExpCtx->mongoProcessInterface->taskExecutor, std::move(*_armParams));
+    return std::make_unique<RouterStageMerge>(pExpCtx->getOperationContext(),
+                                              pExpCtx->getMongoProcessInterface()->taskExecutor,
+                                              std::move(*_armParams));
 }
 
 DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
@@ -135,7 +136,7 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
         populateMerger();
     }
 
-    auto next = uassertStatusOK(_blockingResultsMerger->next(pExpCtx->opCtx));
+    auto next = uassertStatusOK(_blockingResultsMerger->next(pExpCtx->getOperationContext()));
     _stats.dataBearingNodeMetrics.add(_blockingResultsMerger->takeMetrics());
     if (next.isEOF()) {
         return GetNextResult::makeEOF();
@@ -160,8 +161,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
     auto ownedObj = elem.embeddedObject().getOwned();
     auto armParams = AsyncResultsMergerParams::parse(
         IDLParserContext(kStageName,
-                         auth::ValidatedTenancyScope::get(expCtx->opCtx),
-                         expCtx->ns.tenantId(),
+                         auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
+                         expCtx->getNamespaceString().tenantId(),
                          SerializationContext::stateDefault()),
         ownedObj);
     return new DocumentSourceMergeCursors(expCtx, std::move(armParams), std::move(ownedObj));
@@ -187,10 +188,10 @@ void DocumentSourceMergeCursors::reattachToOperationContext(OperationContext* op
 void DocumentSourceMergeCursors::doDispose() {
     if (_blockingResultsMerger) {
         tassert(9535005, "_ownCursors must not be set", !_ownCursors);
-        _blockingResultsMerger->kill(pExpCtx->opCtx);
+        _blockingResultsMerger->kill(pExpCtx->getOperationContext());
     } else if (_ownCursors) {
         populateMerger();
-        _blockingResultsMerger->kill(pExpCtx->opCtx);
+        _blockingResultsMerger->kill(pExpCtx->getOperationContext());
     }
 }
 

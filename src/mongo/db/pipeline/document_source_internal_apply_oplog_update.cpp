@@ -90,7 +90,7 @@ DocumentSource::GetNextResult DocumentSourceInternalApplyOplogUpdate::doGetNext(
 
     // Use _updateDriver to apply the update to the document.
     mutablebson::Document doc(next.getDocument().toBson());
-    uassertStatusOK(_updateDriver.update(pExpCtx->opCtx,
+    uassertStatusOK(_updateDriver.update(pExpCtx->getOperationContext(),
                                          StringData(),
                                          &doc,
                                          false /* validateForStorage */,

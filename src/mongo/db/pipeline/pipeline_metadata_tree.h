@@ -205,8 +205,9 @@ inline auto makeStage(
     const std::function<T(const T&)>& reshapeContents,
     const DocumentSource& source,
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator) {
-    auto contents = (previous) ? reshapeContents(previous.get().contents)
-                               : findStageContents(source.getContext()->ns, initialStageContents);
+    auto contents = (previous)
+        ? reshapeContents(previous.get().contents)
+        : findStageContents(source.getContext()->getNamespaceString(), initialStageContents);
 
     auto [additionalChildren, offTheEndContents] =
         makeAdditionalChildren(initialStageContents, source, propagator, contents);
@@ -298,8 +299,9 @@ inline std::pair<boost::optional<Stage<T>>, T> makeTree(
     // For empty pipelines, there's no Stage<T> to return and the output schema is the same as the
     // input schema.
     if (pipeline.getSources().empty()) {
-        return std::pair(boost::none,
-                         findStageContents(pipeline.getContext()->ns, initialStageContents));
+        return std::pair(
+            boost::none,
+            findStageContents(pipeline.getContext()->getNamespaceString(), initialStageContents));
     }
 
     auto&& [finalStage, reshaper] =

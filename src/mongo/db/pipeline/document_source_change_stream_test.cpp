@@ -136,8 +136,8 @@ public:
     ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
     explicit ChangeStreamStageTestNoSetup(NamespaceString nsString)
         : AggregationContextFixture(nsString) {
-        getExpCtx()->mongoProcessInterface =
-            std::make_unique<ExecutableStubMongoProcessInterface>();
+        getExpCtx()->setMongoProcessInterface(
+            std::make_unique<ExecutableStubMongoProcessInterface>());
     };
 };
 
@@ -232,14 +232,15 @@ class ChangeStreamStageTest : public ChangeStreamStageTestNoSetup {
 public:
     ChangeStreamStageTest() : ChangeStreamStageTest(nss) {
         // Initialize the UUID on the ExpressionContext, to allow tests with a resumeToken.
-        getExpCtx()->uuid = testUuid();
+        getExpCtx()->setUUID(testUuid());
     };
 
     explicit ChangeStreamStageTest(NamespaceString nsString)
         : ChangeStreamStageTestNoSetup(nsString) {
-        repl::ReplicationCoordinator::set(getExpCtx()->opCtx->getServiceContext(),
-                                          std::make_unique<repl::ReplicationCoordinatorMock>(
-                                              getExpCtx()->opCtx->getServiceContext()));
+        repl::ReplicationCoordinator::set(
+            getExpCtx()->getOperationContext()->getServiceContext(),
+            std::make_unique<repl::ReplicationCoordinatorMock>(
+                getExpCtx()->getOperationContext()->getServiceContext()));
     }
 
     void checkTransformation(const OplogEntry& entry,
@@ -252,8 +253,8 @@ public:
         vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry.getEntry().toBSON(), spec);
         auto lastStage = stages.back();
 
-        getExpCtx()->mongoProcessInterface =
-            std::make_unique<MockMongoInterface>(transactionEntries, std::move(documentsForLookup));
+        getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+            transactionEntries, std::move(documentsForLookup)));
 
         if (expectedErrorCode) {
             ASSERT_THROWS_CODE(lastStage->getNext(),
@@ -301,7 +302,7 @@ public:
         std::list<intrusive_ptr<DocumentSource>> result =
             DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
         std::vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
-        getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>();
+        getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
 
         // This match stage is a DocumentSourceChangeStreamOplogMatch, which we explicitly disallow
         // from executing as a safety mechanism, since it needs to use the collection-default
@@ -439,8 +440,9 @@ public:
     std::unique_ptr<Pipeline, PipelineDeleter> buildTestPipeline(
         const std::vector<BSONObj>& rawPipeline) {
         auto expCtx = getExpCtx();
-        expCtx->ns = NamespaceString::createNamespaceString_forTest(boost::none, "a.collection");
-        expCtx->inRouter = true;
+        expCtx->setNamespaceString(
+            NamespaceString::createNamespaceString_forTest(boost::none, "a.collection"));
+        expCtx->setInRouter(true);
 
         auto pipeline = Pipeline::parse(rawPipeline, expCtx);
         pipeline->optimizePipeline();
@@ -527,10 +529,11 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfter
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     {
-        Lock::GlobalWrite lk(expCtx->opCtx);
+        Lock::GlobalWrite lk(expCtx->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-        CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(expCtx->opCtx, std::move(collection), /*ts=*/boost::none);
+        CollectionCatalog::write(expCtx->getOperationContext(), [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(
+                expCtx->getOperationContext(), std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -549,7 +552,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfter
 
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAfterAndResumeAfterOptions) {
     auto expCtx = getExpCtx();
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
 
     // Need to put the collection in the collection catalog so the resume token is validcollection
     {
@@ -580,7 +583,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAfterAndResumeAfterOptions) {
 
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndStartAfterOptions) {
     auto expCtx = getExpCtx();
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     {
@@ -606,7 +609,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndStartAfterO
 
 TEST_F(ChangeStreamStageTest, ShouldRejectResumeAfterWithResumeTokenMissingUUID) {
     auto expCtx = getExpCtx();
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     {
@@ -638,8 +641,8 @@ TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
 
 TEST_F(ChangeStreamStageTest, CannotCreateStageForSystemCollection) {
     auto expressionContext = getExpCtx();
-    expressionContext->ns =
-        NamespaceString::createNamespaceString_forTest("db", "system.namespace");
+    expressionContext->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest("db", "system.namespace"));
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: false}}");
     ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
@@ -648,9 +651,9 @@ TEST_F(ChangeStreamStageTest, CannotCreateStageForSystemCollection) {
 
 TEST_F(ChangeStreamStageTest, CanCreateStageForSystemCollectionWhenAllowToRunOnSystemNSIsTrue) {
     auto expressionContext = getExpCtx();
-    expressionContext->ns =
-        NamespaceString::createNamespaceString_forTest("db", "system.namespace");
-    expressionContext->inRouter = false;
+    expressionContext->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest("db", "system.namespace"));
+    expressionContext->setInRouter(false);
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: true}}");
     DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
 }
@@ -658,9 +661,9 @@ TEST_F(ChangeStreamStageTest, CanCreateStageForSystemCollectionWhenAllowToRunOnS
 TEST_F(ChangeStreamStageTest,
        CannotCreateStageForSystemCollectionWhenAllowToRunOnSystemNSIsTrueAndInMongos) {
     auto expressionContext = getExpCtx();
-    expressionContext->ns =
-        NamespaceString::createNamespaceString_forTest("db", "system.namespace");
-    expressionContext->inRouter = true;
+    expressionContext->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest("db", "system.namespace"));
+    expressionContext->setInRouter(true);
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: true}}");
     ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
@@ -674,7 +677,7 @@ TEST_F(ChangeStreamStageTest, CanCreateStageForNonSystemCollection) {
 
 TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
     auto expCtx = getExpCtx();
-    expCtx->inRouter = true;
+    expCtx->setInRouter(true);
     auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
 
     ASSERT_THROWS_CODE(
@@ -1376,7 +1379,7 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
         {DSChangeStream::kOperationDescriptionField, opDesc},
     };
 
-    getExpCtx()->needsMerge = true;
+    getExpCtx()->setNeedsMerge(true);
 
     checkTransformation(newShardDetected, expectedNewShardDetected, kShowExpandedEventsSpec);
 }
@@ -1427,7 +1430,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
         "{$changeStream: {showMigrationEvents: true, allowToRunOnSystemNS: true, "
         "showExpandedEvents: true}}");
     auto expCtx = getExpCtx();
-    expCtx->ns = temporaryNs;
+    expCtx->setNamespaceString(temporaryNs);
 
     const auto opDesc = V{D{{"reshardingUUID", reshardingUuid}}};
     Document expectedReshardingDoneCatchUp{
@@ -1731,8 +1734,8 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-        std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1});
+    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+        std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
     // applyOps entries.
@@ -1901,12 +1904,12 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface =
+    getExpCtx()->setMongoProcessInterface(
         std::make_unique<MockMongoInterface>(std::vector<repl::OplogEntry>{transactionEntry5,
                                                                            transactionEntry4,
                                                                            transactionEntry3,
                                                                            transactionEntry2,
-                                                                           transactionEntry1});
+                                                                           transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
     // applyOps entries.
@@ -1994,8 +1997,8 @@ TEST_F(ChangeStreamStageTest, TransactionWithOnlyEmptyOplogEntries) {
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-        std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1});
+    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+        std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
     // applyOps entries.
@@ -2089,8 +2092,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-        std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1});
+    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+        std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
     // applyOps entries.
@@ -2235,8 +2238,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-        std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1});
+    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+        std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1}));
 
     // We should get two documents from the change stream, based on the documents in the non-empty
     // applyOps entry.
@@ -2531,14 +2534,14 @@ TEST_F(ChangeStreamStageTest, DSCSTransformStageEmptySpecSerializeResumeAfter) {
     auto originalSpec = BSON(DSChangeStream::kStageName << BSONObj());
 
     // Verify that the 'initialPostBatchResumeToken' is populated while parsing.
-    ASSERT(expCtx->initialPostBatchResumeToken.isEmpty());
+    ASSERT(expCtx->getInitialPostBatchResumeToken().isEmpty());
     ON_BLOCK_EXIT([&expCtx] {
         // Reset for the next run.
-        expCtx->initialPostBatchResumeToken = BSONObj();
+        expCtx->setInitialPostBatchResumeToken(BSONObj());
     });
 
     auto result = DSChangeStream::createFromBson(originalSpec.firstElement(), expCtx);
-    ASSERT(!expCtx->initialPostBatchResumeToken.isEmpty());
+    ASSERT(!expCtx->getInitialPostBatchResumeToken().isEmpty());
 
     vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
     ASSERT_EQ(allStages.size(), 6);
@@ -2566,15 +2569,15 @@ TEST_F(ChangeStreamStageTest, DSCSTransformStageWithResumeTokenSerialize) {
     auto originalSpec = BSON("" << spec.toBSON());
 
     // Verify that the 'initialPostBatchResumeToken' is populated while parsing.
-    ASSERT(expCtx->initialPostBatchResumeToken.isEmpty());
+    ASSERT(expCtx->getInitialPostBatchResumeToken().isEmpty());
     ON_BLOCK_EXIT([&expCtx] {
         // Reset for the next run.
-        expCtx->initialPostBatchResumeToken = BSONObj();
+        expCtx->setInitialPostBatchResumeToken(BSONObj());
     });
 
     auto stage =
         DocumentSourceChangeStreamTransform::createFromBson(originalSpec.firstElement(), expCtx);
-    ASSERT(!expCtx->initialPostBatchResumeToken.isEmpty());
+    ASSERT(!expCtx->getInitialPostBatchResumeToken().isEmpty());
 
     vector<Value> serialization;
     stage->serializeToArray(serialization);
@@ -2727,12 +2730,13 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2FieldIn
     const auto uuid = testUuid();
 
     {
-        Lock::GlobalWrite lk(getExpCtx()->opCtx);
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
-        });
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
     }
 
 
@@ -2774,12 +2778,13 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldUseO2FieldInOplog) {
     const auto uuid = testUuid();
 
     {
-        Lock::GlobalWrite lk(getExpCtx()->opCtx);
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
-        });
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
     }
 
 
@@ -2820,12 +2825,13 @@ TEST_F(ChangeStreamStageTest, ResumeAfterFailsIfResumeTokenDoesNotContainUUID) {
     const Timestamp ts(3, 45);
 
     {
-        Lock::GlobalWrite lk(getExpCtx()->opCtx);
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
-        });
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
     }
 
     // Create a resume token from only the timestamp.
@@ -2891,11 +2897,11 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     {
-        Lock::GlobalWrite lk(getExpCtx()->opCtx);
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-        CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
+        CollectionCatalog::write(expCtx->getOperationContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -2925,9 +2931,9 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
 
     auto stages = makeStages(insert.getEntry().toBSON(), kDefaultSpec);
 
-    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>();
+    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
 
-    getExpCtx()->needsMerge = false;
+    getExpCtx()->setNeedsMerge(false);
 
     auto next = stages.back()->getNext();
 
@@ -3394,12 +3400,13 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2Field
     const auto uuid = testUuid();
 
     {
-        Lock::GlobalWrite lk(getExpCtx()->opCtx);
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
-        });
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
     }
 
     BSONObj docKey = BSON("_id" << 1 << "shardKey" << 2);
@@ -3436,12 +3443,13 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldUseO2FieldInOplog) {
     const auto uuid = testUuid();
 
     {
-        Lock::GlobalWrite lk(getExpCtx()->opCtx);
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
-        });
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
     }
 
     BSONObj docKey = BSON("_id" << 1);
@@ -3478,11 +3486,11 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     {
-        Lock::GlobalWrite lk(getExpCtx()->opCtx);
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-        CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
+        CollectionCatalog::write(expCtx->getOperationContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
+                getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
         });
     }
 
@@ -3506,12 +3514,13 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabase) {
     const auto uuid = testUuid();
 
     {
-        Lock::GlobalWrite lk(getExpCtx()->opCtx);
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
-        });
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
     }
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
@@ -3544,12 +3553,13 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
     const auto uuid = testUuid();
 
     {
-        Lock::GlobalWrite lk(getExpCtx()->opCtx);
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                getExpCtx()->opCtx, std::move(collection), /*ts=*/boost::none);
-        });
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
     }
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
@@ -4395,8 +4405,8 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1HighWaterMark) {
     ResumeTokenData resumeToken = ResumeToken::makeHighWaterMarkToken(resumeTs, 2).getData();
     resumeToken.version = 1;
     auto expCtx = getExpCtxRaw();
-    expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS(
-        DatabaseName::createDatabaseName_forTest(boost::none, "unittests"));
+    expCtx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "unittests")));
 
     // Create a change stream spec that resumes after 'resumeToken'.
     const auto spec =

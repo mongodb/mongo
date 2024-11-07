@@ -88,8 +88,8 @@ using DocumentSourceGroupTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
     auto expCtx = getExpCtx();
-    expCtx->inRouter = true;  // Disallow external sort.
-                              // This is the only way to do this in a debug build.
+    expCtx->setInRouter(true);  // Disallow external sort.
+                                // This is the only way to do this in a debug build.
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
     auto accumulatorArg = BSON("" << 1);
     auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
@@ -123,8 +123,8 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
 
     // Allow the $group stage to spill to disk.
     unittest::TempDir tempDir("DocumentSourceGroupTest");
-    expCtx->tempDir = tempDir.path();
-    expCtx->allowDiskUse = true;
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
     const size_t maxMemoryUsageBytes = 1000;
 
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$push");
@@ -167,8 +167,8 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
 TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSetIsTooLarge) {
     auto expCtx = getExpCtx();
     const size_t maxMemoryUsageBytes = 1000;
-    expCtx->inRouter = true;  // Disallow external sort.
-                              // This is the only way to do this in a debug build.
+    expCtx->setInRouter(true);  // Disallow external sort.
+                                // This is the only way to do this in a debug build.
 
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$push");
     auto accumulatorArg = BSON(""
@@ -193,8 +193,8 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
 TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto expCtx = getExpCtx();
     const size_t maxMemoryUsageBytes = 1000;
-    expCtx->inRouter = true;  // Disallow external sort.
-                              // This is the only way to do this in a debug build.
+    expCtx->setInRouter(true);  // Disallow external sort.
+                                // This is the only way to do this in a debug build.
 
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$push");
     auto accumulatorArg = BSON(""
@@ -375,7 +375,7 @@ TEST_F(DocumentSourceGroupTest, CanHandleEmptyExpressionObject) {
 
 TEST_F(DocumentSourceGroupTest, CanOutputExectionStatsExplainWithoutProcessingDocuments) {
     auto expCtx = getExpCtx();
-    expCtx->explain = ExplainOptions::Verbosity::kExecStats;
+    expCtx->setExplain(ExplainOptions::Verbosity::kExecStats);
 
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
     auto accumulatorArg = BSON("" << 1);
@@ -387,7 +387,7 @@ TEST_F(DocumentSourceGroupTest, CanOutputExectionStatsExplainWithoutProcessingDo
     group->dispose();
 
     SerializationOptions explainOpts;
-    explainOpts.verbosity = expCtx->explain;
+    explainOpts.verbosity = expCtx->getExplain();
     ASSERT_DOCUMENT_EQ(Document(fromjson(
                            R"({
                             $group: {
@@ -491,12 +491,13 @@ protected:
                 _opCtx.get(),
                 AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns),
                                         std::vector<mongo::BSONObj>()));
-        expressionContext->allowDiskUse = true;
+        expressionContext->setAllowDiskUse(true);
         // For $group, 'inShard' implies 'fromRouter' and 'needsMerge'.
-        expressionContext->fromRouter = expressionContext->needsMerge = inShard;
-        expressionContext->inRouter = inRouter;
+        expressionContext->setFromRouter(inShard);
+        expressionContext->setNeedsMerge(inShard);
+        expressionContext->setInRouter(inRouter);
         // Won't spill to disk properly if it needs to.
-        expressionContext->tempDir = _tempDir.path();
+        expressionContext->setTempDir(_tempDir.path());
 
         _group = createFromBson(specElement, expressionContext);
         assertRoundTrips(_group, expressionContext);

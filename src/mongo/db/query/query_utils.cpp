@@ -95,8 +95,8 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
     auto expCtx = cq->getExpCtxRaw();
 
     // If we don't support all expressions used or the query is eligible for IDHack, don't use SBE.
-    if (!expCtx || expCtx->sbeCompatibility == SbeCompatibility::notCompatible ||
-        expCtx->sbePipelineCompatibility == SbeCompatibility::notCompatible ||
+    if (!expCtx || expCtx->getSbeCompatibility() == SbeCompatibility::notCompatible ||
+        expCtx->getSbePipelineCompatibility() == SbeCompatibility::notCompatible ||
         (*collection && isIdHackEligibleQuery(*collection, *cq))) {
         return false;
     }
@@ -123,8 +123,8 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
 
     // Queries against the oplog or a change collection are not supported. Also queries on the inner
     // side of a $lookup are not considered for SBE except search queries.
-    if ((expCtx->inLookup && !cq->isSearchQuery()) || nss.isOplog() || nss.isChangeCollection() ||
-        !cq->metadataDeps().none()) {
+    if ((expCtx->getInLookup() && !cq->isSearchQuery()) || nss.isOplog() ||
+        nss.isChangeCollection() || !cq->metadataDeps().none()) {
         return false;
     }
 

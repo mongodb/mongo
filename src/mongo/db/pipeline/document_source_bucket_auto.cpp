@@ -173,9 +173,9 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
     if (!_sorter) {
         SortOptions opts;
         opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
-        if (pExpCtx->allowDiskUse && !pExpCtx->inRouter) {
+        if (pExpCtx->getAllowDiskUse() && !pExpCtx->getInRouter()) {
             opts.extSortAllowed = true;
-            opts.tempDir = pExpCtx->tempDir;
+            opts.tempDir = pExpCtx->getTempDir();
         }
         const auto& valueCmp = pExpCtx->getValueComparator();
         auto comparator = [valueCmp](const Value& lhs, const Value& rhs) {
@@ -520,7 +520,7 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
     boost::optional<int> numBuckets;
     boost::intrusive_ptr<GranularityRounder> granularityRounder;
 
-    pExpCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    pExpCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     for (auto&& argument : elem.Obj()) {
         const auto argName = argument.fieldNameStringData();
         if ("groupBy" == argName) {

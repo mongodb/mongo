@@ -89,7 +89,8 @@ DocumentSourceOut::~DocumentSourceOut() {
         // Errors are ignored here because nothing can be done about them. Additionally, if
         // this fails and the collection is left behind, it will be cleaned up next time the
         // server is started.
-        auto cleanupClient = pExpCtx->opCtx->getService()->makeClient("$out_replace_coll_cleanup");
+        auto cleanupClient =
+            pExpCtx->getOperationContext()->getService()->makeClient("$out_replace_coll_cleanup");
         AlternativeClientRegion acr(cleanupClient);
 
         // Create a new operation context so that any interrupts on the current operation
@@ -98,7 +99,7 @@ DocumentSourceOut::~DocumentSourceOut() {
         DocumentSourceWriteBlock writeBlock(cleanupOpCtx.get());
         auto dropCollectionCmd = [&](NamespaceString dropNs) {
             try {
-                pExpCtx->mongoProcessInterface->dropTempCollection(cleanupOpCtx.get(), dropNs);
+                pExpCtx->getMongoProcessInterface()->dropTempCollection(cleanupOpCtx.get(), dropNs);
             } catch (const DBException& e) {
                 LOGV2_WARNING(7466203,
                               "Unexpected error dropping temporary collection; drop will complete "
@@ -118,7 +119,7 @@ DocumentSourceOut::~DocumentSourceOut() {
                 // TODO SERVER-92272 Update this to only drop the collection iff a time-series view
                 // doesn't exist.
                 if (_timeseries) {
-                    auto collType = pExpCtx->mongoProcessInterface->getCollectionType(
+                    auto collType = pExpCtx->getMongoProcessInterface()->getCollectionType(
                         cleanupOpCtx.get(), getOutputNs());
                     if (collType != query_shape::CollectionType::kTimeseries) {
                         dropCollectionCmd(getOutputNs().makeTimeseriesBucketsNamespace());
@@ -215,8 +216,8 @@ boost::optional<TimeseriesOptions> DocumentSourceOut::validateTimeseries() {
         // didn't know we will be writing a time-series collection.
         if (targetTSOpts) {
             _originalOutOptions =
-                pExpCtx->mongoProcessInterface
-                    ->getCollectionOptions(pExpCtx->opCtx,
+                pExpCtx->getMongoProcessInterface()
+                    ->getCollectionOptions(pExpCtx->getOperationContext(),
                                            getOutputNs().makeTimeseriesBucketsNamespace())
                     .removeField("uuid");
         }
@@ -230,7 +231,8 @@ boost::optional<TimeseriesOptions> DocumentSourceOut::validateTimeseries() {
     uassert(7268700,
             "Cannot create a time-series collection from a non time-series collection or view.",
             targetTSOpts ||
-                pExpCtx->mongoProcessInterface->getCollectionType(pExpCtx->opCtx, getOutputNs()) ==
+                pExpCtx->getMongoProcessInterface()->getCollectionType(
+                    pExpCtx->getOperationContext(), getOutputNs()) ==
                     query_shape::CollectionType::kNonExistent);
 
     // If the user did specify 'timeseries' options and the target namespace is a time-series
@@ -268,11 +270,11 @@ void DocumentSourceOut::createTemporaryCollection() {
     // Set the enum state to 'kTmpCollExists' first, because 'createTempCollection' can throw
     // after constructing the collection.
     _tmpCleanUpState = OutCleanUpProgress::kTmpCollExists;
-    pExpCtx->mongoProcessInterface->createTempCollection(
-        pExpCtx->opCtx, _tempNs, createCommandOptions.done(), targetShard);
+    pExpCtx->getMongoProcessInterface()->createTempCollection(
+        pExpCtx->getOperationContext(), _tempNs, createCommandOptions.done(), targetShard);
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &outWaitAfterTempCollectionCreation,
-        pExpCtx->opCtx,
+        pExpCtx->getOperationContext(),
         "outWaitAfterTempCollectionCreation",
         []() {
             LOGV2(20901,
@@ -281,7 +283,7 @@ void DocumentSourceOut::createTemporaryCollection() {
 }
 
 void DocumentSourceOut::initialize() {
-    DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
+    DocumentSourceWriteBlock writeBlock(pExpCtx->getOperationContext());
     // We will create a temporary collection with the same indexes and collection options as the
     // target collection if it exists. We will write all results into a temporary collection, then
     // rename the temporary collection to be the target collection once we are done.
@@ -292,15 +294,18 @@ void DocumentSourceOut::initialize() {
         // namespace.
         _originalOutOptions =
             // The uuid field is considered an option, but cannot be passed to createCollection.
-            pExpCtx->mongoProcessInterface
-                ->getCollectionOptions(pExpCtx->opCtx, makeBucketNsIfTimeseries(getOutputNs()))
+            pExpCtx->getMongoProcessInterface()
+                ->getCollectionOptions(pExpCtx->getOperationContext(),
+                                       makeBucketNsIfTimeseries(getOutputNs()))
                 .removeField("uuid");
 
         // Use '_originalOutOptions' to correctly determine if we are writing to a time-series
         // collection.
         _timeseries = validateTimeseries();
-        _originalIndexes = pExpCtx->mongoProcessInterface->getIndexSpecs(
-            pExpCtx->opCtx, makeBucketNsIfTimeseries(getOutputNs()), false /* includeBuildUUIDs */);
+        _originalIndexes = pExpCtx->getMongoProcessInterface()->getIndexSpecs(
+            pExpCtx->getOperationContext(),
+            makeBucketNsIfTimeseries(getOutputNs()),
+            false /* includeBuildUUIDs */);
 
         // Check if it's capped to make sure we have a chance of succeeding before we do all the
         // work. If the collection becomes capped during processing, the collection options will
@@ -338,8 +343,8 @@ void DocumentSourceOut::initialize() {
     try {
         std::vector<BSONObj> tempNsIndexes = {std::begin(_originalIndexes),
                                               std::end(_originalIndexes)};
-        pExpCtx->mongoProcessInterface->createIndexesOnEmptyCollection(
-            pExpCtx->opCtx, _tempNs, tempNsIndexes);
+        pExpCtx->getMongoProcessInterface()->createIndexesOnEmptyCollection(
+            pExpCtx->getOperationContext(), _tempNs, tempNsIndexes);
     } catch (DBException& ex) {
         ex.addContext("Copying indexes for $out failed");
         throw;
@@ -351,26 +356,27 @@ void DocumentSourceOut::renameTemporaryCollection() {
     const NamespaceString& outputNs = makeBucketNsIfTimeseries(getOutputNs());
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &outWaitBeforeTempCollectionRename,
-        pExpCtx->opCtx,
+        pExpCtx->getOperationContext(),
         "outWaitBeforeTempCollectionRename",
         []() {
             LOGV2(7585602,
                   "Hanging aggregation due to 'outWaitBeforeTempCollectionRename' failpoint");
         });
-    pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(pExpCtx->opCtx,
-                                                                            _tempNs,
-                                                                            outputNs,
-                                                                            true /* dropTarget */,
-                                                                            false /* stayTemp */,
-                                                                            _originalOutOptions,
-                                                                            _originalIndexes);
+    pExpCtx->getMongoProcessInterface()->renameIfOptionsAndIndexesHaveNotChanged(
+        pExpCtx->getOperationContext(),
+        _tempNs,
+        outputNs,
+        true /* dropTarget */,
+        false /* stayTemp */,
+        _originalOutOptions,
+        _originalIndexes);
 }
 
 void DocumentSourceOut::createTimeseriesView() {
     _tmpCleanUpState = OutCleanUpProgress::kRenameComplete;
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &outWaitAfterTempCollectionRenameBeforeView,
-        pExpCtx->opCtx,
+        pExpCtx->getOperationContext(),
         "outWaitAfterTempCollectionRenameBeforeView",
         []() {
             LOGV2(8961400,
@@ -381,12 +387,12 @@ void DocumentSourceOut::createTimeseriesView() {
     BSONObjBuilder cmd;
     cmd << "create" << getOutputNs().coll();
     cmd << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON();
-    pExpCtx->mongoProcessInterface->createTimeseriesView(
-        pExpCtx->opCtx, getOutputNs(), cmd.done(), _timeseries.value());
+    pExpCtx->getMongoProcessInterface()->createTimeseriesView(
+        pExpCtx->getOperationContext(), getOutputNs(), cmd.done(), _timeseries.value());
 }
 
 void DocumentSourceOut::finalize() {
-    DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
+    DocumentSourceWriteBlock writeBlock(pExpCtx->getOperationContext());
     uassert(7406101,
             "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
             feature_flags::gFeatureFlagAggOutTimeseries.isEnabled(
@@ -411,7 +417,8 @@ void DocumentSourceOut::finalize() {
     // anyway to ensure that we remove it from the list of in-use temporary collections that will be
     // dropped on stepup (relevant on sharded clusters).
     _tmpCleanUpState = OutCleanUpProgress::kViewCreatedIfNeeded;
-    pExpCtx->mongoProcessInterface->dropTempCollection(pExpCtx->opCtx, _tempNs);
+    pExpCtx->getMongoProcessInterface()->dropTempCollection(pExpCtx->getOperationContext(),
+                                                            _tempNs);
 
     _tmpCleanUpState = OutCleanUpProgress::kComplete;
 }
@@ -419,7 +426,7 @@ void DocumentSourceOut::finalize() {
 BatchedCommandRequest DocumentSourceOut::makeBatchedWriteRequest() const {
     const auto& nss =
         _tempNs.isTimeseriesBucketsCollection() ? _tempNs.getTimeseriesViewNamespace() : _tempNs;
-    return makeInsertCommand(nss, pExpCtx->bypassDocumentValidation);
+    return makeInsertCommand(nss, pExpCtx->getBypassDocumentValidation());
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
@@ -428,7 +435,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
     boost::optional<TimeseriesOptions> timeseries) {
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "{} cannot be used in a transaction"_format(kStageName),
-            !expCtx->opCtx->inMultiDocumentTransaction());
+            !expCtx->getOperationContext()->inMultiDocumentTransaction());
 
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid {} target namespace, {}"_format(kStageName, outputNs.toStringForErrorMsg()),
@@ -447,11 +454,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto outSpec = parseOutSpecAndResolveTargetNamespace(elem, expCtx->ns.dbName());
-    NamespaceString targetNss = NamespaceStringUtil::deserialize(expCtx->ns.dbName().tenantId(),
-                                                                 outSpec.getDb(),
-                                                                 outSpec.getColl(),
-                                                                 outSpec.getSerializationContext());
+    auto outSpec =
+        parseOutSpecAndResolveTargetNamespace(elem, expCtx->getNamespaceString().dbName());
+    NamespaceString targetNss =
+        NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName().tenantId(),
+                                         outSpec.getDb(),
+                                         outSpec.getColl(),
+                                         outSpec.getSerializationContext());
     return create(std::move(targetNss), expCtx, std::move(outSpec.getTimeseries()));
 }
 
@@ -461,7 +470,7 @@ Value DocumentSourceOut::serialize(const SerializationOptions& opts) const {
     // TODO SERVER-77000: use SerializatonContext from expCtx and DatabaseNameUtil to serialize
     // spec.setDb(DatabaseNameUtil::serialize(
     //     getOutputNs().dbName(),
-    //     SerializationContext::stateCommandReply(pExpCtx->serializationCtxt)));
+    //     SerializationContext::stateCommandReply(pExpCtx->getSerializationContext())));
     spec.setDb(getOutputNs().dbName().serializeWithoutTenantPrefix_UNSAFE());
     spec.setColl(getOutputNs().coll());
     spec.setTimeseries(_timeseries);
@@ -472,7 +481,7 @@ Value DocumentSourceOut::serialize(const SerializationOptions& opts) const {
 void DocumentSourceOut::waitWhileFailPointEnabled() {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWhileBuildingDocumentSourceOutBatch,
-        pExpCtx->opCtx,
+        pExpCtx->getOperationContext(),
         "hangWhileBuildingDocumentSourceOutBatch",
         []() {
             LOGV2(

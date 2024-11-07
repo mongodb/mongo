@@ -181,7 +181,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamHandleTopologyChange::do
     // populated. We also resolve the original aggregation command from the expression context.
     if (!_mergeCursors) {
         _mergeCursors = dynamic_cast<DocumentSourceMergeCursors*>(pSource);
-        _originalAggregateCommand = pExpCtx->originalAggregateCommand.getOwned();
+        _originalAggregateCommand = pExpCtx->getOriginalAggregateCommand().getOwned();
 
         tassert(5549100, "Missing $mergeCursors stage", _mergeCursors);
         tassert(
@@ -211,7 +211,7 @@ std::vector<RemoteCursor>
 DocumentSourceChangeStreamHandleTopologyChange::establishShardCursorsOnNewShards(
     const Document& newShardDetectedObj) {
     // Reload the shard registry to see the new shard.
-    auto* opCtx = pExpCtx->opCtx;
+    auto* opCtx = pExpCtx->getOperationContext();
     Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
     // Parse the new shard's information from the document inserted into 'config.shards'.
@@ -228,8 +228,8 @@ DocumentSourceChangeStreamHandleTopologyChange::establishShardCursorsOnNewShards
 
     const bool allowPartialResults = false;  // partial results are not allowed
     return establishCursors(opCtx,
-                            pExpCtx->mongoProcessInterface->taskExecutor,
-                            pExpCtx->ns,
+                            pExpCtx->getMongoProcessInterface()->taskExecutor,
+                            pExpCtx->getNamespaceString(),
                             ReadPreferenceSetting::get(opCtx),
                             {{newShard.getName(), cmdObj}},
                             allowPartialResults);
@@ -240,15 +240,15 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::createUpdatedCommandForN
     // We must start the new cursor from the moment at which the shard became visible.
     const auto newShardAddedTime = LogicalTime{shardAddedTime};
     auto resumeTokenForNewShard = ResumeToken::makeHighWaterMarkToken(
-        newShardAddedTime.addTicks(1).asTimestamp(), pExpCtx->changeStreamTokenVersion);
+        newShardAddedTime.addTicks(1).asTimestamp(), pExpCtx->getChangeStreamTokenVersion());
 
     // Create a new shard command object containing the new resume token.
     auto shardCommand = replaceResumeTokenInCommand(resumeTokenForNewShard.toDocument());
 
     tassert(7663502,
             str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
-                          << pExpCtx->ns.toStringForErrorMsg(),
-            pExpCtx->serializationCtxt != SerializationContext::stateDefault());
+                          << pExpCtx->getNamespaceString().toStringForErrorMsg(),
+            pExpCtx->getSerializationContext() != SerializationContext::stateDefault());
 
     // Parse and optimize the pipeline.
     auto pipeline = Pipeline::parseFromArray(

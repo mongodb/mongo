@@ -526,8 +526,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) 
 
     // Allow the $sort stage to spill to disk.
     unittest::TempDir tempDir("DocumentSourceSortTest");
-    expCtx->tempDir = tempDir.path();
-    expCtx->allowDiskUse = true;
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
     const size_t maxMemoryUsageBytes = 1000;
 
     auto sort =
@@ -564,7 +564,7 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) 
 TEST_F(DocumentSourceSortExecutionTest,
        ShouldErrorIfNotAllowedToSpillToDiskAndResultSetIsTooLarge) {
     auto expCtx = getExpCtx();
-    expCtx->allowDiskUse = false;
+    expCtx->setAllowDiskUse(false);
     const size_t maxMemoryUsageBytes = 1000;
 
     auto sort =
@@ -582,7 +582,7 @@ TEST_F(DocumentSourceSortExecutionTest,
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto expCtx = getExpCtx();
-    expCtx->allowDiskUse = false;
+    expCtx->setAllowDiskUse(false);
     const size_t maxMemoryUsageBytes = 1000;
 
     auto sort =

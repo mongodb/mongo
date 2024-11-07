@@ -81,7 +81,7 @@ namespace mongo {
 template <typename F, typename H>
 MONGO_WARN_UNUSED_RESULT_FUNCTION PlanStage::StageState handlePlanStageYield(
     ExpressionContext* expCtx, StringData opStr, F&& f, H&& yieldHandler) {
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
     invariant(opCtx);
     invariant(shard_role_details::getLocker(opCtx));
     invariant(shard_role_details::getRecoveryUnit(opCtx));
@@ -120,7 +120,8 @@ MONGO_WARN_UNUSED_RESULT_FUNCTION PlanStage::StageState handlePlanStageYield(
         // while locks are being held. We handle this by requesting a yield and then refreshing the
         // CatalogCache after having released the locks.
         const auto& extraInfo = ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
-        planExecutorShardingState(expCtx->opCtx).catalogCacheRefreshRequired = extraInfo->getNss();
+        planExecutorShardingState(expCtx->getOperationContext()).catalogCacheRefreshRequired =
+            extraInfo->getNss();
         yieldHandler();
         return PlanStage::NEED_YIELD;
     }

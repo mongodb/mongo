@@ -71,7 +71,7 @@ void AggCmdShape::appendLetCmdSpecificShapeComponents(
     } else {
         // The cached pipeline shape doesn't match the requested options, so we have to
         // re-parse the pipeline from the initial request.
-        expCtx->inRouter = _inRouter;
+        expCtx->setInRouter(_inRouter);
         expCtx->addResolvedNamespaces(_components.involvedNamespaces);
         auto reparsed = Pipeline::parse(_components.representativePipeline, expCtx);
         auto serializedPipeline = reparsed->serializeToBson(opts);
@@ -114,7 +114,7 @@ AggCmdShape::AggCmdShape(const AggregateCommandRequest& aggregateCommand,
                   std::move(involvedNamespaces_),
                   pipeline.serializeToBson(
                       SerializationOptions::kRepresentativeQueryShapeSerializeOptions)),
-      _inRouter(expCtx->inRouter) {}
+      _inRouter(expCtx->getInRouter()) {}
 
 size_t AggCmdShape::extraSize() const {
     // To account for possible padding, we calculate the extra space with the difference instead of

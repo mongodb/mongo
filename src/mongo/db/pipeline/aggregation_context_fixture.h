@@ -65,8 +65,8 @@ public:
     AggregationContextFixture(NamespaceString nss) {
         _opCtx = makeOperationContext();
         _expCtx = make_intrusive<ExpressionContextForTest>(_opCtx.get(), nss);
-        _expCtx->tempDir = _tempDir.path();
-        _expCtx->changeStreamSpec = DocumentSourceChangeStreamSpec();
+        _expCtx->setTempDir(_tempDir.path());
+        _expCtx->setChangeStreamSpec(DocumentSourceChangeStreamSpec());
     }
 
     auto getExpCtx() {
@@ -82,8 +82,8 @@ public:
     }
 
     void setExpCtx(ExpressionContextOptionsStruct options) {
-        _expCtx->inRouter = options.inRouter;
-        _expCtx->allowDiskUse = options.allowDiskUse;
+        _expCtx->setInRouter(options.inRouter);
+        _expCtx->setAllowDiskUse(options.allowDiskUse);
     }
 
     /*

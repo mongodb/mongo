@@ -213,7 +213,7 @@ StatusWith<BSONObj> extractShardKeyFromBasicQueryWithContext(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const ShardKeyPattern& shardKeyPattern,
     const BSONObj& basicQuery) {
-    auto findCommand = std::make_unique<FindCommandRequest>(expCtx->ns);
+    auto findCommand = std::make_unique<FindCommandRequest>(expCtx->getNamespaceString());
     findCommand->setFilter(basicQuery.getOwned());
     if (!expCtx->getCollatorBSON().isEmpty()) {
         findCommand->setCollation(expCtx->getCollatorBSON().getOwned());
@@ -475,7 +475,7 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
     auto findCommand = std::make_unique<FindCommandRequest>(cm.getNss());
     findCommand->setFilter(query.getOwned());
 
-    expCtx->uuid = cm.getUUID();
+    expCtx->setUUID(cm.getUUID());
 
     if (!collation.isEmpty()) {
         findCommand->setCollation(collation.getOwned());

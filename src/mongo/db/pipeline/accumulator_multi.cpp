@@ -557,7 +557,7 @@ AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
         parseAccumulatorTopBottomNSortBy<sense>(expCtx, *sortBy);
 
     if (hasMeta) {
-        expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
     }
 
     // Construct argument expression. If given sortBy: {field1: 1, field2: 1} it will be shaped like

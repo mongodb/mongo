@@ -88,10 +88,13 @@ PrivilegeVector DocumentSourceListCatalog::LiteParsed::requiredPrivileges(
 
 DocumentSource::GetNextResult DocumentSourceListCatalog::doGetNext() {
     if (!_catalogDocs) {
-        if (pExpCtx->ns.isCollectionlessAggregateNS()) {
-            _catalogDocs = pExpCtx->mongoProcessInterface->listCatalog(pExpCtx->opCtx);
-        } else if (auto catalogDoc = pExpCtx->mongoProcessInterface->getCatalogEntry(
-                       pExpCtx->opCtx, pExpCtx->ns, pExpCtx->uuid)) {
+        if (pExpCtx->getNamespaceString().isCollectionlessAggregateNS()) {
+            _catalogDocs =
+                pExpCtx->getMongoProcessInterface()->listCatalog(pExpCtx->getOperationContext());
+        } else if (auto catalogDoc = pExpCtx->getMongoProcessInterface()->getCatalogEntry(
+                       pExpCtx->getOperationContext(),
+                       pExpCtx->getNamespaceString(),
+                       pExpCtx->getUUID())) {
             _catalogDocs = {{std::move(*catalogDoc)}};
         } else {
             _catalogDocs.emplace();
@@ -117,7 +120,7 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
             "The $listCatalog stage specification must be an empty object",
             elem.type() == Object && elem.Obj().isEmpty());
 
-    const NamespaceString& nss = pExpCtx->ns;
+    const NamespaceString& nss = pExpCtx->getNamespaceString();
 
     uassert(
         ErrorCodes::InvalidNamespace,

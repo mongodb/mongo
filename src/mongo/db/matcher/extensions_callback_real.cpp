@@ -61,7 +61,9 @@ std::unique_ptr<MatchExpression> ExtensionsCallbackReal::createWhere(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WhereMatchExpressionBase::WhereParams where) const {
     if (getTestCommandsEnabled() && internalQueryDesugarWhereToFunction.load()) {
-        uassert(ErrorCodes::BadValue, "ns for $where cannot be empty", expCtx->ns.dbSize() != 0);
+        uassert(ErrorCodes::BadValue,
+                "ns for $where cannot be empty",
+                expCtx->getNamespaceString().dbSize() != 0);
 
         auto code = where.code;
 
@@ -78,9 +80,9 @@ std::unique_ptr<MatchExpression> ExtensionsCallbackReal::createWhere(
 
         return std::make_unique<ExprMatchExpression>(fnExpression, expCtx);
     } else {
-        expCtx->hasWhereClause = true;
+        expCtx->setHasWhereClause(true);
         return std::make_unique<WhereMatchExpression>(
-            _opCtx, std::move(where), expCtx->ns.dbName());
+            _opCtx, std::move(where), expCtx->getNamespaceString().dbName());
     }
 }
 

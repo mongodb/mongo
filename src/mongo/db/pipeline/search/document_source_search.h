@@ -109,7 +109,7 @@ public:
         // If it turns out that this stage is not running on a sharded collection, we don't want
         // to send the protocol version to mongot. If the protocol version is sent, mongot will
         // generate unmerged metadata documents that we won't be set up to merge.
-        if (!pExpCtx->needsMerge) {
+        if (!pExpCtx->getNeedsMerge()) {
             return boost::none;
         }
         return _spec.getMetadataMergeProtocolVersion();

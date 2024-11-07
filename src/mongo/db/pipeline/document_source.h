@@ -464,7 +464,7 @@ public:
             return doGetNext();
         }
 
-        auto serviceCtx = pExpCtx->opCtx->getServiceContext();
+        auto serviceCtx = pExpCtx->getOperationContext()->getServiceContext();
         dassert(serviceCtx);
 
         auto timer = getOptTimer(serviceCtx);
@@ -580,7 +580,7 @@ public:
      * subpipelines, match the argument.
      */
     virtual bool validateOperationContext(const OperationContext* opCtx) const {
-        return getContext()->opCtx == opCtx;
+        return getContext()->getOperationContext() == opCtx;
     }
 
     virtual bool usedDisk() {

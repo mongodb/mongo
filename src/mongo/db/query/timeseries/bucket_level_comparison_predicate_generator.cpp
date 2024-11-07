@@ -267,7 +267,7 @@ BucketLevelComparisonPredicateGeneratorBase::createTightPredicate(
                                             matchExprPath,
                                             matchExprData,
                                             _params.bucketSpec,
-                                            _params.pExpCtx->collationMatchesDefault);
+                                            _params.pExpCtx->getCollationMatchesDefault());
     if (error) {
         return {BucketSpec::handleIneligible(_params.policy, std::move(matchExpr), *error)
                     .loosePredicate};
@@ -344,7 +344,7 @@ BucketLevelComparisonPredicateGeneratorBase::createLoosePredicate(
                                             matchExprPath,
                                             matchExprData,
                                             _params.bucketSpec,
-                                            _params.pExpCtx->collationMatchesDefault);
+                                            _params.pExpCtx->getCollationMatchesDefault());
     if (error) {
         return {BucketSpec::handleIneligible(_params.policy, std::move(matchExpr), *error)
                     .loosePredicate};

@@ -52,7 +52,7 @@ using UpsertType = MongoProcessInterface::UpsertType;
 
 BatchedCommandGenerator makeInsertCommandGenerator() {
     return [](const auto& expCtx, const auto& ns) -> BatchedCommandRequest {
-        return makeInsertCommand(ns, expCtx->bypassDocumentValidation);
+        return makeInsertCommand(ns, expCtx->getBypassDocumentValidation());
     };
 }
 
@@ -62,7 +62,7 @@ BatchedCommandGenerator makeUpdateCommandGenerator() {
         updateOp.setWriteCommandRequestBase([&] {
             write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
-            wcb.setBypassDocumentValidation(expCtx->bypassDocumentValidation);
+            wcb.setBypassDocumentValidation(expCtx->getBypassDocumentValidation());
             return wcb;
         }());
         auto [constants, letParams] =
@@ -110,7 +110,7 @@ MergeStrategy makeUpdateStrategy() {
         constexpr auto multi = false;
         auto updateCommand = bcr.extractUpdateRequest();
         updateCommand->setUpdates(constructUpdateEntries(std::move(batch), upsert, multi));
-        uassertStatusOK(expCtx->mongoProcessInterface->update(
+        uassertStatusOK(expCtx->getMongoProcessInterface()->update(
             expCtx, ns, std::move(updateCommand), wc, upsert, multi, epoch));
     };
 }
@@ -134,7 +134,7 @@ MergeStrategy makeStrictUpdateStrategy() {
         constexpr auto multi = false;
         auto updateCommand = bcr.extractUpdateRequest();
         updateCommand->setUpdates(constructUpdateEntries(std::move(batch), upsert, multi));
-        auto updateResult = uassertStatusOK(expCtx->mongoProcessInterface->update(
+        auto updateResult = uassertStatusOK(expCtx->getMongoProcessInterface()->update(
             expCtx, ns, std::move(updateCommand), wc, upsert, multi, epoch));
         uassert(ErrorCodes::MergeStageNoMatchingDocument,
                 "$merge could not find a matching document in the target collection "
@@ -162,8 +162,8 @@ MergeStrategy makeInsertStrategy() {
         });
         auto insertCommand = bcr.extractInsertRequest();
         insertCommand->setDocuments(std::move(objectsToInsert));
-        uassertStatusOK(
-            expCtx->mongoProcessInterface->insert(expCtx, ns, std::move(insertCommand), wc, epoch));
+        uassertStatusOK(expCtx->getMongoProcessInterface()->insert(
+            expCtx, ns, std::move(insertCommand), wc, epoch));
     };
 }
 
@@ -295,7 +295,7 @@ MergeProcessor::MergeProcessor(const boost::intrusive_ptr<ExpressionContext>& ex
                                boost::optional<ChunkVersion> collectionPlacementVersion,
                                bool allowMergeOnNullishValues)
     : _expCtx(expCtx),
-      _writeConcern(expCtx->opCtx->getWriteConcern()),
+      _writeConcern(expCtx->getOperationContext()->getWriteConcern()),
       _descriptor(getMergeStrategyDescriptors().at({whenMatched, whenNotMatched})),
       _pipeline(std::move(pipeline)),
       _collectionPlacementVersion(collectionPlacementVersion),

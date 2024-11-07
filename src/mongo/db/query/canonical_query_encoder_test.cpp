@@ -119,7 +119,7 @@ protected:
 
         const auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, nss);
         expCtx->addResolvedNamespaces({foreignNss});
-        expCtx->needsMerge = needsMerge;
+        expCtx->setNeedsMerge(needsMerge);
         if (!findCommand->getCollation().isEmpty()) {
             auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                           ->makeFromBSON(findCommand->getCollation());

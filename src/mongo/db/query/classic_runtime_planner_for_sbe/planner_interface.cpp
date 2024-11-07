@@ -45,8 +45,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage) {
     const auto* expCtx = cq()->getExpCtxRaw();
     auto remoteCursors =
-        expCtx->explain ? nullptr : search_helpers::getSearchRemoteCursors(cq()->cqPipeline());
-    auto remoteExplains = expCtx->explain
+        expCtx->getExplain() ? nullptr : search_helpers::getSearchRemoteCursors(cq()->cqPipeline());
+    auto remoteExplains = expCtx->getExplain()
         ? search_helpers::getSearchRemoteExplains(expCtx, cq()->cqPipeline())
         : nullptr;
 

@@ -59,8 +59,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalShardServerInfo::crea
 
 DocumentSource::GetNextResult DocumentSourceInternalShardServerInfo::doGetNext() {
     if (!_didEmit) {
-        auto shardName = pExpCtx->mongoProcessInterface->getShardName(pExpCtx->opCtx);
-        auto hostAndPort = pExpCtx->mongoProcessInterface->getHostAndPort(pExpCtx->opCtx);
+        auto shardName =
+            pExpCtx->getMongoProcessInterface()->getShardName(pExpCtx->getOperationContext());
+        auto hostAndPort =
+            pExpCtx->getMongoProcessInterface()->getHostAndPort(pExpCtx->getOperationContext());
         _didEmit = true;
         return DocumentSource::GetNextResult(DOC("shard" << shardName << "host" << hostAndPort));
     }

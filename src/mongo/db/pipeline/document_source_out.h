@@ -172,7 +172,7 @@ private:
                       boost::optional<TimeseriesOptions> timeseries,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx),
-          _writeConcern(expCtx->opCtx->getWriteConcern()),
+          _writeConcern(expCtx->getOperationContext()->getWriteConcern()),
           _timeseries(std::move(timeseries)) {}
 
     static DocumentSourceOutSpec parseOutSpecAndResolveTargetNamespace(
@@ -182,17 +182,17 @@ private:
     void finalize() override;
 
     void flush(BatchedCommandRequest bcr, BatchedObjects batch) override {
-        DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
+        DocumentSourceWriteBlock writeBlock(pExpCtx->getOperationContext());
 
         auto insertCommand = bcr.extractInsertRequest();
         insertCommand->setDocuments(std::move(batch));
         auto targetEpoch = boost::none;
 
         if (_timeseries) {
-            uassertStatusOK(pExpCtx->mongoProcessInterface->insertTimeseries(
+            uassertStatusOK(pExpCtx->getMongoProcessInterface()->insertTimeseries(
                 pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch));
         } else {
-            uassertStatusOK(pExpCtx->mongoProcessInterface->insert(
+            uassertStatusOK(pExpCtx->getMongoProcessInterface()->insert(
                 pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch));
         }
     }

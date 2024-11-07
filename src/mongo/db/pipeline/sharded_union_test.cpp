@@ -107,7 +107,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnNetworkError) {
     auto pipeline = Pipeline::create(
         {DocumentSourceMatch::create(fromjson("{_id: 'unionResult'}"), expCtx())}, expCtx());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
-    expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
+    expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
     unionWith.setSource(queue.get());
 
@@ -145,13 +145,14 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
 
     auto pipeline = Pipeline::create({}, expCtx());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
-    expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
+    expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
     unionWith.setSource(queue.get());
 
     auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
 
-    expCtx()->opCtx->setDeadlineAfterNowBy(Seconds(15), ErrorCodes::MaxTimeMSExpired);
+    expCtx()->getOperationContext()->setDeadlineAfterNowBy(Seconds(15),
+                                                           ErrorCodes::MaxTimeMSExpired);
 
     auto future = launchAsync([&] {
         // Expect one result from each host.
@@ -194,7 +195,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     auto pipeline = Pipeline::create(
         {DocumentSourceMatch::create(fromjson("{_id: 'unionResult'}"), expCtx())}, expCtx());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
-    expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
+    expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
     unionWith.setSource(queue.get());
 
@@ -281,7 +282,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
                                      {countStatement})},
         expCtx().get());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
-    expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
+    expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
     unionWith.setSource(queue.get());
 
@@ -383,7 +384,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
                                      {countStatement})},
         expCtx().get());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
-    expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
+    expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
     unionWith.setSource(queue.get());
 
@@ -460,15 +461,15 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     auto shards = setupNShards(2);
     auto cm = loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
 
-    NamespaceString nsToUnionWith =
-        NamespaceString::createNamespaceString_forTest(expCtx()->ns.db_forTest(), "view");
+    NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
+        expCtx()->getNamespaceString().db_forTest(), "view");
     // Mock out the view namespace as emtpy for now - this is what it would be when parsing in a
     // sharded cluster - only later would we learn the actual view definition.
     expCtx()->setResolvedNamespaces(StringMap<ResolvedNamespace>{
         {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>{}}}});
     auto bson = BSON("$unionWith" << nsToUnionWith.coll());
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx());
-    expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
+    expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
     unionWith->setSource(queue.get());
 
@@ -566,7 +567,7 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
                                      {countStatement})},
         expCtx().get());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
-    expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
+    expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
     unionWith.setSource(queue.get());
 
@@ -574,8 +575,8 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
 
     auto readConcernArgs = repl::ReadConcernArgs{repl::ReadConcernLevel::kMajorityReadConcern};
     {
-        stdx::lock_guard<Client> lk(*expCtx()->opCtx->getClient());
-        repl::ReadConcernArgs::get(expCtx()->opCtx) = readConcernArgs;
+        stdx::lock_guard<Client> lk(*expCtx()->getOperationContext()->getClient());
+        repl::ReadConcernArgs::get(expCtx()->getOperationContext()) = readConcernArgs;
     }
     auto future = launchAsync([&] {
         auto next = unionWith.getNext();

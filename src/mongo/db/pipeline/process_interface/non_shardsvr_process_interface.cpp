@@ -114,15 +114,16 @@ boost::optional<Document> NonShardServerProcessInterface::lookupSingleDocument(
     // Set the speculative read timestamp appropriately after we do a document lookup locally. We
     // set the speculative read timestamp based on the timestamp used by the transaction.
     repl::SpeculativeMajorityReadInfo& speculativeMajorityReadInfo =
-        repl::SpeculativeMajorityReadInfo::get(expCtx->opCtx);
+        repl::SpeculativeMajorityReadInfo::get(expCtx->getOperationContext());
     if (speculativeMajorityReadInfo.isSpeculativeRead()) {
         // Speculative majority reads are required to use the 'kNoOverlap' read source.
         // Storage engine operations require at least Global IS.
-        Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
-        invariant(shard_role_details::getRecoveryUnit(expCtx->opCtx)->getTimestampReadSource() ==
-                  RecoveryUnit::ReadSource::kNoOverlap);
+        Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+        invariant(shard_role_details::getRecoveryUnit(expCtx->getOperationContext())
+                      ->getTimestampReadSource() == RecoveryUnit::ReadSource::kNoOverlap);
         boost::optional<Timestamp> readTs =
-            shard_role_details::getRecoveryUnit(expCtx->opCtx)->getPointInTimeReadTimestamp();
+            shard_role_details::getRecoveryUnit(expCtx->getOperationContext())
+                ->getPointInTimeReadTimestamp();
         invariant(readTs);
         speculativeMajorityReadInfo.setSpeculativeReadTimestampForward(*readTs);
     }
@@ -136,7 +137,8 @@ Status NonShardServerProcessInterface::insert(
     std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
     const WriteConcernOptions& wc,
     boost::optional<OID> targetEpoch) {
-    auto writeResults = write_ops_exec::performInserts(expCtx->opCtx, *insertCommand);
+    auto writeResults =
+        write_ops_exec::performInserts(expCtx->getOperationContext(), *insertCommand);
 
     // Need to check each result in the batch since the writes are unordered.
     for (const auto& result : writeResults.results) {
@@ -154,8 +156,8 @@ Status NonShardServerProcessInterface::insertTimeseries(
     const WriteConcernOptions& wc,
     boost::optional<OID> targetEpoch) {
     try {
-        auto insertReply =
-            timeseries::write_ops::performTimeseriesWrites(expCtx->opCtx, *insertCommand);
+        auto insertReply = timeseries::write_ops::performTimeseriesWrites(
+            expCtx->getOperationContext(), *insertCommand);
 
         checkWriteErrors(insertReply.getWriteCommandReplyBase());
     } catch (DBException& ex) {
@@ -173,7 +175,8 @@ StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::
     UpsertType upsert,
     bool multi,
     boost::optional<OID> targetEpoch) {
-    auto writeResults = write_ops_exec::performUpdates(expCtx->opCtx, *updateCommand);
+    auto writeResults =
+        write_ops_exec::performUpdates(expCtx->getOperationContext(), *updateCommand);
 
     // Need to check each result in the batch since the writes are unordered.
     UpdateResult updateResult;
@@ -298,7 +301,7 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
         // Managed pipeline goes out of scope at the end of this else block, but we've already
         // extracted the necessary information and won't need it again.
         std::unique_ptr<Pipeline, PipelineDeleter> managedPipeline(
-            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
+            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
         pipelineVec = managedPipeline->writeExplainOps(opts);
         ownedPipeline = nullptr;
     } else {

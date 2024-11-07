@@ -193,7 +193,7 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
     bool modified = false;
     mutablebson::Document doc(fromjson("{a: 'cba'}"));
     driver.setCollator(&reverseStringCollator);
-    ASSERT_OK(driver.update(expCtx->opCtx,
+    ASSERT_OK(driver.update(expCtx->getOperationContext(),
                             StringData(),
                             &doc,
                             validateForStorage,
@@ -601,7 +601,7 @@ public:
         const bool isInsert = false;
         FieldRefSetWithStorage modifiedPaths;
         ASSERT_OK(_driver->update(
-            expCtx->opCtx,
+            expCtx->getOperationContext(),
             matchedField,
             doc,
             validateForStorage,

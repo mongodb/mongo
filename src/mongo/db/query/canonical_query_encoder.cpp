@@ -1361,7 +1361,7 @@ std::string encodeSBE(const CanonicalQuery& cq, const bool requiresSbeCompatibil
     // We can wind up with different query plans for aggregate commands if 'needsMerge' is set or
     // not. For instance, when 'needsMerge' is true, $group queries will produce partial aggregates
     // as output, and complete output otherwise.
-    const bool needsMerge = cq.getExpCtx()->needsMerge;
+    const bool needsMerge = cq.getExpCtx()->getNeedsMerge();
     bufBuilder.appendChar(needsMerge ? 1 : 0);
 
     encodeFindCommandRequest(cq, &bufBuilder);

@@ -60,7 +60,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListCachedAndActiveUsers::cre
     uassert(ErrorCodes::BadValue,
             str::stream() << kStageName << " must be run as { " << kStageName << ": {}}",
             spec.isABSONObj() && spec.Obj().isEmpty());
-    auto users = AuthorizationManager::get(pExpCtx->opCtx->getService())->getUserCacheInfo();
+    auto users =
+        AuthorizationManager::get(pExpCtx->getOperationContext()->getService())->getUserCacheInfo();
     std::deque<DocumentSource::GetNextResult> queue;
     std::transform(
         users.begin(), users.end(), std::back_inserter(queue), makeDocumentFromCachedUserInfo);

@@ -101,11 +101,11 @@ DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
 void DocumentSourceMatch::rebuild(BSONObj predicate) {
     predicate = predicate.getOwned();
     SbeCompatibility originalSbeCompatibility =
-        std::exchange(pExpCtx->sbeCompatibility, SbeCompatibility::noRequirements);
-    ON_BLOCK_EXIT([&] { pExpCtx->sbeCompatibility = originalSbeCompatibility; });
+        pExpCtx->sbeCompatibilityExchange(SbeCompatibility::noRequirements);
+    ON_BLOCK_EXIT([&] { pExpCtx->setSbeCompatibility(originalSbeCompatibility); });
     std::unique_ptr<MatchExpression> expr = uassertStatusOK(MatchExpressionParser::parse(
         predicate, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
-    _sbeCompatibility = pExpCtx->sbeCompatibility;
+    _sbeCompatibility = pExpCtx->getSbeCompatibility();
     rebuild(std::move(predicate), std::move(expr));
 }
 

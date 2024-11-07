@@ -166,8 +166,8 @@ TEST_F(AggKeyTest, SizeOfAggKeyWithAndWithoutWriteConcern) {
     auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
     AggregateCommandRequest acrWithComment(kDefaultTestNss.nss());
     acrWithComment.setPipeline(rawPipeline);
-    expCtx->opCtx->setComment(BSON("comment"
-                                   << " foo"));
+    expCtx->getOperationContext()->setComment(BSON("comment"
+                                                   << " foo"));
     auto pipelineWithComment = Pipeline::parse(rawPipeline, expCtx);
     auto keyWithComment = std::make_unique<AggKey>(acrWithComment,
                                                    *pipelineWithComment,

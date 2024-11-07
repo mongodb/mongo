@@ -222,8 +222,10 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
     requests.reserve(shardIds.size());
 
     const auto targetedSampleId = eligibleForSampling
-        ? analyze_shard_key::tryGenerateTargetedSampleId(
-              expCtx->opCtx, nss, cmdObj.firstElementFieldNameStringData(), shardIds)
+        ? analyze_shard_key::tryGenerateTargetedSampleId(expCtx->getOperationContext(),
+                                                         nss,
+                                                         cmdObj.firstElementFieldNameStringData(),
+                                                         shardIds)
         : boost::none;
 
     for (const ShardId& shardId : shardIds) {
@@ -257,7 +259,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     const BSONObj& query,
     const BSONObj& collation,
     bool eligibleForSampling = false) {
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
 
     const auto& cm = cri.cm;
     std::set<ShardId> shardIds;
@@ -562,7 +564,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     bool eligibleForSampling) {
     const auto requests = buildVersionedRequestsForTargetedShards(
         expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation, eligibleForSampling);
-    return gatherResponses(expCtx->opCtx, dbName, readPref, retryPolicy, requests);
+    return gatherResponses(expCtx->getOperationContext(), dbName, readPref, retryPolicy, requests);
 }
 
 std::vector<AsyncRequestsSender::Response>
@@ -841,7 +843,7 @@ std::set<ShardId> getTargetedShardsForCanonicalQuery(const CanonicalQuery& query
                 query.getExpCtx(), cm, findCommand.getFilter(), findCommand.getCollation());
         }
 
-        query.getExpCtx()->uuid = cm.getUUID();
+        query.getExpCtx()->setUUID(cm.getUUID());
 
         // 'getShardIdsForCanonicalQuery' assumes that the ExpressionContext has the appropriate
         // collation set. Here, if the query collation is empty, we use the collection default

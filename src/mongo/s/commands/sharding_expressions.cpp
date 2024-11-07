@@ -118,7 +118,7 @@ public:
         // Set the collator interface if the index descriptor has a collation.
         if (auto collation = indexDescriptor->collation(); !collation.isEmpty()) {
             auto collatorFactory =
-                CollatorFactoryInterface::get(expCtx->opCtx->getServiceContext());
+                CollatorFactoryInterface::get(expCtx->getOperationContext()->getServiceContext());
             auto collatorFactoryResult = collatorFactory->makeFromBSON(collation);
 
             uassert(6868502,
@@ -419,8 +419,9 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
     uassert(9567001,
             str::stream() << opName << " requires 'ns' argument to be an string",
             nsUnchecked.getType() == BSONType::String);
-    NamespaceString ns(NamespaceStringUtil::deserialize(
-        expCtx->ns.tenantId(), nsUnchecked.getStringData(), expCtx->serializationCtxt));
+    NamespaceString ns(NamespaceStringUtil::deserialize(expCtx->getNamespaceString().tenantId(),
+                                                        nsUnchecked.getStringData(),
+                                                        expCtx->getSerializationContext()));
 
     uassert(9567002,
             str::stream() << opName << " requires 'shardVersion' argument to be an object",
@@ -434,7 +435,7 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
     const auto shardKeyVal = shardKeyValUnchecked.getDocument().toBson();
 
     // Get the 'chunkManager' from the catalog cache.
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
     const auto catalogCache = Grid::get(opCtx)->catalogCache();
     uassert(6868602,
             "$_internalOwningShard expression only makes sense in sharded environment",
@@ -506,7 +507,7 @@ ExpressionInternalIndexKey::ExpressionInternalIndexKey(ExpressionContext* expCtx
     : Expression(expCtx, {std::move(doc), std::move(spec)}),
       _doc(_children[0]),
       _spec(_children[1]) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
 boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::optimize() {
@@ -540,8 +541,8 @@ Value ExpressionInternalIndexKey::evaluate(const Document& root, Variables* vari
     auto specObj = _spec->evaluate(root, variables).getDocument().toBson();
 
     // Parse and validate the index spec and then create the index descriptor object from it.
-    auto indexSpec =
-        index_key_validate::parseAndValidateIndexSpecs(getExpressionContext()->opCtx, specObj);
+    auto indexSpec = index_key_validate::parseAndValidateIndexSpecs(
+        getExpressionContext()->getOperationContext(), specObj);
     BSONObj keyPattern = indexSpec.getObjectField(kIndexSpecKeyField);
     auto indexDescriptor =
         std::make_unique<IndexDescriptor>(IndexNames::findPluginName(keyPattern), indexSpec);

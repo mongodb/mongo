@@ -1406,7 +1406,7 @@ Status translateObjectKeywords(StringMap<BSONElement>& keywordMap,
             // If a top level 'required' field does not contain '_id' and 'additionalProperties' is
             // false, no documents will be permitted. Calculate whether we need to warn the user
             // later in parsing.
-            bool requiredMissingID = expCtx->isParsingCollectionValidator && path.empty() &&
+            bool requiredMissingID = expCtx->getIsParsingCollectionValidator() && path.empty() &&
                 !requiredProperties.contains("_id");
             auto allowedPropertiesExpr = parseAllowedProperties(expCtx,
                                                                 path,
@@ -1942,7 +1942,7 @@ StatusWithMatchExpression JSONSchemaParser::parse(
                     expCtx, "$jsonSchema", oldAnnotation, schema));
             }
         }
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
         return translation;
     } catch (const DBException& ex) {
         return {ex.toStatus()};

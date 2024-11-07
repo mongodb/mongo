@@ -59,8 +59,8 @@ public:
     void setUp() override {
         ShardCatalogCacheTestFixture::setUp();
         _expCtx = make_intrusive<ExpressionContextForTest>(operationContext(), kTestAggregateNss);
-        _expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>(executor());
-        _expCtx->inRouter = true;
+        _expCtx->setMongoProcessInterface(std::make_shared<FakeMongoProcessInterface>(executor()));
+        _expCtx->setInRouter(true);
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx() {

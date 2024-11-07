@@ -162,7 +162,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     _findCommand = std::move(parsedFind->findCommandRequest);
 
     if (optimizeMatchExpression) {
-        const bool enableSimplification = !_expCtx->inLookup && !_expCtx->isUpsert;
+        const bool enableSimplification = !_expCtx->getInLookup() && !_expCtx->getIsUpsert();
         _primaryMatchExpression =
             MatchExpression::normalize(std::move(parsedFind->filter), enableSimplification);
     } else {
@@ -175,7 +175,8 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
         // optimized out. We will optimize the projection later after we are certain that the query
         // is ineligible for SBE.
         bool shouldOptimizeProj =
-            expCtx->sbeCompatibility == SbeCompatibility::notCompatible || !_findCommand->getLet();
+            expCtx->getSbeCompatibility() == SbeCompatibility::notCompatible ||
+            !_findCommand->getLet();
         if (parsedFind->proj->requiresMatchDetails()) {
             // Sadly, in some cases the match details cannot be generated from the unoptimized
             // MatchExpression. For example, a rooted-$or of equalities won't work to produce the
@@ -211,7 +212,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
 
         // If the results of this query might have to be merged on a remote node, then that node
         // might need the sort key metadata. Request that the plan generates this metadata.
-        if (_expCtx->needsMerge) {
+        if (_expCtx->getNeedsMerge()) {
             _metadataDeps.set(DocumentMetadataFields::kSortKey);
         }
     }
@@ -222,7 +223,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     // Perform SBE auto-parameterization if there is not already a reason not to.
     _disablePlanCache = internalQueryDisablePlanCache.load();
     _maxMatchExpressionParams = loadMaxMatchExpressionParams();
-    if (expCtx->sbeCompatibility != SbeCompatibility::notCompatible &&
+    if (expCtx->getSbeCompatibility() != SbeCompatibility::notCompatible &&
         shouldParameterizeSbe(_primaryMatchExpression.get())) {
         // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of caching
         // a parameterized plan. Here we add parameter markers to the appropriate match expression

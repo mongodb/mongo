@@ -47,7 +47,7 @@ ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<Expression
         return spec.getResumeAfter()->getData();
     } else if (spec.getStartAtOperationTime()) {
         return ResumeToken::makeHighWaterMarkToken(*spec.getStartAtOperationTime(),
-                                                   expCtx->changeStreamTokenVersion)
+                                                   expCtx->getChangeStreamTokenVersion())
             .getData();
     }
     tasserted(5666901,

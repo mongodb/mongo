@@ -62,13 +62,13 @@ MONGO_FAIL_POINT_DEFINE(allowAllSetQuerySettings);
 
 void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const QuerySettings& settings) {
-    if (expCtx->explain) {
+    if (expCtx->getExplain()) {
         // Explaining queries which _would_ be rejected if executed is still useful;
         // do not fail here.
         return;
     }
     if (settings.getReject()) {
-        auto* opCtx = expCtx->opCtx;
+        auto* opCtx = expCtx->getOperationContext();
         const Command* curCommand = CommandInvocation::get(opCtx)->definition();
         auto* curOp = CurOp::get(opCtx);
         auto query = curOp->opDescription();
@@ -80,7 +80,7 @@ void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& exp
                             {logv2::LogComponent::kQueryRejected},
                             "Query rejected by QuerySettings",
                             "queryShapeHash"_attr = curOp->getQueryShapeHash()->toHexString(),
-                            "ns"_attr = CurOp::get(expCtx->opCtx)->getNS(),
+                            "ns"_attr = CurOp::get(expCtx->getOperationContext())->getNS(),
                             "command"_attr = redact(cmdToLog.getObject()));
         uasserted(ErrorCodes::QueryRejectedBySettings, "Query rejected by admin query settings");
     }
@@ -243,13 +243,14 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
     const auto serializationContext =
         parsedDistinctCommand->distinctCommandRequest->getSerializationContext();
     auto serializedQueryShape =
-        distinctCmdShape.toBson(expCtx->opCtx,
+        distinctCmdShape.toBson(expCtx->getOperationContext(),
                                 SerializationOptions::kDebugQueryShapeSerializeOptions,
                                 serializationContext);
 
     return RepresentativeQueryInfo{
         .serializedQueryShape = serializedQueryShape,
-        .queryShapeHash = distinctCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
+        .queryShapeHash =
+            distinctCmdShape.sha256Hash(expCtx->getOperationContext(), serializationContext),
         .namespaceString = nssOrUuid.nss(),
         .involvedNamespaces = {nssOrUuid.nss()},
         .encryptionInformation = boost::none,
@@ -291,7 +292,7 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
     const auto serializationContext = aggregateCommandRequest.getSerializationContext();
     AggCmdShape aggCmdShape{aggregateCommandRequest, nss, involvedNamespaces, *pipeline, expCtx};
     auto serializedQueryShape =
-        aggCmdShape.toBson(expCtx->opCtx,
+        aggCmdShape.toBson(expCtx->getOperationContext(),
                            SerializationOptions::kDebugQueryShapeSerializeOptions,
                            serializationContext);
 
@@ -299,7 +300,8 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
     // complexity of determining if a pipeline is eligible or not for IDHACK.
     return RepresentativeQueryInfo{
         .serializedQueryShape = serializedQueryShape,
-        .queryShapeHash = aggCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
+        .queryShapeHash =
+            aggCmdShape.sha256Hash(expCtx->getOperationContext(), serializationContext),
         .namespaceString = nss,
         .involvedNamespaces = std::move(involvedNamespaces),
         .encryptionInformation = aggregateCommandRequest.getEncryptionInformation(),
@@ -342,7 +344,8 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
             // If the incoming request comes from mongos, then no additional query setting lookup
             // has to be performed, rather, if there are query settings associated with the request,
             // they should be attached to the command by mongos.
-            if (requestComesFromMongosOrSentDirectlyToShard(expCtx->opCtx->getClient())) {
+            if (requestComesFromMongosOrSentDirectlyToShard(
+                    expCtx->getOperationContext()->getClient())) {
                 return parsedFind.findCommandRequest->getQuerySettings().value_or(
                     query_settings::QuerySettings());
             }
@@ -359,7 +362,7 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
                 return query_settings::QuerySettings();
             }
 
-            auto* opCtx = expCtx->opCtx;
+            auto* opCtx = expCtx->getOperationContext();
             const auto& serializationContext =
                 parsedFind.findCommandRequest->getSerializationContext();
             auto& opDebug = CurOp::get(opCtx)->debug();
@@ -370,7 +373,7 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
                 }
 
                 return query_shape::FindCmdShape(parsedFind, expCtx)
-                    .sha256Hash(expCtx->opCtx, serializationContext);
+                    .sha256Hash(expCtx->getOperationContext(), serializationContext);
             }();
             setQueryShapeHash(opCtx, hash);
 
@@ -418,7 +421,8 @@ QuerySettings lookupQuerySettingsForAgg(
             // part of the command if the command was created as part of the view resolution. In
             // that case the query settings looked up for the original command are attached to
             // 'aggregateCommandRequest'.
-            if (requestComesFromMongosOrSentDirectlyToShard(expCtx->opCtx->getClient()) ||
+            if (requestComesFromMongosOrSentDirectlyToShard(
+                    expCtx->getOperationContext()->getClient()) ||
                 aggregateCommandRequest.getQuerySettings().has_value()) {
                 return aggregateCommandRequest.getQuerySettings().value_or(
                     query_settings::QuerySettings());
@@ -436,7 +440,7 @@ QuerySettings lookupQuerySettingsForAgg(
                 return query_settings::QuerySettings();
             }
 
-            auto* opCtx = expCtx->opCtx;
+            auto* opCtx = expCtx->getOperationContext();
             const auto& serializationContext = aggregateCommandRequest.getSerializationContext();
             auto& opDebug = CurOp::get(opCtx)->debug();
             auto hash = [&]() {
@@ -482,7 +486,8 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
             // If the incoming request comes from mongos, then no additional query setting lookup
             // has to be performed, rather, if there are query settings associated with the request,
             // they should be attached to the command by mongos.
-            if (requestComesFromMongosOrSentDirectlyToShard(expCtx->opCtx->getClient())) {
+            if (requestComesFromMongosOrSentDirectlyToShard(
+                    expCtx->getOperationContext()->getClient())) {
                 return parsedDistinct.distinctCommandRequest->getQuerySettings().value_or(
                     query_settings::QuerySettings());
             }
@@ -499,7 +504,7 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
                 return query_settings::QuerySettings();
             }
 
-            auto* opCtx = expCtx->opCtx;
+            auto* opCtx = expCtx->getOperationContext();
             const auto& serializationContext =
                 parsedDistinct.distinctCommandRequest->getSerializationContext();
             auto& opDebug = CurOp::get(opCtx)->debug();
@@ -510,7 +515,7 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
                 }
 
                 return query_shape::DistinctCmdShape(parsedDistinct, expCtx)
-                    .sha256Hash(expCtx->opCtx, serializationContext);
+                    .sha256Hash(expCtx->getOperationContext(), serializationContext);
             }();
             setQueryShapeHash(opCtx, hash);
 

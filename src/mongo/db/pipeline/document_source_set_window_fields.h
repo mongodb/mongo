@@ -113,7 +113,7 @@ public:
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
           _outputFields(std::move(outputFields)),
-          _memoryTracker{expCtx->allowDiskUse, maxMemoryBytes},
+          _memoryTracker{expCtx->getAllowDiskUse(), maxMemoryBytes},
           _iterator(expCtx.get(), pSource, &_memoryTracker, std::move(partitionBy), _sortBy),
           _sbeCompatibility(sbeCompatibility){};
 

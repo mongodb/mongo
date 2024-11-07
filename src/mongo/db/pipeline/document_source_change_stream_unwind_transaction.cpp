@@ -100,7 +100,7 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
     // To correctly handle filtering out entries of direct write operations on orphaned documents,
     // we include a filter for "fromMigrate" flagged operations, unless "fromMigrate" events are
     // explicitly requested in the spec.
-    if (!expCtx->changeStreamSpec->getShowMigrationEvents()) {
+    if (!expCtx->getChangeStreamSpec()->getShowMigrationEvents()) {
         unwindFilter->add(buildNotFromMigrateFilter(expCtx, userMatch, bsonObj));
     }
 
@@ -122,7 +122,7 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
  */
 std::unique_ptr<MatchExpression> buildEndOfTransactionFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (!expCtx->changeStreamSpec->getShowExpandedEvents()) {
+    if (!expCtx->getChangeStreamSpec()->getShowExpandedEvents()) {
         return std::make_unique<AlwaysFalseMatchExpression>();
     }
 
@@ -218,13 +218,13 @@ DocumentSource::GetModPathsReturn DocumentSourceChangeStreamUnwindTransaction::g
 DocumentSource::GetNextResult DocumentSourceChangeStreamUnwindTransaction::doGetNext() {
     uassert(5543812,
             str::stream() << kStageName << " cannot be executed from router",
-            !pExpCtx->inRouter);
+            !pExpCtx->getInRouter());
 
     while (true) {
         // If we're unwinding an 'applyOps' from a transaction, check if there are any documents
         // we have stored that can be returned.
         if (_txnIterator) {
-            if (auto next = _txnIterator->getNextTransactionOp(pExpCtx->opCtx)) {
+            if (auto next = _txnIterator->getNextTransactionOp(pExpCtx->getOperationContext())) {
                 return std::move(*next);
             }
 
@@ -280,7 +280,7 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const Document& input,
     const MatchExpression* expression)
-    : _mongoProcessInterface(expCtx->mongoProcessInterface),
+    : _mongoProcessInterface(expCtx->getMongoProcessInterface()),
       _expression(expression),
       _endOfTransactionExpression(change_stream_filter::buildEndOfTransactionFilter(expCtx)) {
 
@@ -356,7 +356,7 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
         // in order to parse an OpTime, this time from the "prevOpTime" field.
         repl::OpTime prevOpTime = repl::OpTime::parse(
             input[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName].getDocument().toBson());
-        _collectAllOpTimesFromTransaction(expCtx->opCtx, prevOpTime);
+        _collectAllOpTimesFromTransaction(expCtx->getOperationContext(), prevOpTime);
     }
 
     // Pop the first OpTime off the stack and use it to load the first oplog entry into the
@@ -376,7 +376,8 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
     } else {
         // This transaction consists of multiple oplog entries; grab the chronologically first
         // entry and extract its "applyOps" array.
-        auto firstApplyOpsEntry = _lookUpOplogEntryByOpTime(expCtx->opCtx, firstTimestamp);
+        auto firstApplyOpsEntry =
+            _lookUpOplogEntryByOpTime(expCtx->getOperationContext(), firstTimestamp);
 
         auto bsonOp = firstApplyOpsEntry.getOperationToApply();
         tassert(5543806,

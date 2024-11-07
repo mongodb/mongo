@@ -133,9 +133,59 @@ ExpressionContextBuilder& ExpressionContextBuilder::isUpsert(bool upsert) {
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::inLookup(bool inLookup) {
+    params.inLookup = inLookup;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::inUnionWith(bool inUnionWith) {
+    params.inUnionWith = inUnionWith;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::isParsingViewDefinition(
+    bool isParsingViewDefinition) {
+    params.isParsingViewDefinition = isParsingViewDefinition;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::isParsingPipelineUpdate(
+    bool isParsingPipelineUpdate) {
+    params.isParsingPipelineUpdate = isParsingPipelineUpdate;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::isParsingCollectionValidator(
+    bool isParsingCollectionValidator) {
+    params.isParsingCollectionValidator = isParsingCollectionValidator;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::blankExpressionContext(
     bool blankExpressionContext) {
     params.blankExpressionContext = blankExpressionContext;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::exprUnstableForApiV1(
+    bool exprUnstableForApiV1) {
+    params.exprUnstableForApiV1 = exprUnstableForApiV1;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::exprDeprecatedForApiV1(
+    bool exprDeprecatedForApiV1) {
+    params.exprDeprecatedForApiV1 = exprDeprecatedForApiV1;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::enabledCounters(bool enabledCounters) {
+    params.enabledCounters = enabledCounters;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::forcePlanCache(bool forcePlanCache) {
+    params.forcePlanCache = forcePlanCache;
     return *this;
 }
 
@@ -162,9 +212,81 @@ ExpressionContextBuilder& ExpressionContextBuilder::letParameters(
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::jsHeapLimitMB(
+    boost::optional<int> jsHeapLimitMB) {
+    params.jsHeapLimitMB = std::move(jsHeapLimitMB);
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::timeZoneDatabase(
+    const TimeZoneDatabase* timeZoneDatabase) {
+    params.timeZoneDatabase = timeZoneDatabase;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::changeStreamTokenVersion(
+    int changeStreamTokenVersion) {
+    params.changeStreamTokenVersion = changeStreamTokenVersion;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::changeStreamSpec(
+    boost::optional<DocumentSourceChangeStreamSpec> changeStreamSpec) {
+    params.changeStreamSpec = std::move(changeStreamSpec);
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::originalAggregateCommand(
+    BSONObj originalAggregateCommand) {
+    params.originalAggregateCommand = std::move(originalAggregateCommand);
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::initialPostBatchResumeToken(
+    BSONObj initialPostBatchResumeToken) {
+    params.initialPostBatchResumeToken = std::move(initialPostBatchResumeToken);
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::sbeCompatibility(
+    SbeCompatibility sbeCompatibility) {
+    params.sbeCompatibility = sbeCompatibility;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::sbeGroupCompatibility(
+    SbeCompatibility sbeGroupCompatibility) {
+    params.sbeGroupCompatibility = sbeGroupCompatibility;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::sbeWindowCompatibility(
+    SbeCompatibility sbeWindowCompatibility) {
+    params.sbeWindowCompatibility = sbeWindowCompatibility;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::sbePipelineCompatibility(
+    SbeCompatibility sbePipelineCompatibility) {
+    params.sbePipelineCompatibility = sbePipelineCompatibility;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::collationMatchesDefault(
     ExpressionContextCollationMatchesDefault collationMatchesDefault) {
     params.collationMatchesDefault = collationMatchesDefault;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::serverSideJsConfig(
+    const ExpressionContext::ServerSideJsConfig& serverSideJsConfig) {
+    params.serverSideJsConfig = serverSideJsConfig;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::viewNS(
+    boost::optional<NamespaceString> viewNS) {
+    params.viewNS = std::move(viewNS);
     return *this;
 }
 
@@ -180,6 +302,22 @@ ExpressionContextBuilder& ExpressionContextBuilder::withReplicationResolvedNames
         NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
 
     resolvedNamespace(std::move(resolvedNamespaces));
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::maxFeatureCompatibilityVersion(
+    boost::optional<multiversion::FeatureCompatibilityVersion> maxFeatureCompatibilityVersion) {
+    params.maxFeatureCompatibilityVersion = std::move(maxFeatureCompatibilityVersion);
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::subPipelineDepth(long long subPipelineDepth) {
+    params.subPipelineDepth = subPipelineDepth;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::tailableMode(TailableModeEnum tailableMode) {
+    params.tailableMode = tailableMode;
     return *this;
 }
 
@@ -273,40 +411,25 @@ ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
       involvedNamespaceIsAView(involvedNamespaceIsAView) {}
 
 ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
-    : explain(params.explain),
-      fromRouter(params.fromRouter),
-      needsMerge(params.needsMerge),
-      inRouter(params.inRouter),
-      forPerShardCursor(params.forPerShardCursor),
-      allowDiskUse(params.allowDiskUse && ([&]() {
-                       tassert(7738401, "opCtx null check", params.opCtx);
-                       return !(params.opCtx->readOnly());
-                   }())),  // Disallow disk use if in read-only mode.
-      bypassDocumentValidation(params.bypassDocumentValidation),
-      hasWhereClause(params.hasWhereClause),
-      isUpsert(params.isUpsert),
-      ns(params.ns),
-      serializationCtxt(params.serializationContext),
-      uuid(std::move(params.collUUID)),
-      tempDir(std::move(params.tmpDir)),
-      opCtx(params.opCtx),
-      mongoProcessInterface(params.mongoProcessInterface
-                                ? params.mongoProcessInterface
-                                : std::make_shared<StubMongoProcessInterface>()),
-      timeZoneDatabase(getTimeZoneDatabase(opCtx)),
-      variablesParseState(variables.useIdGenerator()),
-      mayDbProfile(params.mayDbProfile),
-      collationMatchesDefault(params.collationMatchesDefault),
-      _collator(std::move(params.collator)),
+    : variablesParseState(variables.useIdGenerator()),
+      _params(std::move(params)),
+      _collator(std::move(_params.collator)),
       _documentComparator(_collator.getCollator()),
-      _valueComparator(_collator.getCollator()),
-      _resolvedNamespaces(std::move(params.resolvedNamespaces)) {
+      _valueComparator(_collator.getCollator()) {
+
+    _params.timeZoneDatabase = mongo::getTimeZoneDatabase(_params.opCtx);
+
+    // Disallow disk use if in read-only mode.
+    if (_params.allowDiskUse) {
+        tassert(7738401, "opCtx null check", _params.opCtx);
+        _params.allowDiskUse &= !(_params.opCtx->readOnly());
+    }
 
     // Only initialize 'variables' if we are given a runtimeConstants object. We delay initializing
     // variables and expect callers to invoke 'initializeReferencedSystemVariables()' after query
     // parsing. This allows us to only initialize variables which are used in the query.
 
-    if (params.blankExpressionContext) {
+    if (_params.blankExpressionContext) {
         // This is a shortcut to avoid reading the clock and the vector clock, since we don't
         // actually care about their values for this 'blank' ExpressionContext codepath.
         variables.setLegacyRuntimeConstants({Date_t::min(), Timestamp()});
@@ -315,25 +438,28 @@ ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
         // expression counters before re-parsing to avoid adding to the counters more than once per
         // a given query.
         stopExpressionCounters();
-    } else if (params.runtimeConstants) {
-        if (params.runtimeConstants->getClusterTime().isNull()) {
+    } else if (_params.runtimeConstants) {
+        if (_params.runtimeConstants->getClusterTime().isNull()) {
             // Try to get a default value for clusterTime if a logical clock exists.
-            auto genConsts = variables.generateRuntimeConstants(opCtx);
-            genConsts.setJsScope(params.runtimeConstants->getJsScope());
-            genConsts.setIsMapReduce(params.runtimeConstants->getIsMapReduce());
-            genConsts.setUserRoles(params.runtimeConstants->getUserRoles());
+            auto genConsts = variables.generateRuntimeConstants(getOperationContext());
+            genConsts.setJsScope(_params.runtimeConstants->getJsScope());
+            genConsts.setIsMapReduce(_params.runtimeConstants->getIsMapReduce());
+            genConsts.setUserRoles(_params.runtimeConstants->getUserRoles());
             variables.setLegacyRuntimeConstants(genConsts);
         } else {
-            variables.setLegacyRuntimeConstants(*(params.runtimeConstants));
+            variables.setLegacyRuntimeConstants(*(_params.runtimeConstants));
         }
     }
-    if (params.letParameters) {
-        variables.seedVariablesWithLetParameters(this, *params.letParameters);
+    if (_params.letParameters) {
+        variables.seedVariablesWithLetParameters(this, *_params.letParameters);
     }
-    if (!params.isMapReduceCommand) {
-        jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
+    if (!_params.isMapReduceCommand) {
+        _params.jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
     } else {
-        jsHeapLimitMB = boost::none;
+        _params.jsHeapLimitMB = boost::none;
+    }
+    if (!_params.mongoProcessInterface) {
+        _params.mongoProcessInterface = std::make_shared<StubMongoProcessInterface>();
     }
 }
 
@@ -352,9 +478,9 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::makeBlankExpressionCo
 
 void ExpressionContext::checkForInterruptSlow() {
     // This check could be expensive, at least in relative terms, so don't check every time.
-    invariant(opCtx);
+    invariant(getOperationContext());
     _interruptCounter = kInterruptCheckPeriod;
-    opCtx->checkForInterrupt();
+    getOperationContext()->checkForInterrupt();
 }
 
 ExpressionContext::CollatorStash::CollatorStash(ExpressionContext* const expCtx,
@@ -387,47 +513,46 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
         }
     }();
 
+    // Some of the properties of expression context are not cloned (e.g runtimeConstants,
+    // letParameters). In case new fields need to be cloned, they will need to be added in the
+    // builder and the proper setter called here.
     auto expCtx = ExpressionContextBuilder()
-                      .opCtx(opCtx)
+                      .opCtx(_params.opCtx)
                       .collator(std::move(collator))
-                      .mongoProcessInterface(mongoProcessInterface)
+                      .mongoProcessInterface(_params.mongoProcessInterface)
                       .ns(ns)
-                      .resolvedNamespace(_resolvedNamespaces)
-                      .mayDbProfile(mayDbProfile)
-                      .fromRouter(fromRouter)
-                      .needsMerge(needsMerge)
-                      .forPerShardCursor(forPerShardCursor)
-                      .allowDiskUse(allowDiskUse)
-                      .bypassDocumentValidation(bypassDocumentValidation)
+                      .resolvedNamespace(_params.resolvedNamespaces)
+                      .mayDbProfile(_params.mayDbProfile)
+                      .fromRouter(_params.fromRouter)
+                      .needsMerge(_params.needsMerge)
+                      .forPerShardCursor(_params.forPerShardCursor)
+                      .allowDiskUse(_params.allowDiskUse)
+                      .bypassDocumentValidation(_params.bypassDocumentValidation)
                       .collUUID(uuid)
-                      .explain(explain)
+                      .explain(_params.explain)
+                      .inRouter(_params.inRouter)
+                      .tmpDir(_params.tmpDir)
+                      .serializationContext(_params.serializationContext)
+                      .inLookup(_params.inLookup)
+                      .isParsingViewDefinition(_params.isParsingViewDefinition)
+                      .exprUnstableForApiV1(_params.exprUnstableForApiV1)
+                      .exprDeprecatedForApiV1(_params.exprDeprecatedForApiV1)
+                      .jsHeapLimitMB(_params.jsHeapLimitMB)
+                      .changeStreamTokenVersion(_params.changeStreamTokenVersion)
+                      .changeStreamSpec(_params.changeStreamSpec)
+                      .originalAggregateCommand(_params.originalAggregateCommand)
+                      .maxFeatureCompatibilityVersion(_params.maxFeatureCompatibilityVersion)
+                      .subPipelineDepth(_params.subPipelineDepth)
+                      .initialPostBatchResumeToken(_params.initialPostBatchResumeToken.getOwned())
+                      .viewNS(_params.viewNS)
                       .build();
 
     if (_collator.getIgnore()) {
         expCtx->setIgnoreCollator();
     }
 
-    expCtx->viewNS = viewNS;
-    expCtx->inRouter = inRouter;
-    expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
-    expCtx->subPipelineDepth = subPipelineDepth;
-    expCtx->tempDir = tempDir;
-    expCtx->jsHeapLimitMB = jsHeapLimitMB;
-    expCtx->isParsingViewDefinition = isParsingViewDefinition;
-
     expCtx->variables = variables;
     expCtx->variablesParseState = variablesParseState.copyWith(expCtx->variables.useIdGenerator());
-    expCtx->exprUnstableForApiV1 = exprUnstableForApiV1;
-    expCtx->exprDeprectedForApiV1 = exprDeprectedForApiV1;
-
-    expCtx->initialPostBatchResumeToken = initialPostBatchResumeToken.getOwned();
-    expCtx->changeStreamTokenVersion = changeStreamTokenVersion;
-    expCtx->changeStreamSpec = changeStreamSpec;
-
-    expCtx->originalAggregateCommand = originalAggregateCommand.getOwned();
-
-    expCtx->inLookup = inLookup;
-    expCtx->serializationCtxt = serializationCtxt;
 
     expCtx->_querySettings = _querySettings;
 
@@ -438,37 +563,37 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 }
 
 void ExpressionContext::startExpressionCounters() {
-    if (enabledCounters && !_expressionCounters) {
+    if (_params.enabledCounters && !_expressionCounters) {
         _expressionCounters = std::make_unique<ExpressionCounters>();
     }
 }
 
 void ExpressionContext::incrementMatchExprCounter(StringData name) {
-    if (enabledCounters && _expressionCounters) {
+    if (_params.enabledCounters && _expressionCounters) {
         ++_expressionCounters->matchExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementAggExprCounter(StringData name) {
-    if (enabledCounters && _expressionCounters) {
+    if (_params.enabledCounters && _expressionCounters) {
         ++_expressionCounters->aggExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementGroupAccumulatorExprCounter(StringData name) {
-    if (enabledCounters && _expressionCounters) {
+    if (_params.enabledCounters && _expressionCounters) {
         ++_expressionCounters->groupAccumulatorExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementWindowAccumulatorExprCounter(StringData name) {
-    if (enabledCounters && _expressionCounters) {
+    if (_params.enabledCounters && _expressionCounters) {
         ++_expressionCounters->windowAccumulatorExprCountersMap[name];
     }
 }
 
 void ExpressionContext::stopExpressionCounters() {
-    if (enabledCounters && _expressionCounters) {
+    if (_params.enabledCounters && _expressionCounters) {
         operatorCountersMatchExpressions.mergeCounters(_expressionCounters->matchExprCountersMap);
         operatorCountersAggExpressions.mergeCounters(_expressionCounters->aggExprCountersMap);
         operatorCountersGroupAccumulatorExpressions.mergeCounters(
@@ -486,11 +611,11 @@ void ExpressionContext::initializeReferencedSystemVariables() {
     }
     if (_systemVarsReferencedInQuery.contains(Variables::kClusterTimeId) &&
         !variables.hasValue(Variables::kClusterTimeId)) {
-        variables.defineClusterTime(opCtx);
+        variables.defineClusterTime(getOperationContext());
     }
     if (_systemVarsReferencedInQuery.contains(Variables::kUserRolesId) &&
         !variables.hasValue(Variables::kUserRolesId) && enableAccessToUserRoles.load()) {
-        variables.defineUserRoles(opCtx);
+        variables.defineUserRoles(getOperationContext());
     }
 }
 
@@ -511,8 +636,8 @@ void ExpressionContext::throwIfFeatureFlagIsNotEnabledOnFCV(
     if (!fcv.isVersionInitialized()) {
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         versionToCheck = multiversion::GenericFCV::kLastLTS;
-    } else if (maxFeatureCompatibilityVersion) {
-        versionToCheck = *maxFeatureCompatibilityVersion;
+    } else if (_params.maxFeatureCompatibilityVersion) {
+        versionToCheck = *_params.maxFeatureCompatibilityVersion;
     }
 
     uassert(ErrorCodes::QueryFeatureNotAllowed,

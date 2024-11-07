@@ -134,12 +134,14 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     ChunkVersion targetCollectionPlacementVersion) const {
-    auto* catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
+    auto* catalogCache = Grid::get(expCtx->getOperationContext())->catalogCache();
 
     auto receivedVersion = [&] {
         // Since we are only checking the epoch, don't advance the time in store of the index cache
         auto currentShardingIndexCatalogInfo =
-            uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss)).sii;
+            uassertStatusOK(
+                catalogCache->getCollectionRoutingInfo(expCtx->getOperationContext(), nss))
+                .sii;
 
         // Mark the cache entry routingInfo for the 'nss' if the entry is staler than
         // 'targetCollectionPlacementVersion'.
@@ -154,8 +156,8 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     }();
 
     auto wantedVersion = [&] {
-        auto routingInfo =
-            uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss));
+        auto routingInfo = uassertStatusOK(
+            catalogCache->getCollectionRoutingInfo(expCtx->getOperationContext(), nss));
         auto foundVersion = routingInfo.cm.hasRoutingTable() ? routingInfo.cm.getVersion()
                                                              : ChunkVersion::UNSHARDED();
 
@@ -199,12 +201,16 @@ Status ShardServerProcessInterface::insert(
 
     BatchedCommandRequest batchInsertCommand(std::move(insertCommand));
 
-    const auto originalWC = expCtx->opCtx->getWriteConcern();
-    ScopeGuard resetWCGuard([&] { expCtx->opCtx->setWriteConcern(originalWC); });
-    expCtx->opCtx->setWriteConcern(wc);
+    const auto originalWC = expCtx->getOperationContext()->getWriteConcern();
+    ScopeGuard resetWCGuard([&] { expCtx->getOperationContext()->setWriteConcern(originalWC); });
+    expCtx->getOperationContext()->setWriteConcern(wc);
 
-    cluster::write(
-        expCtx->opCtx, batchInsertCommand, nullptr /* nss */, &stats, &response, targetEpoch);
+    cluster::write(expCtx->getOperationContext(),
+                   batchInsertCommand,
+                   nullptr /* nss */,
+                   &stats,
+                   &response,
+                   targetEpoch);
 
     return response.toStatus();
 }
@@ -222,12 +228,16 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
 
     BatchedCommandRequest batchUpdateCommand(std::move(updateCommand));
 
-    const auto originalWC = expCtx->opCtx->getWriteConcern();
-    ScopeGuard resetWCGuard([&] { expCtx->opCtx->setWriteConcern(originalWC); });
-    expCtx->opCtx->setWriteConcern(wc);
+    const auto originalWC = expCtx->getOperationContext()->getWriteConcern();
+    ScopeGuard resetWCGuard([&] { expCtx->getOperationContext()->setWriteConcern(originalWC); });
+    expCtx->getOperationContext()->setWriteConcern(wc);
 
-    cluster::write(
-        expCtx->opCtx, batchUpdateCommand, nullptr /* nss */, &stats, &response, targetEpoch);
+    cluster::write(expCtx->getOperationContext(),
+                   batchUpdateCommand,
+                   nullptr /* nss */,
+                   &stats,
+                   &response,
+                   targetEpoch);
 
     if (auto status = response.toStatus(); status != Status::OK()) {
         return status;
@@ -645,8 +655,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::prepareP
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
-    std::unique_ptr<Pipeline, PipelineDeleter> targetPipeline(pipeline,
-                                                              PipelineDeleter(expCtx->opCtx));
+    std::unique_ptr<Pipeline, PipelineDeleter> targetPipeline(
+        pipeline, PipelineDeleter(expCtx->getOperationContext()));
     return sharded_agg_helpers::targetShardsAndAddMergeCursors(
         expCtx,
         std::make_pair(aggRequest, std::move(targetPipeline)),

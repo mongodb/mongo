@@ -313,7 +313,7 @@ public:
                               boost::intrusive_ptr<::mongo::Expression> input,
                               WindowBounds bounds)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
     }
 };
 
@@ -439,7 +439,7 @@ public:
 template <typename NonRemovableType, typename RemovableType>
 boost::intrusive_ptr<Expression> genericParseSBEUnsupportedExpressionRemovable(
     BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
-    expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
     return ExpressionRemovable<NonRemovableType, RemovableType>::parse(
         std::move(obj), sortBy, expCtx);
 }
@@ -1115,7 +1115,7 @@ public:
           _ps(std::move(ps)),
           _method(method),
           _intializeExpr(std::move(initializeExpr)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value serialize(const SerializationOptions& opts) const final;

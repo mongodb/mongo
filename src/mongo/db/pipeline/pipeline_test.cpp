@@ -144,7 +144,7 @@ class StubExplainInterface : public StubMongoProcessInterface {
     BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
                                       ExplainOptions::Verbosity verbosity) override {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
+            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
         BSONArrayBuilder bab;
         auto opts = SerializationOptions{.verbosity = boost::make_optional(verbosity)};
         auto pipelineVec = pipeline->writeExplainOps(opts);
@@ -157,7 +157,7 @@ class StubExplainInterface : public StubMongoProcessInterface {
         Pipeline* ownedPipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest) override {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
+            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
         return pipeline;
     }
 };
@@ -181,9 +181,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> assertPipelineOptimizesTo(
     AggregateCommandRequest request(aggNss, rawPipeline);
     boost::intrusive_ptr<ExpressionContextForTest> ctx =
         new ExpressionContextForTest(opCtx.get(), request);
-    ctx->mongoProcessInterface = std::make_shared<StubExplainInterface>();
+    ctx->setMongoProcessInterface(std::make_shared<StubExplainInterface>());
     unittest::TempDir tempDir("PipelineTest");
-    ctx->tempDir = tempDir.path();
+    ctx->setTempDir(tempDir.path());
 
     // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
     // operations will be able to have a resolved view definition.
@@ -3529,10 +3529,10 @@ public:
             _opCtx.get(),
             NamespaceString::createNamespaceString_forTest(
                 boost::none, "unittests", "pipeline_test"));
-        _expCtx->opCtx = _opCtx.get();
-        _expCtx->uuid = UUID::gen();
-        _expCtx->inRouter = options.inRouter;
-        setMockReplicationCoordinatorOnOpCtx(_expCtx->opCtx);
+        _expCtx->setOperationContext(_opCtx.get());
+        _expCtx->setUUID(UUID::gen());
+        _expCtx->setInRouter(options.inRouter);
+        setMockReplicationCoordinatorOnOpCtx(_expCtx->getOperationContext());
     }
 
     BSONObj changestreamStage(const std::string& stageStr) {
@@ -4341,9 +4341,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> getOptimizedPipeline(const BSONObj in
     AggregateCommandRequest request(kTestNss, rawPipeline);
     boost::intrusive_ptr<ExpressionContextForTest> ctx =
         new ExpressionContextForTest(opCtx.get(), request);
-    ctx->mongoProcessInterface = std::make_shared<StubExplainInterface>();
+    ctx->setMongoProcessInterface(std::make_shared<StubExplainInterface>());
     unittest::TempDir tempDir("PipelineTest");
-    ctx->tempDir = tempDir.path();
+    ctx->setTempDir(tempDir.path());
 
     auto outputPipe = Pipeline::parse(request.getPipeline(), ctx);
     outputPipe->optimizePipeline();
@@ -4581,9 +4581,9 @@ public:
         AggregateCommandRequest request(kTestNss, rawPipeline);
         boost::intrusive_ptr<ExpressionContextForTest> ctx = createExpressionContext(request);
         unittest::TempDir tempDir("PipelineTest");
-        ctx->tempDir = tempDir.path();
-        ctx->mongoProcessInterface =
-            std::make_shared<Sharded::ShardMergerMongoProcessInterface>(getCatalogCacheMock());
+        ctx->setTempDir(tempDir.path());
+        ctx->setMongoProcessInterface(
+            std::make_shared<Sharded::ShardMergerMongoProcessInterface>(getCatalogCacheMock()));
 
         // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
         // operations will be able to have a resolved view definition.
@@ -5423,7 +5423,7 @@ public:
 TEST_F(PipelineMustRunOnRouterTest, SplitRouterMergePipelineAssertsIfShardStagePresent) {
     setExpCtx({.inRouter = true, .allowDiskUse = true});
     auto expCtx = getExpCtx();
-    expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
+    expCtx->setMongoProcessInterface(std::make_shared<FakeMongoProcessInterface>());
     auto pipeline = makePipeline(
         {matchStage("{x: 5}"), splitStage(HostTypeRequirement::kNone), runOnRouter(), outStage()});
 
@@ -5546,13 +5546,14 @@ public:
         auto ctx = AggregationContextFixture::getExpCtx();
 
         // The db name string is always set to "a" (collectionless or not).
-        ctx->ns = (options.hasCollectionName)
-            ? kTestNss  // Sets to a.collection when there should be a collection name.
-            : NamespaceString::makeCollectionlessAggregateNSS(
-                  DatabaseName::createDatabaseName_forTest(boost::none, "a"));
+        ctx->setNamespaceString(
+            (options.hasCollectionName)
+                ? kTestNss  // Sets to a.collection when there should be a collection name.
+                : NamespaceString::makeCollectionlessAggregateNSS(
+                      DatabaseName::createDatabaseName_forTest(boost::none, "a")));
 
         if (options.setMockReplCoord) {
-            setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
+            setMockReplicationCoordinatorOnOpCtx(ctx->getOperationContext());
         }
         return ctx;
     }
@@ -5634,7 +5635,7 @@ TEST_F(PipelineValidateTest, ChangeStreamSplitLargeEventIsValid) {
 TEST_F(PipelineValidateTest, ChangeStreamSplitLargeEventIsNotValidWithoutChangeStream) {
     const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStreamSplitLargeEvent: {}}")};
     auto ctx = getExpCtx({.hasCollectionName = true, .setMockReplCoord = true});
-    ctx->changeStreamSpec = boost::none;
+    ctx->setChangeStreamSpec(boost::none);
 
     ASSERT_THROWS_CODE(
         Pipeline::parse(rawPipeline, ctx), DBException, ErrorCodes::IllegalOperation);
@@ -5668,7 +5669,7 @@ TEST_F(PipelineValidateTest, ChangeStreamSplitLargeEventIsValidAfterRedact) {
 using DocumentSourceDisallowedInTransactions = DocumentSourceDisallowedInTransactions;
 TEST_F(PipelineValidateTest, TopLevelPipelineValidatedForStagesIllegalInTransactions) {
     auto ctx = AggregationContextFixture::getExpCtx();
-    ctx->opCtx->setInMultiDocumentTransaction();
+    ctx->getOperationContext()->setInMultiDocumentTransaction();
 
     // Make a pipeline with a legal $match, and then an illegal mock stage, and verify that pipeline
     // creation fails with the expected error code.
@@ -5680,7 +5681,7 @@ TEST_F(PipelineValidateTest, TopLevelPipelineValidatedForStagesIllegalInTransact
 
 TEST_F(PipelineValidateTest, FacetPipelineValidatedForStagesIllegalInTransactions) {
     auto ctx = AggregationContextFixture::getExpCtx();
-    ctx->opCtx->setInMultiDocumentTransaction();
+    ctx->getOperationContext()->setInMultiDocumentTransaction();
 
     const std::vector<BSONObj> rawPipeline = {
         fromjson("{$facet: {subPipe: [{$match: {}}, {$out: 'outColl'}]}}")};
@@ -5783,7 +5784,7 @@ TEST_F(PipelineDependenciesTest,
     auto ctx = getExpCtx();
 
     // When needsMerge is true, the consumer might implicitly use textScore, if it's available.
-    ctx->needsMerge = true;
+    ctx->setNeedsMerge(true);
 
     auto pipeline = makePipeline({});
     auto deps = pipeline->getDependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
@@ -5794,7 +5795,7 @@ TEST_F(PipelineDependenciesTest,
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 
     // When needsMerge is false, if no stage explicitly uses textScore then we know it isn't needed.
-    ctx->needsMerge = false;
+    ctx->setNeedsMerge(false);
 
     pipeline = makePipeline({});
     deps = pipeline->getDependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);

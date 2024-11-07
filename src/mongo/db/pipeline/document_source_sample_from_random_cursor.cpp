@@ -103,12 +103,12 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::doGetNext() 
 
     // Assign it a random value to enable merging by random value, attempting to avoid bias in that
     // process.
-    auto& prng = pExpCtx->opCtx->getClient()->getPrng();
+    auto& prng = pExpCtx->getOperationContext()->getClient()->getPrng();
     _randMetaFieldVal -= smallestFromSampleOfUniform(&prng, _nDocsInColl);
 
     MutableDocument md(nextResult.releaseDocument());
     md.metadata().setRandVal(_randMetaFieldVal);
-    if (pExpCtx->needsMerge) {
+    if (pExpCtx->getNeedsMerge()) {
         // This stage will be merged by sorting results according to this random metadata field, but
         // the merging logic expects to sort by the sort key metadata.
         const bool isSingleElementKey = true;

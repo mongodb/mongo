@@ -96,8 +96,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::c
                       << spec.getSetVariable().toString() << " is not allowed.",
         spec.getSetVariable().toString() == searchMetaStr);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline =
-        Pipeline::parse(spec.getPipeline(), expCtx->copyForSubPipeline(expCtx->ns));
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline = Pipeline::parse(
+        spec.getPipeline(), expCtx->copyForSubPipeline(expCtx->getNamespaceString()));
 
     return DocumentSourceSetVariableFromSubPipeline::create(
         expCtx, std::move(pipeline), Variables::kSearchMetaId);
@@ -120,7 +120,7 @@ DocumentSourceSetVariableFromSubPipeline::create(
 void DocumentSourceSetVariableFromSubPipeline::doDispose() {
     if (_subPipeline) {
         _subPipeline.get_deleter().dismissDisposal();
-        _subPipeline->dispose(pExpCtx->opCtx);
+        _subPipeline->dispose(pExpCtx->getOperationContext());
         _subPipeline.reset();
     }
 }
@@ -161,7 +161,7 @@ void DocumentSourceSetVariableFromSubPipeline::reattachToOperationContext(Operat
 
 bool DocumentSourceSetVariableFromSubPipeline::validateOperationContext(
     const OperationContext* opCtx) const {
-    return getContext()->opCtx == opCtx &&
+    return getContext()->getOperationContext() == opCtx &&
         (!_subPipeline || _subPipeline->validateOperationContext(opCtx));
 }
 

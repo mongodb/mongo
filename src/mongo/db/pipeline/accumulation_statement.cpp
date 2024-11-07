@@ -110,9 +110,13 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
 
     expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(accName, featureFlag);
 
-    tassert(5837900, "Accumulators should only appear in a user operation", expCtx->opCtx);
-    assertLanguageFeatureIsAllowed(
-        expCtx->opCtx, accName.toString(), allowedWithApiStrict, allowedWithClientType);
+    tassert(5837900,
+            "Accumulators should only appear in a user operation",
+            expCtx->getOperationContext());
+    assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
+                                   accName.toString(),
+                                   allowedWithApiStrict,
+                                   allowedWithClientType);
 
     expCtx->incrementGroupAccumulatorExprCounter(accName);
     auto accExpr = parser(expCtx, specElem, vps);

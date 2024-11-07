@@ -56,7 +56,7 @@ void assertInvalidQueryInstance(const boost::intrusive_ptr<ExpressionContext>& e
                                 const BSONObj& representativeQuery,
                                 size_t errorCode) {
     auto representativeQueryInfo =
-        createRepresentativeInfo(expCtx->opCtx, representativeQuery, boost::none);
+        createRepresentativeInfo(expCtx->getOperationContext(), representativeQuery, boost::none);
     ASSERT_THROWS_CODE(
         utils::validateRepresentativeQuery(representativeQueryInfo), DBException, errorCode);
 }
@@ -112,9 +112,10 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotUseUuidAsNs) {
     const BSONObj representativeQ = BSON("find" << uuid1Res.getValue() << "$db"
                                                 << "testDB"
                                                 << "filter" << BSON("a" << BSONNULL));
-    ASSERT_THROWS_CODE(createRepresentativeInfo(expCtx->opCtx, representativeQ, boost::none),
-                       DBException,
-                       7746605);
+    ASSERT_THROWS_CODE(
+        createRepresentativeInfo(expCtx->getOperationContext(), representativeQ, boost::none),
+        DBException,
+        7746605);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndicesCannotReferToSameColl) {

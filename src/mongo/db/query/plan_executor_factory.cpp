@@ -66,7 +66,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<QuerySolution> qs,
     boost::optional<size_t> cachedPlanHash) {
     auto expCtx = cq->getExpCtx();
-    return make(expCtx->opCtx,
+    return make(expCtx->getOperationContext(),
                 std::move(ws),
                 std::move(rootStage),
                 std::move(qs),
@@ -93,7 +93,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     std::unique_ptr<QuerySolution> qs) {
 
-    return make(expCtx->opCtx,
+    return make(expCtx->getOperationContext(),
                 std::move(ws),
                 std::move(rootStage),
                 std::move(qs),
@@ -229,7 +229,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     PlanExecutorPipeline::ResumableScanType resumableScanType) {
-    auto* opCtx = expCtx->opCtx;
+    auto* opCtx = expCtx->getOperationContext();
     auto exec = new PlanExecutorPipeline(std::move(expCtx), std::move(pipeline), resumableScanType);
     return {exec, PlanExecutor::Deleter{opCtx}};
 }

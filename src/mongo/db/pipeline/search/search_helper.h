@@ -200,13 +200,15 @@ std::list<boost::intrusive_ptr<DocumentSource>> createInitialSearchPipeline(
 
     uassert(6600901,
             "Running search command in non-allowed context (update pipeline)",
-            !expCtx->isParsingPipelineUpdate);
+            !expCtx->getIsParsingPipelineUpdate());
 
     // This is only called from user pipelines during desugaring of $search/$searchMeta, so the
     // `specObj` should be the search query itself.
-    auto executor = executor::getMongotTaskExecutor(expCtx->opCtx->getServiceContext());
-    if ((!expCtx->mongoProcessInterface->isExpectedToExecuteQueries() ||
-         !expCtx->mongoProcessInterface->inShardedEnvironment(expCtx->opCtx)) ||
+    auto executor =
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+    if ((!expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries() ||
+         !expCtx->getMongoProcessInterface()->inShardedEnvironment(
+             expCtx->getOperationContext())) ||
         MONGO_unlikely(searchReturnEofImmediately.shouldFail())) {
         return {make_intrusive<TargetSearchDocumentSource>(std::move(specObj), expCtx, executor)};
     }

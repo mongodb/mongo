@@ -162,7 +162,7 @@ BatchedDeleteStage::BatchedDeleteStage(
       _stagedDeletesBuffer(ws),
       _stagedDeletesWatermarkBytes(0),
       _passTotalDocsStaged(0),
-      _passTimer(expCtx->opCtx->getServiceContext()->getTickSource()),
+      _passTimer(expCtx->getOperationContext()->getServiceContext()->getTickSource()),
       _commitStagedDeletes(false),
       _passStagingComplete(false) {
     tassert(6303800,

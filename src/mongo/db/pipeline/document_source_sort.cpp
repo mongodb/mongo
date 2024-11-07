@@ -142,8 +142,11 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
                                        uint64_t limit,
                                        uint64_t maxMemoryUsageBytes)
     : DocumentSource(kStageName, pExpCtx),
-      _sortExecutor(
-          {sortOrder, limit, maxMemoryUsageBytes, pExpCtx->tempDir, pExpCtx->allowDiskUse}),
+      _sortExecutor({sortOrder,
+                     limit,
+                     maxMemoryUsageBytes,
+                     pExpCtx->getTempDir(),
+                     pExpCtx->getAllowDiskUse()}),
       // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
       // by a metadata field.
       _sortKeyGen({sortOrder, pExpCtx->getCollator()}) {
@@ -484,9 +487,9 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
 
     SortOptions opts;
     opts.maxMemoryUsageBytes = internalQueryMaxBlockingSortMemoryUsageBytes.load();
-    if (expCtx->allowDiskUse) {
+    if (expCtx->getAllowDiskUse()) {
         opts.extSortAllowed = true;
-        opts.tempDir = expCtx->tempDir;
+        opts.tempDir = expCtx->getTempDir();
         opts.sorterFileStats = ds->getSorterFileStats();
     }
 
@@ -579,9 +582,9 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
 
     SortOptions opts;
     opts.MaxMemoryUsageBytes(internalQueryMaxBlockingSortMemoryUsageBytes.load());
-    if (expCtx->allowDiskUse) {
+    if (expCtx->getAllowDiskUse()) {
         opts.ExtSortAllowed(true);
-        opts.TempDir(expCtx->tempDir);
+        opts.TempDir(expCtx->getTempDir());
         opts.FileStats(ds->getSorterFileStats());
     }
     if (BSONElement limitElem = args["limit"]) {
@@ -658,7 +661,7 @@ bool DocumentSourceSort::usedDisk() {
 std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) const {
     Value sortKey = _sortKeyGen->computeSortKeyFromDocument(doc);
 
-    if (pExpCtx->needsMerge) {
+    if (pExpCtx->getNeedsMerge()) {
         // If this sort stage is part of a merged pipeline, make sure that each Document's sort key
         // gets saved with its metadata.
         MutableDocument toBeSorted(std::move(doc));
@@ -675,7 +678,7 @@ std::pair<Date_t, Document> DocumentSourceSort::extractTime(Document&& doc) cons
     uassert(6369909, "$_internalBoundedSort only handles Date values", time.getType() == Date);
     auto date = time.getDate();
 
-    if (pExpCtx->needsMerge) {
+    if (pExpCtx->getNeedsMerge()) {
         // If this sort stage is part of a merged pipeline, make sure that each Document's sort key
         // gets saved with its metadata.
         Value sortKey = _sortKeyGen->computeSortKeyFromDocument(doc);

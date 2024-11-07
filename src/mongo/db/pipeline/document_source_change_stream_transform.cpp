@@ -77,7 +77,7 @@ DocumentSourceChangeStreamTransform::createFromBson(
         DocumentSourceChangeStreamSpec::parse(IDLParserContext("$changeStream"), rawSpec.Obj());
 
     // Set the change stream spec on the expression context.
-    expCtx->changeStreamSpec = spec;
+    expCtx->setChangeStreamSpec(spec);
 
     return new DocumentSourceChangeStreamTransform(expCtx, std::move(spec));
 }
@@ -88,13 +88,13 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
                                               expCtx),
       _changeStreamSpec(std::move(spec)),
       _transformer(expCtx, _changeStreamSpec),
-      _isIndependentOfAnyCollection(expCtx->ns.isCollectionlessAggregateNS()) {
+      _isIndependentOfAnyCollection(expCtx->getNamespaceString().isCollectionlessAggregateNS()) {
 
     // Extract the resume token or high-water-mark from the spec.
     auto tokenData = change_stream::resolveResumeTokenFromSpec(expCtx, _changeStreamSpec);
 
     // Set the initialPostBatchResumeToken on the expression context.
-    expCtx->initialPostBatchResumeToken = ResumeToken(tokenData).toBSON();
+    expCtx->setInitialPostBatchResumeToken(ResumeToken(tokenData).toBSON());
 }
 
 StageConstraints DocumentSourceChangeStreamTransform::constraints(
@@ -240,7 +240,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::doGetNext() {
     uassert(50988,
             "Illegal attempt to execute an internal change stream stage on router. A $changeStream "
             "stage must be the first stage in a pipeline",
-            !pExpCtx->inRouter);
+            !pExpCtx->getInRouter());
 
     auto input = pSource->getNext();
     if (!input.isAdvanced()) {

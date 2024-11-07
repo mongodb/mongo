@@ -89,8 +89,8 @@ Status ParsedDelete::parseRequest() {
                   .ns(_request->getNsString())
                   .runtimeConstants(_request->getLegacyRuntimeConstants())
                   .letParameters(_request->getLet())
+                  .collationMatchesDefault(collationMatchesDefault)
                   .build();
-    _expCtx->collationMatchesDefault = collationMatchesDefault;
 
     // The '_id' field of a time-series collection needs to be handled as other fields.
     if (CanonicalQuery::isSimpleIdQuery(_request->getQuery()) && !_timeseriesDeleteQueryExprs) {
@@ -139,7 +139,7 @@ Status ParsedDelete::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
     auto statusWithCQ = mongo::parseWriteQueryToCQ(
-        _expCtx->opCtx,
+        _expCtx->getOperationContext(),
         _expCtx.get(),
         *_request,
         _timeseriesDeleteQueryExprs ? _timeseriesDeleteQueryExprs->_bucketExpr.get() : nullptr);

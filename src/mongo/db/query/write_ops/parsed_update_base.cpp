@@ -114,7 +114,7 @@ ParsedUpdateBase::ParsedUpdateBase(OperationContext* opCtx,
               : nullptr),
       _isRequestToTimeseries(isRequestToTimeseries) {
     if (forgoOpCounterIncrements) {
-        _expCtx->enabledCounters = false;
+        _expCtx->setEnabledCounters(false);
     }
     tassert(
         7655104, "timeseries collection must already exist", _collection || !isRequestToTimeseries);
@@ -195,7 +195,7 @@ Status ParsedUpdateBase::parseRequest() {
     auto [collatorToUse, collationMatchesDefault] =
         resolveCollator(_opCtx, _request->getCollation(), _collection);
     _expCtx->setCollator(std::move(collatorToUse));
-    _expCtx->collationMatchesDefault = collationMatchesDefault;
+    _expCtx->setCollationMatchesDefault(collationMatchesDefault);
 
     auto statusWithArrayFilters = parsedUpdateArrayFilters(
         _expCtx, _request->getArrayFilters(), _request->getNamespaceString());
@@ -235,7 +235,7 @@ Status ParsedUpdateBase::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
     auto statusWithCQ = impl::parseWriteQueryToCQ(
-        _expCtx->opCtx,
+        _expCtx->getOperationContext(),
         _expCtx.get(),
         *_extensionsCallback,
         *_request,
@@ -271,10 +271,10 @@ void ParsedUpdateBase::parseUpdate() {
         _driver.setSkipDotsDollarsCheck(true);
     }
 
-    _expCtx->isParsingPipelineUpdate = true;
+    _expCtx->setIsParsingPipelineUpdate(true);
     _driver.parse(
         *_modification, _arrayFilters, _request->getUpdateConstants(), _request->isMulti());
-    _expCtx->isParsingPipelineUpdate = false;
+    _expCtx->setIsParsingPipelineUpdate(false);
 }
 
 PlanYieldPolicy::YieldPolicy ParsedUpdateBase::yieldPolicy() const {

@@ -108,7 +108,7 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
 
                 auto allowedWithApi = parserRegistration.allowedWithApi;
 
-                const auto opCtx = expCtx->opCtx;
+                const auto opCtx = expCtx->getOperationContext();
 
                 if (!opCtx) {
                     // It's expected that we always have an op context attached to the expression
@@ -281,7 +281,7 @@ boost::intrusive_ptr<Expression> ExpressionMinMaxScalar::parse(
     boost::intrusive_ptr<::mongo::Expression> input = minMaxScalarArgs.first;
     std::pair<Value, Value> sMinAndsMax = minMaxScalarArgs.second;
 
-    expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
     return make_intrusive<ExpressionMinMaxScalar>(
         expCtx, input, std::move(bounds), std::move(sMinAndsMax));
 }

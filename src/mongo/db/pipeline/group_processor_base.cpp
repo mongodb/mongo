@@ -41,7 +41,7 @@ namespace mongo {
 GroupProcessorBase::GroupProcessorBase(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        int64_t maxMemoryUsageBytes)
     : _expCtx(expCtx),
-      _memoryTracker{expCtx->allowDiskUse && !expCtx->inRouter, maxMemoryUsageBytes},
+      _memoryTracker{expCtx->getAllowDiskUse() && !expCtx->getInRouter(), maxMemoryUsageBytes},
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()) {}
 
 void GroupProcessorBase::addAccumulationStatement(AccumulationStatement accumulationStatement) {

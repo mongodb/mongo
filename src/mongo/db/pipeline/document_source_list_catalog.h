@@ -111,7 +111,8 @@ public:
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
 
-        constraints.isIndependentOfAnyCollection = pExpCtx->ns.isCollectionlessAggregateNS();
+        constraints.isIndependentOfAnyCollection =
+            pExpCtx->getNamespaceString().isCollectionlessAggregateNS();
         constraints.requiresInputDocSource = false;
         return constraints;
     }

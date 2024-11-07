@@ -241,7 +241,7 @@ ReshardingCollectionCloner::makeRawNaturalOrderPipeline(
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
     // We associate the aggregation cursors established on each donor shard with a logical
     // session to prevent them from killing the cursor when it is idle locally. Due to the
     // cursor's merging behavior across all donor shards, it is possible for the cursor to be
@@ -598,7 +598,7 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
         opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
     }
 
-    auto request = AggregateCommandRequest(expCtx->ns, rawPipeline);
+    auto request = AggregateCommandRequest(expCtx->getNamespaceString(), rawPipeline);
     // If running in "relaxed" mode, do not set CollectionUUID to prevent NamespaceNotFound or
     // CollectionUUIDMismatch errors.
     if (!_relaxed) {

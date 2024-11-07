@@ -171,8 +171,8 @@ TEST_F(FindAndModifyImageLookupTest, NoopWhenEntryDoesNotHaveNeedsRetryImageFiel
     auto mock = DocumentSourceMock::createForTest(Document(oplogEntryBson), getExpCtx());
     imageLookup->setSource(mock.get());
     // Mock out the foreign collection.
-    getExpCtx()->mongoProcessInterface =
-        std::make_unique<MockMongoInterface>(std::vector<Document>{});
+    getExpCtx()->setMongoProcessInterface(
+        std::make_unique<MockMongoInterface>(std::vector<Document>{}));
 
     auto next = imageLookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -209,8 +209,8 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocMissing
     imageLookup->setSource(mock.get());
 
     // Mock out the foreign collection.
-    getExpCtx()->mongoProcessInterface =
-        std::make_unique<MockMongoInterface>(std::vector<Document>{});
+    getExpCtx()->setMongoProcessInterface(
+        std::make_unique<MockMongoInterface>(std::vector<Document>{}));
 
     auto next = imageLookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -259,8 +259,8 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
     imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
     imageEntry.setImage(preImage);
     // Mock out the foreign collection.
-    getExpCtx()->mongoProcessInterface =
-        std::make_unique<MockMongoInterface>(std::vector<Document>{Document{imageEntry.toBSON()}});
+    getExpCtx()->setMongoProcessInterface(
+        std::make_unique<MockMongoInterface>(std::vector<Document>{Document{imageEntry.toBSON()}}));
 
     auto next = imageLookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -319,8 +319,8 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         imageEntry.setImageKind(imageType);
         imageEntry.setImage(prePostImage);
         // Mock out the foreign collection.
-        getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-            std::vector<Document>{Document{imageEntry.toBSON()}});
+        getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+            std::vector<Document>{Document{imageEntry.toBSON()}}));
 
         // The next doc should be the doc for the forged image oplog entry.
         auto next = imageLookup->getNext();
@@ -414,8 +414,8 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         imageEntry.setImageKind(imageType);
         imageEntry.setImage(prePostImage);
         // Mock out the foreign collection.
-        getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-            std::vector<Document>{Document{imageEntry.toBSON()}});
+        getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+            std::vector<Document>{Document{imageEntry.toBSON()}}));
 
         // The next doc should be the doc for the forged image oplog entry and it should contain the
         // commit transaction timestamp.
@@ -516,8 +516,8 @@ TEST_F(FindAndModifyImageLookupTest,
     imageLookup->setSource(mock.get());
 
     // Mock out the foreign collection.
-    getExpCtx()->mongoProcessInterface =
-        std::make_unique<MockMongoInterface>(std::vector<Document>{Document{}});
+    getExpCtx()->setMongoProcessInterface(
+        std::make_unique<MockMongoInterface>(std::vector<Document>{Document{}}));
 
     // The next doc should be the doc for original applyOps oplog entry but the
     // findAndModify/update operation entry should have 'needsRetryImage' field removed.

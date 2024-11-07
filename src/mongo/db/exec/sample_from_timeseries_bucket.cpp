@@ -129,7 +129,7 @@ PlanStage::StageState SampleFromTimeseriesBucket::doWork(WorkingSetID* out) {
 
         _bucketUnpacker.reset(std::move(bucket));
 
-        auto& prng = expCtx()->opCtx->getClient()->getPrng();
+        auto& prng = expCtx()->getOperationContext()->getClient()->getPrng();
         auto j = prng.nextInt64(_bucketMaxCount);
 
         if (j < _bucketUnpacker.numberOfMeasurements()) {

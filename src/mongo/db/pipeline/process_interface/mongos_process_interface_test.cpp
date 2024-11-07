@@ -61,7 +61,7 @@ public:
 class MongosProcessInterfaceTest : public AggregationContextFixture {
 public:
     MongosProcessInterfaceTest() {
-        getExpCtx()->inRouter = true;
+        getExpCtx()->setInRouter(true);
     }
 
     auto makeProcessInterface() {
@@ -76,10 +76,11 @@ TEST_F(MongosProcessInterfaceTest,
         boost::make_optional(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {0, 0}));
     auto processInterface = makeProcessInterface();
 
-    ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-                           expCtx, {{"_id"}}, targetCollectionPlacementVersion, expCtx->ns),
-                       AssertionException,
-                       51179);
+    ASSERT_THROWS_CODE(
+        processInterface->ensureFieldsUniqueOrResolveDocumentKey(
+            expCtx, {{"_id"}}, targetCollectionPlacementVersion, expCtx->getNamespaceString()),
+        AssertionException,
+        51179);
 }
 
 TEST_F(MongosProcessInterfaceTest, FailsToEnsureFieldsUniqueIfNotSupportedByIndex) {
@@ -89,10 +90,11 @@ TEST_F(MongosProcessInterfaceTest, FailsToEnsureFieldsUniqueIfNotSupportedByInde
 
     processInterface->hasSupportingIndexForFields =
         MongoProcessInterface::SupportingUniqueIndex::None;
-    ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-                           expCtx, {{"x"}}, targetCollectionPlacementVersion, expCtx->ns),
-                       AssertionException,
-                       51190);
+    ASSERT_THROWS_CODE(
+        processInterface->ensureFieldsUniqueOrResolveDocumentKey(
+            expCtx, {{"x"}}, targetCollectionPlacementVersion, expCtx->getNamespaceString()),
+        AssertionException,
+        51190);
 }
 }  // namespace
 }  // namespace mongo

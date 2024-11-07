@@ -48,7 +48,7 @@ public:
     DistinctKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const ParsedDistinctCommand& request,
                 query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
-        : Key(expCtx->opCtx,
+        : Key(expCtx->getOperationContext(),
               std::make_unique<query_shape::DistinctCmdShape>(request, expCtx),
               request.distinctCommandRequest->getHint(),
               request.distinctCommandRequest->getReadConcern(),

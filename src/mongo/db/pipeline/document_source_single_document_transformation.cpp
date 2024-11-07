@@ -94,8 +94,8 @@ intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimi
 void DocumentSourceSingleDocumentTransformation::doDispose() {
     if (_transformationProcessor) {
         // Cache the stage options document in case this stage is serialized after disposing.
-        _cachedStageOptions =
-            _transformationProcessor->getTransformer().serializeTransformation(pExpCtx->explain);
+        _cachedStageOptions = _transformationProcessor->getTransformer().serializeTransformation(
+            pExpCtx->getExplain());
         _transformationProcessor.reset();
     }
 }

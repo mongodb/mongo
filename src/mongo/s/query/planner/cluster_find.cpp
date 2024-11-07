@@ -669,13 +669,13 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
         expCtx->variables.seedVariablesWithLetParameters(expCtx, *letParams);
     }
 
-    if (query.getExpCtx()->hasServerSideJs.where && _samplerWhereClause.tick()) {
+    if (query.getExpCtx()->getServerSideJsConfig().where && _samplerWhereClause.tick()) {
         LOGV2_WARNING(8996504,
                       "$where is deprecated. For more information, see "
                       "https://www.mongodb.com/docs/manual/reference/operator/query/where/");
     }
 
-    if (query.getExpCtx()->hasServerSideJs.function && _samplerFunctionJs.tick()) {
+    if (query.getExpCtx()->getServerSideJsConfig().function && _samplerFunctionJs.tick()) {
         LOGV2_WARNING(
             8996505,
             "$function is deprecated. For more information, see "

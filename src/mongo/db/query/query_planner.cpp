@@ -1691,7 +1691,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                     lookupStage->getFromNs(),
                     lookupStage->getForeignField()->fullPath(),
                     secondaryCollInfos,
-                    query.getExpCtx()->allowDiskUse,
+                    query.getExpCtx()->getAllowDiskUse(),
                     query.getCollator());
 
             if (!lookupStage->hasUnwindSrc()) {

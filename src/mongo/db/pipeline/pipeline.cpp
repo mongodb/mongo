@@ -112,7 +112,7 @@ Value appendCommonExecStats(Value docSource, const CommonStats& stats) {
 void validateTopLevelPipeline(const Pipeline& pipeline) {
     // Verify that the specified namespace is valid for the initial stage of this pipeline.
     auto expCtx = pipeline.getContext();
-    const NamespaceString& nss = expCtx->ns;
+    const NamespaceString& nss = expCtx->getNamespaceString();
 
     const auto& sources = pipeline.getSources();
 
@@ -160,7 +160,7 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
                 hasChangeStreamSplitLargeEventStage = true;
             }
         }
-        auto spec = isChangeStream ? expCtx->changeStreamSpec : boost::none;
+        auto spec = isChangeStream ? expCtx->getChangeStreamSpec() : boost::none;
         auto hasSplitEventResumeToken = spec &&
             change_stream::resolveResumeTokenFromSpec(expCtx, *spec).fragmentNum.has_value();
         uassert(ErrorCodes::ChangeStreamFatalError,
@@ -171,7 +171,7 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
 
     // Verify that usage of $searchMeta and $search is legal. Note that on routers, we defer this
     // check until after we've established cursors on the shards to resolve any views.
-    if (expCtx->opCtx->getServiceContext() && !expCtx->inRouter) {
+    if (expCtx->getOperationContext()->getServiceContext() && !expCtx->getInRouter()) {
         search_helpers::assertSearchMetaAccessValid(sources, expCtx.get());
     }
 }
@@ -235,8 +235,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseCommon(
         stages.insert(stages.end(), parsedSources.begin(), parsedSources.end());
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(new Pipeline(std::move(stages), expCtx),
-                                                        PipelineDeleter(expCtx->opCtx));
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
+        new Pipeline(std::move(stages), expCtx), PipelineDeleter(expCtx->getOperationContext()));
 
     // First call the top level validator, unless this is a $facet
     // (nested) pipeline. Then call the context-specific validator if one
@@ -288,8 +288,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseFacetPipeline(
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::create(
     SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(new Pipeline(std::move(stages), expCtx),
-                                                        PipelineDeleter(expCtx->opCtx));
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
+        new Pipeline(std::move(stages), expCtx), PipelineDeleter(expCtx->getOperationContext()));
 
     constexpr bool alreadyOptimized = false;
     pipeline->validateCommon(alreadyOptimized);
@@ -337,15 +337,16 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
         }
 
         // Verify that we are not attempting to run a router-only stage on a data bearing node.
-        uassert(40644,
-                str::stream() << stage->getSourceName() << " can only be run on router",
-                !(constraints.hostRequirement == HostTypeRequirement::kRouter && !pCtx->inRouter));
-
         uassert(
-            ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Stage not supported inside of a multi-document transaction: "
-                          << stage->getSourceName(),
-            !(pCtx->opCtx->inMultiDocumentTransaction() && !constraints.isAllowedInTransaction()));
+            40644,
+            str::stream() << stage->getSourceName() << " can only be run on router",
+            !(constraints.hostRequirement == HostTypeRequirement::kRouter && !pCtx->getInRouter()));
+
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Stage not supported inside of a multi-document transaction: "
+                              << stage->getSourceName(),
+                !(pCtx->getOperationContext()->inMultiDocumentTransaction() &&
+                  !constraints.isAllowedInTransaction()));
 
         // Verify that a stage which can only appear once doesn't appear more than that.
         uassert(7183900,
@@ -423,7 +424,7 @@ bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
 }
 
 void Pipeline::detachFromOperationContext() {
-    pCtx->opCtx = nullptr;
+    pCtx->setOperationContext(nullptr);
 
     for (auto&& source : _sources) {
         source->detachFromOperationContext();
@@ -434,7 +435,7 @@ void Pipeline::detachFromOperationContext() {
 }
 
 void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
-    pCtx->opCtx = opCtx;
+    pCtx->setOperationContext(opCtx);
 
     for (auto&& source : _sources) {
         source->reattachToOperationContext(opCtx);
@@ -456,12 +457,12 @@ void Pipeline::checkValidOperationContext() const {
     tassert(7406000,
             str::stream()
                 << "All DocumentSources and subpipelines must have the same operation context",
-            validateOperationContext(getContext()->opCtx));
+            validateOperationContext(getContext()->getOperationContext()));
 }
 
 void Pipeline::dispose(OperationContext* opCtx) {
     try {
-        pCtx->opCtx = opCtx;
+        pCtx->setOperationContext(opCtx);
 
         // Make sure all stages are connected, in case we are being disposed via an error path and
         // were not stitched at the time of the error.
@@ -755,7 +756,7 @@ DepsTracker Pipeline::getDependenciesForContainer(
         // There is a text score available. If we are the first half of a split pipeline, then we
         // have to assume future stages might depend on the textScore (unless we've encountered a
         // stage that doesn't preserve metadata).
-        if (expCtx->needsMerge && !knowAllMeta) {
+        if (expCtx->getNeedsMerge() && !knowAllMeta) {
             deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
         }
     } else {
@@ -777,7 +778,7 @@ Status Pipeline::canRunOnRouter() const {
         const bool mustWriteToDisk =
             (constraints.diskRequirement == DiskUseRequirement::kWritesPersistentData);
         const bool mayWriteTmpDataAndDiskUseIsAllowed =
-            (pCtx->allowDiskUse && !pCtx->opCtx->readOnly() &&
+            (pCtx->getAllowDiskUse() && !pCtx->getOperationContext()->readOnly() &&
              constraints.diskRequirement == DiskUseRequirement::kWritesTmpData);
         const bool needsDisk = (mustWriteToDisk || mayWriteTmpDataAndDiskUseIsAllowed);
 
@@ -889,7 +890,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     pipeline->validateCommon(alreadyOptimized);
 
     if (opts.attachCursorSource) {
-        pipeline = expCtx->mongoProcessInterface->preparePipelineForExecution(
+        pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
             pipeline.release(), opts.shardTargetingPolicy, std::move(opts.readConcern));
     }
 
@@ -924,12 +925,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     pipeline->validateCommon(alreadyOptimized);
     aggRequest.setPipeline(pipeline->serializeToBson());
 
-    return expCtx->mongoProcessInterface->preparePipelineForExecution(aggRequest,
-                                                                      pipeline.release(),
-                                                                      expCtx,
-                                                                      shardCursorsSortSpec,
-                                                                      opts.shardTargetingPolicy,
-                                                                      std::move(readConcern));
+    return expCtx->getMongoProcessInterface()->preparePipelineForExecution(
+        aggRequest,
+        pipeline.release(),
+        expCtx,
+        shardCursorsSortSpec,
+        opts.shardTargetingPolicy,
+        std::move(readConcern));
 }
 
 Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
@@ -952,7 +954,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinit
     MakePipelineOptions opts) {
 
     // Update subpipeline's ExpressionContext with the resolved namespace.
-    subPipelineExpCtx->ns = resolvedNs.ns;
+    subPipelineExpCtx->setNamespaceString(resolvedNs.ns);
 
     if (resolvedNs.pipeline.empty()) {
         return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);

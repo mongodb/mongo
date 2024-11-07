@@ -181,7 +181,7 @@ TEST_F(SearchCursorStageTest, SearchTestOutputs) {
     auto metadataSlots = generateMultipleSlotIds(2);
 
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->uuid = UUID::gen();
+    expCtx->setUUID(UUID::gen());
 
     // Build and prepare for execution of the search cursor stage.
     auto searchCursor = makeSearchCursorStage(idSlot,
@@ -195,7 +195,8 @@ TEST_F(SearchCursorStageTest, SearchTestOutputs) {
 
     auto ctx = makeCompileCtx(std::move(env));
     auto remoteCursors = std::make_unique<RemoteCursorMap>();
-    remoteCursors->insert({0, mockTaskExecutorCursor(expCtx->opCtx, 0, resultArray)});
+    remoteCursors->insert(
+        {0, mockTaskExecutorCursor(expCtx->getOperationContext(), 0, resultArray)});
     ctx->remoteCursors = remoteCursors.get();
 
     prepareTree(ctx.get(), searchCursor.get());
@@ -238,7 +239,7 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
     auto fieldSlots = generateMultipleSlotIds(2);
 
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->uuid = UUID::gen();
+    expCtx->setUUID(UUID::gen());
 
 
     // Build and prepare for execution of the search cursor stage.
@@ -253,7 +254,8 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
 
     auto ctx = makeCompileCtx(std::move(env));
     auto remoteCursors = std::make_unique<RemoteCursorMap>();
-    remoteCursors->insert({0, mockTaskExecutorCursor(expCtx->opCtx, 0, resultStoredSource)});
+    remoteCursors->insert(
+        {0, mockTaskExecutorCursor(expCtx->getOperationContext(), 0, resultStoredSource)});
     ctx->remoteCursors = remoteCursors.get();
 
     prepareTree(ctx.get(), searchCursor.get());
@@ -284,7 +286,7 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
     auto fieldSlots = generateMultipleSlotIds(2);
 
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->uuid = UUID::gen();
+    expCtx->setUUID(UUID::gen());
 
     // Build and prepare for execution of the search cursor stage.
     auto searchCursor = makeSearchCursorStage(0 /* idSlot */,
@@ -298,7 +300,8 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
 
     auto ctx = makeCompileCtx(std::move(env));
     auto remoteCursors = std::make_unique<RemoteCursorMap>();
-    remoteCursors->insert({0, mockTaskExecutorCursor(expCtx->opCtx, 0, resultStoredSource)});
+    remoteCursors->insert(
+        {0, mockTaskExecutorCursor(expCtx->getOperationContext(), 0, resultStoredSource)});
     ctx->remoteCursors = remoteCursors.get();
 
     prepareTree(ctx.get(), searchCursor.get());

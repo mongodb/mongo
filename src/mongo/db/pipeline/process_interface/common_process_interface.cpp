@@ -81,7 +81,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
     CurrentOpUserMode userMode,
     CurrentOpTruncateMode truncateMode,
     CurrentOpCursorMode cursorMode) const {
-    OperationContext* opCtx = expCtx->opCtx;
+    OperationContext* opCtx = expCtx->getOperationContext();
     AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
 
     std::vector<BSONObj> ops;
@@ -98,7 +98,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
 
                 // If currOp is being run for a particular tenant, ignore any ops that don't belong
                 // to it.
-                if (auto expCtxTenantId = expCtx->ns.tenantId()) {
+                if (auto expCtxTenantId = expCtx->getNamespaceString().tenantId()) {
                     auto userName = AuthorizationSession::get(client)->getAuthenticatedUserName();
                     if ((userName && userName->tenantId() &&
                          userName->tenantId() != expCtxTenantId) ||
@@ -143,9 +143,9 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
                         str::stream()
                             << "SerializationContext on the expCtx should not be empty, with ns: "
                             << ns->toStringForErrorMsg(),
-                        expCtx->serializationCtxt != SerializationContext::stateDefault());
-                cursorObj.append("ns",
-                                 NamespaceStringUtil::serialize(*ns, expCtx->serializationCtxt));
+                        expCtx->getSerializationContext() != SerializationContext::stateDefault());
+                cursorObj.append(
+                    "ns", NamespaceStringUtil::serialize(*ns, expCtx->getSerializationContext()));
             } else
                 cursorObj.append("ns", "");
 
@@ -234,9 +234,9 @@ bool CommonProcessInterface::keyPatternNamesExactPaths(const BSONObj& keyPattern
 boost::optional<mongo::DatabaseVersion> CommonProcessInterface::refreshAndGetDatabaseVersion(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const DatabaseName& dbName) const {
 
-    const auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
+    const auto catalogCache = Grid::get(expCtx->getOperationContext())->catalogCache();
     catalogCache->onStaleDatabaseVersion(dbName, boost::none /* wantedVersion */);
-    auto db = catalogCache->getDatabase(expCtx->opCtx, dbName);
+    auto db = catalogCache->getDatabase(expCtx->getOperationContext(), dbName);
 
     return db.isOK() ? boost::make_optional(db.getValue()->getVersion()) : boost::none;
 }

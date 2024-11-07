@@ -111,8 +111,8 @@ SortStageDefault::SortStageDefault(boost::intrusive_ptr<ExpressionContext> expCt
       _sortExecutor(std::move(sortPattern),
                     limit,
                     maxMemoryUsageBytes,
-                    expCtx->tempDir,
-                    expCtx->allowDiskUse) {}
+                    expCtx->getTempDir(),
+                    expCtx->getAllowDiskUse()) {}
 
 void SortStageDefault::spool(WorkingSetID wsid) {
     SortableWorkingSetMember extractedMember{_ws->extract(wsid)};
@@ -147,8 +147,8 @@ SortStageSimple::SortStageSimple(boost::intrusive_ptr<ExpressionContext> expCtx,
       _sortExecutor(std::move(sortPattern),
                     limit,
                     maxMemoryUsageBytes,
-                    expCtx->tempDir,
-                    expCtx->allowDiskUse) {}
+                    expCtx->getTempDir(),
+                    expCtx->getAllowDiskUse()) {}
 
 void SortStageSimple::spool(WorkingSetID wsid) {
     auto member = _ws->get(wsid);

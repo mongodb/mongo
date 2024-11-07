@@ -72,8 +72,8 @@ TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfSpecIsNotObject) {
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfNotRunOnAdmin) {
-    getExpCtx()->ns = NamespaceString::makeCollectionlessAggregateNSS(
-        DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
+    getExpCtx()->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "foo")));
     ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
                            fromjson("{$queryStats: {}}").firstElement(), getExpCtx()),
                        AssertionException,
@@ -81,7 +81,7 @@ TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfNotRunOnAdmin) {
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfNotRunWithAggregateOne) {
-    getExpCtx()->ns = NamespaceString::createNamespaceString_forTest("admin.foo");
+    getExpCtx()->setNamespaceString(NamespaceString::createNamespaceString_forTest("admin.foo"));
     ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
                            fromjson("{$queryStats: {}}").firstElement(), getExpCtx()),
                        AssertionException,

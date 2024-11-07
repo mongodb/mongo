@@ -121,8 +121,8 @@ protected:
 
     auto unionWith() {
         auto expCtx = getExpCtx();
-        NamespaceString nsToUnionWith =
-            NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll");
+        NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
+            expCtx->getNamespaceString().dbName(), "coll");
         expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
             {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
         auto bson =
@@ -169,8 +169,8 @@ protected:
 
     auto lookup() {
         auto expCtx = getExpCtx();
-        NamespaceString lookupNs =
-            NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll");
+        NamespaceString lookupNs = NamespaceString::createNamespaceString_forTest(
+            expCtx->getNamespaceString().dbName(), "coll");
         expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
             {lookupNs.coll().toString(), {lookupNs, std::vector<BSONObj>()}}});
         auto bson = BSON("$lookup" << BSON("from" << lookupNs.coll() << "as"
@@ -191,7 +191,7 @@ protected:
 
     auto setVariableFromSubPipeline() {
         auto expCtx = getExpCtx();
-        auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->ns);
+        auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->getNamespaceString());
         return DocumentSourceSetVariableFromSubPipeline::create(
             expCtx, Pipeline::create({}, ctxForSubPipeline), Variables::kSearchMetaId);
     }

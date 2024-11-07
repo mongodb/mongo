@@ -65,9 +65,10 @@ DocumentSource::GetNextResult DocumentSourceOperationMetrics::doGetNext() {
     if (_operationMetrics.empty()) {
         auto dbMetrics = [&]() {
             if (_clearMetrics) {
-                return ResourceConsumption::get(pExpCtx->opCtx).getAndClearDbMetrics();
+                return ResourceConsumption::get(pExpCtx->getOperationContext())
+                    .getAndClearDbMetrics();
             }
-            return ResourceConsumption::get(pExpCtx->opCtx).getDbMetrics();
+            return ResourceConsumption::get(pExpCtx->getOperationContext()).getDbMetrics();
         }();
         auto localTime = jsTime();  // fetch current time to include in all metrics documents
         for (auto& [dbName, metrics] : dbMetrics) {
@@ -97,7 +98,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOperationMetrics::createFromBson(
                   "The aggregateOperationResourceConsumptionMetrics server parameter is not set");
     }
 
-    const NamespaceString& nss = pExpCtx->ns;
+    const NamespaceString& nss = pExpCtx->getNamespaceString();
     uassert(ErrorCodes::InvalidNamespace,
             "$operationMetrics must be run against the 'admin' database with {aggregate: 1}",
             nss.isAdminDB() && nss.isCollectionlessAggregateNS());

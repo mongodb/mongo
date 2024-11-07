@@ -200,8 +200,9 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
                       .explain(verbosity)
                       .build();
     if (!requestCollation.isEmpty()) {
-        auto statusWithCollator = CollatorFactoryInterface::get(expCtx->opCtx->getServiceContext())
-                                      ->makeFromBSON(requestCollation);
+        auto statusWithCollator =
+            CollatorFactoryInterface::get(expCtx->getOperationContext()->getServiceContext())
+                ->makeFromBSON(requestCollation);
         expCtx->setCollator(uassertStatusOK(std::move(statusWithCollator)));
     }
     return expCtx;
@@ -540,7 +541,7 @@ public:
 
         // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
         // manually update the plan cache instead without multiplanning but this is simpler.
-        if (1 == solutions.size() && !_cq->getExpCtxRaw()->forcePlanCache &&
+        if (1 == solutions.size() && !_cq->getExpCtxRaw()->getForcePlanCache() &&
             !internalQueryPlannerUseMultiplannerForSingleSolutions) {
             // Only one possible plan. Build the stages from the solution.
             solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
@@ -1113,7 +1114,7 @@ bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, cons
     // compatible.
     SbeCompatibility minRequiredCompatibility =
         getMinRequiredSbeCompatibility(queryKnob.getInternalQueryFrameworkControlForOp(), sbeFull);
-    return cq.getExpCtx()->sbeCompatibility >= minRequiredCompatibility;
+    return cq.getExpCtx()->getSbeCompatibility() >= minRequiredCompatibility;
 }
 
 bool shouldUseSbePlanCache(const QueryPlannerParams& params) {
@@ -1433,7 +1434,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     const auto& collectionPtr = coll.getCollectionPtr();
 
     auto expCtx = parsedDelete->expCtx();
-    OperationContext* opCtx = expCtx->opCtx;
+    OperationContext* opCtx = expCtx->getOperationContext();
     const DeleteRequest* request = parsedDelete->getRequest();
 
     const NamespaceString& nss(request->getNsString());
@@ -1553,7 +1554,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     }
 
     // Transfer the explain verbosity level into the expression context.
-    cq->getExpCtx()->explain = verbosity;
+    cq->getExpCtx()->setExplain(verbosity);
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {
@@ -1602,7 +1603,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     const auto& collectionPtr = coll.getCollectionPtr();
 
     auto expCtx = parsedUpdate->expCtx();
-    OperationContext* opCtx = expCtx->opCtx;
+    OperationContext* opCtx = expCtx->getOperationContext();
 
     const UpdateRequest* request = parsedUpdate->getRequest();
     UpdateDriver* driver = parsedUpdate->getDriver();
@@ -1850,7 +1851,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     const CountCommandRequest& count) {
     const auto& collection = *coll;
 
-    OperationContext* opCtx = expCtx->opCtx;
+    OperationContext* opCtx = expCtx->getOperationContext();
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
     auto statusWithCQ = CanonicalQuery::make(
@@ -1951,7 +1952,7 @@ StatusWith<std::unique_ptr<QuerySolution>> tryGetQuerySolutionForDistinct(
         return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
     }
 
-    auto* opCtx = canonicalQuery.getExpCtx()->opCtx;
+    auto* opCtx = canonicalQuery.getExpCtx()->getOperationContext();
 
     auto getQuerySolution = [&](size_t options) -> std::unique_ptr<QuerySolution> {
         auto plannerParams =
@@ -1990,7 +1991,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     tassert(9245501, "Expected distinct property on CanonicalQuery", canonicalQuery->getDistinct());
 
     const auto& collectionPtr = collections.getMainCollection();
-    auto* opCtx = canonicalQuery->getExpCtx()->opCtx;
+    auto* opCtx = canonicalQuery->getExpCtx()->getOperationContext();
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     auto collPtrOrAcq = collections.getMainCollectionPtrOrAcquisition();
     auto&& root = stage_builder::buildClassicExecutableTree(

@@ -104,7 +104,7 @@ Document DocumentSourceGeoNearCursor::transformDoc(Document&& objInput) const {
     }
 
     // In a cluster, $geoNear will be merged via $sort, so add the sort key.
-    if (pExpCtx->needsMerge) {
+    if (pExpCtx->getNeedsMerge()) {
         const bool isSingleElementKey = true;
         output.metadata().setSortKey(Value(distance), isSingleElementKey);
     }

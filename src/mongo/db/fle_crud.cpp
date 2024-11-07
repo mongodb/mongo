@@ -1401,8 +1401,8 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
 
     {
-        stdx::lock_guard<Client> lk(*expCtx->opCtx->getClient());
-        CurOp::get(expCtx->opCtx)->setShouldOmitDiagnosticInformation(lk, true);
+        stdx::lock_guard<Client> lk(*expCtx->getOperationContext()->getClient());
+        CurOp::get(expCtx->getOperationContext())->setShouldOmitDiagnosticInformation(lk, true);
     }
 
     auto edcNss = findAndModifyRequest.getNamespace();

@@ -234,8 +234,8 @@ struct StageConstraints {
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
         return (hostRequirement != HostTypeRequirement::kLocalOnly
                     ? hostRequirement
-                    : (expCtx->inRouter ? HostTypeRequirement::kRouter
-                                        : HostTypeRequirement::kAnyShard));
+                    : (expCtx->getInRouter() ? HostTypeRequirement::kRouter
+                                             : HostTypeRequirement::kAnyShard));
     }
 
     /**

@@ -56,7 +56,7 @@ REGISTER_DOCUMENT_SOURCE(listSessions,
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    const NamespaceString& nss = pExpCtx->ns;
+    const NamespaceString& nss = pExpCtx->getNamespaceString();
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << kStageName << " may only be run against "

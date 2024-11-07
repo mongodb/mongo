@@ -130,7 +130,7 @@ TEST_F(ListSearchIndexesTest, ErrorWhenCollDoesNotExistWithoutAtlas) {
             return true;
         }
     };
-    expCtx->mongoProcessInterface = std::make_unique<MockMongoInterface>();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
 
     auto specObj = BSON("$listSearchIndexes" << BSONObj());
 

@@ -100,7 +100,7 @@ Status CurrentDateNode::init(BSONElement modExpr,
                                        " or a $type expression ({$type: 'timestamp/date'}).");
     }
 
-    _service = expCtx->opCtx->getServiceContext();
+    _service = expCtx->getOperationContext()->getServiceContext();
 
     return Status::OK();
 }

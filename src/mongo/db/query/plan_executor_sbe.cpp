@@ -150,7 +150,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     }
     const auto isMultiPlan = candidates.plans.size() > 1 || classicRuntimePlannerStage;
     const auto isCachedCandidate = candidates.winner().fromPlanCache;
-    if (!_cq || !_cq->getExpCtx()->explain) {
+    if (!_cq || !_cq->getExpCtx()->getExplain()) {
         // If we're not in explain mode, there is no need to keep rejected candidate plans around.
         candidates.plans.clear();
         classicRuntimePlannerStage.reset();
@@ -379,7 +379,9 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
         invariant(_state == State::kOpened);
 
         const MetaDataAccessor* metadataAccessors = isDocument ||
-                (_cq && (_cq->getExpCtxRaw()->needsMerge || _cq->getExpCtxRaw()->forPerShardCursor))
+                (_cq &&
+                 (_cq->getExpCtxRaw()->getNeedsMerge() ||
+                  _cq->getExpCtxRaw()->getForPerShardCursor()))
             ? &_metadataAccessors
             : nullptr;
         auto result = fetchNextImpl(_root.get(),
@@ -630,7 +632,7 @@ void PlanExecutorSBE::initializeAccessors(
     MetaDataAccessor& accessor,
     const stage_builder::PlanStageMetadataSlots& metadataSlots,
     const QueryMetadataBitSet& metadataBit) {
-    bool needsMerge = _cq->getExpCtxRaw()->needsMerge;
+    bool needsMerge = _cq->getExpCtxRaw()->getNeedsMerge();
 
     if (auto slot = metadataSlots.searchScoreSlot;
         slot && (needsMerge || metadataBit.test(DocumentMetadataFields::MetaType::kSearchScore))) {

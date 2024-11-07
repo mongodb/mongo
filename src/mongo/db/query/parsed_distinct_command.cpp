@@ -145,7 +145,7 @@ std::unique_ptr<ParsedDistinctCommand> parse(
         MatchExpressionParser::parse(query, expCtx, extensionsCallback, allowedFeatures));
 
     // Collator.
-    parsedDistinct->collator = resolveCollator(expCtx->opCtx, *distinctCommand);
+    parsedDistinct->collator = resolveCollator(expCtx->getOperationContext(), *distinctCommand);
     if (parsedDistinct->collator.get() && expCtx->getCollator()) {
         invariant(CollatorInterface::collatorsMatch(parsedDistinct->collator.get(),
                                                     expCtx->getCollator()));
@@ -240,7 +240,7 @@ std::unique_ptr<CanonicalQuery> parseCanonicalQuery(
             "Key field cannot contain an embedded null byte",
             distinctRequest.getKey().find('\0') == std::string::npos);
 
-    auto findRequest = std::make_unique<FindCommandRequest>(expCtx->ns);
+    auto findRequest = std::make_unique<FindCommandRequest>(expCtx->getNamespaceString());
     if (auto query = distinctRequest.getQuery()) {
         findRequest->setFilter(query->getOwned());
     }

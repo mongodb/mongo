@@ -176,7 +176,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);
     auto runnablePipeline = [&]() {
         auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);
-        return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
+        return expCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
             pipeline.release());
     }();
     auto exec = plan_executor_factory::make(expCtx, std::move(runnablePipeline));
@@ -190,16 +190,16 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     try {
         auto resultArray = exhaustPipelineIntoBSONArray(exec);
 
-        if (expCtx->explain) {
+        if (expCtx->getExplain()) {
             Explain::explainPipeline(
-                exec.get(), false /* executePipeline  */, *expCtx->explain, cmd, &result);
+                exec.get(), false /* executePipeline  */, *expCtx->getExplain(), cmd, &result);
         }
 
         PlanSummaryStats planSummaryStats;
         explainer.getSummaryStats(&planSummaryStats);
         CurOp::get(opCtx)->debug().setPlanSummaryMetrics(std::move(planSummaryStats));
 
-        if (!expCtx->explain) {
+        if (!expCtx->getExplain()) {
             if (parsedMr.getOutOptions().getOutputType() == OutputType::InMemory) {
                 map_reduce_output_format::appendInlineResponse(std::move(resultArray), &result);
             } else {

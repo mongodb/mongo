@@ -306,7 +306,7 @@ void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
                                                const BSONObj letParams) {
     for (auto&& elem : letParams) {
         const auto fieldName = elem.fieldNameStringData();
-        auto maybeSystemVarValidator = validateVariable(expCtx->opCtx, fieldName);
+        auto maybeSystemVarValidator = validateVariable(expCtx->getOperationContext(), fieldName);
         auto expr = Expression::parseOperand(expCtx, elem, expCtx->variablesParseState);
 
         uassert(4890500,

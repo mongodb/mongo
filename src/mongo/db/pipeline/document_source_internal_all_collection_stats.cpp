@@ -70,7 +70,8 @@ REGISTER_DOCUMENT_SOURCE(_internalAllCollectionStats,
 
 DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNext() {
     if (!_catalogDocs) {
-        _catalogDocs = pExpCtx->mongoProcessInterface->listCatalog(pExpCtx->opCtx);
+        _catalogDocs =
+            pExpCtx->getMongoProcessInterface()->listCatalog(pExpCtx->getOperationContext());
     }
 
     while (!_catalogDocs->empty()) {
@@ -181,7 +182,8 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalAllCollectionStats::createFr
 
     uassert(6789104,
             "The $_internalAllCollectionStats stage must be run on the admin database",
-            pExpCtx->ns.isAdminDB() && pExpCtx->ns.isCollectionlessAggregateNS());
+            pExpCtx->getNamespaceString().isAdminDB() &&
+                pExpCtx->getNamespaceString().isCollectionlessAggregateNS());
 
     auto spec = DocumentSourceInternalAllCollectionStatsSpec::parse(
         IDLParserContext(kStageNameInternal), elem.embeddedObject());

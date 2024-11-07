@@ -65,7 +65,7 @@ using boost::intrusive_ptr;
 AccumulationExpression parseInternalConstructStats(ExpressionContext* const expCtx,
                                                    BSONElement elem,
                                                    VariablesParseState vps) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 
     IDLParserContext parser("$_internalConstructStats");
     tassert(7261401,
@@ -88,7 +88,7 @@ AccumulatorInternalConstructStats::AccumulatorInternalConstructStats(
     ExpressionContext* const expCtx, InternalConstructStatsAccumulatorParams params)
     : AccumulatorState(expCtx), _count(0.0), _params(params) {
     assertAllowedInternalIfRequired(
-        expCtx->opCtx, "_internalConstructStats", AllowedWithClientType::kInternal);
+        expCtx->getOperationContext(), "_internalConstructStats", AllowedWithClientType::kInternal);
     _memUsageTracker.set(sizeof(*this));
 }
 

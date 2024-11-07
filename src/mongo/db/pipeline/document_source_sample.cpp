@@ -72,7 +72,7 @@ DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
 
     if (!_sortStage->isPopulated()) {
         // Exhaust source stage, add random metadata, and push all into sorter.
-        PseudoRandom& prng = pExpCtx->opCtx->getClient()->getPrng();
+        PseudoRandom& prng = pExpCtx->getOperationContext()->getClient()->getPrng();
         auto nextInput = pSource->getNext();
         for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
             MutableDocument doc(nextInput.releaseDocument());

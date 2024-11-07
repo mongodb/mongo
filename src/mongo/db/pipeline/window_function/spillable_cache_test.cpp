@@ -69,11 +69,13 @@ class MongoProcessInterfaceForTest : public StubMongoProcessInterface {
 public:
     std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const override {
-        shard_role_details::getRecoveryUnit(expCtx->opCtx)->abandonSnapshot();
-        shard_role_details::getRecoveryUnit(expCtx->opCtx)
+        shard_role_details::getRecoveryUnit(expCtx->getOperationContext())->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(expCtx->getOperationContext())
             ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
-        return expCtx->opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-            expCtx->opCtx, keyFormat);
+        return expCtx->getOperationContext()
+            ->getServiceContext()
+            ->getStorageEngine()
+            ->makeTemporaryRecordStore(expCtx->getOperationContext(), keyFormat);
     }
 
     void writeRecordsToRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -81,23 +83,30 @@ public:
                                    std::vector<Record>* records,
                                    const std::vector<Timestamp>& ts) const override {
 
-        writeConflictRetry(expCtx->opCtx, "MPI::writeRecordsToRecordStore", expCtx->ns, [&] {
-            AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
-            WriteUnitOfWork wuow(expCtx->opCtx);
-            auto writeResult = rs->insertRecords(expCtx->opCtx, records, ts);
-            tassert(5643014,
-                    str::stream() << "Failed to write to disk because " << writeResult.reason(),
-                    writeResult.isOK());
-            wuow.commit();
-        });
+        writeConflictRetry(
+            expCtx->getOperationContext(),
+            "MPI::writeRecordsToRecordStore",
+            expCtx->getNamespaceString(),
+            [&] {
+                AutoGetCollection autoColl(
+                    expCtx->getOperationContext(), expCtx->getNamespaceString(), MODE_IX);
+                WriteUnitOfWork wuow(expCtx->getOperationContext());
+                auto writeResult = rs->insertRecords(expCtx->getOperationContext(), records, ts);
+                tassert(5643014,
+                        str::stream() << "Failed to write to disk because " << writeResult.reason(),
+                        writeResult.isOK());
+                wuow.commit();
+            });
     }
 
     Document readRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        RecordStore* rs,
                                        RecordId rID) const override {
         RecordData possibleRecord;
-        AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
-        auto foundDoc = rs->findRecord(expCtx->opCtx, RecordId(rID), &possibleRecord);
+        AutoGetCollection autoColl(
+            expCtx->getOperationContext(), expCtx->getNamespaceString(), MODE_IX);
+        auto foundDoc =
+            rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
         tassert(5643001, str::stream() << "Could not find document id " << rID, foundDoc);
         return Document(possibleRecord.toBson());
     }
@@ -105,17 +114,19 @@ public:
     void deleteRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      RecordStore* rs,
                                      RecordId rID) const override {
-        AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
-        WriteUnitOfWork wuow(expCtx->opCtx);
-        rs->deleteRecord(expCtx->opCtx, rID);
+        AutoGetCollection autoColl(
+            expCtx->getOperationContext(), expCtx->getNamespaceString(), MODE_IX);
+        WriteUnitOfWork wuow(expCtx->getOperationContext());
+        rs->deleteRecord(expCtx->getOperationContext(), rID);
         wuow.commit();
     }
 
     void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              RecordStore* rs) const override {
-        AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
-        WriteUnitOfWork wuow(expCtx->opCtx);
-        auto status = rs->truncate(expCtx->opCtx);
+        AutoGetCollection autoColl(
+            expCtx->getOperationContext(), expCtx->getNamespaceString(), MODE_IX);
+        WriteUnitOfWork wuow(expCtx->getOperationContext());
+        auto status = rs->truncate(expCtx->getOperationContext());
         tassert(5643015, "Unable to clear record store", status.isOK());
         wuow.commit();
     }
@@ -124,7 +135,7 @@ public:
 class SpillableCacheTest : public AggregationMongoDContextFixture {
 public:
     SpillableCacheTest() : AggregationMongoDContextFixture() {
-        getExpCtx()->mongoProcessInterface = std::make_shared<MongoProcessInterfaceForTest>();
+        getExpCtx()->setMongoProcessInterface(std::make_shared<MongoProcessInterfaceForTest>());
         _expCtx = getExpCtx();
     }
 
@@ -156,38 +167,38 @@ public:
 };
 
 TEST_F(SpillableCacheTest, CanReadAndWriteDocumentsInMem) {
-    _expCtx->allowDiskUse = false;
+    _expCtx->setAllowDiskUse(false);
     auto cache = createSpillableCache(1000);
     buildAndLoadDocumentSet(2, cache.get());
     verifyDocsInCache(0, 2, cache.get());
 }
 
 TEST_F(SpillableCacheTest, LoadingFailsIfCantSpillToDisk) {
-    _expCtx->allowDiskUse = false;
+    _expCtx->setAllowDiskUse(false);
     auto cache = createSpillableCache(1);
     ASSERT_THROWS_CODE(buildAndLoadDocumentSet(1, cache.get()), AssertionException, 5643011);
 }
 
 TEST_F(SpillableCacheTest, CanReadAndWriteDocumentsToDisk) {
-    _expCtx->allowDiskUse = true;
+    _expCtx->setAllowDiskUse(true);
     auto cache = createSpillableCache(1);
     buildAndLoadDocumentSet(3, cache.get());
     verifyDocsInCache(0, 3, cache.get());
-    _expCtx->allowDiskUse = false;
+    _expCtx->setAllowDiskUse(false);
 }
 
 TEST_F(SpillableCacheTest, CanReturnDocumentsFromCacheAndDisk) {
-    _expCtx->allowDiskUse = true;
+    _expCtx->setAllowDiskUse(true);
     // Docs are ~200 each.
     auto cache = createSpillableCache(250);
     buildAndLoadDocumentSet(3, cache.get());
     verifyDocsInCache(0, 3, cache.get());
-    _expCtx->allowDiskUse = false;
+    _expCtx->setAllowDiskUse(false);
     cache->finalize();
 }
 
 DEATH_TEST_F(SpillableCacheTest, RemovesDocumentsWhenExpired, "Requested expired document") {
-    _expCtx->allowDiskUse = false;
+    _expCtx->setAllowDiskUse(false);
     auto cache = createSpillableCache(1000);
     buildAndLoadDocumentSet(4, cache.get());
     cache->freeUpTo(0);
@@ -196,7 +207,7 @@ DEATH_TEST_F(SpillableCacheTest, RemovesDocumentsWhenExpired, "Requested expired
 }
 
 TEST_F(SpillableCacheTest, ReturnsCorrectDocumentsIfSomeHaveBeenRemovedMemOnly) {
-    _expCtx->allowDiskUse = false;
+    _expCtx->setAllowDiskUse(false);
     auto cache = createSpillableCache(5000);
     buildAndLoadDocumentSet(10, cache.get());
     cache->freeUpTo(4);
@@ -204,7 +215,7 @@ TEST_F(SpillableCacheTest, ReturnsCorrectDocumentsIfSomeHaveBeenRemovedMemOnly) 
 }
 
 TEST_F(SpillableCacheTest, ReturnsCorrectDocumentsIfSomeHaveBeenRemovedMixed) {
-    _expCtx->allowDiskUse = true;
+    _expCtx->setAllowDiskUse(true);
     auto cache = createSpillableCache(1000);
     buildAndLoadDocumentSet(10, cache.get());
     // Only mark documents on disk as freed.
@@ -213,11 +224,11 @@ TEST_F(SpillableCacheTest, ReturnsCorrectDocumentsIfSomeHaveBeenRemovedMixed) {
     buildAndLoadDocumentSet(5, cache.get());
     verifyDocsInCache(5, 15, cache.get());
     cache->finalize();
-    _expCtx->allowDiskUse = false;
+    _expCtx->setAllowDiskUse(false);
 }
 
 TEST_F(SpillableCacheTest, CanInsertLargeDocuments) {
-    _expCtx->allowDiskUse = true;
+    _expCtx->setAllowDiskUse(true);
     // 19 MB
     auto cache = createSpillableCache(19 * 1024 * 1024);
     // 1 MB string
@@ -232,7 +243,7 @@ TEST_F(SpillableCacheTest, CanInsertLargeDocuments) {
         ASSERT_EQ(doc["_id"].getInt(), i);
     }
     cache->finalize();
-    _expCtx->allowDiskUse = false;
+    _expCtx->setAllowDiskUse(false);
 }
 
 }  // namespace

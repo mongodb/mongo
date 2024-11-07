@@ -292,9 +292,11 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
     auto& entry = it->second;
     expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(opName, entry.featureFlag);
 
-    if (expCtx->opCtx) {
-        assertLanguageFeatureIsAllowed(
-            expCtx->opCtx, opName, entry.allowedWithApiStrict, entry.allowedWithClientType);
+    if (expCtx->getOperationContext()) {
+        assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
+                                       opName,
+                                       entry.allowedWithApiStrict,
+                                       entry.allowedWithClientType);
     }
 
     // Increment the counter for this expression in the current context.
@@ -1026,7 +1028,7 @@ intrusive_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
 ExpressionCoerceToBool::ExpressionCoerceToBool(ExpressionContext* const expCtx,
                                                intrusive_ptr<Expression> pExpression)
     : Expression(expCtx, {std::move(pExpression)}) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
 intrusive_ptr<Expression> ExpressionCoerceToBool::optimize() {
@@ -1501,7 +1503,7 @@ intrusive_ptr<Expression> ExpressionDateFromParts::optimize() {
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
     if (ExpressionConstant::isNullOrConstant(_children[_kTimeZone])) {
-        _parsedTimeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase,
+        _parsedTimeZone = makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
                                        Document{},
                                        _children[_kTimeZone].get(),
                                        &(getExpressionContext()->variables));
@@ -1598,8 +1600,10 @@ Value ExpressionDateFromParts::evaluate(const Document& root, Variables* variabl
 
     boost::optional<TimeZone> timeZone = _parsedTimeZone;
     if (!timeZone) {
-        timeZone = makeTimeZone(
-            getExpressionContext()->timeZoneDatabase, root, _children[_kTimeZone].get(), variables);
+        timeZone = makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
+                                root,
+                                _children[_kTimeZone].get(),
+                                variables);
         if (!timeZone) {
             return Value(BSONNULL);
         }
@@ -1747,7 +1751,7 @@ intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
     if (ExpressionConstant::isNullOrConstant(_children[_kTimeZone])) {
-        _parsedTimeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase,
+        _parsedTimeZone = makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
                                        Document{},
                                        _children[_kTimeZone].get(),
                                        &(getExpressionContext()->variables));
@@ -1791,8 +1795,10 @@ Value ExpressionDateFromString::evaluate(const Document& root, Variables* variab
     // exception for an invalid timezone string.
     boost::optional<TimeZone> timeZone = _parsedTimeZone;
     if (!timeZone) {
-        timeZone = makeTimeZone(
-            getExpressionContext()->timeZoneDatabase, root, _children[_kTimeZone].get(), variables);
+        timeZone = makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
+                                root,
+                                _children[_kTimeZone].get(),
+                                variables);
     }
 
     // Behavior for nullish input takes precedence over other nullish elements.
@@ -1819,12 +1825,12 @@ Value ExpressionDateFromString::evaluate(const Document& root, Variables* variab
                 return Value(BSONNULL);
             }
 
-            return Value(getExpressionContext()->timeZoneDatabase->fromString(
+            return Value(getExpressionContext()->getTimeZoneDatabase()->fromString(
                 dateTimeString, timeZone.value(), formatValue.getStringData()));
         }
 
-        return Value(
-            getExpressionContext()->timeZoneDatabase->fromString(dateTimeString, timeZone.value()));
+        return Value(getExpressionContext()->getTimeZoneDatabase()->fromString(dateTimeString,
+                                                                               timeZone.value()));
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         if (_children[_kOnError]) {
             return _children[_kOnError]->evaluate(root, variables);
@@ -1896,7 +1902,7 @@ intrusive_ptr<Expression> ExpressionDateToParts::optimize() {
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
     if (ExpressionConstant::isNullOrConstant(_children[_kTimeZone])) {
-        _parsedTimeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase,
+        _parsedTimeZone = makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
                                        Document{},
                                        _children[_kTimeZone].get(),
                                        &(getExpressionContext()->variables));
@@ -1943,8 +1949,10 @@ Value ExpressionDateToParts::evaluate(const Document& root, Variables* variables
 
     boost::optional<TimeZone> timeZone = _parsedTimeZone;
     if (!timeZone) {
-        timeZone = makeTimeZone(
-            getExpressionContext()->timeZoneDatabase, root, _children[_kTimeZone].get(), variables);
+        timeZone = makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
+                                root,
+                                _children[_kTimeZone].get(),
+                                variables);
         if (!timeZone) {
             return Value(BSONNULL);
         }
@@ -2052,7 +2060,7 @@ intrusive_ptr<Expression> ExpressionDateToString::optimize() {
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
     if (ExpressionConstant::isNullOrConstant(_children[_kTimeZone])) {
-        _parsedTimeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase,
+        _parsedTimeZone = makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
                                        Document{},
                                        _children[_kTimeZone].get(),
                                        &(getExpressionContext()->variables));
@@ -2096,8 +2104,10 @@ Value ExpressionDateToString::evaluate(const Document& root, Variables* variable
     // exception for an invalid timezone string.
     boost::optional<TimeZone> timeZone = _parsedTimeZone;
     if (!timeZone) {
-        timeZone = makeTimeZone(
-            getExpressionContext()->timeZoneDatabase, root, _children[_kTimeZone].get(), variables);
+        timeZone = makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
+                                root,
+                                _children[_kTimeZone].get(),
+                                variables);
     }
 
     if (date.nullish()) {
@@ -2215,7 +2225,7 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
     if (ExpressionConstant::isNullOrConstant(_children[_kTimeZone])) {
         _parsedTimeZone = addContextToAssertionException(
             [&]() {
-                return makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                return makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
                                     Document{},
                                     _children[_kTimeZone].get(),
                                     &(getExpressionContext()->variables));
@@ -2287,7 +2297,7 @@ Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) c
     if (!timezone) {
         timezone = addContextToAssertionException(
             [&]() {
-                return makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                return makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
                                     root,
                                     _children[_kTimeZone].get(),
                                     variables);
@@ -2784,7 +2794,7 @@ intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* const expCt
         } else if (elem.fieldNameStringData() == "cond") {
             condElem = elem;
         } else if (elem.fieldNameStringData() == "limit") {
-            assertLanguageFeatureIsAllowed(expCtx->opCtx,
+            assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
                                            "limit argument of $filter operator",
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            AllowedWithClientType::kAny);
@@ -2833,7 +2843,7 @@ ExpressionFilter::ExpressionFilter(ExpressionContext* const expCtx,
       _varName(std::move(varName)),
       _varId(varId),
       _limit(_children.size() == 3 ? 2 : boost::optional<size_t>(boost::none)) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
 intrusive_ptr<Expression> ExpressionFilter::optimize() {
@@ -2903,8 +2913,9 @@ Value ExpressionFilter::evaluate(const Document& root, Variables* variables) con
         }
     }
 
-    auto checkForInterrupt = getExpressionInterruptChecker(getExpressionContext()->opCtx);
-    mapReduceFilterWaitBeforeLoop(getExpressionContext()->opCtx);
+    auto checkForInterrupt =
+        getExpressionInterruptChecker(getExpressionContext()->getOperationContext());
+    mapReduceFilterWaitBeforeLoop(getExpressionContext()->getOperationContext());
 
     vector<Value> output;
     output.reserve(approximateOutputSize);
@@ -3017,7 +3028,7 @@ ExpressionMap::ExpressionMap(ExpressionContext* const expCtx,
                              intrusive_ptr<Expression> input,
                              intrusive_ptr<Expression> each)
     : Expression(expCtx, {std::move(input), std::move(each)}), _varName(varName), _varId(varId) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
 intrusive_ptr<Expression> ExpressionMap::optimize() {
@@ -3048,8 +3059,9 @@ Value ExpressionMap::evaluate(const Document& root, Variables* variables) const 
     if (input.empty())
         return inputVal;
 
-    auto checkForInterrupt = getExpressionInterruptChecker(getExpressionContext()->opCtx);
-    mapReduceFilterWaitBeforeLoop(getExpressionContext()->opCtx);
+    auto checkForInterrupt =
+        getExpressionInterruptChecker(getExpressionContext()->getOperationContext());
+    mapReduceFilterWaitBeforeLoop(getExpressionContext()->getOperationContext());
 
     size_t memUsed = 0;
     vector<Value> output;
@@ -3147,8 +3159,8 @@ intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
     const auto iter = kMetaNameToMetaType.find(expr.valueStringData());
 
     if (iter != kMetaNameToMetaType.end()) {
-        const auto apiStrict =
-            expCtx->opCtx && APIParameters::get(expCtx->opCtx).getAPIStrict().value_or(false);
+        const auto apiStrict = expCtx->getOperationContext() &&
+            APIParameters::get(expCtx->getOperationContext()).getAPIStrict().value_or(false);
 
         auto typeName = iter->first;
         auto usesUnstableField = (typeName == "searchScore") || (typeName == "indexKey") ||
@@ -3177,8 +3189,8 @@ ExpressionMeta::ExpressionMeta(ExpressionContext* const expCtx, MetaType metaTyp
             // If the query contains $meta fields that are not currently supported by SBE, then
             // we can't run any part of pipeline in SBE and we have to run the entire pipeline
             // under the classic engine.
-            expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-            expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
+            expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+            expCtx->setSbePipelineCompatibility(SbeCompatibility::notCompatible);
     }
 }
 
@@ -3895,7 +3907,7 @@ ExpressionInternalFLEEqual::ExpressionInternalFLEEqual(ExpressionContext* const 
                                                        boost::intrusive_ptr<Expression> field,
                                                        ServerZerosEncryptionToken zerosToken)
     : Expression(expCtx, {std::move(field)}), _evaluatorV2({std::move(zerosToken)}) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
 REGISTER_STABLE_EXPRESSION(_internalFleEq, ExpressionInternalFLEEqual::parse);
@@ -3963,7 +3975,7 @@ ExpressionInternalFLEBetween::ExpressionInternalFLEBetween(
     boost::intrusive_ptr<Expression> field,
     std::vector<ServerZerosEncryptionToken> zerosTokens)
     : Expression(expCtx, {std::move(field)}), _evaluatorV2(std::move(zerosTokens)) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
 REGISTER_STABLE_EXPRESSION(_internalFleBetween, ExpressionInternalFLEBetween::parse);
@@ -4604,8 +4616,9 @@ Value ExpressionReduce::evaluate(const Document& root, Variables* variables) con
                           << inputVal.toString(),
             inputVal.isArray());
 
-    auto checkForInterrupt = getExpressionInterruptChecker(getExpressionContext()->opCtx);
-    mapReduceFilterWaitBeforeLoop(getExpressionContext()->opCtx);
+    auto checkForInterrupt =
+        getExpressionInterruptChecker(getExpressionContext()->getOperationContext());
+    mapReduceFilterWaitBeforeLoop(getExpressionContext()->getOperationContext());
 
     size_t memLimit = internalQueryMaxMapFilterReduceBytes.load();
     Value accumulatedValue = _children[_kInitial]->evaluate(root, variables);
@@ -6450,8 +6463,8 @@ public:
         table[BSONType::String][BSONType::Bool] = &performConvertToTrue;
         table[BSONType::String][BSONType::Date] = [](ExpressionContext* const expCtx,
                                                      Value inputValue) {
-            return Value(expCtx->timeZoneDatabase->fromString(inputValue.getStringData(),
-                                                              mongo::TimeZoneDatabase::utcZone()));
+            return Value(expCtx->getTimeZoneDatabase()->fromString(
+                inputValue.getStringData(), mongo::TimeZoneDatabase::utcZone()));
         };
         table[BSONType::String][BSONType::NumberInt] = &parseStringToNumber<int, 10>;
         table[BSONType::String][BSONType::NumberLong] = &parseStringToNumber<long long, 10>;
@@ -7320,7 +7333,7 @@ ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
                   std::move(byteOrder)}),
       _allowBinDataConvert{allowBinDataConvert},
       _allowBinDataConvertNumeric{allowBinDataConvertNumeric} {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
 intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expCtx,
@@ -7355,7 +7368,7 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
                               << ".",
                 // If the command came from router, it means router must be on an FCV that
                 // supports the 'format' field.
-                expCtx->fromRouter || allowBinDataConvert);
+                expCtx->getFromRouter() || allowBinDataConvert);
             format = parseOperand(expCtx, elem, vps);
         } else if (field == "onError"_sd) {
             onError = parseOperand(expCtx, elem, vps);
@@ -7979,7 +7992,7 @@ intrusive_ptr<Expression> ExpressionRandom::parse(ExpressionContext* const expCt
                                                   const VariablesParseState& vps) {
     uassert(3040500,
             "$rand not allowed inside collection validators",
-            !expCtx->isParsingCollectionValidator);
+            !expCtx->getIsParsingCollectionValidator());
 
     uassert(3040501, "$rand does not currently accept arguments", exprElement.Obj().isEmpty());
 
@@ -8098,7 +8111,7 @@ boost::intrusive_ptr<Expression> ExpressionDateArithmetics::optimize() {
         _parsedUnit = parseTimeUnit(unitVal, _opName);
     }
     if (ExpressionConstant::isNullOrConstant(_children[_kTimeZone])) {
-        _parsedTimeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase,
+        _parsedTimeZone = makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
                                        Document{},
                                        _children[_kTimeZone].get(),
                                        &(getExpressionContext()->variables));
@@ -8144,8 +8157,10 @@ Value ExpressionDateArithmetics::evaluate(const Document& root, Variables* varia
     // Get the TimeZone object for the timezone parameter, if it is specified, or UTC otherwise.
     boost::optional<TimeZone> timezone = _parsedTimeZone;
     if (!timezone) {
-        timezone = makeTimeZone(
-            getExpressionContext()->timeZoneDatabase, root, _children[_kTimeZone].get(), variables);
+        timezone = makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
+                                root,
+                                _children[_kTimeZone].get(),
+                                variables);
         if (!timezone) {
             return Value(BSONNULL);
         }
@@ -8331,7 +8346,7 @@ boost::intrusive_ptr<Expression> ExpressionDateTrunc::optimize() {
     if (ExpressionConstant::isNullOrConstant(_children[_kTimeZone])) {
         _parsedTimeZone = addContextToAssertionException(
             [&]() {
-                return makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                return makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
                                     Document{},
                                     _children[_kTimeZone].get(),
                                     &(getExpressionContext()->variables));
@@ -8432,7 +8447,7 @@ Value ExpressionDateTrunc::evaluate(const Document& root, Variables* variables) 
     if (!timezone) {
         timezone = addContextToAssertionException(
             [&]() {
-                return makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                return makeTimeZone(getExpressionContext()->getTimeZoneDatabase(),
                                     root,
                                     _children[_kTimeZone].get(),
                                     variables);
@@ -8813,8 +8828,8 @@ Value ExpressionInternalKeyStringValue::evaluate(const Document& root, Variables
                 collation.isObject());
         auto collationBson = collation.getDocument().toBson();
 
-        auto collatorFactory =
-            CollatorFactoryInterface::get(getExpressionContext()->opCtx->getServiceContext());
+        auto collatorFactory = CollatorFactoryInterface::get(
+            getExpressionContext()->getOperationContext()->getServiceContext());
         collator = uassertStatusOKWithContext(collatorFactory->makeFromBSON(collationBson),
                                               "Invalid collation spec");
     }

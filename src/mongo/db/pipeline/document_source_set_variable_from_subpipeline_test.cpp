@@ -131,7 +131,7 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
         std::vector{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
     auto expCtx = getExpCtx();
     const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(inputDocs[1], expCtx);
-    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->ns);
+    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->getNamespaceString());
     const auto mockSourceForSubPipeline =
         DocumentSourceMock::createForTest(inputDocs, ctxForSubPipeline);
     auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(
@@ -157,7 +157,7 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, QueryShape) {
         std::vector{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
     auto expCtx = getExpCtx();
     const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(inputDocs[1], expCtx);
-    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->ns);
+    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->getNamespaceString());
     const auto mockSourceForSubPipeline =
         DocumentSourceMock::createForTest(inputDocs, ctxForSubPipeline);
     auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(
@@ -194,7 +194,7 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, ShouldPropagateDisposeThrou
 
     const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(expCtx);
 
-    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->ns);
+    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->getNamespaceString());
     const auto mockSourceForSubPipeline = DocumentSourceMock::createForTest(ctxForSubPipeline);
 
     auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(

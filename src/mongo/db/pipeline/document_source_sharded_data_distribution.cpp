@@ -60,12 +60,14 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
             "The $shardedDataDistribution stage specification must be an empty object",
             elem.type() == Object && elem.Obj().isEmpty());
 
-    uassert(
-        6789101, "The $shardedDataDistribution stage can only be run on router", expCtx->inRouter);
+    uassert(6789101,
+            "The $shardedDataDistribution stage can only be run on router",
+            expCtx->getInRouter());
 
     uassert(6789102,
             "The $shardedDataDistribution stage must be run on the admin database",
-            expCtx->ns.isAdminDB() && expCtx->ns.isCollectionlessAggregateNS());
+            expCtx->getNamespaceString().isAdminDB() &&
+                expCtx->getNamespaceString().isCollectionlessAggregateNS());
 
     static const BSONObj kAllCollStatsObj =
         fromjson("{$_internalAllCollectionStats: {stats: {storageStats: {}}}}}");

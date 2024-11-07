@@ -156,8 +156,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGroupBase::optimize() {
     // call.
     auto& idExpressions = _groupProcessor.getMutableIdExpressions();
     auto expCtx = idExpressions[0]->getExpressionContext();
-    auto origSbeCompatibility = expCtx->sbeCompatibility;
-    expCtx->sbeCompatibility = SbeCompatibility::noRequirements;
+    auto origSbeCompatibility = expCtx->getSbeCompatibility();
+    expCtx->setSbeCompatibility(SbeCompatibility::noRequirements);
 
     // TODO: If all idExpressions are ExpressionConstants after optimization, then we know
     // there will be only one group. We should take advantage of that to avoid going through the
@@ -172,8 +172,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGroupBase::optimize() {
         accumulatedField.expr.argument = accumulatedField.expr.argument->optimize();
     }
 
-    _sbeCompatibility = std::min(_sbeCompatibility, expCtx->sbeCompatibility);
-    expCtx->sbeCompatibility = origSbeCompatibility;
+    _sbeCompatibility = std::min(_sbeCompatibility, expCtx->getSbeCompatibility());
+    expCtx->setSbeCompatibility(origSbeCompatibility);
 
     return this;
 }
@@ -308,7 +308,7 @@ void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
     BSONObj groupObj(elem.Obj());
     BSONObjIterator groupIterator(groupObj);
     VariablesParseState vps = pExpCtx->variablesParseState;
-    pExpCtx->sbeGroupCompatibility = SbeCompatibility::noRequirements;
+    pExpCtx->setSbeGroupCompatibility(SbeCompatibility::noRequirements);
     while (groupIterator.more()) {
         BSONElement groupField(groupIterator.next());
         StringData pFieldName = groupField.fieldNameStringData();
@@ -328,7 +328,8 @@ void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
                 AccumulationStatement::parseAccumulationStatement(pExpCtx.get(), groupField, vps));
         }
     }
-    _sbeCompatibility = std::min(pExpCtx->sbeGroupCompatibility, pExpCtx->sbeCompatibility);
+    _sbeCompatibility =
+        std::min(pExpCtx->getSbeGroupCompatibility(), pExpCtx->getSbeCompatibility());
 
     uassert(15955, "a group specification must include an _id", !idExpressions.empty());
 }

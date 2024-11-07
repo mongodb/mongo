@@ -61,8 +61,8 @@ TEST_F(SearchTest, ShouldSerializeAllNecessaryFieldsAtUnspecifiedVerbosity) {
     const auto stageObj = BSON("$search" << mongotQuery);
 
     auto expCtx = getExpCtx();
-    expCtx->mongoProcessInterface = std::make_unique<MockMongoInterface>();
-    expCtx->uuid = UUID::gen();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+    expCtx->setUUID(UUID::gen());
 
     intrusive_ptr<DocumentSource> searchDS =
         DocumentSourceSearch::createFromBson(stageObj.firstElement(), expCtx);

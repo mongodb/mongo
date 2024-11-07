@@ -162,7 +162,7 @@ void DocumentSourceCursor::loadBatch() {
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeDocumentSourceCursorLoadBatch,
-        pExpCtx->opCtx,
+        pExpCtx->getOperationContext(),
         "hangBeforeDocumentSourceCursorLoadBatch",
         []() {
             LOGV2(20895,
@@ -178,12 +178,13 @@ void DocumentSourceCursor::loadBatch() {
             "Expected PlanExecutor to use an external lock policy",
             _exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally);
     autoColl.emplace(
-        pExpCtx->opCtx,
+        pExpCtx->getOperationContext(),
         _exec->nss(),
         AutoGetCollection::Options{}.secondaryNssOrUUIDs(_exec->getSecondaryNamespaces().cbegin(),
                                                          _exec->getSecondaryNamespaces().cend()));
-    uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
-                        ->checkCanServeReadsFor(pExpCtx->opCtx, _exec->nss(), true));
+    uassertStatusOK(
+        repl::ReplicationCoordinator::get(pExpCtx->getOperationContext())
+            ->checkCanServeReadsFor(pExpCtx->getOperationContext(), _exec->nss(), true));
 
     _exec->restoreState(autoColl ? &autoColl->getCollection() : nullptr);
 
@@ -200,7 +201,7 @@ void DocumentSourceCursor::loadBatch() {
             // need the whole pipeline to see each document to see if we should stop waiting.
             bool batchCountFull = _batchSizeCount != 0 && _currentBatch.count() >= _batchSizeCount;
             if (batchCountFull || _currentBatch.memUsageBytes() > _batchSizeBytes ||
-                awaitDataState(pExpCtx->opCtx).shouldWaitForInserts) {
+                awaitDataState(pExpCtx->getOperationContext()).shouldWaitForInserts) {
                 // At any given time only one operation can own the entirety of resources used by a
                 // multi-document transaction. As we can perform a remote call during the query
                 // execution we will check in the session to avoid deadlocks. If we don't release
@@ -284,18 +285,18 @@ Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
 
     uassert(50660,
             "Mismatch between verbosity passed to serialize() and expression context verbosity",
-            verbosity == pExpCtx->explain);
+            verbosity == pExpCtx->getExplain());
 
     MutableDocument out;
 
     BSONObjBuilder explainStatsBuilder;
 
     {
-        auto opCtx = pExpCtx->opCtx;
+        auto opCtx = pExpCtx->getOperationContext();
         auto secondaryNssList = _exec->getSecondaryNamespaces();
         boost::optional<AutoGetCollectionForReadMaybeLockFree> readLock = boost::none;
         auto initAutoGetFn = [&]() {
-            readLock.emplace(pExpCtx->opCtx,
+            readLock.emplace(pExpCtx->getOperationContext(),
                              _exec->nss(),
                              AutoGetCollection::Options{}.secondaryNssOrUUIDs(
                                  secondaryNssList.cbegin(), secondaryNssList.cend()));
@@ -311,15 +312,16 @@ Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
                                                readLock->isAnySecondaryNamespaceAView() ||
                                                    isAnySecondaryCollectionNotLocal,
                                                secondaryNssList);
-        Explain::explainStages(_exec.get(),
-                               collections,
-                               verbosity.value(),
-                               _execStatus,
-                               _winningPlanTrialStats,
-                               BSONObj(),
-                               SerializationContext::stateCommandReply(pExpCtx->serializationCtxt),
-                               BSONObj(),
-                               &explainStatsBuilder);
+        Explain::explainStages(
+            _exec.get(),
+            collections,
+            verbosity.value(),
+            _execStatus,
+            _winningPlanTrialStats,
+            BSONObj(),
+            SerializationContext::stateCommandReply(pExpCtx->getSerializationContext()),
+            BSONObj(),
+            &explainStatsBuilder);
     }
 
     BSONObj explainStats = explainStatsBuilder.obj();
@@ -358,11 +360,11 @@ void DocumentSourceCursor::doDispose() {
 
 void DocumentSourceCursor::cleanupExecutor() {
     invariant(_exec);
-    _exec->dispose(pExpCtx->opCtx);
+    _exec->dispose(pExpCtx->getOperationContext());
 
     // Not freeing _exec if we're in explain mode since it will be used in serialize() to gather
     // execution stats.
-    if (!pExpCtx->explain) {
+    if (!pExpCtx->getExplain()) {
         _exec.reset();
     }
 }
@@ -377,7 +379,7 @@ BSONObj DocumentSourceCursor::getPostBatchResumeToken() const {
 }
 
 DocumentSourceCursor::~DocumentSourceCursor() {
-    if (pExpCtx->explain) {
+    if (pExpCtx->getExplain()) {
         invariant(_exec->isDisposed());  // _exec should have at least been disposed.
     } else {
         invariant(!_exec);  // '_exec' should have been cleaned up via dispose() before destruction.
@@ -409,7 +411,7 @@ DocumentSourceCursor::DocumentSourceCursor(
     _planSummary = explainer.getPlanSummary();
     recordPlanSummaryStats();
 
-    if (pExpCtx->explain) {
+    if (pExpCtx->getExplain()) {
         // It's safe to access the executor even if we don't have the collection lock since we're
         // just going to call getStats() on it.
         _winningPlanTrialStats = explainer.getWinningPlanTrialStats();
@@ -417,13 +419,15 @@ DocumentSourceCursor::DocumentSourceCursor(
 
     if (collections.hasMainCollection()) {
         const auto& coll = collections.getMainCollection();
-        CollectionQueryInfo::get(coll).notifyOfQuery(pExpCtx->opCtx, coll, _stats.planSummaryStats);
+        CollectionQueryInfo::get(coll).notifyOfQuery(
+            pExpCtx->getOperationContext(), coll, _stats.planSummaryStats);
     }
     for (auto& [nss, coll] : collections.getSecondaryCollections()) {
         if (coll) {
             PlanSummaryStats stats;
             explainer.getSecondarySummaryStats(nss, &stats);
-            CollectionQueryInfo::get(coll).notifyOfQuery(pExpCtx->opCtx, coll, stats);
+            CollectionQueryInfo::get(coll).notifyOfQuery(
+                pExpCtx->getOperationContext(), coll, stats);
         }
     }
 

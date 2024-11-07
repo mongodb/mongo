@@ -47,7 +47,7 @@ BSONObj distinctJsonToShapeBSON(const char* json,
     auto distinct = fromjson(json);
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
         IDLParserContext("distinctCommandRequest",
-                         auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                         auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                          boost::none,
                          SerializationContext::stateDefault()),
         distinct));
@@ -55,7 +55,7 @@ BSONObj distinctJsonToShapeBSON(const char* json,
         expCtx, std::move(distinctCommand), ExtensionsCallbackNoop(), {});
     auto shape = std::make_unique<DistinctCmdShape>(*pd, expCtx);
 
-    return shape->toBson(expCtx->opCtx, opts, {});
+    return shape->toBson(expCtx->getOperationContext(), opts, {});
 }
 
 QueryShapeHash distinctQueryShapeHash(const char* json,
@@ -64,7 +64,7 @@ QueryShapeHash distinctQueryShapeHash(const char* json,
     auto distinct = fromjson(json);
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
         IDLParserContext("distinctCommandRequest",
-                         auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                         auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                          boost::none,
                          SerializationContext::stateDefault()),
         distinct));
@@ -72,7 +72,7 @@ QueryShapeHash distinctQueryShapeHash(const char* json,
         expCtx, std::move(distinctCommand), ExtensionsCallbackNoop(), {});
     auto shape = std::make_unique<DistinctCmdShape>(*pd, expCtx);
 
-    return shape->sha256Hash(expCtx->opCtx, {});
+    return shape->sha256Hash(expCtx->getOperationContext(), {});
 }
 
 
@@ -255,7 +255,7 @@ TEST_F(DistinctShapeSizeTest, SizeOfShapeComponents) {
 
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
         IDLParserContext("distinctCommandRequest",
-                         auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                         auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                          boost::none,
                          SerializationContext::stateDefault()),
         distinct));

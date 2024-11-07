@@ -111,7 +111,7 @@ public:
           _userPipeline(original._userPipeline),
           _variables(original._variables),
           _variablesParseState(original._variablesParseState) {
-        _pipeline->getContext()->inUnionWith = true;
+        _pipeline->getContext()->setInUnionWith(true);
     }
 
     ~DocumentSourceUnionWith() override;

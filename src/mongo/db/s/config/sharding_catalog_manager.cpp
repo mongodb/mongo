@@ -381,7 +381,7 @@ public:
     }
 
     AggregateCommandRequest buildAsAggregateCommandRequest() {
-        return AggregateCommandRequest(_expCtx->ns, buildAsBson());
+        return AggregateCommandRequest(_expCtx->getNamespaceString(), buildAsBson());
     }
 
     boost::intrusive_ptr<ExpressionContext>& getExpCtx() {

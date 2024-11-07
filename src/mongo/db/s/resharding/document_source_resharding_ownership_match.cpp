@@ -139,12 +139,14 @@ DocumentSource::GetModPathsReturn DocumentSourceReshardingOwnershipMatch::getMod
 
 DocumentSource::GetNextResult DocumentSourceReshardingOwnershipMatch::doGetNext() {
     if (!_tempReshardingChunkMgr) {
-        auto* catalogCache = Grid::get(pExpCtx->opCtx)->catalogCache();
+        auto* catalogCache = Grid::get(pExpCtx->getOperationContext())->catalogCache();
         auto tempNss = _temporaryReshardingNamespace
             ? _temporaryReshardingNamespace.value()
-            : resharding::constructTemporaryReshardingNss(pExpCtx->ns, *pExpCtx->uuid);
-        _tempReshardingChunkMgr = uassertStatusOK(
-            catalogCache->getCollectionPlacementInfoWithRefresh(pExpCtx->opCtx, tempNss));
+            : resharding::constructTemporaryReshardingNss(pExpCtx->getNamespaceString(),
+                                                          *pExpCtx->getUUID());
+        _tempReshardingChunkMgr =
+            uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(
+                pExpCtx->getOperationContext(), tempNss));
     }
 
     auto nextInput = pSource->getNext();

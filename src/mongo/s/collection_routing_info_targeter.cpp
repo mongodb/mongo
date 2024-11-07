@@ -732,7 +732,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CollectionRoutingInfoTargeter::_cano
     // Parse query.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    expCtx->uuid = cm.getUUID();
+    expCtx->setUUID(cm.getUUID());
 
     if (!collation.isEmpty()) {
         findCommand->setCollation(collation.getOwned());

@@ -947,8 +947,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleAllowed) {
 TEST_F(DocumentSourceScoreFusionTest, CheckUnionWithAllowed) {
     RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
     auto expCtx = getExpCtx();
-    auto nsToUnionWith1 =
-        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "novels");
+    auto nsToUnionWith1 = NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
 
     auto spec = fromjson(R"({
@@ -982,13 +982,14 @@ TEST_F(DocumentSourceScoreFusionTest, CheckUnionWithAllowed) {
 TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
     RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoring", true);
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
-        {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
-    auto nsToUnionWith1 =
-        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "novels");
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto nsToUnionWith1 = NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
-    auto nsToUnionWith2 =
-        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "shortstories");
+    auto nsToUnionWith2 = NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "shortstories");
     expCtx->addResolvedNamespaces({nsToUnionWith2});
 
     auto spec = fromjson(R"({

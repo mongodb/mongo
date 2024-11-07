@@ -127,9 +127,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
     std::list<std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
     // Ensure that all pipelines are valid scored selection pipelines.
     for (const auto& input : spec.getInputs()) {
-        inputPipelines.push_back(Pipeline::parse(input.getPipeline(),
-                                                 pExpCtx->copyForSubPipeline(pExpCtx->ns),
-                                                 scoreFusionPipelineValidator));
+        inputPipelines.push_back(
+            Pipeline::parse(input.getPipeline(),
+                            pExpCtx->copyForSubPipeline(pExpCtx->getNamespaceString()),
+                            scoreFusionPipelineValidator));
     }
 
     // TODO SERVER-94022: Desugar $scoreFusion (will return something then)

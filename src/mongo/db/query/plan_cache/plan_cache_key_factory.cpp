@@ -223,7 +223,7 @@ sbe::PlanCacheKey make(const CanonicalQuery& query,
 }
 
 sbe::PlanCacheKey make(const Pipeline& query, const MultipleCollectionAccessor& collections) {
-    OperationContext* opCtx = query.getContext()->opCtx;
+    OperationContext* opCtx = query.getContext()->getOperationContext();
     auto [mainCollectionState, secondaryCollectionStates] = getCollectionState(opCtx, collections);
 
     std::vector<boost::intrusive_ptr<DocumentSource>> stages;

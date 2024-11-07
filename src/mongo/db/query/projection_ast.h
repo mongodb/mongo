@@ -372,12 +372,12 @@ public:
         auto otherCtx = other._expr->getExpressionContext();
         auto activeCounting = otherCtx->expressionCountersAreActive();
         if (activeCounting) {
-            otherCtx->enabledCounters = false;
+            otherCtx->setEnabledCounters(false);
         }
         boost::intrusive_ptr<Expression> clonedExpr = Expression::parseOperand(
             otherCtx, bob.obj().firstElement(), otherCtx->variablesParseState);
         if (activeCounting) {
-            otherCtx->enabledCounters = true;
+            otherCtx->setEnabledCounters(true);
         }
         _expr = clonedExpr;
     }

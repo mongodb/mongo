@@ -140,7 +140,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
     FieldRefSet fieldSet;
     std::vector<FieldRef> backingRefs;
 
-    expCtx->sbeWindowCompatibility = SbeCompatibility::noRequirements;
+    expCtx->setSbeWindowCompatibility(SbeCompatibility::noRequirements);
     std::vector<WindowFunctionStatement> outputFields;
     const auto& output = spec.getOutput();
     backingRefs.reserve(output.nFields());
@@ -152,7 +152,8 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
                 fieldSet.insert(&backingRefs.back(), &conflict));
         outputFields.push_back(WindowFunctionStatement::parse(outputElem, sortBy, expCtx.get()));
     }
-    auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
+    auto sbeCompatibility =
+        std::min(expCtx->getSbeWindowCompatibility(), expCtx->getSbeCompatibility());
 
     return create(expCtx,
                   std::move(partitionBy),
@@ -307,15 +308,15 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() 
         // the previous SBE compatibility value. See the optimize() function for $group for a more
         // detailed explanation.
         auto expCtx = _outputFields[0].expr->expCtx();
-        auto origSbeCompatibility = expCtx->sbeCompatibility;
-        expCtx->sbeCompatibility = SbeCompatibility::noRequirements;
+        auto origSbeCompatibility = expCtx->getSbeCompatibility();
+        expCtx->setSbeCompatibility(SbeCompatibility::noRequirements);
 
         for (auto&& outputField : _outputFields) {
             outputField.expr->optimize();
         }
 
-        _sbeCompatibility = std::min(_sbeCompatibility, expCtx->sbeCompatibility);
-        expCtx->sbeCompatibility = origSbeCompatibility;
+        _sbeCompatibility = std::min(_sbeCompatibility, expCtx->getSbeCompatibility());
+        expCtx->setSbeCompatibility(origSbeCompatibility);
     }
     return this;
 }
@@ -379,12 +380,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         sortBy.emplace(*sortSpec, expCtx);
     }
 
-    expCtx->sbeWindowCompatibility = SbeCompatibility::noRequirements;
+    expCtx->setSbeWindowCompatibility(SbeCompatibility::noRequirements);
     std::vector<WindowFunctionStatement> outputFields;
     for (auto&& elem : spec.getOutput()) {
         outputFields.push_back(WindowFunctionStatement::parse(elem, sortBy, expCtx.get()));
     }
-    auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
+    auto sbeCompatibility =
+        std::min(expCtx->getSbeWindowCompatibility(), expCtx->getSbeCompatibility());
 
     return make_intrusive<DocumentSourceInternalSetWindowFields>(
         expCtx,

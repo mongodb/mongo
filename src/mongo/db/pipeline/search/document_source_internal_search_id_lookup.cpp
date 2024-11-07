@@ -49,8 +49,8 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
 
     // When search query is being run on a view, we need to store the view pipeline to append to
     // the end of the idLookup's subpipeline.
-    if (pExpCtx->viewNS) {
-        auto resolvedNamespace = pExpCtx->getResolvedNamespace(*pExpCtx->viewNS);
+    if (pExpCtx->getViewNS()) {
+        auto resolvedNamespace = pExpCtx->getResolvedNamespace(*pExpCtx->getViewNS());
         _viewPipeline = Pipeline::parse(resolvedNamespace.pipeline, pExpCtx);
     }
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state shared by the
@@ -67,8 +67,8 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
 
     // When search query is being run on a view, we need to store the view pipeline to append to
     // the end of the idLookup's subpipeline.
-    if (pExpCtx->viewNS) {
-        auto resolvedNamespace = pExpCtx->getResolvedNamespace(*pExpCtx->viewNS);
+    if (pExpCtx->getViewNS()) {
+        auto resolvedNamespace = pExpCtx->getResolvedNamespace(*pExpCtx->getViewNS());
         _viewPipeline = Pipeline::parse(resolvedNamespace.pipeline, pExpCtx);
     }
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state shared by the
@@ -109,8 +109,8 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
         std::vector<BSONObj> pipeline = {
             BSON("$match" << Document({{"_id", Value("_id placeholder"_sd)}}))};
 
-        if (pExpCtx->viewNS) {
-            auto viewPipeline = pExpCtx->getResolvedNamespace(*pExpCtx->viewNS).pipeline;
+        if (pExpCtx->getViewNS()) {
+            auto viewPipeline = pExpCtx->getResolvedNamespace(*pExpCtx->getViewNS()).pipeline;
             pipeline.insert(pipeline.end(), viewPipeline.begin(), viewPipeline.end());
         }
         outputSpec["subPipeline"] =
@@ -152,7 +152,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
 
             uassert(31052,
                     "Collection must have a UUID to use $_internalSearchIdLookup.",
-                    pExpCtx->uuid.has_value());
+                    pExpCtx->getUUID().has_value());
 
             // Find the document by performing a local read.
             MakePipelineOptions pipelineOpts;
@@ -160,7 +160,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
             auto pipeline =
                 Pipeline::makePipeline({BSON("$match" << documentKey)}, pExpCtx, pipelineOpts);
 
-            if (pExpCtx->viewNS) {
+            if (pExpCtx->getViewNS()) {
                 // When search query is being run on a view, we append the view pipeline to the end
                 // of the idLookup's subpipeline. This allows idLookup to retrieve the
                 // full/unmodified documents (from the _id values returned by mongot), apply the
@@ -172,8 +172,9 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
                 pipeline->appendPipeline(_viewPipeline->clone(pExpCtx));
             }
 
-            pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-                pipeline.release());
+            pipeline =
+                pExpCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
+                    pipeline.release());
 
             result = pipeline->getNext();
             if (auto next = pipeline->getNext()) {

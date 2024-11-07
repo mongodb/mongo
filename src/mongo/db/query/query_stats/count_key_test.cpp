@@ -75,7 +75,7 @@ TEST_F(CountKeyTest, DefaultCountKey) {
             "collectionType": "collection"
         })");
 
-    ASSERT_BSONOBJ_EQ(expectedKey, key->toBson(expCtx->opCtx, opts, {}));
+    ASSERT_BSONOBJ_EQ(expectedKey, key->toBson(expCtx->getOperationContext(), opts, {}));
 }
 
 // Test that the hint parameter is included in the key.
@@ -99,7 +99,7 @@ TEST_F(CountKeyTest, CountHintKey) {
             "hint": { a: 1 }
         })");
 
-    ASSERT_BSONOBJ_EQ(expectedKey, key->toBson(expCtx->opCtx, opts, {}));
+    ASSERT_BSONOBJ_EQ(expectedKey, key->toBson(expCtx->getOperationContext(), opts, {}));
 }
 
 // Test that the readConcern parameter is included in the key.
@@ -122,7 +122,7 @@ TEST_F(CountKeyTest, CountReadConcernKey) {
             "collectionType": "collection"
         })");
 
-    ASSERT_BSONOBJ_EQ(expectedKey, key->toBson(expCtx->opCtx, opts, {}));
+    ASSERT_BSONOBJ_EQ(expectedKey, key->toBson(expCtx->getOperationContext(), opts, {}));
 }
 
 // Test that the maxTimeMS parameter is included in the key.
@@ -145,14 +145,14 @@ TEST_F(CountKeyTest, CountMaxTimeMSKey) {
             "maxTimeMS": 1
         })");
 
-    ASSERT_BSONOBJ_EQ(expectedKey, key->toBson(expCtx->opCtx, opts, {}));
+    ASSERT_BSONOBJ_EQ(expectedKey, key->toBson(expCtx->getOperationContext(), opts, {}));
 }
 
 // Test that the comment parameter is included in the key.
 TEST_F(CountKeyTest, CountCommentKey) {
     const auto comment = BSON("comment"
                               << "hello");
-    expCtx->opCtx->setComment(comment);
+    expCtx->getOperationContext()->setComment(comment);
     const auto key = std::make_unique<CountKey>(expCtx,
                                                 *parsedRequest,
                                                 false /* hasLimit */,
@@ -171,7 +171,7 @@ TEST_F(CountKeyTest, CountCommentKey) {
             "collectionType": "collection"
         })");
 
-    ASSERT_BSONOBJ_EQ(expectedKey, key->toBson(expCtx->opCtx, opts, {}));
+    ASSERT_BSONOBJ_EQ(expectedKey, key->toBson(expCtx->getOperationContext(), opts, {}));
 }
 }  // namespace
 }  // namespace mongo::query_stats

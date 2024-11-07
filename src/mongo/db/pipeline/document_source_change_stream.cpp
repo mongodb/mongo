@@ -148,17 +148,17 @@ StringData DocumentSourceChangeStream::resolveAllCollectionsRegex(
     // We never expect this method to be called except when building a change stream pipeline.
     tassert(6189300,
             "Expected change stream spec to be set on the expression context",
-            expCtx->changeStreamSpec);
+            expCtx->getChangeStreamSpec());
     // If 'showSystemEvents' is set, return a less stringent regex.
-    return (expCtx->changeStreamSpec->getShowSystemEvents()
+    return (expCtx->getChangeStreamSpec()->getShowSystemEvents()
                 ? DocumentSourceChangeStream::kRegexAllCollectionsShowSystemEvents
                 : DocumentSourceChangeStream::kRegexAllCollections);
 }
 
 std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto type = getChangeStreamType(expCtx->ns);
-    const auto& nss = expCtx->ns;
+    const auto type = getChangeStreamType(expCtx->getNamespaceString());
+    const auto& nss = expCtx->getNamespaceString();
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target namespace exactly.
@@ -166,7 +166,7 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
                 // Change streams will only be enabled in serverless when multitenancy and
                 // featureFlag are on, therefore we don't have a tenantid prefix.
                 regexEscapeNsForChangeStream(
-                       NamespaceStringUtil::serialize(nss, expCtx->serializationCtxt)) +
+                       NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext())) +
                 "$";
         case ChangeStreamType::kSingleDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
@@ -174,8 +174,8 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
             return "^" +
                 // Change streams will only be enabled in serverless when multitenancy and
                 // featureFlag are on, therefore we don't have a tenantid prefix.
-                regexEscapeNsForChangeStream(
-                       DatabaseNameUtil::serialize(nss.dbName(), expCtx->serializationCtxt)) +
+                regexEscapeNsForChangeStream(DatabaseNameUtil::serialize(
+                    nss.dbName(), expCtx->getSerializationContext())) +
                 "\\." + resolveAllCollectionsRegex(expCtx);
         case ChangeStreamType::kAllChangesForCluster:
             // Match all namespaces that start with any db name other than admin, config, or local,
@@ -188,14 +188,14 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
 
 std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto& nss = expCtx->ns;
+    const auto& nss = expCtx->getNamespaceString();
     switch (getChangeStreamType(nss)) {
         case ChangeStreamType::kSingleDatabase:
             // For a single database, match any events on the system.views collection on that
             // database.
             return "^" +
-                regexEscapeNsForChangeStream(
-                       DatabaseNameUtil::serialize(nss.dbName(), expCtx->serializationCtxt)) +
+                regexEscapeNsForChangeStream(DatabaseNameUtil::serialize(
+                    nss.dbName(), expCtx->getSerializationContext())) +
                 "\\.system.views$";
         case ChangeStreamType::kAllChangesForCluster:
             // Match all system.views collections on all databases.
@@ -208,8 +208,8 @@ std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
 
 std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto type = getChangeStreamType(expCtx->ns);
-    const auto& nss = expCtx->ns;
+    const auto type = getChangeStreamType(expCtx->getNamespaceString());
+    const auto& nss = expCtx->getNamespaceString();
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target collection exactly.
@@ -225,8 +225,8 @@ std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
 
 std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto type = getChangeStreamType(expCtx->ns);
-    const auto& nss = expCtx->ns;
+    const auto type = getChangeStreamType(expCtx->getNamespaceString());
+    const auto& nss = expCtx->getNamespaceString();
     switch (type) {
         case ChangeStreamType::kSingleCollection:
         case ChangeStreamType::kSingleDatabase:
@@ -260,12 +260,13 @@ Timestamp DocumentSourceChangeStream::getStartTimeForNewStream(
     // If we do not have an explicit starting point, we should start from the latest majority
     // committed operation. If we are on mongoS and do not have a starting point, set it to the
     // current clusterTime so that all shards start in sync.
-    auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
-    const auto currentTime =
-        !expCtx->inRouter ? LogicalTime{replCoord->getMyLastAppliedOpTime().getTimestamp()} : [&] {
-            const auto currentTime = VectorClock::get(expCtx->opCtx)->getTime();
-            return currentTime.clusterTime();
-        }();
+    auto replCoord = repl::ReplicationCoordinator::get(expCtx->getOperationContext());
+    const auto currentTime = !expCtx->getInRouter()
+        ? LogicalTime{replCoord->getMyLastAppliedOpTime().getTimestamp()}
+        : [&] {
+              const auto currentTime = VectorClock::get(expCtx->getOperationContext())->getTime();
+              return currentTime.clusterTime();
+          }();
 
     // We always start one tick beyond the most recent operation, to ensure that the stream does not
     // return it.
@@ -294,22 +295,22 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     // If the stream's default version differs from the client's token version, adopt the higher.
     // This is the token version that will be used once the stream has passed the resume token.
     const auto clientToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
-    expCtx->changeStreamTokenVersion =
-        std::max(expCtx->changeStreamTokenVersion, clientToken.version);
+    expCtx->setChangeStreamTokenVersion(
+        std::max(expCtx->getChangeStreamTokenVersion(), clientToken.version));
 
     // If the user explicitly requested to resume from a high water mark token, but its version
     // differs from the version chosen above, regenerate it with the new version. There is no need
     // for a resumed HWM stream to adopt the old token version for events at the same clusterTime.
-    const bool tokenVersionsDiffer = (clientToken.version != expCtx->changeStreamTokenVersion);
+    const bool tokenVersionsDiffer = (clientToken.version != expCtx->getChangeStreamTokenVersion());
     const bool isHighWaterMark = ResumeToken::isHighWaterMarkToken(clientToken);
     if (isHighWaterMark && tokenVersionsDiffer && (spec.getResumeAfter() || spec.getStartAfter())) {
         spec.setResumeAfter(ResumeToken(ResumeToken::makeHighWaterMarkToken(
-            clientToken.clusterTime, expCtx->changeStreamTokenVersion)));
+            clientToken.clusterTime, expCtx->getChangeStreamTokenVersion())));
         spec.setStartAfter(boost::none);
     }
 
     // Save a copy of the spec on the expression context. Used when building the oplog filter.
-    expCtx->changeStreamSpec = spec;
+    expCtx->setChangeStreamSpec(spec);
 
     return _buildPipeline(expCtx, spec);
 }
@@ -328,7 +329,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
     tassert(5666900,
             "'DocumentSourceChangeStreamTransform' stage should populate "
             "'initialPostBatchResumeToken' field",
-            !expCtx->initialPostBatchResumeToken.isEmpty());
+            !expCtx->getInitialPostBatchResumeToken().isEmpty());
 
     // The resume stage must come after the check invalidate stage so that the former can determine
     // whether the event that matches the resume token should be followed by an "invalidate" event.
@@ -342,7 +343,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
     // change event is detected, this stage forwards the event directly to the executor via an
     // exception (bypassing the rest of the pipeline). Router must see all topology change events,
     // so it's important that this stage occurs before any filtering is performed.
-    if (expCtx->inRouter) {
+    if (expCtx->getInRouter()) {
         stages.push_back(DocumentSourceChangeStreamCheckTopologyChange::create(expCtx));
     }
 
@@ -363,7 +364,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
     // If the pipeline is built on router, then the DSCSHandleTopologyChange stage acts as the
     // split point for the pipline. All stages before this stages will run on shards and all
     // stages after and inclusive of this stage will run on the router.
-    if (expCtx->inRouter) {
+    if (expCtx->getInRouter()) {
         stages.push_back(DocumentSourceChangeStreamHandleTopologyChange::create(expCtx));
     }
 
@@ -384,14 +385,14 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
 void DocumentSourceChangeStream::assertIsLegalSpecification(
     const intrusive_ptr<ExpressionContext>& expCtx, const DocumentSourceChangeStreamSpec& spec) {
     // We can only run on a replica set, or through mongoS. Confirm that this is the case.
-    auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
+    auto replCoord = repl::ReplicationCoordinator::get(expCtx->getOperationContext());
     uassert(40573,
             "The $changeStream stage is only supported on replica sets",
-            expCtx->inRouter || (replCoord && replCoord->getSettings().isReplSet()));
+            expCtx->getInRouter() || (replCoord && replCoord->getSettings().isReplSet()));
 
     // We will not validate user specified options when we are not expecting to execute queries,
     // such as during $queryStats.
-    if (!expCtx->mongoProcessInterface->isExpectedToExecuteQueries()) {
+    if (!expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
         return;
     }
 
@@ -400,33 +401,36 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "A $changeStream with 'allChangesForCluster:true' may only be opened "
                              "on the 'admin' database, and with no collection name; found "
-                          << expCtx->ns.toStringForErrorMsg(),
+                          << expCtx->getNamespaceString().toStringForErrorMsg(),
             !spec.getAllChangesForCluster() ||
-                (expCtx->ns.isAdminDB() && expCtx->ns.isCollectionlessAggregateNS()));
+                (expCtx->getNamespaceString().isAdminDB() &&
+                 expCtx->getNamespaceString().isCollectionlessAggregateNS()));
 
     // Prevent $changeStream from running on internal databases. A stream may run against the
     // 'admin' database iff 'allChangesForCluster' is true. A stream may run against the 'config'
     // database iff 'allowToRunOnConfigDB' is true.
-    const bool isNotBannedInternalDB =
-        !expCtx->ns.isLocalDB() && (!expCtx->ns.isConfigDB() || spec.getAllowToRunOnConfigDB());
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "$changeStream may not be opened on the internal "
-                          << expCtx->ns.dbName().toStringForErrorMsg() << " database",
-            expCtx->ns.isAdminDB() ? static_cast<bool>(spec.getAllChangesForCluster())
-                                   : isNotBannedInternalDB);
+    const bool isNotBannedInternalDB = !expCtx->getNamespaceString().isLocalDB() &&
+        (!expCtx->getNamespaceString().isConfigDB() || spec.getAllowToRunOnConfigDB());
+    uassert(
+        ErrorCodes::InvalidNamespace,
+        str::stream() << "$changeStream may not be opened on the internal "
+                      << expCtx->getNamespaceString().dbName().toStringForErrorMsg() << " database",
+        expCtx->getNamespaceString().isAdminDB() ? static_cast<bool>(spec.getAllChangesForCluster())
+                                                 : isNotBannedInternalDB);
 
     // Prevent $changeStream from running on internal collections in any database. A stream may run
     // against the internal collections iff 'allowToRunOnSystemNS' is true and the stream is not
     // opened through a mongos process.
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "$changeStream may not be opened on the internal "
-                          << expCtx->ns.toStringForErrorMsg() << " collection"
+                          << expCtx->getNamespaceString().toStringForErrorMsg() << " collection"
                           << (spec.getAllowToRunOnSystemNS() ? " through router" : ""),
-            !expCtx->ns.isSystem() || (spec.getAllowToRunOnSystemNS() && !expCtx->inRouter));
+            !expCtx->getNamespaceString().isSystem() ||
+                (spec.getAllowToRunOnSystemNS() && !expCtx->getInRouter()));
 
     uassert(31123,
             "Change streams from router may not show migration events",
-            !(expCtx->inRouter && spec.getShowMigrationEvents()));
+            !(expCtx->getInRouter() && spec.getShowMigrationEvents()));
 
     uassert(50865,
             "Do not specify both 'resumeAfter' and 'startAfter' in a $changeStream stage",

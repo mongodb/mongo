@@ -283,7 +283,7 @@ void runBenchmark(BSONObj predicate,
 
     auto opCtx = client->makeOperationContext();
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
-    auto fcr = std::make_unique<FindCommandRequest>(expCtx->ns);
+    auto fcr = std::make_unique<FindCommandRequest>(expCtx->getNamespaceString());
     fcr->setFilter(predicate);
     if (!projection.isEmpty()) {
         fcr->setProjection(projection);

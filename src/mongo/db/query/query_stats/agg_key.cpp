@@ -157,7 +157,7 @@ AggKey::AggKey(AggregateCommandRequest request,
                stdx::unordered_set<NamespaceString> involvedNamespaces,
                const NamespaceString& origNss,
                query_shape::CollectionType collectionType)
-    : Key(expCtx->opCtx,
+    : Key(expCtx->getOperationContext(),
           std::make_unique<query_shape::AggCmdShape>(
               request, origNss, involvedNamespaces, pipeline, expCtx),
           request.getHint(),

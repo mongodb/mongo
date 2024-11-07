@@ -71,7 +71,7 @@ BSONObj generateValidationError(
     const int maxDocValidationErrorSize = kDefaultMaxDocValidationErrorSize,
     const int maxConsideredValues = internalQueryMaxDocValidationErrorConsideredValues.load()) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->isParsingCollectionValidator = true;
+    expCtx->setIsParsingCollectionValidator(true);
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
     MatchExpression* expr = result.getValue().get();

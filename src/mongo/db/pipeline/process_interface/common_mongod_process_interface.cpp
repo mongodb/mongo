@@ -167,8 +167,8 @@ void assertIgnorePrepareConflictsBehavior(const boost::intrusive_ptr<ExpressionC
     tassert(5996900,
             "Expected operation to either be blocking on prepare conflicts or ignoring prepare "
             "conflicts and allowing writes",
-            shard_role_details::getRecoveryUnit(expCtx->opCtx)->getPrepareConflictBehavior() !=
-                PrepareConflictBehavior::kIgnoreConflicts);
+            shard_role_details::getRecoveryUnit(expCtx->getOperationContext())
+                    ->getPrepareConflictBehavior() != PrepareConflictBehavior::kIgnoreConflicts);
 }
 
 /**
@@ -414,8 +414,12 @@ Status CommonMongodProcessInterface::appendStorageStats(
     const StorageStatsSpec& spec,
     BSONObjBuilder* builder,
     const boost::optional<BSONObj>& filterObj) const {
-    return appendCollectionStorageStats(
-        expCtx->opCtx, nss, spec, expCtx->serializationCtxt, builder, filterObj);
+    return appendCollectionStorageStats(expCtx->getOperationContext(),
+                                        nss,
+                                        spec,
+                                        expCtx->getSerializationContext(),
+                                        builder,
+                                        filterObj);
 }
 
 Status CommonMongodProcessInterface::appendRecordCount(OperationContext* opCtx,
@@ -529,8 +533,8 @@ std::unique_ptr<Pipeline, PipelineDeleter>
 CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     Pipeline* ownedPipeline, boost::optional<const AggregateCommandRequest&> aggRequest) {
     auto expCtx = ownedPipeline->getContext();
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                        PipelineDeleter(expCtx->opCtx));
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
+        ownedPipeline, PipelineDeleter(expCtx->getOperationContext()));
 
     Pipeline::SourceContainer& sources = pipeline->getSources();
     boost::optional<DocumentSource*> firstStage =
@@ -549,12 +553,14 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
 
     if (expCtx->eligibleForSampling()) {
         if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
-                expCtx->opCtx, expCtx->ns, analyze_shard_key::SampledCommandNameEnum::kAggregate)) {
+                expCtx->getOperationContext(),
+                expCtx->getNamespaceString(),
+                analyze_shard_key::SampledCommandNameEnum::kAggregate)) {
             auto [_, letParameters] =
                 expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);
-            analyze_shard_key::QueryAnalysisWriter::get(expCtx->opCtx)
+            analyze_shard_key::QueryAnalysisWriter::get(expCtx->getOperationContext())
                 ->addAggregateQuery(*sampleId,
-                                    expCtx->ns,
+                                    expCtx->getNamespaceString(),
                                     pipeline->getInitialQuery(),
                                     expCtx->getCollatorBSON(),
                                     letParameters)
@@ -564,32 +570,33 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
 
     // Reparse 'pipeline' to discover whether there are secondary namespaces that we need to lock
     // when constructing our query executor.
-    auto lpp = LiteParsedPipeline(expCtx->ns, pipeline->serializeToBson());
+    auto lpp = LiteParsedPipeline(expCtx->getNamespaceString(), pipeline->serializeToBson());
     std::vector<NamespaceStringOrUUID> secondaryNamespaces = lpp.getForeignExecutionNamespaces();
-    auto* opCtx = expCtx->opCtx;
+    auto* opCtx = expCtx->getOperationContext();
 
     boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> autoColl = boost::none;
     auto initAutoGetCallback = [&]() {
         autoColl.emplace(opCtx,
-                         expCtx->ns,
+                         expCtx->getNamespaceString(),
                          AutoGetCollection::Options{}.secondaryNssOrUUIDs(
                              secondaryNamespaces.cbegin(), secondaryNamespaces.cend()),
                          AutoStatsTracker::LogMode::kUpdateTop);
     };
 
-    bool isAnySecondaryCollectionNotLocal =
-        intializeAutoGet(opCtx, expCtx->ns, secondaryNamespaces, initAutoGetCallback);
+    bool isAnySecondaryCollectionNotLocal = intializeAutoGet(
+        opCtx, expCtx->getNamespaceString(), secondaryNamespaces, initAutoGetCallback);
 
     tassert(8322002,
             "Should have initialized AutoGet* after calling 'initializeAutoGet'",
             autoColl.has_value());
-    uassert(ErrorCodes::NamespaceNotFound,
-            fmt::format("collection '{}' does not match the expected uuid",
-                        expCtx->ns.toStringForErrorMsg()),
-            !expCtx->uuid ||
-                (autoColl->getCollection() && autoColl->getCollection()->uuid() == expCtx->uuid));
+    uassert(
+        ErrorCodes::NamespaceNotFound,
+        fmt::format("collection '{}' does not match the expected uuid",
+                    expCtx->getNamespaceString().toStringForErrorMsg()),
+        !expCtx->getUUID() ||
+            (autoColl->getCollection() && autoColl->getCollection()->uuid() == expCtx->getUUID()));
 
-    MultipleCollectionAccessor holder{expCtx->opCtx,
+    MultipleCollectionAccessor holder{expCtx->getOperationContext(),
                                       &autoColl->getCollection(),
                                       autoColl->getNss(),
                                       autoColl->isAnySecondaryNamespaceAView() ||
@@ -597,7 +604,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
                                       secondaryNamespaces};
     auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
     PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
-        holder, expCtx->ns, resolvedAggRequest, pipeline.get());
+        holder, expCtx->getNamespaceString(), resolvedAggRequest, pipeline.get());
 
     return pipeline;
 }
@@ -624,7 +631,8 @@ bool CommonMongodProcessInterface::inShardedEnvironment(OperationContext* opCtx)
 
 std::vector<GenericCursor> CommonMongodProcessInterface::getIdleCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
-    return CursorManager::get(expCtx->opCtx)->getIdleCursors(expCtx->opCtx, userMode);
+    return CursorManager::get(expCtx->getOperationContext())
+        ->getIdleCursors(expCtx->getOperationContext(), userMode);
 }
 
 boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
@@ -636,15 +644,16 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     try {
         // Be sure to do the lookup using the collection default collation
-        auto foreignExpCtx = expCtx->copyWith(
-            nss,
-            collectionUUID,
-            _getCollectionDefaultCollator(expCtx->opCtx, nss.dbName(), collectionUUID));
+        auto foreignExpCtx =
+            expCtx->copyWith(nss,
+                             collectionUUID,
+                             _getCollectionDefaultCollator(
+                                 expCtx->getOperationContext(), nss.dbName(), collectionUUID));
 
         // If we are here, we are either executing the pipeline normally or running in one of the
         // execution stat explain verbosities. In either case, we disable explain on the foreign
         // context so that we actually retrieve the document.
-        foreignExpCtx->explain = boost::none;
+        foreignExpCtx->setExplain(boost::none);
         pipeline = Pipeline::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx, opts);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         LOGV2_DEBUG(6726700, 1, "Namespace not found while looking up document", "error"_attr = ex);
@@ -746,7 +755,7 @@ CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const std::set<FieldPath>& fieldPaths) const {
-    auto* opCtx = expCtx->opCtx;
+    auto* opCtx = expCtx->getOperationContext();
 
     // This method just checks metadata of the collection, which should be consistent across all
     // shards therefore it's safe to ignore placement concern when locking the collection for read
@@ -888,10 +897,10 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     const NamespaceString& outputNs) const {
     uassert(51123,
             "Unexpected target chunk version specified",
-            !targetCollectionPlacementVersion || expCtx->fromRouter);
+            !targetCollectionPlacementVersion || expCtx->getFromRouter());
 
     if (!fieldPaths) {
-        uassert(51124, "Expected fields to be provided from router", !expCtx->fromRouter);
+        uassert(51124, "Expected fields to be provided from router", !expCtx->getFromRouter());
         return {std::set<FieldPath>{"_id"},
                 targetCollectionPlacementVersion,
                 SupportingUniqueIndex::Full};
@@ -900,7 +909,7 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     // Make sure the 'fields' array has a supporting index. Skip this check if the command is sent
     // from router since the 'fields' check would've happened already.
     auto supportingUniqueIndex = fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths);
-    if (!expCtx->fromRouter) {
+    if (!expCtx->getFromRouter()) {
         uassert(51183,
                 "Cannot find index to verify that join fields will be unique",
                 supportingUniqueIndex != SupportingUniqueIndex::None);
@@ -967,29 +976,35 @@ void CommonMongodProcessInterface::writeRecordsToRecordStore(
     const std::vector<Timestamp>& ts) const {
     tassert(5643012, "Attempted to write to record store with nullptr", records);
     assertIgnorePrepareConflictsBehavior(expCtx);
-    writeConflictRetry(expCtx->opCtx, "MPI::writeRecordsToRecordStore", expCtx->ns, [&] {
-        Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
-        WriteUnitOfWork wuow(expCtx->opCtx);
-        auto writeResult = rs->insertRecords(expCtx->opCtx, records, ts);
-        tassert(5643002,
-                str::stream() << "Failed to write to disk because " << writeResult.reason(),
-                writeResult.isOK());
-        wuow.commit();
-    });
+    writeConflictRetry(
+        expCtx->getOperationContext(),
+        "MPI::writeRecordsToRecordStore",
+        expCtx->getNamespaceString(),
+        [&] {
+            Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+            WriteUnitOfWork wuow(expCtx->getOperationContext());
+            auto writeResult = rs->insertRecords(expCtx->getOperationContext(), records, ts);
+            tassert(5643002,
+                    str::stream() << "Failed to write to disk because " << writeResult.reason(),
+                    writeResult.isOK());
+            wuow.commit();
+        });
 }
 
 std::unique_ptr<TemporaryRecordStore> CommonMongodProcessInterface::createTemporaryRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
-    return expCtx->opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-        expCtx->opCtx, keyFormat);
+    return expCtx->getOperationContext()
+        ->getServiceContext()
+        ->getStorageEngine()
+        ->makeTemporaryRecordStore(expCtx->getOperationContext(), keyFormat);
 }
 
 Document CommonMongodProcessInterface::readRecordFromRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs, RecordId rID) const {
     RecordData possibleRecord;
-    Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
-    auto foundDoc = rs->findRecord(expCtx->opCtx, RecordId(rID), &possibleRecord);
+    Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+    auto foundDoc = rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
     tassert(775101, str::stream() << "Could not find document id " << rID, foundDoc);
     return Document(possibleRecord.toBson());
 }
@@ -997,33 +1012,39 @@ Document CommonMongodProcessInterface::readRecordFromRecordStore(
 void CommonMongodProcessInterface::deleteRecordFromRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs, RecordId rID) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
-    writeConflictRetry(expCtx->opCtx, "MPI::deleteFromRecordStore", expCtx->ns, [&] {
-        Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
-        WriteUnitOfWork wuow(expCtx->opCtx);
-        rs->deleteRecord(expCtx->opCtx, rID);
-        wuow.commit();
-    });
+    writeConflictRetry(expCtx->getOperationContext(),
+                       "MPI::deleteFromRecordStore",
+                       expCtx->getNamespaceString(),
+                       [&] {
+                           Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+                           WriteUnitOfWork wuow(expCtx->getOperationContext());
+                           rs->deleteRecord(expCtx->getOperationContext(), rID);
+                           wuow.commit();
+                       });
 }
 
 void CommonMongodProcessInterface::truncateRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
-    writeConflictRetry(expCtx->opCtx, "MPI::truncateRecordStore", expCtx->ns, [&] {
-        Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
-        WriteUnitOfWork wuow(expCtx->opCtx);
-        auto status = rs->truncate(expCtx->opCtx);
-        tassert(5643000, "Unable to clear record store", status.isOK());
-        wuow.commit();
-    });
+    writeConflictRetry(expCtx->getOperationContext(),
+                       "MPI::truncateRecordStore",
+                       expCtx->getNamespaceString(),
+                       [&] {
+                           Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+                           WriteUnitOfWork wuow(expCtx->getOperationContext());
+                           auto status = rs->truncate(expCtx->getOperationContext());
+                           tassert(5643000, "Unable to clear record store", status.isOK());
+                           wuow.commit();
+                       });
 }
 
 boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocumentLocally(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const Document& documentKey) {
-    AutoGetCollectionForReadMaybeLockFree autoColl(expCtx->opCtx, nss);
+    AutoGetCollectionForReadMaybeLockFree autoColl(expCtx->getOperationContext(), nss);
     BSONObj document;
-    if (!Helpers::findById(expCtx->opCtx, nss, documentKey.toBson(), document)) {
+    if (!Helpers::findById(expCtx->getOperationContext(), nss, documentKey.toBson(), document)) {
         return boost::none;
     }
     return Document(document).getOwned();

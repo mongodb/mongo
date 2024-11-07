@@ -125,7 +125,7 @@ Status SubplanStage::choosePlanWholeQuery(const QueryPlannerParams& plannerParam
         // Only one possible plan.  Run it.  Build the stages from the solution.
         if (shouldConstructClassicExecutableTree) {
             auto&& root = stage_builder::buildClassicExecutableTree(
-                expCtx()->opCtx, collection(), *_query, *solutions[0], _ws);
+                expCtx()->getOperationContext(), collection(), *_query, *solutions[0], _ws);
             invariant(_children.empty());
             _children.emplace_back(std::move(root));
         }
@@ -150,7 +150,7 @@ Status SubplanStage::choosePlanWholeQuery(const QueryPlannerParams& plannerParam
             solutions[ix]->indexFilterApplied = plannerParams.indexFiltersApplied;
 
             auto&& nextPlanRoot = stage_builder::buildClassicExecutableTree(
-                expCtx()->opCtx, collection(), *_query, *solutions[ix], _ws);
+                expCtx()->getOperationContext(), collection(), *_query, *solutions[ix], _ws);
             multiPlanStage->addPlan(std::move(solutions[ix]), std::move(nextPlanRoot), _ws);
         }
 
@@ -197,8 +197,11 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     };
 
     // Plan each branch of the $or.
-    auto subplanningStatus = QueryPlanner::planSubqueries(
-        expCtx()->opCtx, getSolutionCachedData, collectionPtr(), *_query, plannerParams);
+    auto subplanningStatus = QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
+                                                          getSolutionCachedData,
+                                                          collectionPtr(),
+                                                          *_query,
+                                                          plannerParams);
     if (!subplanningStatus.isOK()) {
         return choosePlanWholeQuery(
             plannerParams, yieldPolicy, shouldConstructClassicExecutableTree);
@@ -236,7 +239,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
         // Dump all the solutions into the MPS.
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
             auto&& nextPlanRoot = stage_builder::buildClassicExecutableTree(
-                expCtx()->opCtx, collection(), *cq, *solutions[ix], _ws);
+                expCtx()->getOperationContext(), collection(), *cq, *solutions[ix], _ws);
 
             multiPlanStage->addPlan(std::move(solutions[ix]), std::move(nextPlanRoot), _ws);
         }
@@ -272,7 +275,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     if (shouldConstructClassicExecutableTree) {
         invariant(_children.empty());
         auto&& root = stage_builder::buildClassicExecutableTree(
-            expCtx()->opCtx, collection(), *_query, *_compositeSolution, _ws);
+            expCtx()->getOperationContext(), collection(), *_query, *_compositeSolution, _ws);
         _children.emplace_back(std::move(root));
     }
 

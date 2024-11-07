@@ -82,7 +82,7 @@ std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
         new ExpressionContextForTest(opCtx, request));
 
     static unittest::TempDir tempDir("ABTPipelineTest");
-    ctx->tempDir = tempDir.path();
+    ctx->setTempDir(tempDir.path());
 
     return Pipeline::parse(request.getPipeline(), ctx);
 }

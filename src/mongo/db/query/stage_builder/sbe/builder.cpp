@@ -178,7 +178,7 @@ std::pair<SbStage, PlanStageSlots> generateEofPlan(StageBuilderState& state,
 
 // Fill in the search slots based on initial cursor response from mongot.
 void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq) {
-    if (cq.cqPipeline().empty() || !cq.isSearchQuery() || !cq.getExpCtxRaw()->uuid) {
+    if (cq.cqPipeline().empty() || !cq.isSearchQuery() || !cq.getExpCtxRaw()->getUUID()) {
         return;
     }
 
@@ -293,7 +293,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     // Call markShouldCollectTimingInfo() if appropriate.
     auto expCtx = cq.getExpCtxRaw();
     tassert(6142207, "No expression context", expCtx);
-    if (expCtx->explain || expCtx->mayDbProfile) {
+    if (expCtx->getExplain() || expCtx->getMayDbProfile()) {
         root->markShouldCollectTimingInfo();
     }
 
@@ -377,8 +377,8 @@ std::pair<SbStage, PlanStageData> buildSearchMetadataExecutorSBE(OperationContex
     sbe::value::SlotIdGenerator slotIdGenerator;
     data->resultSlot = slotIdGenerator.generate();
 
-    auto stage = sbe::SearchCursorStage::createForMetadata(expCtx->ns,
-                                                           expCtx->uuid,
+    auto stage = sbe::SearchCursorStage::createForMetadata(expCtx->getNamespaceString(),
+                                                           expCtx->getUUID(),
                                                            data->resultSlot,
                                                            remoteCursorId,
                                                            yieldPolicy,
@@ -939,8 +939,8 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
              &_collatorsMap,
              &_sortSpecMap,
              _cq.getExpCtx(),
-             _cq.getExpCtx()->needsMerge,
-             _cq.getExpCtx()->allowDiskUse) {
+             _cq.getExpCtx()->getNeedsMerge(),
+             _cq.getExpCtx()->getAllowDiskUse()) {
     // Initialize '_data->queryCollator'.
     _data->queryCollator = cq.getCollatorShared();
 
@@ -4750,7 +4750,7 @@ std::pair<SbStage, PlanStageSlots> buildSearchMeta(const SearchNode* root,
     auto expCtx = cq.getExpCtxRaw();
     PlanStageSlots outputs;
 
-    if (!expCtx->needsMerge) {
+    if (!expCtx->getNeedsMerge()) {
         auto searchMetaSlot = SbSlot{*state.getBuiltinVarSlot(Variables::kSearchMetaId)};
         auto stage = b.makeConstFilter(b.makeLimitOneCoScanTree(),
                                        b.makeFunction("exists"_sd, searchMetaSlot));
@@ -4760,8 +4760,8 @@ std::pair<SbStage, PlanStageSlots> buildSearchMeta(const SearchNode* root,
 
     auto searchResultSlot = SbSlot{slotIdGenerator->generate()};
 
-    auto stage = sbe::SearchCursorStage::createForMetadata(expCtx->ns,
-                                                           expCtx->uuid,
+    auto stage = sbe::SearchCursorStage::createForMetadata(expCtx->getNamespaceString(),
+                                                           expCtx->getUUID(),
                                                            searchResultSlot.getId(),
                                                            root->remoteCursorId,
                                                            yieldPolicy,
@@ -4868,8 +4868,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSearch(const Quer
             topLevelFieldSlots.emplace_back(_slotIdGenerator.generate());
         }
 
-        auto stage = sbe::SearchCursorStage::createForStoredSource(expCtx->ns,
-                                                                   expCtx->uuid,
+        auto stage = sbe::SearchCursorStage::createForStoredSource(expCtx->getNamespaceString(),
+                                                                   expCtx->getUUID(),
                                                                    searchResultSlot->getId(),
                                                                    metadataNames,
                                                                    metadataSlots,
@@ -4893,8 +4893,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSearch(const Quer
 
     auto idSlot = SbSlot{_slotIdGenerator.generate()};
     auto searchCursorStage =
-        sbe::SearchCursorStage::createForNonStoredSource(expCtx->ns,
-                                                         expCtx->uuid,
+        sbe::SearchCursorStage::createForNonStoredSource(expCtx->getNamespaceString(),
+                                                         expCtx->getUUID(),
                                                          idSlot.getId(),
                                                          metadataNames,
                                                          metadataSlots,

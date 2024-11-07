@@ -260,8 +260,9 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNotRankedPipeline) {
 
 TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsAllowed) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
-        {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
 
     auto spec = fromjson(R"({
         $rankFusion: {
@@ -618,13 +619,14 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
 
 TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
-        {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
-    auto nsToUnionWith1 =
-        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "novels");
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto nsToUnionWith1 = NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
-    auto nsToUnionWith2 =
-        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "shortstories");
+    auto nsToUnionWith2 = NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "shortstories");
     expCtx->addResolvedNamespaces({nsToUnionWith2});
 
     auto spec = fromjson(R"({
@@ -831,13 +833,14 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
-        {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
-    auto nsToUnionWith1 =
-        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "novels");
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto nsToUnionWith1 = NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
-    auto nsToUnionWith2 =
-        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "shortstories");
+    auto nsToUnionWith2 = NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "shortstories");
     expCtx->addResolvedNamespaces({nsToUnionWith2});
 
     auto spec = fromjson(R"({
@@ -880,8 +883,9 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
 
 TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
-        {expCtx->ns.coll().toString(), {expCtx->ns, std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {

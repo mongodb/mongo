@@ -83,12 +83,12 @@ public:
         // 'sbeCompatibility' value in the ExpressionContext, which we can use to update the
         // '_sbeCompatibility' value for this $replaceRoot operation.
         SbeCompatibility originalSbeCompatibility =
-            std::exchange(_expCtx->sbeCompatibility, _sbeCompatibility);
-        ON_BLOCK_EXIT([&] { this->_expCtx->sbeCompatibility = originalSbeCompatibility; });
+            _expCtx->sbeCompatibilityExchange(_sbeCompatibility);
+        ON_BLOCK_EXIT([&] { this->_expCtx->setSbeCompatibility(originalSbeCompatibility); });
 
         _newRoot = _newRoot->optimize();
 
-        _sbeCompatibility = _expCtx->sbeCompatibility;
+        _sbeCompatibility = _expCtx->getSbeCompatibility();
     }
 
     // Used by optimize() to optimize out the $replaceRoot stage if it is a no-op.

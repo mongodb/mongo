@@ -268,7 +268,7 @@ public:
     }
 
     void doDispose() final {
-        _exchange->dispose(pExpCtx->opCtx, _consumerId);
+        _exchange->dispose(pExpCtx->getOperationContext(), _consumerId);
     }
 
     auto getConsumerId() const {

@@ -101,7 +101,7 @@ public:
         auto expression =
             Expression::parseExpression(expCtx.get(), expressionSpec, expCtx->variablesParseState);
 
-        if (expCtx->sbeCompatibility == SbeCompatibility::notCompatible) {
+        if (expCtx->getSbeCompatibility() == SbeCompatibility::notCompatible) {
             benchmarkState.SkipWithError("expression is not supported by SBE");
             return;
         }

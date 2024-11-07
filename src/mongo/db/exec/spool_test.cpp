@@ -147,8 +147,8 @@ public:
                          boost::optional<long long> maxAllowedDiskUsageBytes = boost::none) {
         if (maxAllowedDiskUsageBytes) {
             _tempDir = std::make_unique<unittest::TempDir>("SpoolStageTest");
-            expCtx()->tempDir = _tempDir->path();
-            expCtx()->allowDiskUse = maxAllowedDiskUsageBytes.has_value();
+            expCtx()->setTempDir(_tempDir->path());
+            expCtx()->setAllowDiskUse(maxAllowedDiskUsageBytes.has_value());
         }
 
         internalQueryMaxSpoolMemoryUsageBytes.store(maxAllowedMemoryUsageBytes);

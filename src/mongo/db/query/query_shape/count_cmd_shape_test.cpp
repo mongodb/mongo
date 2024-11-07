@@ -50,7 +50,8 @@ public:
             parsed_find_command::parseFromCount(expCtx, ccr, extensionsCallback, testNss));
         auto shape = std::make_unique<CountCmdShape>(
             *parsedRequest, ccr.getLimit().has_value(), ccr.getSkip().has_value());
-        ASSERT_BSONOBJ_EQ(expectedShape, shape->toBson(expCtx->opCtx, serializationOptions, {}));
+        ASSERT_BSONOBJ_EQ(expectedShape,
+                          shape->toBson(expCtx->getOperationContext(), serializationOptions, {}));
         return shape;
     }
 
@@ -58,7 +59,7 @@ public:
         const auto count = fromjson(json);
         const auto countCommand = std::make_unique<CountCommandRequest>(CountCommandRequest::parse(
             IDLParserContext("countCommandRequest",
-                             auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                             auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                              boost::none,
                              SerializationContext::stateDefault()),
             count));
@@ -66,7 +67,7 @@ public:
             expCtx, *countCommand, extensionsCallback, testNss));
         const auto shape = std::make_unique<CountCmdShape>(
             *parsedFind, countCommand->getLimit().has_value(), countCommand->getSkip().has_value());
-        return shape->sha256Hash(expCtx->opCtx, {});
+        return shape->sha256Hash(expCtx->getOperationContext(), {});
     }
 
     std::unique_ptr<CountCmdShapeComponents> makeShapeComponentsFromQuery(const BSONObj& query) {

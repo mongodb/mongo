@@ -77,12 +77,12 @@ Status TrialStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             // subject to TemporarilyUnavailableException's.
             invariant(!expCtx()->getTemporarilyUnavailableException());
         }
-        if (mustYield || yieldPolicy->shouldYieldOrInterrupt(expCtx()->opCtx)) {
+        if (mustYield || yieldPolicy->shouldYieldOrInterrupt(expCtx()->getOperationContext())) {
             if (mustYield && !yieldPolicy->canAutoYield()) {
                 throwWriteConflictException(
                     "Write conflict during TrialStage plan selection and yielding is disabled.");
             }
-            auto yieldStatus = yieldPolicy->yieldOrInterrupt(expCtx()->opCtx);
+            auto yieldStatus = yieldPolicy->yieldOrInterrupt(expCtx()->getOperationContext());
             if (!yieldStatus.isOK()) {
                 return yieldStatus;
             }

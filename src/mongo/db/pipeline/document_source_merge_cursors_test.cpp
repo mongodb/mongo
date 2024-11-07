@@ -122,7 +122,7 @@ public:
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
         _expCtx = makeExpCtx();
-        _expCtx->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>(executor());
+        _expCtx->setMongoProcessInterface(std::make_shared<StubMongoProcessInterface>(executor()));
 
         std::vector<ShardType> shards;
         for (size_t i = 0; i < kTestShardIds.size(); i++) {
@@ -263,10 +263,14 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldReportEOFWithNoCursors) {
     AsyncResultsMergerParams armParams;
     armParams.setNss(getTenantIdNss());
     std::vector<RemoteCursor> cursors;
-    cursors.emplace_back(makeRemoteCursor(
-        kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->ns, kExhaustedCursorID, {})));
-    cursors.emplace_back(makeRemoteCursor(
-        kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->ns, kExhaustedCursorID, {})));
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0],
+                         kTestShardHosts[0],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[1],
+                         kTestShardHosts[1],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
     armParams.setRemotes(std::move(cursors));
     auto pipeline = Pipeline::create({}, expCtx);
     auto mergeCursorsStage = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
@@ -286,10 +290,10 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToIterateCursorsUntilEOF) {
     AsyncResultsMergerParams armParams;
     armParams.setNss(getTenantIdNss());
     std::vector<RemoteCursor> cursors;
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->ns, 1, {})));
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->ns, 2, {})));
+    cursors.emplace_back(makeRemoteCursor(
+        kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->getNamespaceString(), 1, {})));
+    cursors.emplace_back(makeRemoteCursor(
+        kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->getNamespaceString(), 2, {})));
     armParams.setRemotes(std::move(cursors));
     auto pipeline = Pipeline::create({}, expCtx);
     pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
@@ -307,23 +311,26 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToIterateCursorsUntilEOF) {
     // Schedule responses to two getMores which keep the cursor open.
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["getMore"]);
-        return cursorResponseObj(
-            expCtx->ns, request.cmdObj["getMore"].Long(), {BSON("x" << 1), BSON("x" << 1)});
+        return cursorResponseObj(expCtx->getNamespaceString(),
+                                 request.cmdObj["getMore"].Long(),
+                                 {BSON("x" << 1), BSON("x" << 1)});
     });
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["getMore"]);
-        return cursorResponseObj(
-            expCtx->ns, request.cmdObj["getMore"].Long(), {BSON("x" << 1), BSON("x" << 1)});
+        return cursorResponseObj(expCtx->getNamespaceString(),
+                                 request.cmdObj["getMore"].Long(),
+                                 {BSON("x" << 1), BSON("x" << 1)});
     });
 
     // Schedule responses to two getMores which report the cursor is exhausted.
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["getMore"]);
-        return cursorResponseObj(expCtx->ns, kExhaustedCursorID, {});
+        return cursorResponseObj(expCtx->getNamespaceString(), kExhaustedCursorID, {});
     });
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["getMore"]);
-        return cursorResponseObj(expCtx->ns, kExhaustedCursorID, {BSON("x" << 1)});
+        return cursorResponseObj(
+            expCtx->getNamespaceString(), kExhaustedCursorID, {BSON("x" << 1)});
     });
 
     future.default_timed_get();
@@ -334,10 +341,10 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldNotKillCursorsIfTheyAreNotOwned) {
     AsyncResultsMergerParams armParams;
     armParams.setNss(getTenantIdNss());
     std::vector<RemoteCursor> cursors;
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->ns, 1, {})));
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->ns, 2, {})));
+    cursors.emplace_back(makeRemoteCursor(
+        kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->getNamespaceString(), 1, {})));
+    cursors.emplace_back(makeRemoteCursor(
+        kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->getNamespaceString(), 2, {})));
     armParams.setRemotes(std::move(cursors));
     auto pipeline = Pipeline::create({}, expCtx);
     pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
@@ -356,8 +363,8 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {
     AsyncResultsMergerParams armParams;
     armParams.setNss(getTenantIdNss());
     std::vector<RemoteCursor> cursors;
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->ns, 1, {})));
+    cursors.emplace_back(makeRemoteCursor(
+        kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->getNamespaceString(), 1, {})));
     armParams.setRemotes(std::move(cursors));
     auto pipeline = Pipeline::create({}, expCtx);
     pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
@@ -372,7 +379,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {
     // Note we do not use 'kExhaustedCursorID' here, so the cursor is still open.
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["getMore"]);
-        return cursorResponseObj(expCtx->ns, 1, {BSON("x" << 1), BSON("x" << 1)});
+        return cursorResponseObj(expCtx->getNamespaceString(), 1, {BSON("x" << 1), BSON("x" << 1)});
     });
 
     // Here we're looking for the killCursors request to be scheduled.
@@ -400,10 +407,10 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
     armParams.setNss(getTenantIdNss());
     armParams.setSort(BSON("x" << 1));
     std::vector<RemoteCursor> cursors;
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->ns, 1, {})));
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->ns, 2, {})));
+    cursors.emplace_back(makeRemoteCursor(
+        kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->getNamespaceString(), 1, {})));
+    cursors.emplace_back(makeRemoteCursor(
+        kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->getNamespaceString(), 2, {})));
     armParams.setRemotes(std::move(cursors));
     pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
 
@@ -423,13 +430,13 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
     });
 
     onCommand([&](const auto& request) {
-        return cursorResponseObj(expCtx->ns,
+        return cursorResponseObj(expCtx->getNamespaceString(),
                                  kExhaustedCursorID,
                                  {BSON("x" << 1 << "$sortKey" << BSON_ARRAY(1)),
                                   BSON("x" << 3 << "$sortKey" << BSON_ARRAY(3))});
     });
     onCommand([&](const auto& request) {
-        return cursorResponseObj(expCtx->ns,
+        return cursorResponseObj(expCtx->getNamespaceString(),
                                  kExhaustedCursorID,
                                  {BSON("x" << 2 << "$sortKey" << BSON_ARRAY(2)),
                                   BSON("x" << 4 << "$sortKey" << BSON_ARRAY(4))});
@@ -575,10 +582,10 @@ TEST_F(DocumentSourceMergeCursorsShapeTest, QueryShape) {
     armParams.setNss(
         NamespaceString::createNamespaceString_forTest(boost::none, kMergeCursorNsStr));
     std::vector<RemoteCursor> cursors;
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->ns, 1, {})));
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->ns, 2, {})));
+    cursors.emplace_back(makeRemoteCursor(
+        kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->getNamespaceString(), 1, {})));
+    cursors.emplace_back(makeRemoteCursor(
+        kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->getNamespaceString(), 2, {})));
     armParams.setRemotes(std::move(cursors));
     auto stage = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
 

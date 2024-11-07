@@ -122,7 +122,7 @@ DocumentSourceExchange::DocumentSourceExchange(
       _resourceYielder(std::move(yielder)) {}
 
 DocumentSource::GetNextResult DocumentSourceExchange::doGetNext() {
-    return _exchange->getNext(pExpCtx->opCtx, _consumerId, _resourceYielder.get());
+    return _exchange->getNext(pExpCtx->getOperationContext(), _consumerId, _resourceYielder.get());
 }
 
 Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)

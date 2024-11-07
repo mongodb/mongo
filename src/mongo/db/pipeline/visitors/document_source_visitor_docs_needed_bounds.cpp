@@ -52,7 +52,7 @@ using Unknown = docs_needed_bounds::Unknown;
 
 namespace {
 void extractDocsNeededBoundsHelper(const Pipeline& pipeline, DocsNeededBoundsContext* ctx) {
-    ServiceContext* serviceCtx = pipeline.getContext()->opCtx->getServiceContext();
+    ServiceContext* serviceCtx = pipeline.getContext()->getOperationContext()->getServiceContext();
     auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);
     DocumentSourceWalker walker(reg, ctx);
 

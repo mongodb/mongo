@@ -364,7 +364,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResh
     ReshardingSourceId sourceId(UUID::gen(), ShardId("dummyShardId"));
     ReshardingTxnCloner cloner(std::move(sourceId), fetchTimestamp);
 
-    return cloner.makePipeline(expCtx->opCtx, expCtx->mongoProcessInterface, startAfter);
+    return cloner.makePipeline(
+        expCtx->getOperationContext(), expCtx->getMongoProcessInterface(), startAfter);
 }
 
 }  // namespace mongo

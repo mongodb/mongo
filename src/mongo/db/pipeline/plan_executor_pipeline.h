@@ -87,7 +87,7 @@ public:
     }
 
     const NamespaceString& nss() const override {
-        return _expCtx->ns;
+        return _expCtx->getNamespaceString();
     }
 
     const std::vector<NamespaceStringOrUUID>& getSecondaryNamespaces() const final {
@@ -100,7 +100,7 @@ public:
     }
 
     OperationContext* getOpCtx() const override {
-        return _expCtx->opCtx;
+        return _expCtx->getOperationContext();
     }
 
     // Pipeline execution does not support the saveState()/restoreState() interface. Instead, the

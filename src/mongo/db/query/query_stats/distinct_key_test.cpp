@@ -54,7 +54,7 @@ public:
 
         auto dcr = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
             IDLParserContext("distinctCommandRequest",
-                             auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                             auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                              boost::none,
                              SerializationContext::stateDefault()),
             distinct));
@@ -87,7 +87,8 @@ TEST_F(DistinctKeyTest, ExtractKeyFromDistinctRequiredFields) {
         })");
 
     auto key = makeDistinctKeyFromQuery(distinct, expCtx);
-    auto keyBSON = key->toBson(expCtx->opCtx, opts, SerializationContext::stateDefault());
+    auto keyBSON =
+        key->toBson(expCtx->getOperationContext(), opts, SerializationContext::stateDefault());
 
     ASSERT_BSONOBJ_EQ(keyBSON, expectedKey);
 }
@@ -116,7 +117,8 @@ TEST_F(DistinctKeyTest, ExtractKeyFromDistinctQuery) {
         })");
 
     auto key = makeDistinctKeyFromQuery(distinct, expCtx);
-    auto keyBSON = key->toBson(expCtx->opCtx, opts, SerializationContext::stateDefault());
+    auto keyBSON =
+        key->toBson(expCtx->getOperationContext(), opts, SerializationContext::stateDefault());
 
     ASSERT_BSONOBJ_EQ(keyBSON, expectedKey);
 }
@@ -152,11 +154,12 @@ TEST_F(DistinctKeyTest, ExtractKeyFromDistinctComplex) {
         })");
     // For this test, the comment must be set individually outside of the original command BSON
     // because it is not set when being parsed into a DistinctCommandRequest.
-    expCtx->opCtx->setComment(BSON("comment"
-                                   << "hello"));
+    expCtx->getOperationContext()->setComment(BSON("comment"
+                                                   << "hello"));
 
     auto key = makeDistinctKeyFromQuery(distinct, expCtx);
-    auto keyBSON = key->toBson(expCtx->opCtx, opts, SerializationContext::stateDefault());
+    auto keyBSON =
+        key->toBson(expCtx->getOperationContext(), opts, SerializationContext::stateDefault());
 
     ASSERT_BSONOBJ_EQ(keyBSON, expectedKey);
 }
@@ -186,7 +189,8 @@ TEST_F(DistinctKeyTest, ExtractKeyFromDistinctQueryDebugString) {
         })");
 
     auto key = makeDistinctKeyFromQuery(distinct, expCtx);
-    auto keyBSON = key->toBson(expCtx->opCtx, opts, SerializationContext::stateDefault());
+    auto keyBSON =
+        key->toBson(expCtx->getOperationContext(), opts, SerializationContext::stateDefault());
 
     ASSERT_BSONOBJ_EQ(keyBSON, expectedKey);
 }
