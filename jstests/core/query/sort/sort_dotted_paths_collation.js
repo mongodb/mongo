@@ -11,9 +11,6 @@
  * @tags: [
  *   does_not_support_transactions,
  *   assumes_no_implicit_collection_creation_after_drop,
- *   # Fixes behavior which was buggy in 7.0, so multiversion incompatible for now.
- *   # TODO SERVER-76127: Remove this tag.
- *   multiversion_incompatible,
  * ]
  */
 const coll = db.sort_dotted_paths_collation;
