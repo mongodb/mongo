@@ -169,6 +169,7 @@ void CoordinatorCommitMonitorTest::setUp() {
                                                                 _recipientShards,
                                                                 _futureExecutor,
                                                                 _cancellationSource->token(),
+                                                                0,
                                                                 Milliseconds(0));
     _commitMonitor->setNetworkExecutorForTest(executor());
 }

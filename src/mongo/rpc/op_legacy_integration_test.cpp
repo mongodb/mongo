@@ -207,6 +207,18 @@ TEST(OpLegacy, UnsupportedReadOps) {
                   ExceptionForCat<ErrorCategory::NetworkError>);
 }
 
+TEST(OpLegacy, InvalidNs) {
+    auto conn = getIntegrationTestConnection();
+
+    auto msg = makeMessage(dbQuery, [&](BufBuilder& b) {
+        b.appendNum(0);
+        b.appendStrBytes("nonullbyte");
+    });
+    // Since our request is not able to be parsed, we don't receive a response from the server.
+    Message ignore;
+    ASSERT_THROWS(conn->call(msg, ignore), DBException);
+}
+
 TEST(OpLegacy, GenericCommandViaOpQuery) {
     auto conn = getIntegrationTestConnection();
 

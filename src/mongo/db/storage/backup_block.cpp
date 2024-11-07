@@ -49,22 +49,38 @@ const std::set<std::string> kRequiredMDBFiles = {"_mdb_catalog.wt", "sizeStorer.
 
 }  // namespace
 
+namespace details {
+
+std::string extractIdentFromPath(const boost::filesystem::path& dbpath,
+                                 const boost::filesystem::path& identAbsolutePath) {
+    // Remove the dbpath prefix to the identAbsolutePath.
+    boost::filesystem::path identWithExtension = boost::filesystem::relative(
+        identAbsolutePath, boost::filesystem::path(storageGlobalParams.dbpath));
+
+    // Remove the file extension and convert to generic form (i.e. replace "\" with "/"
+    // on windows, no-op on unix).
+    return boost::filesystem::change_extension(identWithExtension, "").generic_string();
+}
+
+}  // namespace details
+
 BackupBlock::BackupBlock(OperationContext* opCtx,
-                         std::string filePath,
+                         std::string fileAbsolutePath,
                          const IdentToNamespaceAndUUIDMap& identToNamespaceAndUUIDMap,
                          boost::optional<Timestamp> checkpointTimestamp,
                          std::uint64_t offset,
                          std::uint64_t length,
                          std::uint64_t fileSize)
-    : _filePath(filePath), _offset(offset), _length(length), _fileSize(fileSize) {
-    boost::filesystem::path path(filePath);
-    _filenameStem = path.stem().string();
+    : _fileAbsolutePath(fileAbsolutePath), _offset(offset), _length(length), _fileSize(fileSize) {
+    boost::filesystem::path absolutePath(fileAbsolutePath);
+    _ident = details::extractIdentFromPath(boost::filesystem::path(storageGlobalParams.dbpath),
+                                           absolutePath);
     _initialize(opCtx, identToNamespaceAndUUIDMap, checkpointTimestamp);
 }
 
 bool BackupBlock::isRequired() const {
     // Extract the filename from the path.
-    boost::filesystem::path path(_filePath);
+    boost::filesystem::path path(_fileAbsolutePath);
     const std::string filename = path.filename().string();
 
     // Check whether this is a required WiredTiger file.
@@ -121,7 +137,7 @@ void BackupBlock::_initialize(OperationContext* opCtx,
     }
 
     // Fetch the latest values for the ident.
-    auto it = identToNamespaceAndUUIDMap.find(_filenameStem);
+    auto it = identToNamespaceAndUUIDMap.find(_ident);
     if (it != identToNamespaceAndUUIDMap.end()) {
         _uuid = it->second.second;
         _setNamespaceString(it->second.first);
@@ -134,7 +150,7 @@ void BackupBlock::_initialize(OperationContext* opCtx,
     // Check if the ident had a different value at the checkpoint timestamp. If so, we want to use
     // that instead as that will be the ident's value when restoring from the backup.
     boost::optional<std::pair<NamespaceString, UUID>> historicalEntry =
-        HistoricalIdentTracker::get(opCtx).lookup(_filenameStem, checkpointTimestamp.value());
+        HistoricalIdentTracker::get(opCtx).lookup(_ident, checkpointTimestamp.value());
     if (historicalEntry) {
         _uuid = historicalEntry->second;
         _setNamespaceString(historicalEntry->first);

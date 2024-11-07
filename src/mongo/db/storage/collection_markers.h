@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include <boost/optional.hpp>
 
 #include "mongo/db/record_id.h"
@@ -53,7 +55,7 @@ class OperationContext;
 // If these requirements hold then this class can be used to compute and maintain up-to-date markers
 // for ranges of deletions. These markers will be expired and returned to the deleter whenever the
 // implementation defined '_hasExcessMarkers' returns true.
-class CollectionTruncateMarkers {
+class CollectionTruncateMarkers : public std::enable_shared_from_this<CollectionTruncateMarkers> {
 public:
     /** Markers represent "waypoints" of the collection that contain information between the current
      * marker and the previous one.
@@ -111,7 +113,18 @@ public:
      */
     void kill();
 
-    void awaitHasExcessMarkersOrDead(OperationContext* opCtx);
+    /**
+     * Waits for expired markers. See _hasExcessMarkers().
+     * Returns true if expired markers are present.
+     * Otherwise, returns false. This could be due to reaching an implementation defined
+     * deadline for the wait, or if we are shutting down this CollectionTruncateMarkers
+     * instance.
+     * This operation may throw an exception if interrupted.
+     * Storage engines supporting oplog truncate markers must implement this function.
+     */
+    bool awaitHasExcessMarkersOrDead(OperationContext* opCtx);
+
+    virtual ~CollectionTruncateMarkers() = default;
 
     boost::optional<Marker> peekOldestMarkerIfNeeded(OperationContext* opCtx) const;
 

@@ -196,6 +196,14 @@ server_parameters:
       cpp_varname: gWiredTigerSkipTableLoggingChecksOnStartup
       default: false
 
+    wiredTigerSkipTableLoggingChecksDuringValidation:
+      description: Skips table logging setting checks during validation
+      set_at: startup
+      cpp_vartype: 'bool'
+      cpp_varname: gWiredTigerSkipTableLoggingChecksDuringValidation
+      default: false
+      redact: false
+
     wiredTigerStressConfig:
       description: >-
         Encourage more interesting races in WiredTiger.

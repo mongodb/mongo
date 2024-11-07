@@ -35,9 +35,7 @@ namespace mongo {
 
 namespace cluster_parameters {
 
-void validateParameter(OperationContext* opCtx,
-                       BSONObj doc,
-                       const boost::optional<TenantId>& tenantId);
+void validateParameter(BSONObj doc, const boost::optional<TenantId>& tenantId);
 
 void updateParameter(OperationContext* opCtx,
                      BSONObj doc,
@@ -91,7 +89,7 @@ void doLoadAllTenantParametersFromDisk(OperationContext* opCtx,
     for (auto doc = cursor->next(); doc; doc = cursor->next()) {
         try {
             auto data = doc.get().data.toBson();
-            validateParameter(opCtx, data, tenantId);
+            validateParameter(data, tenantId);
             onEntry(opCtx, data, mode, tenantId);
         } catch (const DBException& ex) {
             failures.push_back(ex.toStatus());

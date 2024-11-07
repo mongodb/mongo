@@ -1047,7 +1047,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - rhel94-large-packagetest
   - name: selinux_rhel7_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -2558,7 +2558,7 @@ buildvariants:
   display_name: macOS
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100
+  - macos-11
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer --enableEnterpriseTests=off
     push_path: osx
@@ -2594,7 +2594,7 @@ buildvariants:
   display_name: macOS arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100-arm64
+  - macos-11-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer --enableEnterpriseTests=off
     push_path: osx
@@ -2630,7 +2630,7 @@ buildvariants:
   display_name: Enterprise macOS
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100
+  - macos-11
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_latch_analyzer
     additional_package_targets: >-
@@ -2668,7 +2668,7 @@ buildvariants:
   display_name: Enterprise macOS arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100-arm64
+  - macos-11-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_latch_analyzer
     additional_package_targets: >-

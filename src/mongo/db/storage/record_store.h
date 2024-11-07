@@ -46,6 +46,7 @@ namespace mongo {
 
 class Collection;
 class CollectionPtr;
+class CollectionTruncateMarkers;
 class MAdvise;
 class OperationContext;
 
@@ -668,11 +669,12 @@ public:
     }
 
     /**
-     * Returns false if the oplog was dropped while waiting for a deletion request.
+     * Returns a shared reference to the oplog truncate markers to allow the caller to wait
+     * for a deletion request.
      * This should only be called if StorageEngine::supportsOplogTruncateMarkers() is true.
      * Storage engines supporting oplog truncate markers must implement this function.
      */
-    virtual bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) {
+    virtual std::shared_ptr<CollectionTruncateMarkers> getCollectionTruncateMarkers() {
         MONGO_UNREACHABLE;
     }
 

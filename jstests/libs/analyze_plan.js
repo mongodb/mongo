@@ -42,6 +42,19 @@ function getRejectedPlan(rejectedPlan) {
 }
 
 /**
+ * Help function to extract shards from explain in sharded environment. Returns null for
+ * non-sharded plans.
+ */
+function getShardsFromExplain(explain) {
+    if (explain.hasOwnProperty("queryPlanner") &&
+        explain.queryPlanner.hasOwnProperty("winningPlan")) {
+        return explain.queryPlanner.winningPlan.shards;
+    }
+
+    return null;
+}
+
+/**
  * Returns a sub-element of the 'cachedPlan' explain output which represents a query plan.
  */
 function getCachedPlan(cachedPlan) {

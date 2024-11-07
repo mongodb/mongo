@@ -41,7 +41,7 @@ namespace mongo {
  * output, but all other entries pass through unmodified. Note that the namespace filter applies
  * only to unwound transaction operations, not to any other entries.
  */
-class DocumentSourceChangeStreamUnwindTransaction : public DocumentSource {
+class DocumentSourceChangeStreamUnwindTransaction : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamUnwindTransaction"_sd;
 
@@ -57,7 +57,7 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 

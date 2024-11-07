@@ -59,7 +59,7 @@ namespace oom {
 // like. Testing worker threads is not supported.
 const ThreadType FirstThreadTypeToTest = THREAD_TYPE_MAIN;
 const ThreadType LastThreadTypeToTest = THREAD_TYPE_WASM_GENERATOR_TIER2;
-# SERVER-64574 TODO: Should last thread type be changed here for testing 
+
 extern bool InitThreadType(void);
 extern void SetThreadType(ThreadType);
 extern JS_PUBLIC_API uint32_t GetThreadType(void);
