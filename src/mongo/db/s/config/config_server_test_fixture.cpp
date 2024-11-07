@@ -338,7 +338,7 @@ CollectionType ConfigServerTestFixture::setupCollection(
 
     for (const auto& chunk : chunks) {
         ASSERT_OK(insertToConfigCollection(
-            operationContext(), ChunkType::ConfigNS, chunk.toConfigBSON()));
+            operationContext(), NamespaceString::kConfigsvrChunksNamespace, chunk.toConfigBSON()));
     }
 
     return coll;
@@ -351,7 +351,7 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opC
                                                            const Timestamp& collTimestamp) {
 
     const auto query = BSON(ChunkType::collectionUUID() << uuid << ChunkType::min(minKey));
-    auto doc = findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, query);
+    auto doc = findOneOnConfigCollection(opCtx, NamespaceString::kConfigsvrChunksNamespace, query);
     if (!doc.isOK())
         return doc.getStatus();
 
@@ -362,7 +362,8 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opC
                                                            const BSONObj& minKey,
                                                            const OID& collEpoch,
                                                            const Timestamp& collTimestamp) {
-    auto doc = findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, BSON(ChunkType::min(minKey)));
+    auto doc = findOneOnConfigCollection(
+        opCtx, NamespaceString::kConfigsvrChunksNamespace, BSON(ChunkType::min(minKey)));
     if (!doc.isOK())
         return doc.getStatus();
 
@@ -380,7 +381,7 @@ StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionPlacementVersion(
 
     auto chunkDoc =
         findOneOnConfigCollection(opCtx,
-                                  ChunkType::ConfigNS,
+                                  NamespaceString::kConfigsvrChunksNamespace,
                                   BSON(ChunkType::collectionUUID << coll.getUuid()) /* query */,
                                   BSON(ChunkType::lastmod << -1) /* sort */);
 

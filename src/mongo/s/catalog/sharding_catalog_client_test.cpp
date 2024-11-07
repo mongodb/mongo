@@ -454,34 +454,34 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
         return chunks;
     });
 
-    onFindWithMetadataCommand(
-        [this, &chunksQuery, chunkA, chunkB, newOpTime](const RemoteCommandRequest& request) {
-            auto opMsg = static_cast<OpMsgRequest>(request);
-            auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
+    onFindWithMetadataCommand([this, &chunksQuery, chunkA, chunkB, newOpTime](
+                                  const RemoteCommandRequest& request) {
+        auto opMsg = static_cast<OpMsgRequest>(request);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-            ASSERT_EQ(query->getNamespaceOrUUID().nss(), ChunkType::ConfigNS);
-            ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
-            ASSERT_BSONOBJ_EQ(query->getSort(), BSON(ChunkType::lastmod() << -1));
-            ASSERT_EQ(query->getLimit().value(), 1);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrChunksNamespace);
+        ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
+        ASSERT_BSONOBJ_EQ(query->getSort(), BSON(ChunkType::lastmod() << -1));
+        ASSERT_EQ(query->getLimit().value(), 1);
 
-            checkReadConcern(request.cmdObj,
-                             VectorClock::kInitialComponentTime.asTimestamp(),
-                             repl::OpTime::kUninitializedTerm);
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
 
-            ReplSetMetadata metadata(10,
-                                     {newOpTime, Date_t() + Seconds(newOpTime.getSecs())},
-                                     newOpTime,
-                                     100,
-                                     0,
-                                     OID(),
-                                     -1,
-                                     true);
-            BSONObjBuilder builder;
-            metadata.writeToMetadata(&builder).transitional_ignore();
+        ReplSetMetadata metadata(10,
+                                 {newOpTime, Date_t() + Seconds(newOpTime.getSecs())},
+                                 newOpTime,
+                                 100,
+                                 0,
+                                 OID(),
+                                 -1,
+                                 true);
+        BSONObjBuilder builder;
+        metadata.writeToMetadata(&builder).transitional_ignore();
 
-            return std::make_tuple(vector<BSONObj>{chunkA.toConfigBSON(), chunkB.toConfigBSON()},
-                                   builder.obj());
-        });
+        return std::make_tuple(vector<BSONObj>{chunkA.toConfigBSON(), chunkB.toConfigBSON()},
+                               builder.obj());
+    });
 
     const auto& chunks = future.default_timed_get();
     ASSERT_BSONOBJ_EQ(chunkA.toConfigBSON(), chunks[0].toConfigBSON());
@@ -521,7 +521,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForUUIDNoSortNoLimit) {
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss(), ChunkType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrChunksNamespace);
         ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().has_value());

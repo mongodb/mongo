@@ -130,7 +130,7 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
                                                opCtx,
                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                repl::ReadConcernLevel::kLocalReadConcern,
-                                               ChunkType::ConfigNS,
+                                               NamespaceString::kConfigsvrChunksNamespace,
                                                query,
                                                BSONObj(),
                                                1LL))
@@ -327,7 +327,7 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
 
         const auto chunksQuery = BSON(ChunkType::collectionUUID << collType.getUuid());
         auto chunksUpdateRequest =
-            BatchedCommandRequest::buildPipelineUpdateOp(ChunkType::ConfigNS,
+            BatchedCommandRequest::buildPipelineUpdateOp(NamespaceString::kConfigsvrChunksNamespace,
                                                          chunksQuery,
                                                          chunkUpdates,
                                                          false /* upsert */,

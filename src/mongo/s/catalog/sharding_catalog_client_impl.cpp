@@ -177,7 +177,8 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     StringMap<ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
                                                            std::vector<BSONObj>()};
-    resolvedNamespaces[ChunkType::ConfigNS.coll()] = {ChunkType::ConfigNS, std::vector<BSONObj>()};
+    resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace.coll()] = {
+        NamespaceString::kConfigsvrChunksNamespace, std::vector<BSONObj>()};
 
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)
@@ -308,7 +309,7 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
 
         const auto lookupPipeline = [&]() {
             return Doc{
-                {"from", ChunkType::ConfigNS.coll()},
+                {"from", NamespaceString::kConfigsvrChunksNamespace.coll()},
                 {"as", chunksLookupOutputFieldName},
                 {"let", letExpr},
                 {"pipeline",
@@ -990,7 +991,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               getConfigReadPreference(opCtx),
                                               readConcern,
-                                              ChunkType::ConfigNS,
+                                              NamespaceString::kConfigsvrChunksNamespace,
                                               query,
                                               sort,
                                               longLimit,

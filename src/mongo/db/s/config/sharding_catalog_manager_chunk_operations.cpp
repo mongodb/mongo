@@ -174,7 +174,7 @@ StatusWith<ChunkType> findChunkContainingRange(OperationContext* opCtx,
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             repl::ReadConcernLevel::kLocalReadConcern,
-                                            ChunkType::ConfigNS,
+                                            NamespaceString::kConfigsvrChunksNamespace,
                                             chunkQuery,
                                             BSON(ChunkType::min << -1),
                                             1 /* limit */);
@@ -201,12 +201,12 @@ StatusWith<ChunkType> findChunkContainingRange(OperationContext* opCtx,
 BSONObj buildCountChunksInRangeCommand(const UUID& collectionUUID,
                                        const ShardId& shardId,
                                        const ChunkRange& chunkRange) {
-    AggregateCommandRequest countRequest(ChunkType::ConfigNS);
+    AggregateCommandRequest countRequest(NamespaceString::kConfigsvrChunksNamespace);
 
     BSONObjBuilder builder;
-    builder.append(
-        "aggregate",
-        NamespaceStringUtil::serialize(ChunkType::ConfigNS, SerializationContext::stateDefault()));
+    builder.append("aggregate",
+                   NamespaceStringUtil::serialize(NamespaceString::kConfigsvrChunksNamespace,
+                                                  SerializationContext::stateDefault()));
 
     BSONObjBuilder queryBuilder;
     queryBuilder << ChunkType::collectionUUID << collectionUUID;
@@ -223,7 +223,7 @@ BSONObj buildCountChunksInRangeCommand(const UUID& collectionUUID,
 }
 
 BSONObj buildCountSingleChunkCommand(const ChunkType& chunk) {
-    AggregateCommandRequest countRequest(ChunkType::ConfigNS);
+    AggregateCommandRequest countRequest(NamespaceString::kConfigsvrChunksNamespace);
 
     auto query =
         BSON(ChunkType::min(chunk.getMin())
@@ -240,7 +240,7 @@ BSONObj buildCountSingleChunkCommand(const ChunkType& chunk) {
 BSONObj buildCountContiguousChunksByBounds(const UUID& collectionUUID,
                                            const std::string& shard,
                                            const std::vector<BSONObj>& boundsForChunks) {
-    AggregateCommandRequest countRequest(ChunkType::ConfigNS);
+    AggregateCommandRequest countRequest(NamespaceString::kConfigsvrChunksNamespace);
 
     invariant(boundsForChunks.size() > 1);
     auto minBoundIt = boundsForChunks.begin();
@@ -283,7 +283,7 @@ boost::optional<ChunkType> getControlChunkForMigrate(OperationContext* opCtx,
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             repl::ReadConcernLevel::kLocalReadConcern,
-                                            ChunkType::ConfigNS,
+                                            NamespaceString::kConfigsvrChunksNamespace,
                                             queryBuilder.obj(),
                                             {},
                                             1);
@@ -349,7 +349,7 @@ StatusWith<std::pair<CollectionType, ChunkVersion>> getCollectionAndVersion(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             repl::ReadConcernLevel::kLocalReadConcern,
-                                            ChunkType::ConfigNS,
+                                            NamespaceString::kConfigsvrChunksNamespace,
                                             chunksQuery,  // Query all chunks for this namespace.
                                             BSON(ChunkType::lastmod << -1),  // Sort by version.
                                             1))                              // Limit 1.
@@ -371,7 +371,7 @@ ChunkVersion getShardPlacementVersion(OperationContext* opCtx,
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             repl::ReadConcernLevel::kLocalReadConcern,
-                                            ChunkType::ConfigNS,
+                                            NamespaceString::kConfigsvrChunksNamespace,
                                             chunksQuery,
                                             BSON(ChunkType::lastmod << -1),  // Sort by version.
                                             1));
@@ -412,7 +412,7 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        ChunkType::ConfigNS,
+        NamespaceString::kConfigsvrChunksNamespace,
         BSON(ChunkType::collectionUUID << coll.getUuid()) /* query */,
         BSON(ChunkType::lastmod << -1) /* sort */,
         1 /* limit */));
@@ -437,7 +437,7 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
     updateVersionClause.doneFast();
     const auto chunkUpdate = updateBuilder.obj();
     const auto request = BatchedCommandRequest::buildUpdateOp(
-        ChunkType::ConfigNS,
+        NamespaceString::kConfigsvrChunksNamespace,
         BSON(ChunkType::name << newestChunk.getName()),  // query
         chunkUpdate,                                     // update
         false,                                           // upsert
@@ -445,7 +445,7 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
     );
 
     const auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx, ChunkType::ConfigNS, request, txnNumber);
+        opCtx, NamespaceString::kConfigsvrChunksNamespace, request, txnNumber);
 
     auto numDocsExpectedModified = 1;
     auto numDocsModified = res.getIntField("n");
@@ -516,7 +516,7 @@ void mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
             queryBuilder << ChunkType::min(BSON("$gte" << chunk.getMin()));
             queryBuilder << ChunkType::min(BSON("$lt" << chunk.getMax()));
 
-            write_ops::DeleteCommandRequest deleteOp(ChunkType::ConfigNS);
+            write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigsvrChunksNamespace);
             deleteOp.setDeletes([&] {
                 std::vector<write_ops::DeleteOpEntry> deletes;
                 write_ops::DeleteOpEntry entry;
@@ -526,7 +526,8 @@ void mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
             }());
 
             // Prepare insertion of new chunks covering the whole range
-            write_ops::InsertCommandRequest insertOp(ChunkType::ConfigNS, {chunk.toConfigBSON()});
+            write_ops::InsertCommandRequest insertOp(NamespaceString::kConfigsvrChunksNamespace,
+                                                     {chunk.toConfigBSON()});
 
             statementsChain.push_back(txnClient.runCRUDOp(deleteOp, {})
                                           .thenRunOn(txnExec)
@@ -577,7 +578,7 @@ bool isPlacementChangedInParentCollection(OperationContext* opCtx,
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             repl::ReadConcernLevel::kLocalReadConcern,
-                                            ChunkType::ConfigNS,
+                                            NamespaceString::kConfigsvrChunksNamespace,
                                             query,
                                             BSONObj(),
                                             1 /* limit */));
@@ -601,7 +602,7 @@ auto doSplitChunk(const txn_api::TransactionClient& txnClient,
     OID chunkID;
 
     auto shouldTakeOriginalChunkID = true;
-    write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+    write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrChunksNamespace);
     std::vector<write_ops::UpdateOpEntry> entries;
     entries.reserve(newChunkBounds.size());
 
@@ -694,7 +695,8 @@ auto isSplitAlreadyDone(const txn_api::TransactionClient& txnClient,
         origChunk.getCollectionUUID(), shardName, expectedChunksBounds);
 
     const auto expectedChunkCount = expectedChunksBounds.size() - 1;
-    auto countResponse = txnClient.runCommandSync(ChunkType::ConfigNS.dbName(), countRequest);
+    auto countResponse =
+        txnClient.runCommandSync(NamespaceString::kConfigsvrChunksNamespace.dbName(), countRequest);
     const auto docCount = [&]() {
         auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(countResponse));
         auto firstBatch = cursorResponse.getBatch();
@@ -730,15 +732,16 @@ void ShardingCatalogManager::bumpMajorVersionOneChunkPerShard(
 
         const auto query = BSON(ChunkType::collectionUUID << coll.getUuid()
                                                           << ChunkType::shard(shardId.toString()));
-        auto request = BatchedCommandRequest::buildUpdateOp(ChunkType::ConfigNS,
-                                                            query,        // query
-                                                            chunkUpdate,  // update
-                                                            false,        // upsert
-                                                            false         // multi
-        );
+        auto request =
+            BatchedCommandRequest::buildUpdateOp(NamespaceString::kConfigsvrChunksNamespace,
+                                                 query,        // query
+                                                 chunkUpdate,  // update
+                                                 false,        // upsert
+                                                 false         // multi
+            );
 
         auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-            opCtx, ChunkType::ConfigNS, request, txnNumber);
+            opCtx, NamespaceString::kConfigsvrChunksNamespace, request, txnNumber);
 
         auto numDocsExpectedModified = 1;
         auto numDocsModified = res.getIntField("n");
@@ -770,7 +773,8 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
 
         // Verify that the range matches exactly a single chunk
         auto countRequest = buildCountSingleChunkCommand(chunk);
-        auto countResponse = txnClient.runCommandSync(ChunkType::ConfigNS.dbName(), countRequest);
+        auto countResponse = txnClient.runCommandSync(
+            NamespaceString::kConfigsvrChunksNamespace.dbName(), countRequest);
         auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(countResponse));
         auto firstBatch = cursorResponse.getBatch();
 
@@ -959,7 +963,8 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             // Check the merge chunk precondition, chunks must not have moved.
             auto countRequest = buildCountChunksInRangeCommand(collectionUUID, shardId, chunkRange);
-            return txnClient.runCommand(ChunkType::ConfigNS.dbName(), countRequest)
+            return txnClient
+                .runCommand(NamespaceString::kConfigsvrChunksNamespace.dbName(), countRequest)
                 .thenRunOn(txnExec)
                 .then([&txnClient, chunksToMerge, mergeVersion, validAfter](auto commandResponse) {
                     auto countResponse =
@@ -978,7 +983,8 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
 
                     // Construct the new chunk by taking `min` from the first merged chunk and `max`
                     // from the last.
-                    write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+                    write_ops::UpdateCommandRequest updateOp(
+                        NamespaceString::kConfigsvrChunksNamespace);
                     updateOp.setUpdates({[&] {
                         write_ops::UpdateOpEntry entry;
 
@@ -1020,7 +1026,8 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
                     queryBuilder << ChunkType::min(BSON("$gte" << chunkRangeToDelete.getMin()));
                     queryBuilder << ChunkType::min(BSON("$lt" << chunkRangeToDelete.getMax()));
 
-                    write_ops::DeleteCommandRequest deleteOp(ChunkType::ConfigNS);
+                    write_ops::DeleteCommandRequest deleteOp(
+                        NamespaceString::kConfigsvrChunksNamespace);
                     deleteOp.setDeletes([&] {
                         std::vector<write_ops::DeleteOpEntry> deletes;
                         write_ops::DeleteOpEntry entry;
@@ -1095,7 +1102,7 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
-            ChunkType::ConfigNS,
+            NamespaceString::kConfigsvrChunksNamespace,
             shardChunksInRangeQuery,
             BSON(ChunkType::min << 1),
             boost::none));
@@ -1235,7 +1242,7 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                 opCtx,
                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                ChunkType::ConfigNS,
+                                NamespaceString::kConfigsvrChunksNamespace,
                                 BSON(ChunkType::collectionUUID
                                      << collUuid << ChunkType::shard(shardId.toString())
                                      << ChunkType::onCurrentShardSince
@@ -1487,7 +1494,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        ChunkType::ConfigNS,
+        NamespaceString::kConfigsvrChunksNamespace,
         findChunkQuery,
         BSON(ChunkType::lastmod << -1),
         1));
@@ -1704,7 +1711,7 @@ StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(OperationContex
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        ChunkType::ConfigNS,
+        NamespaceString::kConfigsvrChunksNamespace,
         query,
         BSONObj(),
         1);
@@ -1747,7 +1754,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
               logAttrs(nss));
 
         BatchedCommandRequest request([collUuid = coll.getUuid()] {
-            write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+            write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrChunksNamespace);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(BSON(ChunkType::collectionUUID() << collUuid));
@@ -1779,7 +1786,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
-            ChunkType::ConfigNS,
+            NamespaceString::kConfigsvrChunksNamespace,
             BSON(ChunkType::collectionUUID() << collUuid),
             BSONObj(),
             boost::none));
@@ -1826,7 +1833,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
         // Run the update
         uassertStatusOK(
             _localCatalogClient->updateConfigDocument(opCtx,
-                                                      ChunkType::ConfigNS,
+                                                      NamespaceString::kConfigsvrChunksNamespace,
                                                       BSON(ChunkType::name(upgradeChunk.getName())),
                                                       chunkObjBuilder.obj(),
                                                       false,
@@ -1887,7 +1894,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        ChunkType::ConfigNS,
+        NamespaceString::kConfigsvrChunksNamespace,
         targetChunkQuery,
         {},
         1));
@@ -1912,7 +1919,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        ChunkType::ConfigNS,
+        NamespaceString::kConfigsvrChunksNamespace,
         allChunksQuery,
         BSON(ChunkType::lastmod << -1),
         1));
@@ -1957,13 +1964,13 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
 
     auto chunkUpdate = updateBuilder.obj();
 
-    auto didUpdate =
-        uassertStatusOK(_localCatalogClient->updateConfigDocument(opCtx,
-                                                                  ChunkType::ConfigNS,
-                                                                  chunkQuery,
-                                                                  chunkUpdate,
-                                                                  false /* upsert */,
-                                                                  kNoWaitWriteConcern));
+    auto didUpdate = uassertStatusOK(
+        _localCatalogClient->updateConfigDocument(opCtx,
+                                                  NamespaceString::kConfigsvrChunksNamespace,
+                                                  chunkQuery,
+                                                  chunkUpdate,
+                                                  false /* upsert */,
+                                                  kNoWaitWriteConcern));
 
     uassert(51263,
             str::stream() << "failed to clear jumbo flag due to " << chunkQuery
@@ -2024,7 +2031,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                 opCtx,
                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                ChunkType::ConfigNS,
+                                NamespaceString::kConfigsvrChunksNamespace,
                                 requestedChunkQuery,
                                 BSONObj() /* sort */,
                                 1 /* limit */))
@@ -2068,7 +2075,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                 opCtx,
                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                ChunkType::ConfigNS,
+                                NamespaceString::kConfigsvrChunksNamespace,
                                 query,
                                 BSON(ChunkType::lastmod << -1) /* sort */,
                                 1 /* limit */))
@@ -2096,13 +2103,13 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
 
     // Update the chunk, if it still exists, to have the bumped version.
     earlyReturnBeforeDoingWriteGuard.dismiss();
-    auto didUpdate =
-        uassertStatusOK(_localCatalogClient->updateConfigDocument(opCtx,
-                                                                  ChunkType::ConfigNS,
-                                                                  requestedChunkQuery,
-                                                                  newChunk.toConfigBSON(),
-                                                                  false /* upsert */,
-                                                                  kNoWaitWriteConcern));
+    auto didUpdate = uassertStatusOK(
+        _localCatalogClient->updateConfigDocument(opCtx,
+                                                  NamespaceString::kConfigsvrChunksNamespace,
+                                                  requestedChunkQuery,
+                                                  newChunk.toConfigBSON(),
+                                                  false /* upsert */,
+                                                  kNoWaitWriteConcern));
     if (didUpdate) {
         LOGV2(23887,
               "ensureChunkVersionIsGreaterThan bumped the the chunk version",
@@ -2244,7 +2251,7 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
 
             auto status = _localCatalogClient->updateConfigDocument(
                 opCtx,
-                ChunkType::ConfigNS,
+                NamespaceString::kConfigsvrChunksNamespace,
                 chunkQuery,
                 BSON("$set" << BSON(ChunkType::jumbo(true))),
                 false,
@@ -2341,7 +2348,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
         const CollectionType coll(findCollResponse[0]);
 
         // Find the newest chunk
-        FindCommandRequest chunkQuery{ChunkType::ConfigNS};
+        FindCommandRequest chunkQuery{NamespaceString::kConfigsvrChunksNamespace};
         chunkQuery.setFilter(BSON(ChunkType::collectionUUID << coll.getUuid()));
         chunkQuery.setSort(BSON(ChunkType::lastmod << -1));
         chunkQuery.setLimit(1);
@@ -2360,7 +2367,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
             return version;
         }();
 
-        write_ops::UpdateCommandRequest updateChunkOp(ChunkType::ConfigNS);
+        write_ops::UpdateCommandRequest updateChunkOp(NamespaceString::kConfigsvrChunksNamespace);
         BSONObjBuilder updateBuilder;
         BSONObjBuilder updateVersionClause(updateBuilder.subobjStart("$set"));
         updateVersionClause.appendTimestamp(ChunkType::lastmod(), targetVersion.toLong());
@@ -2416,12 +2423,13 @@ void ShardingCatalogManager::setChunkEstimatedSize(OperationContext* opCtx,
     updateSub.appendNumber(ChunkType::estimatedSizeBytes.name(), estimatedDataSizeBytes);
     updateSub.doneFast();
 
-    auto didUpdate = uassertStatusOK(_localCatalogClient->updateConfigDocument(opCtx,
-                                                                               ChunkType::ConfigNS,
-                                                                               chunkQuery,
-                                                                               updateBuilder.done(),
-                                                                               false /* upsert */,
-                                                                               writeConcern));
+    auto didUpdate = uassertStatusOK(
+        _localCatalogClient->updateConfigDocument(opCtx,
+                                                  NamespaceString::kConfigsvrChunksNamespace,
+                                                  chunkQuery,
+                                                  updateBuilder.done(),
+                                                  false /* upsert */,
+                                                  writeConcern));
     if (!didUpdate) {
         uasserted(6049401, "Did not update chunk with estimated size");
     }
@@ -2435,7 +2443,7 @@ bool ShardingCatalogManager::clearChunkEstimatedSize(OperationContext* opCtx, co
     const auto query = BSON(ChunkType::collectionUUID() << uuid);
     const auto update = BSON("$unset" << BSON(ChunkType::estimatedSizeBytes() << ""));
     BatchedCommandRequest request([&] {
-        write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+        write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrChunksNamespace);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(query);
@@ -2501,7 +2509,7 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
                 updateRequestStmtIds.push_back(currStmtId++);
             }
 
-            write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+            write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrChunksNamespace);
             updateOp.setUpdates(std::move(updateEntries));
             return updateOp;
         }();
@@ -2524,7 +2532,7 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
 
         // 3. Use the updated content of config.chunks to build the collection placement metadata.
         // The request is equivalent to "configDb.chunks.distinct('shard',{uuid:collUuid})".
-        DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
+        DistinctCommandRequest distinctRequest(NamespaceString::kConfigsvrChunksNamespace);
         distinctRequest.setKey(ChunkType::shard.name());
         distinctRequest.setQuery(
             BSON(ChunkType::collectionUUID.name() << migratedChunk.getCollectionUUID()));

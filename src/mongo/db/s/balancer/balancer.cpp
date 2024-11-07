@@ -639,7 +639,8 @@ private:
                 auto matchStage = BSON("$match" << BSON(ChunkType::collectionUUID()
                                                         << collType.getUuid() << ChunkType::shard()
                                                         << BSON("$in" << drainingShardNameArray)));
-                AggregateCommandRequest aggRequest{ChunkType::ConfigNS, {std::move(matchStage)}};
+                AggregateCommandRequest aggRequest{NamespaceString::kConfigsvrChunksNamespace,
+                                                   {std::move(matchStage)}};
 
                 auto chunks = catalogClient->runCatalogAggregation(
                     opCtx, aggRequest, {repl::ReadConcernLevel::kMajorityReadConcern});

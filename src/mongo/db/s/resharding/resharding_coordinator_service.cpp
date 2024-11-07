@@ -746,7 +746,7 @@ void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
                    [](ChunkType chunk) { return chunk.toConfigBSON(); });
 
     ShardingCatalogManager::get(opCtx)->insertConfigDocuments(
-        opCtx, ChunkType::ConfigNS, std::move(initialChunksBSON));
+        opCtx, NamespaceString::kConfigsvrChunksNamespace, std::move(initialChunksBSON));
 
 
     ShardingCatalogManager::get(opCtx)->insertConfigDocuments(opCtx, TagsType::ConfigNS, newZones);
@@ -853,7 +853,7 @@ void removeChunkDocs(OperationContext* opCtx, const UUID& collUUID) {
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
     uassertStatusOK(catalogClient->removeConfigDocuments(
-        opCtx, ChunkType::ConfigNS, chunksQuery, kMajorityWriteConcern));
+        opCtx, NamespaceString::kConfigsvrChunksNamespace, chunksQuery, kMajorityWriteConcern));
 }
 
 void writeDecisionPersistedState(OperationContext* opCtx,

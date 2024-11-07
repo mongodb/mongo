@@ -176,7 +176,7 @@ void deleteChunks(OperationContext* opCtx,
     auto hint = BSON(ChunkType::collectionUUID() << 1 << ChunkType::min() << 1);
 
     BatchedCommandRequest request([&] {
-        write_ops::DeleteCommandRequest deleteOp(ChunkType::ConfigNS);
+        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigsvrChunksNamespace);
         deleteOp.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
             entry.setQ(BSON(ChunkType::collectionUUID << collectionUUID));
@@ -715,13 +715,14 @@ std::vector<BatchedCommandRequest> getOperationsToCreateOrShardCollectionOnShard
     }
 
     write_ops::DeleteCommandRequest deleteChunkIfTheCollectionExistsAsUnsplittable(
-        ChunkType::ConfigNS);
+        NamespaceString::kConfigsvrChunksNamespace);
     deleteChunkIfTheCollectionExistsAsUnsplittable.setDeletes({[&] {
         auto deleteQuery = BSON(ChunkType::collectionUUID.name() << uuid);
         return write_ops::DeleteOpEntry{std::move(deleteQuery), false /* multi */};
     }()});
 
-    write_ops::InsertCommandRequest insertChunks(ChunkType::ConfigNS, std::move(chunkEntries));
+    write_ops::InsertCommandRequest insertChunks(NamespaceString::kConfigsvrChunksNamespace,
+                                                 std::move(chunkEntries));
     insertChunks.setWriteCommandRequestBase([] {
         write_ops::WriteCommandRequestBase wcb;
         wcb.setOrdered(false);

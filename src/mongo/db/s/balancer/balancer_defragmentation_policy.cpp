@@ -1617,7 +1617,7 @@ void BalancerDefragmentationPolicy::_clearDefragmentationState(OperationContext*
 
     // Clear datasize estimates from chunks
     write_ops::checkWriteErrors(dbClient.update(write_ops::UpdateCommandRequest(
-        ChunkType::ConfigNS, {[&] {
+        NamespaceString::kConfigsvrChunksNamespace, {[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(

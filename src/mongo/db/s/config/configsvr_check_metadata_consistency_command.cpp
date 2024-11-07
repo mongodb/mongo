@@ -210,7 +210,7 @@ public:
             auto matchStage = BSON("$match" << BSON(ChunkType::collectionUUID() << coll.getUuid()));
             static const auto sortStage = BSON("$sort" << BSON(ChunkType::min() << 1));
 
-            AggregateCommandRequest aggRequest{ChunkType::ConfigNS,
+            AggregateCommandRequest aggRequest{NamespaceString::kConfigsvrChunksNamespace,
                                                {std::move(matchStage), sortStage}};
             auto aggResponse =
                 ShardingCatalogManager::get(opCtx)->localCatalogClient()->runCatalogAggregation(

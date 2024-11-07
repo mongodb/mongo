@@ -820,7 +820,7 @@ public:
         auto collPlacementVersionBefore = [&]() {
             const auto chunkDoc = uassertStatusOK(
                 findOneOnConfigCollection(operationContext(),
-                                          ChunkType::ConfigNS,
+                                          NamespaceString::kConfigsvrChunksNamespace,
                                           BSON(ChunkType::collectionUUID << _collUUID),
                                           BSON(ChunkType::lastmod << -1)));
             auto chunk = uassertStatusOK(

@@ -339,7 +339,7 @@ std::vector<ShardId> getLatestCollectionPlacementInfoFor(OperationContext* opCtx
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
 
-    DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
+    DistinctCommandRequest distinctRequest(NamespaceString::kConfigsvrChunksNamespace);
     distinctRequest.setKey(ChunkType::shard.name());
     distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << uuid));
     distinctRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
@@ -439,7 +439,7 @@ SemiFuture<BatchedCommandResponse> updateChunksUuid(
         // Don't use this for updating a high amount of chunks because the transaction
         // may abort due to hitting the `transactionLifetimeLimitSeconds`.
         BatchedCommandRequest request([&] {
-            write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+            write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrChunksNamespace);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(query);
@@ -1191,7 +1191,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     auto query = BSON("uuid" << *targetUUID);
                     uassertStatusOK(Grid::get(opCtx)->catalogClient()->removeConfigDocuments(
                         opCtx,
-                        ChunkType::ConfigNS,
+                        NamespaceString::kConfigsvrChunksNamespace,
                         query,
                         ShardingCatalogClient::kMajorityWriteConcern));
                 }

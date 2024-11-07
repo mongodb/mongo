@@ -362,7 +362,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     // Mock the operation during which the chunks are moved to the other shard.
-    const NamespaceString chunkNS(ChunkType::ConfigNS);
+    const NamespaceString chunkNS(NamespaceString::kConfigsvrChunksNamespace);
     for (const ChunkType& chunk : chunks) {
         ChunkType updatedChunk = chunk;
         updatedChunk.setShard(shard2.getName());

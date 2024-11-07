@@ -276,7 +276,7 @@ Status createIndexesForConfigChunks(OperationContext* opCtx) {
     const bool unique = true;
     Status result = createIndexOnConfigCollection(
         opCtx,
-        ChunkType::ConfigNS,
+        NamespaceString::kConfigsvrChunksNamespace,
         BSON(ChunkType::collectionUUID() << 1 << ChunkType::min() << 1),
         unique);
     if (!result.isOK()) {
@@ -285,7 +285,7 @@ Status createIndexesForConfigChunks(OperationContext* opCtx) {
 
     result = createIndexOnConfigCollection(
         opCtx,
-        ChunkType::ConfigNS,
+        NamespaceString::kConfigsvrChunksNamespace,
         BSON(ChunkType::collectionUUID() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
         unique);
     if (!result.isOK()) {
@@ -294,7 +294,7 @@ Status createIndexesForConfigChunks(OperationContext* opCtx) {
 
     result = createIndexOnConfigCollection(
         opCtx,
-        ChunkType::ConfigNS,
+        NamespaceString::kConfigsvrChunksNamespace,
         BSON(ChunkType::collectionUUID() << 1 << ChunkType::lastmod() << 1),
         unique);
     if (!result.isOK()) {
@@ -302,7 +302,7 @@ Status createIndexesForConfigChunks(OperationContext* opCtx) {
     }
 
     result = createIndexOnConfigCollection(opCtx,
-                                           ChunkType::ConfigNS,
+                                           NamespaceString::kConfigsvrChunksNamespace,
                                            BSON(ChunkType::collectionUUID()
                                                 << 1 << ChunkType::shard() << 1
                                                 << ChunkType::onCurrentShardSince() << 1),
@@ -497,7 +497,7 @@ AggregateCommandRequest createInitPlacementHistoryAggregationRequest(
 
     auto pipeline = PipelineBuilder(opCtx,
                                     CollectionType::ConfigNS,
-                                    {ChunkType::ConfigNS,
+                                    {NamespaceString::kConfigsvrChunksNamespace,
                                      CollectionType::ConfigNS,
                                      NamespaceString::kConfigDatabasesNamespace,
                                      NamespaceString::kConfigsvrPlacementHistoryNamespace});
@@ -513,9 +513,10 @@ AggregateCommandRequest createInitPlacementHistoryAggregationRequest(
                                                                    << "$onCurrentShardSince")))
                                      .buildAsBson();
 
-        pipeline.addStage<Lookup>(BSON("from" << ChunkType::ConfigNS.coll() << "localField"
-                                              << CollectionType::kUuidFieldName << "foreignField"
-                                              << ChunkType::collectionUUID.name() << "as"
+        pipeline.addStage<Lookup>(BSON("from" << NamespaceString::kConfigsvrChunksNamespace.coll()
+                                              << "localField" << CollectionType::kUuidFieldName
+                                              << "foreignField" << ChunkType::collectionUUID.name()
+                                              << "as"
                                               << "timestampByShard"
                                               << "pipeline" << lookupPipelineObj));
     }

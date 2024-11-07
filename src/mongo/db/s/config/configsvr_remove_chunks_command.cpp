@@ -117,7 +117,7 @@ public:
                     ShardingCatalogManager::get(newOpCtxPtr.get())->localCatalogClient();
                 uassertStatusOK(catalogClient->removeConfigDocuments(
                     newOpCtxPtr.get(),
-                    ChunkType::ConfigNS,
+                    NamespaceString::kConfigsvrChunksNamespace,
                     BSON(ChunkType::collectionUUID << collectionUUID),
                     ShardingCatalogClient::kLocalWriteConcern));
             }

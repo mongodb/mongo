@@ -273,15 +273,15 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
         // specific shard
 
         StringMap<ResolvedNamespace> resolvedNamespaces;
-        resolvedNamespaces[ChunkType::ConfigNS.coll()] = {ChunkType::ConfigNS,
-                                                          std::vector<BSONObj>()};
+        resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace.coll()] = {
+            NamespaceString::kConfigsvrChunksNamespace, std::vector<BSONObj>()};
         resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
                                                                std::vector<BSONObj>()};
 
         Pipeline::SourceContainer stages;
         auto expCtx = ExpressionContextBuilder{}
                           .opCtx(opCtx)
-                          .ns(ChunkType::ConfigNS)
+                          .ns(NamespaceString::kConfigsvrChunksNamespace)
                           .resolvedNamespace(std::move(resolvedNamespaces))
                           .build();
 
@@ -326,17 +326,18 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
 
         stages.emplace_back(DocumentSourceLookUp::createFromBson(
             BSON("$lookup" << BSON(
-                     "from"
-                     << ChunkType::ConfigNS.coll() << "localField" << CollectionType::kUuidFieldName
-                     << "foreignField" << ChunkType::collectionUUID() << "pipeline"
-                     << BSON_ARRAY(BSON("$match" << BSON(
+                     "from" << NamespaceString::kConfigsvrChunksNamespace.coll() << "localField"
+                            << CollectionType::kUuidFieldName << "foreignField"
+                            << ChunkType::collectionUUID() << "pipeline"
+                            << BSON_ARRAY(
+                                   BSON("$match" << BSON(
                                             ChunkType::shard(shard.toString())
                                             << ChunkType::onCurrentShardSince()
                                             << BSON("$lt" << _maxHistoryTimeCurrentRound << "$gte"
                                                           << _maxHistoryTimePreviousRound)))
                                    << BSON("$limit" << 1))
-                     << "as"
-                     << "chunks"))
+                            << "as"
+                            << "chunks"))
                 .firstElement(),
             expCtx));
 

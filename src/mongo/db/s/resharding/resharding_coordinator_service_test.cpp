@@ -516,7 +516,7 @@ public:
         DBDirectClient client(opCtx);
 
         for (const auto& chunk : chunks) {
-            client.insert(ChunkType::ConfigNS, chunk.toConfigBSON());
+            client.insert(NamespaceString::kConfigsvrChunksNamespace, chunk.toConfigBSON());
         }
 
         for (const auto& zone : zones) {
@@ -1051,7 +1051,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         DBDirectClient client(opCtx);
 
         // config.chunks should have been moved to the new UUID
-        FindCommandRequest findRequest{ChunkType::ConfigNS};
+        FindCommandRequest findRequest{NamespaceString::kConfigsvrChunksNamespace};
         findRequest.setFilter(BSON(ChunkType::collectionUUID() << doc.getReshardingUUID()));
         auto chunkCursor = client.find(std::move(findRequest));
         std::vector<ChunkType> foundChunks;

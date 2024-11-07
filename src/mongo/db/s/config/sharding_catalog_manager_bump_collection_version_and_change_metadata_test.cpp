@@ -192,8 +192,10 @@ TEST_F(ShardingCatalogManagerBumpCollectionPlacementVersionAndChangeMetadataTest
     setupCollection(kNss, kKeyPattern, {shard0Chunk0});
 
     auto opCtx = operationContext();
-    ASSERT_OK(deleteToConfigCollection(
-        opCtx, ChunkType::ConfigNS, BSON(ChunkType::name << shard0Chunk0.getName()), false));
+    ASSERT_OK(deleteToConfigCollection(opCtx,
+                                       NamespaceString::kConfigsvrChunksNamespace,
+                                       BSON(ChunkType::name << shard0Chunk0.getName()),
+                                       false));
 
     ASSERT_THROWS_CODE(
         ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(

@@ -72,7 +72,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -321,7 +320,7 @@ Milliseconds getExhaustiveFindOnConfigMaxTimeMS(OperationContext* opCtx,
     }
 
     return std::min(opCtx->getRemainingMaxTimeMillis(),
-                    nss == ChunkType::ConfigNS
+                    nss == NamespaceString::kConfigsvrChunksNamespace
                         ? Milliseconds(gFindChunksOnConfigTimeoutMS.load())
                         : Milliseconds(defaultConfigCommandTimeoutMS.load()));
 }

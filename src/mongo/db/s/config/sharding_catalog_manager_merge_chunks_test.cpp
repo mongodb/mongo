@@ -180,7 +180,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
+                                                 NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -262,7 +262,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
+                                                 NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -351,7 +351,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
+                                                 NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -438,7 +438,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
+                                                 NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -600,7 +600,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
+                                                 NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -676,7 +676,7 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
+                                                 NamespaceString::kConfigsvrChunksNamespace,
                                                  query,
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -827,7 +827,7 @@ protected:
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
-            ChunkType::ConfigNS,
+            NamespaceString::kConfigsvrChunksNamespace,
             query,
             BSON(ChunkType::min << 1),
             boost::none));

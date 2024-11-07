@@ -352,7 +352,8 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
         BSON("v" << 2 << "key" << BSON("ns" << 1 << "tag" << 1) << "name"
                  << "ns_1_tag_1")};
 
-    auto foundChunksIndexes = assertGet(getIndexes(operationContext(), ChunkType::ConfigNS));
+    auto foundChunksIndexes =
+        assertGet(getIndexes(operationContext(), NamespaceString::kConfigsvrChunksNamespace));
     assertBSONObjsSame(expectedChunksIndexes, foundChunksIndexes);
 
     auto foundShardsIndexes =

@@ -1458,16 +1458,18 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.
     const auto getDrainingProgress = [&]() -> RemoveShardProgress::DrainingShardUsage {
-        const auto chunkCount = uassertStatusOK(
-            _runCountCommandOnConfig(opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name))));
+        const auto chunkCount = uassertStatusOK(_runCountCommandOnConfig(
+            opCtx, NamespaceString::kConfigsvrChunksNamespace, BSON(ChunkType::shard(name))));
 
         const auto databaseCount = uassertStatusOK(
             _runCountCommandOnConfig(opCtx,
                                      NamespaceString::kConfigDatabasesNamespace,
                                      BSON(DatabaseType::kPrimaryFieldName << name)));
 
-        const auto jumboCount = uassertStatusOK(_runCountCommandOnConfig(
-            opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name) << ChunkType::jumbo(true))));
+        const auto jumboCount = uassertStatusOK(
+            _runCountCommandOnConfig(opCtx,
+                                     NamespaceString::kConfigsvrChunksNamespace,
+                                     BSON(ChunkType::shard(name) << ChunkType::jumbo(true))));
 
         return {chunkCount, databaseCount, jumboCount};
     };

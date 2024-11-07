@@ -430,8 +430,9 @@ TEST_F(BalancerDefragmentationPolicyTest,
             auto chunkQuery =
                 BSON(ChunkType::collectionUUID()
                      << kUuid1 << ChunkType::min(kKeyAtMin) << ChunkType::max(kKeyAtMax));
-            auto configChunkDoc =
-                findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, chunkQuery).getValue();
+            auto configChunkDoc = findOneOnConfigCollection(
+                                      opCtx, NamespaceString::kConfigsvrChunksNamespace, chunkQuery)
+                                      .getValue();
             ASSERT_EQ(configChunkDoc.getIntField(ChunkType::estimatedSizeBytes.name()), 2000);
 
             // 2. and the algorithm transitioned to the next phase
@@ -464,8 +465,9 @@ TEST_F(BalancerDefragmentationPolicyTest,
             auto chunkQuery =
                 BSON(ChunkType::collectionUUID()
                      << kUuid1 << ChunkType::min(kKeyAtMin) << ChunkType::max(kKeyAtMax));
-            auto configChunkDoc =
-                findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, chunkQuery).getValue();
+            auto configChunkDoc = findOneOnConfigCollection(
+                                      opCtx, NamespaceString::kConfigsvrChunksNamespace, chunkQuery)
+                                      .getValue();
             ASSERT_EQ(configChunkDoc.getField("estimatedDataSizeBytes").safeNumberLong(),
                       std::numeric_limits<int64_t>::max());
 

@@ -92,8 +92,10 @@ ChunkType MigrationTestFixture::setUpChunk(const UUID& collUUID,
     chunk.setMax(chunkMax);
     chunk.setShard(shardId);
     chunk.setVersion(version);
-    ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), ChunkType::ConfigNS, chunk.toConfigBSON(), kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrChunksNamespace,
+                                                    chunk.toConfigBSON(),
+                                                    kMajorityWriteConcern));
     return chunk;
 }
 
@@ -124,8 +126,10 @@ void MigrationTestFixture::removeAllZones(const NamespaceString& collName) {
 
 void MigrationTestFixture::removeAllChunks(const NamespaceString& collName, const UUID& uuid) {
     const auto query = BSON("uuid" << uuid);
-    ASSERT_OK(catalogClient()->removeConfigDocuments(
-        operationContext(), ChunkType::ConfigNS, query, kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->removeConfigDocuments(operationContext(),
+                                                     NamespaceString::kConfigsvrChunksNamespace,
+                                                     query,
+                                                     kMajorityWriteConcern));
     auto findStatus = findOneOnConfigCollection(operationContext(), collName, query);
     ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
 }
