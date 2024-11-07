@@ -90,8 +90,7 @@ public:
         // Build and prepare for execution loop join of the two scan stages.
         value::SlotId lookupStageOutputSlot = generateSlotId();
         SlotExprPair agg = std::make_pair(
-            lookupStageOutputSlot,
-            stage_builder::makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
+            lookupStageOutputSlot, makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
         auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
                                                   std::move(innerScanStage),
                                                   outerScanSlots[1],

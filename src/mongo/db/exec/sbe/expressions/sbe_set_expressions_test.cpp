@@ -36,10 +36,10 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/query/stage_builder/sbe/gen_eexpr_helpers.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -80,8 +80,7 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetUnion) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setUnionExpr = stage_builder::makeFunction(
-        "setUnion", stage_builder::makeVariable(arrSlot1), stage_builder::makeVariable(arrSlot2));
+    auto setUnionExpr = makeFunction("setUnion", makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setUnionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -105,8 +104,7 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetUnion) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setUnionExpr = stage_builder::makeFunction(
-        "setUnion", stage_builder::makeVariable(arrSlot1), stage_builder::makeVariable(arrSlot2));
+    auto setUnionExpr = makeFunction("setUnion", makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setUnionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -118,8 +116,7 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetUnion) {
 TEST_F(SBEBuiltinSetOpTest, AggSetUnion) {
     value::OwnedValueAccessor aggAccessor, inputAccessor;
     auto inputSlot = bindAccessor(&inputAccessor);
-    auto setUnionExpr =
-        stage_builder::makeFunction("aggSetUnion", stage_builder::makeVariable(inputSlot));
+    auto setUnionExpr = makeFunction("aggSetUnion", makeVariable(inputSlot));
     auto compiledExpr = compileAggExpression(*setUnionExpr, &aggAccessor);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -148,9 +145,8 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetIntersection) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setIntersectionExpr = stage_builder::makeFunction("setIntersection",
-                                                           stage_builder::makeVariable(arrSlot1),
-                                                           stage_builder::makeVariable(arrSlot2));
+    auto setIntersectionExpr =
+        makeFunction("setIntersection", makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIntersectionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -175,9 +171,8 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIntersection) {
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setIntersectionExpr = stage_builder::makeFunction("setIntersection",
-                                                           stage_builder::makeVariable(arrSlot1),
-                                                           stage_builder::makeVariable(arrSlot2));
+    auto setIntersectionExpr =
+        makeFunction("setIntersection", makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIntersectionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -191,9 +186,8 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetDifference) {
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setDiffExpr = stage_builder::makeFunction("setDifference",
-                                                   stage_builder::makeVariable(arrSlot1),
-                                                   stage_builder::makeVariable(arrSlot2));
+    auto setDiffExpr =
+        makeFunction("setDifference", makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setDiffExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -224,9 +218,8 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetDifference) {
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setDiffExpr = stage_builder::makeFunction("setDifference",
-                                                   stage_builder::makeVariable(arrSlot1),
-                                                   stage_builder::makeVariable(arrSlot2));
+    auto setDiffExpr =
+        makeFunction("setDifference", makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setDiffExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -239,8 +232,7 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetEquals) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setEqualsExpr = stage_builder::makeFunction(
-        "setEquals", stage_builder::makeVariable(arrSlot1), stage_builder::makeVariable(arrSlot2));
+    auto setEqualsExpr = makeFunction("setEquals", makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setEqualsExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -260,8 +252,7 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetEquals) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setEqualsExpr = stage_builder::makeFunction(
-        "setEquals", stage_builder::makeVariable(arrSlot1), stage_builder::makeVariable(arrSlot2));
+    auto setEqualsExpr = makeFunction("setEquals", makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setEqualsExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
@@ -275,9 +266,8 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetIsSubset) {
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setIsSubsetExpr = stage_builder::makeFunction("setIsSubset",
-                                                       stage_builder::makeVariable(arrSlot1),
-                                                       stage_builder::makeVariable(arrSlot2));
+    auto setIsSubsetExpr =
+        makeFunction("setIsSubset", makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIsSubsetExpr);
 
     // all elements are the same
@@ -328,9 +318,8 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIsSubset) {
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setIsSubsetExpr = stage_builder::makeFunction("setIsSubset",
-                                                       stage_builder::makeVariable(arrSlot1),
-                                                       stage_builder::makeVariable(arrSlot2));
+    auto setIsSubsetExpr =
+        makeFunction("setIsSubset", makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIsSubsetExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));

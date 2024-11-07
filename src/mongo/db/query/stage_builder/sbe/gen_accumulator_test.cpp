@@ -2644,8 +2644,7 @@ public:
 
         // Construct an expression which calls the given agg function, aggregating the values in
         // '_inputSlotId'.
-        auto expr = stage_builder::makeFunction(aggFuncName,
-                                                stage_builder::makeVariable(_inputSlotId.getId()));
+        auto expr = sbe::makeFunction(aggFuncName, sbe::makeVariable(_inputSlotId.getId()));
         auto code = compileAggExpression(*expr, &_aggAccessor);
 
         // Find the first element by skipping the length.
@@ -2722,21 +2721,19 @@ public:
             if constexpr (Collation) {
                 auto collatorSlotId = registerCollator(_state, &collator);
 
-                auto expr =
-                    stage_builder::makeFunction(aggExpr + "Merge",
-                                                stage_builder::makeVariable(_inputSlotId.getId()),
-                                                stage_builder::makeVariable(collatorSlotId));
-                auto finalizeExpr =
-                    stage_builder::makeFunction(aggExpr + "Finalize",
-                                                stage_builder::makeVariable(aggSlot),
-                                                stage_builder::makeVariable(collatorSlotId));
+                auto expr = sbe::makeFunction(aggExpr + "Merge",
+                                              sbe::makeVariable(_inputSlotId.getId()),
+                                              sbe::makeVariable(collatorSlotId));
+                auto finalizeExpr = sbe::makeFunction(aggExpr + "Finalize",
+                                                      sbe::makeVariable(aggSlot),
+                                                      sbe::makeVariable(collatorSlotId));
 
                 return {std::move(expr), std::move(finalizeExpr)};
             } else {
-                auto expr = stage_builder::makeFunction(
-                    aggExpr + "Merge", stage_builder::makeVariable(_inputSlotId.getId()));
-                auto finalizeExpr = stage_builder::makeFunction(
-                    aggExpr + "Finalize", stage_builder::makeVariable(aggSlot));
+                auto expr =
+                    sbe::makeFunction(aggExpr + "Merge", sbe::makeVariable(_inputSlotId.getId()));
+                auto finalizeExpr =
+                    sbe::makeFunction(aggExpr + "Finalize", sbe::makeVariable(aggSlot));
                 return {std::move(expr), std::move(finalizeExpr)};
             }
         }();
@@ -2771,17 +2768,15 @@ public:
                                                                BSONArray inputState,
                                                                sbe::SortSpec* sortSpec,
                                                                BSONArray expected) {
-        auto sortSpecConstant = stage_builder::makeConstant(
+        auto sortSpecConstant = sbe::makeConstant(
             sbe::value::TypeTags::sortSpec, sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec));
 
-        auto expr = stage_builder::makeFunction(aggExpr + "Merge",
-                                                stage_builder::makeVariable(_inputSlotId.getId()),
-                                                sortSpecConstant->clone());
+        auto expr = sbe::makeFunction(
+            aggExpr + "Merge", sbe::makeVariable(_inputSlotId.getId()), sortSpecConstant->clone());
 
         auto aggSlot = bindAccessor(&_aggAccessor);
-        auto finalExpr = stage_builder::makeFunction(aggExpr + "Finalize",
-                                                     stage_builder::makeVariable(aggSlot),
-                                                     std::move(sortSpecConstant));
+        auto finalExpr = sbe::makeFunction(
+            aggExpr + "Finalize", sbe::makeVariable(aggSlot), std::move(sortSpecConstant));
 
         auto [mergeStateTag, mergeStateVal] = convertFromBSONArray(mergeState);
         _aggAccessor.reset(true, mergeStateTag, mergeStateVal);
@@ -3287,8 +3282,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSumLar
     // to make sure that the resulting sum is mathematically correct.
     auto [resTag, resVal] = _aggAccessor.copyOrMoveValue();
     _inputAccessor.reset(true, resTag, resVal);
-    auto finalizeExpr = stage_builder::makeFunction(
-        "doubleDoubleSumFinalize", stage_builder::makeVariable(_inputSlotId.getId()));
+    auto finalizeExpr =
+        sbe::makeFunction("doubleDoubleSumFinalize", sbe::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
     auto [finalizedTag, finalizedRes] = runCompiledExpression(finalizeCode.get());
     ASSERT_EQ(finalizedTag, sbe::value::TypeTags::NumberInt64);
@@ -3346,8 +3341,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevPop) {
     // Feed the result back into the input accessor.
     auto [resTag, resVal] = _aggAccessor.copyOrMoveValue();
     _inputAccessor.reset(true, resTag, resVal);
-    auto finalizeExpr = stage_builder::makeFunction(
-        "stdDevPopFinalize", stage_builder::makeVariable(_inputSlotId.getId()));
+    auto finalizeExpr =
+        sbe::makeFunction("stdDevPopFinalize", sbe::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
     auto [finalizedTag, finalizedRes] = runCompiledExpression(finalizeCode.get());
     ASSERT_EQ(finalizedTag, sbe::value::TypeTags::NumberDouble);
@@ -3372,8 +3367,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevSamp) {
     // Feed the result back into the input accessor.
     auto [resTag, resVal] = _aggAccessor.copyOrMoveValue();
     _inputAccessor.reset(true, resTag, resVal);
-    auto finalizeExpr = stage_builder::makeFunction(
-        "stdDevSampFinalize", stage_builder::makeVariable(_inputSlotId.getId()));
+    auto finalizeExpr =
+        sbe::makeFunction("stdDevSampFinalize", sbe::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
     auto [finalizedTag, finalizedRes] = runCompiledExpression(finalizeCode.get());
     ASSERT_EQ(finalizedTag, sbe::value::TypeTags::NumberDouble);

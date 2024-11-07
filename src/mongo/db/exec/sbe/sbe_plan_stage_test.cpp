@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/stages/virtual_scan.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -67,9 +68,53 @@ void PlanStageTestFixture::assertValuesEqual(value::TypeTags lhsTag,
 }
 
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
+    value::TypeTags arrTag, value::Value arrVal, PlanNodeId planNodeId) {
+    // The value passed in must be an array.
+    invariant(sbe::value::isArray(arrTag));
+
+    auto outputSlot = _slotIdGenerator->generate();
+    auto virtualScan = sbe::makeS<sbe::VirtualScanStage>(planNodeId, outputSlot, arrTag, arrVal);
+
+    // Return the VirtualScanStage and its output slot.
+    return {outputSlot, std::move(virtualScan)};
+}
+
+std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
     const BSONArray& array) {
     auto [arrTag, arrVal] = stage_builder::makeValue(array);
     return generateVirtualScan(arrTag, arrVal);
+}
+
+std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
+PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots,
+                                               value::TypeTags arrTag,
+                                               value::Value arrVal) {
+    using namespace std::literals;
+
+    invariant(numSlots >= 1);
+
+    // Generate a mock scan with a single output slot.
+    auto [scanSlot, scanStage] = generateVirtualScan(arrTag, arrVal);
+
+    // Create a ProjectStage that will read the data from 'scanStage' and split it up
+    // across multiple output slots.
+    sbe::value::SlotVector projectSlots;
+    sbe::SlotExprPairVector projections;
+    for (int32_t i = 0; i < numSlots; ++i) {
+        auto indexExpr = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                    sbe::value::bitcastFrom<int32_t>(i));
+
+        projectSlots.emplace_back(_slotIdGenerator->generate());
+        projections.emplace_back(
+            projectSlots.back(),
+            sbe::makeE<sbe::EFunction>(
+                "getElement"_sd,
+                sbe::makeEs(sbe::makeE<sbe::EVariable>(scanSlot), std::move(indexExpr))));
+    }
+
+    return {std::move(projectSlots),
+            sbe::makeS<sbe::ProjectStage>(
+                std::move(scanStage), std::move(projections), kEmptyPlanNodeId)};
 }
 
 std::pair<value::SlotVector, std::unique_ptr<PlanStage>>

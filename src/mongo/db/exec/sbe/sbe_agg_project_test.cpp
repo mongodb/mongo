@@ -60,12 +60,11 @@ TEST_F(AggProjectStageTest, SimpleCountTest) {
         auto outSlot = generateSlotId();
         auto aggProject = makeS<AggProjectStage>(
             std::move(scanStage),
-            makeAggExprVector(
-                outSlot,
-                nullptr,
-                stage_builder::makeFunction("sum",
-                                            makeE<EConstant>(value::TypeTags::NumberInt64,
-                                                             value::bitcastFrom<int64_t>(1)))),
+            makeAggExprVector(outSlot,
+                              nullptr,
+                              makeFunction("sum",
+                                           makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                            value::bitcastFrom<int64_t>(1)))),
             kEmptyPlanNodeId);
 
         return std::make_pair(outSlot, std::move(aggProject));
@@ -89,10 +88,7 @@ TEST_F(AggProjectStageTest, SimpleSumTest) {
         auto outSlot = generateSlotId();
         auto aggProject = makeS<AggProjectStage>(
             std::move(scanStage),
-            makeAggExprVector(
-                outSlot,
-                nullptr,
-                stage_builder::makeFunction("sum", stage_builder::makeVariable(scanSlot))),
+            makeAggExprVector(outSlot, nullptr, makeFunction("sum", makeVariable(scanSlot))),
             kEmptyPlanNodeId);
         return std::make_pair(outSlot, std::move(aggProject));
     };
@@ -118,7 +114,7 @@ TEST_F(AggProjectStageTest, SumWithInitTest) {
             makeAggExprVector(
                 outSlot,
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(100)),
-                stage_builder::makeFunction("sum", stage_builder::makeVariable(scanSlot))),
+                makeFunction("sum", makeVariable(scanSlot))),
             kEmptyPlanNodeId);
         return std::make_pair(outSlot, std::move(aggProject));
     };

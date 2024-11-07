@@ -46,7 +46,6 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
-#include "mongo/db/query/stage_builder/sbe/gen_eexpr_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

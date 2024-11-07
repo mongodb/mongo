@@ -243,12 +243,11 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
-            makeAggExprVector(
-                countsSlot,
-                nullptr,
-                stage_builder::makeFunction("sum",
-                                            makeE<EConstant>(value::TypeTags::NumberInt64,
-                                                             value::bitcastFrom<int64_t>(1)))),
+            makeAggExprVector(countsSlot,
+                              nullptr,
+                              makeFunction("sum",
+                                           makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                            value::bitcastFrom<int64_t>(1)))),
             makeSV(), /* Seek slot */
             true,
             boost::none,

@@ -57,7 +57,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
-#include "mongo/db/query/stage_builder/sbe/gen_eexpr_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/yieldable.h"
@@ -66,6 +65,39 @@
 #include "mongo/util/id_generator.h"
 
 namespace mongo::sbe {
+
+inline auto makeInt32Constant(int32_t num) {
+    auto val = sbe::value::bitcastFrom<int32_t>(num);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, val);
+}
+
+inline auto makeBoolConstant(bool boolVal) {
+    auto val = sbe::value::bitcastFrom<bool>(boolVal);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, val);
+}
+
+inline auto makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
+    return sbe::makeE<sbe::EConstant>(tag, val);
+}
+
+inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name,
+                                                      sbe::EExpression::Vector args) {
+    return sbe::makeE<sbe::EFunction>(name, std::move(args));
+}
+
+template <typename... Args>
+inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name, Args&&... args) {
+    return sbe::makeE<sbe::EFunction>(name, sbe::makeEs(std::forward<Args>(args)...));
+}
+
+inline std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId) {
+    return sbe::makeE<sbe::EVariable>(slotId);
+}
+
+inline std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId,
+                                                      sbe::value::SlotId slotId) {
+    return sbe::makeE<sbe::EVariable>(frameId, slotId);
+}
 
 template <typename T>
 using MakeStageFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
@@ -169,10 +201,7 @@ public:
      * Note that this method assumes ownership of the SBE Array being passed in.
      */
     std::pair<value::SlotId, std::unique_ptr<PlanStage>> generateVirtualScan(
-        value::TypeTags arrTag, value::Value arrVal, PlanNodeId planNodeId = kEmptyPlanNodeId) {
-        return stage_builder::generateVirtualScan(
-            _slotIdGenerator.get(), arrTag, arrVal, _yieldPolicy.get(), planNodeId);
-    };
+        value::TypeTags arrTag, value::Value arrVal, PlanNodeId planNodeId = kEmptyPlanNodeId);
 
     /**
      * This method is similar to generateVirtualScan(), except that the subtree returned outputs to
@@ -186,10 +215,7 @@ public:
      * Note that this method assumes ownership of the SBE Array being passed in.
      */
     std::pair<value::SlotVector, std::unique_ptr<PlanStage>> generateVirtualScanMulti(
-        int32_t numSlots, value::TypeTags arrTag, value::Value arrVal) {
-        return stage_builder::generateVirtualScanMulti(
-            _slotIdGenerator.get(), numSlots, arrTag, arrVal, _yieldPolicy.get());
-    };
+        int32_t numSlots, value::TypeTags arrTag, value::Value arrVal);
 
     /**
      * Make a mock scan from an BSON array. This method does NOT assume ownership of the BSONArray

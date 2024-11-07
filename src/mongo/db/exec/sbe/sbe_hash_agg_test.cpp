@@ -123,19 +123,16 @@ void HashAggStageTest::performHashAggWithSpillChecking(
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
-            makeAggExprVector(
-                countsSlot,
-                nullptr,
-                stage_builder::makeFunction("sum",
-                                            makeE<EConstant>(value::TypeTags::NumberInt64,
-                                                             value::bitcastFrom<int64_t>(1)))),
+            makeAggExprVector(countsSlot,
+                              nullptr,
+                              makeFunction("sum",
+                                           makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                            value::bitcastFrom<int64_t>(1)))),
             makeSV(),
             true,
             boost::optional<value::SlotId>{shouldUseCollator, collatorSlot},
             shouldSpill,
-            makeSlotExprPairVec(
-                spillSlot,
-                stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+            makeSlotExprPairVec(spillSlot, makeFunction("sum", makeVariable(spillSlot))),
             nullptr /* yieldPolicy */,
             kEmptyPlanNodeId);
 
@@ -222,20 +219,19 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(),
-            makeAggExprVector(minSlot,
-                              nullptr,
-                              stage_builder::makeFunction("min", makeE<EVariable>(scanSlot)),
-                              maxSlot,
-                              nullptr,
-                              stage_builder::makeFunction("max", makeE<EVariable>(scanSlot)),
-                              collMinSlot,
-                              nullptr,
-                              stage_builder::makeFunction(
-                                  "collMin", collExpr->clone(), makeE<EVariable>(scanSlot)),
-                              collMaxSlot,
-                              nullptr,
-                              stage_builder::makeFunction(
-                                  "collMax", collExpr->clone(), makeE<EVariable>(scanSlot))),
+            makeAggExprVector(
+                minSlot,
+                nullptr,
+                makeFunction("min", makeE<EVariable>(scanSlot)),
+                maxSlot,
+                nullptr,
+                makeFunction("max", makeE<EVariable>(scanSlot)),
+                collMinSlot,
+                nullptr,
+                makeFunction("collMin", collExpr->clone(), makeE<EVariable>(scanSlot)),
+                collMaxSlot,
+                nullptr,
+                makeFunction("collMax", collExpr->clone(), makeE<EVariable>(scanSlot))),
             makeSV(),
             true,
             boost::none,
@@ -245,15 +241,14 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
             kEmptyPlanNodeId);
 
         auto outSlot = generateSlotId();
-        auto projectStage =
-            makeProjectStage(std::move(hashAggStage),
-                             kEmptyPlanNodeId,
-                             outSlot,
-                             stage_builder::makeFunction("newArray",
-                                                         makeE<EVariable>(minSlot),
-                                                         makeE<EVariable>(maxSlot),
-                                                         makeE<EVariable>(collMinSlot),
-                                                         makeE<EVariable>(collMaxSlot)));
+        auto projectStage = makeProjectStage(std::move(hashAggStage),
+                                             kEmptyPlanNodeId,
+                                             outSlot,
+                                             makeFunction("newArray",
+                                                          makeE<EVariable>(minSlot),
+                                                          makeE<EVariable>(maxSlot),
+                                                          makeE<EVariable>(collMinSlot),
+                                                          makeE<EVariable>(collMaxSlot)));
 
         return std::make_pair(outSlot, std::move(projectStage));
     };
@@ -292,10 +287,10 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(),
-            makeAggExprVector(hashAggSlot,
-                              nullptr,
-                              stage_builder::makeFunction(
-                                  "collAddToSet", std::move(collExpr), makeE<EVariable>(scanSlot))),
+            makeAggExprVector(
+                hashAggSlot,
+                nullptr,
+                makeFunction("collAddToSet", std::move(collExpr), makeE<EVariable>(scanSlot))),
             makeSV(),
             true,
             boost::none,
@@ -392,12 +387,11 @@ TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
-            makeAggExprVector(
-                countsSlot,
-                nullptr,
-                stage_builder::makeFunction("sum",
-                                            makeE<EConstant>(value::TypeTags::NumberInt64,
-                                                             value::bitcastFrom<int64_t>(1)))),
+            makeAggExprVector(countsSlot,
+                              nullptr,
+                              makeFunction("sum",
+                                           makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                            value::bitcastFrom<int64_t>(1)))),
             makeSV(seekSlot),
             true,
             boost::none,
@@ -460,18 +454,16 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeAggExprVector(
-            countsSlot,
-            nullptr,
-            stage_builder::makeFunction(
-                "sum",
-                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1)))),
         makeSV(),  // Seek slot
         true,
         boost::none,
         true /* allowDiskUse */,
-        makeSlotExprPairVec(
-            spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        makeSlotExprPairVec(spillSlot, makeFunction("sum", makeVariable(spillSlot))),
         nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
@@ -525,18 +517,16 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeAggExprVector(
-            countsSlot,
-            nullptr,
-            stage_builder::makeFunction(
-                "sum",
-                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1)))),
         makeSV(),  // Seek slot
         true,
         boost::none,
         true /* allowDiskUse */,
-        makeSlotExprPairVec(
-            spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        makeSlotExprPairVec(spillSlot, makeFunction("sum", makeVariable(spillSlot))),
         nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
@@ -605,18 +595,16 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeAggExprVector(
-            countsSlot,
-            nullptr,
-            stage_builder::makeFunction(
-                "sum",
-                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1)))),
         makeSV(),  // Seek slot
         true,
         boost::none,
         true /* allowDiskUse */,
-        makeSlotExprPairVec(
-            spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        makeSlotExprPairVec(spillSlot, makeFunction("sum", makeVariable(spillSlot))),
         nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
@@ -670,18 +658,16 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeAggExprVector(
-            countsSlot,
-            nullptr,
-            stage_builder::makeFunction(
-                "sum",
-                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1)))),
         makeSV(),  // Seek slot
         true,
         boost::none,
         true /* allowDiskUse */,
-        makeSlotExprPairVec(
-            spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        makeSlotExprPairVec(spillSlot, makeFunction("sum", makeVariable(spillSlot))),
         nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
@@ -738,18 +724,16 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(),
-        makeAggExprVector(
-            countsSlot,
-            nullptr,
-            stage_builder::makeFunction(
-                "sum",
-                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1)))),
         makeSV(),  // Seek slot
         true,
         boost::none,
         true /* allowDiskUse */,
-        makeSlotExprPairVec(
-            spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        makeSlotExprPairVec(spillSlot, makeFunction("sum", makeVariable(spillSlot))),
         nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
@@ -803,24 +787,22 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeAggExprVector(
-            countsSlot,
-            nullptr,
-            stage_builder::makeFunction(
-                "sum",
-                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1))),
-            sumsSlot,
-            nullptr,
-            stage_builder::makeFunction("sum", makeE<EVariable>(scanSlot))),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1))),
+                          sumsSlot,
+                          nullptr,
+                          makeFunction("sum", makeE<EVariable>(scanSlot))),
         makeSV(),  // Seek slot
         true,
         boost::none,
         true /* allowDiskUse */,
-        makeSlotExprPairVec(
-            spillSlot1,
-            stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot1)),
-            spillSlot2,
-            stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot2))),
+        makeSlotExprPairVec(spillSlot1,
+                            makeFunction("sum", makeVariable(spillSlot1)),
+                            spillSlot2,
+                            makeFunction("sum", makeVariable(spillSlot2))),
         nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
@@ -884,24 +866,22 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeAggExprVector(
-            countsSlot,
-            nullptr,
-            stage_builder::makeFunction(
-                "sum",
-                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1))),
-            sumsSlot,
-            nullptr,
-            stage_builder::makeFunction("sum", makeE<EVariable>(scanSlot))),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1))),
+                          sumsSlot,
+                          nullptr,
+                          makeFunction("sum", makeE<EVariable>(scanSlot))),
         makeSV(),  // Seek slot
         true,
         boost::none,
         true,  // allowDiskUse=true
-        makeSlotExprPairVec(
-            spillSlot1,
-            stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot1)),
-            spillSlot2,
-            stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot2))),
+        makeSlotExprPairVec(spillSlot1,
+                            makeFunction("sum", makeVariable(spillSlot1)),
+                            spillSlot2,
+                            makeFunction("sum", makeVariable(spillSlot2))),
         nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
@@ -975,14 +955,12 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeAggExprVector(
-            sumsSlot, nullptr, stage_builder::makeFunction("sum", makeE<EVariable>(scanSlot))),
+        makeAggExprVector(sumsSlot, nullptr, makeFunction("sum", makeE<EVariable>(scanSlot))),
         makeSV(),  // Seek slot
         true,
         boost::none,
         true,  // allowDiskUse=true
-        makeSlotExprPairVec(
-            spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        makeSlotExprPairVec(spillSlot, makeFunction("sum", makeVariable(spillSlot))),
         nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
@@ -1021,18 +999,16 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeAggExprVector(
-            countsSlot,
-            nullptr,
-            stage_builder::makeFunction(
-                "sum",
-                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
+        makeAggExprVector(countsSlot,
+                          nullptr,
+                          makeFunction("sum",
+                                       makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<int64_t>(1)))),
         makeSV(),  // Seek slot
         true,
         boost::none,
         true,  // allowDiskUse=true
-        makeSlotExprPairVec(
-            spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        makeSlotExprPairVec(spillSlot, makeFunction("sum", makeVariable(spillSlot))),
         nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 

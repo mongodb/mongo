@@ -226,20 +226,18 @@ public:
 
                 if (blockAcc == "valueBlockAggCount") {
                     // valueBlockAggCount is the exception - it takes just the bitset.
-                    blockAccFunc =
-                        stage_builder::makeFunction(blockAcc, makeE<EVariable>(accumulatorBitset));
-                    rowAccFunc = stage_builder::makeFunction(rowAcc);
+                    blockAccFunc = makeFunction(blockAcc, makeE<EVariable>(accumulatorBitset));
+                    rowAccFunc = makeFunction(rowAcc);
                 } else {
                     dataInSlots.push_back(scanSlots[scanSlotIdx++]);
 
                     auto internalSlot = generateSlotId();
                     accDataSlots.push_back(internalSlot);
 
-                    blockAccFunc = stage_builder::makeFunction(blockAcc,
-                                                               makeE<EVariable>(accumulatorBitset),
-                                                               makeE<EVariable>(internalSlot));
-                    rowAccFunc =
-                        stage_builder::makeFunction(rowAcc, makeE<EVariable>(internalSlot));
+                    blockAccFunc = makeFunction(blockAcc,
+                                                makeE<EVariable>(accumulatorBitset),
+                                                makeE<EVariable>(internalSlot));
+                    rowAccFunc = makeFunction(rowAcc, makeE<EVariable>(internalSlot));
                 }
 
                 aggs.emplace_back(
@@ -250,8 +248,7 @@ public:
 
                 auto mergeInternalSlot = generateSlotId();
                 mergingExprs.emplace_back(
-                    mergeInternalSlot,
-                    stage_builder::makeFunction(mergeAcc, makeE<EVariable>(mergeInternalSlot)));
+                    mergeInternalSlot, makeFunction(mergeAcc, makeE<EVariable>(mergeInternalSlot)));
             }
 
             auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),

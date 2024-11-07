@@ -103,7 +103,7 @@ TEST_F(LoopJoinStageTest, LoopJoinConstTruePredicate) {
                                          std::move(innerScanStage),
                                          makeSV(outerScanSlot) /*outerProjects*/,
                                          makeSV() /*outerCorrelated*/,
-                                         stage_builder::makeBoolConstant(true) /*predicate*/,
+                                         makeBoolConstant(true) /*predicate*/,
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
     auto outer = loopJoin->getAccessor(*ctx, outerScanSlot);
@@ -138,7 +138,7 @@ TEST_F(LoopJoinStageTest, LoopJoinConstFalsePredicate) {
                                          std::move(innerScanStage),
                                          makeSV(outerScanSlot) /*outerProjects*/,
                                          makeSV() /*outerCorrelated*/,
-                                         stage_builder::makeBoolConstant(false) /*predicate*/,
+                                         makeBoolConstant(false) /*predicate*/,
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
 
