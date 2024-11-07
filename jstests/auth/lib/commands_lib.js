@@ -8301,52 +8301,44 @@ export const authCommandsLib = {
       {
         testname: "aggregate_$rankFusion",
         command: {
-            aggregate: "foo",
-            cursor: {},
-            pipeline: [{
+          aggregate: "foo",
+          cursor: {},
+          pipeline: [
+            {
               $rankFusion: {
-                inputs: [
-                  {
-                    pipeline: [
+                input: {
+                  pipelines: {
+                    geo: [
                       {
                         $geoNear: {near: [50, 50], distanceField: "dist"}
                       },
                       {
                         $limit: 2
                       }
-                    ]
-                  },
-                  {
-                    pipeline: [
+                    ],
+                    matchPipe: [
                       {
                         $match: {a: 1}
                       },
                       {
                         $sort: {x: 1}
-                      },
-                    ]
-                  },
-                  {
-                    pipeline: [
-                      {
-                        $search: {
-                          // empty query
-                        }
                       }
-                    ]
-                  },
-                  {
-                    pipeline: [
+                    ],
+                    search: [
                       {
-                        $vectorSearch: {
-                          // empty query
-                        }
+                        $search: { /* empty query */ }
+                      }
+                    ],
+                    vector: [
+                      {
+                        $vectorSearch: { /* empty query */ }
                       }
                     ]
                   }
-                ]
+                },
               }
-          }]
+            }
+          ]
         },
         setup: function(db) {
           db.createCollection("foo");
@@ -8358,19 +8350,8 @@ export const authCommandsLib = {
         skipTest: (conn) => {
           return !TestData.setParameters.featureFlagSearchHybridScoringPrerequisites;
         },
-        testcases: [
-          {
-            runOnDb: firstDbName,
-            roles: roles_read,
-            privileges: [{resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}]
-          },
-          {
-            runOnDb: secondDbName,
-            roles: roles_readAny,
-            privileges:
-                [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}]
-          },
-        ]
+        // Expect this to fail since there's no mongot set up to execute the $search/vectorSearch.
+        testcases: testcases_transformationOnlyExpectFail,
       },
       {
         testname: "aggregate_$score",
@@ -8435,19 +8416,7 @@ export const authCommandsLib = {
         skipTest: (conn) => {
           return !TestData.setParameters.featureFlagSearchHybridScoring;
         },
-        testcases: [
-          {
-            runOnDb: firstDbName,
-            roles: roles_read,
-            privileges: [{resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}]
-          },
-          {
-            runOnDb: secondDbName,
-            roles: roles_readAny,
-            privileges:
-                [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}]
-          },
-        ]
+        testcases: testcases_transformationOnlyExpectFail,
       },
     ],
 
