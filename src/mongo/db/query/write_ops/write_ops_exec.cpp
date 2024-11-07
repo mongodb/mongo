@@ -110,7 +110,6 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/resource_yielder.h"
@@ -533,11 +532,9 @@ bool handleError(OperationContext* opCtx,
             // and replaced with a non-retryable code after the migration finishes to avoid wasted
             // retries.
             auto migrationConflictInfo = ex.toStatus().extraInfo<TenantMigrationConflictInfo>();
-            uassertStatusOK(
-                Status(NonRetryableTenantMigrationConflictInfo(
-                           migrationConflictInfo->getMigrationId(),
-                           migrationConflictInfo->getTenantMigrationAccessBlocker()),
-                       "Multi update must block until this tenant migration commits or aborts"));
+            uassertStatusOK(Status(
+                NonRetryableTenantMigrationConflictInfo(migrationConflictInfo->getMigrationId()),
+                "Multi update must block until this tenant migration commits or aborts"));
         }
 
         // If an op fails due to a TenantMigrationError then subsequent ops will also fail due to a
@@ -1022,29 +1019,6 @@ boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
                                                      size_t numErrors) {
     if (status.isOK()) {
         return boost::none;
-    }
-
-    if (status == ErrorCodes::TenantMigrationConflict) {
-        hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
-
-        Status overwrittenStatus =
-            tenant_migration_access_blocker::handleTenantMigrationConflict(opCtx, status);
-
-        // Interruption errors encountered during batch execution fail the entire batch, so throw on
-        // such errors here for consistency.
-        if (ErrorCodes::isInterruption(overwrittenStatus)) {
-            uassertStatusOK(overwrittenStatus);
-        }
-
-        // Tenant migration errors, similarly to migration errors consume too much space in the
-        // ordered:false responses and get truncated. Since the call to
-        // 'handleTenantMigrationConflict' above replaces the original status, we need to manually
-        // truncate the new reason if the original 'status' was also truncated.
-        if (status.reason().empty()) {
-            overwrittenStatus = overwrittenStatus.withReason("");
-        }
-
-        return generateErrorNoTenantMigration(opCtx, overwrittenStatus, index, numErrors);
     }
 
     return generateErrorNoTenantMigration(opCtx, status, index, numErrors);

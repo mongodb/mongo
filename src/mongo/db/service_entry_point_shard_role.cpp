@@ -108,7 +108,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -811,16 +810,9 @@ private:
     bool _shouldCleanUp = false;
 };
 
-void InvokeCommand::run() try {
-    auto& execContext = _ecd->getExecutionContext();
+void InvokeCommand::run() {
     const auto dbName = _ecd->getInvocation()->ns().dbName();
-    tenant_migration_access_blocker::checkIfCanRunCommandOrBlock(
-        execContext.getOpCtx(), dbName, execContext.getCommand()->getName())
-        .get(execContext.getOpCtx());
     runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
-} catch (const ExceptionForCat<ErrorCategory::TenantMigrationConflictError>& ex) {
-    uassertStatusOK(tenant_migration_access_blocker::handleTenantMigrationConflict(
-        _ecd->getExecutionContext().getOpCtx(), ex.toStatus()));
 }
 
 void CheckoutSessionAndInvokeCommand::run() {
@@ -828,11 +820,7 @@ void CheckoutSessionAndInvokeCommand::run() {
         try {
             _checkOutSession();
 
-            auto& execContext = _ecd->getExecutionContext();
             const auto dbName = _ecd->getInvocation()->ns().dbName();
-            tenant_migration_access_blocker::checkIfCanRunCommandOrBlock(
-                execContext.getOpCtx(), dbName, execContext.getCommand()->getName())
-                .get(execContext.getOpCtx());
 
             if (auto scoped = failWithErrorCodeAfterSessionCheckOut.scoped();
                 MONGO_unlikely(scoped.isActive())) {
@@ -847,18 +835,6 @@ void CheckoutSessionAndInvokeCommand::run() {
             }
 
             runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
-            return Status::OK();
-        } catch (const ExceptionForCat<ErrorCategory::TenantMigrationConflictError>& ex) {
-            auto opCtx = _ecd->getExecutionContext().getOpCtx();
-            if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
-                // If the command didn't yield its session, abort transaction and clean up
-                // transaction resources before blocking the command to allow the stable timestamp
-                // on the node to advance.
-                _cleanupTransaction(txnParticipant);
-            }
-
-            uassertStatusOK(tenant_migration_access_blocker::handleTenantMigrationConflict(
-                opCtx, ex.toStatus()));
             return Status::OK();
         } catch (const ExceptionFor<ErrorCodes::WouldChangeOwningShard>& ex) {
             auto opCtx = _ecd->getExecutionContext().getOpCtx();
@@ -1255,8 +1231,6 @@ void RunCommandImpl::_epilogue() {
         });
 
     service_entry_point_shard_role_helpers::waitForLinearizableReadConcern(opCtx);
-    const DatabaseName& dbName = _ecd->getInvocation()->db();
-    tenant_migration_access_blocker::checkIfLinearizableReadWasAllowedOrThrow(opCtx, dbName);
 
     // Wait for data to satisfy the read concern level, if necessary.
     service_entry_point_shard_role_helpers::waitForSpeculativeMajorityReadConcern(opCtx);

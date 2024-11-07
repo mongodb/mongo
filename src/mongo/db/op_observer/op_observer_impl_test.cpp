@@ -91,8 +91,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
-#include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session.h"
@@ -2218,50 +2216,6 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
     ASSERT_EQ(oplogEntry.getTid(), nss1.tenantId());
     ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
     ASSERT_FALSE(oplogEntryObj.getBoolField("prepare"));
-}
-
-class OpObserverServerlessTransactionTest : public OpObserverTransactionTest {
-private:
-    // Needs to override to set serverless mode.
-    repl::ReplSettings createReplSettings() override {
-        return repl::createServerlessReplSettings();
-    }
-};
-
-TEST_F(OpObserverServerlessTransactionTest,
-       OnUnpreparedTransactionCommitChecksIfTenantMigrationIsBlockingWrites) {
-    // Add a tenant migration access blocker on donor for blocking writes.
-    auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), uuid);
-    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
-
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-
-    std::vector<InsertStatement> insert;
-    insert.emplace_back(0,
-                        BSON("_id" << 0 << "data"
-                                   << "x"));
-
-    {
-        AutoGetCollection autoColl(opCtx(), kNssUnderTenantId, MODE_IX);
-        opObserver().onInserts(opCtx(),
-                               *autoColl,
-                               insert.begin(),
-                               insert.end(),
-                               /*recordIds=*/{},
-                               /*fromMigrate=*/std::vector<bool>(insert.size(), false),
-                               /*defaultFromMigrate=*/false);
-    }
-
-    donorMtab->startBlockingWrites();
-
-    auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    ASSERT_EQUALS(txnOps->getNumberOfPrePostImagesToWrite(), 0);
-    ASSERT_THROWS_CODE(commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver()),
-                       DBException,
-                       ErrorCodes::TenantMigrationConflict);
-
-    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).shutDown();
 }
 
 /**

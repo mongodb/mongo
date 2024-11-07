@@ -126,7 +126,6 @@
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/server_options.h"
@@ -1200,19 +1199,6 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
                 "Manually setting 'runtimeConstants' is not supported. Use 'let' for user-defined "
                 "constants.",
                 expCtx->fromRouter || !aggExState.getRequest().getLegacyRuntimeConstants());
-
-        // This prevents opening a new change stream in the critical section of a serverless shard
-        // split or merge operation to prevent resuming on the recipient with a resume token higher
-        // than that operation's blockTimestamp.
-        //
-        // If we do this check before picking a startTime for a change stream then the primary could
-        // go into a blocking state between the check and getting the timestamp resulting in a
-        // startTime greater than blockTimestamp. Therefore we must do this check here, after the
-        // pipeline has been parsed and startTime has been initialized.
-        if (aggExState.hasChangeStream()) {
-            tenant_migration_access_blocker::assertCanOpenChangeStream(
-                aggExState.getOpCtx(), aggExState.getExecutionNss().dbName());
-        }
 
         if (!aggExState.getRequest().getAllowDiskUse().value_or(true)) {
             allowDiskUseFalseCounter.increment();

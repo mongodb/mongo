@@ -261,7 +261,6 @@ mongo_cc_library(
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/index_builds:commit_quorum_options",
         "//src/mongo/db/repl:repl_server_parameters",
-        "//src/mongo/db/repl:tenant_migration_access_blocker",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/transaction",

@@ -56,7 +56,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/repl/oplog_interface_local",
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
-        "$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/db/session/session_catalog_mongod",
         "$BUILD_DIR/mongo/db/shard_role",

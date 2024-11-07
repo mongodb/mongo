@@ -80,8 +80,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_access_blocker.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/server_options.h"
@@ -363,8 +361,6 @@ auto& ttlDeletedDocuments = *MetricBuilder<Counter64>{"ttl.deletedDocuments"};
 auto& ttlCollSubpassesIncreasedPriority =
     *MetricBuilder<Counter64>{"ttl.collSubpassesIncreasedPriority"};
 
-using MtabType = TenantMigrationAccessBlocker::BlockerType;
-
 TTLMonitor::TTLMonitor()
     : BackgroundJob(false /* selfDelete */),
       _ttlMonitorSleepSecs(Seconds{ttlMonitorSleepSecs.load()}) {}
@@ -615,21 +611,6 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         }
 
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, *nss)) {
-            return false;
-        }
-
-        std::shared_ptr<TenantMigrationAccessBlocker> mtab;
-        if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless() &&
-            nullptr !=
-                (mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                            .getTenantMigrationAccessBlockerForDbName(coll.nss().dbName(),
-                                                                      MtabType::kRecipient)) &&
-            mtab->checkIfShouldBlockTTL()) {
-            LOGV2_DEBUG(53768,
-                        1,
-                        "Postpone TTL of DB because of active tenant migration",
-                        "tenantMigrationAccessBlocker"_attr = mtab->getDebugInfo().jsonString(),
-                        "database"_attr = coll.nss().dbName());
             return false;
         }
 

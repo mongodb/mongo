@@ -130,7 +130,6 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/repl:cloner_utils",
         "//src/mongo/db/repl:repl_coordinator_interface",
-        "//src/mongo/db/repl:tenant_migration_access_blocker",
         "//src/mongo/db/repl:timestamp_block",
         "//src/mongo/db/storage:disk_space_monitor",
         "//src/mongo/db/storage:disk_space_util",
@@ -161,7 +160,6 @@ mongo_cc_library(
         "//src/mongo/db:shard_role",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/db/catalog:collection_catalog",
-        "//src/mongo/db/repl:tenant_migration_access_blocker",
         "//src/mongo/db/s:forwardable_operation_metadata",
     ],
     deps = [
@@ -213,7 +211,6 @@ mongo_cc_library(
         ":two_phase_index_build_knobs_idl",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/catalog:collection_catalog",
-        "//src/mongo/db/repl:tenant_migration_access_blocker",
         "//src/mongo/db/s:forwardable_operation_metadata",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/util/concurrency:thread_pool",

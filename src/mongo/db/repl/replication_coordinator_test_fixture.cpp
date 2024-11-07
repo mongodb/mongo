@@ -215,9 +215,6 @@ void ReplCoordTest::start() {
     // construct ServiceEntryPoint and this causes a segmentation fault when
     // reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
-    // Skip recovering tenant migration access blockers for the same reason as the above.
-    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
-        "skipRecoverTenantMigrationAccessBlockers");
     // Skip recovering user writes critical sections for the same reason as the above.
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");

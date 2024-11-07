@@ -43,7 +43,6 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -543,9 +542,7 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
         !shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull(),
         shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp());
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
-    Status abortStatus = signalAction == IndexBuildAction::kTenantMigrationAbort
-        ? tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName)
-        : Status(ErrorCodes::IndexBuildAborted, reason);
+    Status abortStatus = Status(ErrorCodes::IndexBuildAborted, reason);
     invariant(!abortStatus.isOK());
     _indexBuildState.setState(
         IndexBuildState::kExternalAbort, skipCheck, abortTimestamp, abortStatus);

@@ -66,7 +66,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -181,11 +180,8 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx,
     // one that waits for the notification gets the later clusterTime, so when the request finishes
     // it needs to be repeated with the later time.
     while (clusterTime > lastWrittenOpTime) {
-        // Standalone replica set, so there is no need to advance the OpLog on the primary. The only
-        // exception is after a tenant migration because the target time may be from the other
-        // replica set and is not guaranteed to be in the oplog of this node's set.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::None) &&
-            !tenant_migration_access_blocker::hasActiveTenantMigration(opCtx, dbName)) {
+        // Standalone replica set, so there is no need to advance the OpLog on the primary.
+        if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
             return Status::OK();
         }
 

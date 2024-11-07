@@ -95,7 +95,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -723,12 +722,6 @@ public:
 
                 // Update the genericCursor stored in curOp with the new cursor stats.
                 curOp->setGenericCursor(lk, cursorPin->toGenericCursor());
-            }
-
-            // If this is a change stream cursor, check whether the tenant has migrated elsewhere.
-            if (cursorPin->getExecutor()->getPostBatchResumeToken()["_data"]) {
-                tenant_migration_access_blocker::assertCanGetMoreChangeStream(opCtx,
-                                                                              _cmd.getDbName());
             }
 
             // If the 'failGetMoreAfterCursorCheckout' failpoint is enabled, throw an exception with

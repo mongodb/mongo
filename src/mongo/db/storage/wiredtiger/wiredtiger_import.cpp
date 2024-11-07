@@ -41,7 +41,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
@@ -64,14 +63,6 @@ namespace mongo {
 using namespace fmt::literals;
 
 namespace {
-bool shouldImport(const NamespaceString& ns, const UUID& migrationId) {
-    const auto tenantId =
-        tenant_migration_access_blocker::parseTenantIdFromDatabaseName(ns.dbName());
-
-    tenant_migration_access_blocker::validateNssIsBeingMigrated(tenantId, ns, migrationId);
-
-    return !!tenantId;
-}
 
 // catalogEntry is like {idxIdent: {myIndex: "index-12-345", myOtherIndex: "index-67-890"}}.
 StringMap<std::string> makeIndexNameToIdentMap(const BSONObj& catalogEntry) {
@@ -207,10 +198,6 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
 
         NamespaceString ns(NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
             rawCatalogEntry.getStringField("ns")));
-        if (!shouldImport(ns, migrationId)) {
-            LOGV2_DEBUG(6113801, 1, "Not importing donor collection", "ns"_attr = ns);
-            continue;
-        }
 
         auto collIdent = rawCatalogEntry["ident"].String();
         BSONCollectionCatalogEntry::MetaData catalogEntry;

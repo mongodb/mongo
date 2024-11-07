@@ -1341,7 +1341,6 @@ mongo_cc_library(
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/query/write_ops:write_ops_exec",
         "//src/mongo/db/repl:replica_set_messages",
-        "//src/mongo/db/repl:tenant_migration_access_blocker",
         "//src/mongo/db/s:query_analysis_writer",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/stats:counters",

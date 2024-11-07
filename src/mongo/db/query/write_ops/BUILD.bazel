@@ -184,7 +184,6 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:repl_coordinator_interface",
-        "//src/mongo/db/repl:tenant_migration_access_blocker",
         "//src/mongo/db/s:query_analysis_writer",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:server_read_concern_write_concern_metrics",

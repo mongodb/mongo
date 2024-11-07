@@ -37,7 +37,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/repl/tenant_migration_access_blocker.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -48,16 +47,10 @@ const Status kNonRetryableTenantMigrationStatus(
 
 class TenantMigrationConflictInfoBase : public ErrorExtraInfo {
 public:
-    TenantMigrationConflictInfoBase(UUID migrationId,
-                                    std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
-        : _migrationId(std::move(migrationId)), _mtab(std::move(mtab)){};
+    TenantMigrationConflictInfoBase(UUID migrationId) : _migrationId(std::move(migrationId)){};
 
     const auto& getMigrationId() const {
         return _migrationId;
-    }
-
-    const auto& getTenantMigrationAccessBlocker() const {
-        return _mtab;
     }
 
     void serialize(BSONObjBuilder* bob) const override;
@@ -65,25 +58,22 @@ public:
 
 private:
     const UUID _migrationId;
-    const std::shared_ptr<TenantMigrationAccessBlocker> _mtab;
 };
 
 class TenantMigrationConflictInfo final : public TenantMigrationConflictInfoBase {
 public:
     static constexpr auto code = ErrorCodes::TenantMigrationConflict;
 
-    TenantMigrationConflictInfo(UUID migrationId,
-                                std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
-        : TenantMigrationConflictInfoBase(std::move(migrationId), std::move(mtab)) {}
+    TenantMigrationConflictInfo(UUID migrationId)
+        : TenantMigrationConflictInfoBase(std::move(migrationId)) {}
 };
 
 class NonRetryableTenantMigrationConflictInfo final : public TenantMigrationConflictInfoBase {
 public:
     static constexpr auto code = ErrorCodes::NonRetryableTenantMigrationConflict;
 
-    NonRetryableTenantMigrationConflictInfo(
-        UUID migrationId, std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
-        : TenantMigrationConflictInfoBase(std::move(migrationId), std::move(mtab)) {}
+    NonRetryableTenantMigrationConflictInfo(UUID migrationId)
+        : TenantMigrationConflictInfoBase(std::move(migrationId)) {}
 };
 
 using TenantMigrationCommittedException = ExceptionFor<ErrorCodes::TenantMigrationCommitted>;

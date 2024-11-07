@@ -102,7 +102,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -199,10 +198,12 @@ MONGO_FAIL_POINT_DEFINE(hangAfterReconfig);
 MONGO_FAIL_POINT_DEFINE(stepdownHangAfterGrabbingRSTL);
 // Hang before making checks on the new config relative to the current one.
 MONGO_FAIL_POINT_DEFINE(hangBeforeNewConfigValidationChecks);
+// Throws during ReplicationCoordinator start up. The name of this failpoint is outdated since
+// Tenant Migration does not exist but multiversion test runs for
+// repl_startup_error_no_hang_on_shutdown fail if this name is changed.
+MONGO_FAIL_POINT_DEFINE(throwBeforeRecoveringTenantMigrationAccessBlockers);
 // Simulates returning a specified error in the hello response.
 MONGO_FAIL_POINT_DEFINE(setCustomErrorInHelloResponseMongoD);
-// Throws right before the call into recoverTenantMigrationAccessBlockers.
-MONGO_FAIL_POINT_DEFINE(throwBeforeRecoveringTenantMigrationAccessBlockers);
 // Hang before allowing the transition from RECOVERING to SECONDARY.
 MONGO_FAIL_POINT_DEFINE(hangBeforeFinishRecovery);
 
@@ -701,8 +702,6 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     // Read the last op from the oplog after cleaning up any partially applied batches.
     auto stableTimestamp =
         _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, boost::none);
-    LOGV2(4280505,
-          "Creating any necessary TenantMigrationAccessBlockers for unfinished migrations");
 
     if (MONGO_unlikely(throwBeforeRecoveringTenantMigrationAccessBlockers.shouldFail())) {
         uasserted(6111700,
@@ -710,9 +709,6 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
                   "Throwing exception.");
     }
 
-    if (_settings.isServerless()) {
-        tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
-    }
     LOGV2(4280506, "Reconstructing prepared transactions");
     reconstructPreparedTransactions(opCtx,
                                     stableTimestamp ? OplogApplication::Mode::kStableRecovering

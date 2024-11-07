@@ -65,7 +65,6 @@
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -317,9 +316,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             }
 
             // The checks here catch empty index builds and also allow us to stop index
-            // builds before waiting for throttling. It may race with the abort at the start
-            // of migration so we do check again later.
-            uassertStatusOK(tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName));
+            // builds before waiting for throttling.
             uassertStatusOK(writeBlockState->checkIfIndexBuildAllowedToStart(opCtx, nss));
 
             stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
@@ -403,17 +400,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         }
 
         if (opCtx->getClient()->isFromUserConnection()) {
-            auto migrationStatus =
-                tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName);
-            if (!migrationStatus.isOK()) {
-                LOGV2(4886200,
-                      "Aborted index build before start due to tenant migration",
-                      "error"_attr = migrationStatus,
-                      "buildUUID"_attr = buildUUID,
-                      "collectionUUID"_attr = collectionUUID);
-                return migrationStatus;
-            }
-
             auto buildBlockedStatus = writeBlockState->checkIfIndexBuildAllowedToStart(opCtx, nss);
             if (!buildBlockedStatus.isOK()) {
                 LOGV2(6511603,
