@@ -5046,6 +5046,30 @@ TEST_F(BSONColumnTest, InterleavedScalarToObject) {
     verifyDecompression(expected, elems);
 }
 
+TEST_F(BSONColumnTest, ArrayThenObjectNoScalars) {
+    std::vector<BSONElement> elems = {
+        createElementArray(BSON_ARRAY(1 << BSONObjBuilder().obj() << 2)),
+        createElementObj(BSON("x" << BSONObjBuilder().obj()))};
+
+    for (auto elem : elems) {
+        cb.append(elem);
+    }
+    auto binData = cb.finalize();
+
+    BufBuilder expected;
+    appendInterleavedStartArrayRoot(expected, elems[0].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+    appendLiteral(expected, elems[1]);
+    appendEOO(expected);
+
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems, false);
+}
+
 TEST_F(BSONColumnTest, InterleavedScalarToObjectLegacyDecompress) {
     std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
                                       createElementObj(BSON("x" << 2)),
