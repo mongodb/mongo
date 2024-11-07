@@ -6,6 +6,18 @@ export function getShardNames(db) {
     return db.adminCommand({listShards: 1}).shards.map(shard => shard._id);
 }
 
+/**
+ * Finds the _id of the primary shard for database 'dbname', e.g., 'test-rs0'
+ */
+export function getPrimaryShardIdForDatabase(conn, dbname) {
+    var x = conn.getDB("config").databases.findOne({_id: "" + dbname});
+    if (x) {
+        return x.primary;
+    }
+
+    throw Error("couldn't find dbname: " + dbname);
+}
+
 export function getPrimaryShardNameForDB(db) {
     const config = db.getSiblingDB("config");
     const dbdoc = config.databases.findOne({_id: db.getName()});
