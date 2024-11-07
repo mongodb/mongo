@@ -86,7 +86,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/golden_data_test_framework.md @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./etc/OWNERS.yml
-/etc/**/yamllint_config.yml @10gen/devprod-services-integrations @svc-auto-approve-bot
 /etc/**/third_party_components.yml @10gen/server-security @svc-auto-approve-bot
 /etc/**/system_perf.yml @10gen/devprod-performance-analysis @10gen/devprod-performance-infrastructure @10gen/performance @svc-auto-approve-bot
 

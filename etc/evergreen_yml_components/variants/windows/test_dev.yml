@@ -109,18 +109,7 @@ buildvariants:
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_windows_tls
       external_auth_jobs_max: 1
-      # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
-      # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
-      # run too long and hit execution timeouts.
-      # burn_in_task_name: jsCore
     tasks:
-      # - name: burn_in_tasks_gen
-      #   depends_on:
-      #   - name: version_burn_in_gen
-      #     variant: generate-tasks-for-version
-      #     omit_generated_tasks: true
-      #   - name: archive_dist_test
-      #     variant: *windows_compile_variant_name
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
         distros:
@@ -159,18 +148,7 @@ buildvariants:
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_windows_tls
       external_auth_jobs_max: 1
-      # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
-      # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
-      # run too long and hit execution timeouts.
-      # burn_in_task_name: jsCore
     tasks:
-      # - name: burn_in_tasks_gen
-      #   depends_on:
-      #   - name: version_burn_in_gen
-      #     variant: generate-tasks-for-version
-      #     omit_generated_tasks: true
-      #   - name: archive_dist_test
-      #     variant: *windows_compile_variant_name
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
         distros:

@@ -235,10 +235,11 @@ buildvariants:
       - name: .crypt
       - name: crypt_build_debug_and_test
 
-  - <<: *generic_linux_compile_params
-    name: &linux-x86-dynamic-grpc linux-x86-dynamic-grpc
+  - name: &linux-x86-dynamic-grpc linux-x86-dynamic-grpc
     display_name: "~ Linux x86 Shared Library Enterprise with GRPC"
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel8.8-xlarge
     stepback: false
     expansions:
       <<: *generic_linux_compile_expansions
@@ -298,10 +299,6 @@ buildvariants:
       # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
       test_flags: >-
         --runAllFeatureFlagTests
-      # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
-      # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
-      # run too long and hit execution timeouts.
-      # burn_in_task_name: jsCore
     depends_on:
       - name: archive_dist_test
         variant: *linux_x86_dynamic_compile_variant_name
@@ -311,13 +308,6 @@ buildvariants:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     tasks:
-      # - name: burn_in_tasks_gen
-      #   depends_on:
-      #   - name: version_burn_in_gen
-      #     variant: generate-tasks-for-version
-      #     omit_generated_tasks: true
-      #   - name: archive_dist_test
-      #     variant: *linux_x86_dynamic_compile_variant_name
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
@@ -347,7 +337,6 @@ buildvariants:
     run_on:
       - rhel8.8-small
     stepback: false
-    activate: true
     expansions: &enterprise-rhel-8-64-bit-dynamic-embedded-router-expansions
       <<: *enterprise-rhel-8-64-bit-dynamic-expansions
       test_flags: >-
@@ -368,7 +357,6 @@ buildvariants:
     run_on:
       - rhel8.8-small
     stepback: false
-    activate: true
     expansions:
       &enterprise-rhel-8-64-bit-dynamic-replica-set-endpoint-expansions
       <<: *enterprise-rhel-8-64-bit-dynamic-expansions

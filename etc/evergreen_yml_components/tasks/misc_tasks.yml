@@ -348,42 +348,6 @@ tasks:
           resmoke_args: >-
             --runAllFeatureFlagTests
 
-  - name: build_metrics_tasks_gen
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "do scons setup"
-      - func: "f_expansions_write"
-      - command: subprocess.exec
-        params:
-          binary: bash
-          add_expansions_to_env: true
-          args:
-            - "src/evergreen/run_python_script.sh"
-            - "buildscripts/evergreen_gen_build_metrics_tasks.py"
-      - command: archive.targz_pack
-        params:
-          target: build_metrics_task_gen.tgz
-          source_dir: "src"
-          include:
-            - "build_metrics_task_gen.json"
-      - command: s3.put
-        params:
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: build_metrics_task_gen.tgz
-          remote_file: ${project}/${build_variant}/${revision}/build-metrics/${task_name}-${build_id}.tgz
-          bucket: mciuploads
-          permissions: public-read
-          content_type: application/gzip
-          display_name: Build Metrics Task Gen JSON
-      - command: generate.tasks
-        params:
-          files:
-            - src/build_metrics_task_gen.json
-
   - name: check_feature_flag_tags
     tags:
       [
@@ -501,36 +465,6 @@ tasks:
           args:
             - "src/evergreen/run_python_script.sh"
             - "buildscripts/iwyu/test/run_tests.py"
-
-  # Smoke test to ensure the Server still works with Jepsen
-  - <<: *run_jepsen_template
-    name: jepsen-config_fuzzer_smoke
-    tags: ["assigned_to_jira_team_server_repl", "experimental"]
-    commands:
-      - func: "do setup"
-      - func: "do jepsen setup"
-      - func: "setup jepsen config fuzzer"
-      - func: "run jepsen test"
-        vars:
-          <<: *jepsen_config_vars
-          mongod_conf: --mongod-conf mongod.conf
-          jepsen_storage_engine: --storage-engine wiredTiger
-          jepsen_test_name: read-concern-majority
-          jepsen_time_limit: --time-limit 120
-
-  # Smoke test to ensure the Server still works with Jepsen
-  - <<: *run_jepsen_template
-    name: jepsen-smoke
-    tags: ["assigned_to_jira_team_server_repl", "experimental"]
-    commands:
-      - func: "do setup"
-      - func: "do jepsen setup"
-      - func: "run jepsen test"
-        vars:
-          <<: *jepsen_config_vars
-          jepsen_storage_engine: --storage-engine wiredTiger
-          jepsen_test_name: read-concern-majority
-          jepsen_time_limit: --time-limit 120
 
   - <<: *run_jepsen_template
     name: jepsen_config_fuzzer_list-append
@@ -1122,6 +1056,17 @@ tasks:
           binary: bash
           args:
             - "src/evergreen/lint_yaml.sh"
+      - func: "configure evergreen api credentials"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/run_python_script_with_report.sh"
+            - "validate-evergreen-project-config-yaml"
+            - "buildscripts/validate_evg_project_config.py"
+            - "--evg-project-name=${project}"
+            - "--evg-auth-config=.evergreen.yml"
 
   - name: bazel_coverage
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
@@ -1214,23 +1159,6 @@ tasks:
         vars:
           <<: *powercycle_remote_credentials
         timeout_secs: 1800 # 30 minute timeout for no output
-
-  - name: powercycle_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_storage_engines",
-        "experimental",
-        "incompatible_windows",
-      ]
-    commands:
-      - func: "generate powercycle tasks"
-        vars:
-          task_names: >-
-            powercycle
-            powercycle_kill_mongod
-            powercycle_replication_smalloplog
-            powercycle_syncdelay
-          num_tasks: 1
 
   - name: powercycle_kill_mongod
     tags:

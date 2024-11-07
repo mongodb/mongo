@@ -307,3 +307,9 @@ buildscripts/antithesis/base_images/workload/tsan.suppressions
 
 # default download location for resmoke core-analyzer
 core-analyzer
+
+# interim Evergreen yml files for linting
+etc/evaluated_evergreen.yml
+etc/evaluated_evergreen_nightly.yml
+etc/evaluated_system_perf.yml
+etc/trimmed_system_perf.yml

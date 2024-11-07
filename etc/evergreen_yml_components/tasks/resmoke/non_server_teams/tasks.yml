@@ -156,13 +156,6 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_burn_in_task_template
-    name: burn_in_tasks_gen
-    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
-    patch_only: true
-    commands:
-      - func: "generate resmoke tasks"
-
-  - <<: *gen_burn_in_task_template
     name: burn_in_tests_gen
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     patch_only: true

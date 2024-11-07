@@ -356,6 +356,8 @@ tasks:
 
   - name: compile_upload_benchmarks_debug
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    # TODO(SERVER-86426): Figure out a workable long-term solution to benchmark debug symbols
+    disable: true
     depends_on:
       - name: compile_upload_benchmarks
     commands:
@@ -667,21 +669,15 @@ tasks:
           display_name: Libdeps Graph Data
 
   ## compile_all - build all scons targets ##
-  - &compile_all
-    name: compile_all
+  - name: compile_all_future_git_tag_multiversion
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
-      - name: compile_dist_test
+      - name: compile_dist_test_future_git_tag_multiversion
     commands:
       - func: "scons compile"
         vars:
           targets: install-all-meta
           compiling_for_test: true
-
-  - <<: *compile_all
-    name: compile_all_future_git_tag_multiversion
-    depends_on:
-      - name: compile_dist_test_future_git_tag_multiversion
 
   - name: compile_all_but_not_unittests
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
@@ -738,11 +734,10 @@ tasks:
           split: 4
 
   ## compile_unittests ##
-  - &compile_unittests
-    name: compile_unittests
+  - name: compile_unittests_future_git_tag_multiversion
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
-      - name: compile_dist_test
+      - name: compile_dist_test_future_git_tag_multiversion
     commands:
       - func: "scons compile"
         vars:
@@ -841,21 +836,11 @@ tasks:
           install_dir: build/install/bin
           exec_timeout_secs: 32400 # 9 hours
 
-  - <<: *compile_unittests
-    name: compile_unittests_future_git_tag_multiversion
-    depends_on:
-      - name: compile_dist_test_future_git_tag_multiversion
-
-  ## A copy of the compile_unittests task for the recorded unittest taskgroup ##
-  - <<: *compile_unittests
-    name: compile_unittests_for_recorded_unittest
-
   ## run_unittests ##
-  - &run_unittests
-    name: run_unittests
+  - name: run_unittests_future_git_tag_multiversion
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
-      - name: compile_unittests
+      - name: compile_unittests_future_git_tag_multiversion
     commands:
       - func: "f_expansions_write"
       - func: "run diskstats"
@@ -866,40 +851,6 @@ tasks:
         vars:
           suite: unittests
           install_dir: build/install/bin
-
-  - <<: *run_unittests
-    name: run_unittests_future_git_tag_multiversion
-    depends_on:
-      - name: compile_unittests_future_git_tag_multiversion
-
-  ## run_unittests with UndoDB live-record ##
-  #- name: run_unittests_with_recording
-  #  tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-  #  depends_on:
-  #  - name: compile_unittests_for_recorded_unittest
-  #  commands:
-  #    - *f_expansions_write
-  #    - func: "run diskstats"
-  #    - func: "f_expansions_write"
-  #    - func: "monitor process threads"
-  #    - func: "collect system resource info"
-  #    - command: subprocess.exec
-  #      params:
-  #        binary: bash
-  #        args:
-  #          - "./src/evergreen/undo_wiki_page.sh"
-  #    - command: attach.artifacts
-  #      params:
-  #        files:
-  #          - undo_wiki_page_location.json
-  #    - func: "run tests"
-  #      vars:
-  #        suite: unittests
-  #        record_with: --recordWith /opt/undodb5/bin/live-record
-  #        # Start fewer jobs since there's a constant amount of overhead of starting
-  #        # live-record for each job.
-  #        resmoke_jobs_factor: 0.3
-  #        install_dir: build/install/bin
 
   ##compile_and_archive_libfuzzertests - build libfuzzertests ##
   - name: compile_and_archive_libfuzzertests
