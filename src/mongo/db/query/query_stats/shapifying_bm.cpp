@@ -37,7 +37,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_bm_constants.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
@@ -51,180 +51,8 @@
 namespace mongo {
 namespace {
 
-const auto kVeryComplexPredicate = fromjson(R"({
-  "$and": [
-    { "$or": [
-        { "$and": [
-            { "$or": [
-                { "$and": [
-                    { "$or": [
-                        { "$and": [
-                            { "o.to": { "$regex": "^test\\.coll$" } },
-                            { "o.renameCollection": { "$exists": true } }
-                          ]
-                        },
-                        { "o.collMod": { "$regex": "^coll$" } },
-                        { "o.commitIndexBuild": { "$regex": "^coll$" } },
-                        { "o.create": { "$regex": "^coll$" } },
-                        { "o.createIndexes": { "$regex": "^coll$" } },
-                        { "o.drop": { "$regex": "^coll$" } },
-                        { "o.dropIndexes": { "$regex": "^coll$" } },
-                        { "o.renameCollection": { "$regex": "^test\\.coll$" } }
-                      ]
-                    },
-                    { "op": { "$eq": "c" } },
-                    { "ns": { "$regex": "^test\\.\\$cmd$" } }
-                  ]
-                },
-                { "$and": [
-                    { "ns": { "$regex": "^test\\.coll$" } },
-                    { "$nor": [
-                        { "op": { "$eq": "n" } },
-                        { "op": { "$eq": "c" } }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            { "$or": [
-                { "$and": [
-                    { "op": { "$eq": "u" } },
-                    { "o._id": { "$exists": true } }
-                  ]
-                },
-                { "$and": [
-                    { "op": { "$eq": "c" } },
-                    { "o.drop": { "$exists": true } }
-                  ]
-                },
-                { "$and": [
-                    { "op": { "$eq": "c" } },
-                    { "o.dropDatabase": { "$exists": true } }
-                  ]
-                },
-                { "$and": [
-                    { "op": { "$eq": "c" } },
-                    { "o.renameCollection": { "$exists": true } }
-                  ]
-                },
-                { "$and": [
-                    { "op": { "$eq": "u" } },
-                    { "o._id": { "$not": { "$exists": true } } }
-                  ]
-                },
-                { "op": { "$in": [ "d", "i" ] } }
-              ]
-            }
-          ]
-        },
-        { "$and": [
-            { "$or": [
-                { "$and": [
-                    { "o.to": { "$eq": "test.coll" } },
-                    { "o.renameCollection": { "$exists": true } }
-                  ]
-                },
-                { "o.drop": { "$eq": "coll" } },
-                { "o.renameCollection": { "$eq": "test.coll" } }
-              ]
-            },
-            { "ns": { "$eq": "test.$cmd" } },
-            { "op": { "$eq": "c" } }
-          ]
-        },
-        { "$and": [
-            { "$or": [
-                { "o.applyOps": {
-                    "$elemMatch": {
-                      "$and": [
-                        { "$or": [
-                            { "o.create": { "$regex": "^coll$" } },
-                            { "o.createIndexes": { "$regex": "^coll$" } }
-                          ]
-                        },
-                        { "ns": { "$regex": "^test\\.\\$cmd$" } }
-                      ]
-                    }
-                  }
-                },
-                { "o.applyOps.ns": { "$regex": "^test\\.coll$" } },
-                { "prevOpTime": { "$not": { "$eq": 0 } } }
-              ]
-            },
-            { "op": { "$eq": "c" } },
-            { "o.partialTxn": { "$not": { "$eq": true } } },
-            { "o.prepare": { "$not": { "$eq": true } } },
-            { "o.applyOps": { "$type": [ 4 ] } }
-          ]
-        },
-        { "$and": [
-            { "$or": [
-                { "o2.refineCollectionShardKey": { "$exists": true } },
-                { "o2.reshardBegin": { "$exists": true } },
-                { "o2.reshardCollection": { "$exists": true } },
-                { "o2.reshardDoneCatchUp": { "$exists": true } },
-                { "o2.shardCollection": { "$exists": true } }
-              ]
-            },
-            { "op": { "$eq": "n" } },
-            { "ns": { "$regex": "^test\\.coll$" } }
-          ]
-        },
-        { "$and": [
-            { "o.commitTransaction": { "$eq": 1 } },
-            { "op": { "$eq": "c" } }
-          ]
-        },
-        { "$and": [
-            { "op": { "$eq": "n" } },
-            { "o2.endOfTransaction": { "$regex": "^test\\.coll$" } }
-          ]
-        }
-      ]
-    },
-    { "ts": { "$gte": 1729601565 } },
-    { "fromMigrate": { "$not": { "$eq": true } } }
-  ]
-}
-)");
-
-static const auto kVeryComplexProjection = fromjson(R"({
-"reflection": { "$map": {
-  "input": [ { "f": "$field", "m": 1 }, { "f": "$zipField", "m": 100 } ],
-  "as": "input",
-  "in": { "$map": {
-    "input": { "$range": [ 1, { "$size": { "$first": "$$input.f" } } ] },
-    "as": "y",
-    "in": { "$multiply": [
-      "$$input.m",
-      { "$let": {
-        "vars": {
-          "smudges": { "$reduce": {
-            "input": "$$input.f",
-            "initialValue": 0,
-            "in": { "$add": [ "$$value",
-              { "$let": {
-                "vars": { "row": "$$this" },
-                "in": { "$reduce": {
-                  "input": { "$range": [ 0, "$$y" ] },
-                  "initialValue": 0,
-                  "in": { "$let": {
-                    "vars": {
-                      "reflect": { "$arrayElemAt": [ "$$row", { "$add": [ "$$y", { "$subtract": [ "$$y", "$$this" ] }, -1 ] } ] } },
-                      "in": { "$cond":
-                        { "if": { "$or": [ { "$not": "$$reflect" }, { "$eq": [ "$$reflect", { "$arrayElemAt": [ "$$row", "$$this" ] } ] } ] },
-                          "then": "$$value",
-                          "else": { "$add": [ "$$value", 1 ] } } } } } } } } } ] } } } },
-                          "in": { "$cond": {
-                            "if": { "$eq": ["$$smudges", 1] },
-                            "then": "$$y",
-                            "else": 0
-                          } } } } ] } } } } } }
-)");
-
 static const NamespaceStringOrUUID kDefaultTestNss =
-    NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("testDB.testColl")};
+    NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("test.coll")};
 
 static constexpr auto kCollectionType = query_shape::CollectionType::kCollection;
 
@@ -327,14 +155,30 @@ void BM_ShapfiyMildlyComplex(benchmark::State& state) {
                  state);
 }
 
+// Benchmark computing the query stats key and its hash for a complex query predicate.
+void BM_ShapifyComplex(benchmark::State& state) {
+    runBenchmark(query_benchmark_constants::kComplexPredicate,
+                 query_benchmark_constants::kComplexProjection,
+                 buildSortSpec(5),
+                 5,
+                 10,
+                 state);
+}
+
 // Benchmark computing the query stats key and its hash for a very complex query predicate
 // (inspired by change stream predicate).
 void BM_ShapifyVeryComplex(benchmark::State& state) {
-    runBenchmark(kVeryComplexPredicate, kVeryComplexProjection, buildSortSpec(10), 5, 10, state);
+    runBenchmark(query_benchmark_constants::kChangeStreamPredicate,
+                 query_benchmark_constants::kVeryComplexProjection,
+                 buildSortSpec(10),
+                 5,
+                 10,
+                 state);
 }
 
 BENCHMARK(BM_ShapfiyIDHack)->Threads(1);
 BENCHMARK(BM_ShapfiyMildlyComplex)->Threads(1);
+BENCHMARK(BM_ShapifyComplex)->Threads(1);
 BENCHMARK(BM_ShapifyVeryComplex)->Threads(1);
 
 }  // namespace

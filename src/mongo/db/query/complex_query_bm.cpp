@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/json.h"
+#include "mongo/db/query/query_bm_constants.h"
 #include "mongo/db/query/query_bm_fixture.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -34,54 +36,46 @@
 namespace mongo {
 namespace {
 
-class PointQueryBenchmark : public QueryBenchmarkFixture {
+class ComplexQueryBenchmark : public QueryBenchmarkFixture {
 private:
     BSONObj generateDocument(size_t index, size_t approximateSize) override {
-        std::string str;
-        str.reserve(approximateSize);
+        BSONArrayBuilder array2d;
         for (size_t i = 0; i < approximateSize; ++i) {
-            str.push_back(randomLowercaseAlpha());
+            BSONArrayBuilder subArray;
+            for (size_t j = 0; j <= i; ++j) {
+                subArray.append(randomInt64());
+            }
+            array2d.append(subArray.arr());
         }
-        auto uniqueField = static_cast<long long>(index);
-        auto nonUniqueField = static_cast<long long>(index / 2);
+
         return BSONObjBuilder{}
             .append("_id", OID::gen())
-            .append("uniqueField", uniqueField)
-            .append("nonUniqueField", nonUniqueField)
-            .append("arrayField", std::vector<long long>{uniqueField, nonUniqueField})
-            .append("str", str)
+            .append("index", static_cast<int64_t>(index))
+            .append("array2d", array2d.arr())
             .obj();
     }
 
     std::vector<BSONObj> getIndexSpecs() const override {
-        return {buildIndexSpec("uniqueField", true),
-                buildIndexSpec("nonUniqueField", false),
-                buildIndexSpec("arrayField", false)};
+        return {buildIndexSpec("index", true)};
     }
 };
 
-BENCHMARK_DEFINE_F(PointQueryBenchmark, IdPointQuery)
+BENCHMARK_DEFINE_F(ComplexQueryBenchmark, ComplexQueryComplexProjection)
 (benchmark::State& state) {
-    auto id = docs()[docs().size() / 2].getField("_id").OID();
-    runBenchmark(BSON("_id" << id), BSONObj{} /*projection*/, state);
+    runBenchmark(query_benchmark_constants::kComplexPredicate,
+                 query_benchmark_constants::kComplexProjection,
+                 state);
 }
 
-BENCHMARK_DEFINE_F(PointQueryBenchmark, UniqueFieldPointQuery)
+BENCHMARK_DEFINE_F(ComplexQueryBenchmark, SimpleQueryComplexProjection)
 (benchmark::State& state) {
     int64_t fieldValue = docs().size() / 2;
-    runBenchmark(BSON("uniqueField" << fieldValue), BSONObj{} /*projection*/, state);
+    runBenchmark(BSON("index" << fieldValue), query_benchmark_constants::kComplexProjection, state);
 }
 
-BENCHMARK_DEFINE_F(PointQueryBenchmark, NonUniqueFieldPointQuery)
+BENCHMARK_DEFINE_F(ComplexQueryBenchmark, SimpleQueryComplexProjectionNoDocuments)
 (benchmark::State& state) {
-    int64_t fieldValue = docs().size() / 3;
-    runBenchmark(BSON("nonUniqueField" << fieldValue), BSONObj{} /*projection*/, state);
-}
-
-BENCHMARK_DEFINE_F(PointQueryBenchmark, ArrayFieldPointQuery)
-(benchmark::State& state) {
-    int64_t fieldValue = docs().size() / 3;
-    runBenchmark(BSON("arrayField" << fieldValue), BSONObj{} /*projection*/, state);
+    runBenchmark(BSON("index" << -1), query_benchmark_constants::kComplexProjection, state);
 }
 
 /**
@@ -99,9 +93,11 @@ static void configureBenchmarks(benchmark::internal::Benchmark* bm) {
     bm->ThreadRange(1, kMaxThreads)->Args({10, 1024});
 }
 
-BENCHMARK_REGISTER_F(PointQueryBenchmark, IdPointQuery)->Apply(configureBenchmarks);
-BENCHMARK_REGISTER_F(PointQueryBenchmark, UniqueFieldPointQuery)->Apply(configureBenchmarks);
-BENCHMARK_REGISTER_F(PointQueryBenchmark, NonUniqueFieldPointQuery)->Apply(configureBenchmarks);
-BENCHMARK_REGISTER_F(PointQueryBenchmark, ArrayFieldPointQuery)->Apply(configureBenchmarks);
+BENCHMARK_REGISTER_F(ComplexQueryBenchmark, ComplexQueryComplexProjection)
+    ->Apply(configureBenchmarks);
+BENCHMARK_REGISTER_F(ComplexQueryBenchmark, SimpleQueryComplexProjection)
+    ->Apply(configureBenchmarks);
+BENCHMARK_REGISTER_F(ComplexQueryBenchmark, SimpleQueryComplexProjectionNoDocuments)
+    ->Apply(configureBenchmarks);
 }  // namespace
 }  // namespace mongo

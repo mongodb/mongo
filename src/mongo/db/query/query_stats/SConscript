@@ -57,6 +57,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/auth/auth",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "$BUILD_DIR/mongo/db/query/canonical_query",
+        "$BUILD_DIR/mongo/db/query/query_bm_constants",
         "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/server_base",

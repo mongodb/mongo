@@ -251,17 +251,42 @@ env.Benchmark(
     CONSOLIDATED_TARGET="query_bm",
 )
 
-env.Benchmark(
-    target="point_query_bm",
-    source=[
-        "point_query_bm.cpp",
-    ],
+env.Library(
+    target="query_bm_constants",
+    source=["query_bm_constants.cpp"],
+    LIBDEPS_PRIVATE=["$BUILD_DIR/mongo/base"],
+)
+
+bmEnv = env.Clone()
+bmEnv.InjectThirdParty(libraries=["benchmark"])
+
+bmEnv.Library(
+    target="query_bm_fixture",
+    source=["query_bm_fixture.cpp"],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/read_write_concern_defaults_mock",
         "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
         "$BUILD_DIR/mongo/db/service_context_d",
+        "$BUILD_DIR/third_party/benchmark/benchmark",
     ],
+)
+
+env.Benchmark(
+    target="point_query_bm",
+    source=[
+        "point_query_bm.cpp",
+    ],
+    LIBDEPS=["query_bm_fixture"],
+    CONSOLIDATED_TARGET="query_bm",
+)
+
+env.Benchmark(
+    target="complex_query_bm",
+    source=[
+        "complex_query_bm.cpp",
+    ],
+    LIBDEPS=["query_bm_constants", "query_bm_fixture"],
     CONSOLIDATED_TARGET="query_bm",
 )
