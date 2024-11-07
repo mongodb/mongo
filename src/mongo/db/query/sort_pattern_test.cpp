@@ -36,11 +36,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -123,6 +125,64 @@ TEST(SortStageDefaultTest, WrongSortKeyDefinition) {
     sortKeys.push_back(SortPattern::SortPatternPart{false, FieldPath("b")});
     sortKeys.push_back(SortPattern::SortPatternPart{true, FieldPath("a")});
     ASSERT_THROWS_CODE(SortPattern(std::move(sortKeys)), AssertionException, 7472501);
+}
+
+// Testing expected behavior of 'isSortOnSingleMetaField()' stateless function.
+TEST(IsSortOnSingleMetaFieldTest, TestingIsSortOnSingleMetaFieldFn) {
+    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
+        "featureFlagSearchHybridScoringPrerequisites", true);
+
+    auto expCtx = getExpCtx();
+
+    // SortPattern must have a field.
+    ASSERT_FALSE(isSortOnSingleMetaField(SortPattern(fromjson("{}"), expCtx)));
+
+    // SortPattern must have one field, but it must be a metadata field.
+    ASSERT_FALSE(isSortOnSingleMetaField(SortPattern(fromjson("{a: 1}"), expCtx)));
+
+    // SortPattern cannot have multiple fields.
+    ASSERT_FALSE(isSortOnSingleMetaField(SortPattern(fromjson("{a: 1, b: 1}"), expCtx)));
+
+    // SortPattern on a single metadata field, without QueryMetadataBitSet specified should pass for
+    // any valid metadata.
+    ASSERT_TRUE(isSortOnSingleMetaField(
+        SortPattern(fromjson("{score: {$meta: 'vectorSearchScore'}}"), expCtx)));
+
+    // SortPattern on invalid metadata type should throw.
+    ASSERT_THROWS_CODE(isSortOnSingleMetaField(
+                           SortPattern(fromjson("{score: {$meta: 'notRealMetadata'}}"), expCtx)),
+                       DBException,
+                       31138);
+
+    // SortPattern on valid metadata, but with multiple fields should be false.
+    ASSERT_FALSE(isSortOnSingleMetaField(
+        SortPattern(fromjson("{score: {$meta: 'vectorSearchScore'}, a: 1}"), expCtx)));
+
+    // Explicitly specifying the metadata to consider, matching the metadata in the SortPattern
+    // should pass.
+    ASSERT_TRUE(isSortOnSingleMetaField(
+        SortPattern(fromjson("{score: {$meta: 'vectorSearchScore'}}"), expCtx),
+        (1 << DocumentMetadataFields::MetaType::kVectorSearchScore)));
+
+    // Explicitly specifying the metadata to consider, that does not match the metadata in the
+    // SortPattern should fail.
+    ASSERT_FALSE(
+        isSortOnSingleMetaField(SortPattern(fromjson("{score: {$meta: 'searchScore'}}"), expCtx),
+                                (1 << DocumentMetadataFields::MetaType::kVectorSearchScore)));
+
+    // Explicitly specifying multiple metadata to consider, one of them matching the meatada in the
+    // SortPattern should pass.
+    ASSERT_TRUE(isSortOnSingleMetaField(
+        SortPattern(fromjson("{score: {$meta: 'vectorSearchScore'}}"), expCtx),
+        ((1 << DocumentMetadataFields::MetaType::kSearchScore) |
+         (1 << DocumentMetadataFields::MetaType::kVectorSearchScore))));
+
+    // Explicitly specifying multiple metadata to consider, neither of them matching the meatada in
+    // the SortPattern should fail.
+    ASSERT_FALSE(isSortOnSingleMetaField(
+        SortPattern(fromjson("{score: {$meta: 'vectorSearchScore'}}"), expCtx),
+        ((1 << DocumentMetadataFields::MetaType::kSearchScore) |
+         (1 << DocumentMetadataFields::MetaType::kScore))));
 }
 
 }  // namespace

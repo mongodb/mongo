@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/search/vector_search_helper.h"
@@ -260,8 +261,44 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
     return desugaredPipeline;
 }
 
+std::pair<Pipeline::SourceContainer::iterator, bool>
+DocumentSourceVectorSearch::_attemptSortAfterVectorSearchOptimization(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    auto isSortOnVectorSearchMeta = [](const SortPattern& sortPattern) -> bool {
+        return isSortOnSingleMetaField(sortPattern,
+                                       (1 << DocumentMetadataFields::MetaType::kVectorSearchScore));
+    };
+    auto optItr = std::next(itr);
+    if (optItr != container->end()) {
+        if (auto sortStage = dynamic_cast<DocumentSourceSort*>(optItr->get())) {
+            // A $sort stage has been found directly after this stage.
+            // $vectorSearch results are always sorted by 'vectorSearchScore',
+            // so if the $sort stage is also sorted by 'vectorSearchScore', the $sort stage
+            // is redundant and can safely be removed.
+            if (isSortOnVectorSearchMeta(sortStage->getSortKeyPattern())) {
+                // Optimization successful.
+                container->remove(*optItr);
+                return {itr, true};  // Return the same pointer in case there are other
+                                     // optimizations to still be applied.
+            }
+        }
+    }
+
+    // Optimization not possible.
+    return {itr, false};
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceVectorSearch::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    // Attempt to remove a $sort on metadata after this $vectorSearch stage.
+    {
+        const auto&& [returnItr, optimizationSucceeded] =
+            _attemptSortAfterVectorSearchOptimization(itr, container);
+        if (optimizationSucceeded) {
+            return returnItr;
+        }
+    }
+
     auto stageItr = std::next(itr);
     // Only attempt to get the limit from the query if there are further stages in the pipeline.
     if (stageItr != container->end()) {

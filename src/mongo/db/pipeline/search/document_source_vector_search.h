@@ -121,6 +121,23 @@ private:
     // Initialize metrics related to the $vectorSearch stage on the OpDebug object.
     void initializeOpDebugVectorSearchMetrics();
 
+    /**
+     * Attempts a pipeline optimization that removes a $sort stage that comes after the output of
+     * of mongot, if the resulting documents from mongot are sorted by the same criteria as the
+     * $sort ('vectorSearchScore').
+     *
+     * Also, this optimization only applies to cases where the $sort comes directly after this
+     * stage.
+     * TODO SERVER-96068 generalize this optimization to cases where any number of stages that
+     * preserve sort order come between this stage and the sort.
+     *
+     * Returns a pair of the iterator to return to the optimizer, and a bool of whether or not the
+     * optimization was successful. If optimization was successful, the container will be modified
+     * appropriately.
+     */
+    std::pair<Pipeline::SourceContainer::iterator, bool> _attemptSortAfterVectorSearchOptimization(
+        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+
     std::unique_ptr<MatchExpression> _filterExpr;
 
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;

@@ -172,4 +172,17 @@ private:
     // The set of paths on which we're sorting.
     OrderedPathSet _paths;
 };
+
+/**
+ * Returns true if 'sortPattern' represents a sort pattern on a single metadata field like:
+ * {score: {$meta: "searchScore"}}.
+ *
+ * Sort clause must only be on a single field, i.e. {score: {$meta: "searchScore"}, _id: 1} will
+ * return false.
+ *
+ * The 'metadataToConsider' field represents a bitset of all possible metadata fields to consider
+ * the sort is on. If the bitset is empty, any metadata will be considered.
+ */
+bool isSortOnSingleMetaField(const SortPattern& sortPattern,
+                             QueryMetadataBitSet metadataToConsider = QueryMetadataBitSet{});
 }  // namespace mongo

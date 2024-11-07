@@ -1214,3 +1214,20 @@ export function canonicalizePlan(p) {
         });
     }
 }
+
+/**
+ * Returns index of stage in a aggregation pipeline stage plan running on a single node
+ * (will not work for sharded clusters).
+ * 'root' is root of explain JSON.
+ * Returns -1 if stage does not exist.
+ */
+export function getIndexOfStageOnSingleNode(root, stageName) {
+    if (root.hasOwnProperty("stages")) {
+        for (let i = 0; i < root.stages.length; i++) {
+            if (root.stages[i].hasOwnProperty(stageName)) {
+                return i;
+            }
+        }
+    }
+    return -1;
+}

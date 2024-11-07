@@ -198,4 +198,31 @@ bool SortPattern::isExtensionOf(const SortPattern& other) const {
     }
     return true;
 }
+
+bool isSortOnSingleMetaField(const SortPattern& sortPattern,
+                             QueryMetadataBitSet metadataToConsider) {
+    // Exactly 1 expression in the sort pattern is needed.
+    if (sortPattern.begin() == sortPattern.end() ||
+        std::next(sortPattern.begin()) != sortPattern.end()) {
+        // 0 parts, or more than 1 part.
+        return false;
+    }
+    const auto& firstAndOnlyPart = *sortPattern.begin();
+    if (auto* expr = firstAndOnlyPart.expression.get()) {
+        if (auto metaExpr = dynamic_cast<ExpressionMeta*>(expr)) {
+            if (metadataToConsider.none()) {
+                // Any metadata field.
+                return true;
+            }
+            for (std::size_t i = 1; i < DocumentMetadataFields::kNumFields; ++i) {
+                if (metadataToConsider[i] &&
+                    metaExpr->getMetaType() == static_cast<DocumentMetadataFields::MetaType>(i)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+    return false;
+}
 }  // namespace mongo
