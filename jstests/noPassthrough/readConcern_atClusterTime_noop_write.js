@@ -47,32 +47,23 @@ collectionMap[st.shard1.shardName] = {
 };
 
 // Create an unsharded collection per shard.
-function createCollectionOnShard(shard) {
-    var dbName = collectionMap[shard.shardName].dbName;
-    var collName = collectionMap[shard.shardName].collName;
+const createCollectionOnShard = shard => {
+    const dbName = collectionMap[shard.shardName].dbName;
+    const collName = collectionMap[shard.shardName].collName;
+    const fullName = toNs(dbName, collName);
 
     assert.commandWorked(
         st.s.getDB(dbName).adminCommand({enableSharding: dbName, primaryShard: shard.shardName}));
     assert.commandWorked(st.s.getDB(dbName).createCollection(collName));
-}
+
+    // We refresh the metadata forcefully. This is to prevent the clock of any shard from being
+    // ticked by an ongoing refresh while executing the test.
+    assert.commandWorked(
+        shard.rs.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: fullName}));
+};
 
 createCollectionOnShard(st.shard0);
 createCollectionOnShard(st.shard1);
-
-// we wait for the refresh spawned by shardCollection to complete. This is to prevent the clock of
-// any shard from being ticked by an ongoing refresh while executing the test.
-for (let conn of [st.rs0.getPrimary(), st.rs1.getPrimary()]) {
-    let curOps = [];
-    assert.soon(() => {
-        curOps = conn.getDB("admin")
-                     .aggregate([
-                         {$currentOp: {allUsers: true}},
-                         {$match: {"command._flushRoutingTableCacheUpdates": {$exists: true}}}
-                     ])
-                     .toArray();
-        return curOps.length == 0;
-    }, "Timed out waiting for create refreshes to finish, found: " + tojson(curOps));
-}
 
 let testNoopWrite = (sourceShardName, destinationShardName) => {
     var fromDbName = collectionMap[sourceShardName].dbName;
