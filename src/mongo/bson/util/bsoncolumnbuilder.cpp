@@ -1256,20 +1256,28 @@ std::pair<int, int> BSONColumnBuilder<Allocator>::BinaryReopen::_appendUntilOver
         bool rle = (ConstDataView(block).read<LittleEndian<uint64_t>>() &
                     simple8b_internal::kBaseSelectorMask) == simple8b_internal::kRleSelector;
         if (rle) {
-            // RLE detected, we need to continue to detect overflow. Depending on if the last value
-            // before the RLE block matches or current last we overflowed in this RLE block or in
-            // the first non-RLE block prior.
-            auto [lastForRLE, rleIndexOverflow] =
-                _appendUntilOverflowForRLE(mainBuilder, overflow, s8bBlock, index - 1);
-            if (lastForRLE == lastValForRLE) {
-                // Last value prior to RLE matches our RLE state after RLE. We then overflow in the
-                // block prior to RLE.
-                return std::pair(rleIndexOverflow, -1);
-            } else if (rleIndexOverflow == -1) {
-                // We exhausted this control block without determining where the overflow point is.
-                // Return pending RLE index so we can continue this operation in the prior control
-                // block.
-                return std::pair(-1, index);
+            // RLE detected, we need to continue to detect overflow if the overflow detector is in a
+            // state where RLE is possible. Depending on if the last value before the RLE block
+            // matches or current last we overflowed in this RLE block or in the first non-RLE block
+            // prior.
+            if (overflowDetector.rlePossible()) {
+                auto [lastForRLE, rleIndexOverflow] =
+                    _appendUntilOverflowForRLE(mainBuilder, overflow, s8bBlock, index - 1);
+                if (lastForRLE == lastValForRLE) {
+                    // Last value prior to RLE matches our RLE state after RLE. We then overflow in
+                    // the block prior to RLE.
+                    return std::pair(rleIndexOverflow, -1);
+                } else if (rleIndexOverflow == -1) {
+                    // We exhausted this control block without determining where the overflow point
+                    // is. Return pending RLE index so we can continue this operation in the prior
+                    // control block.
+                    return std::pair(-1, index);
+                }
+            } else {
+                // Got RLE block when we're not in a state to do RLE, then we're guaranteed to
+                // overflow in that RLE. No need to actually append the data, just set the overflow
+                // flag and return.
+                overflow = true;
             }
 
             // Overflow inside the RLE block, we're done.

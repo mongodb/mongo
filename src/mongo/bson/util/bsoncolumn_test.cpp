@@ -4443,6 +4443,61 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreDifferent128
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, RLEFirstInControlWithNonRLEAfterWithoutOverflow) {
+    // This test has a control block beginning with RLE and non-RLE data after the RLE that doesn't
+    // overflow by itself. Test that we properly detect the overflow to be inside the RLE block.
+    std::vector<BSONElement> elems = {createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFF),
+                                      createElementInt64(64),
+                                      createElementInt64(128)};
+
+    for (size_t i = 0; i < 190; ++i) {
+        elems.push_back(BSONElement());
+    }
+
+    elems.push_back(createElementInt64(128));
+
+    int i = 0;
+    for (auto&& elem : elems) {
+        cb.append(elem);
+        ++i;
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks64(
+        expected,
+        deltaInt64(elems.begin() + 1, elems.begin() + elems.size() - 131, elems.front()),
+        16);
+    appendSimple8bControl(expected, 0b1000, 0b0010);
+    appendSimple8bRLE(expected, 120);
+    appendSimple8bBlocks64(
+        expected,
+        deltaInt64(elems.begin() + elems.size() - 11, elems.begin() + elems.size(), elems[17]),
+        2);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems);
+}
+
+
 TEST_F(BSONColumnTest, RLELargeValueExtendedSelector) {
     // This test creates an RLE block containing large values that do not fit in the base selector.
     // Ensure the correct selector states are set for binary reopen of this binary.
