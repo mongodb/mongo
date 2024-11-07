@@ -57,7 +57,8 @@ function sendReads({rst, db, cmd, burstCount, initialStatsOnPrimary}) {
 
 /* Wait for all reads to resolve on primary, and check various other metrics related to the
    primary. */
-function waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, readsExpectedToFail) {
+function waitForReadsToResolveOnPrimary(
+    rst, initialStatsOnPrimary, minRateResolved, readsExpectedToFail) {
     let primary = rst.getPrimary();
     let sent, succeeded, erroredDuringSend;
     // Wait for stats to reflect that all the sent reads have been resolved.
@@ -85,7 +86,7 @@ function waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, readsExpecte
                       seen: seen
                   }));
         // Verify that the reads mirrored to the secondaries have been resolved by the primary.
-        return ((pending == 0) && (sent === resolved));
+        return ((pending == 0) && (sent === resolved) && (minRateResolved * seen <= resolved));
     }, "Did not resolve all requests within time limit", 20000);
 
     if (!readsExpectedToFail) {
@@ -152,7 +153,7 @@ function sendAndCheckReadsSucceedWithRate({rst, db, cmd, minRate, maxRate, burst
 
     sendReads({rst, db, cmd, burstCount, initialStatsOnPrimary});
 
-    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, false);
+    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, minRate, false);
 
     // Stats should be stable now that all of the reads have resolved.
     let currentStatsOnPrimary = getMirroredReadsStats(primary);
@@ -180,7 +181,7 @@ function sendAndCheckReadsFailBeforeProcessing(
 
     sendReads({rst, db, cmd, burstCount, initialStatsOnPrimary});
 
-    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, true);
+    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, 1, true);
 
     // Stats should be stable now that all of the reads have resolved.
     let currentStatsOnPrimary = getMirroredReadsStats(primary);
