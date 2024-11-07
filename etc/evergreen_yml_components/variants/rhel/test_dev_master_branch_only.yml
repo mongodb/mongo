@@ -183,6 +183,8 @@ variables:
       - name: vector_search_ssl
       - name: selinux_rhel8_enterprise
       - name: generate_buildid_to_debug_symbols_mapping
+      - name: product_limits
+        cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
 
 buildvariants:
   - <<: *generic_linux_compile_params
@@ -331,6 +333,8 @@ buildvariants:
       # TODO(SERVER-90936): Remove this once streams_kafka* tests can work with the "default" tag.
       - name: streams_kafka
       - name: streams_kafka_gwproxy
+      - name: product_limits
+        cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
 
   # This build variant is used to test suites that use sharded cluster fixture with embedded router mode.
   # Also supports ProgramRunner/ShardingTest driven suites that look for an embedded router flag in TestData.

@@ -1850,3 +1850,16 @@ tasks:
       - func: "run tests"
         vars:
           resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: product_limits
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "development_critical_single_variant",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
