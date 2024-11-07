@@ -50,6 +50,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/persistent_task_store.h"
@@ -137,6 +138,31 @@ public:
                             boost::none /* clusterTime */);
     }
 
+    DonorShardFetchTimestamp makeDonorShardFetchTimestamp(ShardId shardId,
+                                                          Timestamp fetchTimestamp) {
+        DonorShardFetchTimestamp donorFetchTimestamp(shardId);
+        donorFetchTimestamp.setMinFetchTimestamp(fetchTimestamp);
+        return donorFetchTimestamp;
+    }
+
+    ReshardingRecipientDocument makeRecipientStateDocument(
+        std::vector<DonorShardFetchTimestamp> donorShardTimestamps, Timestamp cloneTimestamp) {
+        RecipientShardContext recipientCtx;
+        recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
+
+        ReshardingRecipientDocument doc(std::move(recipientCtx),
+                                        donorShardTimestamps,
+                                        durationCount<Milliseconds>(Milliseconds{5}));
+
+        auto commonMetadata = CommonReshardingMetadata(
+            UUID::gen(), sourceNss(), sourceUUID(), outputNss(), {BSON(_currentShardKey << 1)});
+        commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
+
+        doc.setCommonReshardingMetadata(std::move(commonMetadata));
+        doc.setCloneTimestamp(cloneTimestamp);
+        return doc;
+    }
+
     const NamespaceString& sourceNss() {
         return _sourceNss;
     }
@@ -145,7 +171,89 @@ public:
         return _sourceUUID;
     }
 
+    const NamespaceString& outputNss() {
+        return _outputNss;
+    }
+
+protected:
+    /**
+     * Tests that making ReshardingOplogReplication creates the oplog fetcher progress collection
+     * if 'storeOplogFetcherProgress' is set to true, and does not do so otherwise.
+     */
+    void testCreateOplogFetcherProgressCollection(bool storeOplogFetcherProgress) {
+        CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+        auto sourceChunkMgr = makeChunkManagerForSourceCollection(collator.clone());
+
+        auto cloneTimestamp = Timestamp(5, 0);
+        ShardId shardId0{"shard0"};
+        auto minFetchTimestamp0 = Timestamp{10, 0};
+        auto myShardId = shardId0;
+        ShardId shardId1{"shard1"};
+        auto minFetchTimestamp1 = Timestamp{12, 0};
+
+        std::vector<DonorShardFetchTimestamp> donorFetchTimestamps = {
+            makeDonorShardFetchTimestamp(shardId0, minFetchTimestamp0),
+            makeDonorShardFetchTimestamp(shardId1, minFetchTimestamp1)};
+        auto recipientDoc = makeRecipientStateDocument(donorFetchTimestamps, cloneTimestamp);
+
+        auto reshardingMetrics =
+            ReshardingMetrics::initializeFrom(recipientDoc, getServiceContext());
+
+        ReshardingApplierMetricsMap applierMetricsMap;
+        for (const auto& donor : donorFetchTimestamps) {
+            applierMetricsMap.emplace(donor.getShardId(),
+                                      std::make_unique<ReshardingOplogApplierMetrics>(
+                                          reshardingMetrics.get(), boost::none));
+        }
+
+        auto opCtx = makeOperationContext();
+        create(opCtx.get(), outputNss());
+        auto dataReplication =
+            ReshardingDataReplication::make(opCtx.get(),
+                                            reshardingMetrics.get(),
+                                            &applierMetricsMap,
+                                            1 /* oplogBatchTaskCount */,
+                                            recipientDoc.getCommonReshardingMetadata(),
+                                            recipientDoc.getDonorShards(),
+                                            *recipientDoc.getCloneTimestamp(),
+                                            true /* cloningDone */,
+                                            myShardId,
+                                            sourceChunkMgr,
+                                            storeOplogFetcherProgress,
+                                            false /* relaxed */);
+
+        AutoGetCollection oplopFetcherProgressColl(
+            opCtx.get(), NamespaceString::kReshardingFetcherProgressNamespace, MODE_IS);
+        if (storeOplogFetcherProgress) {
+            // The progress collection should have been created but it should not have any
+            // documents.
+            ASSERT(oplopFetcherProgressColl);
+            ASSERT(oplopFetcherProgressColl->isEmpty(opCtx.get()));
+        } else {
+            ASSERT(!oplopFetcherProgressColl);
+        }
+    }
+
 private:
+    void create(OperationContext* opCtx, NamespaceString nss) {
+        writeConflictRetry(opCtx, "create", nss, [&] {
+            AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+                shard_role_details::getLocker(opCtx));
+            AutoGetDb autoDb(opCtx, nss.dbName(), LockMode::MODE_X);
+            WriteUnitOfWork wunit(opCtx);
+            if (shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull()) {
+                ASSERT_OK(
+                    shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(Timestamp(1, 1)));
+            }
+
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(opCtx);
+            auto db = autoDb.ensureDbExists(opCtx);
+            ASSERT(db->createCollection(opCtx, nss)) << nss.toStringForErrorMsg();
+            wunit.commit();
+        });
+    }
+
     RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
         const auto version = rt.getVersion();
         return RoutingTableHistoryValueHandle(
@@ -153,11 +261,15 @@ private:
             ComparableChunkVersion::makeComparableChunkVersion(version));
     }
 
-    const StringData _currentShardKey = "sk";
+    const StringData _currentShardKey = "currentShardKey";
+    const StringData _newShardKey = "newShardKey";
 
     const NamespaceString _sourceNss =
-        NamespaceString::createNamespaceString_forTest("test_crud", "collection_being_resharded");
+        NamespaceString::createNamespaceString_forTest("testDb", "testColl");
     const UUID _sourceUUID = UUID::gen();
+
+    const NamespaceString _outputNss =
+        resharding::constructTemporaryReshardingNss(sourceNss(), sourceUUID());
 
     const ShardId _myDonorId{"myDonorId"};
 };
@@ -328,6 +440,14 @@ TEST_F(ReshardingDataReplicationTest, GetOplogApplierResumeId) {
         ReshardingDataReplication::getOplogApplierResumeId(opCtx.get(), sourceId, minFetchTimestamp)
             .toBSON(),
         expectedOplogId.toBSON());
+}
+
+TEST_F(ReshardingDataReplicationTest, CreateProgressCollection) {
+    testCreateOplogFetcherProgressCollection(true /* storeOplogFetcherProgress */);
+}
+
+TEST_F(ReshardingDataReplicationTest, NotCreateProgressCollection) {
+    testCreateOplogFetcherProgressCollection(false /* storeOplogFetcherProgress */);
 }
 
 }  // namespace

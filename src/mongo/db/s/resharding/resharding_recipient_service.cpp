@@ -78,6 +78,7 @@
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
+#include "mongo/db/s/resharding/resharding_oplog_fetcher_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -304,6 +305,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
       _oplogBatchTaskCount{recipientDoc.getOplogBatchTaskCount()},
       _skipCloningAndApplying{recipientDoc.getSkipCloningAndApplying().value_or(false)},
+      _storeOplogFetcherProgress{recipientDoc.getStoreOplogFetcherProgress().value_or(false)},
       _relaxed{recipientDoc.getRelaxed()},
       _recipientCtx{recipientDoc.getMutableState()},
       _donorShards{recipientDoc.getDonorShards()},
@@ -872,6 +874,7 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
                                    cloningDone,
                                    std::move(myShardId),
                                    std::move(sourceChunkMgr),
+                                   _storeOplogFetcherProgress,
                                    relaxed);
 }
 
@@ -1563,7 +1566,30 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
         auto setOrAdd = [](auto& opt, auto add) {
             opt = opt.value_or(0) + add;
         };
-        {
+
+        auto sourceIdBson =
+            (ReshardingSourceId{_metadata.getReshardingUUID(), donor.getShardId()}).toBSON();
+
+        if (_storeOplogFetcherProgress) {
+            AutoGetCollection fetcherProgressColl(
+                opCtx.get(), NamespaceString::kReshardingFetcherProgressNamespace, MODE_IS);
+            if (fetcherProgressColl) {
+                BSONObj result;
+                Helpers::findOne(
+                    opCtx.get(),
+                    fetcherProgressColl.getCollection(),
+                    BSON(ReshardingOplogFetcherProgress::kOplogSourceIdFieldName << sourceIdBson),
+                    result);
+
+                if (!result.isEmpty()) {
+                    auto fetcherProgressDoc = ReshardingOplogFetcherProgress::parse(
+                        IDLParserContext("resharding-recipient-service-fetcher-progress-doc"),
+                        result);
+                    setOrAdd(externalMetrics.oplogEntriesFetched,
+                             fetcherProgressDoc.getNumEntriesFetched());
+                }
+            }
+        } else {
             AutoGetCollection oplogBufferColl(opCtx.get(),
                                               resharding::getLocalOplogBufferNamespace(
                                                   _metadata.getSourceUUID(), donor.getShardId()),
@@ -1574,27 +1600,30 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
             }
         }
 
-        boost::optional<ReshardingOplogApplierProgress> progressDoc;
-        AutoGetCollection progressApplierColl(
-            opCtx.get(), NamespaceString::kReshardingApplierProgressNamespace, MODE_IS);
-        if (progressApplierColl) {
-            BSONObj result;
-            Helpers::findOne(
-                opCtx.get(),
-                progressApplierColl.getCollection(),
-                BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName
-                     << (ReshardingSourceId{_metadata.getReshardingUUID(), donor.getShardId()})
-                            .toBSON()),
-                result);
+        {
+            boost::optional<ReshardingOplogApplierProgress> applierProgressDoc;
 
-            if (!result.isEmpty()) {
-                progressDoc = ReshardingOplogApplierProgress::parse(
-                    IDLParserContext("resharding-recipient-service-progress-doc"), result);
-                setOrAdd(externalMetrics.oplogEntriesApplied, progressDoc->getNumEntriesApplied());
+            AutoGetCollection applierProgressColl(
+                opCtx.get(), NamespaceString::kReshardingApplierProgressNamespace, MODE_IS);
+            if (applierProgressColl) {
+                BSONObj result;
+                Helpers::findOne(
+                    opCtx.get(),
+                    applierProgressColl.getCollection(),
+                    BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceIdBson),
+                    result);
+
+                if (!result.isEmpty()) {
+                    applierProgressDoc = ReshardingOplogApplierProgress::parse(
+                        IDLParserContext("resharding-recipient-service-applier-progress-doc"),
+                        result);
+                    setOrAdd(externalMetrics.oplogEntriesApplied,
+                             applierProgressDoc->getNumEntriesApplied());
+                }
             }
-        }
 
-        progressDocList.emplace_back(donor.getShardId(), progressDoc);
+            progressDocList.emplace_back(donor.getShardId(), applierProgressDoc);
+        }
     }
 
     // Restore stats here where interrupts will never occur, this is to ensure we will only update

@@ -165,6 +165,7 @@ public:
         bool cloningDone,
         ShardId myShardId,
         ChunkManager sourceChunkMgr,
+        bool storeOplogFetcherProgress,
         bool relaxed);
 
     // The TrustedInitTag being a private class makes this constructor effectively private. However,
@@ -230,7 +231,8 @@ private:
         ReshardingMetrics* metrics,
         const CommonReshardingMetadata& metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
-        const ShardId& myShardId);
+        const ShardId& myShardId,
+        bool storeProgress);
 
     static std::shared_ptr<executor::TaskExecutor> _makeOplogFetcherExecutor(size_t numDonors);
 

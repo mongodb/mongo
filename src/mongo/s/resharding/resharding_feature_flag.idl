@@ -74,3 +74,10 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
         default: false
         shouldBeFCVGated: true
+    featureFlagReshardingStoreOplogFetcherProgress:
+        description: "Feature flag to make recipient shards store the count of oplog entries fetched
+                      in a progress document and use this count instead of the fast count to recover
+                      metrics upon recovery."
+        cpp_varname: gFeatureFlagReshardingStoreOplogFetcherProgress
+        default: false
+        shouldBeFCVGated: true

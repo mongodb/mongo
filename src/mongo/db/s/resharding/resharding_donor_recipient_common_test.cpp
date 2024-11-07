@@ -442,8 +442,10 @@ public:
     void testProcessRecipientFields(const ShardId& shardThatChunkExistsOn,
                                     const ShardId& primaryShard,
                                     bool expectRecipientStateMachine,
-                                    boost::optional<bool> expectSkipCloningAndApplying) {
+                                    boost::optional<bool> expectSkipCloningAndApplying,
+                                    boost::optional<bool> expectStoreOplogFetcherProgress) {
         ASSERT(!expectRecipientStateMachine || expectSkipCloningAndApplying.has_value());
+        ASSERT(!expectRecipientStateMachine || expectStoreOplogFetcherProgress.has_value());
         OperationContext* opCtx = operationContext();
 
         auto originalCollMetadata =
@@ -487,8 +489,9 @@ public:
             bool noChunksToCopy = shardThatChunkExistsOn != kThisShard.getShardId();
             while (true) {
                 auto recipientDoc = getPersistedRecipientDocument(opCtx, kReshardingUUID);
-                ASSERT_EQ(recipientDoc.getSkipCloningAndApplying(),
-                          expectSkipCloningAndApplying.value_or(false));
+                ASSERT_EQ(recipientDoc.getSkipCloningAndApplying(), *expectSkipCloningAndApplying);
+                ASSERT_EQ(recipientDoc.getStoreOplogFetcherProgress(),
+                          *expectStoreOplogFetcherProgress);
                 if (!recipientDoc.getCloneTimestamp()) {
                     opCtx->sleepFor(Milliseconds{10});
                     continue;
@@ -703,31 +706,64 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
+       ProcessRecipientFieldsWhenShardOwnsChunks_StoreOplogFetcherProgress) {
+    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
+        "featureFlagReshardingSkipCloningAndApplyingIfApplicable", true);
+    RAIIServerParameterControllerForTest storeOplogFetcherProgressFeatureFlagController(
+        "featureFlagReshardingStoreOplogFetcherProgress", true);
+    testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
+                               kThisShard.getShardId() /* primaryShard */,
+                               true /* expectRecipientStateMachine */,
+                               false /* expectSkipCloningAndApplying */,
+                               true /* expectStoreOplogFetcherProgress */);
+}
+
+TEST_F(ReshardingDonorRecipientCommonTest,
+       ProcessRecipientFieldsWhenShardOwnsChunks_NotStoreOplogFetcherProgress) {
+    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
+        "featureFlagReshardingSkipCloningAndApplyingIfApplicable", true);
+    RAIIServerParameterControllerForTest storeOplogFetcherProgressFeatureFlagController(
+        "featureFlagReshardingStoreOplogFetcherProgress", false);
+    testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
+                               kThisShard.getShardId() /* primaryShard */,
+                               true /* expectRecipientStateMachine */,
+                               false /* expectSkipCloningAndApplying */,
+                               false /* expectStoreOplogFetcherProgress */);
+}
+
+TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_NotPrimaryShard) {
     testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
                                kOtherShard.getShardId() /* primaryShard */,
                                false /* expectRecipientStateMachine */,
-                               boost::none);
+                               boost::none /* expectSkipCloningAndApplying */,
+                               boost::none /* expectStoreOplogFetcherProgress */);
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipIfApplicable) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", true);
+    RAIIServerParameterControllerForTest storeOplogFetcherProgressFeatureFlagController(
+        "featureFlagReshardingStoreOplogFetcherProgress", true);
     testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
                                kThisShard.getShardId() /* primaryShard */,
                                true /* expectRecipientStateMachine */,
-                               true /* expectSkipCloningAndApplying */);
+                               true /* expectSkipCloningAndApplying */,
+                               true /* expectStoreOplogFetcherProgress */);
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipIfApplicable) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
+    RAIIServerParameterControllerForTest storeOplogFetcherProgressFeatureFlagController(
+        "featureFlagReshardingStoreOplogFetcherProgress", true);
     testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
                                kThisShard.getShardId() /* primaryShard */,
                                true /* expectRecipientStateMachine */,
-                               false /* expectSkipCloningAndApplying */);
+                               false /* expectSkipCloningAndApplying */,
+                               true /* expectStoreOplogFetcherProgress */);
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessReshardingFieldsWithoutDonorOrRecipientFields) {

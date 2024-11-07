@@ -113,13 +113,45 @@ export const $config = (function() {
                 this.currentShardKeyIndex = newIndex;
                 this.reshardingCount += 1;
             }
+        },
+        checkReshardingMetrics: function checkReshardingMetrics(db, collName) {
+            const ns = db.getName() + "." + collName;
+            const currentOps = db.getSiblingDB("admin")
+                                   .aggregate([
+                                       {$currentOp: {allUsers: true, localOps: false}},
+                                       {
+                                           $match: {
+                                               type: "op",
+                                               "originatingCommand.reshardCollection": ns,
+                                               recipientState: {$exists: true}
+                                           }
+                                       },
+                                   ])
+                                   .toArray();
+            currentOps.forEach(op => {
+                print("Checking resharding metrics " + tojsononeline({
+                          approxDocumentsToCopy: op.approxDocumentsToCopy,
+                          documentsCopied: op.documentsCopied,
+                          approxBytesToCopy: op.approxBytesToCopy,
+                          bytesCopied: op.bytesCopied,
+                          oplogEntriesFetched: op.oplogEntriesFetched,
+                          oplogEntriesApplied: op.oplogEntriesApplied,
+                      }));
+                assert.gte(op.oplogEntriesFetched, op.oplogEntriesApplied, op);
+            });
         }
     };
 
     const transitions = {
         reshardCollection: {insert: 1},
         reshardCollectionSameKey: {insert: 1},
-        insert: {insert: .5, reshardCollection: .25, reshardCollectionSameKey: .25}
+        insert: {
+            insert: 0.45,
+            reshardCollection: 0.2,
+            reshardCollectionSameKey: 0.2,
+            checkReshardingMetrics: 0.15
+        },
+        checkReshardingMetrics: {insert: 1}
     };
 
     function setup(db, collName, _cluster) {

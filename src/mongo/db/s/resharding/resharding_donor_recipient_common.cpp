@@ -378,6 +378,10 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
         !metadata.currentShardHasAnyChunks();
     recipientDoc.setSkipCloningAndApplying(skipCloningAndApplying);
 
+    recipientDoc.setStoreOplogFetcherProgress(
+        resharding::gFeatureFlagReshardingStoreOplogFetcherProgress.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
     recipientDoc.setOplogBatchTaskCount(recipientFields->getOplogBatchTaskCount());
 
     recipientDoc.setRelaxed(recipientFields->getRelaxed());

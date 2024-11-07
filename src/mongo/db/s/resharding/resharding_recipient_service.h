@@ -342,6 +342,11 @@ private:
     // Set to true if this recipient should skip cloning documents and fetching/applying oplog
     // entries because it is not going to own any chunks for the collection after resharding.
     const bool _skipCloningAndApplying;
+    // Set to true if this recipient should store the count of oplog entries fetched in a progress
+    // document and use this count instead of the fast count to recover metrics upon recovery
+    const bool _storeOplogFetcherProgress;
+    // Set to true if this recipient should run cloner aggregation without specifying a collection
+    // UUID to avoid errors in a scenario where the collection UUIDs are inconsistent among shards.
     const OptionalBool _relaxed;
 
     // The in-memory representation of the mutable portion of the document in

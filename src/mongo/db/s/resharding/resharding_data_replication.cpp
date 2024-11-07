@@ -140,7 +140,14 @@ std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::
     ReshardingMetrics* metrics,
     const CommonReshardingMetadata& metadata,
     const std::vector<DonorShardFetchTimestamp>& donorShards,
-    const ShardId& myShardId) {
+    const ShardId& myShardId,
+    bool storeOplogFetcherProgress) {
+    if (storeOplogFetcherProgress) {
+        // Create the oplog fetcher progress collection if necessary.
+        resharding::data_copy::ensureCollectionExists(
+            opCtx, NamespaceString::kReshardingFetcherProgressNamespace, CollectionOptions{});
+    }
+
     std::vector<std::unique_ptr<ReshardingOplogFetcher>> oplogFetchers;
     oplogFetchers.reserve(donorShards.size());
 
@@ -164,7 +171,7 @@ std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::
             donor.getShardId(),
             myShardId,
             std::move(oplogBufferNss),
-            false /* storeOplogFetcherProgress */));
+            storeOplogFetcherProgress));
     }
 
     return oplogFetchers;
@@ -271,6 +278,7 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
     bool cloningDone,
     ShardId myShardId,
     ChunkManager sourceChunkMgr,
+    bool storeOplogFetcherProgress,
     bool relaxed) {
     std::unique_ptr<ReshardingCollectionCloner> collectionCloner;
     std::vector<std::unique_ptr<ReshardingTxnCloner>> txnCloners;
@@ -290,7 +298,8 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
         txnCloners = _makeTxnCloners(metadata, donorShards);
     }
 
-    auto oplogFetchers = _makeOplogFetchers(opCtx, metrics, metadata, donorShards, myShardId);
+    auto oplogFetchers = _makeOplogFetchers(
+        opCtx, metrics, metadata, donorShards, myShardId, storeOplogFetcherProgress);
 
     auto oplogFetcherExecutor = _makeOplogFetcherExecutor(donorShards.size());
 

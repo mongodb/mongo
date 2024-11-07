@@ -1090,6 +1090,14 @@ export var ReshardingTest = class {
 
         assert.eq(
             [],
+            recipient.getCollection(`config.localReshardingOperations.recipient.progress_fetcher`)
+                .find()
+                .toArray(),
+            `config.localReshardingOperations.recipient.progress_fetcher wasn't cleaned up on ${
+                recipient.shardName}`);
+
+        assert.eq(
+            [],
             recipient.getCollection(`config.localReshardingOperations.recipient.progress_applier`)
                 .find()
                 .toArray(),

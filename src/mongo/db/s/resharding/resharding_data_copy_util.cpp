@@ -67,6 +67,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
+#include "mongo/db/s/resharding/resharding_oplog_fetcher_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/session_catalog_migration.h"
@@ -139,6 +140,15 @@ void ensureOplogCollectionsDropped(OperationContext* opCtx,
                                    const std::vector<DonorShardFetchTimestamp>& donorShards) {
     for (const auto& donor : donorShards) {
         auto reshardingSourceId = ReshardingSourceId{reshardingUUID, donor.getShardId()};
+
+        // Remove the oplog fetcher progress doc for this donor.
+        PersistentTaskStore<ReshardingOplogFetcherProgress> oplogFetcherProgressStore(
+            NamespaceString::kReshardingFetcherProgressNamespace);
+        oplogFetcherProgressStore.remove(
+            opCtx,
+            BSON(ReshardingOplogFetcherProgress::kOplogSourceIdFieldName
+                 << reshardingSourceId.toBSON()),
+            WriteConcernOptions());
 
         // Remove the oplog applier progress doc for this donor.
         PersistentTaskStore<ReshardingOplogApplierProgress> oplogApplierProgressStore(
