@@ -32,6 +32,9 @@ import re
 
 from typing import Callable, List, Dict
 
+# Note: The auto-retry settings are prefixed w/ "OOM", but since it's an unconditional retry,
+# it's not really OOM-specific. We're keeping the OOM prefix to make the code change simpler.
+# (This custom retry logic will go away once the build is fully Bazelified).
 
 def command_spawn_func(sh: str, escape: Callable[[str], str], cmd: str, args: List, env: Dict,
                        target: List, source: List):
@@ -39,11 +42,6 @@ def command_spawn_func(sh: str, escape: Callable[[str], str], cmd: str, args: Li
     success = False
 
     build_env = target[0].get_build_env()
-    oom_messages = [
-        re.compile(msg, re.MULTILINE | re.DOTALL)
-        for msg in build_env.get('OOM_RETRY_MESSAGES', [])
-    ]
-    oom_returncodes = [int(returncode) for returncode in build_env.get('OOM_RETRY_RETURNCODES', [])]
     max_retries = build_env.get('OOM_RETRY_ATTEMPTS', 10)
     oom_max_retry_delay = build_env.get('OOM_RETRY_MAX_DELAY_SECONDS', 120)
 
@@ -63,16 +61,14 @@ def command_spawn_func(sh: str, escape: Callable[[str], str], cmd: str, args: Li
         except subprocess.CalledProcessError as exc:
             print(f"{os.path.basename(__file__)} captured error:")
             print(exc.stdout)
-            if any([re.findall(oom_message, exc.stdout) for oom_message in oom_messages]) or any(
-                [oom_returncode == exc.returncode for oom_returncode in oom_returncodes]):
-                retries += 1
-                retry_delay = int((time.time() - start_time) +
-                                  oom_max_retry_delay * random.random())
-                print(f"Ran out of memory while trying to build {target[0]}", )
-                if retries <= max_retries:
-                    print(f"trying again in {retry_delay} seconds with retry attempt {retries}")
-                    time.sleep(retry_delay)
-                    continue
+            retries += 1
+            retry_delay = int((time.time() - start_time) +
+                                oom_max_retry_delay * random.random())
+            print(f"Failed while trying to build {target[0]}", )
+            if retries <= max_retries:
+                print(f"trying again in {retry_delay} seconds with retry attempt {retries}")
+                time.sleep(retry_delay)
+                continue
 
             # There was no OOM error or no more OOM retries left
             return exc.returncode

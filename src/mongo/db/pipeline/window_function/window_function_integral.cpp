@@ -90,7 +90,7 @@ void WindowFunctionIntegral::add(Value value) {
     // track the values in the window because no removal will be made. 'pop_front()' whenever a new
     // value is added to the queue so as to save memory.
     if (!_values.empty() && isNonremovable) {
-        _memUsageBytes -= _values.front().getApproximateSize();
+        decreaseMemUsageBytes(_values.front().getApproximateSize());
         _values.pop_front();
     }
     _memUsageBytes += value.getApproximateSize();
@@ -109,7 +109,7 @@ void WindowFunctionIntegral::remove(Value value) {
     if (arr[0].isNaN() || arr[1].isNaN())
         _nanCount--;
 
-    _memUsageBytes -= value.getApproximateSize();
+    decreaseMemUsageBytes(value.getApproximateSize());
     _values.pop_front();
 
     // Update "_integral" if there are at least two values before removing the current value.

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "scopeguard.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
@@ -39,6 +40,7 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -248,6 +250,43 @@ bool getFileVersion(const char* filePath, DWORD& fileVersionMS, DWORD& fileVersi
     return true;
 }
 
+std::string getCpuString() {
+    // get descriptive CPU string from registry
+    HKEY hKey;
+    LPCWSTR cpuKey = L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0";
+    LPCWSTR valueName = L"ProcessorNameString";
+    std::string cpuString;
+
+    // Open the CPU key in the Windows Registry
+    if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, cpuKey, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        auto guard = makeGuard([hKey] { RegCloseKey(hKey); });
+        WCHAR cpuModel[128];
+        DWORD bufferSize = sizeof(cpuModel);
+
+        // Retrieve the value of ProcessorNameString
+        if (RegQueryValueEx(hKey,
+                            valueName,
+                            nullptr,
+                            nullptr,
+                            reinterpret_cast<LPBYTE>(cpuModel),
+                            &bufferSize) == ERROR_SUCCESS) {
+            cpuString = toUtf8String(cpuModel);
+        } else {
+            auto ec = lastSystemError();
+            LOGV2_WARNING(7663101,
+                          "Failed to retrieve CPU model name from the registry",
+                          "error"_attr = errorMessage(ec));
+        }
+
+        // Close the registry key
+    } else {
+        auto ec = lastSystemError();
+        LOGV2_WARNING(
+            7663102, "Failed to open CPU key in the registry", "error"_attr = errorMessage(ec));
+    }
+    return cpuString;
+}
+
 void ProcessInfo::SystemInfo::collectSystemInfo() {
     BSONObjBuilder bExtra;
     std::stringstream verstr;
@@ -266,6 +305,12 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     numNumaNodes = ppi.numaNodeCount;
     pageSize = static_cast<unsigned long long>(ntsysinfo.dwPageSize);
     bExtra.append("pageSize", static_cast<long long>(pageSize));
+
+    std::string cpuString = getCpuString();
+    if (cpuString != nullptr) {
+        bExtra.append("cpuString", cpuString);
+    }
+
 
     // get memory info
     mse.dwLength = sizeof(mse);

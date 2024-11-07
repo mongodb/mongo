@@ -63,7 +63,7 @@ public:
             "Attempted to remove an element other than the first element from WindowFunctionPush",
             _expCtx->getValueComparator().evaluate(valToRemove == value));
         _values.pop_front();
-        _memUsageBytes -= value.getApproximateSize();
+        decreaseMemUsageBytes(value.getApproximateSize());
     }
 
     void reset() override {

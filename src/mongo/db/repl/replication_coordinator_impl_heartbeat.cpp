@@ -76,6 +76,7 @@ MONGO_FAIL_POINT_DEFINE(blockHeartbeatStepdown);
 MONGO_FAIL_POINT_DEFINE(blockHeartbeatReconfigFinish);
 MONGO_FAIL_POINT_DEFINE(hangAfterTrackingNewHandleInHandleHeartbeatResponseForTest);
 MONGO_FAIL_POINT_DEFINE(waitForPostActionCompleteInHbReconfig);
+MONGO_FAIL_POINT_DEFINE(pauseInHandleHeartbeatResponse);
 
 }  // namespace
 
@@ -180,6 +181,12 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
 
 void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+    pauseInHandleHeartbeatResponse.executeIf(
+        [](const BSONObj& data) { pauseInHandleHeartbeatResponse.pauseWhileSet(); },
+        [&cbData](const BSONObj& data) -> bool {
+            StringData dtarget = data["target"].valueStringDataSafe();
+            return dtarget == cbData.request.target.toString();
+        });
     stdx::unique_lock<Latch> lk(_mutex);
 
     // remove handle from queued heartbeats
@@ -190,7 +197,15 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     Status responseStatus = cbData.response.status;
     const HostAndPort& target = cbData.request.target;
 
-    if (responseStatus == ErrorCodes::CallbackCanceled) {
+    // It is possible that the callback was canceled after handleHeartbeatResponse was called but
+    // before it got the lock above.
+    //
+    // In this case, the responseStatus will be OK and we can process the heartbeat.  However, if
+    // we do so, cancelling heartbeats no longer establishes a barrier after which all heartbeats
+    // processed are "new" (sent subsequent to the cancel), which is something we care about for
+    // catchup takeover.  So if we detect this situation (by checking if the handle was canceled)
+    // we will NOT process the 'stale' heartbeat.
+    if (responseStatus == ErrorCodes::CallbackCanceled || cbData.myHandle.isCanceled()) {
         LOGV2_FOR_HEARTBEATS(4615619,
                              2,
                              "Received response to heartbeat (requestId: {requestId}) from "

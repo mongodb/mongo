@@ -66,7 +66,7 @@ public:
         // which is what we want, to satisfy "remove() undoes add() when called in FIFO order".
         auto iter = _values.find(std::move(value));
         tassert(5371400, "Can't remove from an empty WindowFunctionMinMax", iter != _values.end());
-        _memUsageBytes -= iter->getApproximateSize();
+        decreaseMemUsageBytes(iter->getApproximateSize());
         _values.erase(iter);
     }
 

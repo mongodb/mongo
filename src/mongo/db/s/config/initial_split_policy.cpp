@@ -214,7 +214,7 @@ StringMap<std::vector<ShardId>> buildTagsToShardIdsMap(OperationContext* opCtx,
 }  // namespace
 
 std::vector<BSONObj> InitialSplitPolicy::calculateHashedSplitPoints(
-    const ShardKeyPattern& shardKeyPattern, BSONObj prefix, int numInitialChunks) {
+    const ShardKeyPattern& shardKeyPattern, BSONObj prefix, size_t numInitialChunks) {
     invariant(shardKeyPattern.isHashedPattern());
     invariant(numInitialChunks > 0);
 
@@ -259,7 +259,7 @@ std::vector<BSONObj> InitialSplitPolicy::calculateHashedSplitPoints(
         current += intervalSize / 2;
     }
 
-    for (int i = 0; i < (numInitialChunks - 1) / 2; i++) {
+    for (size_t i = 0; i < (numInitialChunks - 1) / 2; i++) {
         splitPoints.push_back(buildSplitPoint(current));
         splitPoints.push_back(buildSplitPoint(-current));
         current += intervalSize;

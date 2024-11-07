@@ -163,6 +163,10 @@ last-continuous:
     ticket: SERVER-88750
   - test_file: jstests/core/bypass_empty_ts_replacement_timeseries.js
     ticket: SERVER-88750
+  - test_file: jstests/sharding/refresh_sessions.js
+    ticket: SERVER-94635
+  - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
+    ticket: SERVER-86674
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -390,6 +394,10 @@ last-lts:
     ticket: SERVER-88750
   - test_file: jstests/core/bypass_empty_ts_replacement_timeseries.js
     ticket: SERVER-88750
+  - test_file: jstests/sharding/refresh_sessions.js
+    ticket: SERVER-94635
+  - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
+    ticket: SERVER-86674
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

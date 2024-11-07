@@ -33,8 +33,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_rs.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
@@ -1389,6 +1391,18 @@ TEST(OpMsg, HelloOkCanBeDisabled) {
     auto conn = instance.connect(false);
     auto isHelloOk = instance.checkIfClientSupportsHello(conn.get());
     ASSERT(!isHelloOk);
+}
+
+TEST(Message, LegacyInvalidNs) {
+    auto conn = getIntegrationTestConnection();
+
+    auto msg = makeMessage(dbQuery, [&](BufBuilder& b) {
+        b.appendNum(0);
+        b.appendStrBytes("nonullbyte");
+    });
+    // Since our request is not able to be parsed, we don't receive a response from the server.
+    Message ignore;
+    ASSERT_THROWS(conn->call(msg, ignore), DBException);
 }
 
 }  // namespace

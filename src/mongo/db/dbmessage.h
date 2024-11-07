@@ -512,4 +512,18 @@ DbResponse replyToQuery(int queryResultFlags,
 inline DbResponse replyToQuery(const BSONObj& obj, int queryResultFlags = 0) {
     return replyToQuery(queryResultFlags, obj.objdata(), obj.objsize(), /*nReturned*/ 1);
 }
+
+template <typename Func>
+Message makeMessage(NetworkOp op, Func&& bodyBuilder) {
+    BufBuilder b;
+    b.skip(sizeof(MSGHEADER::Layout));
+
+    bodyBuilder(b);
+
+    const int size = b.len();
+    auto out = Message(b.release());
+    out.header().setOperation(op);
+    out.header().setLen(size);
+    return out;
+}
 }  // namespace mongo

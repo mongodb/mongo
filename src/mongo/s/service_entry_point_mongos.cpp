@@ -288,9 +288,17 @@ Future<DbResponse> HandleRequest::run() {
 }
 
 Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
-                                                          const Message& message) noexcept {
+                                                          const Message& message) noexcept try {
     auto hr = std::make_shared<HandleRequest>(opCtx, message);
     return hr->run();
+} catch (const DBException& ex) {
+    auto status = ex.toStatus();
+    LOGV2(9431602, "Failed to handle request", "error"_attr = redact(status));
+    return status;
+} catch (...) {
+    auto error = exceptionToStatus();
+    LOGV2_FATAL(
+        9431601, "Request handling produced unhandled exception", "error"_attr = redact(error));
 }
 
 void ServiceEntryPointMongos::onClientConnect(Client* client) {
