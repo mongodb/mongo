@@ -10,6 +10,21 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "cardinality_estimator",
+    srcs = [
+        "cardinality_estimator.cpp",
+    ],
+    hdrs = [
+        "cardinality_estimator.h",
+    ],
+    deps = [
+        "ce_utils",
+        "estimates",
+        "heuristic_estimator",
+    ],
+)
+
+mongo_cc_library(
     name = "qsn_estimator",
     srcs = [
         "qsn_estimator.cpp",
@@ -19,6 +34,8 @@ mongo_cc_library(
         "//src/mongo/db/query:query_solution.h",
     ],
     deps = [
+        "cardinality_estimator",
+        "ce_utils",
         "estimates",
         "//src/mongo/db:server_base",
         "//src/mongo/db/exec:scoped_timer",
@@ -32,6 +49,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "estimates.h",
+        "estimates_storage.h",
         "//src/mongo/db/query/util:named_enum.h",
         "//src/mongo/util:fixed_string.h",
     ],

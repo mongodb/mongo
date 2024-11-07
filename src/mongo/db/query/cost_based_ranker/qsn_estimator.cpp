@@ -28,48 +28,45 @@
  */
 
 #include "mongo/db/query/cost_based_ranker/qsn_estimator.h"
+#include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
 
 namespace mongo::cost_based_ranker {
 
-Estimate::Estimate()
-    : cardinalty(CardinalityType{0}, EstimationSource::Code),
-      cost(CostType{0}, EstimationSource::Code) {}
-
 namespace {
-void estimateQsn(const QuerySolutionNode* node,
-                 CardinalityEstimate collectionCard,
-                 EstimateMap* res) {
+
+void estimateQsnCost(const QuerySolutionNode* node, EstimateMap& estimateMap) {
     // Dummy implementation of estimation as a starting point to test explain.
     for (auto&& child : node->children) {
-        estimateQsn(child.get(), collectionCard, res);
+        estimateQsnCost(child.get(), estimateMap);
     }
-    Estimate est;
+
+    auto res = estimateMap.find(node);
+    tassert(958671, "All QSNs must have a CE.", res != estimateMap.end());
+    QSNEstimate& est = res->second;
     switch (node->getType()) {
         case STAGE_IXSCAN:
-            est.cardinalty = CardinalityEstimate(CardinalityType{1}, EstimationSource::Code);
             est.cost = CostEstimate(CostType{10}, EstimationSource::Code);
             break;
         case STAGE_FETCH:
-            est.cardinalty = res->at(node->children[0].get()).cardinalty;
             est.cost = CostEstimate(CostType{20}, EstimationSource::Code);
             break;
         case STAGE_COLLSCAN:
-            est.cardinalty = collectionCard;
-            est.cost = CostEstimate{CostType{50}, EstimationSource::Metadata};
+            est.cost = CostEstimate{CostType{50}, EstimationSource::Code};
             break;
         default:
-            est.cardinalty = CardinalityEstimate(CardinalityType{100}, EstimationSource::Code);
             est.cost = CostEstimate(CostType{100}, EstimationSource::Code);
             break;
     }
-    res->insert({node, est});
 }
+
 }  // namespace
 
 void estimatePlanCost(const QuerySolution& plan,
                       CardinalityEstimate collectionCard,
-                      EstimateMap* res) {
-    estimateQsn(plan.root(), collectionCard, res);
+                      EstimateMap& estimateMap) {
+    CardinalityEstimator cardEstimator(collectionCard, estimateMap);
+    cardEstimator.estimatePlan(plan);
+    estimateQsnCost(plan.root(), estimateMap);
 }
 
 }  // namespace mongo::cost_based_ranker

@@ -70,7 +70,7 @@ template <bool isConjunction,
               typename std::conditional_t<isConjunction,
                                           ExactEstimateComparator<SelectivityEstimate>,
                                           ExactEstimateComparator<SelectivityEstimate, false>>>
-SelectivityEstimate expBackoffInternal(std::vector<SelectivityEstimate> sels) {
+SelectivityEstimate expBackoffInternal(std::span<SelectivityEstimate> sels) {
     if (sels.size() == 1) {
         return sels[0];
     }
@@ -88,18 +88,18 @@ SelectivityEstimate expBackoffInternal(std::vector<SelectivityEstimate> sels) {
     return maybeNegate<!isConjunction>(sel);
 }
 
-SelectivityEstimate conjExponentialBackoff(std::vector<SelectivityEstimate> conjSelectivities) {
+SelectivityEstimate conjExponentialBackoff(std::span<SelectivityEstimate> conjSelectivities) {
     tassert(9582601,
             "The array of conjunction selectivities may not be empty.",
             !conjSelectivities.empty());
-    return expBackoffInternal<true /*isConjunction*/>(std::move(conjSelectivities));
+    return expBackoffInternal<true /*isConjunction*/>(conjSelectivities);
 }
 
-SelectivityEstimate disjExponentialBackoff(std::vector<SelectivityEstimate> disjSelectivities) {
+SelectivityEstimate disjExponentialBackoff(std::span<SelectivityEstimate> disjSelectivities) {
     tassert(9582602,
             "The array of disjunction selectivities may not be empty.",
             !disjSelectivities.empty());
-    return expBackoffInternal<false /*isConjunction*/>(std::move(disjSelectivities));
+    return expBackoffInternal<false /*isConjunction*/>(disjSelectivities);
 }
 
 }  // namespace mongo::cost_based_ranker

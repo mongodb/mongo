@@ -58,6 +58,7 @@
 #include "mongo/db/exec/text_match.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
@@ -251,7 +252,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
     // Cost and cardinality of the stage.
     if (querySolutionNode && estimates.contains(querySolutionNode)) {
         const auto& est = estimates.at(querySolutionNode);
-        bob->append("cardinalityEstimate", est.cardinalty.toDouble());
+        bob->append("cardinalityEstimate", est.outCE.toDouble());
         bob->append("costEstimate", est.cost.toDouble());
     }
 

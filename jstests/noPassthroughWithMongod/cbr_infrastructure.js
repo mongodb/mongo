@@ -121,7 +121,9 @@ function verifyCollectionCardinalityEstimate() {
     coll.drop();
     assert.commandWorked(coll.insertMany(Array.from({length: card}, () => ({a: 1}))));
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}));
-    const e1 = coll.find({non_indexed_field: 0}).explain();
+    // This query should not have any predicates, as they are taken into account
+    // by CE, and estimated cardinality will be less than the total.
+    const e1 = coll.find({}).explain();
     const w1 = getWinningPlanFromExplain(e1);
     assert(isCollscan(db, w1));
     assert.eq(w1.cardinalityEstimate, card);

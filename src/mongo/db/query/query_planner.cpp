@@ -1633,7 +1633,7 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
         EstimationSource::Metadata};
     EstimateMap estimates;
     for (auto&& soln : statusWithMultiPlanSolns.getValue()) {
-        estimatePlanCost(*soln, collCard, &estimates);
+        estimatePlanCost(*soln, collCard, estimates);
     }
 
     std::vector<std::unique_ptr<QuerySolution>> acceptedSoln;

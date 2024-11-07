@@ -30,24 +30,10 @@
 #pragma once
 
 #include "mongo/db/query/cost_based_ranker/estimates.h"
+#include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo::cost_based_ranker {
-
-/**
- * The optimizer's estimate of a single node in the physical plan.
- */
-struct Estimate {
-    Estimate();
-
-    CardinalityEstimate cardinalty;
-    CostEstimate cost;
-};
-
-/**
- * EstimateMap is a type representing a mapping from QuerySolutionNodes to cost estimates.
- */
-using EstimateMap = absl::flat_hash_map<const QuerySolutionNode*, Estimate>;
 
 /**
  * Estimate the costs of the given QuerySolution tree. For every QuerySolutionNode in the tree,
@@ -55,6 +41,6 @@ using EstimateMap = absl::flat_hash_map<const QuerySolutionNode*, Estimate>;
  */
 void estimatePlanCost(const QuerySolution& plan,
                       CardinalityEstimate collectionCard,
-                      EstimateMap* res);
+                      EstimateMap& estimateMap);
 
 }  // namespace mongo::cost_based_ranker

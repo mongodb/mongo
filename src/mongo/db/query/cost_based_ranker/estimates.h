@@ -512,6 +512,33 @@ SelectivityEstimate operator/(const CardinalityEstimate& smaller_ce,
 CardinalityEstimate operator*(const SelectivityEstimate& s, const CardinalityEstimate& ce);
 CardinalityEstimate operator*(const CardinalityEstimate& ce, const SelectivityEstimate& s);
 
+/**
+ * The optimizer's estimate of a single QSN in the physical plan.
+ */
+struct QSNEstimate {
+    QSNEstimate()
+        : outCE(CardinalityType{0}, EstimationSource::Code),
+          cost(CostType::maxValue(), EstimationSource::Code){};
+
+    // A QSN may have three estimates:
+    // - the number of processed data items (docs or keys): 'inCE'
+    // - the number of filtered data items by the attached filter (if any): 'filterCE'
+    // - the number of produced data items: 'outCE'
+    // Only leaf QSN nodes have both 'inCE' and 'outCE' estimates. All other nodes have an
+    // 'out' CE since their input size is equal to the number of produced items by their child.
+    // For instance:
+    // - For a CollectionScan with a filter expression, 'inCE' is the total collection cardinality,
+    //   and 'filterCE' is the number of documents after applying the filter, 'outCE' is the same as
+    //   'filterCE'.
+    // - For an IndexScan node 'inCE' is the number of scanned keys, 'filterCE' is the number of
+    //   keys after applying a possible filter expression, and 'outCE' is the size of the final
+    //   result.
+    boost::optional<CardinalityEstimate> inCE;
+    boost::optional<CardinalityEstimate> filterCE;
+    CardinalityEstimate outCE;
+    CostEstimate cost;
+};
+
 // Predefined constants
 inline const CardinalityEstimate zeroCE{CardinalityType{0.0}, EstimationSource::Code};
 inline const CardinalityEstimate oneCE{CardinalityType{1}, EstimationSource::Code};

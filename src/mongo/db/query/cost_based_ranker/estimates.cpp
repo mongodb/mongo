@@ -89,14 +89,16 @@ CostEstimate operator*(const CardinalityEstimate& ce, const CostCoefficient& cc)
 SelectivityEstimate operator/(const CardinalityEstimate& smaller_ce,
                               const CardinalityEstimate& bigger_ce) {
     // Make sure the underlying double values are in correct relationship to produce selectivity.
-    // Using operator< could still pass when smaller_ce is slightly bigger than bigger_ce.
+    // Using operator<= could still pass when smaller_ce is slightly bigger than bigger_ce.
     tassert(9274202,
-            str::stream() << smaller_ce._estimate.v() << " must be < " << bigger_ce._estimate.v()
+            str::stream() << smaller_ce._estimate.v() << " must be <= " << bigger_ce._estimate.v()
                           << " to produce selectivity",
-            smaller_ce._estimate.v() < bigger_ce._estimate.v());
+            smaller_ce._estimate.v() <= bigger_ce._estimate.v());
+
     SelectivityEstimate result(SelectivityType{0.0}, smaller_ce._source);
     result.mergeSources(bigger_ce);
-    result._estimate._v = smaller_ce._estimate.v() / bigger_ce._estimate.v();
+    result._estimate._v =
+        (smaller_ce == bigger_ce) ? 1.0 : smaller_ce._estimate.v() / bigger_ce._estimate.v();
     result.assertValid();
     return result;
 }
