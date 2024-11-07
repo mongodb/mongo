@@ -342,7 +342,7 @@ public:
      *
      * When the stage that received a materialized result req from its parent and asked its child
      * for ResultInfo receives the ResultInfo base object back from its child, it creates the
-     * a materialized result object by taking the contents of the ResultInfo base object as a
+     * materialized result object by taking the contents of the ResultInfo base object as a
      * starting point, dropping 0 or more fields from the doc, writing new values (retrieved from
      * kField slots) to 0 or more fields in the doc, and finally making stage-specific modifications
      * to the doc as appropriate and then materializing it.

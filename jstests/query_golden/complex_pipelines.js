@@ -78,6 +78,20 @@ for (let i = 1; i <= 8; ++i) {
     foreignDocs.push(doc);
 }
 
+// possibleIntFields and possibleObjFields are global variables used in the buildXXX() methods below
+// to pick the fields to be used in each operation. The two arrays should be shuffled using the
+// shuffleArray method before each call to one of the addXXX() methods to randomise the order of the
+// fields.
+let possibleIntFields = [];
+let possibleObjFields = [];
+
+for (let j = 0; j < 12; ++j) {
+    possibleIntFields.push(String.fromCharCode(97 + j));
+}
+for (let j = 0; j < 3; ++j) {
+    possibleObjFields.push(String.fromCharCode(119 + j));
+}
+
 function shuffleArray(arr) {
     let i = arr.length;
 
@@ -91,25 +105,8 @@ function shuffleArray(arr) {
     }
 }
 
-function addInclusion(testcase, allowDottedPaths) {
-    let pipeline = testcase.pipeline;
-    let fields = testcase.fields;
-
+function addInclusion(pipeline, allowDottedPaths) {
     let projectionDoc = {};
-    let newFields = {};
-
-    let possibleIntFields = [];
-    let possibleObjFields = [];
-
-    for (let j = 0; j < 12; ++j) {
-        possibleIntFields.push(String.fromCharCode(97 + j));
-    }
-    for (let j = 0; j < 3; ++j) {
-        possibleObjFields.push(String.fromCharCode(119 + j));
-    }
-
-    shuffleArray(possibleIntFields);
-    shuffleArray(possibleObjFields);
 
     let n = 8 + Random.randInt(4);
     for (let j = 0; j < n; ++j) {
@@ -117,21 +114,12 @@ function addInclusion(testcase, allowDottedPaths) {
 
         if (Random.rand() < 0.70) {
             projectionDoc[c] = 1;
-            if (fields.hasOwnProperty(c)) {
-                newFields[c] = true;
-            }
         } else if (Random.rand() < 0.85) {
             let d = String.fromCharCode(97 + Random.randInt(12));
-
             projectionDoc[c] = "$" + d;
-            if (fields.hasOwnProperty(d)) {
-                newFields[c] = true;
-            }
         } else {
             let num = Random.randInt(100);
-
             projectionDoc[c] = {"$literal": num};
-            newFields[c] = true;
         }
     }
 
@@ -151,35 +139,13 @@ function addInclusion(testcase, allowDottedPaths) {
                 projectionDoc[path] = 1;
             }
         }
-
-        if (fields.hasOwnProperty(c)) {
-            newFields[c] = true;
-        }
     }
 
-    let newPipeline = pipeline.concat([{$project: projectionDoc}]);
-
-    return {pipeline: newPipeline, fields: newFields};
+    return pipeline.concat([{$project: projectionDoc}]);
 }
 
-function addExclusion(testcase, allowDottedPaths) {
-    let pipeline = testcase.pipeline;
-    let fields = testcase.fields;
-
+function addExclusion(pipeline, allowDottedPaths) {
     let projectionDoc = {};
-
-    let possibleIntFields = [];
-    let possibleObjFields = [];
-
-    for (let j = 0; j < 12; ++j) {
-        possibleIntFields.push(String.fromCharCode(97 + j));
-    }
-    for (let j = 0; j < 3; ++j) {
-        possibleObjFields.push(String.fromCharCode(119 + j));
-    }
-
-    shuffleArray(possibleIntFields);
-    shuffleArray(possibleObjFields);
 
     let n = 1 + Random.randInt(2);
     for (let j = 0; j < n; ++j) {
@@ -205,40 +171,11 @@ function addExclusion(testcase, allowDottedPaths) {
         }
     }
 
-    let newPipeline = pipeline.concat([{$project: projectionDoc}]);
-
-    let newFields = {};
-    for (let c in fields) {
-        if (!projectionDoc.hasOwnProperty(c)) {
-            newFields[c] = true;
-        }
-    }
-
-    return {pipeline: newPipeline, fields: newFields};
+    return pipeline.concat([{$project: projectionDoc}]);
 }
 
-function addAddFields(testcase, allowDottedPaths = true) {
-    let pipeline = testcase.pipeline;
-    let fields = testcase.fields;
-
+function addAddFields(pipeline, allowDottedPaths = true) {
     let addFieldsDoc = {};
-    let newFields = {};
-    for (let c in fields) {
-        newFields[c] = true;
-    }
-
-    let possibleIntFields = [];
-    let possibleObjFields = [];
-
-    for (let j = 0; j < 12; ++j) {
-        possibleIntFields.push(String.fromCharCode(97 + j));
-    }
-    for (let j = 0; j < 3; ++j) {
-        possibleObjFields.push(String.fromCharCode(119 + j));
-    }
-
-    shuffleArray(possibleIntFields);
-    shuffleArray(possibleObjFields);
 
     let n = 1 + Random.randInt(3);
     for (let j = 0; j < n; ++j) {
@@ -246,16 +183,10 @@ function addAddFields(testcase, allowDottedPaths = true) {
 
         if (Random.rand() < 0.65) {
             let num = Random.randInt(100);
-
             addFieldsDoc[c] = num;
-            newFields[c] = true;
         } else {
             let d = String.fromCharCode(97 + Random.randInt(20));
-
             addFieldsDoc[c] = "$" + d;
-            if (fields.hasOwnProperty(d)) {
-                newFields[c] = true;
-            }
         }
     }
 
@@ -267,9 +198,6 @@ function addAddFields(testcase, allowDottedPaths = true) {
             let d = String.fromCharCode(119 + Random.randInt(3));
 
             addFieldsDoc[c] = "$" + d;
-            if (fields.hasOwnProperty(d)) {
-                newFields[c] = true;
-            }
         } else {
             let possibleSubfields = ["a", "b", "c"];
             shuffleArray(possibleSubfields);
@@ -281,47 +209,14 @@ function addAddFields(testcase, allowDottedPaths = true) {
 
                 addFieldsDoc[path] = num;
             }
-
-            newFields[c] = true;
         }
     }
 
-    let newPipeline = pipeline.concat([{$addFields: addFieldsDoc}]);
-
-    return {pipeline: newPipeline, fields: newFields};
+    return pipeline.concat([{$addFields: addFieldsDoc}]);
 }
 
-function addMatch(testcase, allowDottedPaths = true) {
-    let pipeline = testcase.pipeline;
-    let fields = testcase.fields;
-
+function addMatch(pipeline, allowDottedPaths = true) {
     let matchDoc = {};
-    let newFields = {};
-    for (let c in fields) {
-        newFields[c] = true;
-    }
-
-    let possibleIntFields = [];
-    let possibleObjFields = [];
-
-    for (let c in fields) {
-        if (c < "w") {
-            possibleIntFields.push(c);
-        } else {
-            possibleObjFields.push(c);
-        }
-    }
-
-    if (possibleIntFields.length == 0) {
-        possibleIntFields.push(String.fromCharCode(97 + Random.randInt(12)));
-    }
-
-    if (possibleObjFields.length == 0) {
-        possibleObjFields.push(String.fromCharCode(119 + Random.randInt(3)));
-    }
-
-    shuffleArray(possibleIntFields);
-    shuffleArray(possibleObjFields);
 
     if (Random.rand() < 0.5 || !allowDottedPaths) {
         let c = possibleIntFields[0];
@@ -351,111 +246,53 @@ function addMatch(testcase, allowDottedPaths = true) {
         }
     }
 
-    let newPipeline = pipeline.concat([{$match: matchDoc}]);
-
-    return {pipeline: newPipeline, fields: newFields};
+    return pipeline.concat([{$match: matchDoc}]);
 }
 
-function addGroup(testcase) {
-    let pipeline = testcase.pipeline;
-    let fields = testcase.fields;
-
+function addGroup(pipeline) {
     let groupDoc = {};
-    let newFields = {};
 
-    let possibleIntFields = [];
-    let possibleObjFields = [];
-
-    let fieldsArray = Object.keys(fields);
-    shuffleArray(fieldsArray);
-
-    let g = fieldsArray.length > 0 ? fieldsArray[0] : String.fromCharCode(97 + Random.randInt(12));
+    let g = String.fromCharCode(97 + Random.randInt(12));
     groupDoc["_id"] = "$" + g;
-
-    for (let j = 0; j < 12; ++j) {
-        possibleIntFields.push(String.fromCharCode(97 + j));
-    }
-    for (let j = 0; j < 3; ++j) {
-        possibleObjFields.push(String.fromCharCode(119 + j));
-    }
-
-    shuffleArray(possibleIntFields);
-    shuffleArray(possibleObjFields);
 
     let n = 8 + Random.randInt(4);
     for (let j = 0; j < n; ++j) {
         let c = possibleIntFields[j];
         let sumArg = "$" + c;
-
         groupDoc[c] = {$sum: sumArg};
-        if (fields.hasOwnProperty(c)) {
-            newFields[c] = true;
-        }
     }
 
     for (let j = 0; j < 3; ++j) {
         let c = possibleObjFields[j];
         let minArg = "$" + c;
-
         groupDoc[c] = {$min: minArg};
-        if (fields.hasOwnProperty(c)) {
-            newFields[c] = true;
-        }
     }
 
-    let newPipeline = pipeline.concat([{$group: groupDoc}]);
-
-    return {pipeline: newPipeline, fields: newFields};
+    return pipeline.concat([{$group: groupDoc}]);
 }
 
-function addLookupUnwind(testcase) {
-    let pipeline = testcase.pipeline;
-    let fields = testcase.fields;
-
+function addLookupUnwind(pipeline) {
     let lookupDoc = {from: foreignCollName, localField: "_id", foreignField: "_id"};
-    let newFields = {};
-    for (let c in fields) {
-        newFields[c] = true;
-    }
 
     let c = String.fromCharCode(119 + Random.randInt(3));
     lookupDoc["as"] = c;
 
     let unwindArg = "$" + c;
 
-    let newPipeline = pipeline.concat([{$lookup: lookupDoc}, {$unwind: unwindArg}]);
-
-    return {pipeline: newPipeline, fields: newFields};
+    return pipeline.concat([{$lookup: lookupDoc}, {$unwind: unwindArg}]);
 }
 
-function addSort(testcase, addLimit = false) {
-    let pipeline = testcase.pipeline;
-    let fields = testcase.fields;
-
+function addSort(pipeline, addLimit = false) {
     let sortDoc = {};
-    let newFields = {};
-    for (let c in fields) {
-        newFields[c] = true;
-    }
-
-    let possibleIntFields = [];
-    let possibleObjFields = [];
-
-    for (let j = 0; j < 12; ++j) {
-        possibleIntFields.push(String.fromCharCode(97 + j));
-    }
-    for (let j = 0; j < 3; ++j) {
-        possibleObjFields.push(String.fromCharCode(119 + j));
-    }
-
-    shuffleArray(possibleIntFields);
-    shuffleArray(possibleObjFields);
 
     let n = 1 + Random.randInt(2);
     for (let j = 0; j < n; ++j) {
         let c = possibleIntFields[j];
         sortDoc[c] = Random.randInt(2) == 0 ? 1 : -1;
     }
+
+    // Add _id to make sure that sort order is always consistent.
+    sortDoc["_id"] = 1;
 
     let newPipeline = pipeline.concat([{$sort: sortDoc}]);
 
@@ -464,67 +301,128 @@ function addSort(testcase, addLimit = false) {
         newPipeline = newPipeline.concat([{$limit: num}]);
     }
 
-    return {pipeline: newPipeline, fields: newFields};
+    return newPipeline;
 }
 
-function generateTestcase(
-    {allowInclusion, allowGroup, allowLookup, allowSort, allowSortWithLimit, allowDottedPaths}) {
-    // Initialize 'testcase'.
-    let testcase = {pipeline: [], fields: []};
-    for (let j = 0; j < 11; ++j) {
-        let c = String.fromCharCode((j < 9) ? 97 + j : 119 + j - 16);
-        testcase.fields[c] = true;
+function getRangeWindow() {
+    switch (Random.randInt(6)) {
+        case 0:
+            return {documents: ["unbounded", "current"]};
+        case 1:
+            return {documents: ["current", "unbounded"]};
+        case 2:
+            return {documents: ["unbounded", "unbounded"]};
+        case 3:
+            return {documents: [-2, 0]};
+        case 4:
+            return {documents: [0, 2]};
+        case 5:
+            return {documents: [-2, 2]};
+    }
+}
+
+function addSetWindowFields(pipeline) {
+    let setWindowFieldsDoc = {};
+
+    const partitionByIdx = Random.randInt(13);
+    if (partitionByIdx < 12) {
+        setWindowFieldsDoc["partitionBy"] = "$" + possibleIntFields[partitionByIdx];
     }
 
+    const sortDoc = addSort([]);
+    const sortByDoc = Object.values(sortDoc[0])[0];
+    setWindowFieldsDoc["sortBy"] = sortByDoc;
+
+    shuffleArray(possibleIntFields);
+    shuffleArray(possibleObjFields);
+
+    let outputDoc = {};
+
+    const sumWindows = 1 + Random.randInt(2);
+    const minWindows = Random.randInt(2);
+
+    for (let j = 0; j < sumWindows; ++j) {
+        const c = possibleIntFields[j];
+        const arg = "$" + c;
+        const windowDoc = getRangeWindow();
+
+        outputDoc[c] = {$sum: arg, window: windowDoc};
+    }
+
+    for (let j = 0; j < minWindows; ++j) {
+        const c = possibleObjFields[j];
+        const arg = "$" + c;
+        const windowDoc = getRangeWindow();
+        outputDoc[c] = {$min: arg, window: windowDoc};
+    }
+
+    setWindowFieldsDoc["output"] = outputDoc;
+
+    return pipeline.concat([{$setWindowFields: setWindowFieldsDoc}]);
+}
+
+function generateTestcase({
+    allowInclusion,
+    allowGroup,
+    allowLookup,
+    allowSort,
+    allowSortWithLimit,
+    allowSetWindowFields,
+    allowDottedPaths
+}) {
+    // Initialize 'pipeline'.
+    let pipeline = [];
     let numStages = Random.randInt(9) + 4;
 
     for (let i = 0; i < numStages;) {
         let r = Random.rand();
-        let updatedTestcase = null;
+        shuffleArray(possibleIntFields);
+        shuffleArray(possibleObjFields);
 
         if (r < 0.10) {
             if (allowInclusion !== true) {
                 continue;
             }
-            updatedTestcase = addInclusion(testcase, allowDottedPaths === true);
-        } else if (r < 0.30) {
-            updatedTestcase = addExclusion(testcase, allowDottedPaths === true);
+            pipeline = addInclusion(pipeline, allowDottedPaths === true);
+        } else if (r < 0.20) {
+            pipeline = addExclusion(pipeline, allowDottedPaths === true);
+        } else if (r < 0.40) {
+            pipeline = addAddFields(pipeline, allowDottedPaths === true);
         } else if (r < 0.55) {
-            updatedTestcase = addAddFields(testcase, allowDottedPaths === true);
+            pipeline = addMatch(pipeline, allowDottedPaths === true);
         } else if (r < 0.70) {
-            updatedTestcase = addMatch(testcase, allowDottedPaths === true);
-        } else if (r < 0.80) {
             if (allowGroup !== true) {
                 continue;
             }
 
-            updatedTestcase = addGroup(testcase);
+            pipeline = addGroup(pipeline);
+        } else if (r < 0.80) {
+            if (allowSetWindowFields !== true) {
+                continue;
+            }
+            pipeline = addSetWindowFields(pipeline, allowDottedPaths === true);
         } else if (r < 0.90) {
             if (allowLookup !== true) {
                 continue;
             }
 
-            updatedTestcase = addLookupUnwind(testcase);
+            pipeline = addLookupUnwind(pipeline);
         } else {
             if (allowSort !== true) {
                 continue;
             }
 
             if (r < 0.95 || allowSortWithLimit !== true) {
-                updatedTestcase = addSort(testcase);
+                pipeline = addSort(pipeline);
             } else {
-                updatedTestcase = addSort(testcase, true);
+                pipeline = addSort(pipeline, true);
             }
-        }
-
-        if (Object.keys(updatedTestcase.fields).length != 0) {
-            testcase = updatedTestcase;
         }
 
         ++i;
     }
 
-    return testcase;
+    return pipeline;
 }
 
 let testcases = [];
@@ -541,6 +439,7 @@ for (let k = 0; k < 2; ++k) {
             let allowInclusion = (i >= 3 && i < 6) || (i >= 9);
             let allowGroup = i >= 6;
             let allowLookup = i >= 9;
+            let allowSetWindowFields = (i % 5 === 0);
 
             let testcase = generateTestcase({
                 allowInclusion,
@@ -548,10 +447,11 @@ for (let k = 0; k < 2; ++k) {
                 allowLookup,
                 allowSort,
                 allowSortWithLimit,
+                allowSetWindowFields,
                 allowDottedPaths
             });
 
-            testcases.push({id: testcaseId, pipeline: testcase.pipeline});
+            testcases.push({id: testcaseId, pipeline: testcase});
             ++testcaseId;
         }
     }

@@ -3766,48 +3766,28 @@ SbExpr getDefaultValueExpr(StageBuilderState& state, const WindowFunctionStateme
     }
 }
 
-std::tuple<bool, PlanStageReqs, PlanStageReqs> computeChildReqsForWindow(
-    const PlanStageReqs& reqs, const WindowNode* windowNode) {
+std::tuple<bool, PlanStageReqs> computeChildReqsForWindow(const PlanStageReqs& reqs,
+                                                          const WindowNode* windowNode) {
     auto reqFields = reqs.getFields();
     bool reqFieldsHasDottedPaths = std::any_of(reqFields.begin(), reqFields.end(), [](auto&& f) {
         return f.find('.') != std::string::npos;
     });
-    if (reqFieldsHasDottedPaths) {
-        reqFields = filterVector(std::move(reqFields),
-                                 [](auto&& f) { return f.find('.') == std::string::npos; });
-    }
 
-    // If the parent requires result, or if reqs.getFields() contained a dotted path, or if
-    // 'windowNode->outputFields' contains a dotted path P where 'getTopLevelField(P)' is in
-    // 'reqFieldSet', then we need to materialize the result object.
-    bool reqResult = [&] {
-        if (reqs.hasResult() || reqFieldsHasDottedPaths) {
-            return true;
-        }
-        auto reqFieldSet = StringDataSet(reqFields.begin(), reqFields.end());
-        for (const auto& outputField : windowNode->outputFields) {
-            const auto& path = outputField.fieldName;
-            if (path.find('.') != std::string::npos && reqFieldSet.count(getTopLevelField(path))) {
-                return true;
-            }
-            if (isTopBottomN(outputField)) {
-                // We need the materialized result object to generate sort keys for $topN/$bottomN.
-                return true;
-            }
-        }
-        return false;
-    }();
+    // We need the materialized result object if there is a dotted path in any of the outputfields
+    // or to generate sort keys for $topN/$bottomN.
+    bool windowNeedsObj =
+        std::any_of(windowNode->outputFields.begin(), windowNode->outputFields.end(), [](auto&& f) {
+            return (f.fieldName.find('.') != std::string::npos) || isTopBottomN(f);
+        });
 
-    auto childReqs =
-        reqResult ? reqs.copyForChild().setResultObj() : reqs.copyForChild().clearResult();
+    bool reqResultObj = reqs.hasResultObj() || reqFieldsHasDottedPaths || windowNeedsObj;
 
-    auto forwardingReqs = childReqs.copyForChild();
-
+    auto childReqs = reqs.copyForChild();
     childReqs.setFields(getTopLevelFields(windowNode->partitionByRequiredFields));
     childReqs.setFields(getTopLevelFields(windowNode->sortByRequiredFields));
     childReqs.setFields(getTopLevelFields(windowNode->outputRequiredFields));
 
-    return {reqResult, std::move(childReqs), std::move(forwardingReqs)};
+    return {reqResultObj, std::move(childReqs)};
 }
 
 class WindowStageBuilder {
@@ -4687,7 +4667,57 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildWindow(const Quer
                                                                       const PlanStageReqs& reqs) {
     auto windowNode = static_cast<const WindowNode*>(root);
 
-    auto [reqResult, childReqs, forwardingReqs] = computeChildReqsForWindow(reqs, windowNode);
+    auto forwardingReqs = reqs.copyForChild();
+    auto [reqResultObj, childReqs] = computeChildReqsForWindow(reqs, windowNode);
+    bool reqResultInfo = !reqResultObj && reqs.hasResultInfo();
+
+    boost::optional<FieldSet> reqTrackedFieldSetForChild;
+    boost::optional<FieldEffects> reqEffectsForChild;
+    boost::optional<FieldEffects> effects;
+
+    if (reqResultInfo) {
+        const auto& reqTrackedFieldSet = reqs.getResultInfoTrackedFieldSet();
+        const auto& reqEffects = reqs.getResultInfoEffects();
+
+        // Get the effects of this stage.
+        effects = getQsnInfo(root).effects;
+
+        bool canParticipate = false;
+        if (effects) {
+            // Narrow 'effects' so that it only has effects applicable to fields in
+            // 'reqTrackedFieldSet'.
+            effects->narrow(reqTrackedFieldSet);
+
+            if (auto composedEffects = composeEffectsForResultInfo(*effects, reqEffects)) {
+                // If this stage can participate with the result info req, then set 'canParticipate'
+                // to true.
+                canParticipate = true;
+
+                // Update the tracked field set for the ResultInfo req. We need to continue to track
+                // all the fields we were tracking before except those with Drop or Add effects.
+                reqTrackedFieldSetForChild.emplace(reqTrackedFieldSet);
+                reqTrackedFieldSetForChild->setIntersect(
+                    effects->getFieldsWithEffects([](auto e) { return !effectIsDropOrAdd(e); }));
+
+                reqEffectsForChild.emplace(std::move(*composedEffects));
+                reqEffectsForChild->narrow(*reqTrackedFieldSetForChild);
+
+                // There is a ResultInfo req that we are participating with. Set a ResultInfo req
+                // on 'childReqs'.
+                childReqs.setResultInfo(*reqTrackedFieldSetForChild, *reqEffectsForChild);
+            }
+        }
+
+        // If this group stage cannot participate with the result info req, then we need to
+        // produce a result object instead. Otherwise, we need to ask for a resultInfo.
+        reqResultObj = !canParticipate;
+        reqResultInfo = canParticipate;
+    }
+
+    if (reqResultObj) {
+        childReqs.setResultObj();
+        forwardingReqs.setResultObj();
+    }
 
     auto child = root->children[0].get();
     auto childStageOutput = build(child, childReqs);
@@ -4716,8 +4746,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildWindow(const Quer
         outputs.set(std::make_pair(PlanStageSlots::kField, field), slot);
     }
 
-    // Produce a materialized result object if needed.
-    if (reqResult) {
+    if (reqResultObj) {
+        // Create a result object.
         SbBuilder b(_state, windowNode->nodeId());
 
         std::vector<ProjectNode> nodes;
@@ -4734,6 +4764,12 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildWindow(const Quer
         stage = std::move(outStage);
 
         outputs.setResultObj(outSlots[0]);
+    } else if (reqResultInfo) {
+        // Set the result base and add this stage's effects to the result info effects.
+        if (outputs.hasResultObj()) {
+            outputs.setResultInfoBaseObj(outputs.getResultObj());
+        }
+        outputs.addEffectsToResultInfo(_state, reqs, *effects);
     }
 
     return {std::move(stage), std::move(outputs)};

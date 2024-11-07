@@ -84,7 +84,7 @@ namespace stage_builder {
  * exists) to the end of the object. The "Generic" effect can make arbitrary changes to the input
  * field's position within the object.
  *
- * Set's set is a superset of Modify's set. Gneeric's set is a superset of all other sets.
+ * Set's set is a superset of Modify's set. Generic's set is a superset of all other sets.
  *
  * If we don't have proof that a given input field is non-existent, then we assume Add's set and
  * Set's set are disjoint (as shown in the diagram above). If we have proof that a given input field

@@ -727,6 +727,42 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
 
             return;
         }
+        case STAGE_WINDOW: {
+            auto windowNode = static_cast<const WindowNode*>(qsNode);
+
+            // Get the output fields of the window node and add them to the createdFieldSet.
+            FieldEffects::CreatedFieldVectorType createdFieldVec;
+            bool hasDottedPath = false;
+            for (size_t i = 0; i < windowNode->outputFields.size(); i++) {
+                const auto& field = windowNode->outputFields[i].fieldName;
+                createdFieldVec.emplace_back(getTopLevelField(field), FieldEffect::kSet);
+                hasDottedPath |= (field.find('.') != std::string::npos);
+            }
+
+            if (hasDottedPath) {
+                qsnInfo.setPostimageAllowedFields(&kUniverseFieldSet);
+                return;
+            }
+
+            // The effects the window node has.
+            auto effects = FieldEffects(
+                FieldSet::makeUniverseSet(), FieldSet::makeEmptySet(), createdFieldVec);
+
+            // Compute the postimage allowed field set combining the pre-image effects with the
+            // window node effects.
+            const auto& preimageAllowedFields =
+                *getQsnInfo(qsNode->children[0]).postimageAllowedFields;
+            auto effectsOverPreimage = FieldEffects(preimageAllowedFields);
+            effectsOverPreimage.compose(effects);
+
+            qsnInfo.effects.emplace(std::move(effects));
+
+            // Store the postimage allowed field set into the QsnInfo.
+            auto postimageAllowedFields = effectsOverPreimage.getAllowedFields();
+            qsnInfo.setPostimageAllowedFields(std::move(postimageAllowedFields));
+
+            return;
+        }
         case STAGE_PROJECTION_DEFAULT:
         case STAGE_PROJECTION_COVERED:
         case STAGE_PROJECTION_SIMPLE: {
