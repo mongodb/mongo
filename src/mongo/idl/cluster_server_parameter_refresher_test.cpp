@@ -33,6 +33,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/cluster_server_parameter_refresher.h"
+#include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -42,19 +43,82 @@
 
 namespace mongo {
 namespace {
-class ClusterServerParameterRefresherTest : public ServiceContextTest {
-public:
+
+class ClusterServerParameterRefresherTest : public virtual service_context_test::RouterRoleOverride,
+                                            public ShardingTestFixture {
+protected:
     void setUp() override {
-        _opCtx = getClient()->makeOperationContext();
+        ShardingTestFixture::setUp();
         _refresher = std::make_unique<ClusterServerParameterRefresher>();
+
+        // RouterServer role is required to run the refresher.
+        auto targetService =
+            operationContext()->getServiceContext()->getService(ClusterRole::RouterServer);
+        operationContext()->getClient()->setService(targetService);
+
+        const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
+        configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
+
+        // (Generic FCV reference): Used to provide a valid FCV version response to the
+        // ClusterServerParameterRefresher. This FCV reference should exist across binary versions.
+        _fcv = multiversion::GenericFCV::kLatest;
+        _clusterParameterDocs.insert({"maxIncomingConnections",
+                                      BSON("_id"
+                                           << "maxIncomingConnections"
+                                           << "value" << 3000 << "type"
+                                           << "int")});
     }
 
-    OperationContext* opCtx() {
-        return _opCtx.get();
+    void mockFCVAndClusterParametersResponses() {
+        auto atClusterTime = Timestamp(10, 3);
+
+        // Respond to FCV find.
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            return BSON(
+                "ok" << 1 << "cursor"
+                     << BSON("firstBatch"
+                             << BSON_ARRAY(BSON("_id"
+                                                << "featureCompatibilityVersion"
+                                                << "version" << multiversion::toString(_fcv)))
+                             << "atClusterTime" << atClusterTime << "id" << 0LL << "ns"
+                             << NamespaceString::kServerConfigurationNamespace.toString_forTest()));
+        });
+
+        // Respond to find for clusterParameters.
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            BSONArrayBuilder clusterParameterDocs;
+            for (const auto& [_, paramDoc] : _clusterParameterDocs) {
+                clusterParameterDocs.append(paramDoc);
+            }
+
+            // atClusterTime in readConcern should be the same as the time returned by the FCV find.
+            ASSERT_EQ(request.cmdObj["readConcern"].Obj()["atClusterTime"].timestamp(),
+                      atClusterTime);
+
+            return BSON(
+                "ok" << 1 << "cursor"
+                     << BSON("firstBatch"
+                             << clusterParameterDocs.obj() << "id" << 0LL << "ns"
+                             << NamespaceString::kClusterParametersNamespace.toString_forTest()));
+        });
     }
+
+    void assertFCVAndClusterParamsMatchExpected(multiversion::FeatureCompatibilityVersion fcv,
+                                                StringMap<BSONObj> clusterParameterDocs) {
+
+        ASSERT_EQ(fcv, _fcv);
+
+        for (const auto& [clusterParameterName, _] : _clusterParameterDocs) {
+            ASSERT_NE(clusterParameterDocs.find(clusterParameterName), clusterParameterDocs.end());
+        }
+    }
+
 
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<ClusterServerParameterRefresher> _refresher;
+
+    multiversion::FeatureCompatibilityVersion _fcv;
+    stdx::unordered_map<std::string, BSONObj> _clusterParameterDocs;
 };
 
 TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrency) {
@@ -70,7 +134,7 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrency) {
         // Since there should be no active job at this point, we expect thread 1 to create the
         // promise, run _refreshParameters, and block on the failpoint.
         stdx::thread firstRun([&]() {
-            Status status = _refresher->refreshParameters(opCtx());
+            Status status = _refresher->refreshParameters(operationContext());
             ASSERT_EQ(status, expectedStatus);
         });
 
@@ -89,11 +153,11 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrency) {
         // Threads 2 and 3 should both see that there is an active promise and take out a future on
         // it, not entering _refreshParameters themselves.
         stdx::thread secondRun([&]() {
-            Status status = _refresher->refreshParameters(opCtx());
+            Status status = _refresher->refreshParameters(operationContext());
             ASSERT_EQ(status, expectedStatus);
         });
         stdx::thread thirdRun([&]() {
-            Status status = _refresher->refreshParameters(opCtx());
+            Status status = _refresher->refreshParameters(operationContext());
             ASSERT_EQ(status, expectedStatus);
         });
 
@@ -153,7 +217,8 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrencyReadYourWrit
 
     // Create a thread that creates the in-progress cluster-wide parameters refresh request in the
     // test scenario.
-    stdx::thread backgroundThread([&]() { ASSERT_OK(_refresher->refreshParameters(opCtx())); });
+    stdx::thread backgroundThread(
+        [&]() { ASSERT_OK(_refresher->refreshParameters(operationContext())); });
 
     // Wait for 'backgroundThread' to block on a fail-point. Note that each time we enter the
     // blocking failpoint, we increment "timesEntered" by 2, because we first check for
@@ -165,7 +230,8 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrencyReadYourWrit
     // Read Your Writes consistency.
     stdx::thread concurrentRequestThread([&]() {
         const bool kEnsureReadYourWritesConsistency = true;
-        Status status = _refresher->refreshParameters(opCtx(), kEnsureReadYourWritesConsistency);
+        Status status =
+            _refresher->refreshParameters(operationContext(), kEnsureReadYourWritesConsistency);
 
         // Verify that "blockAndFailClusterParameterRefresh" fail-point was hit since that implies
         // that a new request to refresh cluster-wide parameters was generated.
@@ -196,5 +262,35 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrencyReadYourWrit
 
     concurrentRequestThread.join();
 }
+
+TEST_F(ClusterServerParameterRefresherTest,
+       testGetFCVAndClusterParamsFunctionRetriesOnSnapshotError) {
+    // gMultitenancySupport is set to false so that the function to get FCV and cluster parameters
+    // skips making a request to get the list of tenants.
+    gMultitenancySupport = false;
+    auto originalMultitenancySupport = gMultitenancySupport;
+    ON_BLOCK_EXIT([&] { gMultitenancySupport = originalMultitenancySupport; });
+
+    auto future = launchAsync([&] {
+        multiversion::FeatureCompatibilityVersion fcv;
+        TenantIdMap<StringMap<BSONObj>> tenantParameterDocs;
+
+        std::tie(fcv, tenantParameterDocs) = getFCVAndClusterParametersFromConfigServer();
+
+        assertFCVAndClusterParamsMatchExpected(fcv, tenantParameterDocs.find(boost::none)->second);
+    });
+
+    // The function should retry when the config server responds with a SnapshotTooOld error.
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        return Status(ErrorCodes::SnapshotTooOld, "Snapshot too old");
+    });
+
+    // The function should succeed on retry when successful responses are provided by the config
+    // server.
+    mockFCVAndClusterParametersResponses();
+
+    future.default_timed_get();
+}
+
 }  // namespace
 }  // namespace mongo

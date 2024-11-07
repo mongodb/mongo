@@ -99,4 +99,7 @@ private:
 
 Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue);
 
+std::pair<multiversion::FeatureCompatibilityVersion, TenantIdMap<StringMap<BSONObj>>>
+getFCVAndClusterParametersFromConfigServer();
+
 }  // namespace mongo

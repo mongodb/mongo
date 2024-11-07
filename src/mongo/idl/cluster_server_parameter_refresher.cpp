@@ -53,6 +53,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -79,6 +80,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -98,8 +100,9 @@ Seconds loadInterval() {
     return Seconds(clusterServerParameterRefreshIntervalSecs.load());
 }
 
-std::pair<multiversion::FeatureCompatibilityVersion,
-          TenantIdMap<stdx::unordered_map<std::string, BSONObj>>>
+}  // namespace
+
+std::pair<multiversion::FeatureCompatibilityVersion, TenantIdMap<StringMap<BSONObj>>>
 getFCVAndClusterParametersFromConfigServer() {
     // Use an alternative client region, because we call refreshParameters both from the internal
     // refresher process and from getClusterParameter.
@@ -114,87 +117,86 @@ getFCVAndClusterParametersFromConfigServer() {
     auto as = AuthorizationSession::get(cc());
     as->grantInternalAuthorization();
 
-    auto configServers = Grid::get(opCtx.get())->shardRegistry()->getConfigShard();
-    // Note that we get the list of tenants outside of the transaction. This should be okay, as if
-    // we miss out on some new tenants created between this call and the transaction, we are just
-    // getting slightly old data. Importantly, different tenants' cluster parameters don't interact
-    // with each other, so we don't need a consistent snapshot of cluster parameters across all
-    // tenants, just a consistent snapshot per tenant.
-    auto tenantIds =
-        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx.get(), configServers.get()));
+    const int kOnSnapshotErrorNumRetries = 3;
+    for (int retry = 1; retry <= kOnSnapshotErrorNumRetries; ++retry) {
+        try {
+            auto configServers = Grid::get(opCtx.get())->shardRegistry()->getConfigShard();
+            // Note that we get the list of tenants outside of the snapshot. This should be okay, as
+            // if we miss out on some new tenants created between this call and the snapshot, we are
+            // just getting slightly old data. Importantly, different tenants' cluster parameters
+            // don't interact with each other, so we don't need a consistent snapshot of cluster
+            // parameters across all tenants, just a consistent snapshot per tenant.
+            auto tenantIds =
+                uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx.get(), configServers.get()));
 
-    auto allDocs = std::make_shared<TenantIdMap<stdx::unordered_map<std::string, BSONObj>>>();
-    auto fcv = std::make_shared<multiversion::FeatureCompatibilityVersion>();
-    auto doFetch = [allDocs, fcv, &tenantIds](const txn_api::TransactionClient& txnClient,
-                                              ExecutorPtr txnExec) {
-        FindCommandRequest findFCV{NamespaceString::kServerConfigurationNamespace};
-        findFCV.setFilter(BSON("_id"
-                               << "featureCompatibilityVersion"));
-        return txnClient.exhaustiveFind(findFCV)
-            .thenRunOn(txnExec)
-            .then([fcv, allDocs, &tenantIds, &txnClient, txnExec](
-                      const std::vector<BSONObj>& foundDocs) {
-                uassert(7410710,
-                        "Expected to find FCV in admin.system.version but found nothing!",
-                        !foundDocs.empty());
-                *fcv = FeatureCompatibilityVersionParser::parseVersion(
-                    foundDocs[0]["version"].String());
+            // Fetch the FCV using a snapshotRead concern and store the atClusterTime so that the
+            // cluster parameter finds per tenant can be performed at the snapshot time.
+            FindCommandRequest findFCV{NamespaceString::kServerConfigurationNamespace};
+            findFCV.setFilter(BSON("_id" << multiversion::kParameterName));
+            findFCV.setReadConcern(repl::ReadConcernArgs::kSnapshot);
+            findFCV.setLimit(1);
+            auto findFCVResponseBSON =
+                uassertStatusOK(
+                    configServers->runCommand(opCtx.get(),
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              findFCV.getDbName(),
+                                              findFCV.toBSON(),
+                                              Shard::RetryPolicy::kIdempotent))
+                    .response;
+            auto findFCVResponse =
+                uassertStatusOK(CursorResponse::parseFromBSON(findFCVResponseBSON));
 
-                // Fetch one tenant, then call doFetchTenants for the rest of the tenants within
-                // then() recursively.
-                auto doFetchTenants = [](auto it,
-                                         const auto& tenantIds,
-                                         auto allDocs,
-                                         const auto& txnClient,
-                                         ExecutorPtr txnExec,
-                                         auto& doFetchTenants_ref) mutable {
-                    if (it == tenantIds.end()) {
-                        return SemiFuture<void>::makeReady();
-                    }
-                    FindCommandRequest findClusterParametersTenant{
-                        NamespaceString::makeClusterParametersNSS(*it)};
-                    // We don't specify a filter as we want all documents.
-                    return txnClient.exhaustiveFind(findClusterParametersTenant)
-                        .thenRunOn(txnExec)
-                        .then([&doFetchTenants_ref, &txnClient, &tenantIds, txnExec, it, allDocs](
-                                  const std::vector<BSONObj>& foundDocs) {
-                            stdx::unordered_map<std::string, BSONObj> docsMap;
-                            for (const auto& doc : foundDocs) {
-                                auto name = doc["_id"].String();
-                                docsMap.insert({std::move(name), doc.getOwned()});
-                            }
-                            allDocs->insert({*it, std::move(docsMap)});
-                            return doFetchTenants_ref(std::next(it),
-                                                      tenantIds,
-                                                      allDocs,
-                                                      txnClient,
-                                                      txnExec,
-                                                      doFetchTenants_ref);
-                        })
-                        .semi();
-                };
-                return doFetchTenants(
-                    tenantIds.begin(), tenantIds, allDocs, txnClient, txnExec, doFetchTenants);
-            })
-            .semi();
-    };
+            auto fcvDocs = findFCVResponse.getBatch();
+            uassert(7410710,
+                    "Expected to find FCV in "
+                    "admin.system.version but found nothing!",
+                    !fcvDocs.empty());
+            auto fcv = uassertStatusOK(FeatureCompatibilityVersionParser::parse(fcvDocs[0]));
 
-    repl::ReadConcernArgs::get(opCtx.get()) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+            auto atClusterTime = findFCVResponse.getAtClusterTime();
+            uassert(9565401, "Expected an atClusterTime in find FCV response", atClusterTime);
 
-    // We need to commit w/ writeConcern = majority for readConcern = snapshot to work.
-    opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
-                                               WriteConcernOptions::SyncMode::UNSET,
-                                               WriteConcernOptions::kNoTimeout});
+            // Fetch the cluster parameters for each tenant using a snapshotRead concern with the
+            // atClusterTime of the FCV find.
+            TenantIdMap<StringMap<BSONObj>> allDocs;
+            for (const auto& tenant : tenantIds) {
+                FindCommandRequest findClusterParametersTenant{
+                    NamespaceString::makeClusterParametersNSS(tenant)};
+                auto readConcern = repl::ReadConcernArgs::snapshot(*atClusterTime);
+                findClusterParametersTenant.setReadConcern(readConcern);
 
-    auto executor = Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor();
-    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    txn_api::SyncTransactionWithRetries txn(opCtx.get(), executor, nullptr, inlineExecutor);
-    txn.run(opCtx.get(), doFetch);
-    return {*fcv, *allDocs};
+                auto clusterParameterDocs =
+                    uassertStatusOK(configServers->runExhaustiveCursorCommand(
+                                        opCtx.get(),
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        findClusterParametersTenant.getDbName(),
+                                        findClusterParametersTenant.toBSON(),
+                                        Milliseconds(-1)))
+                        .docs;
+                StringMap<BSONObj> docsMap;
+                for (const auto& doc : clusterParameterDocs) {
+                    auto name = doc["_id"].String();
+                    docsMap[name] = doc.getOwned();
+                }
+                allDocs.insert({tenant, std::move(docsMap)});
+            }
+
+            return {fcv, allDocs};
+        } catch (const ExceptionForCat<ErrorCategory::SnapshotError>& e) {
+            if (retry < kOnSnapshotErrorNumRetries) {
+                LOGV2_DEBUG(9565402,
+                            3,
+                            "Reattempting to get FCV and cluster parameters after encountering "
+                            "snapshot error",
+                            "error"_attr = e);
+                continue;
+            }
+
+            throw;
+        }
+    }
+    MONGO_UNREACHABLE
 }
-
-}  // namespace
 
 Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue) {
     LOGV2_DEBUG(6226400,
@@ -226,6 +228,7 @@ void ClusterServerParameterRefresher::setPeriod(Milliseconds period) {
 Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCtx,
                                                           bool ensureReadYourWritesConsistency) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+    LOGV2_DEBUG(9403901, 3, "ClusterServerParameterRefresher starting");
 
     // If Read Your Writes consistency is requested and a request to fetch the parameter values is
     // in progress, then wait until that request completes.
@@ -272,6 +275,8 @@ Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCt
         }
     }();
 
+    LOGV2_DEBUG(9403902, 3, "ClusterServerParameterRefresher finished");
+
     lk.lock();
     // Complete the promise and detach it from the object, allowing a new job to be created the
     // next time refreshParameters is run. Note that the futures of this promise hold references to
@@ -294,7 +299,7 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
 
     invariant(serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
     multiversion::FeatureCompatibilityVersion fcv;
-    TenantIdMap<stdx::unordered_map<std::string, BSONObj>> clusterParameterDocs;
+    TenantIdMap<StringMap<BSONObj>> clusterParameterDocs;
 
     try {
         std::tie(fcv, clusterParameterDocs) = getFCVAndClusterParametersFromConfigServer();

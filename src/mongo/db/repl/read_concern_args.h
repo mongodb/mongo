@@ -110,6 +110,12 @@ public:
         return rc;
     }
 
+    static ReadConcernArgs snapshot(Timestamp atClusterTime) {
+        auto rc = ReadConcernArgs::kSnapshot;
+        rc.setArgsAtClusterTimeForSnapshot(atClusterTime);
+        return rc;
+    }
+
     /**
      * Format:
      * {
