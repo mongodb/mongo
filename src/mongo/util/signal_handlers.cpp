@@ -37,6 +37,7 @@
 #include <cstring>
 #include <ctime>
 #include <memory>
+#include <sstream>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -313,6 +314,39 @@ void setupSignalHandlers() {
 #endif
 }
 
+#ifndef _WIN32
+void maskSignals(const std::vector<int>& blocked) {
+    // The signals that should be handled by the SignalProcessingThread, once it is started via
+    // startSignalProcessingThread().
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    for (int sig : blocked)
+        sigaddset(&sigset, sig);
+
+    if (pthread_sigmask(SIG_SETMASK, &sigset, nullptr) != 0) {
+        auto ec = lastSystemError();
+        LOGV2_FATAL(9570503, "Failed to mask signal", "error"_attr = errorMessage(ec));
+    }
+}
+
+// Reset the action of the passed signals to use the default signal handler.
+void resetSignalHandlers(const std::vector<int>& blocked) {
+    for (int signum : blocked) {
+        struct sigaction sa;
+        memset(&sa, 0, sizeof(sa));
+        sigemptyset(&sa.sa_mask);
+        sa.sa_handler = SIG_DFL;
+        if (sigaction(signum, &sa, nullptr) != 0) {
+            auto ec = lastSystemError();
+            LOGV2_FATAL(9570502,
+                        "Failed to reset signal handler",
+                        "signal"_attr = signum,
+                        "error"_attr = errorMessage(ec));
+        }
+    }
+}
+#endif
+
 void startSignalProcessingThread(LogFileStatus rotate) {
 #ifdef _WIN32
     stdx::thread(eventProcessingThread).detach();
@@ -320,20 +354,24 @@ void startSignalProcessingThread(LogFileStatus rotate) {
 
     // The signals that should be handled by the SignalProcessingThread, once it is started via
     // startSignalProcessingThread().
-    sigset_t sigset;
-    sigemptyset(&sigset);
+    std::vector<int> blocked;
     for (int sig : kSignalProcessingThreadExclusives)
-        sigaddset(&sigset, sig);
+        blocked.push_back(sig);
 
 #if defined(MONGO_STACKTRACE_HAS_SIGNAL) && !defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
     // On a Unixlike build without the stacktrace behavior, we still want to handle SIGUSR2 to
     // print a message, but it must only go to the signalProcessingThread, not on other threads.
-    // It's as if stackTraceSignal (e.g. SIGUSR2) is a member of kSignalProcessingThreadExclusives.
-    sigaddset(&sigset, stackTraceSignal());
+    blocked.push_back(stackTraceSignal());
 #endif
 
     // Mask signals in the current (only) thread. All new threads will inherit this mask.
-    invariant(pthread_sigmask(SIG_SETMASK, &sigset, nullptr) == 0);
+    maskSignals(blocked);
+
+    // Use default signal handlers for all of the signals we block. This is because on some systems
+    // such as macOS, "if sa_handler is set to SIG_IGN current and pending instances of the signal
+    // are ignored and discarded." See macOS `sigaction` man page for more information.
+    resetSignalHandlers(blocked);
+
     // Spawn a thread to capture the signals we just masked off.
     stdx::thread(signalProcessingThread, rotate).detach();
 #endif
