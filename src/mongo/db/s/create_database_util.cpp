@@ -35,8 +35,6 @@
 #include "mongo/s/shard_util.h"
 #include "mongo/util/pcre_util.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 namespace mongo {
 namespace {
 
@@ -45,19 +43,6 @@ using namespace fmt::literals;
 }  // namespace
 
 namespace create_database_util {
-
-void logCommitCreateDatabaseFailed(const DatabaseName& dbName, const std::string& reason) {
-    LOGV2_DEBUG(8917900,
-                1,
-                "Commit create database failed",
-                "dbName"_attr = dbName.toStringForErrorMsg(),
-                "reason"_attr = reason);
-}
-
-void logCreateDatabaseRetryExhausted(const DatabaseName& dbName) {
-    LOGV2_WARNING(
-        8917901, "Exhausted retries trying to commit create database", "dbName"_attr = dbName);
-}
 
 boost::optional<DatabaseType> checkDbNameConstraints(const DatabaseName& dbName) {
     if (dbName.isConfigDB()) {

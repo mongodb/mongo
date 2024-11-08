@@ -48,13 +48,6 @@ void CreateDatabaseCoordinator::_checkPreconditions() {
     }
 }
 
-ExecutorFuture<void> CreateDatabaseCoordinator::_cleanupOnAbort(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token,
-    const Status& status) noexcept {
-    return ExecutorFuture<void>(**executor);
-}
-
 ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -80,6 +73,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                         opCtx, dbNameStr, existingDatabase->getPrimary());
                     _result = ConfigsvrCreateDatabaseResponse(existingDatabase->getVersion());
                 } else {
+                    // TODO(SERVER-96180): Limit the number of retries.
                     const auto candidatePrimaryShardId =
                         create_database_util::getCandidatePrimaryShard(opCtx, _primaryShard);
                     auto createdDatabase = ShardingCatalogManager::get(opCtx)->commitCreateDatabase(
@@ -117,42 +111,6 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
             if (status == ErrorCodes::RequestAlreadyFulfilled) {
                 return Status::OK();
             }
-
-            if (_doc.getPhase() < Phase::kCommitOnShardingCatalog) {
-                // Early exit to not trigger the clean up procedure because the commit phase hasn't
-                // started yet.
-                return status;
-            }
-
-            const auto opCtxHolder = cc().makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
-            const auto& dbName = nss().dbName();
-
-            // The proposed primary shard was found to not exist or be draining when attempting to
-            // commit.
-            if (status == ErrorCodes::ShardNotFound) {
-                create_database_util::logCommitCreateDatabaseFailed(dbName, status.reason());
-                if (_primaryShard) {
-                    // If a primary shard was explicitly selected by the caller, then fail the
-                    // create operation.
-                    triggerCleanup(opCtx, status);
-                    MONGO_UNREACHABLE;
-                } else {
-                    // If no primary shard was explicitly selected by the caller, then retry to
-                    // choose a new one.
-                    if (--_availableRetries > 0) {
-                        StateDoc newDoc(_doc);
-                        newDoc.setAvailableRetries(_availableRetries);
-                        _updateStateDocument(opCtx, std::move(newDoc));
-                    } else {
-                        create_database_util::logCreateDatabaseRetryExhausted(dbName);
-                        triggerCleanup(opCtx, status);
-                        MONGO_UNREACHABLE;
-                    }
-                }
-            }
-
             return status;
         });
 }
