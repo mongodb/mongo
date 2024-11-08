@@ -21,11 +21,15 @@ var $config = (function() {
         },
         dbHash: function(db, collName) {
             jsTestLog("dbHash: " + db + "." + collName + " tid: " + this.tid);
-            jsTestLog("dbHash begin opTime:" + tojson(this.opTime));
-            let dbHashRes = assert.commandWorked(db.collName.runCommand({
-                dbHash: 1,
-                $_internalReadAtClusterTime: Timestamp(this.opTime['t'], this.opTime['i'])
-            }));
+            let opTime =
+                assert
+                    .commandWorked(db.runCommand(
+                        {insert: collName, documents: [{x: 1}], writeConcern: {w: "majority"}}))
+                    .operationTime;
+            jsTestLog("dbHash opTime:" + tojson(opTime));
+            jsTestLog("dbHash begin opTime:" + tojson(opTime));
+            let dbHashRes = assert.commandWorked(db.collName.runCommand(
+                {dbHash: 1, $_internalReadAtClusterTime: Timestamp(opTime['t'], opTime['i'])}));
             jsTestLog("dbHash done" + dbHashRes.timeMillis);
         },
         fullValidation: function(db, collName) {
@@ -50,13 +54,6 @@ var $config = (function() {
             bulk.insert({_id: x + i.toString()});
         }
         assertAlways.commandWorked(bulk.execute());
-
-        this.opTime =
-            assert
-                .commandWorked(db.runCommand(
-                    {insert: collName, documents: [{x: 1}], writeConcern: {w: "majority"}}))
-                .operationTime;
-        jsTestLog("dbHash opTime:" + tojson(this.opTime));
 
         // Avoid filling the cache by flushing on a shorter interval
         setSyncDelay(db, 10);
