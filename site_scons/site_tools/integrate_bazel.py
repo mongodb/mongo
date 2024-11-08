@@ -125,6 +125,24 @@ class Globals:
     def bazel_target(scons_node):
         return Globals.scons2bazel_targets[str(scons_node).replace("\\", "/")]["bazel_target"]
 
+    @staticmethod
+    def bazel_link_file(scons_node):
+        bazel_target = Globals.scons2bazel_targets[str(scons_node).replace("\\", "/")][
+            "bazel_target"
+        ]
+        linkfile = bazel_target.replace("//src/", "bazel-bin/src/") + "_links.list"
+        return "/".join(linkfile.rsplit(":", 1))
+
+    @staticmethod
+    def bazel_sources_file(scons_node):
+        bazel_target = Globals.scons2bazel_targets[str(scons_node).replace("\\", "/")][
+            "bazel_target"
+        ]
+        sources_file = (
+            bazel_target.replace("//src/", "bazel-bin/src/") + "_sources_list.sources_list"
+        )
+        return "/".join(sources_file.rsplit(":", 1))
+
 
 def bazel_debug(msg: str):
     pass
@@ -696,8 +714,7 @@ def auto_install_bazel(env, libdep, shlib_suffix):
     query_results = env.CheckBazelDepsCache(bazel_target)
 
     if query_results is None:
-        linkfile = bazel_target.replace("//src/", "bazel-bin/src/") + "_links.list"
-        linkfile = "/".join(linkfile.rsplit(":", 1))
+        linkfile = env["SCONS2BAZEL_TARGETS"].bazel_link_file(scons_target)
         with open(os.path.join(env.Dir("#").abspath, linkfile)) as f:
             query_results = f.read()
 
@@ -750,10 +767,7 @@ def auto_archive_bazel(env, node, already_archived, search_stack):
         scons_target = str(bazel_child).replace(
             f"{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path
         )
-        bazel_target = env["SCONS2BAZEL_TARGETS"].bazel_target(scons_target)
-
-        linkfile = bazel_target.replace("//src/", "bazel-bin/src/") + "_links.list"
-        linkfile = "/".join(linkfile.rsplit(":", 1))
+        linkfile = env["SCONS2BAZEL_TARGETS"].bazel_link_file(scons_target)
 
         with open(os.path.join(env.Dir("#").abspath, linkfile)) as f:
             query_results = f.read()

@@ -1648,6 +1648,27 @@ def mongo_cc_library(
         deps = deps + cc_deps + [name + HEADER_DEP_SUFFIX],
     )
 
+def write_sources_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".sources_list")
+    ctx.actions.write(
+        out,
+        "\n".join(ctx.attr.sources),
+    )
+    return [
+        DefaultInfo(
+            files = depset([out]),
+        ),
+    ]
+
+write_sources = rule(
+    write_sources_impl,
+    attrs = {
+        "sources": attr.string_list(
+            doc = "the sources used to build the binary",
+        ),
+    },
+)
+
 def _mongo_cc_binary_and_program(
         name,
         srcs = [],
@@ -1755,6 +1776,12 @@ def _mongo_cc_binary_and_program(
         target_compatible_with = target_compatible_with + enterprise_compatible,
     )
 
+    write_sources(
+        name = name + "_sources_list",
+        sources = srcs,
+        tags = ["scons_link_lists"],
+    )
+
     if _program_type == "binary":
         cc_binary(**args)
         extract_debuginfo_binary(
@@ -1798,7 +1825,8 @@ def mongo_cc_binary(
         defines = [],
         additional_linker_inputs = [],
         features = [],
-        exec_properties = {}):
+        exec_properties = {},
+        **kwargs):
     """Wrapper around cc_binary.
 
     Args:
@@ -1846,6 +1874,7 @@ def mongo_cc_binary(
         features,
         exec_properties,
         _program_type = "binary",
+        **kwargs
     )
 
 def mongo_cc_test(
@@ -1865,7 +1894,8 @@ def mongo_cc_test(
         defines = [],
         additional_linker_inputs = [],
         features = [],
-        exec_properties = {}):
+        exec_properties = {},
+        **kwargs):
     """Wrapper around cc_test.
 
     Args:
@@ -1912,6 +1942,47 @@ def mongo_cc_test(
         features,
         exec_properties,
         _program_type = "test",
+        **kwargs
+    )
+
+def mongo_cc_unit_test(
+        name,
+        srcs = [],
+        deps = [],
+        header_deps = [],
+        visibility = None,
+        data = [],
+        tags = [],
+        copts = [],
+        linkopts = [],
+        includes = [],
+        linkstatic = False,
+        local_defines = [],
+        target_compatible_with = [],
+        defines = [],
+        additional_linker_inputs = [],
+        features = [],
+        exec_properties = {},
+        **kwargs):
+    mongo_cc_test(
+        name = name,
+        srcs = srcs,
+        deps = deps + ["//src/mongo/unittest:unittest_main"],
+        header_deps = header_deps,
+        visibility = visibility,
+        data = data,
+        tags = tags + ["no-remote-exec", "no-remote-cache"],
+        copts = copts,
+        linkopts = linkopts,
+        includes = includes,
+        linkstatic = linkstatic,
+        local_defines = local_defines,
+        target_compatible_with = target_compatible_with,
+        defines = defines,
+        additional_linker_inputs = additional_linker_inputs,
+        features = features,
+        exec_properties = exec_properties,
+        **kwargs
     )
 
 IdlInfo = provider(

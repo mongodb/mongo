@@ -199,6 +199,8 @@ mongo_cc_library(
     hdrs = [
         "clustered_collection_options_gen",
         "collection_options_gen",
+        "index_catalog.h",
+        "index_catalog_entry.h",
         "//src/mongo/base:error_codes_header",
         "//src/mongo/bson:bson_validate_gen",
         "//src/mongo/client:client_api_version_parameters_gen",

@@ -394,6 +394,9 @@ mongo_cc_library(
     linkopts = select({
         "//bazel/config:ssl_enabled_linux": ["-lcrypto"],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:posix": ["-ldl"],
+        "//conditions:default": [],
     }),
     local_defines = select({
         "//bazel/config:gcov_enabled": ["MONGO_GCOV"],

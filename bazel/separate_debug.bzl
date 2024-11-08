@@ -131,11 +131,16 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
             linker_input_deps.append(dep[CcInfo].linking_context.linker_inputs)
 
         if shared_lib or static_lib:
+            if shared_lib:
+                so_path = shared_lib.path.replace(ctx.bin_dir.path + "/", "")
+            else:
+                so_path = ""
             direct_lib = cc_common.create_library_to_link(
                 actions = ctx.actions,
                 feature_configuration = feature_configuration,
                 cc_toolchain = cc_toolchain,
                 dynamic_library = shared_lib,
+                dynamic_library_symlink_path = so_path,
                 static_library = static_lib if cc_shared_library == None else None,
                 alwayslink = True,
             )
@@ -202,6 +207,7 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
             cc_toolchain = cc_toolchain,
             # Replace reference to dynamic library with final name
             dynamic_library = output_shared_lib,
+            dynamic_library_symlink_path = output_shared_lib.path.replace(ctx.bin_dir.path + "/", ""),
             # Omit reference to static library
         )
         linker_input = cc_common.create_linker_input(
@@ -278,12 +284,16 @@ def linux_extraction(ctx, cc_toolchain, inputs):
     # The final program binary depends on the existence of the dependent dynamic library files. With
     # build-without-the-bytes enabled, these aren't downloaded. Manually collect them and add them to the
     # output set.
+    dynamic_deps_runfiles = None
     if ctx.attr.type == "program":
-        outputs.extend(get_transitive_dyn_libs(ctx.attr.deps))
+        dynamic_deps = get_transitive_dyn_libs(ctx.attr.deps)
+        dynamic_deps_runfiles = ctx.runfiles(files = get_transitive_dyn_libs(ctx.attr.deps))
+        outputs.extend(dynamic_deps)
 
     provided_info = [
         DefaultInfo(
             files = depset(outputs),
+            runfiles = dynamic_deps_runfiles,
             executable = output_bin if ctx.attr.type == "program" else None,
         ),
         create_new_ccinfo_library(ctx, cc_toolchain, output_bin, unstripped_static_bin, ctx.attr.cc_shared_library),

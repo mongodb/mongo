@@ -21,6 +21,8 @@
 #
 """Pseudo-builders for building and registering unit tests."""
 
+import os
+
 from site_scons.mongo import insort_wrapper
 
 LAST_TEST_GROUP = 0
@@ -68,7 +70,11 @@ def build_cpp_unit_test(env, target, source, **kwargs):
     else:
         kwargs["AIB_COMPONENTS_EXTRA"] = list(unit_test_components)
 
-    result = env.Program(target, source, **kwargs)
+    if not source:
+        result = env.BazelProgram(target, source, **kwargs)
+    else:
+        result = env.Program(target, source, **kwargs)
+
     env.RegisterTest("$UNITTEST_LIST", result[0])
     env.Alias("$UNITTEST_ALIAS", result[0])
 

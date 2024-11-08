@@ -6654,7 +6654,7 @@ if env.get("__NINJA_NO") != "1":
                     )
             except KeyError:
                 if env.Verbose():
-                    print("BazelAutoInstall not processing non bazel target:\n{libdep_node}}")
+                    print(f"BazelAutoInstall not processing non bazel target:\n{libdep_node}")
 
         return target, source
 

@@ -18,22 +18,8 @@ env.SConscript(
 
 env.CppUnitTest(
     target="bson_test",
-    source=[
-        "bson_field_test.cpp",
-        "bson_iterator_test.cpp",
-        "bson_obj_data_type_test.cpp",
-        "bson_obj_test.cpp",
-        "bson_validate_test.cpp",
-        "bsonelement_test.cpp",
-        "bsonobjbuilder_test.cpp",
-        "oid_test.cpp",
-        "simple_bsonobj_comparator_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/bson_validate",
-        "$BUILD_DIR/mongo/bson/column/column",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

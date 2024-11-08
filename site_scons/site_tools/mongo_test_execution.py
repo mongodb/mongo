@@ -73,8 +73,26 @@ def generate_test_execution_aliases(env, test):
     env.Pseudo(target_command)
     env.Alias("test-execution-aliases", target_command)
 
-    for source in test.sources:
+    try:
+        scons_node = env.File(os.path.join(os.getcwd(), str(test)))
+        root_path = scons_node.abspath.replace("\\", "/").replace(
+            env.Dir("#").abspath.replace("\\", "/") + "/", ""
+        )
+        if root_path.startswith("src"):
+            root_path = env.Dir("$BUILD_DIR").path + root_path[3:]
+        root_path = root_path.replace("\\", "/")
+        sources_list = env["SCONS2BAZEL_TARGETS"].bazel_sources_file(root_path)
+        sources = []
+        with open(os.path.join(env.Dir("#").abspath, sources_list)) as f:
+            for s in f.readlines():
+                if s.strip().endswith(".cpp"):
+                    sources.append(env.File(s.strip()))
+    except KeyError:
+        sources = test.sources
+
+    for source in sources:
         source_base_name = os.path.basename(source.get_path())
+
         # Strip suffix
         dot_idx = source_base_name.rfind(".")
         suffix = source_base_name[dot_idx:]

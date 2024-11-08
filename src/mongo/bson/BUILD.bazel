@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -36,5 +36,30 @@ mongo_cc_library(
         "//src/mongo/bson/column",
         "//src/mongo/db:server_base",
         "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "bson_test",
+    srcs = [
+        "bson_field_test.cpp",
+        "bson_iterator_test.cpp",
+        "bson_obj_data_type_test.cpp",
+        "bson_obj_test.cpp",
+        "bson_validate_test.cpp",
+        "bsonelement_test.cpp",
+        "bsonobjbuilder_test.cpp",
+        "oid_test.cpp",
+        "simple_bsonobj_comparator_test.cpp",
+        "//src/mongo/bson:bsonelement_comparator.h",
+        "//src/mongo/bson:bsonobj_comparator.h",
+        "//src/mongo/bson:unordered_fields_bsonobj_comparator.h",
+        "//src/mongo/bson/mutable:mutable_bson_test_utils.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/bson/column",
+        "//src/mongo/db/catalog:index_catalog",
     ],
 )
