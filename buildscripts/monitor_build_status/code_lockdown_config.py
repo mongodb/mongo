@@ -6,15 +6,19 @@ import yaml
 from pydantic import BaseModel
 
 
-class BfCountThresholds(BaseModel):
-    hot_bf_count: int
-    cold_bf_count: int
-    perf_bf_count: int
-    include_bfs_older_than_hours: int
+class ThresholdConfig(BaseModel):
+    count: int
+    grace_period_days: int
+
+
+class BfThresholds(BaseModel):
+    hot_bf: ThresholdConfig
+    cold_bf: ThresholdConfig
+    perf_bf: ThresholdConfig
 
 
 class Defaults(BaseModel):
-    thresholds: BfCountThresholds
+    thresholds: BfThresholds
     slack_tags: List[str]
 
 
@@ -26,14 +30,14 @@ class DefaultsConfig(BaseModel):
 
 class TeamConfig(BaseModel):
     name: str
-    thresholds: Optional[BfCountThresholds]
+    thresholds: Optional[BfThresholds]
     slack_tags: Optional[List[str]]
 
 
 class GroupConfig(BaseModel):
     name: str
     teams: List[str]
-    thresholds: Optional[BfCountThresholds]
+    thresholds: Optional[BfThresholds]
     slack_tags: Optional[List[str]]
 
 
@@ -70,11 +74,11 @@ class CodeLockdownConfig(BaseModel):
 
         return []
 
-    def get_overall_thresholds(self) -> BfCountThresholds:
+    def get_overall_thresholds(self) -> BfThresholds:
         """Get overall thresholds."""
         return self.defaults.overall.thresholds
 
-    def get_group_thresholds(self, group_name: str) -> BfCountThresholds:
+    def get_group_thresholds(self, group_name: str) -> BfThresholds:
         """
         Get group or default thresholds.
 
@@ -87,7 +91,7 @@ class CodeLockdownConfig(BaseModel):
 
         return self.defaults.group.thresholds
 
-    def get_team_thresholds(self, team_name: str) -> BfCountThresholds:
+    def get_team_thresholds(self, team_name: str) -> BfThresholds:
         """
         Get team or default thresholds.
 

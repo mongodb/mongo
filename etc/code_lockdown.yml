@@ -1,25 +1,40 @@
 defaults:
   overall:
     thresholds:
-      hot_bf_count: 30
-      cold_bf_count: 100
-      perf_bf_count: 30
-      include_bfs_older_than_hours: 168 # 7 days
+      hot_bf:
+        count: 30
+        grace_period_days: 7
+      cold_bf:
+        count: 100
+        grace_period_days: 7
+      perf_bf:
+        count: 30
+        grace_period_days: 7
     slack_tags:
       - "<!here>"
   group:
     thresholds:
-      hot_bf_count: 15
-      cold_bf_count: 50
-      perf_bf_count: 15
-      include_bfs_older_than_hours: 168 # 7 days
+      hot_bf:
+        count: 15
+        grace_period_days: 7
+      cold_bf:
+        count: 50
+        grace_period_days: 7
+      perf_bf:
+        count: 15
+        grace_period_days: 14
     slack_tags: []
   team:
     thresholds:
-      hot_bf_count: 3
-      cold_bf_count: 10
-      perf_bf_count: 5
-      include_bfs_older_than_hours: 48
+      hot_bf:
+        count: 3
+        grace_period_days: 2
+      cold_bf:
+        count: 10
+        grace_period_days: 2
+      perf_bf:
+        count: 3
+        grace_period_days: 2
     slack_tags: []
 
 groups:
@@ -32,10 +47,15 @@ groups:
   #     - "Team Name 2"
   #     - "Team Name 3"
   #   thresholds:  # Optional, group default thresholds will be used if absent
-  #     hot_bf_count: 15
-  #     cold_bf_count: 50
-  #     perf_bf_count: 15
-  #     include_bfs_older_than_hours: 168 # 7 days
+  #     hot_bf:
+  #       count: 15
+  #       grace_period_days: 7
+  #     cold_bf:
+  #       count: 50
+  #       grace_period_days: 7
+  #     perf_bf:
+  #       count: 15
+  #       grace_period_days: 7
   #   slack_tags:  # Optional, group default slack_tags will be used if absent
   #     - "<!here>" # This is equivalent to "@here"
   #     - "<@{slack-member-id}>" # How to find Slack member ID: https://forums.slackcommunity.com/s/question/0D5Hq00009mZfnuKAC/hello-i-am-a-slack-newbie-how-do-i-find-my-slack-id?language=en_US
@@ -83,10 +103,15 @@ teams:
   #######################################################################
   # - name: "Team Name"  # Should exactly match "Assigned Teams" Jira BF field value
   #   thresholds:  # Optional, team default thresholds will be used if absent
-  #     hot_bf_count: 3
-  #     cold_bf_count: 10
-  #     perf_bf_count: 5
-  #     include_bfs_older_than_hours: 48
+  #     hot_bf:
+  #       count: 3
+  #       grace_period_days: 2
+  #     cold_bf:
+  #       count: 10
+  #       grace_period_days: 2
+  #     perf_bf:
+  #       count: 5
+  #       grace_period_days: 2
   #   slack_tags:  # Optional, team default slack_tags will be used if absent
   #     - "<!here>" # This is equivalent to "@here"
   #     - "<@{slack-member-id}>" # How to find Slack member ID: https://forums.slackcommunity.com/s/question/0D5Hq00009mZfnuKAC/hello-i-am-a-slack-newbie-how-do-i-find-my-slack-id?language=en_US

@@ -19,7 +19,7 @@ if __name__ == "__main__" and __package__ is None:
 from buildscripts.client.jiraclient import JiraAuth, JiraClient
 from buildscripts.monitor_build_status.bfs_report import BfCategory, BFsReport
 from buildscripts.monitor_build_status.code_lockdown_config import (
-    BfCountThresholds,
+    BfThresholds,
     CodeLockdownConfig,
 )
 from buildscripts.monitor_build_status.evergreen_service import (
@@ -172,15 +172,15 @@ class MonitorBuildStatusOrchestrator:
             hot_bf_count: int,
             cold_bf_count: int,
             perf_bf_count: int,
-            thresholds: BfCountThresholds,
+            thresholds: BfThresholds,
             slack_tags: List[str],
         ) -> None:
             if all(count == 0 for count in [hot_bf_count, cold_bf_count, perf_bf_count]):
                 return
 
-            hot_bf_percentage = hot_bf_count / thresholds.hot_bf_count * 100
-            cold_bf_percentage = cold_bf_count / thresholds.cold_bf_count * 100
-            perf_bf_percentage = perf_bf_count / thresholds.perf_bf_count * 100
+            hot_bf_percentage = hot_bf_count / thresholds.hot_bf.count * 100
+            cold_bf_percentage = cold_bf_count / thresholds.cold_bf.count * 100
+            perf_bf_percentage = perf_bf_count / thresholds.perf_bf.count * 100
 
             label = f"{scope} {' '.join(slack_tags)}"
             percentages[label] = [hot_bf_percentage, cold_bf_percentage, perf_bf_percentage]
@@ -188,22 +188,28 @@ class MonitorBuildStatusOrchestrator:
             table_data.append(
                 [
                     scope,
-                    f"{hot_bf_percentage:.0f}% ({hot_bf_count} / {thresholds.hot_bf_count})",
-                    f"{cold_bf_percentage:.0f}% ({cold_bf_count} / {thresholds.cold_bf_count})",
-                    f"{perf_bf_percentage:.0f}% ({perf_bf_count} / {thresholds.perf_bf_count})",
+                    f"{hot_bf_percentage:.0f}% ({hot_bf_count} / {thresholds.hot_bf.count})",
+                    f"{cold_bf_percentage:.0f}% ({cold_bf_count} / {thresholds.cold_bf.count})",
+                    f"{perf_bf_percentage:.0f}% ({perf_bf_count} / {thresholds.perf_bf.count})",
                 ]
             )
 
         overall_thresholds = code_lockdown_config.get_overall_thresholds()
         overall_slack_tags = code_lockdown_config.get_overall_slack_tags()
-        overall_older_than_time = now - timedelta(
-            hours=overall_thresholds.include_bfs_older_than_hours
-        )
         _process_thresholds(
             "[Org] Overall",
-            bfs_report.get_bf_count(BfCategory.HOT, overall_older_than_time),
-            bfs_report.get_bf_count(BfCategory.COLD, overall_older_than_time),
-            bfs_report.get_bf_count(BfCategory.PERF, overall_older_than_time),
+            bfs_report.get_bf_count(
+                BfCategory.HOT,
+                now - timedelta(days=overall_thresholds.hot_bf.grace_period_days),
+            ),
+            bfs_report.get_bf_count(
+                BfCategory.COLD,
+                now - timedelta(days=overall_thresholds.cold_bf.grace_period_days),
+            ),
+            bfs_report.get_bf_count(
+                BfCategory.PERF,
+                now - timedelta(days=overall_thresholds.perf_bf.grace_period_days),
+            ),
             overall_thresholds,
             overall_slack_tags,
         )
@@ -212,14 +218,23 @@ class MonitorBuildStatusOrchestrator:
             group_teams = code_lockdown_config.get_group_teams(group_name)
             group_thresholds = code_lockdown_config.get_group_thresholds(group_name)
             group_slack_tags = code_lockdown_config.get_group_slack_tags(group_name)
-            group_older_than_time = now - timedelta(
-                hours=group_thresholds.include_bfs_older_than_hours
-            )
             _process_thresholds(
                 f"[Group] {group_name}",
-                bfs_report.get_bf_count(BfCategory.HOT, group_older_than_time, group_teams),
-                bfs_report.get_bf_count(BfCategory.COLD, group_older_than_time, group_teams),
-                bfs_report.get_bf_count(BfCategory.PERF, group_older_than_time, group_teams),
+                bfs_report.get_bf_count(
+                    BfCategory.HOT,
+                    now - timedelta(days=group_thresholds.hot_bf.grace_period_days),
+                    group_teams,
+                ),
+                bfs_report.get_bf_count(
+                    BfCategory.COLD,
+                    now - timedelta(days=group_thresholds.cold_bf.grace_period_days),
+                    group_teams,
+                ),
+                bfs_report.get_bf_count(
+                    BfCategory.PERF,
+                    now - timedelta(days=group_thresholds.perf_bf.grace_period_days),
+                    group_teams,
+                ),
                 group_thresholds,
                 group_slack_tags,
             )
@@ -227,14 +242,23 @@ class MonitorBuildStatusOrchestrator:
         for assigned_team in sorted(list(bfs_report.team_reports.keys())):
             team_thresholds = code_lockdown_config.get_team_thresholds(assigned_team)
             team_slack_tags = code_lockdown_config.get_team_slack_tags(assigned_team)
-            team_older_than_time = now - timedelta(
-                hours=team_thresholds.include_bfs_older_than_hours
-            )
             _process_thresholds(
                 f"[Team] {assigned_team}",
-                bfs_report.get_bf_count(BfCategory.HOT, team_older_than_time, [assigned_team]),
-                bfs_report.get_bf_count(BfCategory.COLD, team_older_than_time, [assigned_team]),
-                bfs_report.get_bf_count(BfCategory.PERF, team_older_than_time, [assigned_team]),
+                bfs_report.get_bf_count(
+                    BfCategory.HOT,
+                    now - timedelta(days=team_thresholds.hot_bf.grace_period_days),
+                    [assigned_team],
+                ),
+                bfs_report.get_bf_count(
+                    BfCategory.COLD,
+                    now - timedelta(days=team_thresholds.cold_bf.grace_period_days),
+                    [assigned_team],
+                ),
+                bfs_report.get_bf_count(
+                    BfCategory.PERF,
+                    now - timedelta(days=team_thresholds.perf_bf.grace_period_days),
+                    [assigned_team],
+                ),
                 team_thresholds,
                 team_slack_tags,
             )
