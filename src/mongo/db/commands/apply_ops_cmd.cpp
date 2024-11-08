@@ -176,6 +176,15 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
                 ret = OplogApplicationValidity::kNeedsForceAndUseUUID;
             }
 
+            if (checkCOperationType(opObj, "dropDatabase"_sd)) {
+                // dropDatabase is not allowed to run inside a nested applyOps command.
+                // Typically applyOps takes the global write lock, but dropDatabase requires the
+                // lock not to be taken. We allow it on a top-level applyOps as a special case,
+                // but running it inside a nested applyOps is non-trivial and does not fulfill any
+                // use case, so we disallow it and return an error instead.
+                uassert(9585500, "dropDatabase is not allowed inside nested applyOps", depth == 0);
+            }
+
             // If the op contains a nested applyOps...
             if (checkCOperationType(opObj, "applyOps"_sd)) {
                 // And we've recursed too far, then bail out.
