@@ -1128,7 +1128,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         bazel_internal_flags.extend(formatted_options)
 
     if normalized_arch not in ["arm64", "amd64"]:
-        bazel_internal_flags.append("--config=local")
+        bazel_internal_flags.append("--config=no-remote-exec")
     elif os.environ.get("USE_NATIVE_TOOLCHAIN"):
         print("Custom toolchain detected, using --config=local for bazel build.")
         bazel_internal_flags.append("--config=local")
@@ -1137,6 +1137,10 @@ def generate(env: SCons.Environment.Environment) -> None:
         # s390x systems don't have enough RAM to handle the default job count and will
         # OOM unless we reduce it.
         bazel_internal_flags.append("--jobs=3")
+    elif normalized_arch == "ppc64le":
+        # ppc64le builds are OOMing with default concurrency, but it's not clear if it's
+        # an issue with the bazel client itself or in the compiler.
+        bazel_internal_flags.append("--jobs=32")
 
     public_release = False
     # Disable remote execution for public release builds.
