@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -138,7 +139,7 @@ void SamplingEstimator::generateRandomSample(size_t sampleSize) {
     BSONObj obj;
     // Execute the plan, exhaust results and cache the sample.
     while (PlanExecutor::ADVANCED == exec->getNext(&obj, nullptr)) {
-        _sample.push_back(obj);
+        _sample.push_back(obj.getOwned());
     }
     return;
 }
@@ -158,22 +159,38 @@ void SamplingEstimator::generateChunkSample() {
     return;
 }
 
-Cardinality SamplingEstimator::estimateCardinality(const MatchExpression* expr) {
-    // TODO SERVER-93730: Evaluate MatchExpression against a sample.
-    return 10.0;
+CardinalityEstimate SamplingEstimator::estimateCardinality(const MatchExpression* expr) {
+    size_t cnt = 0;
+    for (const auto& doc : _sample) {
+        if (expr->matchesBSON(doc, nullptr)) {
+            cnt++;
+        }
+    }
+    double estimate = (cnt * getCollCard()) / _sampleSize;
+    CardinalityEstimate ce(mongo::cost_based_ranker::CardinalityType{estimate},
+                           mongo::cost_based_ranker::EstimationSource::Sampling);
+    return ce;
 }
 
-std::vector<Cardinality> SamplingEstimator::estimateCardinality(
-    const std::vector<MatchExpression*>& expr) {
-    // TODO SERVER-93730: Evaluate MatchExpression against a sample.
-    return {10.0};
+std::vector<CardinalityEstimate> SamplingEstimator::estimateCardinality(
+    const std::vector<MatchExpression*>& expressions) {
+    std::vector<CardinalityEstimate> estimates;
+    for (auto& expr : expressions) {
+        estimates.push_back(estimateCardinality(expr));
+    }
+
+    return estimates;
 }
 
 SamplingEstimator::SamplingEstimator(OperationContext* opCtx,
                                      const MultipleCollectionAccessor& collections,
                                      size_t sampleSize,
-                                     SamplingStyle samplingStyle)
-    : _opCtx(opCtx), _collections(collections), _sampleSize(sampleSize) {
+                                     SamplingStyle samplingStyle,
+                                     CardinalityEstimate collectionCard)
+    : _opCtx(opCtx),
+      _collections(collections),
+      _sampleSize(sampleSize),
+      _collectionCard(collectionCard) {
 
     if (samplingStyle == SamplingStyle::kRandom) {
         generateRandomSample();
@@ -184,8 +201,9 @@ SamplingEstimator::SamplingEstimator(OperationContext* opCtx,
 
 SamplingEstimator::SamplingEstimator(OperationContext* opCtx,
                                      const MultipleCollectionAccessor& collections,
-                                     SamplingStyle samplingStyle)
-    : SamplingEstimator(opCtx, collections, calculateSampleSize(), samplingStyle) {}
+                                     SamplingStyle samplingStyle,
+                                     CardinalityEstimate collectionCard)
+    : SamplingEstimator(opCtx, collections, calculateSampleSize(), samplingStyle, collectionCard) {}
 
 SamplingEstimator::~SamplingEstimator() {}
 

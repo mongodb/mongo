@@ -29,12 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 
 namespace mongo::ce {
 
-using Cardinality = double;
+using CardinalityEstimate = mongo::cost_based_ranker::CardinalityEstimate;
 
 /**
  * This CE Estimator estimates cardinality of predicates by running a filter/MatchExpression against
@@ -53,7 +54,8 @@ public:
      */
     SamplingEstimator(OperationContext* opCtx,
                       const MultipleCollectionAccessor& collections,
-                      SamplingEstimator::SamplingStyle samplingStyle);
+                      SamplingEstimator::SamplingStyle samplingStyle,
+                      CardinalityEstimate collectionCard);
 
     /*
      * This constructor allows the caller to specify the sample size if necessary. This constructor
@@ -64,20 +66,21 @@ public:
     SamplingEstimator(OperationContext* opCtx,
                       const MultipleCollectionAccessor& collections,
                       size_t sampleSize,
-                      SamplingEstimator::SamplingStyle samplingStyle);
+                      SamplingEstimator::SamplingStyle samplingStyle,
+                      CardinalityEstimate collectionCard);
     ~SamplingEstimator();
 
     /**
      * Estimates the Cardinality of a filter/MatchExpression by running the given ME against the
      * sample.
      */
-    Cardinality estimateCardinality(const MatchExpression* expr);
+    CardinalityEstimate estimateCardinality(const MatchExpression* expr);
 
     /**
      * Batch Estimates the Cardinality of a vector of filter/MatchExpression by running the given
      * MEs against the sample.
      */
-    std::vector<Cardinality> estimateCardinality(const std::vector<MatchExpression*>& expr);
+    std::vector<CardinalityEstimate> estimateCardinality(const std::vector<MatchExpression*>& expr);
 
     /*
      * Generates a sample using a random cursor. The caller can call this function to draw a sample
@@ -110,6 +113,10 @@ protected:
                                                               OperationContext* opCtx,
                                                               size_t sampleSize);
 
+    double getCollCard() {
+        return _collectionCard.cardinality().v();
+    }
+
     // The sample is stored in memory for estimating the cardinality of all predicates of one query
     // request. The sample will be freed on destruction of the SamplingEstimator instance or when a
     // re-sample is requested. A new sample will replace this.
@@ -136,6 +143,8 @@ private:
     // optimized.
     const MultipleCollectionAccessor& _collections;
     size_t _sampleSize;
+
+    CardinalityEstimate _collectionCard;
 };
 
 }  // namespace mongo::ce

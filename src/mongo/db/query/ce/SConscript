@@ -85,7 +85,10 @@ env.Library(
     source=[
         "sampling_estimator.cpp",
     ],
-    LIBDEPS=["$BUILD_DIR/mongo/db/query_exec"],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/cost_based_ranker/estimates",
+        "$BUILD_DIR/mongo/db/query_exec",
+    ],
 )
 
 env.CppUnitTest(
@@ -95,6 +98,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
+        "$BUILD_DIR/mongo/db/query/cost_based_ranker/estimates",
         "sampling_estimator",
     ],
 )
