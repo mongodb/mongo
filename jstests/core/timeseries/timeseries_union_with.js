@@ -8,12 +8,20 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   references_foreign_collection,
+ *   requires_fcv_81,
+ *   # Setting a server parameter is not allowed with a security token.
+ *   not_allowed_with_signed_security_token
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const testDB = db.getSiblingDB(jsTestName());
+    // TODO SERVER-93961: It may be possible to remove this when the shard role API is ready.
+    // In slower builds, inserts may get stuck behind resharding operations. This fix lowers the
+    // chance for that to occur.
+    assert.commandWorked(
+        testDB.adminCommand({setParameter: 1, maxRoundsWithoutProgressParameter: 10}));
     assert.commandWorked(testDB.dropDatabase());
     const timeFieldName = "time";
     const tagFieldName = "tag";
