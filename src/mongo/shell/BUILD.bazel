@@ -159,7 +159,6 @@ mongo_cc_library(
         "//src/mongo/bson:bson_bin_util.h",
         "//src/mongo/bson:bsonobj_comparator.h",
         "//src/mongo/transport:message_compressor_options_client_gen",
-        "//src/mongo/util:signal_win32.h",
     ],
     deps = [
         ":benchrun",
@@ -179,6 +178,7 @@ mongo_cc_library(
         "//src/mongo/util:buildinfo",
         "//src/mongo/util:icu",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:password",
+        "//src/mongo/util:signal_handlers",
     ],
 )
 
