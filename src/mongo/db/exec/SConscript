@@ -48,7 +48,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/s/shard_server_test_fixture",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/db/timeseries/bucket_compression",
         "$BUILD_DIR/mongo/dbtests/mocklib",
@@ -56,6 +55,30 @@ env.CppUnitTest(
         "document_value/document_value",
         "document_value/document_value_test_util",
         "projection_executor",
+        "query_shard_server_test_fixture",
         "working_set",
+    ],
+)
+
+env.Library(
+    target="query_shard_server_test_fixture",
+    source=[
+        "query_shard_server_test_fixture.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/s/shard_server_test_fixture",
+    ],
+)
+
+env.Benchmark(
+    target="distinct_scan_bm",
+    source=[
+        "distinct_scan_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
+        "query_shard_server_test_fixture",
     ],
 )

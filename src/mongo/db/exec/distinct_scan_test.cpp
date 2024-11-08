@@ -31,187 +31,32 @@
 
 #include "mongo/client/index_spec.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/query_shard_server_test_fixture.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/metadata_manager.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 namespace {
-class DistinctScanTest : public ShardServerTestFixture {
+// Helper used to simplify index bounds construction for unit tests.
+IndexBounds makeIndexBounds(
+    std::vector<std::pair<std::string, std::vector<Interval>>>&& protoOils) {
+    IndexBounds bounds;
+    bounds.isSimpleRange = true;
+    for (auto&& [fieldName, intervals] : protoOils) {
+        OrderedIntervalList oil(fieldName);
+        oil.intervals = std::move(intervals);
+        bounds.fields.push_back(oil);
+    }
+    return bounds;
+}
+
+class DistinctScanTest : public QueryShardServerTestFixture {
 public:
-    static IndexBounds makeIndexBounds(
-        std::vector<std::pair<std::string, std::vector<Interval>>>&& protoOils) {
-        IndexBounds bounds;
-        bounds.isSimpleRange = true;
-        for (auto&& [fieldName, intervals] : protoOils) {
-            OrderedIntervalList oil(fieldName);
-            oil.intervals = std::move(intervals);
-            bounds.fields.push_back(oil);
-        }
-        return bounds;
-    }
-
-    static IndexSpec makeIndexSpec(const BSONObj& index, StringData indexName) {
-        IndexSpec spec;
-        spec.name(indexName);
-        spec.addKeys(index);
-        return spec;
-    }
-
-    static void validateOutput(const WorkingSet& ws,
-                               const WorkingSetID wsid,
-                               const BSONObj& expectedKeyData,
-                               bool shouldFetch) {
-        // For some reason (at least under OS X clang), we cannot refer to INVALID_ID
-        // inside the test assertion macro.
-        WorkingSetID invalid = WorkingSet::INVALID_ID;
-        ASSERT_NOT_EQUALS(invalid, wsid);
-
-        auto member = ws.get(wsid);
-
-        if (shouldFetch) {
-            ASSERT_TRUE(member->hasObj());
-            ASSERT_BSONOBJ_EQ(expectedKeyData, member->doc.value().toBson());
-        } else {
-            // Key value is retrieved from working set key data
-            // instead of RecordId.
-            ASSERT_FALSE(member->hasObj());
-            ASSERT_EQ(member->keyData.size(), 1);
-            ASSERT_BSONOBJ_EQ(expectedKeyData, member->keyData[0].keyData);
-        }
-    }
-
-    using DoWorkResult = std::variant<PlanStage::StageState, BSONObj>;
-    static void doWorkAndValidate(DistinctScan& scan,
-                                  WorkingSet& ws,
-                                  WorkingSetID& wsid,
-                                  const std::vector<DoWorkResult>& expectedWorkPattern,
-                                  bool shouldFetch) {
-        for (const auto& nextExpectedWork : expectedWorkPattern) {
-            const auto nextState = scan.work(&wsid);
-            visit(OverloadedVisitor{
-                      [&nextState](PlanStage::StageState state) { ASSERT_EQ(nextState, state); },
-                      [shouldFetch, &nextState, &ws, &wsid](const BSONObj& expectedKeyData) {
-                          ASSERT_EQ(nextState, PlanStage::ADVANCED);
-                          validateOutput(ws, wsid, expectedKeyData, shouldFetch);
-                      }},
-                  nextExpectedWork);
-        }
-    }
-
-    void setUp() final {
-        ShardServerTestFixture::setUp();
-        OperationContext* opCtx = operationContext();
-
-        _testNss = NamespaceString::createNamespaceString_forTest("test_db.distinct_test"_sd);
-        _expCtx = std::make_unique<ExpressionContextForTest>(opCtx, _testNss);
-        _client = std::make_unique<DBDirectClient>(opCtx);
-    }
-
-    auto* expressionContext() {
-        return _expCtx.get();
-    }
-
-    const auto& nss() {
-        return _testNss;
-    }
-
-    /**
-     * Create a simple 'index' on an empty collection with name 'indexName'.
-     */
-    void createIndex(const BSONObj index, std::string indexName) {
-        _client->createIndex(_testNss, makeIndexSpec(index, indexName));
-    }
-
-    /**
-     * Insert the given documents into the test collection.
-     */
-    void insertDocs(const std::vector<BSONObj>& docs) {
-        const size_t expectedSize = docs.size();
-        write_ops::InsertCommandRequest insertOp(_testNss);
-        insertOp.setDocuments(std::move(docs));
-        auto insertReply = _client->insert(insertOp);
-        ASSERT_FALSE(insertReply.getWriteErrors());
-        ASSERT_EQ(insertReply.getN(), expectedSize);
-    }
-
-    /**
-     * Get the index descriptor for the provided 'index'. Asserts if index isn't found.
-     */
-    const IndexDescriptor& getIndexDescriptor(const CollectionPtr& coll, StringData indexName) {
-        auto* opCtx = operationContext();
-        std::vector<const IndexDescriptor*> indexes;
-        const auto* idxDesc = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
-        ASSERT_NE(idxDesc, nullptr);
-        return *idxDesc;
-    }
-
-    struct ChunkDesc {
-        ChunkRange range;
-        bool isOnCurShard;
-    };
-
-    CollectionMetadata prepareTestData(const KeyPattern& shardKeyPattern,
-                                       const std::vector<ChunkDesc>& chunkDescs) {
-        const UUID uuid = UUID::gen();
-        const OID epoch = OID::gen();
-
-        ShardId curShard("0");
-        ShardId otherShard("1");
-        ChunkVersion version({epoch, Timestamp(1, 1)}, {1, 0});
-
-        _chunks.clear();
-        _chunks.reserve(chunkDescs.size());
-        for (auto&& chunkDesc : chunkDescs) {
-            ChunkType c{
-                uuid, chunkDesc.range, version, chunkDesc.isOnCurShard ? curShard : otherShard};
-            _chunks.push_back(c);
-        };
-
-        auto rt = RoutingTableHistory::makeNew(_testNss,
-                                               uuid,
-                                               shardKeyPattern,
-                                               false, /* unsplittable */
-                                               nullptr,
-                                               false,
-                                               epoch,
-                                               Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true,
-                                               _chunks);
-
-        ChunkManager cm(curShard,
-                        DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                        makeStandaloneRoutingTableHistory(std::move(rt)),
-                        boost::none);
-        ASSERT_EQ(_chunks.size(), cm.numChunks());
-
-        {
-            AutoGetCollection autoColl(operationContext(), _testNss, MODE_X);
-            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                operationContext(), _testNss);
-            scopedCsr->setFilteringMetadata(operationContext(), CollectionMetadata(cm, curShard));
-        }
-
-        _manager = std::make_shared<MetadataManager>(
-            getServiceContext(), _testNss, CollectionMetadata(cm, curShard));
-
-        return CollectionMetadata(std::move(cm), curShard);
-    }
-
     struct DistinctScanParamsForTest {
         // Collection & sharding set-up.
         const KeyPattern& shardKey;
@@ -271,16 +116,8 @@ public:
                               &ws,
                               std::move(sfi),
                               testParams.shouldFetch);
-        doWorkAndValidate(
-            distinct, ws, wsid, testParams.expectedWorkPattern, testParams.shouldFetch);
+        doWorkAndValidate(distinct, ws, wsid, testParams.expectedWorkPattern);
     }
-
-private:
-    std::vector<ChunkType> _chunks;
-    std::shared_ptr<MetadataManager> _manager;
-    std::unique_ptr<ExpressionContextForTest> _expCtx;
-    std::unique_ptr<DBDirectClient> _client;
-    NamespaceString _testNss;
 };
 
 const std::vector<BSONObj> kDataset = {

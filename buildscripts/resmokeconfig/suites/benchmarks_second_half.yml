@@ -33,6 +33,7 @@ selector:
     - build/install/bin/query_nond_bm*
     - build/install/bin/plan_cache_classic_bm*
     - build/install/bin/point_query_bm*
+    - build/install/bin/distinct_scan_bm*
     # These benchmarks are being run as part of the benchmarks_expression*.yml
     - build/install/bin/expression_bm*
     - build/install/bin/sbe_expression_bm*

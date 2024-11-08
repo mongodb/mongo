@@ -44,7 +44,7 @@ namespace mongo::tidy {
  *
  * The check function then retrieves the nodes bound by the matchers and emit diagnostics if
  * any illegal usage is detected. An usage is considered illegal if the source file is not in the
- * exception directories (e.g., "src/mongo/db/s/").
+ * exception directories (e.g., "src/mongo/db/s/") or exception files list.
  *
  */
 class MongoCollectionShardingRuntimeCheck : public clang::tidy::ClangTidyCheck {
@@ -54,6 +54,7 @@ public:
     void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
     void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
     std::vector<std::string> exceptionDirs;
+    std::vector<std::string> exceptionFiles;
 };
 
 }  // namespace mongo::tidy

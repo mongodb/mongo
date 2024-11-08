@@ -40,7 +40,10 @@ MongoCollectionShardingRuntimeCheck::MongoCollectionShardingRuntimeCheck(
     StringRef Name, clang::tidy::ClangTidyContext* Context)
     : ClangTidyCheck(Name, Context),
       exceptionDirs(clang::tidy::utils::options::parseStringList(
-          Options.get("exceptionDirs", "src/mongo/db/s"))) {}
+          Options.get("exceptionDirs", "src/mongo/db/s"))),
+      exceptionFiles(clang::tidy::utils::options::parseStringList(
+          Options.get("exceptionFiles", "src/mongo/db/exec/query_shard_server_test_fixture.cpp"))) {
+}
 
 void MongoCollectionShardingRuntimeCheck::registerMatchers(MatchFinder* Finder) {
     // Match instances of the CollectionShardingRuntime class
@@ -84,6 +87,13 @@ void MongoCollectionShardingRuntimeCheck::check(const MatchFinder::MatchResult& 
     // If the file path is in an exception directory, skip the check.
     for (const auto& dir : this->exceptionDirs) {
         if (FilePath.startswith(dir)) {
+            return;
+        }
+    }
+
+    // If the file path is one of the exception files, skip the check.
+    for (const auto& file : this->exceptionFiles) {
+        if (FilePath.equals(file)) {
             return;
         }
     }

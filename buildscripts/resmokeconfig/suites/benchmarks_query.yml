@@ -10,6 +10,7 @@ selector:
     - build/install/bin/query_nond_bm*
     - build/install/bin/point_query_bm*
     - build/install/bin/plan_cache_classic_bm*
+    - build/install/bin/distinct_scan_bm*
     - build/install/bin/shapifying_bm*
 
 executor:
