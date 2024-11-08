@@ -457,7 +457,7 @@ public:
     /**
      * Attempt to signal the index build to commit and advance the index build to the
      * kApplyCommitOplogEntry state. Returns true if successful and false if the attempt was
-     * unnecessful and the caller should retry.
+     * unsuccessful and the caller should retry.
      */
     bool tryCommit(OperationContext* opCtx);
 

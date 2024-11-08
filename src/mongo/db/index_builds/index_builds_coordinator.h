@@ -261,7 +261,7 @@ public:
      * This should only be called when certain the server will not start any new index builds --
      * i.e. after a call to setNewIndexBuildsBlocked -- and potentially after aborting all index
      * builds that can be aborted -- i.e. using abortAllIndexBuildsWithReason -- to avoid an
-     * excesively long wait.
+     * excessively long wait.
      */
     void waitForAllIndexBuildsToStop(OperationContext* opCtx);
 

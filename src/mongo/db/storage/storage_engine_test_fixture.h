@@ -59,11 +59,13 @@ public:
     }
 
     StatusWith<DurableCatalog::EntryIdentifier> createCollection(OperationContext* opCtx,
-                                                                 NamespaceString ns) {
+                                                                 NamespaceString ns,
+                                                                 CollectionOptions options = {}) {
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb db(opCtx, ns.dbName(), LockMode::MODE_X);
-        CollectionOptions options;
-        options.uuid = UUID::gen();
+        if (!options.uuid) {
+            options.uuid = UUID::gen();
+        }
         RecordId catalogId;
         std::unique_ptr<RecordStore> rs;
         {
@@ -84,6 +86,13 @@ public:
         });
 
         return {{_storageEngine->getCatalog()->getEntry(catalogId)}};
+    }
+
+    StatusWith<DurableCatalog::EntryIdentifier> createTempCollection(OperationContext* opCtx,
+                                                                     NamespaceString ns) {
+        CollectionOptions options;
+        options.temp = true;
+        return createCollection(opCtx, ns, options);
     }
 
     std::unique_ptr<TemporaryRecordStore> makeTemporary(OperationContext* opCtx) {
@@ -164,11 +173,12 @@ public:
                            std::string key,
                            boost::optional<UUID> buildUUID) {
         BSONObjBuilder builder;
+        builder.append("v", 2);
         {
             BSONObjBuilder keyObj;
             builder.append("key", keyObj.append(key, 1).done());
         }
-        BSONObj spec = builder.append("name", key).append("v", 2).done();
+        BSONObj spec = builder.append("name", key).done();
 
         Collection* collection =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
