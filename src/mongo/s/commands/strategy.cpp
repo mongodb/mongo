@@ -436,7 +436,6 @@ private:
     void _onStaleDbVersion(Status& status);
     void _onSnapshotError(Status& status);
     void _onShardCannotRefreshDueToLocksHeldError(Status& status);
-    void _onTenantMigrationAborted(Status& status);
     void _onCannotImplicitlyCreateCollection(Status& status);
 
     ParseAndRunCommand* const _parc;
@@ -1094,10 +1093,6 @@ void ParseAndRunCommand::RunAndRetry::_onShardCannotRefreshDueToLocksHeldError(S
     _checkRetryForTransaction(status);
 }
 
-void ParseAndRunCommand::RunAndRetry::_onTenantMigrationAborted(Status& status) {
-    invariant(status.code() == ErrorCodes::TenantMigrationAborted);
-}
-
 void ParseAndRunCommand::RunAndRetry::_onCannotImplicitlyCreateCollection(Status& status) {
     invariant(status.code() == ErrorCodes::CannotImplicitlyCreateCollection);
 
@@ -1130,8 +1125,6 @@ void ParseAndRunCommand::RunAndRetry::run() {
                 _onSnapshotError(status);
             } else if (status == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
                 _onShardCannotRefreshDueToLocksHeldError(status);
-            } else if (status == ErrorCodes::TenantMigrationAborted) {
-                _onTenantMigrationAborted(status);
             } else if (status == ErrorCodes::CannotImplicitlyCreateCollection) {
                 _onCannotImplicitlyCreateCollection(status);
             } else if (status == ErrorCodes::TransactionParticipantFailedUnyield) {

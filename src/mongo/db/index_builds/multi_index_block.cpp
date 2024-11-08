@@ -68,7 +68,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/ident.h"
@@ -488,12 +487,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         wunit.commit();
         return indexInfoObjs;
     } catch (const StorageUnavailableException&) {
-        throw;
-    } catch (const ExceptionForCat<ErrorCategory::TenantMigrationConflictError>&) {
-        // Avoid converting TenantMigrationConflict errors to Status.
-        throw;
-    } catch (const TenantMigrationCommittedException&) {
-        // Avoid converting TenantMigrationCommittedException to Status.
         throw;
     } catch (...) {
         return exceptionToStatus().withContext(str::stream()

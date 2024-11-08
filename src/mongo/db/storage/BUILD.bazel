@@ -67,7 +67,9 @@ mongo_cc_library(
         "named_pipe.h",
         "record_store.h",
         "record_store_base.h",
+        "//src/mongo/db/catalog:virtual_collection_options.h",
         "//src/mongo/db/exec:batched_delete_stage_gen",
+        "//src/mongo/db/pipeline:external_data_source_option_gen",
         "//src/mongo/db/storage:damage_vector.h",
     ],
     deps = [
@@ -537,6 +539,7 @@ mongo_cc_library(
         "recovery_unit_base",
         "storage_options",
         "//src/mongo:base",
+        "//src/mongo/db/views",
     ],
 )
 

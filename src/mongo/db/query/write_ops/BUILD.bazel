@@ -155,6 +155,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:runtime_constants_idl",
     ],
 )

@@ -36,8 +36,6 @@ error_categories:
   # Codes for internal use only. The codes can be passed between servers in a cluster, but must
   # never be returned to the client in a network response.
   - InternalOnly
-  - TenantMigrationError
-  - TenantMigrationConflictError
   - CursorInvalidatedError
 
 error_codes:
@@ -510,39 +508,11 @@ error_codes:
     }
   - {code: 319, name: MovePrimaryInProgress}
 
-  - {
-      code: 320,
-      name: TenantMigrationConflict,
-      extra: TenantMigrationConflictInfo,
-      categories: [TenantMigrationError, TenantMigrationConflictError],
-    }
-  - {
-      code: 321,
-      name: TenantMigrationCommitted,
-      categories: [TenantMigrationError],
-    }
-
   - {code: 322, name: APIVersionError, categories: [VersionedAPIError]}
   - {code: 323, name: APIStrictError, categories: [VersionedAPIError]}
   - {code: 324, name: APIDeprecationError, categories: [VersionedAPIError]}
 
-  - {
-      code: 325,
-      name: TenantMigrationAborted,
-      categories: [TenantMigrationError],
-    }
-
   - {code: 326, name: OplogQueryMinTsMissing}
-
-  - {code: 327, name: NoSuchTenantMigration}
-
-  - {
-      code: 328,
-      name: TenantMigrationAccessBlockerShuttingDown,
-      categories: [InternalOnly],
-    }
-
-  - {code: 329, name: TenantMigrationInProgress}
 
   - {code: 330, name: SkipCommandExecution}
 
@@ -556,8 +526,6 @@ error_codes:
       categories: [ShutdownError, CancellationError, InternalOnly],
     }
   - {code: 334, name: MechanismUnavailable}
-
-  - {code: 335, name: TenantMigrationForgotten}
 
   - {code: 336, name: TimeseriesBucketCleared, categories: [InternalOnly]}
 
@@ -606,13 +574,6 @@ error_codes:
       extra: ChangeStreamStartAfterInvalidateInfo,
     }
   - {code: 352, name: UnsupportedOpQueryCommand}
-
-  - {
-      code: 353,
-      name: NonRetryableTenantMigrationConflict,
-      extra: NonRetryableTenantMigrationConflictInfo,
-      categories: [TenantMigrationError, TenantMigrationConflictError],
-    }
 
   - {
       code: 354,

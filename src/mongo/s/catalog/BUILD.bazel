@@ -86,6 +86,7 @@ mongo_cc_library(
         "//src/mongo/db/commands/query_cmd:bulk_write_crud_op.h",
         "//src/mongo/db/commands/query_cmd:bulk_write_gen",
         "//src/mongo/db/commands/query_cmd:bulk_write_parser.h",
+        "//src/mongo/db/pipeline:aggregate_command_gen",
         "//src/mongo/db/pipeline:aggregation_request_helper.h",
         "//src/mongo/db/pipeline:plan_executor_pipeline.h",
         "//src/mongo/db/pipeline:plan_explainer_pipeline.h",
@@ -106,6 +107,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:keys_collection_document",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/document_value",
     ],
 )
 
@@ -116,6 +118,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "sharding_catalog_client_impl.h",
+        "//src/mongo/db/pipeline:aggregate_command_gen",
     ],
     deps = [
         ":sharding_catalog_client",

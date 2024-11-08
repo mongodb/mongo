@@ -1933,6 +1933,7 @@ mongo_cc_library(
     deps = [
         ":server_base",
         "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/exec/document_value",
     ],
 )
 
@@ -1959,7 +1960,6 @@ mongo_cc_library(
         ":server_base",
         "//src/mongo/db/catalog:cannot_convert_index_to_unique_info",
         "//src/mongo/db/catalog:collection_uuid_mismatch_info",
-        "//src/mongo/db/repl:tenant_migration_errors",
     ],
 )
 
@@ -1974,6 +1974,7 @@ mongo_cc_library(
     deps = [
         ":server_base",
         "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/exec/document_value",
     ],
 )
 

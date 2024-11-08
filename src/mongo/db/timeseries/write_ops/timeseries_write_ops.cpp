@@ -630,31 +630,6 @@ void getTimeseriesBatchResults(OperationContext* opCtx,
                                                             docsToRetry);
 }
 
-void getTimeseriesBatchResultsNoTenantMigration(
-    OperationContext* opCtx,
-    const TimeseriesBatches& batches,
-    int64_t start,
-    int64_t indexOfLastProcessedBatch,
-    bool canContinue,
-    std::vector<mongo::write_ops::WriteError>* errors,
-    boost::optional<repl::OpTime>* opTime,
-    boost::optional<OID>* electionId,
-    std::vector<size_t>* docsToRetry = nullptr) noexcept {
-    auto errorGenerator =
-        [](OperationContext* opCtx, const Status& status, int index, size_t numErrors) {
-            return write_ops_exec::generateErrorNoTenantMigration(opCtx, status, index, numErrors);
-        };
-    getTimeseriesBatchResultsBase<decltype(errorGenerator)>(opCtx,
-                                                            batches,
-                                                            start,
-                                                            indexOfLastProcessedBatch,
-                                                            canContinue,
-                                                            errors,
-                                                            opTime,
-                                                            electionId,
-                                                            docsToRetry);
-}
-
 /**
  * Stages writes to the system.buckets collection, which may have the side effect of reopening an
  * existing bucket to put the measurement(s) into as well as closing buckets. Returns info about the
@@ -806,10 +781,10 @@ insertIntoBucketCatalog(OperationContext* opCtx,
         boost::optional<repl::OpTime> opTime;
         boost::optional<OID> electionId;
         std::vector<size_t> docsToRetry;
-        errors->emplace_back(*write_ops_exec::generateErrorNoTenantMigration(
-            opCtx, ex.toStatus(), 0, errors->size()));
+        errors->emplace_back(
+            *write_ops_exec::generateError(opCtx, ex.toStatus(), 0, errors->size()));
 
-        getTimeseriesBatchResultsNoTenantMigration(
+        getTimeseriesBatchResults(
             opCtx, batches, 0, -1, false, errors, &opTime, &electionId, &docsToRetry);
         throw;
     }
@@ -925,16 +900,16 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
                     "Failed to compress bucket for time-series insert, please retry your write",
                     "bucketId"_attr = bucketId);
 
-                errors->emplace_back(*write_ops_exec::generateErrorNoTenantMigration(
+                errors->emplace_back(*write_ops_exec::generateError(
                     opCtx, ex.toStatus(), start + index, errors->size()));
             } catch (const DBException& ex) {
                 // Exception during commit, append error and wait for all our batches to commit or
                 // abort. We need to wait here as pointers to memory owned by this command is stored
                 // in the WriteBatch(es). This ensures that no other thread may try to access this
                 // memory after this command has been torn down due to the exception.
-                errors->emplace_back(*write_ops_exec::generateErrorNoTenantMigration(
+                errors->emplace_back(*write_ops_exec::generateError(
                     opCtx, ex.toStatus(), start + index, errors->size()));
-                getTimeseriesBatchResultsNoTenantMigration(
+                getTimeseriesBatchResults(
                     opCtx, batches, 0, itr, canContinue, errors, opTime, electionId, &docsToRetry);
                 throw;
             }

@@ -252,6 +252,7 @@ mongo_cc_library(
         ":mongos_server_parameters",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/repl:hello_command",
         "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
@@ -509,6 +510,7 @@ mongo_cc_library(
         "stale_exception.h",
         "transaction_participant_failed_unyield_exception.h",
         "would_change_owning_shard_exception.h",
+        "//src/mongo/db:drop_gen",
 
         # Header-only.
         "//src/mongo/db/commands:txn_cmds_gen",
@@ -537,6 +539,7 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",
         ":analyze_shard_key_common",
         ":sharding_helpers",
+        "//src/mongo/executor:scoped_task_executor",
 
         # TODO(SERVER-93876): Remove.
         "//src/mongo/client:read_preference",

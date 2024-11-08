@@ -739,6 +739,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/exec/document_value",
     ],
 )
 

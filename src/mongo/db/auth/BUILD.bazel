@@ -350,6 +350,7 @@ mongo_cc_library(
         "auth_types_gen",
         "parsed_privilege_gen",
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:privilege_format.h",
         "//src/mongo/db/query:explain_verbosity_gen",
     ],
     header_deps = [
@@ -403,6 +404,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/document_value",
         "//src/mongo/db/stats:counters",
     ],
 )

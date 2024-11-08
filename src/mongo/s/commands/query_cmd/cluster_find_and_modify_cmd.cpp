@@ -903,10 +903,6 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
         uassertStatusOK(responseStatus.withContext("findAndModify"));
     }
 
-    if (responseStatus.code() == ErrorCodes::TenantMigrationAborted) {
-        uassertStatusOK(responseStatus.withContext("findAndModify"));
-    }
-
     if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
         if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {

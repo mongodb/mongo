@@ -75,18 +75,6 @@ TEST(IsTransientTransactionErrorTest, PreparedTransactionInProgressIsTransient) 
                                             false /* isCommitOrAbort */));
 }
 
-TEST(IsTransientTransactionErrorTest, TenantMigrationCommittedIsTransient) {
-    ASSERT_TRUE(isTransientTransactionError(ErrorCodes::TenantMigrationCommitted,
-                                            false /* hasWriteConcernError */,
-                                            false /* isCommitOrAbort */));
-}
-
-TEST(IsTransientTransactionErrorTest, TenantMigrationAbortedIsTransient) {
-    ASSERT_TRUE(isTransientTransactionError(ErrorCodes::TenantMigrationAborted,
-                                            false /* hasWriteConcernError */,
-                                            false /* isCommitOrAbort */));
-}
-
 TEST(IsTransientTransactionErrorTest, ShardCannotRefreshDueToLocksHeldIsTransient) {
     ASSERT_TRUE(isTransientTransactionError(ErrorCodes::ShardCannotRefreshDueToLocksHeld,
                                             false /* hasWriteConcernError */,

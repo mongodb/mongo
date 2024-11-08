@@ -22,5 +22,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/exec/document_value",
     ],
 )

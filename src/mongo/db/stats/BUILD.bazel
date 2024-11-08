@@ -159,11 +159,21 @@ mongo_cc_library(
         "counters.cpp",
     ],
     hdrs = [
+        "//src/mongo/bson:bsonelement_comparator.h",
+        "//src/mongo/db/exec/sbe/values:key_string_entry.h",
+        "//src/mongo/db/exec/sbe/values:value.h",
+        "//src/mongo/db/matcher:expression_leaf.h",
+        "//src/mongo/db/matcher:expression_path.h",
+        "//src/mongo/db/matcher:in_list_data.h",
         "//src/mongo/db/pipeline:expression_from_accumulator_quantile.h",
+        "//src/mongo/db/pipeline:javascript_execution.h",
+        "//src/mongo/db/pipeline:resume_token.h",
+        "//src/mongo/db/storage:sorted_data_interface.h",
     ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/util/concurrency:spin_lock",
     ],
 )

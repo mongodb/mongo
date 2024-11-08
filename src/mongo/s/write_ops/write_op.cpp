@@ -62,7 +62,6 @@ MONGO_FAIL_POINT_DEFINE(hangAfterCompletingWriteWithoutShardKeyWithId);
 bool isRetryErrCode(int errCode) {
     return errCode == ErrorCodes::StaleConfig || errCode == ErrorCodes::StaleDbVersion ||
         errCode == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
-        errCode == ErrorCodes::TenantMigrationAborted ||
         errCode == ErrorCodes::CannotImplicitlyCreateCollection;
 }
 

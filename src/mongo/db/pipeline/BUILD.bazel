@@ -160,6 +160,9 @@ mongo_cc_library(
         "resume_token.h",
         "single_document_transformation_processor.h",
         "transformer_interface.h",
+        "//src/mongo/db:dbcommands_gen",
+        "//src/mongo/db/catalog:database.h",
+        "//src/mongo/db/catalog:virtual_collection_options.h",
     ],
     deps = [
         ":docs_needed_bounds",  # TODO(SERVER-93876): Remove.

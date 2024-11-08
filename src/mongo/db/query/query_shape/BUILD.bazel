@@ -50,6 +50,7 @@ mongo_cc_library(
         "find_cmd_shape.h",
         "query_shape.h",
         "shape_helpers.h",
+        "//src/mongo/db/pipeline:aggregate_command_gen",
     ],
     deps = [
         ":query_shape_common",

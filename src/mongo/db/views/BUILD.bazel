@@ -20,10 +20,10 @@ mongo_cc_library(
         "util.h",
         "view.h",
         "view_graph.h",
+        "//src/mongo/db/query/collation:collator_factory_interface.h",
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
     ],
 )
 

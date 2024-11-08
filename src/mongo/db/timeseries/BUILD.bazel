@@ -109,6 +109,9 @@ mongo_cc_library(
         "//src/mongo/util/tracking:tracked_btree_map.h",
         "//src/mongo/util:tracked_types.h",
         "//src/mongo/util:tracking_context.h",
+        "//src/mongo/db/catalog:collection.h",
+        "//src/mongo/db/catalog:index_catalog.h",
+        "//src/mongo/db/catalog:index_catalog_entry.h",
     ],
     header_deps = [
         "//src/mongo/db/commands:server_status_core",
@@ -116,6 +119,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/bson/column",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/collection_crud:capped_visibility",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/util:fail_point",
     ],

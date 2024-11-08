@@ -251,7 +251,6 @@ bool processResponseFromRemote(OperationContext* opCtx,
     TrackedErrors trackedErrors;
     trackedErrors.startTracking(ErrorCodes::StaleConfig);
     trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
-    trackedErrors.startTracking(ErrorCodes::TenantMigrationAborted);
     trackedErrors.startTracking(ErrorCodes::CannotImplicitlyCreateCollection);
 
     LOGV2_DEBUG(22907,
@@ -284,8 +283,6 @@ bool processResponseFromRemote(OperationContext* opCtx,
     // Note if anything was stale
     auto staleConfigErrors = trackedErrors.getErrors(ErrorCodes::StaleConfig);
     const auto& staleDbErrors = trackedErrors.getErrors(ErrorCodes::StaleDbVersion);
-    const auto& tenantMigrationAbortedErrors =
-        trackedErrors.getErrors(ErrorCodes::TenantMigrationAborted);
     const auto& cannotImplicitlyCreateCollectionErrors =
         trackedErrors.getErrors(ErrorCodes::CannotImplicitlyCreateCollection);
 
@@ -297,10 +294,6 @@ bool processResponseFromRemote(OperationContext* opCtx,
     if (!staleDbErrors.empty()) {
         noteStaleDbVersionResponses(opCtx, staleDbErrors, &targeter);
         ++stats->numStaleDbBatches;
-    }
-
-    if (!tenantMigrationAbortedErrors.empty()) {
-        ++stats->numTenantMigrationAbortedErrors;
     }
 
     if (!cannotImplicitlyCreateCollectionErrors.empty()) {

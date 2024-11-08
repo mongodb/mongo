@@ -42,7 +42,19 @@ mongo_cc_library(
         "capped_visibility.cpp",
     ],
     hdrs = [
-        "capped_visibility.cpp",
+        "capped_visibility.h",
+        "//src/mongo/bson:bsonelement_comparator.h",
+        "//src/mongo/db/catalog:collection.h",
+        "//src/mongo/db/catalog:index_catalog.h",
+        "//src/mongo/db/catalog:index_catalog_entry.h",
+        "//src/mongo/db/exec/sbe/values:bson.h",
+        "//src/mongo/db/exec/sbe/values:key_string_entry.h",
+        "//src/mongo/db/exec/sbe/values:value.h",
+        "//src/mongo/db/index:index_descriptor.h",
+        "//src/mongo/db/index:index_descriptor_fwd.h",
+        "//src/mongo/db/matcher:expression_path.h",
+        "//src/mongo/db/matcher:in_list_data.h",
+        "//src/mongo/db/storage:sorted_data_interface.h",
     ],
     header_deps = [
         "//src/mongo/bson/mutable:mutable_bson",
@@ -50,6 +62,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/db/storage:recovery_unit_base",
     ],
 )

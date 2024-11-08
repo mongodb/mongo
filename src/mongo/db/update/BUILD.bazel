@@ -34,7 +34,9 @@ mongo_cc_library(
         "document_diff_serialization.cpp",
     ],
     hdrs = [
+        "document_diff_applier.h",
         "document_diff_calculator.h",
+        "document_diff_serialization.h",
         "//src/mongo/base:error_codes_header",
     ],
     deps = [

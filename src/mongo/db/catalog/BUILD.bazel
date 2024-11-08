@@ -273,7 +273,11 @@ mongo_cc_library(
         "database_holder.cpp",
     ],
     hdrs = [
+        "database.h",
         "database_holder.h",
+        "virtual_collection_options.h",
+        "//src/mongo/db:dbcommands_gen",
+        "//src/mongo/db/pipeline:external_data_source_option_gen",
     ],
     deps = [
         "//src/mongo:base",

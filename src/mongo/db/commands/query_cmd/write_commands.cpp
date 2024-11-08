@@ -170,7 +170,6 @@ void populateReply(OperationContext* opCtx,
         if (lastResult == ErrorCodes::StaleDbVersion ||
             lastResult == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
             ErrorCodes::isStaleShardVersionError(lastResult.getStatus()) ||
-            ErrorCodes::isTenantMigrationError(lastResult.getStatus()) ||
             lastResult == ErrorCodes::CannotImplicitlyCreateCollection) {
             // For ordered:false commands we need to duplicate these error results for all ops
             // after we stopped. See handleError() in write_ops_exec.cpp for more info.

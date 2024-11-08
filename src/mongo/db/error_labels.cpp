@@ -295,8 +295,6 @@ bool isTransientTransactionError(ErrorCodes::Error code,
         case ErrorCodes::PreparedTransactionInProgress:
         case ErrorCodes::ShardCannotRefreshDueToLocksHeld:
         case ErrorCodes::StaleDbVersion:
-        case ErrorCodes::TenantMigrationAborted:
-        case ErrorCodes::TenantMigrationCommitted:
             return true;
         default:
             isTransient = false;

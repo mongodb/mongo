@@ -91,11 +91,7 @@ typedef std::map<ConnectionString, HostOpTime> HostOpTimeMap;
 
 class BatchWriteExecStats {
 public:
-    BatchWriteExecStats()
-        : numRounds(0),
-          numStaleShardBatches(0),
-          numStaleDbBatches(0),
-          numTenantMigrationAbortedErrors(0) {}
+    BatchWriteExecStats() : numRounds(0), numStaleShardBatches(0), numStaleDbBatches(0) {}
 
     void noteTargetedShard(const ShardId& shardId);
     void noteNumShardsOwningChunks(int nShardsOwningChunks);
@@ -113,8 +109,6 @@ public:
     int numStaleShardBatches;
     // Number of stale batches due to StaleDbVersion
     int numStaleDbBatches;
-    // Number of tenant migration aborted errors
-    int numTenantMigrationAbortedErrors;
 
 private:
     std::set<ShardId> _targetedShards;
