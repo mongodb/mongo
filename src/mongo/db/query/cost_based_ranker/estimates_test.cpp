@@ -182,6 +182,18 @@ TEST(EstimatesFramework, SourceMerge) {
     auto ce3 = ce1 + ce2;
     ASSERT_EQUALS(ce3.source(), ce1.source());
     ASSERT_EQUALS(ce3.source(), ce2.source());
+
+    // Combining selectivities with Code should leave it unchanged and be symmetric.
+    SelectivityEstimate s1{SelectivityType{0}, EstimationSource::Code};
+    SelectivityEstimate s2{SelectivityType{0}, EstimationSource::Heuristics};
+    ASSERT_EQ((s1 + s2).source(), EstimationSource::Heuristics);
+    ASSERT_EQ((s2 + s1).source(), EstimationSource::Heuristics);
+
+    // Combining selectivities with Metadata should leave it unchanged and be symmetric.
+    SelectivityEstimate s3{SelectivityType{0}, EstimationSource::Metadata};
+    SelectivityEstimate s4{SelectivityType{0}, EstimationSource::Heuristics};
+    ASSERT_EQ((s1 + s2).source(), EstimationSource::Heuristics);
+    ASSERT_EQ((s2 + s1).source(), EstimationSource::Heuristics);
 }
 
 }  // unnamed namespace

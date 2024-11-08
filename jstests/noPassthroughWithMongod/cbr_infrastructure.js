@@ -129,6 +129,16 @@ function verifyCollectionCardinalityEstimate() {
     assert.eq(w1.cardinalityEstimate, card);
 }
 
+function verifyHeuristicEstimateSource() {
+    coll.drop();
+    assert.commandWorked(coll.insert({a: 1}));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
+    const e1 = coll.find({a: 1}).explain();
+    const w1 = getWinningPlanFromExplain(e1);
+    assert.eq(w1.estimatesMetadata.ceSource, "Heuristics", w1);
+}
+
 try {
     checkLastRejectedPlan(q1);
     checkLastRejectedPlan(q2);
@@ -136,6 +146,7 @@ try {
     checkRootedOr(q4);
     checkLastRejectedPlan(q5);
     verifyCollectionCardinalityEstimate();
+    verifyHeuristicEstimateSource();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));

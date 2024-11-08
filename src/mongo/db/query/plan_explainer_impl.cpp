@@ -254,6 +254,9 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         const auto& est = estimates.at(querySolutionNode);
         bob->append("cardinalityEstimate", est.outCE.toDouble());
         bob->append("costEstimate", est.cost.toDouble());
+        BSONObjBuilder metadataBob(bob->subobjStart("estimatesMetadata"));
+        metadataBob.append("ceSource", toStringData(est.outCE.source()));
+        metadataBob.done();
     }
 
     // Display the BSON representation of the filter, if there is one.

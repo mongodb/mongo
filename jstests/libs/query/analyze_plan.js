@@ -1206,6 +1206,7 @@ export function canonicalizePlan(p) {
     delete p.isCached;
     delete p.cardinalityEstimate;
     delete p.costEstimate;
+    delete p.estimatesMetadata;
     if (p.hasOwnProperty("inputStage")) {
         canonicalizePlan(p.inputStage);
     } else if (p.hasOwnProperty("inputStages")) {

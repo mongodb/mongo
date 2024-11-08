@@ -87,9 +87,9 @@ SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
     return [&]() -> SelectivityEstimate {
         switch (expr->matchType()) {
             case MatchExpression::MatchType::ALWAYS_FALSE:
-                return zeroSel;
+                return zeroSelHeuristic;
             case MatchExpression::MatchType::ALWAYS_TRUE:
-                return oneSel;
+                return oneSelHeuristic;
             case MatchExpression::MatchType::EQ:
             case MatchExpression::MatchType::INTERNAL_EXPR_EQ: {
                 // Equality predicate is equalivent to a point interval
@@ -147,14 +147,14 @@ SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
 
 SelectivityEstimate estimateInterval(const Interval& interval, CardinalityEstimate inputCard) {
     if (interval.isEmpty() || interval.isNull()) {
-        return zeroSel;
+        return zeroSelHeuristic;
     }
     if (interval.isFullyOpen()) {
-        return oneSel;
+        return oneSelHeuristic;
     }
     if (interval.isPoint()) {
         if (inputCard <= oneCE) {
-            return oneSel;
+            return oneSelHeuristic;
         }
         return heuristicPointIntervalSel(inputCard);
     }

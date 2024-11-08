@@ -61,9 +61,21 @@ void EstimateBase::mergeSources(const EstimateBase& other) {
     tassert(
         9274203, "Other estimate has unknown source", other._source != EstimationSource::Unknown);
 
+    // Merging with a code based estimate does not modify the estimate type
     if (other._source == EstimationSource::Code) {
-        return;  // Estimates stored as C++ do not modify the source
+        return;
+    } else if (_source == EstimationSource::Code) {
+        _source = other._source;
+        return;
     }
+    // Merging with a metadata based estimate does not modify the estimate type
+    if (other._source == EstimationSource::Metadata) {
+        return;
+    } else if (_source == EstimationSource::Metadata) {
+        _source = other._source;
+        return;
+    }
+    // Different types result in Mixed, otherwise keep it unchanged.
     _source = (_source == other._source) ? _source : EstimationSource::Mixed;
 }
 
