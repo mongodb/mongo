@@ -29,17 +29,17 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <memory>
 #include <utility>
 #include <vector>
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -150,16 +150,13 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
                     executor::RemoteCommandResponse(
                         reply.targetUsed, replyBob.obj(), reply.elapsed)};
             })
-            .getNoThrow(opCtx);
+            .getNoThrow();
 
     if (ignoreResponses) {
         return {};
     }
 
     if (auto status = responses.getStatus(); status != Status::OK()) {
-        if (status != ErrorCodes::RemoteCommandExecutionError) {
-            uassertStatusOK(status);
-        }
         uassertStatusOK(async_rpc::unpackRPCStatus(status));
     }
 
