@@ -17,7 +17,11 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
-import {getPlanStages, getWinningPlan, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    isIndexOnly
+} from "jstests/libs/query/analyze_plan.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 
@@ -27,8 +31,9 @@ let coll = assertDropAndRecreateCollection(
 
 // Extracts the winning plan for the given query and projection from the explain output.
 const winningPlan = (query, proj) => FixtureHelpers.isMongos(db)
-    ? getWinningPlan(getWinningPlan(coll.find(query, proj).explain().queryPlanner).shards[0])
-    : getWinningPlan(coll.find(query, proj).explain().queryPlanner);
+    ? getWinningPlanFromExplain(
+          getWinningPlanFromExplain(coll.find(query, proj).explain().queryPlanner).shards[0])
+    : getWinningPlanFromExplain(coll.find(query, proj).explain().queryPlanner);
 
 // Runs the given query and confirms that: (1) the $** was used to answer the query, (2) the
 // results produced by the $** index match the given 'expectedResults', and (3) the same output

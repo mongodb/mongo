@@ -8,6 +8,7 @@ import {
     getPlanStages,
     getQueryPlanners,
     getWinningPlan,
+    getWinningPlanFromExplain,
     isAlwaysFalsePlan,
     isEofPlan,
     isIdhackOrExpress,
@@ -147,7 +148,7 @@ export class QuerySettingsIndexHintsTests {
         return this.assertIndexUse(cmd, expectedIndex, (explain) => {
             return getQueryPlanners(explain)
                 .filter(queryPlanner => queryPlanner.namespace == `${ns.db}.${ns.coll}`)
-                .map(getWinningPlan)
+                .map(queryPlan => getWinningPlanFromExplain(queryPlan, false))
                 .flatMap(winningPlan => getPlanStages(winningPlan, "IXSCAN"));
         });
     }
@@ -162,7 +163,7 @@ export class QuerySettingsIndexHintsTests {
 
         this.assertIndexUse(cmd, expectedIndex, (explain) => {
             return getQueryPlanners(explain)
-                .map(getWinningPlan)
+                .map(queryPlan => getWinningPlanFromExplain(queryPlan, false))
                 .flatMap(winningPlan => getPlanStages(winningPlan, "EQ_LOOKUP"))
                 .map(stage => {
                     stage.keyPattern = stage.indexKeyPattern;
@@ -186,7 +187,7 @@ export class QuerySettingsIndexHintsTests {
     assertDistinctScanStage(cmd, expectedIndex) {
         return this.assertIndexUse(cmd, expectedIndex, (explain) => {
             return getQueryPlanners(explain)
-                .map(getWinningPlan)
+                .map(queryPlan => getWinningPlanFromExplain(queryPlan, false))
                 .flatMap(winningPlan => getPlanStages(winningPlan, "DISTINCT_SCAN"));
         });
     }
@@ -194,7 +195,7 @@ export class QuerySettingsIndexHintsTests {
     assertCollScanStage(cmd, allowedDirections) {
         const explain = assert.commandWorked(this._db.runCommand({explain: cmd}));
         const collscanStages = getQueryPlanners(explain)
-                                   .map(getWinningPlan)
+                                   .map(queryPlan => getWinningPlanFromExplain(queryPlan, false))
                                    .flatMap(winningPlan => getPlanStages(winningPlan, "COLLSCAN"));
         assert.gte(collscanStages.length, 1, explain);
         for (const collscanStage of collscanStages) {
@@ -386,7 +387,8 @@ export class QuerySettingsIndexHintsTests {
         const settings = {indexHints: {ns, allowedIndexes: [this.indexAB]}};
         const getWinningPlansForQuery = (query) => {
             const explain = assert.commandWorked(this._db.runCommand({explain: query}));
-            return getQueryPlanners(explain).map(getWinningPlan);
+            return getQueryPlanners(explain).map(queryPlan =>
+                                                     getWinningPlanFromExplain(queryPlan, false));
         };
 
         this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
@@ -417,7 +419,8 @@ export class QuerySettingsIndexHintsTests {
             this._qsutils.withQuerySettings(
                 {...query, $db: querySettingsQuery.$db}, settings, () => {
                     const explain = assert.commandWorked(this._db.runCommand({explain: query}));
-                    winningPlans = getQueryPlanners(explain).map(getWinningPlan);
+                    winningPlans = getQueryPlanners(explain).map(
+                        queryPlan => getWinningPlanFromExplain(queryPlan, false));
                 });
             return winningPlans;
         };
@@ -437,7 +440,9 @@ export class QuerySettingsIndexHintsTests {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
         const getWinningStages = (explain) =>
-            getQueryPlanners(explain).flatMap(getWinningPlan).flatMap(flattenQueryPlanTree);
+            getQueryPlanners(explain)
+                .flatMap(queryPlan => getWinningPlanFromExplain(queryPlan, false))
+                .flatMap(flattenQueryPlanTree);
 
         // It's not guaranteed for all the queries to preserve the order of the stages when
         // replanning (namely in the case of subplanning with $or statements). Flatten the plan tree

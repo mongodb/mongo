@@ -5,7 +5,7 @@
  *
  */
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 export const $config = (function() {
     var data = {
@@ -45,11 +45,11 @@ export const $config = (function() {
             assert(res.queryPlanner, tojson(res));
             assert(res.queryPlanner.winningPlan, tojson(res));
             if (isMongod(db) && !TestData.testingReplicaSetEndpoint) {
-                assert.eq(getWinningPlan(res.queryPlanner).stage, 'EOF', tojson(res));
+                assert.eq(getWinningPlanFromExplain(res.queryPlanner).stage, 'EOF', tojson(res));
             } else {
                 // In the sharding case, each shard has a winningPlan
                 res.queryPlanner.winningPlan.shards.forEach(function(shard) {
-                    assert.eq(getWinningPlan(shard).stage, 'EOF', tojson(res));
+                    assert.eq(getWinningPlanFromExplain(shard).stage, 'EOF', tojson(res));
                 });
             }
         }

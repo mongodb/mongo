@@ -15,7 +15,11 @@
 // ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {getPlanStages, getQueryPlanners, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getQueryPlanners,
+    getWinningPlanFromExplain
+} from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
@@ -48,7 +52,7 @@ assert.commandWorked(coll.createIndexes([indexA, indexB, indexAB]));
  * Asserts that 'queryPlanner' contains index scan stages with the 'expectedIndex'.
  */
 function assertIndexScan(queryPlanner, expectedIndex) {
-    const ixscans = getPlanStages(getWinningPlan(queryPlanner), "IXSCAN");
+    const ixscans = getPlanStages(getWinningPlanFromExplain(queryPlanner), "IXSCAN");
     assert.gte(ixscans.length, 1, queryPlanner);
 
     for (const stage of ixscans) {
