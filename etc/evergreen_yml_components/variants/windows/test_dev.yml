@@ -47,12 +47,12 @@ variables:
 
 buildvariants:
   - name: &windows-compile-required windows-compile-required
-    display_name: "! Windows Server 2022 Enterprise Compile"
+    display_name: "! Windows Server 2022 Enterprise Compile Essential"
     tags: ["required", "bazel_check", "forbid_tasks_tagged_with_experimental"]
     run_on:
       - windows-2022-xxlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
-    expansions:
+    expansions: &windows_compile_expansions
       exe: ".exe"
       ext: zip
       additional_package_targets: >-
@@ -73,12 +73,29 @@ buildvariants:
       - name: compile_ninja_quick_TG
       - name: compile_test_serial_no_unittests_TG
       - name: compile_test_parallel_unittest_stream_TG
-      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch
-      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
         distros:
           - windows-2022-xxlarge
-      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
-      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant .requires_execution_on_windows_patch_build
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant .requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-xxlarge
+
+  - name: windows-compile-suggested
+    display_name: "* Windows Server 2022 Enterprise Compile Non-essential"
+    tags: ["suggested", "bazel_check", "forbid_tasks_tagged_with_experimental"]
+    run_on:
+      - windows-2022-xxlarge
+    activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
+    expansions: *windows_compile_expansions
+    tasks:
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-xxlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.requires_execution_on_windows_patch_build
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.requires_execution_on_windows_patch_build
         distros:
           - windows-2022-xxlarge
 
@@ -90,7 +107,7 @@ buildvariants:
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - windows-2022-small
-    expansions:
+    expansions: &windows_essential_expansions
       <<: *windows_expansions
       burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
       exe: ".exe"
@@ -121,8 +138,7 @@ buildvariants:
 
   # This Windows build variant exists to run all tasks that have been excluded from running on the required Windows build variant.
   # See SERVER-79037 for how the essential set of tasks was computed.
-  - &enterprise-windows-all-feature-flags-required-template
-    <<: *windows_compile_variant_dependency
+  - <<: *windows_compile_variant_dependency
     name: &enterprise-windows-all-feature-flags-non-essential enterprise-windows-all-feature-flags-non-essential
     display_name: "* Enterprise Windows Server 2022 (all feature flags) non-essential tasks"
     tags: ["suggested"]
@@ -130,24 +146,8 @@ buildvariants:
     run_on:
       - windows-2022-small
     expansions:
-      <<: *windows_expansions
+      <<: *windows_essential_expansions
       burn_in_tests_build_variant: enterprise-windows-all-feature-flags-non-essential
-      exe: ".exe"
-      content_type: application/zip
-      python: "/cygdrive/c/python/python310/python.exe"
-      ext: zip
-      multiversion_platform: windows
-      multiversion_edition: enterprise
-      jstestfuzz_num_generated_files: 35
-      target_resmoke_time: 20
-      max_sub_suites: 5
-      large_distro_name: windows-2022-xlarge
-      # To force disable feature flags even on the all feature flags variant, please use this file:
-      # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
-      test_flags: >-
-        --runAllFeatureFlagTests
-        --excludeWithAnyTags=incompatible_with_windows_tls
-      external_auth_jobs_max: 1
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
