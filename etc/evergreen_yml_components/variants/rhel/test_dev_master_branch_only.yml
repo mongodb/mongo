@@ -999,7 +999,6 @@ buildvariants:
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: secondary_reads_passthrough_gen
-  - name: .shard_split
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
