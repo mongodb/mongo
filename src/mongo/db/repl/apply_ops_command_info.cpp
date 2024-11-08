@@ -108,6 +108,10 @@ ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
     uassert(6711600,
             "applyOps command no longer supports the 'preCondition' option",
             !getPreCondition());
+
+    uassert(6711601,
+            "applyOps command no longer supports the 'alwaysUpsert' option",
+            !getAlwaysUpsert());
 }
 
 // static
@@ -166,18 +170,6 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
                           << redact(applyOpsOplogEntry.toBSONForLogging()),
             OplogEntry::CommandType::kApplyOps == applyOpsOplogEntry.getCommandType());
 
-    // The 'alwaysUpsert' field defaults to true in the absence of a txnNumber.  When a txnNumber is
-    // present the 'alwaysUpsert' field is ignored if present, and 'alwaysUpsert' is considered to
-    // be false.
-    //
-    // TODO(SERVER-88158): Consider removing 'alwaysUpsert' entirely.
-    bool alwaysUpsert = !applyOpsOplogEntry.getTxnNumber();
-    if (alwaysUpsert) {
-        auto alwaysUpsertField = applyOpsOplogEntry.getObject()["alwaysUpsert"];
-        if (alwaysUpsertField.type() == Bool && !alwaysUpsertField.boolean())
-            alwaysUpsert = false;
-    }
-
     // The algorithm here is
     // 1. Get a vector of common elements to be added to the operations from the topLevelDoc.
     //    This vector is annotated with an integer which will hold an index value.
@@ -204,17 +196,12 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
     for (const auto& operationDocElem : operationDocs) {
         auto operationDoc = operationDocElem.Obj();
         BSONObjBuilder builder;
-        bool mustUpsert = alwaysUpsert;
         {
             BSONObjIterator it(operationDoc);
             while (it.more()) {
                 BSONElement e = it.next();
                 builder.append(e);
                 StringData fieldName = e.fieldNameStringData();
-                if (alwaysUpsert && fieldName == OplogEntry::kUpsertFieldName) {
-                    // If the operation already sets the "b" field, respect that.
-                    mustUpsert = false;
-                }
                 auto commonElementIter = commonNamesMap.find(fieldName);
                 if (commonElementIter != commonNamesMap.end()) {
                     commonElementIter->second->second = applyOpsIdx;
@@ -225,11 +212,6 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
             if (elementRef.second != applyOpsIdx) {
                 builder.append(elementRef.first);
             }
-        }
-        // Oplog entries can have an oddly-named "b" field for "upsert". MongoDB stopped creating
-        // such entries in 4.0, but we can use the "b" field for the extracted entry here.
-        if (mustUpsert) {
-            builder.append(OplogEntry::kUpsertFieldName, true);
         }
         auto operation = builder.obj();
 

@@ -13,6 +13,7 @@
  *   # that 'preCondition' is rejected is validated by this test, so it cannot run against nodes
  *   # older than 6.2.
  *   requires_fcv_62,
+ *   multiversion_incompatible
  * ]
  */
 
@@ -199,7 +200,7 @@ assert.eq(0, t.find().count(), "Non-zero amount of documents in collection to st
 
 /**
  * Test function for running CRUD operations on non-existent namespaces using various
- * combinations of invalid namespaces (collection/database), alwaysUpsert, and nesting.
+ * combinations of invalid namespaces (collection/database) and nesting.
  *
  * Leave 'expectedErrorCode' undefined if this command is expected to run successfully.
  */
@@ -210,15 +211,13 @@ function testCrudOperationOnNonExistentNamespace(optype, o, o2, expectedErrorCod
         const op = {op: optype, ns: coll.getFullName(), o: o, o2: o2};
         [false, true].forEach(nested => {
             const opToRun = nested ? {op: 'c', ns: 'test.$cmd', o: {applyOps: [op]}, o2: {}} : op;
-            [false, true].forEach(alwaysUpsert => {
-                const cmd = {applyOps: [opToRun], alwaysUpsert: alwaysUpsert};
-                jsTestLog('Testing applyOps on non-existent namespace: ' + tojson(cmd));
-                if (expectedErrorCode === ErrorCodes.OK) {
-                    assert.commandWorked(db.adminCommand(cmd));
-                } else {
-                    assert.commandFailedWithCode(db.adminCommand(cmd), expectedErrorCode);
-                }
-            });
+            const cmd = {applyOps: [opToRun]};
+            jsTestLog('Testing applyOps on non-existent namespace: ' + tojson(cmd));
+            if (expectedErrorCode === ErrorCodes.OK) {
+                assert.commandWorked(db.adminCommand(cmd));
+            } else {
+                assert.commandFailedWithCode(db.adminCommand(cmd), expectedErrorCode);
+            }
         });
     });
 }
@@ -319,7 +318,7 @@ res = db.runCommand({
 });
 
 assert.eq(true, res.results[0], "Valid update failed");
-assert.eq(true, res.results[1], "Valid update failed");
+assert.eq(false, res.results[1], "Nonexisting doc upserted");
 
 // Ops with transaction numbers are valid.
 const lsid = {
@@ -357,7 +356,7 @@ res = db.runCommand({
 });
 
 assert.eq(true, res.results[0], "Valid insert with transaction number failed");
-assert.eq(true, res.results[1], "Valid update with transaction number failed");
+assert.eq(false, res.results[1], "Nonexisting doc upserted");
 assert.eq(true, res.results[2], "Valid delete with transaction number failed");
 
 // Ops with multiple statement IDs are valid.
@@ -392,7 +391,7 @@ res = db.runCommand({
 });
 
 assert.eq(true, res.results[0], "Valid insert with multiple statement IDs failed");
-assert.eq(true, res.results[1], "Valid update with multiple statement IDs failed");
+assert.eq(false, res.results[1], "Nonexisting doc upserted");
 assert.eq(true, res.results[2], "Valid delete with multiple statement IDs failed");
 
 // When applying a "u" (update) op in the $v: 2 format, the

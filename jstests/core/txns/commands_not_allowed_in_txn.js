@@ -136,9 +136,8 @@ if (!runningOnMongos) {
             op: "u",
             ns: testColl.getFullName(),
             o2: {_id: 0},
-            o:
-
-                {$v: 2, diff: {u: {a: 5}}}
+            o: {$v: 2, diff: {u: {a: 5}}},
+            b: true
         }]
     });
 }

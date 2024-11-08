@@ -48,10 +48,9 @@ structs:
             alwaysUpsert:
                 cpp_name: alwaysUpsert
                 type: bool
-                default: true
-                description: "Affects update operations. Set 'alwaysUpsert' to false in the command
-                              object to never insert a new document if no document matches the query
-                              criteria in an update operation."
+                default: false
+                description: "No longer supported, but kept here to improve the error message
+                              returned to the client. Affects update operations. Defaults to false."
             preCondition:
                 cpp_name: preCondition
                 type: array<object>

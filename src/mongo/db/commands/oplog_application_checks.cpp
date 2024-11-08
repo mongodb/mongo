@@ -70,8 +70,7 @@ UUID OplogApplicationChecks::getUUIDFromOplogEntry(const BSONObj& oplogEntry) {
 Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opCtx,
                                                            const DatabaseName& dbName,
                                                            const BSONObj& oplogEntry,
-                                                           AuthorizationSession* authSession,
-                                                           bool alwaysUpsert) {
+                                                           AuthorizationSession* authSession) {
     BSONElement opTypeElem = oplogEntry["op"];
     checkBSONType(BSONType::String, opTypeElem);
     const StringData opType = opTypeElem.checkAndGetStringData();
@@ -155,7 +154,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         }
         bool b = bElem.trueValue();
 
-        const bool upsert = b || alwaysUpsert;
+        const bool upsert = b;
 
         return auth::checkAuthForUpdate(authSession,
                                         opCtx,
@@ -282,14 +281,11 @@ Status OplogApplicationChecks::checkAuthForOperation(OperationContext* opCtx,
     if (shouldBypassDocumentValidationForCommand(cmdObj))
         maybeDisableValidation.emplace(opCtx);
 
-    const bool alwaysUpsert =
-        cmdObj.hasField("alwaysUpsert") ? cmdObj["alwaysUpsert"].trueValue() : true;
-
     checkBSONType(BSONType::Array, cmdObj.firstElement());
     for (const BSONElement& e : cmdObj.firstElement().Array()) {
         checkBSONType(BSONType::Object, e);
         Status status = OplogApplicationChecks::checkOperationAuthorization(
-            opCtx, dbName, e.Obj(), authSession, alwaysUpsert);
+            opCtx, dbName, e.Obj(), authSession);
         if (!status.isOK()) {
             return status;
         }

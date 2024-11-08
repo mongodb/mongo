@@ -472,7 +472,7 @@ TEST_F(ApplyOpsTest, ExtractOperationsIsUpsertDependsOnOperationAndAlwaysUpsert)
                     << "ns" << ns3.ns_forTest() << "ui" << ui3 << "b" << true << "o"
                     << BSON("$set" << BSON("a" << 3)) << "o2" << BSON("_id" << 3));
 
-    // AlwayUpsert defaults to true.
+    // AlwayUpsert defaults to false.
     auto oplogEntry =
         makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSON_ARRAY(op1 << op2 << op3)));
 
@@ -493,70 +493,6 @@ TEST_F(ApplyOpsTest, ExtractOperationsIsUpsertDependsOnOperationAndAlwaysUpsert)
         ASSERT(operation1.getObject2());
         ASSERT_BSONOBJ_EQ(BSON("_id" << 1), *operation1.getObject2());
 
-        // No "b" and "alwaysUpsert" true -> upsert.
-        ASSERT_TRUE(operation1.getUpsert());
-        ASSERT_TRUE(*operation1.getUpsert());
-    }
-
-    {
-        ASSERT(operations.cend() != it);
-        const auto& operation2 = *(it++);
-        ASSERT(OpTypeEnum::kUpdate == operation2.getOpType())
-            << "Unexpected op type: " << operation2.toBSONForLogging();
-        ASSERT_EQUALS(ui2, *operation2.getUuid());
-        ASSERT_EQUALS(ns2, operation2.getNss());
-        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("a" << 2)), operation2.getOperationToApply());
-        ASSERT(operation2.getObject2());
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 2), *operation2.getObject2());
-
-        // "b" false and "alwaysUpsert" true -> upsert false
-        ASSERT_TRUE(operation2.getUpsert());
-        ASSERT_FALSE(*operation2.getUpsert());
-    }
-
-    {
-        ASSERT(operations.cend() != it);
-        const auto& operation3 = *(it++);
-        ASSERT(OpTypeEnum::kUpdate == operation3.getOpType())
-            << "Unexpected op type: " << operation3.toBSONForLogging();
-        ASSERT_EQUALS(ui3, *operation3.getUuid());
-        ASSERT_EQUALS(ns3, operation3.getNss());
-        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("a" << 3)), operation3.getOperationToApply());
-        ASSERT(operation3.getObject2());
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 3), *operation3.getObject2());
-
-        // "b" true and "alwaysUpsert" true -> upsert true.
-        ASSERT_TRUE(operation3.getUpsert());
-        ASSERT(*operation3.getUpsert());
-    }
-    ASSERT(operations.cend() == it);
-
-    // Check again but with a transaction number, so alwaysUpsert will default to false.
-    OperationSessionInfo sessionInfo;
-    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
-    sessionInfo.setTxnNumber(TxnNumber(1));
-    oplogEntry = makeOplogEntry(OpTypeEnum::kCommand,
-                                BSON("applyOps" << BSON_ARRAY(op1 << op2 << op3)),
-                                {}, /* StmtIds */
-                                sessionInfo);
-
-    operations = ApplyOps::extractOperations(oplogEntry);
-    ASSERT_EQUALS(3U, operations.size())
-        << "Unexpected number of operations extracted: " << oplogEntry.toBSONForLogging();
-
-    // Check extracted CRUD operations.
-    it = operations.cbegin();
-    {
-        ASSERT(operations.cend() != it);
-        const auto& operation1 = *(it++);
-        ASSERT(OpTypeEnum::kUpdate == operation1.getOpType())
-            << "Unexpected op type: " << operation1.toBSONForLogging();
-        ASSERT_EQUALS(ui1, *operation1.getUuid());
-        ASSERT_EQUALS(ns1, operation1.getNss());
-        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("a" << 1)), operation1.getOperationToApply());
-        ASSERT(operation1.getObject2());
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), *operation1.getObject2());
-
         // No "b" and "alwaysUpsert" false -> no upsert.
         ASSERT_FALSE(operation1.getUpsert());
     }
@@ -588,66 +524,7 @@ TEST_F(ApplyOpsTest, ExtractOperationsIsUpsertDependsOnOperationAndAlwaysUpsert)
         ASSERT(operation3.getObject2());
         ASSERT_BSONOBJ_EQ(BSON("_id" << 3), *operation3.getObject2());
 
-        // "b" true and "alwaysUpsert" fase -> upsert true.
-        ASSERT_TRUE(operation3.getUpsert());
-        ASSERT(*operation3.getUpsert());
-    }
-    ASSERT(operations.cend() == it);
-
-    // Check again with no transaction but alwaysUpsert explicitly set to false.
-    oplogEntry = makeOplogEntry(
-        OpTypeEnum::kCommand,
-        BSON("applyOps" << BSON_ARRAY(op1 << op2 << op3) << "alwaysUpsert" << false));
-
-    operations = ApplyOps::extractOperations(oplogEntry);
-    ASSERT_EQUALS(3U, operations.size())
-        << "Unexpected number of operations extracted: " << oplogEntry.toBSONForLogging();
-
-    // Check extracted CRUD operations.
-    it = operations.cbegin();
-    {
-        ASSERT(operations.cend() != it);
-        const auto& operation1 = *(it++);
-        ASSERT(OpTypeEnum::kUpdate == operation1.getOpType())
-            << "Unexpected op type: " << operation1.toBSONForLogging();
-        ASSERT_EQUALS(ui1, *operation1.getUuid());
-        ASSERT_EQUALS(ns1, operation1.getNss());
-        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("a" << 1)), operation1.getOperationToApply());
-        ASSERT(operation1.getObject2());
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), *operation1.getObject2());
-
-        // No "b" and "alwaysUpsert" false -> no upsert.
-        ASSERT_FALSE(operation1.getUpsert());
-    }
-
-    {
-        ASSERT(operations.cend() != it);
-        const auto& operation2 = *(it++);
-        ASSERT(OpTypeEnum::kUpdate == operation2.getOpType())
-            << "Unexpected op type: " << operation2.toBSONForLogging();
-        ASSERT_EQUALS(ui2, *operation2.getUuid());
-        ASSERT_EQUALS(ns2, operation2.getNss());
-        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("a" << 2)), operation2.getOperationToApply());
-        ASSERT(operation2.getObject2());
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 2), *operation2.getObject2());
-
-        // "b" false and "alwaysUpsert" false -> upsert false.
-        ASSERT_TRUE(operation2.getUpsert());
-        ASSERT_FALSE(*operation2.getUpsert());
-    }
-
-    {
-        ASSERT(operations.cend() != it);
-        const auto& operation3 = *(it++);
-        ASSERT(OpTypeEnum::kUpdate == operation3.getOpType())
-            << "Unexpected op type: " << operation3.toBSONForLogging();
-        ASSERT_EQUALS(ui3, *operation3.getUuid());
-        ASSERT_EQUALS(ns3, operation3.getNss());
-        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("a" << 3)), operation3.getOperationToApply());
-        ASSERT(operation3.getObject2());
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 3), *operation3.getObject2());
-
-        // "b" true and "alwaysUpsert" fase -> upsert true.
+        // "b" true and "alwaysUpsert" false -> upsert true.
         ASSERT_TRUE(operation3.getUpsert());
         ASSERT(*operation3.getUpsert());
     }

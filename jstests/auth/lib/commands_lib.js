@@ -1040,7 +1040,6 @@ export const authCommandsLib = {
                   "o2": {"_id": 1},
                   "o": {"_id": 1, "data": 8}
               }],
-              alwaysUpsert: false
           },
           skipSharded: true,
           setup: function(db) {
@@ -1071,7 +1070,6 @@ export const authCommandsLib = {
                       "o2": {"_id": 1},
                       "o": {"_id": 1, "data": 8}
                   }],
-                  alwaysUpsert: false
               };
           },
           skipSharded: true,
@@ -1109,7 +1107,6 @@ export const authCommandsLib = {
                       "o2": {"_id": 1},
                       "o": {"_id": 1, "data": 8}
                   }],
-                  alwaysUpsert: false
               };
           },
           skipSharded: true,

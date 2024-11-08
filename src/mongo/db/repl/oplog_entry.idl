@@ -152,9 +152,9 @@ structs:
                 optional: true
                 description: "If true, treats this update operation as an upsert.
                               Used when extracting individual update oplog entries from the oplog
-                              entry of an applyOps command that was executed with alwaysUpsert true
-                              (the default). Originally added for backwards compatibility with
-                              updates from 3.6 and before."
+                              entry of an applyOps command that was executed with alwaysUpsert true.
+                              Originally added for backwards compatibility with updates from 3.6
+                              and before."
             preImageOpTime:
                 type: optime
                 optional: true

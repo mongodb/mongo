@@ -261,7 +261,6 @@ void logOplogConstraintViolation(OperationContext* opCtx,
 /**
  * Used for applying from an oplog entry or grouped inserts.
  * @param opOrGroupedInserts a single oplog entry or grouped inserts to be applied.
- * @param alwaysUpsert convert some updates to upserts for idempotency reasons
  * @param mode specifies what oplog application mode we are in
  * @param incrementOpsAppliedStats is called whenever an op is applied.
  * Returns failure status if the op was an update that could not be applied.

@@ -91,7 +91,6 @@ Status _applyOps(OperationContext* opCtx,
     int errors = 0;
 
     BSONArrayBuilder ab;
-    const auto& alwaysUpsert = info.getAlwaysUpsert();
     // Apply each op in the given 'applyOps' command object.
     for (const auto& opObj : ops) {
         // Ignore 'n' operations.
@@ -114,7 +113,7 @@ Status _applyOps(OperationContext* opCtx,
                 opCtx,
                 "applyOps",
                 nss,
-                [opCtx, nss, opObj, opType, alwaysUpsert, oplogApplicationMode, &info, &dbName] {
+                [opCtx, nss, opObj, opType, oplogApplicationMode, &info, &dbName] {
                     BSONObjBuilder builder;
                     builder.appendElements(opObj);
                     if (!builder.hasField(OplogEntry::kTimestampFieldName)) {
@@ -186,7 +185,7 @@ Status _applyOps(OperationContext* opCtx,
                     return repl::applyOperation_inlock(opCtx,
                                                        collection,
                                                        ApplierOperation{&entry},
-                                                       alwaysUpsert,
+                                                       false, /* alwaysUpsert */
                                                        oplogApplicationMode,
                                                        isDataConsistent);
                 });

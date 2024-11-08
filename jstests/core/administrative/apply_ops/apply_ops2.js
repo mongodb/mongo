@@ -12,6 +12,7 @@
  *   assumes_against_mongod_not_mongos,
  *   # applyOps uses the oplog that require replication support
  *   requires_replication,
+ *   multiversion_incompatible
  * ]
  */
 
@@ -22,8 +23,7 @@ assert.eq(0, t.find().count(), "test collection not empty");
 
 t.insert({_id: 1, x: "init"});
 
-// alwaysUpsert = true
-print("Testing applyOps with alwaysUpsert = true");
+print("Testing applyOps with alwaysUpsert explicity set to true");
 
 var res = db.runCommand({
     applyOps: [
@@ -43,12 +43,13 @@ var res = db.runCommand({
     alwaysUpsert: true
 });
 
-assert.eq(true, res.results[0], "upsert = true, existing doc update failed");
-assert.eq(true, res.results[1], "upsert = true, nonexisting doc not upserted");
-assert.eq(2, t.find().count(), "2 docs expected after upsert");
+// Verify that the 'alwaysUpsert' option is no longer supported.
+assert.commandFailedWithCode(res, 6711601);
+assert.eq(
+    1, t.find().count(), "1 doc expected after unsupported option failure on applyOps command");
 
-// alwaysUpsert = false
-print("Testing applyOps with alwaysUpsert = false");
+// alwaysUpsert not specified, should default to false
+print("Testing applyOps with default alwaysUpsert");
 
 res = db.runCommand({
     applyOps: [
@@ -58,44 +59,15 @@ res = db.runCommand({
             o2: {_id: 1},
             o: {$v: 2, diff: {u: {x: "upsert=false existing"}}}
         },
-
         {
             op: "u",
             ns: t.getFullName(),
             o2: {_id: 3},
             o: {$v: 2, diff: {u: {x: "upsert=false non-existing"}}}
         }
-
-    ],
-    alwaysUpsert: false
+    ]
 });
 
 assert.eq(true, res.results[0], "upsert = true, existing doc expected to succeed, but it failed");
 assert.eq(false, res.results[1], "upsert = false, nonexisting doc upserted");
-assert.eq(2, t.find().count(), "2 docs expected after upsert failure");
-
-// alwaysUpsert not specified, should default to true
-print("Testing applyOps with default alwaysUpsert");
-
-res = db.runCommand({
-    applyOps: [
-        {
-            op: "u",
-            ns: t.getFullName(),
-            o2: {_id: 1},
-            o: {$v: 2, diff: {u: {x: "upsert=default existing"}}}
-        },
-
-        {
-            op: "u",
-            ns: t.getFullName(),
-            o2: {_id: 4},
-
-            o: {$v: 2, diff: {u: {x: "upsert=default non-existing"}}}
-        },
-    ]
-});
-
-assert.eq(true, res.results[0], "default upsert, existing doc update failed");
-assert.eq(true, res.results[1], "default upsert, nonexisting doc not upserted");
-assert.eq(3, t.find().count(), "2 docs expected after upsert failure");
+assert.eq(1, t.find().count(), "1 doc expected after upsert failure");

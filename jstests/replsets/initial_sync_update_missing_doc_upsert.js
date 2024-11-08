@@ -51,37 +51,22 @@ assert.commandWorked(coll.update({_id: documentIdCounter}, {x: 1}, {upsert: true
 documentIdCounter++;
 numDocuments++;
 
-function applyOps({documentId, alwaysUpsert}) {
+function applyOps({documentId}) {
     let command = {
         applyOps: [
             {op: "u", ns: coll.getFullName(), o2: {_id: documentId}, o: {$v: 2, diff: {u: {x: 1}}}}
         ]
     };
 
-    if (alwaysUpsert !== null) {
-        command['alwaysUpsert'] = alwaysUpsert;
-    }
-
     assert.commandWorked(primary.getDB(dbName).runCommand(command));
 }
 
-/* alwaysUpsert is true by default; test with the default value and an explicit value */
-for (let alwaysUpsert of [null, true]) {
-    /* It writes a regular op: 'u' entry. The update is treated as
-     * an upsert by the primary. Ensure it is treated that way by the secondary when it applies
-     * the oplog entry during initial sync.
-     */
-    applyOps({documentId: documentIdCounter, alwaysUpsert: alwaysUpsert});
-    documentIdCounter++;
-    numDocuments++;
-}
-
-/* The interesting scenario for alwaysUpsert: false is if the document is deleted on the primary
- * after updating. When the secondary attempts to apply the oplog entry during initial sync,
- * it will fail to update. Ensure that initial sync proceeds anyway.
+/* The interesting scenario for (default) alwaysUpsert: false is if the document is deleted on
+ * the primary after updating. When the secondary attempts to apply the oplog entry during initial
+ * sync, it will fail to update. Ensure that initial sync proceeds anyway.
  */
 coll.insertOne({_id: documentIdCounter});
-applyOps({documentId: documentIdCounter, alwaysUpsert: false});
+applyOps({documentId: documentIdCounter});
 coll.deleteOne({_id: documentIdCounter});
 // Don't increment numDocuments, since we deleted the document we just inserted.
 documentIdCounter++;

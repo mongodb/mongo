@@ -295,8 +295,13 @@ for (const isPSASet of [true, false]) {
     testWriteConcernMetrics(
         {applyOps: [{op: "i", ns: testColl.getFullName(), o: {_id: 0}}]}, "insert", 1, isPSASet);
     testWriteConcernMetrics({
-        applyOps:
-            [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$v: 2, diff: {u: {a: 1}}}}]
+        applyOps: [{
+            op: "u",
+            ns: testColl.getFullName(),
+            o2: {_id: 0},
+            o: {$v: 2, diff: {u: {a: 1}}},
+            b: true
+        }]
     },
                             "update",
                             1,

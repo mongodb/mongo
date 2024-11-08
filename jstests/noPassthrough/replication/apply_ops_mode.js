@@ -1,6 +1,6 @@
 /**
  * Tests that applyOps correctly respects the 'oplogApplicationMode' and 'alwaysUpsert' flags.
- * 'alwaysUpsert' defaults to true and 'oplogApplicationMode' defaults to 'ApplyOps'. We test
+ * 'alwaysUpsert' defaults to false and 'oplogApplicationMode' defaults to 'ApplyOps'. We test
  * that these default values do not lead to command failure.
  */
 
@@ -22,12 +22,12 @@ for (let updateOp of [
     assert.writeOK(coll.insert({_id: 1}));
 
     jsTestLog(`Test applyOps with the following op:\n${tojson(updateOp)}`);
-    assert.commandFailed(db.adminCommand({applyOps: [updateOp], alwaysUpsert: false}));
+    assert.commandFailed(db.adminCommand({applyOps: [updateOp]}));
     assert.eq(coll.count({x: 1}), 0);
 
-    // Test that 'InitialSync' does not override 'alwaysUpsert: false'.
-    assert.commandFailed(db.adminCommand(
-        {applyOps: [updateOp], alwaysUpsert: false, oplogApplicationMode: "InitialSync"}));
+    // Test that 'InitialSync' does not override (default) 'alwaysUpsert: false'.
+    assert.commandFailed(
+        db.adminCommand({applyOps: [updateOp], oplogApplicationMode: "InitialSync"}));
     assert.eq(coll.count({x: 1}), 0);
 
     // Test parsing failure.
@@ -36,18 +36,6 @@ for (let updateOp of [
         ErrorCodes.FailedToParse);
     assert.commandFailedWithCode(db.adminCommand({applyOps: [updateOp], oplogApplicationMode: 5}),
                                  ErrorCodes.TypeMismatch);
-
-    // Test default succeeds.
-    assert.commandWorked(db.adminCommand({applyOps: [updateOp]}));
-    assert.eq(coll.count({x: 1}), 1);
-
-    coll.drop();
-    assert.commandWorked(coll.insert({_id: 1}));
-
-    // Test default succeeds in 'InitialSync' mode.
-    assert.commandWorked(
-        db.adminCommand({applyOps: [updateOp], oplogApplicationMode: "InitialSync"}));
-    assert.eq(coll.count({x: 1}), 1);
 }
 
 // ------------ Testing fCV updates ---------------
