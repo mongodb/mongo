@@ -76,12 +76,12 @@ public:
     explicit InsertStatement(BSONObj toInsert) : doc(std::move(toInsert)) {}
 
     InsertStatement(std::vector<StmtId> statementIds, BSONObj toInsert)
-        : stmtIds(statementIds), doc(std::move(toInsert)) {}
+        : stmtIds(std::move(statementIds)), doc(std::move(toInsert)) {}
     InsertStatement(StmtId stmtId, BSONObj toInsert)
         : InsertStatement(std::vector<StmtId>{stmtId}, std::move(toInsert)) {}
 
     InsertStatement(std::vector<StmtId> statementIds, BSONObj toInsert, OplogSlot os)
-        : stmtIds(statementIds), oplogSlot(std::move(os)), doc(std::move(toInsert)) {}
+        : stmtIds(std::move(statementIds)), oplogSlot(std::move(os)), doc(std::move(toInsert)) {}
     InsertStatement(StmtId stmtId, BSONObj toInsert, OplogSlot os)
         : InsertStatement(std::vector<StmtId>{stmtId}, std::move(toInsert), std::move(os)) {}
 

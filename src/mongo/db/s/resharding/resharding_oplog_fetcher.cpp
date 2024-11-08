@@ -159,7 +159,7 @@ std::vector<OplogInsertBatch> getOplogInsertBatches(const std::vector<BSONObj>& 
             } else if (totalBytes + currentBytes > maxBytes) {
                 break;
             }
-            insertBatch.statements.emplace_back(InsertStatement(currentDoc));
+            insertBatch.statements.emplace_back(currentDoc);
             totalBytes += currentBytes;
             ++currentIndex;
 
@@ -174,10 +174,11 @@ std::vector<OplogInsertBatch> getOplogInsertBatches(const std::vector<BSONObj>& 
         }
 
         invariant(!insertBatch.statements.empty());
-        insertBatches.push_back(insertBatch);
         totalOperations += insertBatch.statements.size();
+        const bool moreToCome = insertBatch.moreToCome;
+        insertBatches.push_back(std::move(insertBatch));
 
-        if (!insertBatch.moreToCome) {
+        if (!moreToCome) {
             break;
         }
     }
