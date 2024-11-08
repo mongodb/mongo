@@ -18,7 +18,7 @@ import {
     getAggPlanStages,
     getPlanStage,
     getSingleNodeExplain,
-    getWinningPlan,
+    getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -35,12 +35,12 @@ function checkUnshardedResults(pipeline, expectedPlanStages, expectedPipeline) {
     const explain = getSingleNodeExplain(coll.explain().aggregate(pipeline));
     if (explain.stages) {
         const queryStages =
-            flattenQueryPlanTree(getWinningPlan(explain.stages[0].$cursor.queryPlanner));
+            flattenQueryPlanTree(getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner));
         const pipelineStages = explain.stages.slice(1).map(s => Object.keys(s)[0]);
         assert.eq(queryStages, expectedPlanStages, explain);
         assert.eq(pipelineStages, expectedPipeline, explain);
     } else {
-        const queryStages = flattenQueryPlanTree(getWinningPlan(explain.queryPlanner));
+        const queryStages = flattenQueryPlanTree(getWinningPlanFromExplain(explain.queryPlanner));
         assert.eq(queryStages, expectedPlanStages, explain);
         assert.eq([], expectedPipeline, explain);
     }
@@ -113,7 +113,8 @@ const topKSortPipeline = [
 ];
 checkUnshardedResults(topKSortPipeline, ["COLLSCAN", "SORT", "EQ_LOOKUP"], []);
 const explain = getSingleNodeExplain(coll.explain().aggregate(topKSortPipeline));
-assert.eq(getPlanStage(getWinningPlan(explain.queryPlanner), "SORT").limitAmount, 5, explain);
+assert.eq(
+    getPlanStage(getWinningPlanFromExplain(explain.queryPlanner), "SORT").limitAmount, 5, explain);
 
 // Tests on a sharded collection.
 coll.createIndex({x: 1});

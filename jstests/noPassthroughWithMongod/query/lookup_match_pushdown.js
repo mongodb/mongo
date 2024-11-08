@@ -2,7 +2,7 @@
  * Tests that the $match stage is pushed before $lookup stage.
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.lookup_match_pushdown;
 coll.drop();
@@ -21,7 +21,7 @@ function checkPipelineAndResults(pipeline, expectedPipeline, expectedResults) {
     // Check pipeline is as expected.
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
     if (expectedPipeline.length > 0) {
-        assert.eq(getWinningPlan(explain.stages[0].$cursor.queryPlanner).stage,
+        assert.eq(getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner).stage,
                   expectedPipeline[0],
                   explain);
     }

@@ -6,7 +6,7 @@
  *    featureFlagSbeFull,
  * ]
  */
-import {getPlanStages, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDb.dropDatabase());
@@ -29,9 +29,9 @@ function assertCountScan(pipeline) {
     const explain = coll.explain().aggregate(pipeline);
     let queryPlan;
     if (explain.hasOwnProperty("stages")) {
-        queryPlan = getWinningPlan(explain.stages[0].$cursor.queryPlanner);
+        queryPlan = getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner);
     } else {
-        queryPlan = getWinningPlan(explain.queryPlanner);
+        queryPlan = getWinningPlanFromExplain(explain.queryPlanner);
     }
     const countScan = getPlanStages(queryPlan, "COUNT_SCAN");
     assert.neq([], countScan, explain);

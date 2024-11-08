@@ -1,7 +1,7 @@
 /**
  * Tests that the $limit stage is pushed before $lookup stages, except when there is an $unwind.
  */
-import {flattenQueryPlanTree, getWinningPlan} from "jstests/libs/query/analyze_plan.js";
+import {flattenQueryPlanTree, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeFullyEnabled,
@@ -27,11 +27,11 @@ function checkResults(pipeline, isOptimized, expected) {
     const explain = coll.explain().aggregate(pipeline);
     if (explain.stages) {
         const queryStages =
-            flattenQueryPlanTree(getWinningPlan(explain.stages[0].$cursor.queryPlanner));
+            flattenQueryPlanTree(getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner));
         const pipelineStages = explain.stages.slice(1).map(s => Object.keys(s)[0]);
         assert.eq(queryStages.concat(pipelineStages), expected, explain);
     } else {
-        const queryStages = flattenQueryPlanTree(getWinningPlan(explain.queryPlanner));
+        const queryStages = flattenQueryPlanTree(getWinningPlanFromExplain(explain.queryPlanner));
         assert.eq(queryStages, expected, explain);
     }
 }

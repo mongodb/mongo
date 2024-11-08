@@ -10,7 +10,7 @@ import {
 } from "jstests/aggregation/extras/utils.js";
 import {
     getPlanStages,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     isAggregationPlan,
     isQueryPlan,
 } from "jstests/libs/query/analyze_plan.js";
@@ -60,10 +60,10 @@ function assertResultsMatch({
 
         if (pipelineOptimizedAway) {
             assert(isQueryPlan(explain), explain);
-            result = getWinningPlan(explain.queryPlanner);
+            result = getWinningPlanFromExplain(explain.queryPlanner);
         } else {
             assert(isAggregationPlan(explain), explain);
-            result = getWinningPlan(explain.stages[0].$cursor.queryPlanner);
+            result = getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner);
         }
 
         // Check that $project uses the query system and all expectedCoalescedProjects are

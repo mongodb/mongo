@@ -14,7 +14,7 @@ import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     getAllNodeExplains,
     getPlanStage,
-    getWinningPlan,
+    getWinningPlanFromExplain,
     hasRejectedPlans
 } from "jstests/libs/query/analyze_plan.js";
 
@@ -128,7 +128,7 @@ if (!isHintsToQuerySettingsSuite) {
     });
 
     getAllNodeExplains(largePopView.explain().distinct("pop")).forEach((explainPlan) => {
-        assert.neq(getWinningPlan(explainPlan.stages[0].$cursor.queryPlanner).stage,
+        assert.neq(getWinningPlanFromExplain(explainPlan.stages[0].$cursor.queryPlanner).stage,
                    "IXSCAN",
                    tojson(explainPlan));
     });
