@@ -125,3 +125,9 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:admission_context",
     ],
 )
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db/admission:execution_admission_context.h to //src/mongo/db/admission:execution_admission_context
+filegroup(
+    name = "execution_admission_context_hdrs",
+    srcs = [":execution_admission_context.h"],
+)

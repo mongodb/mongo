@@ -202,3 +202,15 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+# TODO(SERVER-96852): Remove cycle created by moving //src/mongo/rpc:message.h to //src/mongo/rpc:message
+filegroup(
+    name = "message_hdrs",
+    srcs = [":message.h"],
+)
+
+# TODO(SERVER-96852): Remove cycle created by moving //src/mongo/rpc:op_msg.h to //src/mongo/rpc:message
+filegroup(
+    name = "op_msg_hdrs",
+    srcs = [":op_msg.h"],
+)

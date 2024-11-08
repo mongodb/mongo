@@ -22,3 +22,9 @@ mongo_cc_library(
         "//src/mongo/bson:bson_validate",
     ],
 )
+
+# TODO(SERVER-96862): Remove cycle created by moving //src/mongo/db/storage/key_string:key_string.h to //src/mongo/db/storage/key_string:key_string
+filegroup(
+    name = "key_string_hdrs",
+    srcs = [":key_string.h"],
+)

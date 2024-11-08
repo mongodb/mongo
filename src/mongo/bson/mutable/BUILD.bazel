@@ -28,3 +28,9 @@ mongo_cc_library(
         "//src/mongo/util:safe_num",
     ],
 )
+
+# TODO(SERVER-96851): Remove cycle created by moving //src/mongo/bson/mutable:element.h to //src/mongo/bson/mutable:mutable_bson
+filegroup(
+    name = "element_hdrs",
+    srcs = [":element.h"],
+)

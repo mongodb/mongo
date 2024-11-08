@@ -829,3 +829,45 @@ mongo_cc_library(
         "//src/mongo/db/repl:oplog_entry",
     ],
 )
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:action_set.h to //src/mongo/db/auth:authprivilege
+filegroup(
+    name = "action_set_hdrs",
+    srcs = [":action_set.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:action_type.h to //src/mongo/db/auth:authprivilege
+filegroup(
+    name = "action_type_hdrs",
+    srcs = [":action_type.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:auth_name.h to //src/mongo/db:server_base
+filegroup(
+    name = "auth_name_hdrs",
+    srcs = [":auth_name.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:privilege.h to //src/mongo/db/auth:authprivilege
+filegroup(
+    name = "privilege_hdrs",
+    srcs = [":privilege.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:resource_pattern.h to //src/mongo/db/auth:authprivilege
+filegroup(
+    name = "resource_pattern_hdrs",
+    srcs = [":resource_pattern.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:validated_tenancy_scope.h to //src/mongo/db:server_base
+filegroup(
+    name = "validated_tenancy_scope_hdrs",
+    srcs = [":validated_tenancy_scope.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:validated_tenancy_scope_factory.h to //src/mongo/db/auth:security_token_auth
+filegroup(
+    name = "validated_tenancy_scope_factory_hdrs",
+    srcs = [":validated_tenancy_scope_factory.h"],
+)

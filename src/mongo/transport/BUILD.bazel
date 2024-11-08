@@ -263,3 +263,9 @@ mongo_cc_library(
         "//src/mongo/util/net:ssl_manager",
     ],
 )
+
+# TODO(SERVER-96852): Remove cycle created by moving //src/mongo/transport:session.h to //src/mongo/transport:transport_layer_common
+filegroup(
+    name = "session_hdrs",
+    srcs = [":session.h"],
+)

@@ -682,3 +682,21 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+# TODO(SERVER-96857): Remove cycle created by moving //src/mongo/db/storage:record_store.h to //src/mongo/db/storage:record_store_base
+filegroup(
+    name = "record_store_hdrs",
+    srcs = [":record_store.h"],
+)
+
+# TODO(SERVER-96857): Remove cycle created by moving //src/mongo/db/storage:recovery_unit.h to //src/mongo/db/storage:recovery_unit_base
+filegroup(
+    name = "recovery_unit_hdrs",
+    srcs = [":recovery_unit.h"],
+)
+
+# TODO(SERVER-96857): Remove cycle created by moving //src/mongo/db/storage:write_unit_of_work.h to //src/mongo/db/storage:write_unit_of_work
+filegroup(
+    name = "write_unit_of_work_hdrs",
+    srcs = [":write_unit_of_work.h"],
+)

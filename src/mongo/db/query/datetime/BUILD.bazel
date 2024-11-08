@@ -34,3 +34,9 @@ mongo_cc_library(
         "//src/third_party/timelib",
     ],
 )
+
+# TODO(SERVER-96859): Remove cycle created by moving //src/mongo/db/query/datetime:date_time_support.h to //src/mongo/db/query/datetime:date_time_support
+filegroup(
+    name = "date_time_support_hdrs",
+    srcs = [":date_time_support.h"],
+)

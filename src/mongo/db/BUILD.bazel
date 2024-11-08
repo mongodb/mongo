@@ -3389,3 +3389,105 @@ mongo_cc_binary(
         "server_base",
     ],
 )
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:baton.h to //src/mongo/db:service_context
+filegroup(
+    name = "baton_hdrs",
+    srcs = [":baton.h"],
+)
+
+# TODO(SERVER-96851): Remove cycle created by moving //src/mongo/db:client.h to //src/mongo/db:service_context
+filegroup(
+    name = "client_hdrs",
+    srcs = [":client.h"],
+)
+
+# TODO(SERVER-96855): Remove cycle created by moving //src/mongo/db:cluster_role.h to //src/mongo/db:server_base
+filegroup(
+    name = "cluster_role_hdrs",
+    srcs = [":cluster_role.h"],
+)
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:database_name.h to //src/mongo/db:common
+filegroup(
+    name = "database_name_hdrs",
+    srcs = [":database_name.h"],
+)
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:logical_time.h to //src/mongo/db:server_base
+filegroup(
+    name = "logical_time_hdrs",
+    srcs = [":logical_time.h"],
+)
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:namespace_string.h to //src/mongo/db:server_base
+filegroup(
+    name = "namespace_string_hdrs",
+    srcs = [":namespace_string.h"],
+)
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:operation_context.h to //src/mongo/db:service_context
+filegroup(
+    name = "operation_context_hdrs",
+    srcs = [":operation_context.h"],
+)
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:operation_id.h to //src/mongo/db:service_context
+filegroup(
+    name = "operation_id_hdrs",
+    srcs = [":operation_id.h"],
+)
+
+# TODO(SERVER-96856): Remove cycle created by moving //src/mongo/db:read_write_concern_provenance.h to //src/mongo/db:server_base
+filegroup(
+    name = "read_write_concern_provenance_hdrs",
+    srcs = [":read_write_concern_provenance.h"],
+)
+
+# TODO(SERVER-96857): Remove cycle created by moving //src/mongo/db:record_id_helpers.h to //src/mongo/db:record_id_helpers
+filegroup(
+    name = "record_id_helpers_hdrs",
+    srcs = [":record_id_helpers.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db:server_options.h to //src/mongo/db:server_base
+filegroup(
+    name = "server_options_hdrs",
+    srcs = [":server_options.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db:server_parameter.h to //src/mongo/db:server_base
+filegroup(
+    name = "server_parameter_hdrs",
+    srcs = [":server_parameter.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db:server_parameter_with_storage.h to //src/mongo/db:server_base
+filegroup(
+    name = "server_parameter_with_storage_hdrs",
+    srcs = [":server_parameter_with_storage.h"],
+)
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:service_context.h to //src/mongo/db:service_context
+filegroup(
+    name = "service_context_hdrs",
+    srcs = [":service_context.h"],
+)
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:tenant_id.h to //src/mongo/db:server_base
+filegroup(
+    name = "tenant_id_hdrs",
+    srcs = [":tenant_id.h"],
+)
+
+# TODO(SERVER-96856): Remove cycle created by moving //src/mongo/db:write_concern_idl.h to //src/mongo/db:server_base
+filegroup(
+    name = "write_concern_idl_hdrs",
+    srcs = [":write_concern_idl.h"],
+)
+
+# TODO(SERVER-96856): Remove cycle created by moving //src/mongo/db:write_concern_options.h to //src/mongo/db:server_base
+filegroup(
+    name = "write_concern_options_hdrs",
+    srcs = [":write_concern_options.h"],
+)

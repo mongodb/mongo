@@ -321,3 +321,15 @@ mongo_cc_library(
         "//src/mongo/db/transaction",
     ],
 )
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db/session:logical_session_id.h to //src/mongo/db/session:logical_session_id
+filegroup(
+    name = "logical_session_id_hdrs",
+    srcs = [":logical_session_id.h"],
+)
+
+# TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db/session:logical_session_id_helpers.h to //src/mongo/db/session:logical_session_id_helpers
+filegroup(
+    name = "logical_session_id_helpers_hdrs",
+    srcs = [":logical_session_id_helpers.h"],
+)

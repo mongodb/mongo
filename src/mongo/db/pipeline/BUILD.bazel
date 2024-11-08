@@ -1197,3 +1197,9 @@ mongo_cc_library(
         "//src/mongo/util:periodic_runner",
     ],
 )
+
+# TODO(SERVER-96860): Remove cycle created by moving //src/mongo/db/pipeline:field_path.h to //src/mongo/db/pipeline:field_path
+filegroup(
+    name = "field_path_hdrs",
+    srcs = [":field_path.h"],
+)

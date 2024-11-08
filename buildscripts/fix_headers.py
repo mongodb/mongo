@@ -21,6 +21,10 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import buildscripts.util.buildozer_utils as bd_utils
+from buildscripts.client.jiraclient import JiraAuth, JiraClient
+from buildscripts.util.codeowners_utils import Owners
+
+JIRA_SERVER = "https://jira.mongodb.org"
 
 CC_LIB_SUFFIX = "_with_debug"
 
@@ -31,8 +35,8 @@ def move_header(
     bd_utils.bd_remove([fix_target], "hdrs", [header])
     if new_dep:
         bd_utils.bd_add([fix_target], "deps", [new_dep])
-        if add_header:
-            bd_utils.bd_add([new_dep], "hdrs", [header])
+        # if add_header:
+        #     bd_utils.bd_add([new_dep], "hdrs", [header])
 
 
 def undo_header_move(
@@ -40,9 +44,32 @@ def undo_header_move(
 ) -> None:
     if new_dep:
         bd_utils.bd_remove([fix_target], "deps", [new_dep])
-        if remove_header:
-            bd_utils.bd_remove([new_dep], "hdrs", [header])
-    bd_utils.bd_add([fix_target], "hdrs", [header])
+        # if remove_header:
+        #     bd_utils.bd_remove([new_dep], "hdrs", [header])
+    # bd_utils.bd_add([fix_target], "hdrs", [header])
+
+
+def new_filegroup(header: str, issue_key: str) -> str:
+    package = header.split(":")[0] + ":__pkg__"
+    target_name = header.split(".")[0]
+    fg_name = target_name.split(":")[1] + "_hdrs"
+    fg_label = package.split(":")[0] + f":{fg_name}"
+    bd_utils.bd_new(package, "filegroup", fg_name)
+    bd_utils.bd_add([fg_label], "srcs", [header])
+    return fg_label
+
+
+def fix_cycle(fix_target: str, header: str, issue_key: str) -> str:
+    fg_label = new_filegroup(header, issue_key)
+    bd_utils.bd_add([fix_target], "hdrs", [fg_label])
+    return fg_label
+
+
+def todo_comment(issue_key: str, header: str, new_dep: str, fg_label: str) -> None:
+    comment = f"TODO({issue_key}): Remove cycle created by moving {header} to {new_dep}".replace(
+        " ", "\ "
+    )
+    bd_utils.bd_comment([fg_label], comment)
 
 
 def useful_print(fixes: Dict) -> None:
@@ -73,13 +100,23 @@ class HeaderFixer:
             bazel_include_info = json.load(f)
         self.bazel_exec = bazel_include_info["bazel_exec"]
         self.bazel_config = bazel_include_info["config"]
+        auth = JiraAuth()
+        auth.pat = os.environ["JIRA_TOKEN"]
+        self.jira_client = JiraClient(JIRA_SERVER, auth, dry_run=False)
+        self.owners = Owners()
+        self.team_issues = {}
 
     def _query(
         self, query: str, config: bool = False, args: List[str] = []
     ) -> subprocess.CompletedProcess:
-        query_cmd = "cquery" if config else "query"
+        query_cmd = "cquery"
+        config_args = self.bazel_config
+        if not config:
+            query_cmd = "query"
+            config_args = []
+
         p = subprocess.run(
-            [self.bazel_exec, query_cmd] + self.bazel_config + args + [query],
+            [self.bazel_exec, query_cmd] + config_args + args + [query],
             capture_output=True,
             text=True,
             check=True,
@@ -91,7 +128,6 @@ class HeaderFixer:
             [self.bazel_exec, "build"] + self.bazel_config + [target],
             capture_output=True,
             text=True,
-            check=True,
         )
         return p
 
@@ -162,10 +198,15 @@ class HeaderFixer:
                 orphaned_headers.append(hdr)
                 continue
 
+            # ignore if cpp file of respective header is a src of our fix target
+            if new_dep == target:
+                continue
+
             buildozer_cmds = [f"buildozer 'remove hdrs {hdr}' {target}"]
             if not has_header:
                 buildozer_cmds += [f"buildozer 'add hdrs {hdr}' {new_dep}"]
             if self._check_dep_exists(target, new_dep):
+                print(f"Dep {new_dep} is already a dependency")
                 new_dep = None
             else:
                 buildozer_cmds += [f"buildozer 'add deps {new_dep}' {target}"]
@@ -173,11 +214,14 @@ class HeaderFixer:
             p = self._build(target)
             if p.returncode == 0:
                 target_fixes["fixes"][hdr] = buildozer_cmds
-            elif p.returncode == 1 and "cycle in dependency graph" in p.stdout:
+            elif p.returncode == 1 and "cycle in dependency graph" in p.stderr:
                 target_fixes["cycles"][hdr] = buildozer_cmds
+                issue_key = self._create_jira_ticket(hdr)
+                fg_label = fix_cycle(target, hdr, issue_key)
+                todo_comment(issue_key, hdr, new_dep, fg_label)
+                undo_header_move(target, hdr, new_dep, has_header)
             else:
                 print("Unexpected bazel failure.")
-            undo_header_move(target, hdr, new_dep, has_header)
 
         print(f"Orphaned headers for {target}")
         print("\n".join(orphaned_headers))
@@ -193,6 +237,35 @@ class HeaderFixer:
             for line in p.stdout.splitlines()
             if line.startswith("//")
         ]
+
+    def _create_jira_ticket(self, header: str) -> str:
+        summary = f"Fix cycle created by " + header
+        header_file_path = header.replace(":", "/")[2:]
+        assigned_teams = self.owners.get_jira_team_owner(header_file_path)
+        if not assigned_teams:
+            assigned_teams = ["Build"]
+        teams_key = ",".join(sorted(assigned_teams))
+        if teams_key in self.team_issues:
+            description = header
+            issue = self.team_issues[teams_key]
+            # Add new header to description
+            issue.update(description=(issue.fields.description or "") + "\n" + description)
+        else:
+            description = (
+                "[Header relocation info|https://github.com/10gen/mongo/blob/master/bazel/docs/header_cycle_resolution.md]\nPlease resolve dependency issues with the following headers:\n"
+                + header
+            )
+            issue = self.jira_client.create_issue(
+                issue_type="Bug",
+                summary=summary,
+                description=description,
+                assigned_teams=assigned_teams,
+                jira_project="SERVER",
+            )
+            self.team_issues[teams_key] = issue
+        if not issue:
+            return ""
+        return issue.key
 
     def fix_targets(self, target_exp: str) -> Dict:
         fixes = {}

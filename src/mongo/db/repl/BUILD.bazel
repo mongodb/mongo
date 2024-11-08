@@ -2211,3 +2211,15 @@ mongo_cc_library(
         "//src/mongo/util:fail_point",
     ],
 )
+
+# TODO(SERVER-96856): Remove cycle created by moving //src/mongo/db/repl:optime.h to //src/mongo/db/repl:optime
+filegroup(
+    name = "optime_hdrs",
+    srcs = [":optime.h"],
+)
+
+# TODO(SERVER-96856): Remove cycle created by moving //src/mongo/db/repl:read_concern_idl.h to //src/mongo/db:server_base
+filegroup(
+    name = "read_concern_idl_hdrs",
+    srcs = [":read_concern_idl.h"],
+)

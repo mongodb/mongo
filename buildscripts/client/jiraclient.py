@@ -6,6 +6,7 @@ from typing import Any, Dict, Iterable, Optional, Sequence
 
 from jira import JIRA, Issue
 from jira.client import ResultList
+from jira.resilientsession import ResilientSession
 from pydantic import BaseSettings
 
 ASSIGNED_TEAMS_FIELD = "customfield_12751"
@@ -104,15 +105,14 @@ class JiraClient:
         priority: str = "3",
         components: Optional[Sequence[str]] = None,
         labels: Optional[Sequence[str]] = None,
-    ) -> Issue:
+    ) -> Optional[Issue]:
         assigned_teams_mapped = list(map(lambda x: {"value": x}, assigned_teams))
         fields = {
             "project": {"key": jira_project},
-            "summary": issue_summary,
+            "summary": summary,
             "description": description,
             "issuetype": {"name": issue_type},
             ASSIGNED_TEAMS_FIELD: assigned_teams_mapped,
-            "components": components,
             "priority": {"id": priority},
         }
         if labels:
@@ -121,7 +121,12 @@ class JiraClient:
         if owner:
             fields["assignee"] = {"name": owner}
 
+        if components:
+            fields["components"] = components
+
         logger.info({"message": "Creating JIRA issue", "fields": fields})
 
         if not self.dry_run:
             return self._jira.create_issue(fields=fields)
+
+        return None

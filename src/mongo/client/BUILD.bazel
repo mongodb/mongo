@@ -520,3 +520,9 @@ mongo_cc_library(
         "native_sasl_client",
     ],
 )
+
+# TODO(SERVER-96852): Remove cycle created by moving //src/mongo/client:connection_string.h to //src/mongo/client:connection_string
+filegroup(
+    name = "connection_string_hdrs",
+    srcs = [":connection_string.h"],
+)
