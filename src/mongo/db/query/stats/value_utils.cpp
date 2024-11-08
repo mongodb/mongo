@@ -37,6 +37,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -253,9 +254,9 @@ double valueToDouble(value::TypeTags tag, value::Value val) {
     return result;
 }
 
-BSONObj sbeValueToBSON(const SBEValue& sbeValue, const std::string& fieldName) {
-
-    BSONObjBuilder builder;
+void addSbeValueToBSONBuilder(const SBEValue& sbeValue,
+                              const std::string& fieldName,
+                              BSONObjBuilder& builder) {
 
     switch (sbeValue.getTag()) {
         case sbe::value::TypeTags::NumberInt32:
@@ -287,6 +288,25 @@ BSONObj sbeValueToBSON(const SBEValue& sbeValue, const std::string& fieldName) {
             uassert(9370100, "Unexpected value type", false);
             break;
     }
+}
+
+BSONObj sbeValueToBSON(const SBEValue& sbeValue, const std::string& fieldName) {
+    BSONObjBuilder builder;
+
+    addSbeValueToBSONBuilder(sbeValue, fieldName, builder);
+
+    return builder.obj();
+}
+
+BSONObj sbeValuesToInterval(const SBEValue& sbeValueLow,
+                            const std::string& fieldNameLow,
+                            const SBEValue& sbeValueHigh,
+                            const std::string& fieldNameHigh) {
+
+    BSONObjBuilder builder;
+
+    addSbeValueToBSONBuilder(sbeValueLow, fieldNameLow, builder);
+    addSbeValueToBSONBuilder(sbeValueHigh, fieldNameHigh, builder);
 
     return builder.obj();
 }

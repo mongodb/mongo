@@ -134,8 +134,8 @@ bool isEmptyArray(sbe::value::TypeTags tag, sbe::value::Value val);
 bool isTrueBool(sbe::value::TypeTags tag, sbe::value::Value val);
 
 /**
-    Sort a vector of values in place in BSON order
-*/
+ * Sort a vector of values in place in BSON order
+ */
 void sortValueVector(std::vector<SBEValue>& sortVector);
 
 /**
@@ -150,15 +150,23 @@ double stringToDouble(StringData sd);
 double objectIdToDouble(const sbe::value::ObjectIdType* sd);
 
 /**
-    Convert a value of any supported type into a double according to some metric. This
-    metric will be consistent with ordering in the type.
-*/
+ * Convert a value of any supported type into a double according to some metric. This
+ * metric will be consistent with ordering in the type.
+ */
 double valueToDouble(sbe::value::TypeTags tag, sbe::value::Value val);
 
 /**
-    Convert a SBEValue of any supported type into a BSONObj.
-*/
+ * Convert a SBEValue of any supported type into a BSONObj.
+ */
 BSONObj sbeValueToBSON(const SBEValue& sbeValue, const std::string& fieldName);
+
+/**
+ * Convert two SBEValues of any supported type into a BSONObj representing an Interval.
+ */
+BSONObj sbeValuesToInterval(const SBEValue& sbeValueLow,
+                            const std::string& fieldNameLow,
+                            const SBEValue& sbeValueHigh,
+                            const std::string& fieldNameHigh);
 
 /**
  * Returns true for types that can be estimated via histograms, and false for types that need type

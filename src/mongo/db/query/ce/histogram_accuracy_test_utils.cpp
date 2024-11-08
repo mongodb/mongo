@@ -52,12 +52,29 @@ std::tuple<double, double, double, double> percentiles(std::vector<double> arr) 
 
 size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
                                           sbe::value::TypeTags type,
-                                          stats::SBEValue valueToCalculate) {
+                                          stats::SBEValue valueToCalculate,
+                                          bool includeScalar) {
     int actualCard = 0;
     for (const auto& value : data) {
-        if (mongo::stats::compareValues(
-                type, value.getValue(), type, valueToCalculate.getValue()) == 0) {
-            actualCard++;
+        if (value.getTag() == TypeTags::Array) {
+            auto array = sbe::value::getArrayView(value.getValue());
+
+            bool matched = std::any_of(
+                array->values().begin(), array->values().end(), [&](const auto& element) {
+                    return mongo::stats::compareValues(
+                               type, element.second, type, valueToCalculate.getValue()) == 0;
+                });
+
+            if (matched) {
+                actualCard++;
+            }
+        } else {
+            if (includeScalar) {
+                if (mongo::stats::compareValues(
+                        type, value.getValue(), type, valueToCalculate.getValue()) == 0) {
+                    actualCard++;
+                }
+            }
         }
     }
     return actualCard;
@@ -113,7 +130,7 @@ static std::pair<boost::optional<double>, boost::optional<double>> computeErrors
 
 void printHeader() {
     std::stringstream ss;
-    ss << "Data distribution, Number of histogram buckets, Data type, Data size, "
+    ss << "Data distribution, Number of histogram buckets, Data type, IncludeScalar, Data size, "
        << "Query type, Query data type, Number of Queries, "
        << "Data interval start, Data interval end, "
        << "relative error (Avg), relative error (Max), relative error "
@@ -130,6 +147,7 @@ void printResult(const DataDistributionEnum dataDistribution,
                  const int numberOfQueries,
                  QueryType queryType,
                  const std::pair<size_t, size_t>& dataInterval,
+                 bool includeScalar,
                  ErrorCalculationSummary error) {
 
     std::string distribution;
@@ -158,6 +176,8 @@ void printResult(const DataDistributionEnum dataDistribution,
         ss << type.first << "." << type.second << " ";
     }
     ss << ", ";
+
+    ss << includeScalar << ", ";
 
     // Data size
     ss << size << ", ";
@@ -282,7 +302,8 @@ void generateDataNormal(size_t size,
                         const TypeCombination& typeCombination,
                         const size_t seed,
                         const size_t ndv,
-                        std::vector<stats::SBEValue>& data) {
+                        std::vector<stats::SBEValue>& data,
+                        int arrayLength) {
 
     // Generator for type selection.
     std::mt19937 rng(seed);
@@ -296,7 +317,7 @@ void generateDataNormal(size_t size,
     stats::TypeDistrVector td;
 
     populateTypeDistrVectorAccordingToInputConfig(
-        td, interval, typeCombination, ndv, seedArray, normal);
+        td, interval, typeCombination, ndv, seedArray, normal, arrayLength);
 
     stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
     data = desc.genRandomDataset(size);
@@ -307,7 +328,8 @@ void generateDataZipfian(const size_t size,
                          const TypeCombination& typeCombination,
                          const size_t seed,
                          const size_t ndv,
-                         std::vector<stats::SBEValue>& data) {
+                         std::vector<stats::SBEValue>& data,
+                         int arrayLength) {
 
     // Generator for type selection.
     std::mt19937 rng(seed);
@@ -321,7 +343,7 @@ void generateDataZipfian(const size_t size,
     stats::TypeDistrVector td;
 
     populateTypeDistrVectorAccordingToInputConfig(
-        td, interval, typeCombination, ndv, seedArray, zipfian);
+        td, interval, typeCombination, ndv, seedArray, zipfian, arrayLength);
 
     stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
     data = desc.genRandomDataset(size);
@@ -382,12 +404,27 @@ ErrorCalculationSummary runQueries(size_t size,
             case kPoint: {
 
                 // Find actual frequency.
-                actualCard =
-                    calculateFrequencyFromDataVectorEq(data, queryTypeInfo.first, sbeValLow[i]);
+                actualCard = calculateFrequencyFromDataVectorEq(
+                    data, queryTypeInfo.first, sbeValLow[i], includeScalar);
 
-                // Estimate result.
-                estimatedCard = estimateCardinalityEq(
-                    *ceHist, queryTypeInfo.first, sbeValLow[i].getValue(), includeScalar);
+                if (useE2EAPI) {
+                    BSONObj bsonInterval = sbeValuesToInterval(sbeValLow[i], "", sbeValLow[i], "");
+
+                    Interval interval(bsonInterval, true /*startIncluded*/, true /*endIncluded*/);
+
+                    auto sizeCardinality = CardinalityEstimate{CardinalityType{(double)size},
+                                                               EstimationSource::Histogram};
+
+                    estimatedCard.card = HistogramEstimator::estimateCardinality(
+                                             *ceHist, sizeCardinality, interval, includeScalar)
+                                             .toDouble();
+
+                } else {
+                    // Estimate result.
+                    estimatedCard = estimateCardinalityEq(
+                        *ceHist, queryTypeInfo.first, sbeValLow[i].getValue(), includeScalar);
+                }
+
                 break;
             }
             case kRange: {
@@ -402,15 +439,28 @@ ErrorCalculationSummary runQueries(size_t size,
                 actualCard = calculateFrequencyFromDataVectorRange(
                     data, queryTypeInfo.first, sbeValLow[i], sbeValHigh[i]);
 
-                // Estimate result.
-                estimatedCard = estimateCardinalityRange(*ceHist,
-                                                         true /*lowInclusive*/,
-                                                         queryTypeInfo.first,
-                                                         sbeValLow[i].getValue(),
-                                                         true /*highInclusive*/,
-                                                         queryTypeInfo.first,
-                                                         sbeValHigh[i].getValue(),
-                                                         includeScalar);
+                if (useE2EAPI) {
+                    BSONObj bsonInterval = sbeValuesToInterval(sbeValLow[i], "", sbeValHigh[i], "");
+
+                    Interval interval(bsonInterval, true /*startIncluded*/, true /*endIncluded*/);
+
+                    auto sizeCardinality = CardinalityEstimate{CardinalityType{(double)size},
+                                                               EstimationSource::Histogram};
+
+                    estimatedCard.card = HistogramEstimator::estimateCardinality(
+                                             *ceHist, sizeCardinality, interval, includeScalar)
+                                             .toDouble();
+                } else {
+                    // Estimate result.
+                    estimatedCard = estimateCardinalityRange(*ceHist,
+                                                             true /*lowInclusive*/,
+                                                             queryTypeInfo.first,
+                                                             sbeValLow[i].getValue(),
+                                                             true /*highInclusive*/,
+                                                             queryTypeInfo.first,
+                                                             sbeValHigh[i].getValue(),
+                                                             includeScalar);
+                }
                 break;
             }
         }
@@ -455,6 +505,11 @@ bool checkTypeExistence(const TypeProbability& typeCombinationQuery,
     for (const auto& typeCombinationData : typeCombinationsData) {
         if (typeCombinationQuery.first == typeCombinationData.first) {
             typeExists = true;
+        } else if (typeCombinationData.first == TypeTags::Array &&
+                   typeCombinationQuery.first == TypeTags::NumberInt64) {
+            // If the data type is array, we accept queries on integers. (the default data type in
+            // arrays is integer.)
+            typeExists = true;
         }
     }
 
@@ -482,17 +537,21 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
             // Random value generator for actual data in histogram.
             std::vector<stats::SBEValue> data;
             std::map<stats::SBEValue, double> insertedData;
+            int arrayLength = 1000;
 
             // Create one by one the values.
             switch (dataDistribution) {
                 case kUniform:
-                    generateDataUniform(size, dataInterval, typeCombinationData, seed, ndv, data);
+                    generateDataUniform(
+                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayLength);
                     break;
                 case kNormal:
-                    generateDataNormal(size, dataInterval, typeCombinationData, seed, ndv, data);
+                    generateDataNormal(
+                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayLength);
                     break;
                 case kZipfian:
-                    generateDataZipfian(size, dataInterval, typeCombinationData, seed, ndv, data);
+                    generateDataZipfian(
+                        size, dataInterval, typeCombinationData, seed, ndv, data, arrayLength);
                     break;
             }
 
@@ -525,6 +584,7 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
                                 numberOfQueries,
                                 queryType,
                                 dataInterval,
+                                includeScalar,
                                 error);
                 }
             }
