@@ -195,19 +195,24 @@ public:
      */
     explicit MallocFreeOStreamGuard(int signum) : _lk(_streamMutex, stdx::defer_lock) {
         if (terminateDepth++) {
+            if (_onDeadlock)
+                _onDeadlock(signum);
             endProcessWithSignal(signum);
         }
         _lk.lock();
     }
 
+    static void setGlobalDeadlockCallback_forTest(std::function<void(int)> cb) {
+        _onDeadlock = std::move(cb);
+    }
+
 private:
-    static stdx::mutex _streamMutex;
-    static thread_local int terminateDepth;
+    static inline stdx::mutex _streamMutex;
+    static inline thread_local int terminateDepth = 0;
+    static inline std::function<void(int)> _onDeadlock;
+
     stdx::unique_lock<stdx::mutex> _lk;
 };
-
-stdx::mutex MallocFreeOStreamGuard::_streamMutex;
-thread_local int MallocFreeOStreamGuard::terminateDepth = 0;
 
 void logNoRecursion(StringData message) {
     // If we were within a log call when we hit a signal, don't call back into the logging
@@ -464,6 +469,14 @@ std::string describeActiveException() {
     std::ostringstream oss;
     globalActiveExceptionWitness().describe(oss);
     return oss.str();
+}
+
+std::shared_ptr<void> makeMallocFreeOStreamGuard_forTest(int sig) {
+    return std::make_shared<MallocFreeOStreamGuard>(sig);
+}
+
+void setMallocFreeOStreamGuardDeadlockCallback_forTest(std::function<void(int)> cb) {
+    MallocFreeOStreamGuard::setGlobalDeadlockCallback_forTest(std::move(cb));
 }
 
 }  // namespace mongo

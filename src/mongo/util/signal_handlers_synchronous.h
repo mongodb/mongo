@@ -135,4 +135,11 @@ ActiveExceptionWitness& globalActiveExceptionWitness();
 
 std::string describeActiveException();
 
+/**
+ * Returns a `shared_ptr` that will have sole ownership of a `MallocFreeOStreamGuard`. The passed in
+ * signal number is used to end the process if the deadlock mitigation is triggered.
+ */
+std::shared_ptr<void> makeMallocFreeOStreamGuard_forTest(int sig);
+void setMallocFreeOStreamGuardDeadlockCallback_forTest(std::function<void(int)> cb);
+
 }  // namespace mongo
