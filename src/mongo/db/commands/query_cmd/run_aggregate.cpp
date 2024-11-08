@@ -40,24 +40,17 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <cstddef>
-#include <cstdint>
-#include <deque>
 #include <functional>
 #include <iosfwd>
-#include <map>
 #include <memory>
-#include <mutex>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/api_parameters.h"
@@ -65,17 +58,12 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/external_data_source_scope_guard.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/fle_crud.h"
@@ -83,55 +71,41 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
-#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
-#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
-#include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
-#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_knob_configuration.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
-#include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_stats/agg_key.h"
-#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/read_concern.h"
-#include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
@@ -139,31 +113,20 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
-#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/resource_yielders.h"
 #include "mongo/s/router_role.h"
-#include "mongo/s/shard_version.h"
-#include "mongo/s/sharding_state.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/namespace_string_util.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
-#include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/synchronized_value.h"
-#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -171,7 +134,6 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::shared_ptr;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
@@ -600,10 +562,8 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
 
 std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor(
     const AggExState& aggExState,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    const MultipleCollectionAccessor& collections,
-    CurOp* curOp,
-    const std::function<void(void)>& resetContextFn) {
+    AggCatalogState& aggCatalogState,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
     const auto expCtx = pipeline->getContext();
     // Check if the pipeline has a $geoNear stage, as it will be ripped away during the build query
     // executor phase below (to be replaced with a $geoNearCursorStage later during the executor
@@ -614,8 +574,11 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor
     // Prepare a PlanExecutor to provide input into the pipeline, if needed; and additional
     // executors if needed to serve the aggregation, this currently only includes search commands
     // that generate metadata.
-    auto [executor, attachCallback, additionalExecutors] = PipelineD::buildInnerQueryExecutor(
-        collections, aggExState.getExecutionNss(), &aggExState.getRequest(), pipeline.get());
+    auto [executor, attachCallback, additionalExecutors] =
+        PipelineD::buildInnerQueryExecutor(aggCatalogState.getCollections(),
+                                           aggExState.getExecutionNss(),
+                                           &aggExState.getRequest(),
+                                           pipeline.get());
 
     std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     if (canOptimizeAwayPipeline(aggExState, pipeline.get(), executor.get(), hasGeoNearStage)) {
@@ -628,7 +591,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor
     } else {
         // Complete creation of the initial $cursor stage, if needed.
         PipelineD::attachInnerQueryExecutorToPipeline(
-            collections, attachCallback, std::move(executor), pipeline.get());
+            aggCatalogState.getCollections(), attachCallback, std::move(executor), pipeline.get());
 
         std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
         // Any pipeline that relies on calls to mongot requires additional setup.
@@ -640,7 +603,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor
             // Release locks early, before we generate the search pipeline, so that we don't hold
             // them during network calls to mongot. This is fine for search pipelines since they are
             // not reading any local (lock-protected) data in the main pipeline.
-            resetContextFn();
+            aggCatalogState.relinquishLocks();
             pipelines.push_back(std::move(pipeline));
 
             // TODO SERVER-89546 extractDocsNeededBounds should be called internally within
@@ -676,7 +639,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor
         // though, as we will be changing its lock policy to 'kLockExternally' (see details
         // below), and in order to execute the initial getNext() call in 'handleCursorCommand',
         // we need to hold the collection lock.
-        resetContextFn();
+        aggCatalogState.relinquishLocks();
     }
 
     for (auto& exec : additionalExecutors) {
@@ -698,18 +661,16 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
 
 // TODO SERVER-93539 take a ResolvedViewAggExState instead of a AggExState that gets set as a view.
 Status runAggregateOnView(AggExState& aggExState,
-                          const MultipleCollectionAccessor& collections,
+                          std::unique_ptr<AggCatalogState> aggCatalogState,
                           boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse,
-                          const ViewDefinition* view,
-                          std::shared_ptr<const CollectionCatalog> catalog,
-                          rpc::ReplyBuilderInterface* result,
-                          const std::function<void(void)>& resetContextFn) {
+                          rpc::ReplyBuilderInterface* result) {
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "mapReduce on a view is not supported",
             !aggExState.getRequest().getIsMapReduceCommand());
 
     // Check that the default collation of 'view' is compatible with the operation's
     // collation. The check is skipped if the request did not specify a collation.
+    const ViewDefinition* view = aggCatalogState->getCtx().getView();
     if (!aggExState.getRequest().getCollation().get_value_or(BSONObj()).isEmpty()) {
         invariant(collatorToUse);  // Should already be resolved at this point.
         if (!CollatorInterface::collatorsMatch(view->defaultCollator(), collatorToUse->get()) &&
@@ -720,12 +681,12 @@ Status runAggregateOnView(AggExState& aggExState,
         }
     }
 
-    aggExState.setView(catalog, view);
+    aggExState.setView(aggCatalogState->getCatalog(), view);
     // Resolved view will be available after view has been set on AggregationExecutionState
     auto resolvedView = aggExState.getResolvedView().value();
 
     // With the view & collation resolved, we can relinquish locks.
-    resetContextFn();
+    aggCatalogState->relinquishLocks();
 
     auto status{Status::OK()};
     if (!OperationShardingState::get(aggExState.getOpCtx())
@@ -794,38 +755,11 @@ Status runAggregateOnView(AggExState& aggExState,
     return status;
 }
 
-/**
- * Determines the collection type of the query by precedence of various configurations. The order
- * of these checks is critical since there may be overlap (e.g., a view over a virtual collection
- * is classified as a view).
- */
-query_shape::CollectionType determineCollectionType(
-    const AggExState& aggExState,
-    const boost::optional<AutoGetCollectionForReadCommandMaybeLockFree>& ctx,
-    bool isCollectionless) {
-    if (aggExState.getResolvedView().has_value()) {
-        if (aggExState.getResolvedView()->timeseries()) {
-            return query_shape::CollectionType::kTimeseries;
-        }
-        return query_shape::CollectionType::kView;
-    }
-    if (isCollectionless) {
-        return query_shape::CollectionType::kVirtual;
-    }
-    if (aggExState.hasChangeStream()) {
-        return query_shape::CollectionType::kChangeStream;
-    }
-    return ctx ? ctx->getCollectionType() : query_shape::CollectionType::kUnknown;
-}
-
 std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     const AggExState& aggExState,
-    const boost::optional<AutoGetCollectionForReadCommandMaybeLockFree>& ctx,
+    const AggCatalogState& aggCatalogState,
     std::unique_ptr<CollatorInterface> collator,
-    boost::optional<UUID> uuid,
-    ExpressionContextCollationMatchesDefault collationMatchesDefault,
-    const MultipleCollectionAccessor& collections,
-    bool isCollectionless) {
+    ExpressionContextCollationMatchesDefault collationMatchesDefault) {
     // If we're operating over a view, we first parse just the original user-given request
     // for the sake of registering query stats. Then, we'll parse the view pipeline and stitch
     // the two pipelines together below.
@@ -834,7 +768,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                                    aggExState.getRequest(),
                                    allowDiskUseByDefault.load())
                       .collator(std::move(collator))
-                      .collUUID(uuid)
+                      .collUUID(aggCatalogState.getUUID())
                       .mongoProcessInterface(MongoProcessInterface::create(aggExState.getOpCtx()))
                       .mayDbProfile(CurOp::get(aggExState.getOpCtx())->dbProfileLevel() > 0)
                       .resolvedNamespace(uassertStatusOK(aggExState.resolveInvolvedNamespaces()))
@@ -843,7 +777,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                       .build();
     // If any involved collection contains extended-range data, set a flag which individual
     // DocumentSource parsers can check.
-    collections.forEach([&](const CollectionPtr& coll) {
+    aggCatalogState.getCollections().forEach([&](const CollectionPtr& coll) {
         if (coll->getRequiresTimeseriesExtendedRangeSupport())
             expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
     });
@@ -855,13 +789,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
 
     // Register query stats with the pre-optimized pipeline. Exclude queries against collections
     // with encrypted fields. We still collect query stats on collection-less aggregations.
-    bool hasEncryptedFields = ctx && ctx->getCollection() &&
-        ctx->getCollection()->getCollectionOptions().encryptedFieldConfig;
+    bool hasEncryptedFields = aggCatalogState.lockAcquired() &&
+        aggCatalogState.getCtx().getCollection() &&
+        aggCatalogState.getCtx().getCollection()->getCollectionOptions().encryptedFieldConfig;
     if (!hasEncryptedFields) {
         // If this is a query over a resolved view, we want to register query stats with the
         // original user-given request and pipeline, rather than the new request generated when
         // resolving the view.
-        auto collectionType = determineCollectionType(aggExState, ctx, isCollectionless);
+        auto collectionType = aggCatalogState.determineCollectionType();
         NamespaceStringSet pipelineInvolvedNamespaces(aggExState.getInvolvedNamespaces());
         query_stats::registerRequest(
             aggExState.getOpCtx(),
@@ -896,7 +831,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
 
     if (aggExState.getResolvedView().has_value()) {
         expCtx->startExpressionCounters();
-        pipeline = handleViewHelper(aggExState, expCtx, std::move(pipeline), uuid);
+        pipeline =
+            handleViewHelper(aggExState, expCtx, std::move(pipeline), aggCatalogState.getUUID());
         expCtx->stopExpressionCounters();
     }
 
@@ -939,25 +875,6 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         }
     }
 
-    // Determine if this aggregation has foreign collections that the execution subsystem needs
-    // to be aware of.
-    std::vector<NamespaceStringOrUUID> secondaryExecNssList =
-        aggExState.getForeignExecutionNamespaces();
-
-    // The collation to use for this aggregation. boost::optional to distinguish between the case
-    // where the collation has not yet been resolved, and where it has been resolved to nullptr.
-    boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse;
-    ExpressionContextCollationMatchesDefault collatorToUseMatchesDefault;
-
-    // The UUID of the collection for the execution namespace of this aggregation.
-    boost::optional<UUID> uuid;
-
-    // If emplaced, AutoGetCollectionForReadCommand will throw if the sharding version for this
-    // connection is out of date. If the namespace is a view, the lock will be released before
-    // re-running the expanded aggregation.
-    boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-    MultipleCollectionAccessor collections;
-
     // Going forward this operation must never ignore interrupt signals while waiting for lock
     // acquisition. This InterruptibleLockGuard will ensure that waiting for lock re-acquisition
     // after yielding will not ignore interrupt signals. This is necessary to avoid deadlocking with
@@ -966,7 +883,8 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     // must never hold open storage cursors while ignoring interrupt.
     InterruptibleLockGuard interruptibleLockAcquisition(aggExState.getOpCtx());
 
-    auto catalog = CollectionCatalog::latest(aggExState.getOpCtx());
+    // Acquire any catalog locks needed by the pipeline, and create catalog-dependent state.
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState.createAggCatalogState();
 
     hangAfterAcquiringCollectionCatalog.executeIf(
         [&](const auto&) { hangAfterAcquiringCollectionCatalog.pauseWhileSet(); },
@@ -974,43 +892,10 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
             return aggExState.getExecutionNss().coll() == data["collection"].valueStringData();
         });
 
-    auto initContext = [&](auto_get_collection::ViewMode m) {
-        auto initAutoGetCallback = [&]() {
-            ctx.emplace(aggExState.getOpCtx(),
-                        aggExState.getExecutionNss(),
-                        AutoGetCollection::Options{}.viewMode(m).secondaryNssOrUUIDs(
-                            secondaryExecNssList.cbegin(), secondaryExecNssList.cend()),
-                        AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
-        };
-        bool anySecondaryCollectionNotLocal = intializeAutoGet(aggExState.getOpCtx(),
-                                                               aggExState.getExecutionNss(),
-                                                               secondaryExecNssList,
-                                                               initAutoGetCallback);
-        tassert(8322000,
-                "Should have initialized AutoGet* after calling 'initializeAutoGet'",
-                ctx.has_value());
-        collections = MultipleCollectionAccessor(aggExState.getOpCtx(),
-                                                 &ctx->getCollection(),
-                                                 ctx->getNss(),
-                                                 ctx->isAnySecondaryNamespaceAView() ||
-                                                     anySecondaryCollectionNotLocal,
-                                                 secondaryExecNssList);
-
-        // Return the catalog that gets implicitly stashed during the collection acquisition
-        // above, which also implicitly opened a storage snapshot. This catalog object can
-        // be potentially different than the one obtained before and will be in sync with
-        // the opened snapshot.
-        return CollectionCatalog::get(aggExState.getOpCtx());
-    };
-
-    auto resetContext = [&]() -> void {
-        ctx.reset();
-        collections.clear();
-    };
-
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(aggExState.getOpCtx());
+    auto [collatorToUse, collatorToUseMatchesDefault] = aggCatalogState->resolveCollator();
 
     {
         const auto& pipelineInvolvedNamespaces = aggExState.getInvolvedNamespaces();
@@ -1018,120 +903,13 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         // If this is a collectionless aggregation, we won't create 'ctx' but will still need an
         // AutoStatsTracker to record CurOp and Top entries.
         boost::optional<AutoStatsTracker> statsTracker;
+        aggCatalogState->getStatsTrackerIfNeeded(statsTracker);
 
-        // The aggregation can be on / from one of three mutally exclusive collection spaces:
-        // (1) The oplog (for change streams)
-        // (2) Originating from no collection(s)
-        // (3) From standard user defined collections(s)
-        if (aggExState.hasChangeStream()) {
-            // If this is a change stream, perform special checks and change the execution
-            // namespace.
-            uassert(4928900,
-                    str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
-                                  << " is not supported for a change stream",
-                    !aggExState.getRequest().getCollectionUUID());
-
-            // Replace the execution namespace with the oplog.
-            aggExState.setExecutionNss(NamespaceString::kRsOplogNamespace);
-
-            // In case of serverless the change stream will be opened on the change collection.
-            const bool isServerless = change_stream_serverless_helpers::isServerlessEnvironment();
-            if (isServerless) {
-                const auto tenantId = change_stream_serverless_helpers::resolveTenantId(
-                    aggExState.getOriginalNss().tenantId());
-
-                uassert(ErrorCodes::BadValue,
-                        "Change streams cannot be used without tenant id",
-                        tenantId);
-                aggExState.setExecutionNss(NamespaceString::makeChangeCollectionNSS(tenantId));
-            }
-
-            // Assert that a change stream on the config server is always opened on the oplog.
-            tassert(6763400,
-                    str::stream() << "Change stream was unexpectedly opened on the namespace: "
-                                  << aggExState.getExecutionNss().toStringForErrorMsg()
-                                  << " in the config server",
-                    !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-                        aggExState.getExecutionNss().isOplog());
-
-            // Upgrade and wait for read concern if necessary.
-            aggExState.adjustChangeStreamReadConcern();
-
-            // Obtain collection locks on the execution namespace; that is, the oplog.
-            catalog = initContext(auto_get_collection::ViewMode::kViewsForbidden);
-
-            // Raise an error if original nss is a view. We do not need to check this if we are
-            // opening a stream on an entire db or across the cluster.
-            if (!aggExState.getOriginalNss().isCollectionlessAggregateNS()) {
-                auto view = catalog->lookupView(aggExState.getOpCtx(), aggExState.getOriginalNss());
-                uassert(ErrorCodes::CommandNotSupportedOnView,
-                        str::stream() << "Cannot run aggregation on timeseries with namespace "
-                                      << aggExState.getOriginalNss().toStringForErrorMsg(),
-                        !view || !view->timeseries());
-                uassert(ErrorCodes::CommandNotSupportedOnView,
-                        str::stream()
-                            << "Namespace " << aggExState.getOriginalNss().toStringForErrorMsg()
-                            << " is a view, not a collection",
-                        !view);
-            }
-
-            // If the user specified an explicit collation, adopt it; otherwise, use the simple
-            // collation. We do not inherit the collection's default collation or UUID, since
-            // the stream may be resuming from a point before the current UUID existed.
-            auto [collator, match] =
-                resolveCollator(aggExState.getOpCtx(),
-                                aggExState.getRequest().getCollation().get_value_or(BSONObj()),
-                                CollectionPtr());
-            collatorToUse.emplace(std::move(collator));
-            collatorToUseMatchesDefault = match;
-
-            uassert(ErrorCodes::ChangeStreamNotEnabled,
-                    "Change streams must be enabled before being used",
-                    !isServerless ||
-                        change_stream_serverless_helpers::isChangeStreamEnabled(
-                            aggExState.getOpCtx(), *aggExState.getExecutionNss().tenantId()));
-        } else if (aggExState.getExecutionNss().isCollectionlessAggregateNS() &&
-                   pipelineInvolvedNamespaces.empty()) {
-            uassert(4928901,
-                    str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
-                                  << " is not supported for a collectionless aggregation",
-                    !aggExState.getRequest().getCollectionUUID());
-
-            // If this is a collectionless agg with no foreign namespaces, don't acquire any locks.
-            statsTracker.emplace(
-                aggExState.getOpCtx(),
-                aggExState.getExecutionNss(),
-                Top::LockType::NotLocked,
-                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                DatabaseProfileSettings::get(aggExState.getOpCtx()->getServiceContext())
-                    .getDatabaseProfileLevel(aggExState.getExecutionNss().dbName()));
-            auto [collator, match] =
-                resolveCollator(aggExState.getOpCtx(),
-                                aggExState.getRequest().getCollation().get_value_or(BSONObj()),
-                                CollectionPtr());
-            collatorToUse.emplace(std::move(collator));
-            collatorToUseMatchesDefault = match;
-            tassert(6235101,
-                    "A collection-less aggregate should not take any locks",
-                    ctx == boost::none);
-        } else {
-            // This is a regular aggregation. Lock the collection or view.
-            catalog = initContext(auto_get_collection::ViewMode::kViewsPermitted);
-            auto [collator, match] =
-                resolveCollator(aggExState.getOpCtx(),
-                                aggExState.getRequest().getCollation().get_value_or(BSONObj()),
-                                collections.getMainCollection());
-            collatorToUse.emplace(std::move(collator));
-            collatorToUseMatchesDefault = match;
-            if (collections.hasMainCollection()) {
-                uuid = collections.getMainCollection()->uuid();
-            }
-        }
         if (aggExState.getRequest().getResumeAfter()) {
             uassert(ErrorCodes::InvalidPipelineOperator,
                     "$_resumeAfter is not supported on view",
-                    !ctx->getView());
-            const auto& collection = ctx->getCollection();
+                    !aggCatalogState->getCtx().getView());
+            const auto& collection = aggCatalogState->getCtx().getCollection();
             const bool isClusteredCollection = collection && collection->isClustered();
             uassertStatusOK(
                 query_request_helper::validateResumeAfter(aggExState.getOpCtx(),
@@ -1142,7 +920,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         // If collectionUUID was provided, verify the collection exists and has the expected UUID.
         checkCollectionUUIDMismatch(aggExState.getOpCtx(),
                                     aggExState.getExecutionNss(),
-                                    collections.getMainCollection(),
+                                    aggCatalogState->getCollections().getMainCollection(),
                                     aggExState.getRequest().getCollectionUUID());
 
         // If this is a view, resolve it by finding the underlying collection and stitching view
@@ -1154,27 +932,15 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         // $collStats is supported on a view namespace. For a time-series collection, however, the
         // view is abstracted out for the users, so we needed to resolve the namespace to get the
         // underlying bucket collection.
-        if (ctx && ctx->getView() &&
-            (!aggExState.startsWithCollStats() || ctx->getView()->timeseries())) {
-            return runAggregateOnView(aggExState,
-                                      collections,
-                                      std::move(collatorToUse),
-                                      ctx->getView(),
-                                      catalog,
-                                      result,
-                                      resetContext);
+        if (aggCatalogState->lockAcquired() && aggCatalogState->getCtx().getView() &&
+            (!aggExState.startsWithCollStats() ||
+             aggCatalogState->getCtx().getView()->timeseries())) {
+            return runAggregateOnView(
+                aggExState, std::move(aggCatalogState), std::move(collatorToUse), result);
         }
 
-        invariant(collatorToUse);
-
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline = parsePipelineAndRegisterQueryStats(
-            aggExState,
-            ctx,
-            std::move(*collatorToUse),
-            uuid,
-            collatorToUseMatchesDefault,
-            collections,
-            aggExState.getExecutionNss().isCollectionlessAggregateNS());
+            aggExState, *aggCatalogState, std::move(collatorToUse), collatorToUseMatchesDefault);
         expCtx = pipeline->getContext();
 
         // Start the query planning timer right after parsing.
@@ -1245,7 +1011,7 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
                 .getAsync([](auto) {});
         }
 
-        execs = createExecutor(aggExState, std::move(pipeline), collections, curOp, resetContext);
+        execs = createExecutor(aggExState, *aggCatalogState, std::move(pipeline));
 
         tassert(6624353, "No executors", !execs.empty());
 
@@ -1265,7 +1031,10 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     // themselves, not the cursor we create here.
     hangAfterCreatingAggregationPlan.executeIf(
         [](const auto&) { hangAfterCreatingAggregationPlan.pauseWhileSet(); },
-        [&](const BSONObj& data) { return uuid && UUID::parse(data["uuid"]) == *uuid; });
+        [&](const BSONObj& data) {
+            boost::optional<UUID> uuid{aggCatalogState->getUUID()};
+            return uuid && UUID::parse(data["uuid"]) == *uuid;
+        });
     // Report usage statistics for each stage in the pipeline.
     aggExState.tickGlobalStageCounters();
 
@@ -1285,9 +1054,9 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
             // to collect statistics. If the PlanExecutor uses kLockExternally policy, the
             // appropriate collection lock must be already held. Make sure it has not been released
             // yet.
-            invariant(ctx);
+            invariant(aggCatalogState->lockAcquired());
             Explain::explainStages(explainExecutor,
-                                   collections,
+                                   aggCatalogState->getCollections(),
                                    *(expCtx->getExplain()),
                                    BSON("optimizedPipeline" << true),
                                    SerializationContext::stateCommandReply(
@@ -1302,16 +1071,17 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
-        if (ctx) {
+        if (aggCatalogState->lockAcquired()) {
             auto exec =
                 maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
             const auto& planExplainer = exec->getPlanExplainer();
-            if (const auto& coll = ctx->getCollection()) {
+            if (const auto& coll = aggCatalogState->getCtx().getCollection()) {
                 CollectionQueryInfo::get(coll).notifyOfQuery(coll, curOp->debug());
             }
             // For SBE pushed down pipelines, we may need to report stats saved for secondary
             // collections separately.
-            for (const auto& [secondaryNss, coll] : collections.getSecondaryCollections()) {
+            for (const auto& [secondaryNss, coll] :
+                 aggCatalogState->getCollections().getSecondaryCollections()) {
                 if (coll) {
                     PlanSummaryStats secondaryStats;
                     planExplainer.getSecondarySummaryStats(secondaryNss, &secondaryStats);

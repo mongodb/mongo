@@ -28,8 +28,242 @@
  */
 
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/pipeline/initialize_auto_get_helper.h"
+#include "mongo/db/profile_settings.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/views/view_catalog_helpers.h"
 
 namespace mongo {
+namespace {
+
+/**
+ * This class represents catalog state for normal (i.e., not change stream or collectionless)
+ * pipelines.
+ *
+ * The catalog lock is managed in the RAII style, being acquired in the constructor and relinquished
+ * in the destructor (unless relinquished early by calling 'relinquishLocks()').
+ */
+class DefaultAggCatalogState : public AggCatalogState {
+public:
+    /**
+     * This class should never be copied or moved, since catalog locks are scoped to the lifetime of
+     * exactly one instance of this class.
+     */
+    DefaultAggCatalogState(const DefaultAggCatalogState&) = delete;
+    DefaultAggCatalogState(DefaultAggCatalogState&&) = delete;
+
+    explicit DefaultAggCatalogState(const AggExState& aggExState)
+        : AggCatalogState{aggExState},
+          _secondaryExecNssList{aggExState.getForeignExecutionNamespaces()} {
+        initContext(auto_get_collection::ViewMode::kViewsPermitted);
+        if (_collections.hasMainCollection()) {
+            _uuid = _collections.getMainCollection()->uuid();
+        }
+    }
+
+    void validate() const override {}
+
+    bool lockAcquired() const override {
+        return _ctx.has_value();
+    }
+
+    std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>
+    resolveCollator() const override {
+        return ::mongo::resolveCollator(
+            _aggExState.getOpCtx(),
+            _aggExState.getRequest().getCollation().get_value_or(BSONObj()),
+            _collections.getMainCollection());
+    }
+
+    const AutoGetCollectionForReadCommandMaybeLockFree& getCtx() const override {
+        invariant(lockAcquired());
+        return *_ctx;
+    }
+
+    void getStatsTrackerIfNeeded(boost::optional<AutoStatsTracker>& statsTracker) const override {
+        // By default '_ctx' will create a stats tracker, so no need to need to instantiate an
+        // AutoStatsTracker here.
+    }
+
+    const MultipleCollectionAccessor& getCollections() const override {
+        return _collections;
+    }
+
+    std::shared_ptr<const CollectionCatalog> getCatalog() const override {
+        return _catalog;
+    }
+
+    boost::optional<UUID> getUUID() const override {
+        return _uuid;
+    }
+
+    void relinquishLocks() override {
+        _ctx.reset();
+        _collections.clear();
+    }
+
+    ~DefaultAggCatalogState() override {}
+
+private:
+    /**
+     * This is the method that does the actual acquisition and initialization of catalog data
+     * structures, during construction of subclass instances.
+     */
+    void initContext(auto_get_collection::ViewMode viewMode) {
+        auto initAutoGetCallback = [&]() {
+            _ctx.emplace(_aggExState.getOpCtx(),
+                         _aggExState.getExecutionNss(),
+                         AutoGetCollection::Options{}.viewMode(viewMode).secondaryNssOrUUIDs(
+                             _secondaryExecNssList.cbegin(), _secondaryExecNssList.cend()),
+                         AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
+        };
+        bool anySecondaryCollectionNotLocal = intializeAutoGet(_aggExState.getOpCtx(),
+                                                               _aggExState.getExecutionNss(),
+                                                               _secondaryExecNssList,
+                                                               initAutoGetCallback);
+        tassert(8322000,
+                "Should have initialized AutoGet* after calling 'initializeAutoGet'",
+                _ctx.has_value());
+        _collections = MultipleCollectionAccessor(_aggExState.getOpCtx(),
+                                                  &_ctx->getCollection(),
+                                                  _ctx->getNss(),
+                                                  _ctx->isAnySecondaryNamespaceAView() ||
+                                                      anySecondaryCollectionNotLocal,
+                                                  _secondaryExecNssList);
+
+        // Return the catalog that gets implicitly stashed during the collection acquisition
+        // above, which also implicitly opened a storage snapshot. This catalog object can
+        // be potentially different than the one obtained before and will be in sync with
+        // the opened snapshot.
+        _catalog = CollectionCatalog::get(_aggExState.getOpCtx());
+    }
+
+protected:
+    /**
+     * Contructor used by Oplog subclass.
+     */
+    DefaultAggCatalogState(const AggExState& aggExState, auto_get_collection::ViewMode viewMode)
+        : AggCatalogState{aggExState} {
+        initContext(viewMode);
+    }
+
+    const std::vector<NamespaceStringOrUUID> _secondaryExecNssList;
+
+    // If emplaced, AutoGetCollectionForReadCommandMaybeLockFree will throw if the sharding version
+    // for this connection is out of date. If the namespace is a view, the lock will be released
+    // before re-running the expanded aggregation.
+    boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> _ctx;
+    MultipleCollectionAccessor _collections;
+    std::shared_ptr<const CollectionCatalog> _catalog;
+    boost::optional<UUID> _uuid;
+};
+
+/**
+ * Change stream pipelines have some subtle differences from normal pipelines. This class
+ * encapsulates them.
+ */
+class OplogAggCatalogState : public DefaultAggCatalogState {
+public:
+    explicit OplogAggCatalogState(const AggExState& aggExState)
+        : DefaultAggCatalogState{aggExState, auto_get_collection::ViewMode::kViewsForbidden} {}
+
+    void validate() const override {
+        // Raise an error if original nss is a view. We do not need to check this if we are opening
+        // a stream on an entire db or across the cluster.
+        if (!_aggExState.getOriginalNss().isCollectionlessAggregateNS()) {
+            auto view = _catalog->lookupView(_aggExState.getOpCtx(), _aggExState.getOriginalNss());
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "Cannot run aggregation on timeseries with namespace "
+                                  << _aggExState.getOriginalNss().toStringForErrorMsg(),
+                    !view || !view->timeseries());
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "Namespace "
+                                  << _aggExState.getOriginalNss().toStringForErrorMsg()
+                                  << " is a view, not a collection",
+                    !view);
+        }
+    }
+
+    std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>
+    resolveCollator() const override {
+        // If the user specified an explicit collation, adopt it; otherwise, use the simple
+        // collation. We do not inherit the collection's default collation or UUID, since the stream
+        // may be resuming from a point before the current UUID existed.
+        return ::mongo::resolveCollator(
+            _aggExState.getOpCtx(),
+            _aggExState.getRequest().getCollation().get_value_or(BSONObj()),
+            CollectionPtr{});
+    }
+
+    ~OplogAggCatalogState() override {}
+};
+
+/**
+ * AggCatalogState subclass for pipelines that do not access any collections. They do not have a
+ * main collection and they do not access other collections (e.g., via $lookup).
+ */
+class CollectionlessAggCatalogState : public AggCatalogState {
+public:
+    explicit CollectionlessAggCatalogState(const AggExState& aggExState)
+        : AggCatalogState{aggExState}, _catalog(CollectionCatalog::latest(aggExState.getOpCtx())) {}
+
+    void validate() const override {}
+
+    bool lockAcquired() const override {
+        // Collectionless pipelines never acquire catalog locks, and thus never contain a valid
+        // catalog context.
+        return false;
+    }
+
+    void getStatsTrackerIfNeeded(boost::optional<AutoStatsTracker>& tracker) const override {
+        tracker.emplace(_aggExState.getOpCtx(),
+                        _aggExState.getExecutionNss(),
+                        Top::LockType::NotLocked,
+                        AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                        DatabaseProfileSettings::get(_aggExState.getOpCtx()->getServiceContext())
+                            .getDatabaseProfileLevel(_aggExState.getExecutionNss().dbName()));
+    }
+
+    std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>
+    resolveCollator() const override {
+        return ::mongo::resolveCollator(
+            _aggExState.getOpCtx(),
+            _aggExState.getRequest().getCollation().get_value_or(BSONObj()),
+            CollectionPtr());
+    }
+
+    const AutoGetCollectionForReadCommandMaybeLockFree& getCtx() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    const MultipleCollectionAccessor& getCollections() const override {
+        return _emptyMultipleCollectionAccessor;
+    }
+
+    std::shared_ptr<const CollectionCatalog> getCatalog() const override {
+        return _catalog;
+    }
+
+    boost::optional<UUID> getUUID() const override {
+        return boost::none;
+    }
+
+    void relinquishLocks() override {}
+
+    ~CollectionlessAggCatalogState() override {}
+
+private:
+    static const MultipleCollectionAccessor _emptyMultipleCollectionAccessor;
+
+    std::shared_ptr<const CollectionCatalog> _catalog;
+};
+
+const MultipleCollectionAccessor CollectionlessAggCatalogState::_emptyMultipleCollectionAccessor{};
+
+}  // namespace
+
 StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces() const {
     auto request = getRequest();
     auto pipelineInvolvedNamespaces = getInvolvedNamespaces();
@@ -281,4 +515,107 @@ void AggExState::adjustChangeStreamReadConcern() {
     setPrepareConflictBehaviorForReadConcern(
         _opCtx, readConcernArgs, PrepareConflictBehavior::kIgnoreConflicts);
 }
+
+std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
+    std::unique_ptr<AggCatalogState> collectionState;
+    if (hasChangeStream()) {
+        // If this is a change stream, perform special checks and change the execution
+        // namespace.
+        uassert(4928900,
+                str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
+                              << " is not supported for a change stream",
+                !getRequest().getCollectionUUID());
+
+        // Replace the execution namespace with the oplog.
+        setExecutionNss(NamespaceString::kRsOplogNamespace);
+
+        // In case of serverless the change stream will be opened on the change collection.
+        const bool isServerless = change_stream_serverless_helpers::isServerlessEnvironment();
+        if (isServerless) {
+            const auto tenantId =
+                change_stream_serverless_helpers::resolveTenantId(getOriginalNss().tenantId());
+
+            uassert(
+                ErrorCodes::BadValue, "Change streams cannot be used without tenant id", tenantId);
+            setExecutionNss(NamespaceString::makeChangeCollectionNSS(tenantId));
+
+            uassert(ErrorCodes::ChangeStreamNotEnabled,
+                    "Change streams must be enabled before being used",
+                    change_stream_serverless_helpers::isChangeStreamEnabled(
+                        getOpCtx(), *getExecutionNss().tenantId()));
+        }
+
+        // Assert that a change stream on the config server is always opened on the oplog.
+        tassert(6763400,
+                str::stream() << "Change stream was unexpectedly opened on the namespace: "
+                              << getExecutionNss().toStringForErrorMsg() << " in the config server",
+                !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
+                    getExecutionNss().isOplog());
+
+        // Upgrade and wait for read concern if necessary.
+        adjustChangeStreamReadConcern();
+
+        collectionState = AggCatalogStateFactory::createOplogAggCatalogState(*this);
+    } else if (getExecutionNss().isCollectionlessAggregateNS() && getInvolvedNamespaces().empty()) {
+        // We get here for aggregations that are not against a specific collection, e.g.,
+        //   { aggregate: 1, pipeline: [...] }
+        // that also do not access any secondary collections (via $lookup for example).
+        uassert(4928901,
+                str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
+                              << " is not supported for a collectionless aggregation",
+                !getRequest().getCollectionUUID());
+        collectionState = AggCatalogStateFactory::createCollectionlessAggCatalogState(*this);
+    } else {
+        collectionState = AggCatalogStateFactory::createDefaultAggCatalogState(*this);
+    }
+
+    collectionState->validate();
+    return collectionState;
+}
+
+/**
+ * Determines the collection type of the query by precedence of various configurations. The order of
+ * these checks is critical since there may be overlap (e.g., a view over a virtual collection is
+ * classified as a view).
+ */
+query_shape::CollectionType AggCatalogState::determineCollectionType() const {
+    if (_aggExState.getResolvedView().has_value()) {
+        if (_aggExState.getResolvedView()->timeseries()) {
+            return query_shape::CollectionType::kTimeseries;
+        }
+        return query_shape::CollectionType::kView;
+    }
+
+    if (_aggExState.getExecutionNss().isCollectionlessAggregateNS()) {
+        // Note that the notion of "collectionless" here is different from how the word is used for
+        // CollectionlessAggCatalogState. In this case we only care if the pipeline lacks a main
+        // collection, e.g., '{ aggregate: 1, pipeline: [...] }'. It might be accessing secondary
+        // collections via $lookup, but we still consider it collectionless for purposes of
+        // determining the collection type.
+        return query_shape::CollectionType::kVirtual;
+    }
+
+    if (_aggExState.hasChangeStream()) {
+        return query_shape::CollectionType::kChangeStream;
+    }
+    return lockAcquired() ? getCtx().getCollectionType() : query_shape::CollectionType::kUnknown;
+}
+
+std::unique_ptr<AggCatalogState> AggCatalogStateFactory::createDefaultAggCatalogState(
+    const AggExState& aggExState) {
+    return std::make_unique<DefaultAggCatalogState>(aggExState);
+}
+
+std::unique_ptr<AggCatalogState> AggCatalogStateFactory::createOplogAggCatalogState(
+    const AggExState& aggExState) {
+    return std::make_unique<OplogAggCatalogState>(aggExState);
+}
+
+std::unique_ptr<AggCatalogState> AggCatalogStateFactory::createCollectionlessAggCatalogState(
+    const AggExState& aggExState) {
+    auto cs = std::make_unique<CollectionlessAggCatalogState>(aggExState);
+    tassert(6235101, "A collection-less aggregate should not take any locks", !cs->lockAcquired());
+    return cs;
+}
+
 }  // namespace mongo

@@ -60,6 +60,7 @@ env.CppUnitTest(
         "parse_log_component_settings_test.cpp",
         "query_cmd/explain_test.cpp",
         "query_cmd/external_data_source_commands_test.cpp",
+        "query_cmd/aggregation_execution_state_test.cpp",
         "query_cmd/index_filter_commands_test.cpp",
         "query_cmd/mr_test.cpp" if get_option("js-engine") != "none" else [],
         "query_cmd/plan_cache_commands_test.cpp",
