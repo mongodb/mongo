@@ -173,11 +173,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
                 try {
                     return commitCreateDatabase(opCtx, dbName, candidatePrimaryShardId);
                 } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& ex) {
-                    LOGV2_DEBUG(8917900,
-                                1,
-                                "Commit create database failed",
-                                "dbName"_attr = dbName.toStringForErrorMsg(),
-                                "ex"_attr = redact(ex));
+                    create_database_util::logCommitCreateDatabaseFailed(dbName, redact(ex));
                     // The proposed primaryShard was found to not exist or be draining when
                     // attempting to commit.
                     if (optResolvedPrimaryShard) {
@@ -191,9 +187,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
                         if (retries > 0) {
                             continue;
                         } else {
-                            LOGV2_WARNING(8917901,
-                                          "Exhausted retries trying to commit create database",
-                                          "dbName"_attr = dbName);
+                            create_database_util::logCreateDatabaseRetryExhausted(dbName);
                             throw;
                         }
                     }
