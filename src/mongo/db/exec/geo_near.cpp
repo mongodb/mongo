@@ -65,7 +65,7 @@
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/hash.h"
-#include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/expression_geo_index_knobs_gen.h"
@@ -679,7 +679,7 @@ GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
     // _nearParams.baseBounds should have collator-generated comparison keys in place of raw
     // strings, and _nearParams.filter should have the collator.
     const CollatorInterface* collator = nullptr;
-    ExpressionParams::initialize2dsphereParams(s2Index->infoObj(), collator, &_indexParams);
+    index2dsphere::initialize2dsphereParams(s2Index->infoObj(), collator, &_indexParams);
 }
 
 namespace {

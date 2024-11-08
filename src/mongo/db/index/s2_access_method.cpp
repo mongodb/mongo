@@ -46,6 +46,7 @@
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/s2_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -66,7 +67,7 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState,
     : SortedDataIndexAccessMethod(btreeState, std::move(btree)) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
-    ExpressionParams::initialize2dsphereParams(
+    index2dsphere::initialize2dsphereParams(
         descriptor->infoObj(), btreeState->getCollator(), &_params);
 
     int geoFields = 0;
@@ -176,16 +177,16 @@ void S2AccessMethod::doGetKeys(OperationContext* opCtx,
                                KeyStringSet* multikeyMetadataKeys,
                                MultikeyPaths* multikeyPaths,
                                const boost::optional<RecordId>& id) const {
-    ExpressionKeysPrivate::getS2Keys(pooledBufferBuilder,
-                                     obj,
-                                     entry->descriptor()->keyPattern(),
-                                     _params,
-                                     keys,
-                                     multikeyPaths,
-                                     getSortedDataInterface()->getKeyStringVersion(),
-                                     context,
-                                     getSortedDataInterface()->getOrdering(),
-                                     id);
+    index2dsphere::getS2Keys(pooledBufferBuilder,
+                             obj,
+                             entry->descriptor()->keyPattern(),
+                             _params,
+                             keys,
+                             multikeyPaths,
+                             getSortedDataInterface()->getKeyStringVersion(),
+                             context,
+                             getSortedDataInterface()->getOrdering(),
+                             id);
 }
 
 }  // namespace mongo

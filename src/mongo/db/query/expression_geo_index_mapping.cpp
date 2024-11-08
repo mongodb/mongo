@@ -231,7 +231,7 @@ void ExpressionMapping::S2CellIdsToIntervalsWithParents(const std::vector<S2Cell
     }
 
     for (const S2CellId& exact : exactSet) {
-        BSONObj exactBSON = S2CellIdToIndexKey(exact, indexParams.indexVersion);
+        BSONObj exactBSON = index2dsphere::S2CellIdToIndexKey(exact, indexParams.indexVersion);
         oilOut->intervals.push_back(IndexBoundsBuilder::makePointInterval(exactBSON));
     }
 

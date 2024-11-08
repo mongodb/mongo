@@ -42,11 +42,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/ordering.h"
-#include "mongo/db/index/expression_keys_private.h"
-#include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/s2_common.h"
+#include "mongo/db/index/s2_key_generator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -140,21 +139,21 @@ struct S2KeyGeneratorTest : public unittest::Test {
         BSONObj infoObj = fromjson("{key: {a: '2dsphere'}, '2dsphereIndexVersion': 3}");
         S2IndexingParams params;
         const CollatorInterface* collator = nullptr;
-        ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+        index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
 
         KeyStringSet keys;
         // There's no need to compute the prefixes of the indexed fields that cause the index to be
         // multikey when computing the cell id of the geo field.
         MultikeyPaths* multikeyPaths = nullptr;
-        ExpressionKeysPrivate::getS2Keys(allocator,
-                                         obj,
-                                         keyPattern,
-                                         params,
-                                         &keys,
-                                         multikeyPaths,
-                                         key_string::Version::kLatestVersion,
-                                         SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                         Ordering::make(BSONObj()));
+        index2dsphere::getS2Keys(allocator,
+                                 obj,
+                                 keyPattern,
+                                 params,
+                                 &keys,
+                                 multikeyPaths,
+                                 key_string::Version::kLatestVersion,
+                                 SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                                 Ordering::make(BSONObj()));
 
         ASSERT_EQUALS(1U, keys.size());
         auto key = key_string::toBson(*keys.begin(), Ordering::make(BSONObj()));
@@ -171,19 +170,19 @@ TEST_F(S2KeyGeneratorTest, GetS2KeysFromSubobjectWithArrayOfGeoAndNonGeoSubobjec
         fromjson("{key: {'a.b.nongeo': 1, 'a.b.geo': '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock* collator = nullptr;
-    ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     genKeysFrom,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             genKeysFrom,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
                                        BSON("" << 1 << "" << getCellID(0, 0)),
@@ -213,19 +212,19 @@ TEST_F(S2KeyGeneratorTest, GetS2KeysFromArrayOfNonGeoSubobjectsWithArrayValues) 
         fromjson("{key: {'a.nongeo': 1, geo: '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock* collator = nullptr;
-    ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     genKeysFrom,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             genKeysFrom,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
                                        BSON("" << 1 << "" << getCellID(0, 0)),
@@ -249,19 +248,19 @@ TEST_F(S2KeyGeneratorTest, GetS2KeysFromMultiPointInGeoField) {
     BSONObj infoObj = fromjson("{key: {nongeo: 1, geo: '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock* collator = nullptr;
-    ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     genKeysFrom,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             genKeysFrom,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     const bool multiPoint = true;
     key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
@@ -285,19 +284,19 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldAfterGeoField) {
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, &collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON("" << getCellID(0, 0) << ""
@@ -316,19 +315,19 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
     BSONObj infoObj = fromjson("{key: {a: 1, b: '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, &collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON(""
@@ -348,19 +347,19 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
     BSONObj infoObj = fromjson("{key: {a: 1, b: '2dsphere', c: 1}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, &collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON(""
@@ -382,19 +381,19 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldWithMultiplePathCo
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', 'b.c.d': 1}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, &collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON("" << getCellID(0, 0) << ""
@@ -413,19 +412,19 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInArray) {
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, &collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
                                        BSON("" << getCellID(0, 0) << ""
@@ -448,19 +447,19 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInAllArrays) {
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1, c: 1}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, &collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
                                        BSON("" << getCellID(0, 0) << ""
@@ -499,19 +498,19 @@ TEST_F(S2KeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, &collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON("" << getCellID(0, 0) << "" << 5),
@@ -529,19 +528,19 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, &collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON("" << getCellID(0, 0) << ""
@@ -561,19 +560,19 @@ TEST_F(S2KeyGeneratorTest, NoCollation) {
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     const CollatorInterface* collator = nullptr;
-    ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON("" << getCellID(0, 0) << ""
@@ -592,19 +591,19 @@ TEST_F(S2KeyGeneratorTest, EmptyArrayForLeadingFieldIsConsideredMultikey) {
     BSONObj infoObj = fromjson("{key: {a: 1, b: '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     const CollatorInterface* collator = nullptr;
-    ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON("" << BSONUndefined << "" << getCellID(0, 0)),
@@ -621,19 +620,19 @@ TEST_F(S2KeyGeneratorTest, EmptyArrayForTrailingFieldIsConsideredMultikey) {
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', a: 1}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     const CollatorInterface* collator = nullptr;
-    ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON("" << getCellID(0, 0) << "" << BSONUndefined),
@@ -650,19 +649,19 @@ TEST_F(S2KeyGeneratorTest, SingleElementTrailingArrayIsConsideredMultikey) {
     BSONObj infoObj = fromjson("{key: {'a.c': 1, b: '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     const CollatorInterface* collator = nullptr;
-    ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON("" << 99 << "" << getCellID(0, 0)),
@@ -679,19 +678,19 @@ TEST_F(S2KeyGeneratorTest, MidPathSingleElementArrayIsConsideredMultikey) {
     BSONObj infoObj = fromjson("{key: {'a.c': 1, b: '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     const CollatorInterface* collator = nullptr;
-    ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(allocator,
-                                     obj,
-                                     keyPattern,
-                                     params,
-                                     &actualKeys,
-                                     &actualMultikeyPaths,
-                                     key_string::Version::kLatestVersion,
-                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                     Ordering::make(BSONObj()));
+    index2dsphere::getS2Keys(allocator,
+                             obj,
+                             keyPattern,
+                             params,
+                             &actualKeys,
+                             &actualMultikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
 
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       BSON("" << 99 << "" << getCellID(0, 0)),

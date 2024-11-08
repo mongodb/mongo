@@ -9,7 +9,16 @@ filters:
   - "multikey_metadata_access_stats.h":
     approvers:
       - 10gen/query-execution
-  - "*key_generator*":
+  - "btree_key_generator*":
+    approvers:
+      - 10gen/query-execution
+  - "hash_key_generator*":
+    approvers:
+      - 10gen/query-execution
+  - "sort_key_generator*":
+    approvers:
+      - 10gen/query-execution
+  - "wildcard_key_generator*":
     approvers:
       - 10gen/query-execution
   - "expression_keys*":
@@ -24,3 +33,15 @@ filters:
   - "multikey_paths*":
     approvers:
       - 10gen/query-execution
+  - "2d_common*":
+    approvers:
+      - 10gen/query-integration-geo
+  - "2d_key_generator*":
+    approvers:
+      - 10gen/query-integration-geo
+  - "s2_common*":
+    approvers:
+      - 10gen/query-integration-geo
+  - "s2*key_generator*":
+    approvers:
+      - 10gen/query-integration-geo

@@ -44,7 +44,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/2d_common.h"
-#include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/2d_key_generator.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
@@ -115,14 +115,14 @@ TEST_F(TwoDKeyGeneratorTest, TrailingField) {
     BSONObj obj = fromjson("{a: [0, 0], b: 5}");
     BSONObj infoObj = fromjson("{key: {a: '2d', b: 1}}");
     TwoDIndexingParams params;
-    ExpressionParams::parseTwoDParams(infoObj, &params);
+    index2d::parse2dParams(infoObj, &params);
     KeyStringSet actualKeys;
-    ExpressionKeysPrivate::get2DKeys(allocator,
-                                     obj,
-                                     params,
-                                     &actualKeys,
-                                     key_string::Version::kLatestVersion,
-                                     Ordering::make(BSONObj()));
+    index2d::get2DKeys(allocator,
+                       obj,
+                       params,
+                       &actualKeys,
+                       key_string::Version::kLatestVersion,
+                       Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;
     BSONObj trailingFields = BSON("" << 5);
@@ -135,14 +135,14 @@ TEST_F(TwoDKeyGeneratorTest, ArrayTrailingField) {
     BSONObj obj = fromjson("{a: [0, 0], b: [5, 6]}");
     BSONObj infoObj = fromjson("{key: {a: '2d', b: 1}}");
     TwoDIndexingParams params;
-    ExpressionParams::parseTwoDParams(infoObj, &params);
+    index2d::parse2dParams(infoObj, &params);
     KeyStringSet actualKeys;
-    ExpressionKeysPrivate::get2DKeys(allocator,
-                                     obj,
-                                     params,
-                                     &actualKeys,
-                                     key_string::Version::kLatestVersion,
-                                     Ordering::make(BSONObj()));
+    index2d::get2DKeys(allocator,
+                       obj,
+                       params,
+                       &actualKeys,
+                       key_string::Version::kLatestVersion,
+                       Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;
     BSONObj trailingFields = BSON("" << BSON_ARRAY(5 << 6));
@@ -155,14 +155,14 @@ TEST_F(TwoDKeyGeneratorTest, ArrayOfObjectsTrailingField) {
     BSONObj obj = fromjson("{a: [0, 0], b: [{c: 5}, {c: 6}]}");
     BSONObj infoObj = fromjson("{key: {a: '2d', 'b.c': 1}}");
     TwoDIndexingParams params;
-    ExpressionParams::parseTwoDParams(infoObj, &params);
+    index2d::parse2dParams(infoObj, &params);
     KeyStringSet actualKeys;
-    ExpressionKeysPrivate::get2DKeys(allocator,
-                                     obj,
-                                     params,
-                                     &actualKeys,
-                                     key_string::Version::kLatestVersion,
-                                     Ordering::make(BSONObj()));
+    index2d::get2DKeys(allocator,
+                       obj,
+                       params,
+                       &actualKeys,
+                       key_string::Version::kLatestVersion,
+                       Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;
     BSONObj trailingFields = BSON("" << BSON_ARRAY(5 << 6));

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,21 +29,25 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/hasher.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index/s2_common.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
-namespace mongo {
-
-class CollatorInterface;
-
-namespace ExpressionParams {
-
-void parseHashParams(const BSONObj& infoObj, int* versionOut, BSONObj* keyPattern);
-
-}  // namespace ExpressionParams
-
-}  // namespace mongo
+namespace mongo::index2dsphere {
+/**
+ * Generates keys for S2 access method, used for 2dsphere index type.
+ */
+void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+               const BSONObj& obj,
+               const BSONObj& keyPattern,
+               const S2IndexingParams& params,
+               KeyStringSet* keys,
+               MultikeyPaths* multikeyPaths,
+               key_string::Version keyStringVersion,
+               SortedDataIndexAccessMethod::GetKeysContext context,
+               Ordering ordering,
+               const boost::optional<RecordId>& id = boost::none);
+}  // namespace mongo::index2dsphere

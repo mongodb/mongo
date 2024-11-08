@@ -49,7 +49,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
@@ -973,8 +972,7 @@ void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
         }
 
         S2IndexingParams params;
-        ExpressionParams::initialize2dsphereParams(
-            indexEntry.infoObj, indexEntry.collator, &params);
+        index2dsphere::initialize2dsphereParams(indexEntry.infoObj, indexEntry.collator, &params);
 
         if (params.indexVersion < S2_INDEX_VERSION_3) {
             continue;

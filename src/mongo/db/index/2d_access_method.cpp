@@ -34,18 +34,17 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/index/2d_key_generator.h"
 #include "mongo/db/index/expression_keys_private.h"
-#include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
-
 TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState,
                                    std::unique_ptr<SortedDataInterface> btree)
     : SortedDataIndexAccessMethod(btreeState, std::move(btree)) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
-    ExpressionParams::parseTwoDParams(descriptor->infoObj(), &_params);
+    index2d::parse2dParams(descriptor->infoObj(), &_params);
 }
 
 void TwoDAccessMethod::validateDocument(const CollectionPtr& collection,
@@ -65,13 +64,13 @@ void TwoDAccessMethod::doGetKeys(OperationContext* opCtx,
                                  KeyStringSet* multikeyMetadataKeys,
                                  MultikeyPaths* multikeyPaths,
                                  const boost::optional<RecordId>& id) const {
-    ExpressionKeysPrivate::get2DKeys(pooledBufferBuilder,
-                                     obj,
-                                     _params,
-                                     keys,
-                                     getSortedDataInterface()->getKeyStringVersion(),
-                                     getSortedDataInterface()->getOrdering(),
-                                     id);
+    index2d::get2DKeys(pooledBufferBuilder,
+                       obj,
+                       _params,
+                       keys,
+                       getSortedDataInterface()->getKeyStringVersion(),
+                       getSortedDataInterface()->getOrdering(),
+                       id);
 }
 
 }  // namespace mongo

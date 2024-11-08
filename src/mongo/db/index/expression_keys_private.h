@@ -40,7 +40,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -51,9 +50,6 @@ namespace mongo {
 class CollectionPtr;
 class CollatorInterface;
 
-struct TwoDIndexingParams;
-struct S2IndexingParams;
-
 namespace fts {
 
 class FTSSpec;
@@ -61,9 +57,13 @@ class FTSSpec;
 }  // namespace fts
 
 /**
- * Do not use this class or any of its methods directly.  The key generation of btree-indexed
- * expression indices is kept outside of the access method for testing and for upgrade
- * compatibility checking.
+ * Do not use this class or any of its methods directly.
+ *
+ * The key generation of btree-indexed expression indices is kept outside of the access method for
+ * testing and for upgrade compatibility checking.
+ *
+ * The key generators of 2d- and 2dsphere-indexed expressions are kept separate for code ownership
+ * reasons.
  */
 class ExpressionKeysPrivate {
 public:
@@ -74,18 +74,6 @@ public:
     static void validateDocumentCommon(const CollectionPtr& collection,
                                        const BSONObj& obj,
                                        const BSONObj& keyPattern);
-
-    //
-    // 2d
-    //
-
-    static void get2DKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                          const BSONObj& obj,
-                          const TwoDIndexingParams& params,
-                          KeyStringSet* keys,
-                          key_string::Version keyStringVersion,
-                          Ordering ordering,
-                          const boost::optional<RecordId>& id = boost::none);
 
     //
     // FTS
@@ -124,24 +112,6 @@ public:
      * so mongo/db/index_legacy.cpp can use it.
      */
     static long long int makeSingleHashKey(const BSONElement& e, int v);
-
-    //
-    // S2
-    //
-
-    /**
-     * Generates keys for S2 access method.
-     */
-    static void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                          const BSONObj& obj,
-                          const BSONObj& keyPattern,
-                          const S2IndexingParams& params,
-                          KeyStringSet* keys,
-                          MultikeyPaths* multikeyPaths,
-                          key_string::Version keyStringVersion,
-                          SortedDataIndexAccessMethod::GetKeysContext context,
-                          Ordering ordering,
-                          const boost::optional<RecordId>& id = boost::none);
 };
 
 }  // namespace mongo

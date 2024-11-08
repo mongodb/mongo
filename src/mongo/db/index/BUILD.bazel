@@ -12,11 +12,12 @@ exports_files(
 mongo_cc_library(
     name = "expression_params",
     srcs = [
-        "2d_common.h",
+        "2d_common.cpp",
         "expression_params.cpp",
         "s2_common.cpp",
     ],
     hdrs = [
+        "2d_common.h",
         "expression_params.h",
         "s2_common.h",
     ],
@@ -36,6 +37,7 @@ mongo_cc_library(
     name = "index_access_method",
     srcs = [
         "2d_access_method.cpp",
+        "2d_key_generator.cpp",
         "btree_access_method.cpp",
         "btree_key_generator.cpp",
         "expression_keys_private.cpp",
@@ -45,6 +47,7 @@ mongo_cc_library(
         "index_descriptor.cpp",
         "multikey_paths.cpp",
         "s2_access_method.cpp",
+        "s2_key_generator.cpp",
         "sort_key_generator.cpp",
         "wildcard_access_method.cpp",
         "wildcard_key_generator.cpp",
@@ -54,6 +57,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "2d_access_method.h",
+        "2d_key_generator.h",
         "btree_access_method.h",
         "btree_key_generator.h",
         "bulk_builder_common.h",
@@ -66,6 +70,7 @@ mongo_cc_library(
         "multikey_paths.h",
         "s2_access_method.h",
         "s2_bucket_access_method.h",
+        "s2_key_generator.h",
         "sort_key_generator.h",
         "wildcard_access_method.h",
         "wildcard_key_generator.h",

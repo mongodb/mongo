@@ -47,7 +47,6 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/shapes.h"
-#include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_geo.h"
@@ -1175,7 +1174,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             MONGO_verify(gme->getGeoExpression().getGeometry().hasS2Region());
             const S2Region& region = gme->getGeoExpression().getGeometry().getS2Region();
             S2IndexingParams indexParams;
-            ExpressionParams::initialize2dsphereParams(index.infoObj, index.collator, &indexParams);
+            index2dsphere::initialize2dsphereParams(index.infoObj, index.collator, &indexParams);
             ExpressionMapping::cover2dsphere(region, indexParams, oilOut);
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         } else if ("2d" == elt.valueStringDataSafe()) {
@@ -1201,7 +1200,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                     ibgwme->getGeoContainer().hasS2Region());
             const S2Region& region = ibgwme->getGeoContainer().getS2Region();
             S2IndexingParams indexParams;
-            ExpressionParams::initialize2dsphereParams(index.infoObj, index.collator, &indexParams);
+            index2dsphere::initialize2dsphereParams(index.infoObj, index.collator, &indexParams);
             ExpressionMapping::cover2dsphere(region, indexParams, oilOut);
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         } else {

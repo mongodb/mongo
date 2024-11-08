@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,23 +27,31 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/index/2d_common.h"
 
-#include <string>
-#include <vector>
+namespace mongo::index2d {
+void parse2dParams(const BSONObj& infoObj, TwoDIndexingParams* out) {
+    BSONObjIterator i(infoObj.getObjectField("key"));
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/hasher.h"
-#include "mongo/db/jsobj.h"
+    while (i.more()) {
+        BSONElement e = i.next();
+        if (e.type() == String && IndexNames::GEO_2D == e.str()) {
+            uassert(16800, "can't have 2 geo fields", out->geo.empty());
+            uassert(16801, "2d has to be first in index", out->other.empty());
+            out->geo = e.fieldName();
+        } else {
+            int order = 1;
+            if (e.isNumber()) {
+                order = e.safeNumberInt();
+            }
+            out->other.emplace_back(e.fieldName(), order);
+        }
+    }
 
-namespace mongo {
+    uassert(16802, "no geo field specified", out->geo.size());
 
-class CollatorInterface;
-
-namespace ExpressionParams {
-
-void parseHashParams(const BSONObj& infoObj, int* versionOut, BSONObj* keyPattern);
-
-}  // namespace ExpressionParams
-
-}  // namespace mongo
+    auto result = GeoHashConverter::createFromDoc(infoObj);
+    uassertStatusOK(result.getStatus());
+    out->geoHashConverter.reset(result.getValue().release());
+}
+}  // namespace mongo::index2d

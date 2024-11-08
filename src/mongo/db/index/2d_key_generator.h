@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,21 +29,22 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/hasher.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/index/2d_common.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
-namespace mongo {
+namespace mongo::index2d {
 
-class CollatorInterface;
-
-namespace ExpressionParams {
-
-void parseHashParams(const BSONObj& infoObj, int* versionOut, BSONObj* keyPattern);
-
-}  // namespace ExpressionParams
-
-}  // namespace mongo
+/**
+ * Generates keys for 2d access method, used for 2d index type.
+ */
+void get2DKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+               const BSONObj& obj,
+               const TwoDIndexingParams& params,
+               KeyStringSet* keys,
+               key_string::Version keyStringVersion,
+               Ordering ordering,
+               const boost::optional<RecordId>& id = boost::none);
+}  // namespace mongo::index2d

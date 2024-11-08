@@ -919,11 +919,18 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/index/**/index_access_method* @10gen/server-storage-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/key_gen_bm.cpp @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/multikey_metadata_access_stats.h @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/index/**/*key_generator* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/index/**/btree_key_generator* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/index/**/hash_key_generator* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/index/**/sort_key_generator* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/index/**/wildcard_key_generator* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/expression_keys* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/expression_params* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/wildcard_validation* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/index/**/multikey_paths* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/index/**/2d_common* @10gen/query-integration-geo @svc-auto-approve-bot
+/src/mongo/db/index/**/2d_key_generator* @10gen/query-integration-geo @svc-auto-approve-bot
+/src/mongo/db/index/**/s2_common* @10gen/query-integration-geo @svc-auto-approve-bot
+/src/mongo/db/index/**/s2*key_generator* @10gen/query-integration-geo @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/index_builds/OWNERS.yml
 /src/mongo/db/index_builds/**/* @10gen/server-storage-execution @svc-auto-approve-bot

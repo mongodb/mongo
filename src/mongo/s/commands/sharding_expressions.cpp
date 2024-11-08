@@ -56,6 +56,7 @@
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/2d_common.h"
+#include "mongo/db/index/2d_key_generator.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
@@ -63,6 +64,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/s2_common.h"
+#include "mongo/db/index/s2_key_generator.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
@@ -226,18 +228,18 @@ private:
      */
     void _generate2DIndexKeys(KeyStringSet* keyStrings) const {
         TwoDIndexingParams twoDIndexingParams;
-        ExpressionParams::parseTwoDParams(_indexDescriptor->infoObj(), &twoDIndexingParams);
+        index2d::parse2dParams(_indexDescriptor->infoObj(), &twoDIndexingParams);
 
         const boost::optional<RecordId> recordId = boost::none;
         SharedBufferFragmentBuilder pooledBufferBuilder(BufBuilder::kDefaultInitSizeBytes);
 
-        ExpressionKeysPrivate::get2DKeys(pooledBufferBuilder,
-                                         _docObj,
-                                         twoDIndexingParams,
-                                         keyStrings,
-                                         _keyStringVersion,
-                                         _ordering,
-                                         recordId);
+        index2d::get2DKeys(pooledBufferBuilder,
+                           _docObj,
+                           twoDIndexingParams,
+                           keyStrings,
+                           _keyStringVersion,
+                           _ordering,
+                           recordId);
     }
 
     /*
@@ -246,23 +248,23 @@ private:
      */
     void _generate2DSphereIndexKeys(KeyStringSet* keyStrings) const {
         S2IndexingParams s2IndexingParams;
-        ExpressionParams::initialize2dsphereParams(
+        index2dsphere::initialize2dsphereParams(
             _indexDescriptor->infoObj(), _collatorInterface.get(), &s2IndexingParams);
 
         MultikeyPaths multikeyPaths;
         const boost::optional<RecordId> recordId = boost::none;
         SharedBufferFragmentBuilder pooledBufferBuilder(BufBuilder::kDefaultInitSizeBytes);
 
-        ExpressionKeysPrivate::getS2Keys(pooledBufferBuilder,
-                                         _docObj,
-                                         _indexDescriptor->keyPattern(),
-                                         s2IndexingParams,
-                                         keyStrings,
-                                         &multikeyPaths,
-                                         _keyStringVersion,
-                                         SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                                         _ordering,
-                                         recordId);
+        index2dsphere::getS2Keys(pooledBufferBuilder,
+                                 _docObj,
+                                 _indexDescriptor->keyPattern(),
+                                 s2IndexingParams,
+                                 keyStrings,
+                                 &multikeyPaths,
+                                 _keyStringVersion,
+                                 SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                                 _ordering,
+                                 recordId);
     }
 
     /**
