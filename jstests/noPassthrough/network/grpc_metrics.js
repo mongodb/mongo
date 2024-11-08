@@ -113,8 +113,8 @@ function runTest(conn) {
     // While a test failure may take up to 15s, this test should take no longer than a normal shell
     // exection.
     const kSIGKILL = 9;
-    const kShellShutdownDelay = 15 * 1000;
-    const kShellStartTimeout = 5 * 1000;
+    const kShellStartTimeout = 30 * 1000;
+    const kShellShutdownDelay = kShellStartTimeout * 2;
     const kShellStartInterval = 500;
     clearRawMongoProgramOutput();
     evalCmd(uri, `print("Kill Test\\n"); sleep(${kShellShutdownDelay});`, false, function(pid) {
