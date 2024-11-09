@@ -34,7 +34,6 @@ env.SConscript(
         "admission",
         "auth",
         "catalog",
-        "collection_crud",
         "commands",
         "concurrency",
         "exec",
