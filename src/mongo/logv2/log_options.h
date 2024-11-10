@@ -91,6 +91,9 @@ public:
     LogOptions(LogComponent component, LogDomain* domain, LogTag tags)
         : _domain(domain), _tags(tags), _component(component) {}
 
+    LogOptions(LogTruncation truncation, UserAssertAfterLog uassertAfterLog)
+        : _truncation(truncation), _userAssertErrorCode(uassertAfterLog.errorCode) {}
+
     LogOptions(LogComponent component,
                LogDomain* domain,
                LogTag tags,

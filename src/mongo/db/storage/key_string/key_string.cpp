@@ -55,6 +55,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/endian.h"
 #include "mongo/platform/strnlen.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/shared_buffer.h"
@@ -436,6 +437,30 @@ string readInvertedCStringWithNuls(BufReader* reader) {
 
     return out;
 }
+
+#define keyStringAssertWithBuffer(id, msg, cond, buffer, bufferSize, ...) \
+    do {                                                                  \
+        if (MONGO_unlikely(!(cond))) {                                    \
+            logUassert(id, msg, buffer, bufferSize, ##__VA_ARGS__);       \
+        }                                                                 \
+    } while (false)
+
+
+template <size_t N, typename... Args>
+void logUassert(int32_t id,
+                const char (&msg)[N],
+                const unsigned char* buffer,
+                size_t bufferSize,
+                Args... args) {
+    auto encoded = base64::encode(buffer, bufferSize);
+    LOGV2_OPTIONS(id,
+                  logv2::LogOptions(logv2::LogTruncation::Disabled, logv2::UserAssertAfterLog()),
+                  msg,
+                  "buffer"_attr = encoded,
+                  "bufferSize"_attr = bufferSize,
+                  args...);
+}
+
 }  // namespace
 
 template <class BufferT>
@@ -2810,15 +2835,17 @@ RecordId decodeRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize) {
 
 int32_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize, RecordId* recordId) {
     const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
-    keyStringAssert(8273006,
-                    fmt::format("Input too short to encode RecordId. bufSize: {}", bufSize),
-                    bufSize >= 2);  // smallest possible encoding of a RecordId.
+    keyStringAssertWithBuffer(
+        8273006, "Input too short to encode RecordId", bufSize >= 2, buffer, bufSize);
     const unsigned char lastByte = *(buffer + bufSize - 1);
     const size_t ridSize = 2 + (lastByte & 0x7);  // stored in low 3 bits.
-    keyStringAssert(
-        8273001,
-        fmt::format("Encoded RecordId size is too big. bufSize: {}, ridSize: {}", bufSize, ridSize),
-        bufSize >= ridSize);
+
+    keyStringAssertWithBuffer(8273001,
+                              "Encoded RecordId size is too big",
+                              bufSize >= ridSize,
+                              buffer,
+                              bufSize,
+                              "ridSize"_attr = ridSize);
     if (recordId) {
         const unsigned char* firstBytePtr = buffer + bufSize - ridSize;
         BufReader reader(firstBytePtr, ridSize);
@@ -2828,9 +2855,11 @@ int32_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize, Reco
 }
 
 int32_t sizeWithoutDiscriminatorAtEnd(const void* bufferRaw, size_t bufSize) {
-    keyStringAssert(8328701,
-                    fmt::format("Input too short to decode RecordId. bufSize: {}", bufSize),
-                    bufSize >= 2);  // smallest possible encoding of a RecordId.
+    keyStringAssertWithBuffer(8328701,
+                              "Input too short to decode RecordId",
+                              bufSize >= 2,
+                              static_cast<const unsigned char*>(bufferRaw),
+                              bufSize);  // smallest possible encoding of a RecordId.
     const char* ptr = static_cast<const char*>(bufferRaw) + bufSize - 1;
     uint8_t ctype = ConstDataView(ptr).read<uint8_t>();
     tassert(8328700,
@@ -2843,32 +2872,34 @@ int32_t sizeWithoutDiscriminatorAtEnd(const void* bufferRaw, size_t bufSize) {
 
 RecordId decodeRecordIdLong(BufReader* reader) {
     const unsigned bufSize = reader->remaining();
-    keyStringAssert(843441,
-                    fmt::format("Input too short to decode RecordId. bufSize: {}", bufSize),
-                    bufSize >= 2);  // smallest possible encoding of a RecordId.
-
     const unsigned char* firstBytePtr = static_cast<const unsigned char*>(reader->pos());
+    keyStringAssertWithBuffer(
+        843441, "Input too short to decode RecordId", bufSize >= 2, firstBytePtr, bufSize);
+
     const unsigned char firstByte = *firstBytePtr;
     const unsigned numExtraBytes = firstByte >> 5;  // high 3 bits in firstByte
     uint64_t repr = firstByte & 0x1f;               // low 5 bits in firstByte
 
     const unsigned ridSize = numExtraBytes + 2;
-    keyStringAssert(
-        8434401,
-        fmt::format("Encoded RecordId size is too big. bufSize: {}, ridSize: {}", bufSize, ridSize),
-        bufSize >= ridSize);
+    keyStringAssertWithBuffer(8434401,
+                              "Encoded RecordId size is too big",
+                              bufSize >= ridSize,
+                              firstBytePtr,
+                              bufSize,
+                              "ridSize"_attr = ridSize);
     unsigned offset = 1;
     for (; offset < numExtraBytes + 1; offset++) {
         repr = (repr << 8) | firstBytePtr[offset];
     }
 
     const unsigned char lastByte = firstBytePtr[offset];
-    keyStringAssert(8273000,
-                    fmt::format("Number of extra bytes for RecordId is not encoded correctly. Low "
-                                "3 bits of lastByte: {}, high 3 bits of firstByte: {}",
-                                lastByte & 0x7,
-                                numExtraBytes),
-                    (lastByte & 0x7) == numExtraBytes);
+    keyStringAssertWithBuffer(8273000,
+                              "Number of extra bytes for RecordId is not encoded correctly",
+                              (lastByte & 0x7) == numExtraBytes,
+                              firstBytePtr,
+                              bufSize,
+                              "low 3 bits of lastByte"_attr = lastByte & 0x7,
+                              "high 3 bits of firstByte"_attr = numExtraBytes);
 
     // Only advance the reader once we know we will return something.
     reader->skip(ridSize);
@@ -2922,12 +2953,13 @@ int32_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize, Recor
     }
     ridSize += static_cast<size_t>(sizes[sizeByteId]) << ((numSegments - sizeByteId - 1) * 7);
 
-    keyStringAssert(8273005,
-                    fmt::format("RecordId too long. bufSize: {}, ridSize: {}, numSegments: {}",
-                                bufSize,
-                                ridSize,
-                                numSegments),
-                    bufSize >= ridSize + numSegments);
+    keyStringAssertWithBuffer(8273005,
+                              "RecordId too long",
+                              bufSize >= ridSize + numSegments,
+                              buffer,
+                              bufSize,
+                              "ridSize"_attr = ridSize,
+                              "numSegments"_attr = numSegments);
 
     if (recordId) {
         *recordId = RecordId(
