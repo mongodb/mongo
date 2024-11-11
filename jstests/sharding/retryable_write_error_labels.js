@@ -207,28 +207,36 @@ function testMongosError() {
     // Test commitTransaction command.
     jsTestLog(
         "commitTransaction should return mongos shutdown error with RetryableWriteError label");
-    let commitTxnFailPoint = configureFailPoint(shard0Primary, "hangBeforeCommitingTxn");
-    const commitTxnThread = new Thread((mongosHost, dbName, collName) => {
-        const mongos = new Mongo(mongosHost);
-        const session = mongos.startSession();
-        const sessionDb = session.getDatabase(dbName);
-        const sessionColl = sessionDb.getCollection(collName);
-        session.startTransaction();
-        assert.commandWorked(sessionColl.update({k: 0}, {$inc: {x: 1}}));
-        return sessionDb.adminCommand({
-            commitTransaction: 1,
-            txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-            autocommit: false
-        });
-    }, st.s.host, dbName, collName);
-    commitTxnThread.start();
+    const mongosConn = new Mongo(st.s.host);
+    const session = mongosConn.startSession();
+    let commitTxnFailPoint = assert.commandWorked(shard0Primary.getDB("admin").runCommand({
+        configureFailPoint: "hangBeforeCommitingTxn",
+        mode: "alwaysOn",
+        data: {uuid: session.getSessionId().id}
+    }));
+    let timesEntered = commitTxnFailPoint.count;
+    const shutdownThread = new Thread((mongos, shard0PrimaryHost, timesEntered) => {
+        var primary = new Mongo(shard0PrimaryHost);
+        const kDefaultWaitForFailPointTimeout = 10 * 60 * 1000;
+        assert.commandWorked(primary.getDB("admin").runCommand({
+            waitForFailPoint: "hangBeforeCommitingTxn",
+            timesEntered: timesEntered + 1,
+            maxTimeMS: kDefaultWaitForFailPointTimeout
+        }));
+        MongoRunner.stopMongos(mongos);
+        assert.commandWorked(primary.getDB("admin").runCommand(
+            {configureFailPoint: "hangBeforeCommitingTxn", mode: "off"}));
+    }, st.s, st.rs0.getPrimary().host, timesEntered);
+    shutdownThread.start();
 
-    commitTxnFailPoint.wait();
-    MongoRunner.stopMongos(st.s);
-    commitTxnFailPoint.off();
+    session.startTransaction();
+    const sessionDb = session.getDatabase(dbName);
+    const sessionColl = sessionDb.getCollection(collName);
+    assert.commandWorked(sessionColl.update({k: 0}, {$inc: {x: 1}}));
+    const commitTxnRes = sessionDb.adminCommand(
+        {commitTransaction: 1, txnNumber: session.getTxnNumber_forTesting(), autocommit: false});
 
     try {
-        const commitTxnRes = commitTxnThread.returnData();
         checkErrorCode(commitTxnRes, acceptableErrorsDuringShutdown, false /* isWCError */);
         assertContainRetryableErrorLabel(commitTxnRes);
     } catch (e) {
@@ -236,6 +244,9 @@ function testMongosError() {
             throw e;
         }
     }
+
+    shutdownThread.join();
+    mongosConn.close();
 
     st.s = MongoRunner.runMongos(st.s);
 
