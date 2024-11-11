@@ -114,6 +114,9 @@ struct Instruction {
         pushLocalLambda,
         pop,
         swap,
+        makeOwn,
+        // If the only argument is a stack-owned value, it is propagated unchanged;
+        // if it is not owned by the stack, it returns a copy of it.
 
         add,
         sub,
@@ -302,6 +305,8 @@ struct Instruction {
                 return "pop";
             case swap:
                 return "swap";
+            case makeOwn:
+                return "makeOwn";
             case add:
                 return "add";
             case sub:
@@ -1100,6 +1105,7 @@ public:
     void appendLocalLambda(int codePosition);
     void appendPop();
     void appendSwap();
+    void appendMakeOwn(Instruction::Parameter arg);
     void appendAdd(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendSub(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendMul(Instruction::Parameter lhs, Instruction::Parameter rhs);

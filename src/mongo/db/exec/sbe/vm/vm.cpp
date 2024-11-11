@@ -126,6 +126,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     1,   // pushLocalLambda
     -1,  // pop
     0,   // swap
+    0,   // makeOwn
 
     -1,  // add
     -1,  // sub
@@ -621,6 +622,10 @@ void CodeFragment::appendPop() {
 
 void CodeFragment::appendSwap() {
     appendSimpleInstruction(Instruction::swap);
+}
+
+void CodeFragment::appendMakeOwn(Instruction::Parameter arg) {
+    appendSimpleInstruction(Instruction::makeOwn, arg);
 }
 
 void CodeFragment::appendCmp3w(Instruction::Parameter lhs, Instruction::Parameter rhs) {
@@ -10660,6 +10665,24 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::swap: {
                 swapStack();
+                break;
+            }
+            case Instruction::makeOwn: {
+                auto [popParam, moveFromParam, offsetParam] = decodeParam(pcPointer);
+                auto [owned, tag, val] = moveFromStack(offsetParam);
+                if (!owned) {
+                    // Value is not owned, make a copy.
+                    std::tie(tag, val) = value::copyValue(tag, val);
+                }
+                // Pop the stack entry if required, otherwise invalidate it to avoid the error
+                // "swapping stack entries containing the same value".
+                if (popParam) {
+                    popStack();
+                } else {
+                    setTagToNothing(offsetParam);
+                }
+                pushStack(true, tag, val);
+
                 break;
             }
             case Instruction::add: {

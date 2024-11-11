@@ -38,6 +38,7 @@
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
 #include "mongo/db/query/sbe_stage_builder_const_eval.h"
 #include "mongo/db/query/sbe_stage_builder_type_checker.h"
+#include "mongo/db/query/sbe_stage_builder_value_lifetime.h"
 
 namespace mongo::stage_builder {
 using SlotId = sbe::value::SlotId;
@@ -172,6 +173,8 @@ TypeSignature constantFold(optimizer::ABT& abt,
 
         modified = typeChecker.modified();
     } while (modified);
+
+    ValueLifetime{}.validate(abt);
 
     return signature;
 }

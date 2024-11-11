@@ -1748,6 +1748,7 @@ execEnv.Library(
         'query/sbe_stage_builder_ts.cpp',
         'query/sbe_stage_builder_type_checker.cpp',
         'query/sbe_stage_builder_type_signature.cpp',
+        "query/sbe_stage_builder_value_lifetime.cpp",
         'query/sbe_stage_builder_vectorizer.cpp',
         'query/sbe_stage_builder_window_function.cpp',
         'query/sbe_sub_planner.cpp',

@@ -533,6 +533,7 @@ env.CppUnitTest(
         'sbe_stage_builder_test_fixture.cpp',
         'sbe_stage_builder_type_checker_test.cpp',
         'sbe_stage_builder_vectorizer_test.cpp',
+        'sbe_stage_builder_value_lifetime_test.cpp',
         'sbe_stage_builder_window_function_test.cpp',
         'shard_filterer_factory_mock.cpp',
         'sort_pattern_test.cpp',
