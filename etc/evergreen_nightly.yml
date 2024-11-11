@@ -38,8 +38,6 @@ include:
 - filename: etc/evergreen_yml_components/variants/suse/test_release.yml
 
 - filename: etc/evergreen_yml_components/variants/ubuntu/test_release.yml
-### Uncomment when using this file for a LTS release branch. ###
-- filename: etc/evergreen_yml_components/variants/ubuntu/test_dev_master_and_lts_branches_only.yml
 
 - filename: etc/evergreen_yml_components/variants/windows/test_release.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
