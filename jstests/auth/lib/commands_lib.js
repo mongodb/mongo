@@ -4783,7 +4783,6 @@ export const authCommandsLib = {
         {
           testname: "fsyncUnlock",
           command: {fsyncUnlock: 1},
-          skipSharded: true,  // TODO: remove when fsyncUnlock is implemented in mongos
           testcases: [
               {
                 runOnDb: adminDbName,
