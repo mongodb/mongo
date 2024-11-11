@@ -7,7 +7,6 @@ import {
     getEngine,
     getPlanStages,
     getQueryPlanners,
-    getWinningPlan,
     getWinningPlanFromExplain,
     isAlwaysFalsePlan,
     isEofPlan,

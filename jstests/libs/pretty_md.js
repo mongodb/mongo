@@ -7,8 +7,6 @@
 import {normalizeArray, tojsonMultiLineSortKeys} from "jstests/libs/golden_test.js";
 import {
     formatExplainRoot,
-    getQueryPlanner,
-    getWinningPlan,
 } from "jstests/libs/query/analyze_plan.js";
 
 let sectionCount = 1;

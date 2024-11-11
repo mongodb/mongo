@@ -1,7 +1,11 @@
 // Test query works with IXSCAN in descending scanning direction. These tests ensure shard ids can
 // be obtained correctly with descending intervals.
 
-import {getPlanStages, getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    planHasStage
+} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const shardingTest = new ShardingTest({shards: 1});
@@ -24,7 +28,7 @@ assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: 
 
     // Asserts that the test case contains intervals in descending direction.
     const explain = coll.find(query).sort(sortSpec).explain();
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain.queryPlanner);
     const ixscans = getPlanStages(winningPlan, 'IXSCAN');
     assert.eq(ixscans.length, 1);
     const ixscan = ixscans[0];
@@ -42,7 +46,7 @@ assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: 
 
     // Asserts that the test case contains an interval in descending direction for each IXSCAN.
     const explain = coll.find(query).sort(sortSpec).explain();
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain.queryPlanner);
     assert(planHasStage(db, winningPlan, 'SORT_MERGE'));
     const ixscans = getPlanStages(winningPlan, 'IXSCAN');
     assert.eq(ixscans.length, 2);

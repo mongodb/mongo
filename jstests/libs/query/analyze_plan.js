@@ -105,25 +105,21 @@ export function getSingleNodeExplain(explain) {
 }
 
 /**
- * Returns a sub-element of the 'queryPlanner' explain output which represents a winning plan.
- * For sharded collections, this may return the top-level "winningPlan" which contains the shards.
- * To ensure getting the winning plan for a specific shard, provide as input the specific explain
- * for that shard i.e, queryPlanner.winningPlan.shards[shardNames[0]].
- */
-export function getWinningPlan(queryPlanner) {
-    // The 'queryPlan' format is used when the SBE engine is turned on. If this field is present,
-    // it will hold a serialized winning plan, otherwise it will be stored in the 'winningPlan'
-    // field itself.
-    return queryPlanner.winningPlan.hasOwnProperty("queryPlan") ? queryPlanner.winningPlan.queryPlan
-                                                                : queryPlanner.winningPlan;
-}
-
-/**
  * Returns the winning plan from the corresponding sub-node of classic/SBE explain output. Takes
  * into account that the plan may or may not have agg stages.
+ * For sharded collections, this may return the top-level "winningPlan" which contains the shards.
+ * To ensure getting the winning plan for a specific shard, provide as input the specific explain
+ * for that shard i.e, explain.queryPlanner.winningPlan.shards[shardNames[0]].
  */
 export function getWinningPlanFromExplain(explain, isSBEPlan = false) {
     let getWinningSBEPlan = (queryPlanner) => queryPlanner.winningPlan.slotBasedPlan;
+
+    // The 'queryPlan' format is used when the SBE engine is turned on. If this field is present,
+    // it will hold a serialized winning plan, otherwise it will be stored in the 'winningPlan'
+    // field itself.
+    let getWinningPlan = (queryPlanner) => queryPlanner.winningPlan.hasOwnProperty("queryPlan")
+        ? queryPlanner.winningPlan.queryPlan
+        : queryPlanner.winningPlan;
 
     if ("shards" in explain) {
         for (const shardName in explain.shards) {
@@ -235,7 +231,7 @@ export function flattenPlan(plan) {
  */
 export function formatQueryPlanner(queryPlanner) {
     return {
-        winningPlan: flattenPlan(getWinningPlan(queryPlanner)),
+        winningPlan: flattenPlan(getWinningPlanFromExplain(queryPlanner)),
         rejectedPlans: queryPlanner.rejectedPlans.map(flattenPlan),
     };
 }
@@ -363,7 +359,8 @@ export function getPlanStages(root, stage) {
     }
 
     if ("queryPlanner" in root) {
-        results = results.concat(getPlanStages(getWinningPlan(root.queryPlanner), stage));
+        results =
+            results.concat(getPlanStages(getWinningPlanFromExplain(root.queryPlanner), stage));
     }
 
     if ("thenStage" in root) {
@@ -400,12 +397,12 @@ export function getPlanStages(root, stage) {
 
     if ("shards" in root) {
         if (Array.isArray(root.shards)) {
-            results =
-                root.shards.reduce((res, shard) => res.concat(getPlanStages(
-                                       shard.hasOwnProperty("winningPlan") ? getWinningPlan(shard)
-                                                                           : shard.executionStages,
-                                       stage)),
-                                   results);
+            results = root.shards.reduce(
+                (res, shard) => res.concat(getPlanStages(shard.hasOwnProperty("winningPlan")
+                                                             ? getWinningPlanFromExplain(shard)
+                                                             : shard.executionStages,
+                                                         stage)),
+                results);
         } else {
             const shards = Object.keys(root.shards);
             results = shards.reduce(
@@ -645,8 +642,8 @@ export function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
             results = results.concat(
                 getPlanStages(queryLayerOutput.executionStats.executionStages, stage));
         } else {
-            results =
-                results.concat(getPlanStages(getWinningPlan(queryLayerOutput.queryPlanner), stage));
+            results = results.concat(
+                getPlanStages(getWinningPlanFromExplain(queryLayerOutput.queryPlanner), stage));
         }
 
         return results;
@@ -889,7 +886,9 @@ export function isQueryPlan(root) {
  *  false otherwise.
  */
 export function everyWinningPlan(explain, predicate) {
-    return getQueryPlanners(explain).map(getWinningPlan).every(predicate);
+    return getQueryPlanners(explain)
+        .map(queryPlanner => getWinningPlanFromExplain(queryPlanner, false))
+        .every(predicate);
 }
 
 /**
@@ -897,7 +896,8 @@ export function everyWinningPlan(explain, predicate) {
  * shard filter.
  */
 export function getChunkSkipsFromShard(shardPlan, shardExecutionStages) {
-    const shardFilterPlanStage = getPlanStage(getWinningPlan(shardPlan), "SHARDING_FILTER");
+    const shardFilterPlanStage =
+        getPlanStage(getWinningPlanFromExplain(shardPlan), "SHARDING_FILTER");
     if (!shardFilterPlanStage) {
         return 0;
     }
@@ -975,12 +975,12 @@ export function assertExplainCount({explainResults, expectedCount}) {
  */
 export function assertCoveredQueryAndCount({collection, query, project, count}) {
     let explain = collection.find(query, project).explain();
-    assert(isIndexOnly(db, getWinningPlan(explain.queryPlanner)),
+    assert(isIndexOnly(db, getWinningPlanFromExplain(explain.queryPlanner)),
            "Winning plan was not covered: " + tojson(explain.queryPlanner.winningPlan));
 
     // Same query as a count command should also be covered.
     explain = collection.explain("executionStats").find(query).count();
-    assert(isIndexOnly(db, getWinningPlan(explain.queryPlanner)),
+    assert(isIndexOnly(db, getWinningPlanFromExplain(explain.queryPlanner)),
            "Winning plan for count was not covered: " + tojson(explain.queryPlanner.winningPlan));
     assertExplainCount({explainResults: explain, expectedCount: count});
 }
@@ -992,7 +992,7 @@ export function assertCoveredQueryAndCount({collection, query, project, count}) 
  */
 export function assertStagesForExplainOfCommand({coll, cmdObj, expectedStages, stagesNotExpected}) {
     const plan = assert.commandWorked(coll.runCommand({explain: cmdObj}));
-    const winningPlan = getWinningPlan(plan.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(plan.queryPlanner);
     for (let expectedStage of expectedStages) {
         assert(planHasStage(coll.getDB(), winningPlan, expectedStage),
                "Could not find stage " + expectedStage + ". Plan: " + tojson(plan));
@@ -1075,7 +1075,7 @@ export function flattenQueryPlanTree(winningPlan) {
  */
 export function assertNoFetchFilter({coll, cmdObj}) {
     const plan = assert.commandWorked(coll.runCommand({explain: cmdObj}));
-    const winningPlan = getWinningPlan(plan.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(plan.queryPlanner);
     const fetch = getPlanStage(winningPlan, "FETCH");
     assert((fetch === null || !fetch.hasOwnProperty("filter")),
            "Unexpected fetch: " + tojson(fetch));
@@ -1088,7 +1088,7 @@ export function assertNoFetchFilter({coll, cmdObj}) {
  */
 export function assertFetchFilter({coll, predicate, expectedFilter, nReturned}) {
     const exp = coll.find(predicate).explain("executionStats");
-    const plan = getWinningPlan(exp.queryPlanner);
+    const plan = getWinningPlanFromExplain(exp.queryPlanner);
     const fetch = getPlanStage(plan, "FETCH");
     assert(fetch !== null, "Missing FETCH stage " + plan);
     assert(fetch.hasOwnProperty("filter"),
@@ -1150,7 +1150,7 @@ export function assertEngine(pipeline, engine, coll) {
  * Returns the number of index scans in a query plan.
  */
 export function getNumberOfIndexScans(explain) {
-    const indexScans = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN");
+    const indexScans = getPlanStages(getWinningPlanFromExplain(explain.queryPlanner), "IXSCAN");
     return indexScans.length;
 }
 
@@ -1158,7 +1158,8 @@ export function getNumberOfIndexScans(explain) {
  * Returns the number of column scans in a query plan.
  */
 export function getNumberOfColumnScans(explain) {
-    const columnIndexScans = getPlanStages(getWinningPlan(explain.queryPlanner), "COLUMN_SCAN");
+    const columnIndexScans =
+        getPlanStages(getWinningPlanFromExplain(explain.queryPlanner), "COLUMN_SCAN");
     return columnIndexScans.length;
 }
 

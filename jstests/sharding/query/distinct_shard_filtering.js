@@ -10,7 +10,7 @@
  * ]
  */
 
-import {getWinningPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 import {
     coll,
     prepareShardedCollectionWithOrphans
@@ -31,7 +31,7 @@ function assertDistinctResultsAndExplain({field, query, expectedOutput, validate
 }
 
 function assertCoveredDistinctScanPlan(explain) {
-    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const winningPlan = getWinningPlanFromExplain(explain.queryPlanner);
     assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
     assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 }
