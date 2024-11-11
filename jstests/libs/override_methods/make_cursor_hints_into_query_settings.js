@@ -69,6 +69,13 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
         return originalResponse;
     }
 
+    // Ensure that no open, hanging cursors are left so they do not interfere with
+    // the rest of the test cases.
+    if (originalResponse.cursor) {
+        const hangingCursor = new DBCommandCursor(db, originalResponse);
+        hangingCursor.close();
+    }
+
     // Set the equivalent query settings, execute the original command without the hint, and finally
     // remove all the settings.
     const settings = {indexHints: {ns: {db: dbName, coll: collectionName}, allowedIndexes}};
