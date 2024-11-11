@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -74,5 +74,45 @@ mongo_cc_library(
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/s:grid",
         "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "fault_manager_test_suite",
+    srcs = [],
+    hdrs = [
+        "fault_facet_mock.h",
+        "fault_manager_test_suite.h",
+        "health_observer_mock.h",
+    ],
+    deps = [
+        ":fault_manager",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:task_executor_test_fixture",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "fault_base_classes_test",
+    srcs = [
+        "fault_facet_test.cpp",
+        "fault_manager_test.cpp",
+        "fault_state_machine_test.cpp",
+        "fault_test.cpp",
+        "health_observer_test.cpp",
+        "state_machine_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":fault_manager_test_suite",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/executor:network_interface_mock",
     ],
 )

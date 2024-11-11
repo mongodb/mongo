@@ -44,31 +44,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="task_executor_test_fixture",
-    source=[
-        "task_executor_test_common.cpp",
-        "task_executor_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "network_interface_mock",
-        "task_executor_interface",
-    ],
-)
-
-env.Library(
-    target="thread_pool_task_executor_test_fixture",
-    source=[
-        "thread_pool_task_executor_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        "task_executor_test_fixture",
-        "thread_pool_task_executor",
-    ],
-)
-
 env.CppUnitTest(
     target="network_executor_test",
     source=[

@@ -4,40 +4,8 @@ Import("env")
 
 env = env.Clone()
 
-# The source file in this library is empty since Scons needs a source file to make a library. Once
-# this library is converted to bazel, we can delete the emptry source file and only use the header
-# to define the library.
-env.Library(
-    target="fault_manager_test_suite",
-    source=[
-        "fault_manager_test_suite.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/task_executor_test_fixture",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
-        "$BUILD_DIR/mongo/transport/transport_layer_manager",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-    ],
-)
-
 env.CppUnitTest(
     target="fault_base_classes_test",
-    source=[
-        "fault_facet_test.cpp",
-        "fault_manager_test.cpp",
-        "fault_state_machine_test.cpp",
-        "fault_test.cpp",
-        "health_observer_test.cpp",
-        "state_machine_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/executor/network_interface_mock",
-        "fault_manager",
-        "fault_manager_test_suite",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
