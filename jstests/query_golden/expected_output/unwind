@@ -154,43 +154,57 @@ Query 32: [ { "$match" : { "_id" : 24 } }, { "$unwind" : { "path" : "$a.b", "inc
 {  "_id" : 24,  "a" : {  "b" : {  "c" : {  "e" : 3 } },  "y" : 6 },  "j" : {  "k" : NumberLong(0) },  "z" : 14 }
 {  "_id" : 24,  "a" : {  "b" : {  "c" : {  "e" : 4 } },  "y" : 6 },  "j" : {  "k" : NumberLong(1) },  "z" : 14 }
 
-Query 33: [ { "$match" : { "_id" : 13 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b" } }, { "$project" : { "x" : 0 } } ]
+Query 33: [ { "$match" : { "_id" : 13 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a" } }, { "$project" : { "x" : 0 } } ]
+{  "_id" : 13,  "a" : NumberLong(0),  "z" : 7 }
+{  "_id" : 13,  "a" : NumberLong(1),  "z" : 7 }
+{  "_id" : 13,  "a" : NumberLong(2),  "z" : 7 }
+
+Query 34: [ { "$match" : { "_id" : 16 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a" } }, { "$project" : { "x" : 0 } } ]
+{  "_id" : 16,  "a" : NumberLong(0),  "z" : 12 }
+{  "_id" : 16,  "a" : NumberLong(1),  "z" : 12 }
+
+Query 35: [ { "$match" : { "_id" : 13 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b" } }, { "$project" : { "x" : 0 } } ]
 {  "_id" : 13,  "a" : {  "b" : NumberLong(0),  "y" : 7 },  "z" : 7 }
 {  "_id" : 13,  "a" : {  "b" : NumberLong(1),  "y" : 7 },  "z" : 7 }
 {  "_id" : 13,  "a" : {  "b" : NumberLong(2),  "y" : 7 },  "z" : 7 }
 
-Query 34: [ { "$match" : { "_id" : 13 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c" } }, { "$project" : { "x" : 0 } } ]
+Query 36: [ { "$match" : { "_id" : 13 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c" } }, { "$project" : { "x" : 0 } } ]
 {  "_id" : 13,  "a" : {  "b" : {  "c" : NumberLong(0),  "p" : 4 },  "y" : 7 },  "z" : 7 }
 {  "_id" : 13,  "a" : {  "b" : {  "c" : NumberLong(1) },  "y" : 7 },  "z" : 7 }
 {  "_id" : 13,  "a" : {  "b" : {  "c" : NumberLong(2) },  "y" : 7 },  "z" : 7 }
 
-Query 35: [ { "$match" : { "_id" : 16 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c" } }, { "$project" : { "x" : 0 } } ]
+Query 37: [ { "$match" : { "_id" : 16 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c" } }, { "$project" : { "x" : 0 } } ]
 {  "_id" : 16,  "a" : {  "b" : {  "c" : NumberLong(0),  "p" : 6 },  "y" : 11 },  "z" : 12 }
 {  "_id" : 16,  "a" : {  "b" : {  "c" : NumberLong(1),  "p" : 10 },  "y" : 11 },  "z" : 12 }
 
-Query 36: [ { "$match" : { "_id" : 13 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
+Query 38: [ { "$match" : { "_id" : 13 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
 {  "_id" : 13,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(0),  "e" : 3 },  "p" : 4 },  "y" : 7 },  "z" : 7 }
 {  "_id" : 13,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(1),  "e" : 5 } },  "y" : 7 },  "z" : 7 }
 {  "_id" : 13,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(2) } },  "y" : 7 },  "z" : 7 }
 
-Query 37: [ { "$match" : { "_id" : 14 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
+Query 39: [ { "$match" : { "_id" : 14 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
 {  "_id" : 14,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(0),  "e" : 4 },  "p" : 5 },  "y" : 10 },  "z" : 11 }
 {  "_id" : 14,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(1),  "e" : 7 },  "p" : 8 },  "y" : 10 },  "z" : 11 }
 {  "_id" : 14,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(2) } },  "y" : 10 },  "z" : 11 }
 
-Query 38: [ { "$match" : { "_id" : 15 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
+Query 40: [ { "$match" : { "_id" : 15 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
 {  "_id" : 15,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(0),  "e" : 5 },  "p" : 6 },  "y" : 11 },  "z" : 12 }
 {  "_id" : 15,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(1),  "e" : 9 },  "p" : 10 },  "y" : 11 },  "z" : 12 }
 
-Query 39: [ { "$match" : { "_id" : 16 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
+Query 41: [ { "$match" : { "_id" : 16 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
 {  "_id" : 16,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(0) },  "p" : 6 },  "y" : 11 },  "z" : 12 }
 {  "_id" : 16,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(1) },  "p" : 10 },  "y" : 11 },  "z" : 12 }
 
-Query 40: [ { "$match" : { "_id" : 17 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
+Query 42: [ { "$match" : { "_id" : 17 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
 {  "_id" : 17,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(0) },  "p" : 8 },  "y" : 15 },  "z" : 16 }
 {  "_id" : 17,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(1) },  "p" : 14 },  "y" : 15 },  "z" : 16 }
 
-Query 41: [ { "$match" : { "_id" : 18 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
+Query 43: [ { "$match" : { "_id" : 18 } }, { "$unwind" : { "path" : "$a.b", "includeArrayIndex" : "a.b.c.d" } }, { "$project" : { "x" : 0 } } ]
 {  "_id" : 18,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(0) },  "p" : 10 },  "y" : 19 },  "z" : 20 }
 {  "_id" : 18,  "a" : {  "b" : {  "c" : {  "d" : NumberLong(1) },  "p" : 18 },  "y" : 19 },  "z" : 20 }
+
+Query 44: [ { "$match" : { "_id" : 25 } }, { "$unwind" : { "path" : "$a.b.c", "includeArrayIndex" : "a.b" } }, { "$project" : { "x" : 0 } } ]
+{  "_id" : 25,  "a" : {  "b" : NumberLong(0) } }
+{  "_id" : 25,  "a" : {  "b" : NumberLong(1) } }
+{  "_id" : 25,  "a" : {  "b" : NumberLong(2) } }
 

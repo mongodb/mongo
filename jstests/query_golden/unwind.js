@@ -87,7 +87,8 @@ let docs = [
         a: {b: [{c: {e: 3}}, {c: {e: 4}}, 5], y: 6},
         j: [{k: [7, 8], p: 9}, {k: [10, 11], p: 12}, 13],
         z: 14
-    }
+    },
+    {_id: 25, a: {b: {c: [{d: 1}, {d: 2}, {e: 3}]}}}
 ];
 
 let testcases = [
@@ -124,6 +125,8 @@ let testcases = [
     [{$match: {_id: 22}}, {$unwind: {path: "$a.b", includeArrayIndex: "j.k"}}],
     [{$match: {_id: 23}}, {$unwind: {path: "$a.b", includeArrayIndex: "j.k"}}],
     [{$match: {_id: 24}}, {$unwind: {path: "$a.b", includeArrayIndex: "j.k"}}],
+    [{$match: {_id: 13}}, {$unwind: {path: "$a.b", includeArrayIndex: "a"}}],
+    [{$match: {_id: 16}}, {$unwind: {path: "$a.b", includeArrayIndex: "a"}}],
     [{$match: {_id: 13}}, {$unwind: {path: "$a.b", includeArrayIndex: "a.b"}}],
     [{$match: {_id: 13}}, {$unwind: {path: "$a.b", includeArrayIndex: "a.b.c"}}],
     [{$match: {_id: 16}}, {$unwind: {path: "$a.b", includeArrayIndex: "a.b.c"}}],
@@ -132,7 +135,8 @@ let testcases = [
     [{$match: {_id: 15}}, {$unwind: {path: "$a.b", includeArrayIndex: "a.b.c.d"}}],
     [{$match: {_id: 16}}, {$unwind: {path: "$a.b", includeArrayIndex: "a.b.c.d"}}],
     [{$match: {_id: 17}}, {$unwind: {path: "$a.b", includeArrayIndex: "a.b.c.d"}}],
-    [{$match: {_id: 18}}, {$unwind: {path: "$a.b", includeArrayIndex: "a.b.c.d"}}]
+    [{$match: {_id: 18}}, {$unwind: {path: "$a.b", includeArrayIndex: "a.b.c.d"}}],
+    [{$match: {_id: 25}}, {$unwind: {path: "$a.b.c", includeArrayIndex: "a.b"}}]
 ];
 
 coll.insert(docs);

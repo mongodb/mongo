@@ -44,7 +44,8 @@ UnwindProcessor::UnwindProcessor(const FieldPath& unwindPath,
     : _unwindPath(unwindPath),
       _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays),
       _indexPath(indexPath),
-      _strict(strict) {}
+      _strict(strict),
+      _conflictingPaths(indexPath ? indexPath->isPrefixOf(unwindPath) : false) {}
 
 void UnwindProcessor::process(const Document& document) {
     // Reset document specific attributes.
@@ -85,8 +86,11 @@ boost::optional<Document> UnwindProcessor::getNext() {
             // across documents that have come out of this pipeline operator. This is a partial deep
             // clone. Because the value at the end will be replaced, everything along the path
             // leading to that will be replaced in order not to share that change with any other
-            // clones (or the original).
-            _output.setNestedField(_unwindPathFieldIndexes, _inputArray[_index]);
+            // clones (or the original). If the array index path is a parent of the unwind path, we
+            // ignore the array value since it would be overwritten by the index.
+            if (!_conflictingPaths) {
+                _output.setNestedField(_unwindPathFieldIndexes, _inputArray[_index]);
+            }
             indexForOutput = _index;
             _index++;
             _haveNext = _index < length;
