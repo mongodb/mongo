@@ -317,6 +317,7 @@ class RecordIdPrinter(object):
             return "unknown RecordId format: %d" % rid_format
 
 
+MAX_DB_NAME_LENGTH = 63
 TENANT_ID_MASK = 0x80
 OBJECT_ID_WIDTH = 12
 
@@ -373,7 +374,13 @@ class DatabaseNamePrinter(object):
     def to_string(self):
         """Return string representation of NamespaceString."""
         address, size = self._get_storage_data()
-        return self._get_string(address, size)
+        # Do not decode the DatabaseName if the parsed size exceeds maximum.
+        maxSize = 1 + OBJECT_ID_WIDTH + MAX_DB_NAME_LENGTH
+        if size > maxSize:
+            return "DatabaseName with size {} exceeds maximum {}, _data = {}".format(
+                size, maxSize, self.val["_data"])
+        else:
+            return self._get_string(address, size)
 
 
 class DecorablePrinter(object):
