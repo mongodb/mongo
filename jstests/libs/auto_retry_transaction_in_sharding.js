@@ -7,6 +7,7 @@ Random.setRandomSeed();
 
 export var {
     withTxnAndAutoRetryOnMongos,
+    withRetryOnTransientTxnError,
     retryOnceOnTransientOnMongos,
     retryOnceOnTransientAndRestartTxnOnMongos
 } = (() => {
@@ -34,6 +35,24 @@ export var {
             func();
             assert.commandWorked(session.commitTransaction_forTesting());
         }
+    }
+
+    function withRetryOnTransientTxnError(func, cleanup = null) {
+        assert.soon(() => {
+            try {
+                func();
+            } catch (e) {
+                if ((e.hasOwnProperty('errorLabels') &&
+                     e.errorLabels.includes('TransientTransactionError'))) {
+                    if (cleanup)
+                        cleanup();
+                    return false;
+                } else {
+                    throw e;
+                }
+            }
+            return true;
+        });
     }
 
     /**
@@ -93,6 +112,7 @@ export var {
 
     return {
         withTxnAndAutoRetryOnMongos,
+        withRetryOnTransientTxnError,
         retryOnceOnTransientOnMongos,
         retryOnceOnTransientAndRestartTxnOnMongos
     };
