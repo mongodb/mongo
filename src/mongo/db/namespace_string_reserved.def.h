@@ -164,6 +164,10 @@ NSS_CONSTANT(kReshardingTxnClonerProgressNamespace,
              DatabaseName::kConfig,
              "localReshardingOperations.recipient.progress_txn_cloner"_sd)
 
+// Namespace for serializing between dropDatabase and a following concurrent createDatabase. The
+// dropDatabase DDL coordinator will be the only writer to this collection.
+NSS_CONSTANT(kConfigDropPendingDBsNamespace, DatabaseName::kConfig, "dropPendingDBs"_sd)
+
 // Namespace for storing config.collectionCriticalSections documents
 NSS_CONSTANT(kCollectionCriticalSectionsNamespace,
              DatabaseName::kConfig,
