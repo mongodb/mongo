@@ -240,6 +240,7 @@ tasks:
           num_files: 20
           num_tasks: 20
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          jstestfuzz_vars: --numPipelines=3000
           npm_command: agg-fuzzer
           run_no_feature_flag_tests: "true"
 
@@ -400,7 +401,7 @@ tasks:
           # integration, please update this comment and/or move numPipelines to a yaml arg here.
           num_files: 70
           num_tasks: 20
-          jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000
+          jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=750
           npm_command: agg-fuzzer
           suite: generational_fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -472,7 +473,7 @@ tasks:
           # integration, please update this comment and/or move numPipelines to a yaml arg here.
           num_files: 70
           num_tasks: 20
-          jstestfuzz_vars: --diffTestingMode blockprocessing --numPipelines=1000
+          jstestfuzz_vars: --diffTestingMode blockprocessing --numPipelines=750
           npm_command: agg-fuzzer
           suite: generational_fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -1574,7 +1575,7 @@ tasks:
           <<: *jstestfuzz_config_vars
           num_files: 20
           num_tasks: 20
-          jstestfuzz_vars: --diffTestingMode optimization
+          jstestfuzz_vars: --diffTestingMode optimization --numPipelines=3000
           suite: generational_fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           npm_command: agg-fuzzer
