@@ -552,10 +552,10 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
             ++posInIdx;
         }
     } catch (const MaxKeysExceededException&) {
-        LOGV2_WARNING_OPTIONS(6118400,
-                              {logv2::UserAssertAfterLog(ErrorCodes::CannotBuildIndexKeys)},
-                              "Insert of geo object exceeded maximum number of generated keys",
-                              "obj"_attr = redact(obj));
+        uasserted(
+            ErrorCodes::CannotBuildIndexKeys,
+            str::stream() << "Insert of geo object exceeded maximum number of generated keys: "
+                          << redact(obj));
     }
 
     // Make sure that if we're >= V2 there's at least one geo field present in the doc.
@@ -563,13 +563,6 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
         if (!haveGeoField) {
             return;
         }
-    }
-
-    if (keysToAdd.size() > params.maxKeysPerInsert) {
-        LOGV2_WARNING(23755,
-                      "Insert of geo object generated a large number of keys",
-                      "obj"_attr = redact(obj),
-                      "numKeys"_attr = keysToAdd.size());
     }
 
     invariant(keys->empty());
