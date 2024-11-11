@@ -202,7 +202,7 @@ void setUpObservers(ServiceContext* serviceContext, ClusterRole clusterRole, boo
     if (audit::opObserverRegistrar) {
         audit::opObserverRegistrar(opObserverRegistry.get());
     }
-    serviceContext->setOpObserver(std::move(opObserverRegistry));
+    serviceContext->resetOpObserver_forTest(std::move(opObserverRegistry));
 }
 
 void BM_setOplogTruncateAfterPoint(benchmark::State& state) {
