@@ -179,7 +179,7 @@ struct IndexSeekPoint {
      * Elements starting at index 'prefixLen' are logically appended to the prefix.
      * The elements before index 'prefixLen' should be ignored.
      */
-    std::vector<const BSONElement*> keySuffix;
+    std::vector<BSONElement> keySuffix;
 
     /**
      * If non-negative, then the comparison will be exclusive and any elements after index

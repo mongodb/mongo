@@ -28,6 +28,7 @@ env.CppUnitTest(
         "exclusion_projection_executor_test.cpp",
         "find_projection_executor_test.cpp",
         "inclusion_projection_executor_test.cpp",
+        "orphan_chunk_skipper_test.cpp",
         "projection_executor_builder_test.cpp",
         "projection_executor_redaction_test.cpp",
         "projection_executor_test.cpp",

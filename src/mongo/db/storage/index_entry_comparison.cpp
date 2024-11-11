@@ -140,8 +140,7 @@ StringData IndexEntryComparison::makeKeyStringFromSeekPointForSeek(const IndexSe
     size_t end = seekPoint.firstExclusive >= 0 ? static_cast<size_t>(seekPoint.firstExclusive + 1)
                                                : seekPoint.keySuffix.size();
     for (size_t i = seekPoint.prefixLen; i < end; i++) {
-        invariant(seekPoint.keySuffix[i]);
-        builder.appendBSONElement(*seekPoint.keySuffix[i]);
+        builder.appendBSONElement(seekPoint.keySuffix[i]);
     }
 
     return builder.finishAndGetBuffer(discriminator);

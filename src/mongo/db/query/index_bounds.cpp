@@ -528,7 +528,7 @@ bool IndexBoundsChecker::getStartSeekPoint(IndexSeekPoint* out) {
         if (0 == _bounds->fields[i].intervals.size()) {
             return false;
         }
-        out->keySuffix[i] = &_bounds->fields[i].intervals[0].start;
+        out->keySuffix[i] = _bounds->fields[i].intervals[0].start;
         if (!_bounds->fields[i].intervals[0].startInclusive) {
             out->firstExclusive = i;
         }
@@ -682,7 +682,7 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
 
         for (int j = _curInterval.size() - 1; j >= out->prefixLen; --j) {
             const OrderedIntervalList& oil = _bounds->fields[j];
-            out->keySuffix[j] = &oil.intervals[_curInterval[j]].start;
+            out->keySuffix[j] = oil.intervals[_curInterval[j]].start;
             if (!oil.intervals[_curInterval[j]].startInclusive) {
                 out->firstExclusive = j;
             }
@@ -727,7 +727,7 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
             out->firstExclusive = -1;
             for (int i = _curInterval.size() - 1; i >= out->prefixLen; --i) {
                 const OrderedIntervalList& oil = _bounds->fields[i];
-                out->keySuffix[i] = &oil.intervals[_curInterval[i]].start;
+                out->keySuffix[i] = oil.intervals[_curInterval[i]].start;
                 if (!oil.intervals[_curInterval[i]].startInclusive) {
                     out->firstExclusive = i;
                 }

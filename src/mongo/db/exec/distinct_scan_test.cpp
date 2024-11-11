@@ -259,20 +259,20 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsIndexKeyTest) {
          .bounds = makeIndexBounds({{"a", {IndexBoundsBuilder::allValues()}}}),
          .shouldShardFilter = true,
          .shouldFetch = false,
-         .expectedWorkPattern = {// See first unique value, not an orphan, so we seek.
-                                 BSON("" << 5),
-                                 // Same here.
-                                 BSON("" << 9),
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 // Finally find non-orphan; back to seeking.
-                                 BSON("" << 20),
-                                 BSON("" << 25),
-                                 // Last doc is an orphan- call next().
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::IS_EOF}});
+         .expectedWorkPattern = {
+             // See first unique value, not an orphan, so we seek.
+             BSON("" << 5),
+             // Same here.
+             BSON("" << 9),
+             // We found an orphan! Here we can use the chunk skipping
+             // optimization to seek to the next owned chunk directly, so we only return one
+             // NEED_TIME (as opposed to 4x, one per orphan doc we would have to scan sequentially.)
+             PlanStage::NEED_TIME,
+             // Finally find non-orphan; back to seeking.
+             BSON("" << 20),
+             BSON("" << 25),
+             // Last doc is an orphan, and oru shard key is the index key, so we end the scan.
+             PlanStage::IS_EOF}});
 }
 
 TEST_F(DistinctScanTest, ShardFilteringShardKeyIsReverseOfIndexKeyReverseScanTest) {
@@ -296,16 +296,14 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsReverseOfIndexKeyReverseScanTes
          .shouldShardFilter = true,
          .shouldFetch = false,
          // Same pattern as above.
-         .expectedWorkPattern = {BSON("" << 5),
-                                 BSON("" << 9),
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 BSON("" << 20),
-                                 BSON("" << 25),
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::IS_EOF}});
+         .expectedWorkPattern = {
+             BSON("" << 5),
+             BSON("" << 9),
+             PlanStage::NEED_TIME,
+             BSON("" << 20),
+             BSON("" << 25),
+             // Last doc is an orphan, and oru shard key is the index key, so we end the scan.
+             PlanStage::IS_EOF}});
 }
 
 TEST_F(DistinctScanTest, ShardFilteringShardKeyIsPrefixDistinctKeyPrefixTest) {
@@ -331,20 +329,18 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsPrefixDistinctKeyPrefixTest) {
          .shouldShardFilter = true,
          .shouldFetch = false,
          // Same pattern as above (but with more fields).
-         .expectedWorkPattern = {BSON("" << 5 << "" << false << ""
-                                         << "apple"),
-                                 BSON("" << 9 << "" << false << ""
-                                         << "ApPlE"),
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 BSON("" << 20 << "" << false << ""
-                                         << "BaNaNa"),
-                                 BSON("" << 25 << "" << true << ""
-                                         << "ananas"),
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::IS_EOF}});
+         .expectedWorkPattern = {
+             BSON("" << 5 << "" << false << ""
+                     << "apple"),
+             BSON("" << 9 << "" << false << ""
+                     << "ApPlE"),
+             PlanStage::NEED_TIME,
+             BSON("" << 20 << "" << false << ""
+                     << "BaNaNa"),
+             BSON("" << 25 << "" << true << ""
+                     << "ananas"),
+             // Last doc is an orphan, and our shard key is the index key, so we end the scan.
+             PlanStage::IS_EOF}});
 }
 
 TEST_F(DistinctScanTest, ShardFilteringShardKeyIsPrefixDistinctKeyMiddleTest) {
@@ -377,16 +373,14 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsPrefixDistinctKeyMiddleTest) {
                                  BSON("" << 9 << "" << false << ""
                                          << "ApPlE"),
                                  PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
                                  BSON("" << 20 << "" << false << ""
                                          << "BaNaNa"),
                                  BSON("" << 20 << "" << true << ""
                                          << "BANANA"),
                                  BSON("" << 25 << "" << true << ""
                                          << "ananas"),
-                                 PlanStage::NEED_TIME,
+                                 // Last doc is an orphan, and our shard key is a prefix of the
+                                 // index, so we end the scan.
                                  PlanStage::IS_EOF}});
 }
 
@@ -422,9 +416,6 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsPrefixDistinctKeyEndTest) {
                                  BSON("" << 9 << "" << false << ""
                                          << "ApPlE"),
                                  PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
                                  BSON("" << 20 << "" << false << ""
                                          << "BaNaNa"),
                                  BSON("" << 20 << "" << false << ""
@@ -435,7 +426,8 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyIsPrefixDistinctKeyEndTest) {
                                          << "baNaNa"),
                                  BSON("" << 25 << "" << true << ""
                                          << "ananas"),
-                                 PlanStage::NEED_TIME,
+                                 // Last doc is an orphan, and our shard key is a prefix of the
+                                 // index, so we end the scan.
                                  PlanStage::IS_EOF}});
 }
 
@@ -459,24 +451,24 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyInMiddleDistinctKeyPrefixTest) {
          .shouldShardFilter = true,
          .shouldFetch = false,
          // Only 'true" values f "b" are owned by this shard; note that 'false' always sorts first.
-         .expectedWorkPattern = {PlanStage::NEED_TIME,
-                                 BSON("" << 5 << "" << true << ""
-                                         << "AppLe"),
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 BSON("" << 10 << "" << true << ""
-                                         << "PEAR"),
-                                 BSON("" << 15 << "" << true << ""
-                                         << "pEaR"),
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::NEED_TIME,
-                                 BSON("" << 20 << "" << true << ""
-                                         << "BANANA"),
-                                 BSON("" << 25 << "" << true << ""
-                                         << "ananas"),
-                                 PlanStage::NEED_TIME,
-                                 PlanStage::IS_EOF}});
+         .expectedWorkPattern = {
+             PlanStage::NEED_TIME,
+             BSON("" << 5 << "" << true << ""
+                     << "AppLe"),
+             PlanStage::NEED_TIME,  // Seek to next distinct key (9) but its an orphan.
+             PlanStage::NEED_TIME,
+             BSON("" << 10 << "" << true << ""
+                     << "PEAR"),
+             BSON("" << 15 << "" << true << ""
+                     << "pEaR"),
+             PlanStage::NEED_TIME,
+             PlanStage::NEED_TIME,
+             BSON("" << 20 << "" << true << ""
+                     << "BANANA"),
+             BSON("" << 25 << "" << true << ""
+                     << "ananas"),
+             PlanStage::NEED_TIME,
+             PlanStage::IS_EOF}});
 }
 
 TEST_F(DistinctScanTest, ShardFilteringShardKeyInMiddleDistinctKeySuffixTest) {
@@ -510,7 +502,6 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyInMiddleDistinctKeySuffixTest) {
                                          << "PEAR"),
                                  BSON("" << 15 << "" << true << ""
                                          << "pEaR"),
-                                 PlanStage::NEED_TIME,
                                  PlanStage::NEED_TIME,
                                  PlanStage::NEED_TIME,
                                  BSON("" << 20 << "" << true << ""
@@ -573,6 +564,7 @@ TEST_F(DistinctScanTest, ShardFilteringShardKeyAtEndTest) {
 }
 
 TEST_F(DistinctScanTest, ShardFilteringCompoundShardKeySubsetTest) {
+    // Note: this is ineligible for the chunk-skipping optimization.
     const ShardKeyPattern shardKeyPattern(BSON("a" << 1 << "c" << 1));
     const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
     verifyDistinctScanExecution(
@@ -617,6 +609,226 @@ TEST_F(DistinctScanTest, ShardFilteringCompoundShardKeySubsetTest) {
                                  BSON("" << 19 << "" << false << ""
                                          << "PeAr"),
                                  PlanStage::IS_EOF}});
+}
+
+TEST_F(DistinctScanTest, ShardFilteringCompoundShardKeySubsetTestChunkSkipping) {
+    // Note: this is ineligible for the chunk-skipping optimization.
+    const ShardKeyPattern shardKeyPattern(BSON("a" << 1 << "c" << 1));
+    const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
+    verifyDistinctScanExecution(
+        {.shardKey = shardKey,
+         .docsOnShard = kDataset,
+         .chunks =
+             {
+                 {{shardKey.globalMin(),
+                   BSON("a" << 10 << "c"
+                            << "banana")},
+                  false /* isOnCurShard */},
+                 {{BSON("a" << 10 << "c"
+                            << "banana"),
+                   BSON("a" << 20 << "c"
+                            << "banana")},
+                  true /* isOnCurShard */},
+                 {{BSON("a" << 20 << "c"
+                            << "banana"),
+                   shardKey.globalMax()},
+                  false /* isOnCurShard */},
+             },
+         .idxKey = BSON("a" << 1 << "b" << -1 << "c" << 1),
+         .scanDirection = 1,
+         .fieldNo = 0,
+         .bounds = makeIndexBounds(
+             {{"a",
+               {IndexBoundsBuilder::makeRangeInterval(
+                   BSON("" << 0 << "" << 19), BoundInclusion::kIncludeBothStartAndEndKeys)}},
+              {"b", {IndexBoundsBuilder::allValues().reverseClone()}},
+              {"c", {IndexBoundsBuilder::allValues()}}}),
+         .shouldShardFilter = true,
+         .shouldFetch = false,
+         .expectedWorkPattern = {PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 BSON("" << 10 << "" << false << ""
+                                         << "pear"),
+                                 BSON("" << 15 << "" << true << ""
+                                         << "pEaR"),
+                                 BSON("" << 19 << "" << false << ""
+                                         << "PeAr"),
+                                 PlanStage::IS_EOF}});
+}
+
+TEST_F(DistinctScanTest, ShardFilteringCompoundShardKeySubsetTestNoChunkSkippingWithFetch) {
+    // Note: this is ineligible for the chunk-skipping optimization because of the fetch.
+    const ShardKeyPattern shardKeyPattern(BSON("a" << 1 << "c" << 1));
+    const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
+    verifyDistinctScanExecution(
+        {.shardKey = shardKey,
+         .docsOnShard = kDataset,
+         .chunks =
+             {
+                 {{shardKey.globalMin(),
+                   BSON("a" << 10 << "c"
+                            << "banana")},
+                  false /* isOnCurShard */},
+                 {{BSON("a" << 10 << "c"
+                            << "banana"),
+                   BSON("a" << 20 << "c"
+                            << "banana")},
+                  true /* isOnCurShard */},
+                 {{BSON("a" << 20 << "c"
+                            << "banana"),
+                   shardKey.globalMax()},
+                  false /* isOnCurShard */},
+             },
+         .idxKey = BSON("a" << 1 << "b" << -1 << "c" << 1),
+         .scanDirection = 1,
+         .fieldNo = 0,
+         .bounds = makeIndexBounds(
+             {{"a",
+               {IndexBoundsBuilder::makeRangeInterval(
+                   BSON("" << 0 << "" << 19), BoundInclusion::kIncludeBothStartAndEndKeys)}},
+              {"b", {IndexBoundsBuilder::allValues().reverseClone()}},
+              {"c", {IndexBoundsBuilder::allValues()}}}),
+         .shouldShardFilter = true,
+         .shouldFetch = true,
+         .expectedWorkPattern = {PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 PlanStage::NEED_TIME,
+                                 BSON("_id" << 6 << "a" << 10 << "b" << false << "c"
+                                            << "pear"),
+                                 BSON("_id" << 7 << "a" << 15 << "b" << true << "c"
+                                            << "pEaR"),
+                                 BSON("_id" << 8 << "a" << 19 << "b" << false << "c"
+                                            << "PeAr"),
+                                 PlanStage::IS_EOF}});
+}
+
+TEST_F(DistinctScanTest, ShardFilteringCompoundShardKeyContiguousPrefixTest) {
+    const ShardKeyPattern shardKeyPattern(BSON("a" << 1 << "b" << 1));
+    const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
+    verifyDistinctScanExecution(
+        {.shardKey = shardKey,
+         .docsOnShard = kDataset,
+         .chunks = {{{shardKey.globalMin(), BSON("a" << 5 << "b" << false)},
+                     false /* isOnCurShard */},
+                    {{BSON("a" << 5 << "b" << false), BSON("a" << 9 << "b" << false)},
+                     true /* isOnCurShard */},
+                    {{BSON("a" << 9 << "b" << false), BSON("a" << 10 << "b" << false)},
+                     false /* isOnCurShard */},
+                    {{BSON("a" << 10 << "b" << false), BSON("a" << 18 << "b" << true)},
+                     true /* isOnCurShard */},
+                    {{BSON("a" << 18 << "b" << true), shardKey.globalMax()},
+                     false /* isOnCurShard */}},
+         .idxKey = BSON("a" << 1 << "b" << 1 << "c" << 1),
+         .scanDirection = 1,
+         .fieldNo = 1,
+         .bounds = makeIndexBounds(
+             {{"a",
+               {IndexBoundsBuilder::makeRangeInterval(
+                   BSON("" << 0 << "" << 19), BoundInclusion::kIncludeBothStartAndEndKeys)}},
+              {"b", {IndexBoundsBuilder::allValues()}},
+              {"c", {IndexBoundsBuilder::allValues()}}}),
+         .shouldShardFilter = true,
+         .shouldFetch = false,
+         .expectedWorkPattern = {BSON("" << 5 << "" << false << ""
+                                         << "apple"),
+                                 BSON("" << 5 << "" << true << ""
+                                         << "AppLe"),
+                                 PlanStage::NEED_TIME,
+                                 BSON("" << 10 << "" << false << ""
+                                         << "pear"),
+                                 BSON("" << 10 << "" << true << ""
+                                         << "PEAR"),
+                                 BSON("" << 15 << "" << true << ""
+                                         << "pEaR"),
+                                 // We have an orphan here, but we know we can terminate the scan.
+                                 PlanStage::IS_EOF}});
+}
+
+TEST_F(DistinctScanTest, ShardFilteringCompoundShardKeyContiguousSubsetTest) {
+    const ShardKeyPattern shardKeyPattern(BSON("b" << 1 << "c" << 1));
+    const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
+    verifyDistinctScanExecution(
+        {.shardKey = shardKey,
+         .docsOnShard = kDataset,
+         .chunks = {{{shardKey.globalMin(),
+                      BSON("b" << false << "c"
+                               << "banana")},
+                     false /* isOnCurShard */},
+                    {{BSON("b" << false << "c"
+                               << "banana"),
+                      BSON("b" << true << "c"
+                               << "pear")},
+                     true /* isOnCurShard */},
+                    {{BSON("b" << true << "c"
+                               << "pear"),
+                      shardKey.globalMax()},
+                     false /* isOnCurShard */}},
+         .idxKey = BSON("a" << 1 << "b" << 1 << "c" << 1),
+         .scanDirection = -1,
+         .fieldNo = 1,
+         .bounds = makeIndexBounds(
+             {{"a",
+               {IndexBoundsBuilder::makeRangeInterval(BSON("" << 0 << "" << 19),
+                                                      BoundInclusion::kIncludeBothStartAndEndKeys)
+                    .reverseClone()}},
+              {"b", {IndexBoundsBuilder::allValues().reverseClone()}},
+              {"c", {IndexBoundsBuilder::allValues().reverseClone()}}}),
+         .shouldShardFilter = true,
+         .shouldFetch = false,
+         .expectedWorkPattern = {
+             PlanStage::NEED_TIME,
+             BSON("" << 15 << "" << true << ""
+                     << "pEaR"),
+             BSON("" << 10 << "" << true << ""
+                     << "PEAR"),
+             BSON("" << 10 << "" << false << ""
+                     << "pear"),
+             PlanStage::NEED_TIME,
+             BSON("" << 5 << "" << true << ""
+                     << "apple"),
+             // We can't skip to the end here, since shard key is not a prefix.
+             PlanStage::NEED_TIME,
+             PlanStage::IS_EOF,
+         }});
+}
+
+TEST_F(DistinctScanTest, ShardFilteringCompoundIndexShardKeySuffixTestChunkSkipping) {
+    const ShardKeyPattern shardKeyPattern(BSON("c" << 1));
+    const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
+    verifyDistinctScanExecution({.shardKey = shardKey,
+                                 .docsOnShard =
+                                     {
+                                         BSON("a" << 1 << "b" << 1 << "c"
+                                                  << "orphan-no-next-chunk"),
+                                         BSON("a" << 2 << "b" << 1 << "c"
+                                                  << "non-orphan"),
+                                     },
+                                 .chunks = {{{shardKey.globalMin(),
+                                              BSON("c"
+                                                   << "non-orphan-end")},
+                                             true /* isOnCurShard */},
+                                            {{BSON("c"
+                                                   << "non-orphan-end"),
+                                              shardKey.globalMax()},
+                                             false /* isOnCurShard */}},
+                                 .idxKey = BSON("a" << 1 << "b" << -1 << "c" << 1),
+                                 .scanDirection = 1,
+                                 .fieldNo = 0,
+                                 .bounds = makeIndexBounds(
+                                     {{"a", {IndexBoundsBuilder::allValues()}},
+                                      {"b", {IndexBoundsBuilder::allValues().reverseClone()}},
+                                      {"c", {IndexBoundsBuilder::allValues()}}}),
+                                 .shouldShardFilter = true,
+                                 .shouldFetch = false,
+                                 .expectedWorkPattern = {PlanStage::NEED_TIME,
+                                                         BSON("" << 2 << "" << 1 << ""
+                                                                 << "non-orphan"),
+                                                         PlanStage::IS_EOF}});
 }
 
 TEST_F(DistinctScanTest, ShardFilteringNoShardKeyInIndexKeyTest) {

@@ -30,9 +30,8 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -72,5 +71,10 @@ public:
     virtual const KeyPattern& getKeyPattern() const = 0;
 
     virtual size_t getApproximateSize() const = 0;
+
+    virtual ChunkManager::ChunkOwnership nearestOwnedChunk(const BSONObj& key,
+                                                           ChunkMap::Direction direction) const {
+        MONGO_UNIMPLEMENTED_TASSERT(9246502);
+    }
 };
 }  // namespace mongo

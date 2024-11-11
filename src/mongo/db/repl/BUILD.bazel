@@ -881,6 +881,8 @@ mongo_cc_library(
         "//src/mongo/rpc:unique_message.h",
         "//src/mongo/rpc/metadata:impersonated_user_metadata_gen",
         "//src/mongo/rpc/metadata:oplog_query_metadata.h",
+        "//src/mongo/s:chunk.h",
+        "//src/mongo/s:chunk_manager.h",
         "//src/mongo/s:chunk_version.h",
         "//src/mongo/s:database_version.h",
         "//src/mongo/s:database_version_base_gen",
@@ -888,6 +890,10 @@ mongo_cc_library(
         "//src/mongo/s:shard_key_pattern.h",
         "//src/mongo/s:shard_version.h",
         "//src/mongo/s:stale_exception.h",
+        "//src/mongo/s:type_collection_common_types_gen",
+        "//src/mongo/s/catalog:type_chunk.h",
+        "//src/mongo/s/catalog:type_chunk_base_gen",
+        "//src/mongo/s/resharding:type_collection_fields_gen",
         "//src/mongo/scripting:engine.h",
         "//src/mongo/transport:baton.h",
         "//src/mongo/transport:message_compressor_base.h",
@@ -946,6 +952,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "oplog_buffer_blocking_queue.h",
+        "//src/mongo/s:type_collection_common_types_gen",
         "//src/mongo/util:queue.h",
     ],
     header_deps = [
@@ -963,6 +970,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "oplog_buffer_proxy.h",
+        "//src/mongo/s:type_collection_common_types_gen",
     ],
     header_deps = [
         "oplog_buffer_batched_queue",

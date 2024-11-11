@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/orphan_chunk_skipper.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_index_stage.h"
@@ -150,7 +151,7 @@ private:
 
     const IndexBounds _bounds;
 
-    const int _fieldNo = 0;
+    const size_t _fieldNo = 0;
 
     // The cursor we use to navigate the tree.
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
@@ -161,6 +162,7 @@ private:
 
     // State used to implement shard filtering.
     std::unique_ptr<ShardFiltererImpl> _shardFilterer;
+    boost::optional<OrphanChunkSkipper> _chunkSkipper;
     // When '_needsSequentialScan' is true, the 'DistinctScan' stage cannot skip over consecutive
     // index entries with the same value, as it normally would, but must instead examine the next
     // entry, as a normal index scan does. This step is necessary when the '_shardFilterer' rejects
@@ -168,7 +170,7 @@ private:
     // determine if one of them may be accepted.
     bool _needsSequentialScan = false;
     // When set to true, performs a fetch before outputting.
-    bool _needsFetch;
+    const bool _needsFetch;
     // The cursor we use to fetch.
     std::unique_ptr<SeekableRecordCursor> _fetchCursor;
     // In case of a yield while fetching, this is the id of the working set entry that we need to

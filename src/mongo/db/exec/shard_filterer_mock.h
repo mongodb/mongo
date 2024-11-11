@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/exec/shard_filterer.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 
 namespace mongo {
 

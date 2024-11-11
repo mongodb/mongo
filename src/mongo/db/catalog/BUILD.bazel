@@ -253,6 +253,7 @@ mongo_cc_library(
         "//src/mongo/s:chunk_version_gen",
         "//src/mongo/s:database_version_base_gen",
         "//src/mongo/s:gossiped_routing_cache_gen",
+        "//src/mongo/s:type_collection_common_types_gen",
         "//src/mongo/util/version:releases_header",
     ],
     header_deps = [
