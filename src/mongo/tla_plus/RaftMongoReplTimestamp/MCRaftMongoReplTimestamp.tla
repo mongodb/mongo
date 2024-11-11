@@ -14,4 +14,6 @@ StateConstraint ==
     /\ \forall i \in Server: /\ Len(log[i]) <= MaxLogLen
                              /\ restartTimes[i] <= MaxRestartTimes
                              /\ failoverTimes[i] <= MaxFailoverTimes
+
+ServerSymmetry == Permutations(Server)
 =============================================================================

@@ -954,9 +954,22 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
             // to add the collation field to attempt to disambiguate.
             donorIdIndexSpec = spec;
         } else if (expandSimpleCollation && !spec[IndexDescriptor::kCollationFieldName]) {
-            spec = BSONObjBuilder(std::move(spec))
-                       .append(IndexDescriptor::kCollationFieldName, CollationSpec::kSimpleSpec)
-                       .obj();
+            BSONObjBuilder builder;
+            for (auto&& [fieldName, elem] : spec) {
+                if (fieldName != IndexDescriptor::kOriginalSpecFieldName ||
+                    elem.Obj().hasField(IndexDescriptor::kCollationFieldName)) {
+                    builder.append(elem);
+                    continue;
+                }
+
+                BSONObjBuilder originalSpecBuilder{
+                    builder.subobjStart(IndexDescriptor::kOriginalSpecFieldName)};
+                originalSpecBuilder.appendElements(elem.Obj());
+                originalSpecBuilder.append(IndexDescriptor::kCollationFieldName,
+                                           CollationSpec::kSimpleSpec);
+            }
+            builder.append(IndexDescriptor::kCollationFieldName, CollationSpec::kSimpleSpec);
+            spec = builder.obj();
         }
 
         donorIndexSpecs.push_back(spec);

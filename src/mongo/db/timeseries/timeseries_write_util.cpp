@@ -116,7 +116,7 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
                                             std::shared_ptr<bucket_catalog::WriteBatch> batch,
                                             OperationSource source) {
     return [sortedMeasurements = std::move(sortedMeasurements), batch, source](
-               const BSONObj& docToWrite) {
+               const BSONObj& docToWrite, const BSONObj& pre) {
         timeseriesDataIntegrityCheckFailureUpdate.executeIf(
             [&](const BSONObj&) {
                 uasserted(  // In testing, we want any failures within this check to invariant.
@@ -129,41 +129,43 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
             [&source](const BSONObj&) { return source == OperationSource::kTimeseriesUpdate; });
 
         using AddAttrsFn = std::function<void(logv2::DynamicAttributes&)>;
-        auto failed = [&sortedMeasurements, &batch, &docToWrite](StringData reason,
-                                                                 AddAttrsFn addAttrsWithoutData,
-                                                                 AddAttrsFn addAttrsWithData) {
-            logv2::DynamicAttributes attrs;
-            attrs.add("reason", reason);
-            attrs.add("bucketId", batch->bucketId.oid);
-            attrs.add("collectionUUID", batch->bucketId.collectionUUID);
-            addAttrsWithoutData(attrs);
+        auto failed =
+            [&sortedMeasurements, &batch, &docToWrite, &pre](
+                StringData reason, AddAttrsFn addAttrsWithoutData, AddAttrsFn addAttrsWithData) {
+                logv2::DynamicAttributes attrs;
+                attrs.add("reason", reason);
+                attrs.add("bucketId", batch->bucketId.oid);
+                attrs.add("collectionUUID", batch->bucketId.collectionUUID);
+                addAttrsWithoutData(attrs);
 
-            LOGV2_WARNING(
-                8807500, "Failed data verification inserting into compressed column", attrs);
+                LOGV2_WARNING(
+                    8807500, "Failed data verification inserting into compressed column", attrs);
 
-            attrs = {};
-            auto seqLogDataFields = [](const details::Measurement& measurement) {
-                return logv2::seqLog(measurement.dataFields);
+                attrs = {};
+                auto seqLogDataFields = [](const details::Measurement& measurement) {
+                    return logv2::seqLog(measurement.dataFields);
+                };
+                auto measurementsAttr = logv2::seqLog(
+                    boost::make_transform_iterator(sortedMeasurements.begin(), seqLogDataFields),
+                    boost::make_transform_iterator(sortedMeasurements.end(), seqLogDataFields));
+                attrs.add("measurements", measurementsAttr);
+                auto preAttr = base64::encode(pre.objdata(), pre.objsize());
+                attrs.add("pre", preAttr);
+                auto bucketAttr = base64::encode(docToWrite.objdata(), docToWrite.objsize());
+                attrs.add("bucket", bucketAttr);
+                addAttrsWithData(attrs);
+
+                LOGV2_WARNING_OPTIONS(8807501,
+                                      logv2::LogTruncation::Disabled,
+                                      "Failed data verification inserting into compressed column",
+                                      attrs);
+
+                invariant(!TestingProctor::instance().isEnabled());
+                tasserted(timeseries::BucketCompressionFailure(batch->bucketId.collectionUUID,
+                                                               batch->bucketId.oid,
+                                                               batch->bucketId.keySignature),
+                          "Failed data verification inserting into compressed column");
             };
-            auto measurementsAttr = logv2::seqLog(
-                boost::make_transform_iterator(sortedMeasurements.begin(), seqLogDataFields),
-                boost::make_transform_iterator(sortedMeasurements.end(), seqLogDataFields));
-            attrs.add("measurements", measurementsAttr);
-            auto bucketAttr = base64::encode(docToWrite.objdata(), docToWrite.objsize());
-            attrs.add("bucket", bucketAttr);
-            addAttrsWithData(attrs);
-
-            LOGV2_WARNING_OPTIONS(8807501,
-                                  logv2::LogTruncation::Disabled,
-                                  "Failed data verification inserting into compressed column",
-                                  attrs);
-
-            invariant(!TestingProctor::instance().isEnabled());
-            tasserted(timeseries::BucketCompressionFailure(batch->bucketId.collectionUUID,
-                                                           batch->bucketId.oid,
-                                                           batch->bucketId.keySignature),
-                      "Failed data verification inserting into compressed column");
-        };
 
         auto actualMeta = docToWrite.getField(kBucketMetaFieldName);
         auto expectedMeta = batch->bucketKey.metadata.element();
@@ -276,13 +278,17 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
     };
 };
 
-// Builds the data field of a bucket document. Computes the min and max fields if necessary.
+// Builds the data field of a bucket document. Computes the min and max fields if necessary. If a
+// minTime is passed in, this means that we want to preserve the currentMinTime in the updated
+// bucket; we will update all min and max values to reflect the new data except for the minTime in
+// this case, which will remain unchanged.
 boost::optional<std::pair<BSONObj, BSONObj>> processTimeseriesMeasurements(
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
     StringDataMap<BSONObjBuilder>& dataBuilders,
     const boost::optional<TimeseriesOptions>& options = boost::none,
-    const boost::optional<const StringDataComparator*>& comparator = boost::none) {
+    const boost::optional<const StringDataComparator*>& comparator = boost::none,
+    const boost::optional<Date_t> currentMinTime = boost::none) {
     TrackingContext trackingContext;
     bucket_catalog::MinMax minmax{trackingContext};
     bool computeMinmax = options && comparator;
@@ -310,8 +316,10 @@ boost::optional<std::pair<BSONObj, BSONObj>> processTimeseriesMeasurements(
 
     // Rounds the minimum timestamp and updates the min time field.
     if (computeMinmax) {
-        auto minTime = roundTimestampToGranularity(
-            minmax.min().getField(options->getTimeField()).Date(), *options);
+        auto minTime = (currentMinTime != boost::none)
+            ? currentMinTime.get()
+            : roundTimestampToGranularity(minmax.min().getField(options->getTimeField()).Date(),
+                                          *options);
         auto controlDoc =
             bucket_catalog::buildControlMinTimestampDoc(options->getTimeField(), minTime);
         minmax.update(controlDoc, /*metaField=*/boost::none, *comparator);
@@ -822,7 +830,7 @@ std::vector<Measurement> sortMeasurementsOnTimeField(
     std::sort(measurements.begin(),
               measurements.end(),
               [](const Measurement& lhs, const Measurement& rhs) {
-                  return lhs.timeField.timestamp() < rhs.timeField.timestamp();
+                  return lhs.timeField.date() < rhs.timeField.date();
               });
 
     return measurements;
@@ -883,10 +891,11 @@ BucketDocument makeNewDocumentForWrite(
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
     const TimeseriesOptions& options,
-    const boost::optional<const StringDataComparator*>& comparator) {
+    const boost::optional<const StringDataComparator*>& comparator,
+    const boost::optional<Date_t> currentMinTime) {
     StringDataMap<BSONObjBuilder> dataBuilders;
-    auto minmax =
-        processTimeseriesMeasurements(measurements, metadata, dataBuilders, options, comparator);
+    auto minmax = processTimeseriesMeasurements(
+        measurements, metadata, dataBuilders, options, comparator, currentMinTime);
 
     invariant(minmax);
 
@@ -913,8 +922,14 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
         trackingContext, collectionUUID, comparator, options, measurements[0]));
     auto time = res.second;
     auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
-    BucketDocument bucketDoc = makeNewDocumentForWrite(
-        nss, collectionUUID, oid, measurements, res.first.metadata.toBSON(), options, comparator);
+    BucketDocument bucketDoc = makeNewDocumentForWrite(nss,
+                                                       collectionUUID,
+                                                       oid,
+                                                       measurements,
+                                                       res.first.metadata.toBSON(),
+                                                       options,
+                                                       comparator,
+                                                       boost::none);
 
     invariant(bucketDoc.compressedBucket ||
               !feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
@@ -926,7 +941,10 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
 }
 
 std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
-    const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements) {
+    const OID& bucketId,
+    const CollectionPtr& coll,
+    const std::vector<BSONObj>& measurements,
+    const boost::optional<Date_t> currentMinTime) {
     // A bucket will be fully deleted if no measurements are passed in.
     if (measurements.empty()) {
         write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);
@@ -952,7 +970,8 @@ std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> m
                                                        measurements,
                                                        metadata,
                                                        *timeseriesOptions,
-                                                       coll->getDefaultCollator());
+                                                       coll->getDefaultCollator(),
+                                                       currentMinTime);
     BSONObj bucketToReplace = bucketDoc.uncompressedBucket;
     invariant(bucketDoc.compressedBucket ||
               !feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
@@ -1018,7 +1037,7 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
         if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load()) {
             auto verifierFunction =
                 makeVerifierFunction(sortedMeasurements, batch, OperationSource::kTimeseriesInsert);
-            verifierFunction(bucketToInsert);
+            verifierFunction(bucketToInsert, BSONObj());
         }
     } else {
         bucketDoc = makeNewDocumentForWrite(bucketsNs, batch, metadata);
@@ -1177,16 +1196,16 @@ void makeWriteRequest(OperationContext* opCtx,
                       std::vector<write_ops::InsertCommandRequest>* insertOps,
                       std::vector<write_ops::UpdateCommandRequest>* updateOps) {
     if (batch->numPreviouslyCommittedMeasurements == 0) {
-        insertOps->push_back(makeTimeseriesInsertOp(
-            batch, bucketsNs, metadata, std::move(stmtIds[batch->bucketId.oid])));
+        insertOps->push_back(
+            makeTimeseriesInsertOp(batch, bucketsNs, metadata, std::move(stmtIds[batch.get()])));
         return;
     }
     if (batch->generateCompressedDiff) {
         updateOps->push_back(makeTimeseriesCompressedDiffUpdateOp(
-            opCtx, batch, bucketsNs, std::move(stmtIds[batch->bucketId.oid])));
+            opCtx, batch, bucketsNs, std::move(stmtIds[batch.get()])));
     } else {
         updateOps->push_back(makeTimeseriesUpdateOp(
-            opCtx, batch, bucketsNs, metadata, std::move(stmtIds[batch->bucketId.oid])));
+            opCtx, batch, bucketsNs, metadata, std::move(stmtIds[batch.get()])));
     }
 }
 
@@ -1371,9 +1390,10 @@ void performAtomicWritesForDelete(OperationContext* opCtx,
                                   const RecordId& recordId,
                                   const std::vector<BSONObj>& unchangedMeasurements,
                                   bool fromMigrate,
-                                  StmtId stmtId) {
+                                  StmtId stmtId,
+                                  Date_t currentMinTime) {
     OID bucketId = record_id_helpers::toBSONAs(recordId, "_id")["_id"].OID();
-    auto modificationOp = makeModificationOp(bucketId, coll, unchangedMeasurements);
+    auto modificationOp = makeModificationOp(bucketId, coll, unchangedMeasurements, currentMinTime);
     performAtomicWrites(opCtx, coll, recordId, modificationOp, {}, {}, fromMigrate, stmtId);
 }
 
@@ -1387,7 +1407,8 @@ void performAtomicWritesForUpdate(
     bool fromMigrate,
     StmtId stmtId,
     std::set<bucket_catalog::BucketId>* bucketIds,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc) {
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    const boost::optional<Date_t> currentMinTime) {
     auto timeSeriesOptions = *coll->getTimeseriesOptions();
     auto batches = insertIntoBucketCatalogForUpdate(opCtx,
                                                     sideBucketCatalog,
@@ -1401,7 +1422,8 @@ void performAtomicWritesForUpdate(
         ? boost::make_optional(
               makeModificationOp(record_id_helpers::toBSONAs(recordId, "_id")["_id"].OID(),
                                  coll,
-                                 *unchangedMeasurements))
+                                 *unchangedMeasurements,
+                                 currentMinTime))
         : boost::none;
     commitTimeseriesBucketsAtomically(opCtx,
                                       sideBucketCatalog,

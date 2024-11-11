@@ -121,7 +121,7 @@ def prepare_branch(branch, config):
             print(f'Branch {branch} is already cloned')
             system(f'git -C "{path}" pull')
         else:
-            source = 'git@github.com:wiredtiger/wiredtiger.git'
+            source = 'https://github.com/wiredtiger/wiredtiger.git'
             print(f'Cloning branch {branch}')
             system(f'git clone "{source}" "{path}" -b {branch}')
 

@@ -29,6 +29,8 @@
 
 #include <boost/cstdint.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/posix_time/time_parsers.hpp>
 #include <boost/move/utility_core.hpp>
 #include <cstdint>
 #include <string>
@@ -304,8 +306,14 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurements) {
         fromjson(R"({"time":{"$date":"2022-06-06T15:33:30.000Z"},"a":3,"b":3})")};
 
     // Makes the new document for write.
-    auto newDoc = timeseries::makeNewDocumentForWrite(
-                      ns, uuid, oid, measurements, /*metadata=*/{}, options, /*comparator=*/nullptr)
+    auto newDoc = timeseries::makeNewDocumentForWrite(ns,
+                                                      uuid,
+                                                      oid,
+                                                      measurements,
+                                                      /*metadata=*/{},
+                                                      options,
+                                                      /*comparator=*/nullptr,
+                                                      boost::none)
                       .uncompressedBucket;
 
     // Checks the measurements are stored in the bucket format.
@@ -337,9 +345,10 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
     auto metadata = fromjson(R"({"meta":{"tag":1}})");
 
     // Makes the new document for write.
-    auto newDoc = timeseries::makeNewDocumentForWrite(
-                      ns, uuid, oid, measurements, metadata, options, /*comparator=*/nullptr)
-                      .uncompressedBucket;
+    auto newDoc =
+        timeseries::makeNewDocumentForWrite(
+            ns, uuid, oid, measurements, metadata, options, /*comparator=*/nullptr, boost::none)
+            .uncompressedBucket;
 
     // Checks the measurements are stored in the bucket format.
     const BSONObj bucketDoc = fromjson(
@@ -842,14 +851,26 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
                                                      << "time"))));
 
     // Inserts a bucket document.
-    const BSONObj bucketDoc = ::mongo::fromjson(
-        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":2,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
-                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3},
+    const BSONObj uncompressedDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"66e1d884953633cfd2c479f2"},
+            "control":{"version":1,"min":{"time":{"$date":"2024-09-11T17:51:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2024-09-11T17:53:18.428Z"},"a":3,"b":3},
                                    "count":3},
-            "data":{"time":{"$binary":"CQBwO6c5gQEAAIANAAAAAAAAAAA=","$type":"07"},
-                    "a":{"$binary":"AQAAAAAAAADwP5AtAAAACAAAAAA=","$type":"07"},
-                    "b":{"$binary":"AQAAAAAAAADwP5AtAAAACAAAAAA=","$type":"07"}}})");
+            "data":{"time":{"0":{"$date":"2024-09-11T17:51:30.000Z"},
+                            "1":{"$date":"2024-09-11T17:52:12.000Z"},
+                            "2":{"$date":"2024-09-11T17:53:18.428Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+
+    CompressionResult compressionResult = compressBucket(uncompressedDoc,
+                                                         kTimeseriesOptions.getTimeField(),
+                                                         ns,
+                                                         /*validateDecompression*/ true);
+    const BSONObj& bucketDoc = compressionResult.compressedBucket.value();
+    auto minTime = bucketDoc.getObjectField(kBucketControlFieldName)
+                       .getObjectField(kBucketControlMinFieldName)
+                       .getField("time")
+                       .Date();
     OID bucketId = bucketDoc["_id"].OID();
     auto recordId = record_id_helpers::keyForOID(bucketId);
 
@@ -861,27 +882,53 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
         wunit.commit();
     }
 
-    // Deletes two measurements from the bucket.
+    // Deletes two measurements from the bucket. This includes deleting the earliest measurement. We
+    // should check that the minTime of the bucket does not get changed in spite of this.
     {
         ASSERT_DOES_NOT_THROW(performAtomicWritesForDelete(
             opCtx,
             bucketsColl.getCollection(),
             recordId,
-            {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2})")},
+            {::mongo::fromjson(R"({"time":{"$date":"2024-09-11T17:53:18.428Z"},"a":3,"b":3})")},
             /*fromMigrate=*/false,
-            /*stmtId=*/kUninitializedStmtId));
+            /*stmtId=*/kUninitializedStmtId,
+            minTime));
     }
 
-    // Checks only one measurement is left in the bucket.
+    // Checks only one measurement is left in the bucket. Ensure that the time of the last remaining
+    // measurement has not changed, and that our bucket's control.min.time has not changed.
     {
-        const BSONObj replaceDoc = ::mongo::fromjson(
-            R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":2,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":2,"b":2},
-                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2},
-                                   "count":1},
-            "data":{"time":{"$binary":"CQBwO6c5gQEAAAA=","$type":"07"},
-                    "a":{"$binary":"EAACAAAAAA==","$type":"07"},
-                    "b":{"$binary":"EAACAAAAAA==","$type":"07"}}})");
+        const BSONObj uncompressedReplaceDoc = ::mongo::fromjson(
+            R"({"_id":{"$oid":"66e1d884953633cfd2c479f2"},
+            "control":{"version":1,"min":{"time":{"$date":"2024-09-11T17:51:00.000Z"},"a":3,"b":3},
+                                   "max":{"time":{"$date":"2024-09-11T17:53:18.428Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2024-09-11T17:53:18.428Z"}},
+                    "a":{"0":3},
+                    "b":{"0":3}}})");
+        // As part of this test we are checking that deleting the earliest measurements in a bucket
+        // does not impact the bucket's control.min time-field. To verify that this was done here,
+        // let's check that the remaining measurement's rounded time is not equal to the current
+        // control.min time. That way, we'll know that if we were incorrectly updating the
+        // control.min time to be the min time of the remaining measurement, it would not be the
+        // same time as it was when it was based on the true earliest (now-deleted) measurement.
+        // TODO (SERVER-94872): Revisit this behavior, we may no longer need this check.
+        auto remainingMeasurementMinTime =
+            roundTimestampToGranularity(uncompressedReplaceDoc.getObjectField(kBucketDataFieldName)
+                                            .getObjectField("time")
+                                            .getField("0")
+                                            .Date(),
+                                        kTimeseriesOptions);
+        auto controlMinTime = uncompressedReplaceDoc.getObjectField(kBucketControlFieldName)
+                                  .getObjectField(kBucketControlMinFieldName)
+                                  .getField("time")
+                                  .Date();
+        ASSERT_NE(remainingMeasurementMinTime, controlMinTime);
+        CompressionResult compressionResult = compressBucket(uncompressedReplaceDoc,
+                                                             kTimeseriesOptions.getTimeField(),
+                                                             ns,
+                                                             /*validateDecompression*/ true);
+        const BSONObj& replaceDoc = compressionResult.compressedBucket.value();
+
         Snapshotted<BSONObj> doc;
         bool found = bucketsColl->findDoc(opCtx, recordId, &doc);
 
@@ -897,7 +944,8 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
                                                            recordId,
                                                            {},
                                                            /*fromMigrate=*/false,
-                                                           /*stmtId=*/kUninitializedStmtId));
+                                                           /*stmtId=*/kUninitializedStmtId,
+                                                           minTime));
     }
 
     // Checks the document is removed.
@@ -929,6 +977,8 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
                     "b":{"$binary":"AQAAAAAAAADwP5AtAAAACAAAAAA=","$type":"07"}}})");
     OID bucketId = bucketDoc["_id"].OID();
     auto recordId = record_id_helpers::keyForOID(bucketId);
+    auto minTime =
+        bucketDoc.getObjectField("control").getObjectField("min").getField("time").Date();
 
     AutoGetCollection bucketsColl(opCtx, ns.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
@@ -957,7 +1007,8 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
             /*compressAndWriteBucketFunc=*/
-            nullptr));
+            nullptr,
+            minTime));
         ASSERT_EQ(bucketIds.size(), 1);
     }
 
@@ -1004,6 +1055,8 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
                     "b":{"0":1,"1":2,"2":3}}})");
     OID bucketId = bucketDoc["_id"].OID();
     auto recordId = record_id_helpers::keyForOID(bucketId);
+    auto minTime =
+        bucketDoc.getObjectField("control").getObjectField("min").getField("time").Date();
 
     AutoGetCollection bucketsColl(opCtx, ns.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
@@ -1034,7 +1087,8 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
             /*compressAndWriteBucketFunc=*/
-            nullptr));
+            nullptr,
+            minTime));
         ASSERT_EQ(bucketIds.size(), 1);
     }
 
@@ -1054,7 +1108,8 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
             /*compressAndWriteBucketFunc=*/
-            nullptr));
+            nullptr,
+            minTime));
         ASSERT_EQ(bucketIds.size(), 1);
     }
 
@@ -1074,7 +1129,8 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
             /*compressAndWriteBucketFunc=*/
-            nullptr));
+            nullptr,
+            minTime));
         ASSERT_EQ(bucketIds.size(), 2);
     }
 }
@@ -1121,6 +1177,54 @@ TEST_F(TimeseriesWriteUtilTest, SortMeasurementsOnTimeField) {
         m.dataFields.push_back(sortedMeasurements[i].getField("b"));
         ASSERT_EQ(m, testMeasurements[i]);
     }
+}
+
+TEST_F(TimeseriesWriteUtilTest, SortMeasurementsOnTimeFieldExtendedRange) {
+    const BSONObj metaField = fromjson(R"({"meta":{"tag":1}})");
+
+    // TODO SERVER-94228: Support ISO 8601 date parsing and formatting of dates prior to 1970.
+    static constexpr auto epoch = boost::posix_time::ptime(boost::gregorian::date(1970, 1, 1));
+    auto parse = [](const std::string& input) {
+        auto ptime = boost::posix_time::from_iso_extended_string(input);
+        return (ptime - epoch).total_milliseconds();
+    };
+
+    // Two measurements in reverse order at different side of the epoch
+    const std::vector<BSONObj> measurements = {
+        fromjson(fmt::format(
+            R"({{"time":{{"$date":{{"$numberLong": "{}"}}}},"meta":{{"tag":1}},"a":1,"b":1}})",
+            parse("1970-01-01T00:15:00.001"))),
+        fromjson(fmt::format(
+            R"({{"time":{{"$date":{{"$numberLong": "{}"}}}},"meta":{{"tag":1}},"a":2,"b":2}})",
+            parse("1969-12-31T23:30:30.001")))};
+
+    auto batch =
+        generateBatch(UUID::gen(),
+                      {bucket_catalog::getTrackingContext(
+                           _trackingContexts, bucket_catalog::TrackingScope::kOpenBucketsByKey),
+                       metaField.getField("meta"),
+                       nullptr,
+                       boost::none});
+    batch->measurements = {measurements.begin(), measurements.end()};
+    batch->min = measurements[1];
+    batch->max = measurements[0];
+    batch->timeField = kTimeseriesOptions.getTimeField();
+
+    const std::vector testMeasurements = details::sortMeasurementsOnTimeField(batch);
+
+    ASSERT_EQ(testMeasurements.size(), measurements.size());
+
+    auto compare = [&](int inputIdx, int outputIdx) {
+        details::Measurement m;
+        m.timeField = measurements[inputIdx].getField("time");
+        m.dataFields.push_back(measurements[inputIdx].getField("time"));
+        m.dataFields.push_back(measurements[inputIdx].getField("a"));
+        m.dataFields.push_back(measurements[inputIdx].getField("b"));
+        ASSERT_EQ(m, testMeasurements[outputIdx]);
+    };
+
+    compare(1, 0);
+    compare(0, 1);
 }
 
 }  // namespace

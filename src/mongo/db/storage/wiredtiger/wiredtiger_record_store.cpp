@@ -799,10 +799,12 @@ void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {
 
 void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx,
                                                 const NamespaceString& ns) {
-    // If the server was started in read-only mode, skip calculating the oplog truncate markers. The
-    // OplogCapMaintainerThread does not get started in this instance.
+    // If the server was started in read-only mode or if we are restoring the node, skip
+    // calculating the oplog truncate markers. The OplogCapMaintainerThread does not get started
+    // in this instance.
     if (_isOplog && opCtx->getServiceContext()->userWritesAllowed() &&
-        !storageGlobalParams.repair) {
+        !storageGlobalParams.repair && !storageGlobalParams.restore &&
+        !storageGlobalParams.magicRestore) {
         _oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, this, ns);
     }
 

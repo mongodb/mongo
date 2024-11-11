@@ -394,6 +394,16 @@ Date_t roundTimestampToGranularity(const Date_t& time, const TimeseriesOptions& 
 Date_t roundTimestampBySeconds(const Date_t& time, const long long roundingSeconds) {
     long long timeSeconds = durationCount<Seconds>(time.toDurationSinceEpoch());
     long long roundedTimeSeconds = (timeSeconds - (timeSeconds % roundingSeconds));
+    // Make sure we always round down and not towards epoch, even for dates prior to 1970 with a
+    // negative duration since epoch.
+    if (roundedTimeSeconds > timeSeconds) {
+        roundedTimeSeconds -= roundingSeconds;
+        // It is not possible that we underflowed when performing the subtraction above. Because
+        // we've converted the dates in milliseconds to seconds there is tons of integer space left
+        // for the subtraction. We'd need to have a gigantic amount of rounding seconds to be able
+        // to overflow here. Therefore we invariant over uasserting.
+        invariant(roundedTimeSeconds <= timeSeconds);
+    }
     return Date_t::fromDurationSinceEpoch(Seconds{roundedTimeSeconds});
 }
 

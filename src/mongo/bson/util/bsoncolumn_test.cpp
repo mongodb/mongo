@@ -1974,6 +1974,65 @@ TEST_F(BSONColumnTest, DoubleRescaleFirstRescaledIsSkip) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, DoubleScaleDownWithMultipleBlocksPending) {
+    // This test writes a simple8b using a high scale factor followed by a large number of skips
+    // that do not fit in a single simple8b block in the control with a different scale factor that
+    // follows.
+    std::vector<BSONElement> elems = {createElementDouble(-153764908544737.4),
+                                      createElementDouble(-85827904635132.83)};
+    for (int i = 0; i < 150; ++i) {
+        elems.push_back(BSONElement());
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected, deltaDoubleMemory(elems.begin() + 1, elems.begin() + 2, elems.front()), 1);
+    appendSimple8bControl(expected, 0b1011, 0b0010);
+    appendSimple8bBlocks64(expected, deltaDouble(elems.begin() + 2, elems.end(), elems[1], 100), 3);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, DoubleScaleDownWithRLEPending) {
+    // This test writes a simple8b using a high scale factor followed by a large number of skips
+    // that do not fit in a single simple8b block. The builder will scale down to fit these skips as
+    // the high scale factor is not needed. The number of skips in the scaled down block is an RLE
+    // multiple resulting in a single RLE block in the scaled down block.
+    std::vector<BSONElement> elems = {
+        createElementDouble(std::numeric_limits<double>::denorm_min()),
+        BSONElement(),
+        createElementDouble(0.0)};
+    for (int i = 0; i < 148; ++i) {
+        elems.push_back(BSONElement());
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected, deltaDoubleMemory(elems.begin() + 1, elems.begin() + 31, elems.front()), 1);
+    appendSimple8bControl(expected, 0b1001, 0b0000);
+    appendSimple8bRLE(expected, 120);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, DoubleIncreaseScaleWithoutOverflow) {
     // This test needs to rescale doubles but can do so where there's no overflow in the new control
     std::vector<BSONElement> elems = {createElementDouble(314159264193.46228),
@@ -2141,6 +2200,40 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkipThenScaleBackUp) {
     appendSimple8bControl(expected, 0b1101, 0b0001);
     appendSimple8bBlocks64(
         expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 100000000), 2);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, DoubleRescalingPreserveRLE) {
+    // This test is using large deltas for the double type where the values are mostly unscalable
+    // except for one of the doubles that is scalable. This will trigger the rescaling logic and
+    // we're testing that the RLE state is properly preserved through the rescaling as the deltas
+    // are all identical.
+    static constexpr uint64_t kLargeDelta = 0x0474747474747474;
+
+    std::vector<BSONElement> elems;
+    uint64_t value = 0xbea6a6a6a6e78efc;
+    elems.push_back(createElementDouble(std::bit_cast<double>(value)));
+    elems.push_back(BSONElement());
+    elems.push_back(createElementDouble(std::bit_cast<double>(value += kLargeDelta)));
+    elems.push_back(createElementDouble(std::bit_cast<double>(value += kLargeDelta)));
+    elems.push_back(createElementDouble(std::bit_cast<double>(value += kLargeDelta)));
+
+    // One of the values are scalable, this will trigger rescaling.
+    ASSERT_TRUE(Simple8bTypeUtil::encodeDouble(elems.at(2).Double(), 0).has_value());
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0011);
+    appendSimple8bBlocks64(
+        expected, deltaDoubleMemory(elems.begin() + 1, elems.end(), elems.front()), 4);
     appendEOO(expected);
 
     auto binData = cb.finalize();
@@ -4350,6 +4443,61 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreDifferent128
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, RLEFirstInControlWithNonRLEAfterWithoutOverflow) {
+    // This test has a control block beginning with RLE and non-RLE data after the RLE that doesn't
+    // overflow by itself. Test that we properly detect the overflow to be inside the RLE block.
+    std::vector<BSONElement> elems = {createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFF),
+                                      createElementInt64(64),
+                                      createElementInt64(128)};
+
+    for (size_t i = 0; i < 190; ++i) {
+        elems.push_back(BSONElement());
+    }
+
+    elems.push_back(createElementInt64(128));
+
+    int i = 0;
+    for (auto&& elem : elems) {
+        cb.append(elem);
+        ++i;
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks64(
+        expected,
+        deltaInt64(elems.begin() + 1, elems.begin() + elems.size() - 131, elems.front()),
+        16);
+    appendSimple8bControl(expected, 0b1000, 0b0010);
+    appendSimple8bRLE(expected, 120);
+    appendSimple8bBlocks64(
+        expected,
+        deltaInt64(elems.begin() + elems.size() - 11, elems.begin() + elems.size(), elems[17]),
+        2);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems);
+}
+
+
 TEST_F(BSONColumnTest, RLELargeValueExtendedSelector) {
     // This test creates an RLE block containing large values that do not fit in the base selector.
     // Ensure the correct selector states are set for binary reopen of this binary.
@@ -4896,6 +5044,30 @@ TEST_F(BSONColumnTest, InterleavedScalarToObject) {
     appendEOO(expected);
 
     verifyDecompression(expected, elems);
+}
+
+TEST_F(BSONColumnTest, ArrayThenObjectNoScalars) {
+    std::vector<BSONElement> elems = {
+        createElementArray(BSON_ARRAY(1 << BSONObjBuilder().obj() << 2)),
+        createElementObj(BSON("x" << BSONObjBuilder().obj()))};
+
+    for (auto elem : elems) {
+        cb.append(elem);
+    }
+    auto binData = cb.finalize();
+
+    BufBuilder expected;
+    appendInterleavedStartArrayRoot(expected, elems[0].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+    appendLiteral(expected, elems[1]);
+    appendEOO(expected);
+
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems, false);
 }
 
 TEST_F(BSONColumnTest, InterleavedScalarToObjectLegacyDecompress) {
