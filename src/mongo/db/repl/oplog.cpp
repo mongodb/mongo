@@ -983,13 +983,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               opCtx, applicationMode, swOplogEntry.getValue());
           return Status::OK();
       },
-      // These index related error codes needs to be ignored during initial sync because these
-      // indexes can already be cloned during initial sync database cloning and the oplogs become
-      // no-op. During steady state, since DDL oplogs are applied in serial, we should never see
-      // these errors.
       {ErrorCodes::IndexAlreadyExists,
        ErrorCodes::IndexBuildAlreadyInProgress,
-       ErrorCodes::IndexKeySpecsConflict,
        ErrorCodes::NamespaceNotFound}}},
     {"commitIndexBuild",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)

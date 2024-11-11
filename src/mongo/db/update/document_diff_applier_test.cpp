@@ -140,40 +140,6 @@ TEST(DiffApplierTest, BinaryIsIdempotent) {
     checkDiff(firstImage, BSON("b1" << BSONBinData("abcdef", 6, BinDataType::Column)), thirdImage);
 }
 
-TEST(DiffApplierTest, BinaryIsIdempotentMultipleWithShrink) {
-    // Applies "def" to "abc" and then shinks to "ax" twice using the same two diffs. The final
-    // result is expected to be "ax".
-    auto diffAppend = [&]() -> BSONObj {
-        const BSONObj storage(BSON(
-            "a" << BSON("o" << 3 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
-
-        diff_tree::DocumentSubDiffNode diffNode;
-        diffNode.addBinary("b1", storage["a"]);
-
-        return diffNode.serialize();
-    };
-
-    auto diffShrink = [&]() -> BSONObj {
-        const BSONObj storage(
-            BSON("a" << BSON("o" << 1 << "d" << BSONBinData("x", 1, BinDataType::BinDataGeneral))));
-
-        diff_tree::DocumentSubDiffNode diffNode;
-        diffNode.addBinary("b1", storage["a"]);
-
-        return diffNode.serialize();
-    };
-
-    const BSONObj firstImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
-    const BSONObj secondImage(BSON("b1" << BSONBinData("abcdef", 6, BinDataType::Column)));
-    const BSONObj thirdImage(BSON("b1" << BSONBinData("ax", 2, BinDataType::Column)));
-
-    checkDiff(firstImage, secondImage, diffAppend());
-    checkDiff(secondImage, thirdImage, diffShrink());
-
-    checkDiff(thirdImage, thirdImage, diffAppend());
-    checkDiff(thirdImage, thirdImage, diffShrink());
-}
-
 TEST(DiffApplierTest, UpdateSimple) {
     const BSONObj preImage(BSON("f1" << 0 << "foo" << 2 << "f2" << 3));
 

@@ -115,8 +115,7 @@ BucketDocument makeNewDocumentForWrite(
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
     const TimeseriesOptions& options,
-    const boost::optional<const StringDataComparator*>& comparator,
-    boost::optional<Date_t> currentMinTime);
+    const boost::optional<const StringDataComparator*>& comparator);
 
 /**
  * Returns the document for writing a new bucket with 'measurements'. Generates the id and
@@ -138,7 +137,7 @@ std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> m
     const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements);
 
 using TimeseriesBatches = std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>;
-using TimeseriesStmtIds = stdx::unordered_map<bucket_catalog::WriteBatch*, std::vector<StmtId>>;
+using TimeseriesStmtIds = stdx::unordered_map<OID, std::vector<StmtId>, OID::Hasher>;
 
 /**
  * Builds the transform update oplog entry with a transform function.
@@ -272,8 +271,7 @@ void performAtomicWritesForDelete(OperationContext* opCtx,
                                   const RecordId& recordId,
                                   const std::vector<BSONObj>& unchangedMeasurements,
                                   bool fromMigrate,
-                                  StmtId stmtId,
-                                  Date_t currentMinTime);
+                                  StmtId stmtId);
 
 /**
  * Constructs the write requests with the provided measurements and performs the writes atomically
@@ -289,8 +287,7 @@ void performAtomicWritesForUpdate(
     bool fromMigrate,
     StmtId stmtId,
     std::set<bucket_catalog::BucketId>* bucketIds,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    boost::optional<Date_t> currentMinTime);
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc);
 
 /**
  * Change the bucket namespace to time-series view namespace for time-series command.

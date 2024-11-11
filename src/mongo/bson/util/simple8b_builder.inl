@@ -193,7 +193,7 @@ template <typename T, class Allocator>
 template <class F>
 requires Simple8bBlockWriter<F>
 bool Simple8bBuilder<T, Allocator>::append(T value, F&& writeFn) {
-    if (rlePossible()) {
+    if (_rlePossible()) {
         if (_lastValueInPrevWord == value) {
             ++_rleCount;
             // RLE does not use selectors, make sure they are reset.
@@ -211,7 +211,7 @@ template <typename T, class Allocator>
 template <class F>
 requires Simple8bBlockWriter<F>
 void Simple8bBuilder<T, Allocator>::skip(F&& writeFn) {
-    if (rlePossible()) {
+    if (_rlePossible()) {
         if (!_lastValueInPrevWord.has_value()) {
             ++_rleCount;
             // RLE does not use selectors, make sure they are reset.
@@ -257,14 +257,14 @@ void Simple8bBuilder<T, Allocator>::setLastForRLE(boost::optional<T> val) {
 
 template <typename T, class Allocator>
 void Simple8bBuilder<T, Allocator>::resetLastForRLEIfNeeded() {
-    if (!rlePossible()) {
+    if (!_rlePossible()) {
         _lastValueInPrevWord = 0;
     }
 }
 
 template <typename T, class Allocator>
 void Simple8bBuilder<T, Allocator>::initializeRLEFrom(const Simple8bBuilder<T, Allocator>& other) {
-    if (other.rlePossible()) {
+    if (other._rlePossible()) {
         _lastValueInPrevWord = other._lastValueInPrevWord;
     }
 }
@@ -471,7 +471,7 @@ void Simple8bBuilder<T, Allocator>::_appendRleEncoding(F&& writeFn) {
 }
 
 template <typename T, class Allocator>
-bool Simple8bBuilder<T, Allocator>::rlePossible() const {
+bool Simple8bBuilder<T, Allocator>::_rlePossible() const {
     return _pendingValues.empty() || _rleCount != 0;
 }
 

@@ -59,18 +59,5 @@ struct ImportOptions {
     // Determines if we need to set new rand for this node to avoid ident collision in future due to
     // this collection & it's associated index import.
     bool skipIdentCollisionCheck = false;
-
-    // Determines whether WT should panic or error upon corrupt metadata for a collection
-    // This can occur during importCollection as the provided metadata may become invalid due to
-    // multiple checkpoints invalidating the metadata. In this case falling back to repair=true is
-    // slower but ensures a successful import
-    // true: WT will panic
-    // false: WT will error and the operation can be retried with repair=true
-    bool panicOnCorruptWtMetadata = true;
-
-    // Whether WT should try to reconstruct the collection metadata from the latest checkpoint. This
-    // requires reading the entire table and should only be used when absolutely required to ensure
-    // the import succeeds
-    bool repair = false;
 };
 }  // namespace mongo

@@ -1,0 +1,159 @@
+config_variables:
+- &keyFile jstests/libs/authTestsKey
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+- &authOptions
+  authenticationDatabase: admin
+  authenticationMechanism: SCRAM-SHA-256
+  password: *keyFileData
+  username: __system
+
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # Skip any tests that run with auth explicitly.
+  - jstests/core/administrative/*[aA]uth*.js
+  # This test uses `benchRun` which spawns connections which do not inherit the causal session.
+  - jstests/core/**/benchrun_pipeline_updates.js
+
+  #
+  # Denylists from session_jscore_passthrough.yml
+  #
+
+  # These test run commands using legacy queries, which are not supported on sessions.
+  - jstests/core/**/comment_field.js
+  - jstests/core/**/exhaust.js
+
+  # Unacknowledged writes prohibited in an explicit session.
+  - jstests/core/**/crud_api.js
+  - jstests/core/**/batch_write_command_w0.js
+
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
+  # These tests run getMore commands which are not supported in the tenant migration passthrough.
+  - requires_getmore
+  # Due to background tenant migrations, operations in the main test shell are not guaranteed to
+  # be causally consistent with operations in a parallel shell. The reason is that
+  # TenantMigrationCommitted error is only thrown when the client does a write or a atClusterTime/
+  # afterClusterTime or linearlizable read. Therefore, one of shell may not be aware that the
+  # migration has occurred and would not forward the read/write command to the right replica set.
+  - uses_parallel_shell
+  # Profile settings are stored in-memory only so are not transferred to the recipient.
+  - requires_profiling
+  # capped collections are banned in Serverless
+  - requires_capped
+  # emptycapped command is blocked during tenant migration.
+  - requires_emptycapped
+  # Multi-updates that conflict with tenant migration are not retried by simulate_atlas_proxy.js.
+  - requires_multi_updates
+  ##
+  # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+  # override when it refuses to replace the readPreference of a particular command. Above each tag
+  # are the message(s) that cause the tag to be warranted.
+  ##
+  # "Cowardly refusing to override read preference of command: ..."
+  # "Cowardly refusing to run test with overridden read preference when it reads from a
+  #  non-replicated collection: ..."
+  - assumes_read_preference_unchanged
+  - does_not_support_causal_consistency
+  - requires_collstats
+  # Full validation can cause ongoing queries to fail. This can affect the tenant migration
+  # process.
+  - uses_full_validation
+  - tenant_migration_incompatible
+  - uses_transactions
+  # Parallel shell is not causally consistent because it uses a different session.
+  - uses_parallel_shell
+  # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
+  - simulate_atlas_proxy_incompatible
+
+  # Skip time-series tests which need special handling to not fail validate.
+  # Currently, the validate hook is run before migration reaches the recipient kConsistent stage
+  # which is fine for regular collections, but will show as corruption for system.buckets collections.
+  - jstests/core/timeseries/*.js
+
+executor:
+  archive:
+    tests: true
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
+        await import("jstests/libs/override_methods/enable_causal_consistency.js");
+        await import("jstests/libs/override_methods/enable_sessions.js");
+        jsTest.authenticate(db.getMongo());
+      global_vars:
+        TestData: &TestData
+          tenantId: "636d957b2646ddfaf9b5e13f"
+          auth: true
+          authMechanism: SCRAM-SHA-256
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
+  hooks:
+  - class: ContinuousTenantMigration
+    shell_options:
+      global_vars:
+        TestData:
+          <<: *TestData
+          authOptions: *authOptions
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+    shell_options:
+      global_vars:
+        TestData: *TestData
+  - class: CheckReplDBHash
+    shell_options:
+      global_vars:
+        TestData: *TestData
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData: *TestData
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: TenantMigrationFixture
+    common_mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        failpoint.abortTenantMigrationBeforeLeavingBlockingState:
+            mode:
+              activationProbability: 0.5
+        failpoint.pauseTenantMigrationBeforeLeavingBlockingState:
+            mode: alwaysOn
+            data:
+              blockTimeMS: 250
+        # Disable some cluster time validation optimizations to get more consistent coverage of
+        # gossiping cluster times across tenant migrations.
+        failpoint.alwaysValidateClientsClusterTime:
+            mode: alwaysOn
+        failpoint.externalClientsNeverAuthorizedToAdvanceLogicalClock:
+            mode: alwaysOn
+        # To avoid routing commands in each test incorrectly, the ContinuousTenantMigration hook
+        # only runs donorForgetMigration against the donor of each migration when it is safe to do
+        # so. Therefore, the garbage collection delay doesn't need to be large.
+        tenantMigrationGarbageCollectionDelayMS: 1
+        ttlMonitorSleepSecs: 1
+      tlsMode: allowTLS
+      tlsCAFile: jstests/libs/ca.pem
+      tlsAllowInvalidHostnames: ''
+      auth: ''
+      keyFile: *keyFile
+    per_mongod_options:
+      # Each entry is for a different replica set's extra mongod options.
+      - tlsCertificateKeyFile: jstests/libs/rs0.pem
+      - tlsCertificateKeyFile: jstests/libs/rs1.pem
+    num_replica_sets: 2
+    num_nodes_per_replica_set: 3
+    use_replica_set_connection_string: true
+    auth_options: *authOptions

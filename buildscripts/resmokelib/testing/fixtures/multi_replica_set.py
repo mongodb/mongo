@@ -143,5 +143,5 @@ class MultiReplicaSetFixture(interface.MultiClusterFixture):
         return output
 
     def get_independent_clusters(self):
-        """Return the independent replica sets."""
+        """Return the replica sets involved in the tenant migration."""
         return self.replica_sets.copy()

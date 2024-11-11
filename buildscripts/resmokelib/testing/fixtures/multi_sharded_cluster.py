@@ -146,5 +146,5 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
         return output
 
     def get_independent_clusters(self):
-        """Return the independent sharded clusters."""
+        """Return the sharded clusters involved in the tenant migration."""
         return self.sharded_clusters.copy()

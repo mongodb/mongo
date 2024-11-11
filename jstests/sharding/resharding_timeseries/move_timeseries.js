@@ -31,17 +31,11 @@ const timeseriesCollection = reshardingTest.createUnshardedCollection({
     }
 });
 
-const metaIndexName = "meta_x_1";
+const idxName = "myIndex";
 assert.commandWorked(timeseriesCollection.createIndex(
-    {'meta.x': 1}, {name: metaIndexName, collation: {locale: "simple"}}));
-const preReshardingMetaIndexSpec =
-    timeseriesCollection.getIndexes().filter(idx => idx.name === metaIndexName);
-
-const measurementIndexName = "a_1";
-assert.commandWorked(timeseriesCollection.createIndex(
-    {a: 1}, {name: measurementIndexName, collation: {locale: "simple"}}));
-const preReshardingMeasurementIndexSpec =
-    timeseriesCollection.getIndexes().filter(idx => idx.name === measurementIndexName);
+    {'meta.x': 1}, {name: idxName, collation: {locale: "simple"}}));
+const preReshardingIndexSpec =
+    timeseriesCollection.getIndexes().filter(idx => idx.name === idxName);
 
 // Insert some docs
 assert.commandWorked(timeseriesCollection.insert([
@@ -76,12 +70,8 @@ assert.eq(5, st.rs2.getPrimary().getCollection(bucketNss).countDocuments({}));
 assert.eq(0, st.rs0.getPrimary().getCollection(bucketNss).countDocuments({}));
 assert.eq(8, st.s0.getCollection(ns).countDocuments({}));
 
-const postReshardingMetaIndexSpec =
-    timeseriesCollection.getIndexes().filter(idx => idx.name === metaIndexName);
-assert.eq(preReshardingMetaIndexSpec, postReshardingMetaIndexSpec);
-
-const postReshardingMeasurementIndexSpec =
-    timeseriesCollection.getIndexes().filter(idx => idx.name === measurementIndexName);
-assert.eq(preReshardingMeasurementIndexSpec, postReshardingMeasurementIndexSpec);
+const postReshardingIndexSpec =
+    timeseriesCollection.getIndexes().filter(idx => idx.name === idxName);
+assert.eq(preReshardingIndexSpec, postReshardingIndexSpec);
 
 reshardingTest.teardown();

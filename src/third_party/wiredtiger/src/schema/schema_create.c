@@ -219,16 +219,6 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
         import_repair =
           __wt_config_getones(session, config, "import.repair", &cval) == 0 && cval.val != 0;
         if (!import_repair) {
-            /*
-             * Check if the user wants to avoid panic if the system detects the metadata for this
-             * table is not valid. Set the quiet flag on corruption to avoid panic. This setting
-             * allows the system to not panic the entire database but lets the caller handle the
-             * error on this specific file in their own way (such as another call with repair=true).
-             */
-            if (__wt_config_getones(session, config, "import.panic_corrupt", &cval) == 0 &&
-              cval.val == 0)
-                F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
-
             if (__wt_config_getones(session, config, "import.file_metadata", &cval) == 0 &&
               cval.len != 0) {
                 /*
@@ -328,7 +318,6 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
         WT_ERR(__wt_session_release_dhandle(session));
 
 err:
-    F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
     __wt_scr_free(session, &buf);
     __wt_scr_free(session, &val);
     __wt_free(session, fileconf);

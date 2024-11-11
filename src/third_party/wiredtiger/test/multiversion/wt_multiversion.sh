@@ -5,7 +5,7 @@ last_stable_dir=wiredtiger_${last_stable}/
 last_stable_branch=mongodb-${last_stable}
 
 function setup_last_stable {
-    git clone https://github.com/wiredtiger/wiredtiger.git ${last_stable_dir}
+    git clone git@github.com:wiredtiger/wiredtiger.git ${last_stable_dir}
     cd ${last_stable_dir}/build_posix/ || exit
     git checkout $last_stable_branch || exit 1
     bash reconf

@@ -127,15 +127,6 @@ functions:
     type: setup
     params:
       directory: wiredtiger
-  "generate github token": &gen_github_token
-    command: github.generate_token
-    params:
-      owner: wiredtiger
-      repo: automation-scripts
-      expansion_name: generated_token
-      permissions:
-          metadata: read
-          contents: read
   "get automation-scripts": &get_automation_scripts
     command: shell.exec
     type: setup
@@ -145,7 +136,7 @@ functions:
         set -o errexit
         set -o verbose
         if ! [ -d "./automation-scripts" ]; then
-          git clone https://x-access-token:${generated_token}@github.com/wiredtiger/automation-scripts.git
+          git clone git@github.com:wiredtiger/automation-scripts.git
         fi
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -379,7 +370,6 @@ functions:
         fi
         echo "Ending 'make wiredtiger' step"
   "compile wiredtiger":
-    - *gen_github_token
     - *get_automation_scripts
     - *configure_wiredtiger
     - *make_wiredtiger
@@ -542,7 +532,7 @@ functions:
             exit 0
           fi
 
-          git clone https://github.com/wiredtiger/wiredtiger.github.com.git
+          git clone git@github.com:wiredtiger/wiredtiger.github.com.git
           cd wiredtiger.github.com
 
           # Branches to update are defined through an expansion variable.
@@ -1299,7 +1289,6 @@ functions:
           ${python_binary|python3} wiredtiger/bench/perf_run_py/perf_json_converter_for_atlas_evergreen.py -i ${input_file} -n ${test_name} -o ${output_path}
 
   "upload stats to atlas":
-    - *gen_github_token
     - *get_automation_scripts
     - command: shell.exec
       params:
@@ -2858,7 +2847,6 @@ tasks:
   - name: configure-combinations
     commands:
       - func: "get project"
-      - func: "generate github token"
       - func: "get automation-scripts"
       - command: shell.exec
         params:
@@ -3332,7 +3320,6 @@ tasks:
   - name: long-test
     commands:
       - func: "get project"
-      - func: "generate github token"
       - func: "get automation-scripts"
       - func: "configure wiredtiger"
       - func: "make wiredtiger"

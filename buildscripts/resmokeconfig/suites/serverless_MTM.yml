@@ -1,0 +1,17 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/serverless/tenant_migration*.js
+  exclude_with_any_tags:
+  - requires_shard_merge
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      global_vars:
+        TestData:
+          hashTestNamesForMultitenancy: true
+          setParameters:
+            featureFlagShardMerge: false

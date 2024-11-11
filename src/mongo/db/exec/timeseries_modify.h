@@ -234,11 +234,6 @@ private:
      *
      * Returns the tuple of (whether the write was successful, the stage state to propagate, the
      * matched/modified measurement to return if the write was successful).
-     *
-     * The current minTime of the bucket we are deleting measurements from/updating is passed down
-     * so that we leave it unchanged. We do not want it to change because we use the minTime as the
-     * key for emplacing/retrieving buckets from the set of archived buckets, and because the
-     * minTime of a bucket is used as the shard key when sharding a time-series collection on time.
      */
     template <typename F>
     std::tuple<bool, PlanStage::StageState, boost::optional<BSONObj>> _writeToTimeseriesBuckets(
@@ -246,7 +241,6 @@ private:
         WorkingSetID bucketWsmId,
         std::vector<BSONObj>&& unchangedMeasurements,
         std::vector<BSONObj>&& matchedMeasurements,
-        Date_t currentMinTime,
         bool bucketFromMigrate);
 
     /**

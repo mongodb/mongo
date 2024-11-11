@@ -58,7 +58,6 @@ struct IndexFeatures {
     bool id = false;
     bool internal = false;
     bool partial = false;
-    bool prepareUnique = false;
     bool sparse = false;
     bool ttl = false;
     bool unique = false;
@@ -81,7 +80,6 @@ enum class FeatureStatType {
     kId,
     kInternal,
     kPartial,
-    kPrepareUnique,
     kSingle,
     kSparse,
     kTTL,

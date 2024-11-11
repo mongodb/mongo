@@ -153,7 +153,6 @@ TEST_F(TimeseriesDottedPathSupportTest, fieldContainsArrayData) {
     BSONObj input = ::mongo::fromjson(R"(
 {
     control: {
-        version: 1,
         min: {
             a: 1.0,
             b: true,

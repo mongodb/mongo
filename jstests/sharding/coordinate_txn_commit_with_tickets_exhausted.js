@@ -1,6 +1,6 @@
 /**
- * Validate SERVER-60682 and SERVER-92292: TransactionCoordinator won't starve for a storage ticket
- * to prepare or commit a cross-shard transaction.
+ * Validate SERVER-60682: TransactionCoordinator won't starve for a storage ticket to
+ * persist its decision.
  *
  * @tags: [
  *   requires_fcv_70,
@@ -50,12 +50,9 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(sourceCollection, {key: 1}
 // Insert a document into each shard.
 assert.commandWorked(sourceCollection.insert([{key: 200}, {key: -200}]));
 
-const txnCoordinator = st.rs1.getPrimary();
-
 // Create a thread which leaves the TransactionCoordinator in a state where prepareTransaction has
 // been run on both participant shards and it is about to write the commit decision locally to the
 // config.transaction_coordinators collection.
-const hangBeforeWritingDecisionFp = configureFailPoint(txnCoordinator, "hangBeforeWritingDecision");
 const preparedTxnThread = new Thread(function runTwoPhaseCommitTxn(host, dbName, collName) {
     const conn = new Mongo(host);
     const session = conn.startSession({causalConsistency: false});
@@ -66,26 +63,12 @@ const preparedTxnThread = new Thread(function runTwoPhaseCommitTxn(host, dbName,
     assert.commandWorked(sessionCollection.update({key: -200}, {$inc: {counter: 1}}));
     assert.commandWorked(session.commitTransaction_forTesting());
 }, st.s.host, sourceCollection.getDB().getName(), sourceCollection.getName());
+
+const txnCoordinator = st.rs1.getPrimary();
+const hangBeforeWritingDecisionFp = configureFailPoint(txnCoordinator, "hangBeforeWritingDecision");
+
 preparedTxnThread.start();
-hangBeforeWritingDecisionFp.wait({timesEntered: 1});
-
-// Create a thread which leaves the TransactionCoordinator in a state where write operations has
-// been run on both participant shards and it is about to start the two-phase-commit protocol (e.g.
-// before writing the participant list).
-const hangBeforeWritingParticipantListFp =
-    configureFailPoint(txnCoordinator, "hangBeforeWritingParticipantList");
-const commitTxnThread = new Thread(function runTwoPhaseCommitTxn(host, dbName, collName) {
-    const conn = new Mongo(host);
-    const session = conn.startSession({causalConsistency: false});
-    const sessionCollection = session.getDatabase(dbName).getCollection(collName);
-
-    session.startTransaction();
-    assert.commandWorked(sessionCollection.insert({key: 300}));
-    assert.commandWorked(sessionCollection.insert({key: -300}));
-    assert.commandWorked(session.commitTransaction_forTesting());
-}, st.s.host, sourceCollection.getDB().getName(), sourceCollection.getName());
-commitTxnThread.start();
-hangBeforeWritingParticipantListFp.wait();
+hangBeforeWritingDecisionFp.wait();
 
 // Create other threads which will block on a prepare conflict while still holding a write ticket to
 // test that the TransactionCoordinator from preparedTxnThread can still complete.
@@ -98,7 +81,7 @@ for (let i = 0; i < kNumWriteTickets; ++i) {
 
         session.startTransaction();
         // Do a write to ensure the transaction takes a write ticket.
-        assert.commandWorked(sessionCollection.insert({key: 100}));
+        assert.commandWorked(sessionCollection.insert({key: 300}));
         // Then do a read which will block until the prepare conflict resolves.
         assert.eq({key: 200, counter: 1}, sessionCollection.findOne({key: 200}, {_id: 0}));
         assert.commandWorked(session.commitTransaction_forTesting());
@@ -114,23 +97,9 @@ assert.soon(() => {
     return ops.length >= Math.min(prepareConflictThreads.length, kNumWriteTickets);
 }, () => `Failed to find prepare conflicts in $currentOp output: ${tojson(currentOp())}`);
 
-// Allow the commitTxnThread to proceed with preparing the transaction. This tests that we skip
-// write ticket acquisition when preparing a transaction.
-hangBeforeWritingParticipantListFp.off();
-
-jsTestLog("Waiting for commitTxnThread to successfully prepare the transaction");
-hangBeforeWritingDecisionFp.wait({timesEntered: 3});
-
-// Allow both prepared transactions to proceed with committing the transaction. This tests that we
-// skip write ticket acquisition when persisting the transaction decision and committing the
-// prepared transaction.
 hangBeforeWritingDecisionFp.off();
 
-jsTestLog("Waiting for both transactions to successfully commit");
 preparedTxnThread.join();
-commitTxnThread.join();
-
-jsTestLog("Waiting for all transactional reads to complete");
 for (let thread of prepareConflictThreads) {
     thread.join();
 }

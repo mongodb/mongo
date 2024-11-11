@@ -57,7 +57,7 @@ struct DamagesOutput {
  * 'verifierFunction' is an optional parameter that, if set, will perform a check on the BSONObj
  * that is created as a result of the application of 'diff' onto 'pre'.
  */
-using VerifierFunc = std::function<void(const BSONObj& post, const BSONObj& pre)>;
+using VerifierFunc = std::function<void(const BSONObj&)>;
 BSONObj applyDiff(const BSONObj& pre,
                   const Diff& diff,
                   bool mustCheckExistenceForInsertOperations,

@@ -32,7 +32,6 @@ const knownFeatures = [
     "id",
     "normal",
     "partial",
-    "prepareUnique",
     "single",
     "sparse",
     "text",

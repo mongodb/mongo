@@ -159,11 +159,6 @@ public:
     std::reverse_iterator<PendingIterator> rend() const;
 
     /**
-     * Checks to see if RLE is possible and/or ongoing
-     */
-    bool rlePossible() const;
-
-    /**
      * Forcibly set last value so future append/skip calls may use this to construct RLE. This
      * should not be called in normal operation.
      */
@@ -274,6 +269,11 @@ private:
      */
     template <class F>
     void _appendRleEncoding(F&& writeFn);
+
+    /*
+     * Checks to see if RLE is possible and/or ongoing
+     */
+    bool _rlePossible() const;
 
     /**
      * Tests if a value would fit inside the current simple8b word using any of the selectors

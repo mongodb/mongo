@@ -1679,15 +1679,14 @@ void TransactionParticipant::Participant::unstashTransactionResources(
         // admission tickets. This scoped priority allows us to conditionally skip acquisition for
         // specific commands.
         boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
-        if (o().txnState.isPrepared() || cmdName == "prepareTransaction" ||
-            cmdName == "commitTransaction" || cmdName == "abortTransaction") {
+        if (o().txnState.isPrepared() || cmdName == "commitTransaction" ||
+            cmdName == "abortTransaction") {
             // commitTransaction and abortTransaction commands can skip ticketing mechanism as they
             // don't acquire any new storage resources (except writing to oplog) but they release
             // any claimed storage resources.
-            // Prepared transactions or attempts to prepare a transaction should not acquire ticket.
-            // Else, it can deadlock with other non-transactional operations that have exhausted the
-            // write tickets and are blocked on them due to prepare or lock conflict. See
-            // SERVER-41980 and SERVER-92292.
+            // Prepared transactions should not acquire ticket. Else, it can deadlock with other
+            // non-transactional operations that have exhausted the write tickets and are blocked on
+            // them due to prepare or lock conflict.
             admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
         }
 

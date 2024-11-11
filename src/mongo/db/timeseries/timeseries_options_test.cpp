@@ -31,8 +31,6 @@
 #include <tuple>
 #include <vector>
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/date_time/posix_time/time_parsers.hpp>
 #include <boost/move/utility_core.hpp>
 
 #include "mongo/base/string_data.h"
@@ -77,122 +75,6 @@ TEST(TimeseriesOptionsTest, RoundTimestampToGranularity) {
         auto roundedDate =
             timeseries::roundTimestampToGranularity(inputDate.getValue(), granularity);
         ASSERT_EQ(dateToISOStringUTC(roundedDate), expectedOutput);
-    }
-}
-
-TEST(TimeseriesOptionsTest, RoundTimestampBySeconds) {
-    std::vector<std::tuple<long long, std::string, std::string>> testCases{
-        {60l, "2024-08-08T00:00:00.000Z", "2024-08-08T00:00:00.000Z"},
-        {60l, "2024-08-08T00:00:00.001Z", "2024-08-08T00:00:00.000Z"},
-        {60l, "2024-08-08T00:00:15.555Z", "2024-08-08T00:00:00.000Z"},
-        {60l, "2024-08-08T00:00:30.555Z", "2024-08-08T00:00:00.000Z"},
-        {60l, "2024-08-08T00:00:45.555Z", "2024-08-08T00:00:00.000Z"},
-        {60l, "2024-08-08T00:00:59.999Z", "2024-08-08T00:00:00.000Z"},
-
-        {60l, "2024-08-08T05:04:00.000Z", "2024-08-08T05:04:00.000Z"},
-        {60l, "2024-08-08T05:04:00.001Z", "2024-08-08T05:04:00.000Z"},
-        {60l, "2024-08-08T05:04:15.555Z", "2024-08-08T05:04:00.000Z"},
-        {60l, "2024-08-08T05:04:30.555Z", "2024-08-08T05:04:00.000Z"},
-        {60l, "2024-08-08T05:04:45.555Z", "2024-08-08T05:04:00.000Z"},
-        {60l, "2024-08-08T05:04:59.999Z", "2024-08-08T05:04:00.000Z"},
-
-        {3600l, "2024-08-08T00:00:00.000Z", "2024-08-08T00:00:00.000Z"},
-        {3600l, "2024-08-08T00:00:00.001Z", "2024-08-08T00:00:00.000Z"},
-        {3600l, "2024-08-08T00:15:00.000Z", "2024-08-08T00:00:00.000Z"},
-        {3600l, "2024-08-08T00:30:00.000Z", "2024-08-08T00:00:00.000Z"},
-        {3600l, "2024-08-08T00:45:00.000Z", "2024-08-08T00:00:00.000Z"},
-        {3600l, "2024-08-08T00:59:59.999Z", "2024-08-08T00:00:00.000Z"},
-
-        {86400l, "2024-08-08T00:00:00.000Z", "2024-08-08T00:00:00.000Z"},
-        {86400l, "2024-08-08T00:00:00.001Z", "2024-08-08T00:00:00.000Z"},
-        {86400l, "2024-08-08T06:00:00.000Z", "2024-08-08T00:00:00.000Z"},
-        {86400l, "2024-08-08T12:00:00.000Z", "2024-08-08T00:00:00.000Z"},
-        {86400l, "2024-08-08T18:00:00.000Z", "2024-08-08T00:00:00.000Z"},
-        {86400l, "2024-08-08T23:59:59.999Z", "2024-08-08T00:00:00.000Z"},
-    };
-
-    for (const auto& [roundingSeconds, input, expectedOutput] : testCases) {
-        auto inputDate = dateFromISOString(input);
-        ASSERT_OK(inputDate);
-        auto roundedDate =
-            timeseries::roundTimestampBySeconds(inputDate.getValue(), roundingSeconds);
-        ASSERT_EQ(dateToISOStringUTC(roundedDate), expectedOutput);
-    }
-}
-
-TEST(TimeseriesOptionsTest, ExtendedRangeRoundTimestamp) {
-    std::vector<std::tuple<long long, std::string, std::string>> testCases{
-        {60l, "1901-01-01T00:00:12.345", "1901-01-01T00:00:00"},
-        {60l, "1901-01-01T00:04:12.345", "1901-01-01T00:04:00"},
-        {60l, "1901-01-01T02:04:12.345", "1901-01-01T02:04:00"},
-
-        {60l, "1969-01-01T00:00:12.345", "1969-01-01T00:00:00"},
-        {60l, "1969-01-01T00:04:12.345", "1969-01-01T00:04:00"},
-        {60l, "1969-01-01T02:04:12.345", "1969-01-01T02:04:00"},
-
-        {60l, "2040-01-01T00:00:12.345", "2040-01-01T00:00:00"},
-        {60l, "2040-01-01T00:04:12.345", "2040-01-01T00:04:00"},
-        {60l, "2040-01-01T02:04:12.345", "2040-01-01T02:04:00"},
-
-        {60l, "2108-01-01T00:00:12.345", "2108-01-01T00:00:00"},
-        {60l, "2108-01-01T00:04:12.345", "2108-01-01T00:04:00"},
-        {60l, "2108-01-01T02:04:12.345", "2108-01-01T02:04:00"},
-
-        {3600l, "1901-01-01T00:00:12.345", "1901-01-01T00:00:00"},
-        {3600l, "1901-01-01T00:04:12.345", "1901-01-01T00:00:00"},
-        {3600l, "1901-01-01T02:04:12.345", "1901-01-01T02:00:00"},
-
-        {3600l, "1969-01-01T00:00:12.345", "1969-01-01T00:00:00"},
-        {3600l, "1969-01-01T00:04:12.345", "1969-01-01T00:00:00"},
-        {3600l, "1969-01-01T02:04:12.345", "1969-01-01T02:00:00"},
-
-        {3600l, "2040-01-01T00:00:12.345", "2040-01-01T00:00:00"},
-        {3600l, "2040-01-01T00:04:12.345", "2040-01-01T00:00:00"},
-        {3600l, "2040-01-01T02:04:12.345", "2040-01-01T02:00:00"},
-
-        {3600l, "2108-01-01T00:00:12.345", "2108-01-01T00:00:00"},
-        {3600l, "2108-01-01T00:04:12.345", "2108-01-01T00:00:00"},
-        {3600l, "2108-01-01T02:04:12.345", "2108-01-01T02:00:00"},
-
-        {86400l, "1901-01-01T00:00:12.345", "1901-01-01T00:00:00"},
-        {86400l, "1901-01-01T00:04:12.345", "1901-01-01T00:00:00"},
-        {86400l, "1901-01-01T02:04:12.345", "1901-01-01T00:00:00"},
-
-        {86400l, "1969-01-01T00:00:12.345", "1969-01-01T00:00:00"},
-        {86400l, "1969-01-01T00:04:12.345", "1969-01-01T00:00:00"},
-        {86400l, "1969-01-01T02:04:12.345", "1969-01-01T00:00:00"},
-
-        {86400l, "2040-01-01T00:00:12.345", "2040-01-01T00:00:00"},
-        {86400l, "2040-01-01T00:04:12.345", "2040-01-01T00:00:00"},
-        {86400l, "2040-01-01T02:04:12.345", "2040-01-01T00:00:00"},
-
-        {86400l, "2108-01-01T00:00:12.345", "2108-01-01T00:00:00"},
-        {86400l, "2108-01-01T00:04:12.345", "2108-01-01T00:00:00"},
-        {86400l, "2108-01-01T02:04:12.345", "2108-01-01T00:00:00"},
-    };
-
-    // TODO SERVER-94228: Support ISO 8601 date parsing and formatting of dates prior to 1970.
-    static constexpr auto epoch = boost::posix_time::ptime(boost::gregorian::date(1970, 1, 1));
-    auto parse = [](const std::string& input) {
-        auto ptime = boost::posix_time::from_iso_extended_string(input);
-        return Date_t::fromMillisSinceEpoch((ptime - epoch).total_milliseconds());
-    };
-    auto format = [](Date_t date) {
-        boost::posix_time::milliseconds ms(date.toMillisSinceEpoch());
-        return boost::posix_time::to_iso_extended_string(epoch + ms);
-    };
-
-    for (const auto& [roundingSeconds, input, expectedOutput] : testCases) {
-        Date_t inputDate = parse(input);
-        auto roundedDate = timeseries::roundTimestampBySeconds(inputDate, roundingSeconds);
-        // We should always round down
-        ASSERT_LTE(roundedDate, inputDate);
-        // The rounding amount should be less than the rounding seconds
-        ASSERT_LT((inputDate - roundedDate).count(), roundingSeconds * 1000);
-        // Ensure that we've rounded to an even number according to our rounding seconds
-        ASSERT_EQ(durationCount<Seconds>(roundedDate.toDurationSinceEpoch()) % roundingSeconds, 0);
-        // Validate the expected output
-        ASSERT_EQ(format(roundedDate), expectedOutput);
     }
 }
 

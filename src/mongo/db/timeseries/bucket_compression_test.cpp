@@ -170,24 +170,5 @@ TEST(TimeseriesBucketCompression, CannotDecompressUncompressedBucket) {
     ASSERT_FALSE(decompressed.has_value());
 }
 
-TEST(TimeseriesBucketCompression, CompressAlreadyCompressedBucket) {
-    // Compressing an already compressed bucket is a noop, should return the same compressed bucket
-    // untouched.
-    auto compressed = timeseries::compressBucket(
-        sampleBucket, "t"_sd, NamespaceString::createNamespaceString_forTest("test.foo"), false);
-    ASSERT_TRUE(compressed.compressedBucket.has_value());
-    auto res =
-        timeseries::compressBucket(*compressed.compressedBucket,
-                                   "t"_sd,
-                                   NamespaceString::createNamespaceString_forTest("test.foo"),
-                                   false);
-    ASSERT_TRUE(res.compressedBucket.has_value());
-    ASSERT_EQ(compressed.compressedBucket->objsize(), res.compressedBucket->objsize());
-    ASSERT_EQ(memcmp(compressed.compressedBucket->objdata(),
-                     res.compressedBucket->objdata(),
-                     compressed.compressedBucket->objsize()),
-              0);
-}
-
 }  // namespace
 }  // namespace mongo

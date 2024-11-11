@@ -54,13 +54,9 @@ void logWriteConflictAndBackoff(size_t attempt,
                                 StringData operation,
                                 StringData reason,
                                 const NamespaceStringOrUUID& nssOrUUID) {
-
-    auto severity = ((attempt != 0) && ((attempt % 1000) == 0)) ? logv2::LogSeverity::Info()
-                                                                : logv2::LogSeverity::Debug(1);
-
     logAndBackoff(4640401,
                   logv2::LogComponent::kWrite,
-                  severity,
+                  logv2::LogSeverity::Debug(1),
                   static_cast<size_t>(attempt),
                   "Caught WriteConflictException",
                   "operation"_attr = operation,

@@ -733,8 +733,6 @@ last-continuous:
     ticket: SERVER-91195
   - test_file: jstests/change_streams/timeseries.js
     ticket: SERVER-91195
-  - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
-    ticket: SERVER-92292
   - test_file: jstests/core/query/project/projection_with_hashed_index.js
     ticket: SERVER-91757
   - test_file: jstests/sharding/sharded_data_distribution.js
@@ -1548,8 +1546,6 @@ last-lts:
     ticket: SERVER-91195
   - test_file: jstests/change_streams/timeseries.js
     ticket: SERVER-91195
-  - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
-    ticket: SERVER-92292
   - test_file: jstests/core/query/project/projection_with_hashed_index.js
     ticket: SERVER-91757
   - test_file: jstests/sharding/sharded_data_distribution.js
