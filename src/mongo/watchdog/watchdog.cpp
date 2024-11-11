@@ -157,16 +157,13 @@ void WatchdogPeriodicThread::setPeriod(Milliseconds period) {
 }
 
 void WatchdogPeriodicThread::doLoop() {
-    Client::initThread(_threadName,
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-    Client* client = &cc();
-
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*client);
-        client->setSystemOperationUnkillableByStepdown(lk);
-    }
+    Client::initThread(_threadName,
+                       getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                       Client::noSession(),
+                       ClientOperationKillableByStepdown{false});
 
+    Client* client = &cc();
     auto preciseClockSource = client->getServiceContext()->getPreciseClockSource();
 
     {

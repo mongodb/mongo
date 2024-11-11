@@ -554,15 +554,11 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksS
 
     return ExecutorFuture<void>(_executor)
         .then([=, this]() {
-            ThreadClient tc("ShardServerCatalogCacheLoader::getChunksSince",
-                            getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-            auto context = _contexts.makeOperationContext(*tc);
-
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
+            ThreadClient tc("ShardServerCatalogCacheLoader::getChunksSince",
+                            getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                            ClientOperationKillableByStepdown{false});
+            auto context = _contexts.makeOperationContext(*tc);
 
             {
                 // We may have missed an OperationContextGroup interrupt since this operation
@@ -596,15 +592,11 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoader::getDatabase(const Databa
 
     return ExecutorFuture<void>(_executor)
         .then([this, dbName, isPrimary = isPrimary, term = term]() {
-            ThreadClient tc("ShardServerCatalogCacheLoader::getDatabase",
-                            getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-            auto context = _contexts.makeOperationContext(*tc);
-
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
+            ThreadClient tc("ShardServerCatalogCacheLoader::getDatabase",
+                            getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                            ClientOperationKillableByStepdown{false});
+            auto context = _contexts.makeOperationContext(*tc);
 
             {
                 // We may have missed an OperationContextGroup interrupt since this operation began
@@ -1128,16 +1120,12 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(
 }
 
 void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString& nss) {
-    ThreadClient tc("ShardServerCatalogCacheLoader::runCollAndChunksTasks",
-                    getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-    auto context = _contexts.makeOperationContext(*tc);
-
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
+    ThreadClient tc("ShardServerCatalogCacheLoader::runCollAndChunksTasks",
+                    getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                    ClientOperationKillableByStepdown{false});
 
+    auto context = _contexts.makeOperationContext(*tc);
     bool taskFinished = false;
     bool inShutdown = false;
     try {
@@ -1209,15 +1197,11 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
 }
 
 void ShardServerCatalogCacheLoader::_runDbTasks(const DatabaseName& dbName) {
-    ThreadClient tc("ShardServerCatalogCacheLoader::runDbTasks",
-                    getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-    auto context = _contexts.makeOperationContext(*tc);
-
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
+    ThreadClient tc("ShardServerCatalogCacheLoader::runDbTasks",
+                    getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                    ClientOperationKillableByStepdown{false});
+    auto context = _contexts.makeOperationContext(*tc);
 
     bool taskFinished = false;
     bool inShutdown = false;

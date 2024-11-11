@@ -122,17 +122,11 @@ SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunks
 
     return ExecutorFuture<void>(_executor)
         .then([=]() {
-            ThreadClient tc("ConfigServerCatalogCacheLoader::getChunksSince",
-                            getGlobalServiceContext()->getService());
-
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
-
+            ThreadClient tc("ConfigServerCatalogCacheLoader::getChunksSince",
+                            getGlobalServiceContext()->getService(),
+                            ClientOperationKillableByStepdown{false});
             auto opCtx = tc->makeOperationContext();
-
             return getChangedChunks(opCtx.get(), nss, version);
         })
         .semi();
@@ -141,14 +135,10 @@ SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunks
 SemiFuture<DatabaseType> ConfigServerCatalogCacheLoader::getDatabase(const DatabaseName& dbName) {
     return ExecutorFuture<void>(_executor)
         .then([dbName] {
-            ThreadClient tc("ConfigServerCatalogCacheLoader::getDatabase",
-                            getGlobalServiceContext()->getService());
-
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
+            ThreadClient tc("ConfigServerCatalogCacheLoader::getDatabase",
+                            getGlobalServiceContext()->getService(),
+                            ClientOperationKillableByStepdown{false});
 
             auto opCtx = tc->makeOperationContext();
             return Grid::get(opCtx.get())

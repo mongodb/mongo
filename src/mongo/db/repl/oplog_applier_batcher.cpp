@@ -333,15 +333,12 @@ void OplogApplierBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBu
 }
 
 void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
+    // The OplogApplierBatcher's thread has its own shutdown sequence triggered by the
+    // OplogApplier, so we don't want it to be killed in other ways.
     Client::initThread("ReplBatcher",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-
-    {
-        // The OplogApplierBatcher's thread has its own shutdown sequence triggered by the
-        // OplogApplier, so we don't want it to be killed in other ways.
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
+                       getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                       Client::noSession(),
+                       ClientOperationKillableByStepdown{false});
 
     BatchLimits batchLimits;
 

@@ -217,7 +217,7 @@ public:
         threadPoolOptions.threadNamePrefix = "TestReshardOplogBatchApplier-";
         threadPoolOptions.poolName = "TestReshardOplogBatchApplierThreadPool";
         threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
+            Client::initThread(threadName, getGlobalServiceContext()->getService());
             auto* client = Client::getCurrent();
             AuthorizationSession::get(*client)->grantInternalAuthorization();
         };

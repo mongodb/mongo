@@ -309,17 +309,12 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
     CancelableOperationContextFactory factory) {
     return ExecutorFuture(executor)
         .then([this, executor, cancelToken, factory] {
+            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             ThreadClient client(fmt::format("OplogFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
-                                _service()->getService(ClusterRole::ShardServer));
-
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*client.get());
-                client.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
-
+                                _service()->getService(ClusterRole::ShardServer),
+                                ClientOperationKillableByStepdown{false});
             return iterate(client.get(), factory);
         })
         .then([executor, cancelToken](bool moreToCome) {
@@ -474,19 +469,14 @@ bool ReshardingOplogFetcher::consume(Client* client,
             _env->metrics()->onBatchRetrievedDuringOplogFetching(
                 Milliseconds(batchFetchTimer.millis()));
 
+            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
                                 _service()->getService(ClusterRole::ShardServer),
-                                nullptr);
+                                ClientOperationKillableByStepdown{false});
             auto opCtxRaii = factory.makeOperationContext(client.get());
             auto opCtx = opCtxRaii.get();
-
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*client.get());
-                client.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
 
             // Noting some possible optimizations:
             //

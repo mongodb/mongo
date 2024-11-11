@@ -305,14 +305,12 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
                             session.kill(ErrorCodes::InterruptedAtShutdown));
     });
 
+    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     auto newClient = opCtx->getServiceContext()
                          ->getService(ClusterRole::RouterServer)
-                         ->makeClient("ImplicitlyAbortTxnAtShutdown");
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<mongo::Client> lk(*newClient.get());
-        newClient.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
+                         ->makeClient("ImplicitlyAbortTxnAtShutdown",
+                                      Client::noSession(),
+                                      ClientOperationKillableByStepdown{false});
     AlternativeClientRegion acr(newClient);
 
     Status shutDownStatus(ErrorCodes::InterruptedAtShutdown,
@@ -376,15 +374,13 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         // This client initiation pattern is only to be used here, with plans to eliminate this
         // pattern down the line.
         if (!haveClient()) {
-            Client::initThread(getThreadName(),
-                               serviceContext->getService(ClusterRole::RouterServer));
-
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(cc());
-                cc().setSystemOperationUnkillableByStepdown(lk);
-            }
+            Client::initThread(getThreadName(),
+                               serviceContext->getService(ClusterRole::RouterServer),
+                               Client::noSession(),
+                               ClientOperationKillableByStepdown{false});
         }
+
         Client& client = cc();
 
         ServiceContext::UniqueOperationContext uniqueTxn;
@@ -749,13 +745,10 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                                                   &startupInfoBuilder);
         });
 
-    ThreadClient tc("mongosMain", serviceContext->getService(ClusterRole::RouterServer));
-
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
+    ThreadClient tc("mongosMain",
+                    serviceContext->getService(ClusterRole::RouterServer),
+                    ClientOperationKillableByStepdown{false});
 
     logMongosVersionInfo(nullptr);
 

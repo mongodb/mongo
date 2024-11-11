@@ -82,14 +82,8 @@ ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
                 return;
             }
 
-            ThreadClient tc(taskInfo->service);
-
             // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
-
+            ThreadClient tc(taskInfo->service, ClientOperationKillableByStepdown{false});
             auto opCtxHolder = tc->makeOperationContext();
 
             cancelStatusAtTaskBegin = [&] {

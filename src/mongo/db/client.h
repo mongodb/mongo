@@ -112,9 +112,11 @@ public:
      * If `session` is non-null, then it will be used to augment the thread name
      * and for reporting purposes. Its ref count will be bumped by this Client.
      */
-    static void initThread(StringData desc,
-                           Service* service,
-                           std::shared_ptr<transport::Session> session = noSession());
+    static void initThread(
+        StringData desc,
+        Service* service,
+        std::shared_ptr<transport::Session> session = noSession(),
+        ClientOperationKillableByStepdown killable = ClientOperationKillableByStepdown{true});
 
     /**
      * Moves client into the thread_local for this thread. After this call, Client::getCurrent
@@ -255,48 +257,15 @@ public:
         return _uuid;
     }
 
-    /**
-     * Used to mark system operations that are not allowed to be killed by the stepdown
-     * thread. This should only be called once per Client and only from system connections. The
-     * Client should be locked by the caller. We should minimize the usage of this function because
-     * improper usage could lead to a deadlock. More context comes as follows.
-     *
-     * How does this kill operation process work?
-     * To be more clear, the kill operation is actually an interruption. In order to get the RSTL
-     * lock during stepUp/stepDown, the replication coordinator will start a RstlKillOpThread to
-     * interrupt all threads that may block it for the RSTL lock. The RstlKillOpThread will loop
-     * through all threads and find out the threads that have ever taken a global lock in S/X/IX
-     * mode. It will interrupt these threads by interrupting their opCtx, which will cause an
-     * InterruptedDueToReplStateChange error to be thrown when the thread checks interruption on the
-     * opCtx. In addition to those threads hold global locks, a thread could also be interrupted if
-     * it is explicitly marked as alwaysInterruptAtStepDownOrUp or waiting on prepare conflicts.
-     *
-     * What should I consider if I introduced a new thread?
-     * - Whether the new thread ever takes any global lock in S/IX/X mode? If not, the stepdown
-     *   thread won't interrupt the new thread so we should leave it as killable. Even if the thread
-     *   takes global lock, the best practice should be making the new thread killable and handle
-     *   the interruption properly.
-     * - It's always better to write the code in a way that can catch the
-     *   InterruptedDueToReplStateChange error and recover from there. This helps make the thread
-     *   killable in a safer way and can prevent deadlock from unkillable thread.
-     * - If the thread has to be unkillable, it would be helpful to leave the reason in a comment so
-     *   if it becomes an issue, it will be easier to find the cause.
-     */
-    void setSystemOperationUnkillableByStepdown(WithLock) {
-        // This can only be changed once for system operations.
-        invariant(isFromSystemConnection());
-        invariant(_systemOperationKillable);
-        _systemOperationKillable = false;
+    void setOperationUnkillable_ForTest() {
+        _operationKillable = ClientOperationKillableByStepdown{false};
     }
 
     /**
-     * Used to determine whether a system operation is allowed to be killed by the stepdown thread.
-     * The Client should be locked by the caller.
+     * Used to determine whether an operation is allowed to be killed by the stepdown thread.
      */
-    bool canKillSystemOperationInStepdown(WithLock) const {
-        // Should only be called on system operations.
-        invariant(isFromSystemConnection());
-        return _systemOperationKillable;
+    bool canKillOperationInStepdown() const {
+        return static_cast<bool>(_operationKillable);
     }
 
     PseudoRandom& getPrng() {
@@ -418,7 +387,10 @@ private:
     friend class ServiceContext;
     friend class ThreadClient;
 
-    Client(std::string desc, Service* service, std::shared_ptr<transport::Session> session);
+    Client(std::string desc,
+           Service* service,
+           std::shared_ptr<transport::Session> session,
+           ClientOperationKillableByStepdown killable);
 
     /**
      * Sets the active operation context on this client to "opCtx".
@@ -445,7 +417,7 @@ private:
     OperationContext* _opCtx = nullptr;
 
     // If the active system client operation is allowed to be killed.
-    bool _systemOperationKillable = true;
+    ClientOperationKillableByStepdown _operationKillable{true};
 
     PseudoRandom _prng;
 
@@ -481,29 +453,43 @@ private:
  */
 class ThreadClient {
 public:
+    using Killable = ClientOperationKillableByStepdown;
+
     /**
-     * The overload set for this constructor bears some explanation.
-     * The primary fully-populated parameter list is:
-     *     StringData desc
-     *     Service* service
-     *     std::shared_ptr<transport::Session> session
-     *
-     * However, a full set of 2 variations on this constructor are accepted.
-     *
-     * A) The `desc` can be omitted, and will default to `getThreadName()`.
-     *
-     * B) The `session` can be omitted, and will default to `Client::noSession()`.
+     * Only the Service pointer is a required parameter. All other parameters are optional and will
+     * take defaults specified below.
      */
-    ThreadClient(StringData desc, Service* service, std::shared_ptr<transport::Session> session);
+    ThreadClient(StringData desc,
+                 Service* service,
+                 std::shared_ptr<transport::Session> session,
+                 Killable killable);
 
-    /** A) Repeat, with `desc` omitted. */
+    /**
+     * If the thread's description is not specified, default it to the thread's existing name.
+     */
+    explicit ThreadClient(Service* service) : ThreadClient{getThreadName(), service} {}
+    ThreadClient(Service* service, Killable killable)
+        : ThreadClient{getThreadName(), service, killable} {}
     ThreadClient(Service* service, std::shared_ptr<transport::Session> session)
-        : ThreadClient(getThreadName(), service, std::move(session)) {}
+        : ThreadClient{getThreadName(), service, std::move(session)} {}
+    ThreadClient(Service* service, std::shared_ptr<transport::Session> session, Killable killable)
+        : ThreadClient{getThreadName(), service, std::move(session), killable} {}
 
-    /** B) Repeat all previous constructors, with `session` omitted. */
+    /**
+     * Then, if the session pointer is not specified, default it to the sentinel value for no
+     * session.
+     */
     ThreadClient(StringData desc, Service* service)
         : ThreadClient{desc, service, Client::noSession()} {}
-    explicit ThreadClient(Service* service) : ThreadClient{service, Client::noSession()} {}
+    ThreadClient(StringData desc, Service* service, Killable killable)
+        : ThreadClient{desc, service, Client::noSession(), killable} {}
+
+    /**
+     * Then, if it's not specified whether the client's operation should be killable, default it to
+     * true.
+     */
+    ThreadClient(StringData desc, Service* service, std::shared_ptr<transport::Session> session)
+        : ThreadClient{desc, service, std::move(session), Killable{true}} {}
 
     ~ThreadClient();
     ThreadClient(const ThreadClient&) = delete;

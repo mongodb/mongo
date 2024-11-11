@@ -2711,16 +2711,12 @@ namespace {
 
 template <typename Func>
 void runOnAlternateContext(OperationContext* opCtx, std::string name, Func func) {
-    auto newClient =
-        opCtx->getServiceContext()->getService(ClusterRole::ShardServer)->makeClient(name);
-
     // The cleanup doesn't involve WT operations, and notifies the primary with a networking
     // message, it's safe and better to keep it unkillable.
-    {
-        stdx::lock_guard<Client> lk(*newClient.get());
-        newClient.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
+    auto newClient =
+        opCtx->getServiceContext()
+            ->getService(ClusterRole::ShardServer)
+            ->makeClient(name, Client::noSession(), ClientOperationKillableByStepdown{false});
     AlternativeClientRegion acr(newClient);
     const auto newCtx = cc().makeOperationContext();
     func(newCtx.get());

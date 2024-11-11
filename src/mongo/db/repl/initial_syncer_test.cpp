@@ -413,7 +413,7 @@ protected:
         dbThreadPoolOptions.minThreads = 1U;
         dbThreadPoolOptions.maxThreads = 1U;
         dbThreadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
+            Client::initThread(threadName, getGlobalServiceContext()->getService());
         };
         _dbWorkThreadPool = std::make_unique<ThreadPool>(dbThreadPoolOptions);
         _dbWorkThreadPool->startup();
@@ -473,7 +473,7 @@ protected:
         threadPoolOptions.minThreads = 1U;
         threadPoolOptions.maxThreads = 1U;
         threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
+            Client::initThread(threadName, getGlobalServiceContext()->getService());
         };
 
         auto dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();

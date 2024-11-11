@@ -272,7 +272,7 @@ private:
 
     void subthread(int x) override {
         std::string threadName = (str::stream() << "ticketHolder" << x);
-        Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
+        Client::initThread(threadName, getGlobalServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
         MockAdmissionContext admCtx;
 

@@ -272,16 +272,10 @@ private:
                   "Updating shard identity config string with confirmed replica set",
                   "connectionString"_attr = update);
 
-
-            ThreadClient tc("updateShardIdentityConfigString",
-                            _serviceContext->getService(ClusterRole::ShardServer));
-
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
-
+            ThreadClient tc("updateShardIdentityConfigString",
+                            _serviceContext->getService(ClusterRole::ShardServer),
+                            ClientOperationKillableByStepdown{false});
             auto opCtx = tc->makeOperationContext();
             ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(), update);
         } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {

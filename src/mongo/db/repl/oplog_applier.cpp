@@ -189,14 +189,11 @@ std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount,
     options.maxThreads = static_cast<size_t>(threadCount);
     options.onCreateThread = [isKillableByStepdown](const std::string&) {
         Client::initThread(getThreadName(),
-                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+                           getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                           Client::noSession(),
+                           ClientOperationKillableByStepdown{isKillableByStepdown});
         auto client = Client::getCurrent();
         AuthorizationSession::get(*client)->grantInternalAuthorization();
-
-        if (!isKillableByStepdown) {
-            stdx::lock_guard<Client> lk(*client);
-            client->setSystemOperationUnkillableByStepdown(lk);
-        }
     };
     auto pool = std::make_unique<ThreadPool>(options);
     pool->startup();

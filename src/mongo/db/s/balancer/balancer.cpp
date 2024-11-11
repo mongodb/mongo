@@ -1018,16 +1018,12 @@ void Balancer::_mainThread() {
         _joinCond.notify_all();
     });
 
-    ThreadClient threadClient("Balancer",
-                              getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-    auto opCtx = threadClient->makeOperationContext();
-
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*threadClient);
-        threadClient->setSystemOperationUnkillableByStepdown(lk);
-    }
+    ThreadClient threadClient("Balancer",
+                              getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                              ClientOperationKillableByStepdown{false});
 
+    auto opCtx = threadClient->makeOperationContext();
     auto shardingContext = Grid::get(opCtx.get());
 
     LOGV2(21856, "CSRS balancer is starting");

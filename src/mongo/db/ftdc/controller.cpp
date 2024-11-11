@@ -215,14 +215,11 @@ void FTDCController::stop() {
 
 void FTDCController::doLoop(Service* service) try {
     // Note: All exceptions thrown in this loop are considered process fatal.
-    Client::initThread(kFTDCThreadName, service);
-    Client* client = &cc();
-
+    //
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*client);
-        client->setSystemOperationUnkillableByStepdown(lk);
-    }
+    Client::initThread(
+        kFTDCThreadName, service, Client::noSession(), ClientOperationKillableByStepdown{false});
+    Client* client = &cc();
 
     // Update config
     {

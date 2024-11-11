@@ -138,14 +138,11 @@ void RouterUptimeReporter::startPeriodicThread(ServiceContext* serviceContext) {
     Date_t created = jsTime();
 
     _thread = stdx::thread([serviceContext, created] {
-        Client::initThread("Uptime-reporter",
-                           serviceContext->getService(ClusterRole::RouterServer));
-
         // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(cc());
-            cc().setSystemOperationUnkillableByStepdown(lk);
-        }
+        Client::initThread("Uptime-reporter",
+                           serviceContext->getService(ClusterRole::RouterServer),
+                           Client::noSession(),
+                           ClientOperationKillableByStepdown{false});
 
         auto opCtx = cc().makeOperationContext();
         const std::string hostName(getHostNameCached());

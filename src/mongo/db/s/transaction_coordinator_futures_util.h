@@ -119,14 +119,10 @@ public:
                             uassertStatusOK(args.status);
                         }
 
-                        ThreadClient tc("TransactionCoordinator",
-                                        _serviceContext->getService(ClusterRole::ShardServer));
-
                         // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-                        {
-                            stdx::lock_guard<Client> lk(*tc.get());
-                            tc.get()->setSystemOperationUnkillableByStepdown(lk);
-                        }
+                        ThreadClient tc("TransactionCoordinator",
+                                        _serviceContext->getService(ClusterRole::ShardServer),
+                                        ClientOperationKillableByStepdown{false});
 
                         auto uniqueOpCtxIter = [&] {
                             stdx::lock_guard lk(_mutex);

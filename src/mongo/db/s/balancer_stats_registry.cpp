@@ -119,14 +119,10 @@ void BalancerStatsRegistry::onStepUpComplete(OperationContext* opCtx, long long 
 void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
     ExecutorFuture<void>(_threadPool)
         .then([this] {
-            ThreadClient tc("BalancerStatsRegistry::asynchronousInitialization",
-                            getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
+            ThreadClient tc("BalancerStatsRegistry::asynchronousInitialization",
+                            getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                            ClientOperationKillableByStepdown{false});
 
             {
                 stdx::lock_guard lk{_stateMutex};

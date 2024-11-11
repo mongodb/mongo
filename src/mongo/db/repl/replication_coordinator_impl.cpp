@@ -2948,11 +2948,11 @@ void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
     invariant(serviceCtx);
 
     for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
-        ClientLock lk(client);
-        if (client->isFromSystemConnection() && !client->canKillSystemOperationInStepdown(lk)) {
+        if (!client->canKillOperationInStepdown()) {
             continue;
         }
 
+        ClientLock lk(client);
         OperationContext* toKill = client->getOperationContext();
 
         // Don't kill step up/step down thread.
@@ -3044,14 +3044,9 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_startKillOpThrea
 
 void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn() {
     Client::initThread("RstlKillOpThread",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-
-    invariant(!cc().isFromUserConnection());
-
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
+                       getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                       Client::noSession(),
+                       ClientOperationKillableByStepdown{false});
 
     LOGV2(21343, "Starting to kill user operations");
     auto uniqueOpCtx = cc().makeOperationContext();

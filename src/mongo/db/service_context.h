@@ -310,6 +310,42 @@ private:
     boost::optional<GlobalInitializerRegisterer> _registerer;
 };
 
+
+/**
+ * Used to mark operations that are not allowed to be killed by the stepdown thread.
+ *
+ * Do not add any new uses of unkillable operations without very careful deliberation. Improper
+ * usage could lead to a deadlock, and plans are in place via SERVER-74658 to make as many
+ * operations as possible killable.
+ *
+ * How does the operation killing process work?
+ *   To be clear, an operation kill is actually an interruption. In order to get the RSTL lock
+ *   lock during stepUp/stepDown, the replication coordinator will start a RstlKillOpThread to
+ *   interrupt all threads that may block it for the RSTL lock. The RstlKillOpThread will loop
+ *   through all threads and find out the threads that have ever taken a global lock in S/X/IX
+ *   mode. It will interrupt these threads by interrupting their opCtx. Interrupting their opCtx
+ *   will cause an InterruptedDueToReplStateChange error to be thrown when the thread checks for
+ *   interruption on that opCtx.
+ *
+ *   In addition to threads holding global locks, a thread could also be interrupted if it:
+ *   - is explicitly marked as alwaysInterruptAtStepDownOrUp, or if it
+ *   - is waiting on prepare conflicts.
+ *
+ * What should I consider if I want to introduce a new thread?
+ *   Does the new thread ever take any global lock in S/IX/X mode? If not, the stepdown thread
+ *   won't interrupt the new thread, so we should leave it as killable. Even if the thread takes
+ *   takes the global lock, the best practice should still be making the new thread killable and
+ *   handling the interruption properly. It's always better to write the code in a way that can
+ *   catch the InterruptedDueToReplStateChange error and recover from there, to avoid locking
+ *   issues.
+ *
+ *   If the thread has to be unkillable, a comment must be left explaining the reason. This will
+ *   help future diagnosability.
+ *
+ * TODO(SERVER-74658): Remove this type if all theads are found to be killable.
+ */
+enum class ClientOperationKillableByStepdown : bool {};
+
 /**
  * Class representing the context of a service, such as a MongoD database service or
  * a MongoS routing service.
@@ -482,6 +518,7 @@ public:
     /** Internal: Called by Service->makeClient. */
     UniqueClient makeClientForService(std::string desc,
                                       std::shared_ptr<transport::Session> session,
+                                      ClientOperationKillableByStepdown killable,
                                       Service* service);
 
     /**
@@ -878,9 +915,11 @@ public:
      *
      * If supplied, "session" is the transport::Session used for communicating with the client.
      */
-    ServiceContext::UniqueClient makeClient(std::string desc,
-                                            std::shared_ptr<transport::Session> session = nullptr) {
-        return _sc->makeClientForService(std::move(desc), std::move(session), this);
+    ServiceContext::UniqueClient makeClient(
+        std::string desc,
+        std::shared_ptr<transport::Session> session = nullptr,
+        ClientOperationKillableByStepdown killable = ClientOperationKillableByStepdown{true}) {
+        return _sc->makeClientForService(std::move(desc), std::move(session), killable, this);
     }
 
     static UniqueService make(ServiceContext* sc, ClusterRole role);

@@ -379,7 +379,7 @@ public:
         threadPoolOptions.threadNamePrefix = "PrimaryOnlyServiceTest-";
         threadPoolOptions.poolName = "PrimaryOnlyServiceTestThreadPool";
         threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
+            Client::initThread(threadName, getGlobalServiceContext()->getService());
         };
 
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();

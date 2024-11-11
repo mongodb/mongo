@@ -228,8 +228,12 @@ void onCreate(T* object, const ObserversContainer& observers) {
 }  // namespace
 
 ServiceContext::UniqueClient ServiceContext::makeClientForService(
-    std::string desc, std::shared_ptr<transport::Session> session, Service* service) {
-    std::unique_ptr<Client> client(new Client(std::move(desc), service, std::move(session)));
+    std::string desc,
+    std::shared_ptr<transport::Session> session,
+    ClientOperationKillableByStepdown killable,
+    Service* service) {
+    std::unique_ptr<Client> client(
+        new Client(std::move(desc), service, std::move(session), killable));
     onCreate(client.get(), _clientObservers);
     auto entry = _clientsList.add(client.get());
     {

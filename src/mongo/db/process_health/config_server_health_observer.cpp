@@ -212,16 +212,14 @@ Future<ConfigServerHealthObserver::CheckResult> ConfigServerHealthObserver::_che
     auto checkCtx =
         std::make_shared<CheckContext>(std::move(periodicCheckContext.cancellationToken));
     checkCtx->taskExecutor = periodicCheckContext.taskExecutor;
-    checkCtx->client =
-        _svcCtx->getService(ClusterRole::RouterServer)->makeClient("ConfigServerHealthObserver");
-    checkCtx->opCtx = checkCtx->client->makeOperationContext();
-    checkCtx->opCtx->setDeadlineAfterNowBy(kObserverTimeout, ErrorCodes::ExceededTimeLimit);
 
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*checkCtx->client.get());
-        checkCtx->client.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
+    checkCtx->client = _svcCtx->getService(ClusterRole::RouterServer)
+                           ->makeClient("ConfigServerHealthObserver",
+                                        Client::noSession(),
+                                        ClientOperationKillableByStepdown{false});
+    checkCtx->opCtx = checkCtx->client->makeOperationContext();
+    checkCtx->opCtx->setDeadlineAfterNowBy(kObserverTimeout, ErrorCodes::ExceededTimeLimit);
 
     LOGV2_DEBUG(5939001, 3, "Checking Config server health");
 

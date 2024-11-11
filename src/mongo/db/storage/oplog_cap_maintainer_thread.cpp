@@ -189,12 +189,10 @@ void OplogCapMaintainerThread::_run() {
     setThreadName(name);
 
     LOGV2_DEBUG(5295000, 1, "Oplog cap maintainer thread started", "threadName"_attr = name);
-    ThreadClient tc(name, getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
+    ThreadClient tc(name,
+                    getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                    Client::noSession(),
+                    ClientOperationKillableByStepdown{false});
 
     ServiceContext::UniqueOperationContext opCtx;
     while (true) {
@@ -232,7 +230,7 @@ void OplogCapMaintainerThread::_run() {
                 LOGV2_FATAL_NOTRACE(
                     6761100, "Error in OplogCapMaintainerThread", "error"_attr = err);
             }
-            // Since we set setSystemOperationUnkillableByStepdown(), the opCtx can't be interrupted
+            // Since we make this operation unkillable by stepdown, the opCtx can't be interrupted
             // by repl state transitions - stepdown, stepup, and rollback.
             // It can only be interrupted by shutdown, killOp, or storage change
             // (causes ErrorCodes::InterruptedDueToStorageChange) due to FCBIS. The shutdown case is

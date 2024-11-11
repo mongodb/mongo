@@ -189,13 +189,10 @@ auto makeThreadPool(const std::string& poolName, const std::string& threadName) 
     threadPoolOptions.threadNamePrefix = threadName + "-";
     threadPoolOptions.poolName = poolName;
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str(),
-                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-
-        {
-            stdx::lock_guard<Client> lk(cc());
-            cc().setSystemOperationUnkillableByStepdown(lk);
-        }
+        Client::initThread(threadName,
+                           getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                           Client::noSession(),
+                           ClientOperationKillableByStepdown{false});
 
         AuthorizationSession::get(cc())->grantInternalAuthorization();
     };

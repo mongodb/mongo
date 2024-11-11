@@ -152,17 +152,13 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
 }
 
 void ProgressMonitor::_progressMonitorLoop() {
+    // TODO(SERVER-74659): Please revisit if this thread could be made killable.
     Client::initThread("FaultManagerProgressMonitor"_sd,
                        _svcCtx->getService(ClusterRole::RouterServer),
-                       Client::noSession());
+                       Client::noSession(),
+                       ClientOperationKillableByStepdown{false});
+
     static const int kSleepsPerInterval = 10;
-
-    // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
-
     while (!_terminate.load()) {
         progressMonitorCheck(_crashCb);
 

@@ -50,7 +50,7 @@ auto makeTaskExecutor() {
     tpOptions.poolName = "OCSPManagerHTTP";
     tpOptions.maxThreads = 10;
     tpOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
+        Client::initThread(threadName, getGlobalServiceContext()->getService());
     };
     return std::make_unique<ThreadPool>(tpOptions);
 }

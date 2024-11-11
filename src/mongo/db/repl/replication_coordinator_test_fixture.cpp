@@ -136,10 +136,8 @@ void ReplCoordTest::addSelf(const HostAndPort& selfHost) {
 void ReplCoordTest::init() {
     invariant(!_repl);
     invariant(!_callShutdown);
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
+    cc().setOperationUnkillable_ForTest();
+
     auto service = getGlobalServiceContext();
     _storageInterface = new StorageInterfaceMock();
     StorageInterface::set(service, std::unique_ptr<StorageInterface>(_storageInterface));
@@ -182,10 +180,10 @@ void ReplCoordTest::init() {
     _externalState = externalState.get();
     executor::ThreadPoolMock::Options tpOptions;
     tpOptions.onCreateThread = []() {
-        Client::initThread("replexec", getGlobalServiceContext()->getService());
-
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
+        Client::initThread("replexec",
+                           getGlobalServiceContext()->getService(),
+                           Client::noSession(),
+                           ClientOperationKillableByStepdown{false});
     };
     auto pool = std::make_unique<executor::ThreadPoolMock>(_net, seed, tpOptions);
     auto replExec = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));

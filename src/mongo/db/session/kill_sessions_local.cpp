@@ -216,17 +216,16 @@ void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx) {
 
 void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
     // Create a new opCtx because we need an empty locker to refresh the locks.
-    auto newClient = opCtx->getServiceContext()
-                         ->getService(ClusterRole::ShardServer)
-                         ->makeClient("prepared-txns-yield-locks");
-
+    //
     // When checking out sessions below, the opCtx can hold the global lock acquired by the prepared
     // transaction, making it a target by the repl killOp thread. The input opCtx is already
     // unkillable so we just mark this one also unkillable to avoid crash.
-    {
-        stdx::lock_guard<Client> lk(*newClient.get());
-        newClient.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
+    auto newClient = opCtx->getServiceContext()
+                         ->getService(ClusterRole::ShardServer)
+                         ->makeClient("prepared-txns-yield-locks",
+                                      Client::noSession(),
+                                      ClientOperationKillableByStepdown{false});
+
 
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();

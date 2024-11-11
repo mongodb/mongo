@@ -430,12 +430,9 @@ void ApplyBatchFinalizerForJournal::record(const OpTimeAndWallTime& newOpTimeAnd
 
 void ApplyBatchFinalizerForJournal::_run() {
     Client::initThread("ApplyBatchFinalizerForJournal",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
+                       getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                       Client::noSession(),
+                       ClientOperationKillableByStepdown{false});
 
     while (true) {
         {

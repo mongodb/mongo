@@ -120,14 +120,10 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(
                 if (!data["useUninterruptibleSleep"].eoo()) {
                     failpoint.pauseWhileSet();
                 } else {
-                    ThreadClient tc(failPointName, service->getService(ClusterRole::ShardServer));
-
                     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-                    {
-                        stdx::lock_guard<Client> lk(*tc.get());
-                        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-                    }
-
+                    ThreadClient tc(failPointName,
+                                    service->getService(ClusterRole::ShardServer),
+                                    ClientOperationKillableByStepdown{false});
                     auto opCtx = tc->makeOperationContext();
                     failpoint.pauseWhileSet(opCtx.get());
                 }

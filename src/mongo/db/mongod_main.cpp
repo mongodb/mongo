@@ -470,13 +470,11 @@ void logMongodStartupTimeElapsedStatistics(ServiceContext* serviceContext,
 // of the initialization steps within.  If you add or change any of these steps, make sure
 // any necessary changes are also made to File Copy Based Initial Sync.
 ExitCode _initAndListen(ServiceContext* serviceContext) {
-    Client::initThread("initandlisten", serviceContext->getService(ClusterRole::ShardServer));
-
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
+    Client::initThread("initandlisten",
+                       serviceContext->getService(ClusterRole::ShardServer),
+                       Client::noSession(),
+                       ClientOperationKillableByStepdown{false});
 
     BSONObjBuilder startupTimeElapsedBuilder;
     BSONObjBuilder startupInfoBuilder;
@@ -1360,11 +1358,10 @@ auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
     tpOptions.poolName = "ReplNodeDbWorkerThreadPool";
     tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
     tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
-        Client::initThread(threadName.c_str(),
-                           serviceContext->getService(ClusterRole::ShardServer));
-
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
+        Client::initThread(threadName,
+                           serviceContext->getService(ClusterRole::ShardServer),
+                           Client::noSession(),
+                           ClientOperationKillableByStepdown{false});
     };
     return executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(tpOptions),
@@ -1378,11 +1375,10 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
     tpOptions.poolName = "ReplCoordThreadPool";
     tpOptions.maxThreads = 50;
     tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
-        Client::initThread(threadName.c_str(),
-                           serviceContext->getService(ClusterRole::ShardServer));
-
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
+        Client::initThread(threadName,
+                           serviceContext->getService(ClusterRole::ShardServer),
+                           Client::noSession(),
+                           ClientOperationKillableByStepdown{false});
     };
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
@@ -1620,13 +1616,12 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (Client::getCurrent()) {
         oldClient = Client::releaseCurrent();
     }
-    Client::setCurrent(
-        serviceContext->getService(ClusterRole::ShardServer)->makeClient("shutdownTask"));
+    Client::setCurrent(serviceContext->getService(ClusterRole::ShardServer)
+                           ->makeClient("shutdownTask",
+                                        Client::noSession(),
+                                        ClientOperationKillableByStepdown{false}));
     const auto client = Client::getCurrent();
-    {
-        stdx::lock_guard<Client> lk(*client);
-        client->setSystemOperationUnkillableByStepdown(lk);
-    }
+
     // The new client and opCtx are stashed in the ServiceContext, will survive past this
     // function and are never destructed. This is required to avoid releasing the global lock until
     // the process calls exit().

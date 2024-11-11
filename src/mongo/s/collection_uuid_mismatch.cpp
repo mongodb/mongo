@@ -73,14 +73,11 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
 
     // The listCollections command cannot be run in multi-document transactions, so run it using an
     // alternative client.
-    auto client = opCtx->getService()->makeClient("populateCollectionUUIDMismatch");
-
+    //
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<mongo::Client> lk(*client.get());
-        client.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
+    auto client = opCtx->getService()->makeClient("populateCollectionUUIDMismatch",
+                                                  Client::noSession(),
+                                                  ClientOperationKillableByStepdown{false});
     auto alternativeOpCtx = client->makeOperationContext();
     opCtx = alternativeOpCtx.get();
     AlternativeClientRegion acr{client};

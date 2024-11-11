@@ -586,11 +586,11 @@ public:
         auto serviceCtx = opCtx->getServiceContext();
         for (ServiceContext::LockedClientsCursor cursor(serviceCtx);
              Client* client = cursor.next();) {
-            ClientLock lk(client);
-            if (client->isFromSystemConnection() && !client->canKillSystemOperationInStepdown(lk)) {
+            if (!client->canKillOperationInStepdown()) {
                 continue;
             }
 
+            ClientLock lk(client);
             OperationContext* toKill = client->getOperationContext();
 
             if (toKill && !toKill->isKillPending() && toKill->getOpID() != opCtx->getOpID()) {
