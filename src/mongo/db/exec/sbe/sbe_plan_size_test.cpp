@@ -180,6 +180,7 @@ TEST_F(PlanSizeTest, HashJoin) {
 TEST_F(PlanSizeTest, SimpleIndexScanStage) {
     auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto stage = makeS<SimpleIndexScanStage>(collUuid,
+                                             DatabaseName(),
                                              StringData(),
                                              true,
                                              generateSlotId(),
@@ -203,6 +204,7 @@ TEST_F(PlanSizeTest, GenericIndexScanStage) {
                                        key_string::Version{0},
                                        Ordering::allAscending()};
     auto stage = makeS<GenericIndexScanStage>(collUuid,
+                                              DatabaseName(),
                                               StringData(),
                                               std::move(params),
                                               generateSlotId(),
@@ -266,6 +268,7 @@ TEST_F(PlanSizeTest, Project) {
 TEST_F(PlanSizeTest, Scan) {
     auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto stage = makeS<sbe::ScanStage>(collUuid,
+                                       DatabaseName(),
                                        generateSlotId() /* recordSlot */,
                                        generateSlotId() /* recordIdSlot */,
                                        generateSlotId() /* snapshotIdSlot */,

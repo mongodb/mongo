@@ -769,6 +769,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     CurOp::get(state.opCtx)->debug().indexedLoopJoin += 1;
 
     const auto foreignCollUUID = foreignColl->uuid();
+    const auto foreignCollDbName = foreignColl->ns().dbName();
     const auto indexName = index.identifier.catalogName;
     const auto indexDescriptor =
         foreignColl->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
@@ -929,6 +930,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     auto snapshotIdSlot = slotIdGenerator.generate();
     auto indexIdentSlot = slotIdGenerator.generate();
     auto ixScanStage = makeS<SimpleIndexScanStage>(foreignCollUUID,
+                                                   foreignCollDbName,
                                                    indexName,
                                                    true /* forward */,
                                                    indexKeySlot,
@@ -1239,8 +1241,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto [matchedDocumentsSlot, foreignStage] = [&, localStage = std::move(localStage)]() mutable
         -> std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> {
-        const CollectionPtr& foreignColl =
-            _collections.lookupCollection(NamespaceString(eqLookupNode->foreignCollection));
+        NamespaceString foreignNss(eqLookupNode->foreignCollection);
+        auto foreignColl = _collections.lookupCollection(foreignNss);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection "
+                              << eqLookupNode->foreignCollection.toStringForErrorMsg()
+                              << " either dropped or renamed",
+                (eqLookupNode->lookupStrategy ==
+                 EqLookupNode::LookupStrategy::kNonExistentForeignCollection) ||
+                    (foreignColl && foreignColl->ns() == foreignNss));
 
         boost::optional<SlotId> collatorSlot = _state.getCollatorSlot();
         switch (eqLookupNode->lookupStrategy) {
@@ -1283,6 +1292,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
                 std::unique_ptr<sbe::PlanStage> foreignStage =
                     makeS<sbe::ScanStage>(foreignColl->uuid(),
+                                          foreignColl->ns().dbName(),
                                           foreignResultSlot,
                                           foreignRecordIdSlot,
                                           boost::none /* snapshotIdSlot */,
@@ -1353,8 +1363,15 @@ SlotBasedStageBuilder::buildEqLookupUnwind(const QuerySolutionNode* root,
 
     auto [matchedDocumentsSlot, foreignStage] = [&, localStage = std::move(localStage)]() mutable
         -> std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> {
-        const CollectionPtr& foreignColl =
-            _collections.lookupCollection(NamespaceString(eqLookupUnwindNode->foreignCollection));
+        NamespaceString foreignNss(eqLookupUnwindNode->foreignCollection);
+        auto foreignColl = _collections.lookupCollection(foreignNss);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection "
+                              << eqLookupUnwindNode->foreignCollection.toStringForErrorMsg()
+                              << " either dropped or renamed",
+                (eqLookupUnwindNode->lookupStrategy ==
+                 EqLookupNode::LookupStrategy::kNonExistentForeignCollection) ||
+                    (foreignColl && foreignColl->ns() == foreignNss));
 
         boost::optional<SlotId> collatorSlot = _state.getCollatorSlot();
 
@@ -1398,6 +1415,7 @@ SlotBasedStageBuilder::buildEqLookupUnwind(const QuerySolutionNode* root,
 
                 std::unique_ptr<sbe::PlanStage> foreignStage =
                     makeS<sbe::ScanStage>(foreignColl->uuid(),
+                                          foreignColl->ns().dbName(),
                                           foreignResultSlot,
                                           foreignRecordIdSlot,
                                           boost::none /* snapshotIdSlot */,

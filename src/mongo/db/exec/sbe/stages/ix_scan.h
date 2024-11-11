@@ -89,6 +89,7 @@ class IndexScanStageBase : public PlanStage {
 public:
     IndexScanStageBase(StringData stageType,
                        UUID collUuid,
+                       DatabaseName dbName,
                        StringData indexName,
                        bool forward,
                        boost::optional<value::SlotId> indexKeySlot,
@@ -154,6 +155,7 @@ protected:
     void debugPrintImpl(std::vector<DebugPrinter::Block>&) const;
 
     const UUID _collUuid;
+    const DatabaseName _dbName;
     const std::string _indexName;
     const bool _forward;
     const boost::optional<value::SlotId> _indexKeySlot;
@@ -223,6 +225,7 @@ protected:
 class SimpleIndexScanStage final : public IndexScanStageBase {
 public:
     SimpleIndexScanStage(UUID collUuid,
+                         DatabaseName dbName,
                          StringData indexName,
                          bool forward,
                          boost::optional<value::SlotId> indexKeySlot,
@@ -293,6 +296,7 @@ struct GenericIndexScanStageParams {
 class GenericIndexScanStage final : public IndexScanStageBase {
 public:
     GenericIndexScanStage(UUID collUuid,
+                          DatabaseName dbName,
                           StringData indexName,
                           GenericIndexScanStageParams params,
                           boost::optional<value::SlotId> indexKeySlot,

@@ -57,6 +57,7 @@ namespace mongo::optimizer::fast_path {
  */
 struct ExecTreeGeneratorParams {
     const UUID collectionUuid;
+    const DatabaseName dbName;
     PlanYieldPolicy* yieldPolicy;
     const BSONObj& filter;
     const std::vector<FieldRef> projectFields;
