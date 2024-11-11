@@ -1,0 +1,21 @@
+norm
+norm
+norm.coll as fuzzer_coll
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+
+:normalizeNumerics {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+
+:normalizeNulls {aggregate: "fuzzer_coll", pipeline: [{$limit:10}], cursor: {}}
+
+:sortBSON {aggregate: "fuzzer_coll", pipeline: [{$limit:2}], cursor: {}}
+
+:sortFull {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+
+:sortBSONNormalizeNumerics {aggregate: "fuzzer_coll", pipeline: [{$limit:2}], cursor: {}}
+
+:normalizeNonNull {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+
+:normalizeFull {aggregate: "fuzzer_coll", pipeline: [{$limit:10}], cursor: {}}

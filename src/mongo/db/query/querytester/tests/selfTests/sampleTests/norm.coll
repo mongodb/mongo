@@ -1,0 +1,13 @@
+{a: 1}
+{b: 1}
+{_id: 1, a: 1}
+
+{_id: 1, a: NumberLong(10), b: {b: 2.0, a: 1, c: 3}}
+{_id: 0, b: [3, 2, 1], a: 5.0}
+{_id: 2, a: 10, b: {a: 1, b: 2, c: [true, false, {d: 1}]}}
+{_id: 3, a: [NumberDecimal('2'), 2.01]}
+{_id: 4, b: 5, a: [1, 3, 2]}
+{_id: 5, b: null}
+{_id: 6, b: null, c: [null, 5]}
+{_id: 7, e: undefined}
+{_id: 8, b: undefined, c: [null, 7, undefined]}

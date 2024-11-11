@@ -1,0 +1,38 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.AppendUnique(
+    FORCEINCLUDES=[
+        "mongo/platform/basic.h",
+    ],
+)
+env.Library(
+    target="mongotest_core",
+    source=[
+        "src/command_helpers.cpp",
+        "src/file_helpers.cpp",
+        "src/test.cpp",
+        "src/testfile.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/client/clientdriver_network",
+        "$BUILD_DIR/mongo/db/common",
+        "$BUILD_DIR/mongo/db/query/jparse_util",
+        "$BUILD_DIR/mongo/rpc/message",
+        "$BUILD_DIR/mongo/shell/shell_utils",
+        "$BUILD_DIR/mongo/transport/transport_layer_manager",
+    ],
+)
+
+mongoTest = env.Program(
+    target="mongotest",
+    source=["src/main.cpp"],
+    LIBDEPS=[
+        "mongotest_core",
+    ],
+    AIB_COMPONENT="mongotest",
+)

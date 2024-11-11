@@ -1,0 +1,7 @@
+mismatched_countB
+mismatched_countB
+test.coll as fuzzer_coll
+
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$limit: 1}], cursor: {}}
+
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$limit: 2}], cursor: {}}

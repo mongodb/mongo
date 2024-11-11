@@ -1,0 +1,7 @@
+same_res_len_diff_res
+same_res_len_diff_res
+test.coll as fuzzer_coll
+
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$sort: {value: -1}}], cursor: {}}
+
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$sort: {value: -1}}, {$addFields: {_id: {$multiply: [-1, "$_id"]}}}], cursor: {}}
