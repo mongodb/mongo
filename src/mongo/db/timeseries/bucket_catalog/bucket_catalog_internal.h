@@ -233,8 +233,12 @@ void waitToCommitBatch(BucketStateRegistry& registry,
 /**
  * Removes the given bucket from the bucket catalog's internal data structures.
  */
-void removeBucket(
-    BucketCatalog& catalog, Stripe& stripe, WithLock stripeLock, Bucket& bucket, RemovalMode mode);
+void removeBucket(BucketCatalog& catalog,
+                  Stripe& stripe,
+                  WithLock stripeLock,
+                  Bucket& bucket,
+                  ExecutionStatsController& stats,
+                  RemovalMode mode);
 
 /**
  * Archives the given bucket, minimizing the memory footprint but retaining the necessary
@@ -245,6 +249,7 @@ void archiveBucket(OperationContext* opCtx,
                    Stripe& stripe,
                    WithLock stripeLock,
                    Bucket& bucket,
+                   ExecutionStatsController& stats,
                    ClosedBuckets& closedBuckets);
 
 /**
@@ -295,6 +300,7 @@ void abort(BucketCatalog& catalog,
            Stripe& stripe,
            WithLock stripeLock,
            Bucket& bucket,
+           ExecutionStatsController& stats,
            std::shared_ptr<WriteBatch> batch,
            const Status& status);
 
@@ -316,7 +322,8 @@ void expireIdleBuckets(OperationContext* opCtx,
                        BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
-                       ExecutionStatsController& stats,
+                       const UUID& collectionUUID,
+                       ExecutionStatsController& collectioStats,
                        ClosedBuckets& closedBuckets);
 
 /**
@@ -377,10 +384,23 @@ ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
                                                        const UUID& collectionUUID);
 
 /**
+ * Retrieves the execution stats for the given namespace, if they have already been initialized. A
+ * valid instance is returned if the stats does not exist for the given namespace but any statistics
+ * reported to it will not be reported to the catalog.
+ */
+ExecutionStatsController getExecutionStats(BucketCatalog& catalog, const UUID& collectionUUID);
+
+/**
  * Retrieves the execution stats for the given namespace, if they have already been initialized.
  */
-shared_tracked_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
-                                                     const UUID& collectionUUID);
+shared_tracked_ptr<ExecutionStats> getCollectionExecutionStats(const BucketCatalog& catalog,
+                                                               const UUID& collectionUUID);
+
+/**
+ * Release the execution stats of a collection from the bucket catalog.
+ */
+std::vector<shared_tracked_ptr<ExecutionStats>> releaseExecutionStatsFromBucketCatalog(
+    BucketCatalog& catalog, std::span<const UUID> collectionUUIDs);
 
 /**
  * Retrieves the execution stats from the side bucket catalog.
@@ -409,6 +429,7 @@ void closeOpenBucket(OperationContext* opCtx,
                      Stripe& stripe,
                      WithLock stripeLock,
                      Bucket& bucket,
+                     ExecutionStatsController& stats,
                      ClosedBuckets& closedBuckets);
 /**
  * Close an open bucket, setting the state appropriately and removing it from the catalog.
@@ -418,6 +439,7 @@ void closeOpenBucket(OperationContext* opCtx,
                      Stripe& stripe,
                      WithLock stripeLock,
                      Bucket& bucket,
+                     ExecutionStatsController& stats,
                      boost::optional<ClosedBucket>& closedBucket);
 /**
  * Close an archived bucket, setting the state appropriately and removing it from the catalog.

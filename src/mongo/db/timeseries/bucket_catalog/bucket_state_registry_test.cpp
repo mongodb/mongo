@@ -91,6 +91,18 @@ public:
                      *state);
     }
 
+    ExecutionStatsController& stats(Bucket& bucket) {
+        if (bucket.bucketId.collectionUUID == uuid1)
+            return info1.stats;
+        else if (bucket.bucketId.collectionUUID == uuid2)
+            return info2.stats;
+        else if (bucket.bucketId.collectionUUID == uuid3)
+            return info3.stats;
+        else {
+            MONGO_UNREACHABLE;
+        }
+    }
+
     Bucket& createBucket(InsertContext& info, Date_t time) {
         auto ptr = &internal::allocateBucket(
             operationContext(), *this, *stripes[info.stripeNumber], withLock, info, time);
@@ -104,6 +116,7 @@ public:
                                    *stripes[internal::getStripeNumber(*this, bucket.key)],
                                    withLock,
                                    bucket,
+                                   stats(bucket),
                                    internal::RemovalMode::kAbort);
             return true;
         } else {
@@ -128,6 +141,7 @@ public:
                                *stripes[internal::getStripeNumber(*this, bucket.key)],
                                withLock,
                                bucket,
+                               stats(bucket),
                                internal::RemovalMode::kAbort);
     }
 
@@ -164,13 +178,18 @@ public:
     BucketKey bucketKey3{uuid3, bucketMetadata};
     Date_t date = Date_t::now();
     TimeseriesOptions options;
-    ExecutionStatsController stats = internal::getOrInitializeExecutionStats(*this, uuid1);
-    InsertContext info1{
-        std::move(bucketKey1), internal::getStripeNumber(*this, bucketKey1), options, stats};
-    InsertContext info2{
-        std::move(bucketKey2), internal::getStripeNumber(*this, bucketKey2), options, stats};
-    InsertContext info3{
-        std::move(bucketKey3), internal::getStripeNumber(*this, bucketKey3), options, stats};
+    InsertContext info1{std::move(bucketKey1),
+                        internal::getStripeNumber(*this, bucketKey1),
+                        options,
+                        internal::getOrInitializeExecutionStats(*this, uuid1)};
+    InsertContext info2{std::move(bucketKey2),
+                        internal::getStripeNumber(*this, bucketKey2),
+                        options,
+                        internal::getOrInitializeExecutionStats(*this, uuid2)};
+    InsertContext info3{std::move(bucketKey3),
+                        internal::getStripeNumber(*this, bucketKey3),
+                        options,
+                        internal::getOrInitializeExecutionStats(*this, uuid3)};
 };
 
 
@@ -726,6 +745,7 @@ TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
                             *stripes[info1.stripeNumber],
                             WithLock::withoutLock(),
                             bucket,
+                            stats(bucket),
                             closedBuckets);
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
