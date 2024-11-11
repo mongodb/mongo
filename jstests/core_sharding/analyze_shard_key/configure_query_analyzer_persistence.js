@@ -6,7 +6,9 @@
  * @tags: [
  *   requires_fcv_70,
  *   # Balancer will perform random moveCollections that change the collUuid.
- *   assumes_balancer_off
+ *   assumes_balancer_off,
+ *   # Stepdown test coverage is already provided by the analyze shard key FSM suites.
+ *   does_not_support_stepdowns,
  * ]
  */
 import {

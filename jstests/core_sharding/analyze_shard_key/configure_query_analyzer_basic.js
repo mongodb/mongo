@@ -3,7 +3,9 @@
  *
  * @tags: [
  *   requires_fcv_70,
- *   assumes_read_concern_unchanged
+ *   assumes_read_concern_unchanged,
+ *   # Stepdown test coverage is already provided by the analyze shard key FSM suites.
+ *   does_not_support_stepdowns,
  * ]
  */
 

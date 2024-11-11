@@ -1,7 +1,10 @@
 /**
  * Smoke tests for moveChunk command
  *
- * @tags: [assumes_balancer_off]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   does_not_support_stepdowns
+ * ]
  */
 
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";

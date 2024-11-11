@@ -6,7 +6,9 @@
  *  requires_collstats,
  *  featureFlagMoveCollection,
  *  assumes_balancer_off,
- *  requires_capped
+ *  requires_capped,
+ *  # Stepdown test coverage is already provided by the resharding FSM suites.
+ *  does_not_support_stepdowns,
  * ]
  */
 

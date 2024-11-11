@@ -1,7 +1,10 @@
 /**
  * Test that chunk operations preserve collection UUID in config.chunks documents
  *
- * @tags: [assumes_balancer_off]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   does_not_support_stepdowns
+ * ]
  */
 
 const dbName = db.getName();

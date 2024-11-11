@@ -4,7 +4,9 @@
  *   featureFlagReshardingImprovements,
  *   featureFlagMoveCollection,
  *   assumes_balancer_off,
- *   requires_fcv_80
+ *   requires_fcv_80,
+ *   # Stepdown test coverage is already provided by the resharding FSM suites.
+ *   does_not_support_stepdowns,
  * ]
  */
 

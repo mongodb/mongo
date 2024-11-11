@@ -4,6 +4,8 @@
  *  featureFlagReshardingForTimeseries,
  *  requires_fcv_80,
  *  requires_timeseries,
+ *  # Stepdown test coverage is already provided by the resharding FSM suites.
+ *  does_not_support_stepdowns,
  * ]
  */
 

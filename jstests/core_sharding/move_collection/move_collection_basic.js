@@ -7,6 +7,8 @@
  *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection,
  *  assumes_balancer_off,
+ *  # Stepdown test coverage is already provided by the resharding FSM suites.
+ *  does_not_support_stepdowns,
  * ]
  */
 

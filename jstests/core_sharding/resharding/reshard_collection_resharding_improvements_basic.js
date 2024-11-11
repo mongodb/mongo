@@ -5,7 +5,9 @@
  *
  * @tags: [
  *  requires_fcv_72,
- *  featureFlagReshardingImprovements
+ *  featureFlagReshardingImprovements,
+ *  # Stepdown test coverage is already provided by the resharding FSM suites.
+ *  does_not_support_stepdowns,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

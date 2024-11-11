@@ -1,7 +1,9 @@
 /**
  * Basic tests for reshardCollection.
  * @tags: [
- *  uses_atclustertime
+ *  uses_atclustertime,
+ *  # Stepdown test coverage is already provided by the resharding FSM suites.
+ *  does_not_support_stepdowns,
  * ]
  */
 

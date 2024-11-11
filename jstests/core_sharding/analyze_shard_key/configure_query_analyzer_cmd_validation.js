@@ -1,7 +1,11 @@
 /**
  * Tests basic validation within the configureQueryAnalyzer command.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *  requires_fcv_70,
+ *  # Stepdown test coverage is already provided by the analyze shard key FSM suites.
+ *  does_not_support_stepdowns,
+ * ]
  */
 import {
     runInvalidNamespaceTestsForConfigure
