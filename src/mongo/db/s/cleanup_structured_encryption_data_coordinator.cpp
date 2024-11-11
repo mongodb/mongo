@@ -228,21 +228,23 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
     // for the ESC collection, and retry if write errors occur due to StaleConfig.
     sharding::router::CollectionRouter escRouter(opCtx->getServiceContext(), escNss);
 
-    escRouter.route(opCtx,
-                    description,
-                    [&](OperationContext* innerOpCtx, const CollectionRoutingInfo& innerCri) {
-                        tassert(7647924,
-                                str::stream() << "Namespace " << escNss.toStringForErrorMsg()
-                                              << " is expected to be unsharded, but is sharded",
-                                !innerCri.cm.isSharded());
+    escRouter.route(
+        opCtx,
+        description,
+        [&](OperationContext* innerOpCtx, const CollectionRoutingInfo& innerCri) {
+            tassert(7647924,
+                    str::stream() << "Namespace " << escNss.toStringForErrorMsg()
+                                  << " is expected to be unsharded, but is sharded",
+                    !innerCri.cm.isSharded());
 
-                        FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                            innerOpCtx, escNss, ChunkVersion::UNSHARDED());
-                        ScopedSetShardRole escShardRole(
-                            innerOpCtx, escNss, ShardVersion::UNSHARDED(), innerCri.cm.dbVersion());
+            uassertStatusOK(
+                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+                    innerOpCtx, escNss, ChunkVersion::UNSHARDED()));
+            ScopedSetShardRole escShardRole(
+                innerOpCtx, escNss, ShardVersion::UNSHARDED(), innerCri.cm.dbVersion());
 
-                        cleanupESCAnchors(innerOpCtx, escNss, pq, tagsPerDelete, escStats);
-                    });
+            cleanupESCAnchors(innerOpCtx, escNss, pq, tagsPerDelete, escStats);
+        });
 }
 
 bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,

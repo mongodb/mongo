@@ -120,14 +120,18 @@ public:
      * execution state in the response. This is specifically problematic for write commands, which
      * are expected to return the set of write batch entries that succeeded.
      */
-    Status onCollectionPlacementVersionMismatchNoExcept(
+    Status onCollectionPlacementVersionMismatch(
         OperationContext* opCtx,
         const NamespaceString& nss,
         boost::optional<ChunkVersion> chunkVersionReceived) noexcept;
 
-    void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              boost::optional<ChunkVersion> chunkVersionReceived);
+    /**
+     * Unconditionally causes the collection placement to be refreshed from the config server.
+     *
+     * NOTE: Does network I/O and acquires collection lock on the specified namespace, so it must
+     * not be called with a lock.
+     */
+    void forceCollectionPlacementRefresh(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Should be called when any client request on this shard generates a StaleDbVersion exception.
@@ -135,19 +139,9 @@ public:
      * Invalidates the cached database version, schedules a refresh of the database info, waits for
      * the refresh to complete, and updates the cached database version.
      */
-    Status onDbVersionMismatchNoExcept(OperationContext* opCtx,
-                                       const DatabaseName& dbName,
-                                       boost::optional<DatabaseVersion> clientDbVersion) noexcept;
-
-    /**
-     * Unconditionally causes the shard's filtering metadata to be refreshed from the config server
-     * and returns the resulting placement version (which might not have changed), or throws.
-     *
-     * NOTE: Does network I/O and acquires collection lock on the specified namespace, so it must
-     * not be called with a lock
-     */
-    ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
-                                                    const NamespaceString& nss);
+    Status onDbVersionMismatch(OperationContext* opCtx,
+                               const DatabaseName& dbName,
+                               boost::optional<DatabaseVersion> clientDbVersion) noexcept;
 
 private:
     /**
@@ -189,6 +183,10 @@ private:
         const NamespaceString& nss,
         bool runRecover,
         CancellationToken cancellationToken);
+
+    void _onCollectionPlacementVersionMismatch(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               boost::optional<ChunkVersion> chunkVersionReceived);
 
     std::shared_ptr<CatalogCacheLoader> _loader = nullptr;
 };

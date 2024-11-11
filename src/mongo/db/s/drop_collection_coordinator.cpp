@@ -192,7 +192,7 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
     // Force the refresh of the catalog cache to purge outdated information. Note also that this
     // code is indirectly used to notify to secondary nodes to clear their filtering information
     // once the data flushed to disk get replicated.
-    FilteringMetadataCache::get(opCtx)->forceShardFilteringMetadataRefresh(opCtx, nss);
+    FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, nss);
     FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
 
     // Ensures the remove of range deletions and the refresh of the catalog cache will be waited for

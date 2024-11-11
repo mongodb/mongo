@@ -233,8 +233,8 @@ public:
 
     void refreshCollectionPlacementInfo(OperationContext* opCtx,
                                         const NamespaceString& sourceNss) override {
-        FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-            opCtx, sourceNss, boost::none);
+        uassertStatusOK(FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+            opCtx, sourceNss, boost::none));
     }
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>

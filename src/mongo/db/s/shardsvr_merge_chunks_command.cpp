@@ -121,8 +121,8 @@ void mergeChunks(OperationContext* opCtx,
 
     // Check that the preconditions for merge chunks are met and throw StaleShardVersion otherwise.
     const auto metadataBeforeMerge = [&]() {
-        FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-            opCtx, nss, boost::none);
+        uassertStatusOK(FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+            opCtx, nss, boost::none));
         const auto [metadata, indexInfo] =
             checkCollectionIdentity(opCtx, nss, expectedEpoch, expectedTimestamp);
         checkShardKeyPattern(opCtx, nss, metadata, indexInfo, chunkRange);
@@ -140,8 +140,8 @@ void mergeChunks(OperationContext* opCtx,
         }
         return boost::none;
     }();
-    FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-        opCtx, nss, std::move(chunkVersionReceived));
+    uassertStatusOK(FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+        opCtx, nss, std::move(chunkVersionReceived)));
 
     uassertStatusOKWithContext(cmdResponse.commandStatus, "Failed to commit chunk merge");
     uassertStatusOKWithContext(cmdResponse.writeConcernStatus, "Failed to commit chunk merge");

@@ -192,8 +192,9 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
             hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(newOpCtx);
 
             try {
-                FilteringMetadataCache::get(newOpCtx)->onCollectionPlacementVersionMismatch(
-                    newOpCtx, nss, boost::none);
+                uassertStatusOK(
+                    FilteringMetadataCache::get(newOpCtx)->onCollectionPlacementVersionMismatch(
+                        newOpCtx, nss, boost::none));
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // Can throw NamespaceNotFound if the collection/database was dropped
             }
@@ -669,8 +670,9 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
     while (store.count(opCtx)) {
         store.forEach(opCtx, BSONObj(), [opCtx](const MigrationCoordinatorDocument& doc) {
             try {
-                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                    opCtx, doc.getNss(), boost::none);
+                uassertStatusOK(
+                    FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+                        opCtx, doc.getNss(), boost::none));
             } catch (DBException& ex) {
                 ex.addContext(str::stream() << "Failed to recover pending migration for document "
                                             << doc.toBSON());

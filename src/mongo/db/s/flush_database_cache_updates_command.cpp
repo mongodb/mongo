@@ -209,7 +209,7 @@ public:
 
             if (Base::request().getSyncFromConfig()) {
                 LOGV2_DEBUG(21981, 1, "Forcing remote routing table refresh", "db"_attr = dbName);
-                uassertStatusOK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatchNoExcept(
+                uassertStatusOK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
                     opCtx, dbName, boost::none));
             }
 

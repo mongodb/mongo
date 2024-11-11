@@ -290,12 +290,12 @@ void appendReplyMetadata(OperationContext* opCtx,
 }
 
 Status refreshDatabase(OperationContext* opCtx, const StaleDbRoutingVersion& se) noexcept {
-    return FilteringMetadataCache::get(opCtx)->onDbVersionMismatchNoExcept(
+    return FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
         opCtx, se.getDb(), se.getVersionReceived());
 }
 
 Status refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) noexcept {
-    return FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatchNoExcept(
+    return FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
         opCtx, se.getNss(), se.getVersionReceived().placementVersion());
 }
 

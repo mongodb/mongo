@@ -304,13 +304,12 @@ protected:
                          "y"),
             boost::none);
 
-        ASSERT_OK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatchNoExcept(
+        ASSERT_OK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
             opCtx, kNss.dbName(), boost::none));
-        FilteringMetadataCache::get(opCtx)->forceShardFilteringMetadataRefresh(opCtx, kNss);
+        FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, kNss);
 
         if (refreshTempNss)
-            FilteringMetadataCache::get(opCtx)->forceShardFilteringMetadataRefresh(opCtx,
-                                                                                   env.tempNss);
+            FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, env.tempNss);
 
         return env;
     }

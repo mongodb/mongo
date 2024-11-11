@@ -652,7 +652,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
                     }
 
                     FilteringMetadataCache::get(opCtx)
-                        ->onCollectionPlacementVersionMismatchNoExcept(
+                        ->onCollectionPlacementVersionMismatch(
                             opCtx,
                             *nss,
                             staleInfo->getVersionWanted()
