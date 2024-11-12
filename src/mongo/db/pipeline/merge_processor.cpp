@@ -320,17 +320,21 @@ MergeProcessor::MergeProcessor(const boost::intrusive_ptr<ExpressionContext>& ex
       _descriptor(getMergeStrategyDescriptors().at({whenMatched, whenNotMatched})),
       _pipeline(std::move(pipeline)),
       _collectionPlacementVersion(collectionPlacementVersion) {
-    if (letVariables) {
-        _letVariables.emplace();
+    if (!letVariables) {
+        return;
+    }
 
-        for (auto&& varElem : *letVariables) {
-            const auto varName = varElem.fieldNameStringData();
-            variableValidation::validateNameForUserWrite(varName);
+    for (auto&& varElem : *letVariables) {
+        const auto varName = varElem.fieldNameStringData();
+        variableValidation::validateNameForUserWrite(varName);
 
-            _letVariables->emplace(
-                varName.toString(),
-                Expression::parseOperand(expCtx.get(), varElem, expCtx->variablesParseState));
-        }
+        _letVariables.emplace_back(
+            varName.toString(),
+            Expression::parseOperand(expCtx.get(), varElem, expCtx->variablesParseState),
+            // Variable::Id is set to INT64_MIN as it is not needed for processing $merge stage.
+            // The '_letVariables' are evaluated in resolveLetVariablesIfNeeded(), serialized into
+            // BSONObj and later placed into MongoProcessInterface::BatchObject.
+            INT64_MIN);
     }
 }
 

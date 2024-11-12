@@ -205,11 +205,8 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {
         // Although $merge is not allowed in sub-pipelines and this method is used for correlation
         // analysis, the method is generic enough to be used in the future for other purposes.
-        const auto& letVariables = _mergeProcessor->getLetVariables();
-        if (letVariables) {
-            for (auto&& [name, expr] : *letVariables) {
-                expression::addVariableRefs(expr.get(), refs);
-            }
+        for (const auto& letVar : _mergeProcessor->getLetVariables()) {
+            expression::addVariableRefs(letVar.expression.get(), refs);
         }
     }
 

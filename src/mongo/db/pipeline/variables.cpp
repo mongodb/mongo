@@ -439,6 +439,11 @@ void Variables::defineUserRoles(OperationContext* opCtx) {
     _definitions[kUserRolesId] = {Value(builder.arr()), true /* isConst */};
 }
 
+LetVariable::LetVariable(std::string attributeName,
+                         boost::intrusive_ptr<Expression> attributeExpression,
+                         Variables::Id varId)
+    : name(std::move(attributeName)), expression(std::move(attributeExpression)), id(varId) {}
+
 Variables::Id VariablesParseState::defineVariable(StringData name) {
     // Caller should have validated before hand by using
     // variableValidation::validateNameForUserWrite.
