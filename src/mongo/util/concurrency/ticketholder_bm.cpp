@@ -39,7 +39,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/latency_distribution.h"
@@ -184,9 +183,9 @@ void BM_acquireAndRelease(benchmark::State& state) {
     }
 }
 
-// The 'AdmissionsPriority' has no effect on SemaphoreTicketHolder performance because the
-// SemaphoreTicketHolder treaats all operations the same, regardless of their specified priority.
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, SemaphoreTicketHolder, AdmissionsPriority::kNormal)
+// The 'AdmissionsPriority' has no effect on TicketHolder performance because the
+// TicketHolder treaats all operations the same, regardless of their specified priority.
+BENCHMARK_TEMPLATE(BM_acquireAndRelease, TicketHolder, AdmissionsPriority::kNormal)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
     ->Threads(128)

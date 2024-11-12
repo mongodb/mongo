@@ -34,6 +34,7 @@
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -51,11 +52,10 @@ const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
 IngressAdmissionController::IngressAdmissionController() {}
 
 void IngressAdmissionController::init() {
-    _ticketHolder =
-        std::make_unique<SemaphoreTicketHolder>(&getIngressAdmissionController.owner(*this),
-                                                gIngressAdmissionControllerTicketPoolSize.load(),
-                                                false,
-                                                SemaphoreTicketHolder::ResizePolicy::kImmediate);
+    _ticketHolder = std::make_unique<TicketHolder>(&getIngressAdmissionController.owner(*this),
+                                                   gIngressAdmissionControllerTicketPoolSize.load(),
+                                                   false,
+                                                   TicketHolder::ResizePolicy::kImmediate);
 }
 
 IngressAdmissionController& IngressAdmissionController::get(OperationContext* opCtx) {

@@ -49,8 +49,8 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/cancellation.h"
-#include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/uuid.h"
@@ -183,7 +183,7 @@ private:
     // Indicates if source is prepared to service _migrateClone requests in parallel.
     bool _isParallelFetchingSupported;
 
-    SemaphoreTicketHolder _secondaryThrottleTicket;
+    TicketHolder _secondaryThrottleTicket;
 
     BufferSizeTracker _bufferSizeTracker;
 

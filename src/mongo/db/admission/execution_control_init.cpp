@@ -36,7 +36,7 @@
 #include "mongo/db/admission/execution_control_parameters_gen.h"
 #include "mongo/db/admission/throughput_probing.h"
 #include "mongo/db/admission/ticketholder_manager.h"
-#include "mongo/util/concurrency/semaphore_ticketholder.h"  // IWYU pragma: keep
+#include "mongo/util/concurrency/ticketholder.h"  // IWYU pragma: keep
 
 namespace mongo {
 namespace admission {
@@ -76,8 +76,8 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
     };
 
     std::unique_ptr<TicketHolderManager> ticketHolderManager = makeTicketHolderManager(
-        std::make_unique<SemaphoreTicketHolder>(svcCtx, readTransactions, usingThroughputProbing),
-        std::make_unique<SemaphoreTicketHolder>(svcCtx, writeTransactions, usingThroughputProbing));
+        std::make_unique<TicketHolder>(svcCtx, readTransactions, usingThroughputProbing),
+        std::make_unique<TicketHolder>(svcCtx, writeTransactions, usingThroughputProbing));
 
     TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
 

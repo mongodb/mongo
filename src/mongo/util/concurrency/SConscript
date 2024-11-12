@@ -15,10 +15,9 @@ env.Library(
 env.CppUnitTest(
     target="util_concurrency_test",
     source=[
-        "semaphore_ticketholder_test.cpp",
+        "ticketholder_test.cpp",
         "spin_lock_test.cpp",
         "thread_pool_test.cpp",
-        "ticketholder_test_fixture.cpp",
         "with_lock_test.cpp",
     ],
     LIBDEPS=[

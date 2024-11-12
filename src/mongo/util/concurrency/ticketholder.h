@@ -35,16 +35,18 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class Ticket;
-class SemaphoreTicketHolder;
 
 /**
  * Maintains and distributes tickets across operations from a limited pool of tickets. The ticketing
@@ -55,8 +57,23 @@ class TicketHolder {
     friend class Ticket;
 
 public:
-    TicketHolder(ServiceContext* svcCtx, int32_t numTickets, bool trackPeakUsed);
-    virtual ~TicketHolder() {}
+    /**
+     * Describes the algorithm used to update the TicketHolder when the size of the ticket pool
+     * changes.
+     *
+     * kImmediate: update the atomic value _tickets and call notifyMany on waiters if the
+     * number of available tickets becomes positive. Otherwise, no waiters are notified.
+     *
+     * kGradual: iteratively increment _tickets and notify a single waiter for each new
+     * available ticket. If the ticket pool shrinks, we iteratively retire the necessary number of
+     * tickets as operations finish running.
+     */
+    enum class ResizePolicy { kGradual = 0, kImmediate };
+
+    TicketHolder(ServiceContext* serviceContext,
+                 int numTickets,
+                 bool trackPeakUsed,
+                 ResizePolicy resizePolicy = ResizePolicy::kGradual);
 
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
@@ -67,8 +84,11 @@ public:
     bool resize(OperationContext* opCtx, int32_t newSize, Date_t deadline = Date_t::max());
 
     /**
-     * Attempts to acquire a ticket without blocking.
-     * Returns a ticket if one is available, and boost::none otherwise.
+     * Attempts to acquire a ticket without blocking. Returns a ticket if one is available,
+     * and boost::none otherwise.
+     *
+     * Operations exempt from ticketing get issued a new ticket immediately, while normal priority
+     * operations take a ticket from the pool if available.
      */
     boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx);
 
@@ -88,10 +108,10 @@ public:
                                                Date_t until);
 
     /**
-     * The same as `waitForTicketUntil` except the wait will be uninterruptible. Please make every
-     * effort to make your waiter interruptible, and try not to use this function! It only exists
-     * as a stepping stone until we can complete the work in SERVER-68868 to ensure all work in the
-     * server is interruptible.
+     * The same as `waitForTicketUntil` except the wait will be uninterruptible. Please
+     * make every effort to make your waiter interruptible, and try not to use this function! It
+     * only exists as a stepping stone until we can complete the work in SERVER-68868 to ensure all
+     * work in the server is interruptible.
      *
      * TODO(SERVER-68868): Remove this function completely
      */
@@ -114,6 +134,12 @@ public:
     }
 
     /**
+     * Instantaneous number of operations waiting in queue for a ticket.
+     * TODO SERVER-74082: Consider changing this metric to int32_t.
+     */
+    int64_t queued() const;
+
+    /**
      * Peak number of tickets checked out at once since the previous time this function was called.
      * Invariants that 'trackPeakUsed' has been passed to the TicketHolder,
      */
@@ -123,21 +149,17 @@ public:
      * Instantaneous number of tickets 'available' (not checked out by an operation) in the ticket
      * pool.
      */
-    virtual int32_t available() const = 0;
-
-    /**
-     * Instantaneous number of operations waiting in queue for a ticket.
-     *
-     * TODO SERVER-74082: Once the SemaphoreTicketHolder is removed, consider changing this metric
-     * to int32_t.
-     */
-    virtual int64_t queued() const = 0;
+    int32_t available() const;
 
     /**
      * The total number of operations that acquired a ticket, completed their work, and released the
      * ticket.
      */
-    virtual int64_t numFinishedProcessing() const = 0;
+    int64_t numFinishedProcessing() const;
+
+    void setNumFinishedProcessing_forTest(int32_t numFinishedProcessing);
+
+    void setPeakUsed_forTest(int32_t used);
 
     /**
      * Statistics for queueing mechanisms in the TicketHolder implementations. The term "Queue" is a
@@ -160,38 +182,25 @@ public:
      */
     void appendStats(BSONObjBuilder& b) const;
 
-protected:
-    virtual bool _resizeImpl(WithLock lock,
-                             OperationContext* opCtx,
-                             int32_t newSize,
-                             Date_t deadline);
-
 private:
     /**
-     * Releases a ticket back into the ticketing pool.
+     * Releases a ticket back into the ticket pool and updates queueing statistics. Tickets
+     * issued for exempt operations do not get deposited back to the pool.
      */
-    virtual void _releaseToTicketPool(Ticket& ticket) noexcept;
+    void _releaseTicketUpdateStats(Ticket& ticket) noexcept;
 
-    virtual void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept = 0;
+    void _releaseNormalPriorityTicket(AdmissionContext* admCtx) noexcept;
 
-    virtual boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) = 0;
+    boost::optional<Ticket> _tryAcquireNormalPriorityTicket(AdmissionContext* admCtx);
 
-    boost::optional<Ticket> _waitForTicketUntil(OperationContext* opCtx,
-                                                AdmissionContext* admCtx,
-                                                Date_t until,
-                                                bool interruptible);
-    virtual boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
-                                                            AdmissionContext* admCtx,
-                                                            Date_t until,
-                                                            bool interruptible) = 0;
-
-    virtual void _appendImplStats(BSONObjBuilder& b) const {}
-
-    /**
-     * Fetches the queueing statistics for the given priority. All statistics that are queue
-     * specific should be updated through the resulting 'QueueStats'.
-     */
-    virtual QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept = 0;
+    boost::optional<Ticket> _waitForTicketUntilMaybeInterruptible(OperationContext* opCtx,
+                                                                  AdmissionContext* admCtx,
+                                                                  Date_t until,
+                                                                  bool interruptible);
+    boost::optional<Ticket> _performWaitForTicketUntil(OperationContext* opCtx,
+                                                       AdmissionContext* admCtx,
+                                                       Date_t until,
+                                                       bool interruptible);
 
     void _updatePeakUsed();
 
@@ -201,71 +210,31 @@ private:
     void _updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx,
                                               TicketHolder::QueueStats& queueStats);
 
-    stdx::mutex _resizeMutex;
-    QueueStats _exemptQueueStats;
-
-protected:
     /**
-     * Appends the standard statistics stored in QueueStats to BSONObjBuilder b;
+     * Appends the statistics stored in QueueStats to BSONObjBuilder b; We track statistics
+     * for normalPriority operations and operations that are exempt from queueing.
      */
-    void _appendCommonQueueImplStats(BSONObjBuilder& b, const QueueStats& stats) const;
+    void _appendQueueStats(BSONObjBuilder& b, const QueueStats& stats) const;
+
+    void _immediateResize(WithLock, int32_t newSize);
 
     /**
      * Creates a ticket for a non-exempt admission.
      */
     Ticket _makeTicket(AdmissionContext* admCtx);
 
+    QueueStats _normalPriorityQueueStats;
+    QueueStats _exemptQueueStats;
+    ResizePolicy _resizePolicy;
+    ServiceContext* _serviceContext;
+
+    // Serializes updates to _outof to ensure only 1 thread can change the size of the ticket pool
+    // at a time. Reading _outof does not require holding the lock.
+    stdx::mutex _resizeMutex;
+    BasicWaitableAtomic<int32_t> _tickets;
+    Atomic<int32_t> _waiterCount{0};
     AtomicWord<int32_t> _outof;
     AtomicWord<int32_t> _peakUsed;
-
-    ServiceContext* _serviceContext;
-};
-
-class MockTicketHolder : public TicketHolder {
-public:
-    MockTicketHolder(ServiceContext* svcCtx) : TicketHolder(svcCtx, 0, true) {}
-
-    int32_t available() const override {
-        return _available;
-    }
-
-    void setPeakUsed(int32_t used) {
-        _peakUsed.store(used);
-    }
-
-    void setAvailable(int32_t available) {
-        _available = available;
-    }
-
-    int64_t queued() const override {
-        return 0;
-    }
-
-    int64_t numFinishedProcessing() const override {
-        return _numFinishedProcessing;
-    }
-
-    void setNumFinishedProcessing(int32_t numFinishedProcessing) {
-        _numFinishedProcessing = numFinishedProcessing;
-    }
-
-private:
-    void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override;
-
-    boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override;
-
-    boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
-                                                    AdmissionContext* admCtx,
-                                                    Date_t until,
-                                                    bool interruptible) override;
-
-    QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept override {
-        return _stats;
-    }
-
-    QueueStats _stats;
-    int32_t _available = 0;
-    int32_t _numFinishedProcessing = 0;
 };
 
 /**
@@ -304,7 +273,7 @@ public:
 
     ~Ticket() {
         if (_ticketholder) {
-            _ticketholder->_releaseToTicketPool(*this);
+            _ticketholder->_releaseTicketUpdateStats(*this);
         }
     }
 

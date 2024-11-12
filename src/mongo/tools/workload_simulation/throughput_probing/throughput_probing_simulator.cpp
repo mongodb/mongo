@@ -32,7 +32,7 @@
 #include "mongo/db/admission/execution_control_parameters_gen.h"
 #include "mongo/db/admission/throughput_probing.h"
 #include "mongo/db/admission/throughput_probing_gen.h"
-#include "mongo/util/concurrency/semaphore_ticketholder.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -48,10 +48,8 @@ void ThroughputProbing::setup() {
     Milliseconds probingInterval{gStorageEngineConcurrencyAdjustmentIntervalMillis};
 
     constexpr bool trackPeakUsed = true;
-    _readTicketHolder =
-        std::make_unique<SemaphoreTicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
-    _writeTicketHolder =
-        std::make_unique<SemaphoreTicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
+    _readTicketHolder = std::make_unique<TicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
+    _writeTicketHolder = std::make_unique<TicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
 
     _runner = [svcCtx = svcCtx()] {
         auto runner = std::make_unique<MockPeriodicRunner>();

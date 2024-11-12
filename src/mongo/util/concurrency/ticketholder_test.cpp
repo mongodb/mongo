@@ -28,11 +28,10 @@
  */
 #include <memory>
 
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/concurrency/ticketholder_test_fixture.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/packaged_task.h"
@@ -53,10 +52,17 @@ Date_t getNextDeadline() {
     return Date_t::now() + kDefaultTimeout;
 }
 
-class SemaphoreTicketHolderTest : public TicketHolderTestFixture {
+class TicketHolderTest : public ServiceContextTest {
 public:
+    TicketHolderTest()
+        : ServiceContextTest(
+              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+                  nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {}
+
     void setUp() override {
-        TicketHolderTestFixture::setUp();
+        ServiceContextTest::setUp();
+        _client = getServiceContext()->getService()->makeClient("test");
+        _opCtx = _client->makeOperationContext();
 
         ThreadPool::Options opts;
         _pool = std::make_unique<ThreadPool>(opts);
@@ -64,9 +70,12 @@ public:
     }
 
     void tearDown() override {
-        TicketHolderTestFixture::tearDown();
         _pool->shutdown();
-        //_pool->join();
+        ServiceContextTest::tearDown();
+    }
+
+    TickSourceMock<Microseconds>* getTickSource() {
+        return checked_cast<decltype(getTickSource())>(getServiceContext()->getTickSource());
     }
 
     /**
@@ -86,68 +95,234 @@ public:
         return taskFuture;
     }
 
-    /** Utility to make a immediate-resize-policy SemaphoreTicketHolder. */
-    std::unique_ptr<SemaphoreTicketHolder> makeImmediateResizeHolder(int initialNumTickets) {
-        return std::make_unique<SemaphoreTicketHolder>(
-            getServiceContext(),
-            initialNumTickets,
-            false /* trackPeakUsed */,
-            SemaphoreTicketHolder::ResizePolicy::kImmediate);
+    /** Utility to make a immediate-resize-policy TicketHolder. */
+    std::unique_ptr<TicketHolder> makeImmediateResizeHolder(int initialNumTickets) {
+        return std::make_unique<TicketHolder>(getServiceContext(),
+                                              initialNumTickets,
+                                              false /* trackPeakUsed */,
+                                              TicketHolder::ResizePolicy::kImmediate);
     }
+
+
+protected:
+    class Stats;
+    struct MockAdmission;
+    ServiceContext::UniqueClient _client;
+    ServiceContext::UniqueOperationContext _opCtx;
 
 private:
     std::unique_ptr<ThreadPool> _pool;
 };
 
-TEST_F(SemaphoreTicketHolderTest, BasicTimeoutSemaphore) {
-    basicTimeout(
-        _opCtx.get(),
-        std::make_unique<SemaphoreTicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */));
+/**
+ * Provides easy access to instantaneous statistics of the TicketHolder.
+ */
+class TicketHolderTest::Stats {
+public:
+    Stats(TicketHolder* holder) : _holder(holder){};
+
+    long long operator[](StringData field) const {
+        BSONObjBuilder bob;
+        _holder->appendStats(bob);
+        auto stats = bob.obj();
+        return stats[field].numberLong();
+    }
+
+    BSONObj getStats() const {
+        BSONObjBuilder bob;
+        _holder->appendStats(bob);
+        return bob.obj();
+    }
+
+    BSONObj getNonTicketStats() const {
+        return getStats().removeField("out").removeField("available").removeField("totalTickets");
+    }
+
+private:
+    TicketHolder* _holder;
+};
+
+/**
+ * Constructs the context necessary to submit a for-test admission to a TicketHolder.
+ */
+struct TicketHolderTest::MockAdmission {
+    MockAdmission(ServiceContext* serviceContext, AdmissionContext::Priority priority) {
+        client = serviceContext->getService()->makeClient("");
+        opCtx = client->makeOperationContext();
+        admissionPriority.emplace(opCtx.get(), admCtx, priority);
+    }
+
+    // Block until this Admission attempt is queued waiting on a ticket.
+    bool waitUntilQueued(Nanoseconds timeout) {
+        return admCtx.waitUntilQueued(timeout);
+    }
+
+    ServiceContext::UniqueClient client;
+    ServiceContext::UniqueOperationContext opCtx;
+    MockAdmissionContext admCtx;
+    boost::optional<ScopedAdmissionPriorityBase> admissionPriority;
+    boost::optional<Ticket> ticket;
+};
+
+TEST_F(TicketHolderTest, BasicTimeout) {
+    auto holder = std::make_unique<TicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+    OperationContext* opCtx = _opCtx.get();
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 1);
+    ASSERT_EQ(holder->outof(), 1);
+
+    MockAdmissionContext admCtx{};
+    {
+        // Ignores deadline if there is a ticket instantly available.
+        auto ticket = holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() - Milliseconds(100));
+        ASSERT(ticket);
+        ASSERT_EQ(holder->used(), 1);
+        ASSERT_EQ(holder->available(), 0);
+        ASSERT_EQ(holder->outof(), 1);
+
+        // Respects there are none available.
+        ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now()));
+        ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(42)));
+    }
+
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 1);
+    ASSERT_EQ(holder->outof(), 1);
 }
 
-TEST_F(SemaphoreTicketHolderTest, ResizeStatsSemaphore) {
-    resizeTest(
-        _opCtx.get(),
-        std::make_unique<SemaphoreTicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */),
-        getTickSource());
+/**
+ * Tests that TicketHolder::resize() does not impact metrics outside of those related to the
+ * number of tickets available(), used(), and outof().
+ */
+TEST_F(TicketHolderTest, ResizeStats) {
+    auto holder = std::make_unique<TicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+    OperationContext* opCtx = _opCtx.get();
+    auto tickSource = getTickSource();
+    Stats stats(holder.get());
+
+    std::array<MockAdmissionContext, 6> admCtxs;
+    auto ticket = holder->waitForTicketUntil(opCtx, &admCtxs[0], Date_t::now() + Milliseconds{500});
+
+    ASSERT_EQ(holder->used(), 1);
+    ASSERT_EQ(holder->available(), 0);
+    ASSERT_EQ(holder->outof(), 1);
+
+    auto currentStats = stats.getNonTicketStats();
+
+    tickSource->advance(Microseconds{100});
+    ASSERT_TRUE(holder->resize(opCtx, 10));
+
+    ASSERT_EQ(holder->available(), 9);
+    ASSERT_EQ(holder->outof(), 10);
+
+    auto newStats = stats.getNonTicketStats();
+
+    ASSERT_EQ(currentStats.woCompare(newStats), 0);
+
+    tickSource->advance(Microseconds{100});
+    ticket.reset();
+
+    currentStats = stats.getNonTicketStats();
+
+    ASSERT_EQ(stats["out"], 0);
+    ASSERT_EQ(stats["available"], 10);
+    ASSERT_EQ(stats["totalTickets"], 10);
+
+    ASSERT_TRUE(holder->resize(opCtx, 1));
+    newStats = stats.getNonTicketStats();
+    ASSERT_EQ(currentStats.woCompare(newStats), 0);
+
+    tickSource->advance(Microseconds{100});
+    ASSERT_TRUE(holder->resize(opCtx, 10));
+    currentStats = stats.getNonTicketStats();
+    ASSERT_EQ(currentStats.woCompare(newStats), 0);
+
+    ASSERT_TRUE(holder->resize(opCtx, 6));
+    std::array<boost::optional<Ticket>, 5> tickets;
+    {
+        auto ticket = holder->waitForTicket(opCtx, &admCtxs[0]);
+        ASSERT_EQ(holder->used(), 1);
+        ASSERT_EQ(holder->outof(), 6);
+
+        for (int i = 0; i < 5; ++i) {
+            tickets[i] = holder->waitForTicket(opCtx, &admCtxs[i + 1]);
+            ASSERT_EQ(holder->used(), 2 + i);
+            ASSERT_EQ(holder->outof(), 6);
+        }
+        ASSERT_FALSE(
+            holder->waitForTicketUntil(opCtx, &admCtxs[0], Date_t::now() + Milliseconds(1)));
+    }
+
+    ASSERT_TRUE(holder->resize(opCtx, 5));
+    ASSERT_EQ(holder->used(), 5);
+    ASSERT_EQ(holder->outof(), 5);
+    ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtxs[0], Date_t::now() + Milliseconds(1)));
+
+    ASSERT_FALSE(holder->resize(opCtx, 4, Date_t::now() + Milliseconds(1)));
 }
 
-TEST_F(SemaphoreTicketHolderTest, Interruption) {
-    interruptTest(
-        _opCtx.get(),
-        std::make_unique<SemaphoreTicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */));
+TEST_F(TicketHolderTest, Interruption) {
+    auto holder = std::make_unique<TicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+    OperationContext* opCtx = _opCtx.get();
+
+    ASSERT_TRUE(holder->resize(opCtx, 0));
+
+    auto waiter = stdx::thread([&]() {
+        MockAdmissionContext admCtx{};
+        ASSERT_THROWS_CODE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::max()),
+                           DBException,
+                           ErrorCodes::Interrupted);
+    });
+
+    while (!holder->queued()) {
+    }
+
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 0);
+
+    opCtx->markKilled();
+    waiter.join();
 }
 
-TEST_F(SemaphoreTicketHolderTest, InterruptResize) {
+TEST_F(TicketHolderTest, InterruptResize) {
     auto ticketHolder =
-        std::make_unique<SemaphoreTicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+        std::make_unique<TicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
 
     _opCtx->markKilled(ErrorCodes::ClientMarkedKilled);
     ASSERT_THROWS_CODE(
         ticketHolder->resize(_opCtx.get(), 0), DBException, ErrorCodes::ClientMarkedKilled);
 }
 
-TEST_F(SemaphoreTicketHolderTest, PriorityBookkeeping) {
-    priorityBookkeepingTest(
-        _opCtx.get(),
-        std::make_unique<SemaphoreTicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */),
-        AdmissionContext::Priority::kNormal,
-        AdmissionContext::Priority::kExempt,
-        [](auto statsWhileProcessing, auto statsWhenFinished) {
-            ASSERT_EQ(statsWhileProcessing.getObjectField("normalPriority")
-                          .getIntField("startedProcessing"),
-                      0);
-            ASSERT_EQ(
-                statsWhileProcessing.getObjectField("exempt").getIntField("startedProcessing"), 1);
-            ASSERT_EQ(statsWhenFinished.getObjectField("normalPriority")
-                          .getIntField("finishedProcessing"),
-                      0);
-            ASSERT_EQ(statsWhenFinished.getObjectField("exempt").getIntField("finishedProcessing"),
-                      1);
-        });
+TEST_F(TicketHolderTest, PriorityBookkeeping) {
+    auto holder = std::make_unique<TicketHolder>(getServiceContext(), 1, false /* trackPeakUsed */);
+    OperationContext* opCtx = _opCtx.get();
+    MockAdmissionContext admCtx{};
+    ScopedAdmissionPriorityBase initialPriority{opCtx, admCtx, AdmissionContext::Priority::kNormal};
+
+    Stats stats(holder.get());
+
+    boost::optional<ScopedAdmissionPriorityBase> priorityOverride;
+    priorityOverride.emplace(opCtx, admCtx, AdmissionContext::Priority::kExempt);
+
+    boost::optional<Ticket> ticket = holder->waitForTicket(opCtx, &admCtx);
+
+    priorityOverride.reset();
+
+    auto statsWhileProcessing = stats.getStats();
+    ticket.reset();
+    auto statsWhenFinished = stats.getStats();
+
+    // The ticket must be released with the same priority with which it was acquired.
+    ASSERT_EQ(
+        statsWhileProcessing.getObjectField("normalPriority").getIntField("startedProcessing"), 0);
+    ASSERT_EQ(statsWhileProcessing.getObjectField("exempt").getIntField("startedProcessing"), 1);
+    ASSERT_EQ(statsWhenFinished.getObjectField("normalPriority").getIntField("finishedProcessing"),
+              0);
+
+    ASSERT_EQ(statsWhenFinished.getObjectField("exempt").getIntField("finishedProcessing"), 1);
 }
 
-TEST_F(SemaphoreTicketHolderTest, QueuedWaiterGetsTicketWhenMadeAvailable) {
+TEST_F(TicketHolderTest, QueuedWaiterGetsTicketWhenMadeAvailable) {
     constexpr int initialNumTickets = 3;
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
@@ -183,9 +358,9 @@ TEST_F(SemaphoreTicketHolderTest, QueuedWaiterGetsTicketWhenMadeAvailable) {
     ASSERT_EQ(holder->outof(), 3);
 }
 
-using SemaphoreTicketHolderImmediateResizeTest = SemaphoreTicketHolderTest;
+using TicketHolderImmediateResizeTest = TicketHolderTest;
 
-TEST_F(SemaphoreTicketHolderImmediateResizeTest, CanResizePool) {
+TEST_F(TicketHolderImmediateResizeTest, CanResizePool) {
     constexpr int initialNumTickets = 1;
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
@@ -206,7 +381,7 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest, CanResizePool) {
     ASSERT_EQ(holder->outof(), 5);
 }
 
-TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownTicketsStillAvailable) {
+TEST_F(TicketHolderImmediateResizeTest, ResizeDownTicketsStillAvailable) {
     constexpr int initialNumTickets = 10;
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
@@ -233,7 +408,7 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownTicketsStillAvailable
     ASSERT_TRUE(holder->tryAcquire(&admCtxs[0]));
 }
 
-TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownSoNoTicketsAvailable) {
+TEST_F(TicketHolderImmediateResizeTest, ResizeDownSoNoTicketsAvailable) {
     constexpr int initialNumTickets = 10;
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
@@ -263,7 +438,7 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeDownSoNoTicketsAvailable)
     ASSERT_FALSE(holder->tryAcquire(&admCtxs[0]));
 }
 
-TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeUpMakesTicketsAvailableToWaiters) {
+TEST_F(TicketHolderImmediateResizeTest, ResizeUpMakesTicketsAvailableToWaiters) {
     constexpr int initialNumTickets = 3;
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
@@ -300,7 +475,7 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest, ResizeUpMakesTicketsAvailableTo
     ASSERT_EQ(holder->outof(), 5);
 }
 
-TEST_F(SemaphoreTicketHolderImmediateResizeTest,
+TEST_F(TicketHolderImmediateResizeTest,
        QueuedWaiterRemainsNegativeAfterReleaseToPoolWithNegativeAvailable) {
     constexpr int initialNumTickets = 10;
     auto holder = makeImmediateResizeHolder(initialNumTickets);
@@ -345,7 +520,7 @@ TEST_F(SemaphoreTicketHolderImmediateResizeTest,
     });
 }
 
-TEST_F(SemaphoreTicketHolderTest, ReleaseToPoolWakesWaiters) {
+TEST_F(TicketHolderTest, ReleaseToPoolWakesWaiters) {
     // We had a bug where releasing a ticket back to the ticket holder would only waker waiters when
     // adding a ticket would result in 0 available tickets (a case only reachable after resize).
     // This test is meant to prove that we always wake waiters when a ticket is returned, if there
@@ -353,7 +528,7 @@ TEST_F(SemaphoreTicketHolderTest, ReleaseToPoolWakesWaiters) {
     constexpr int initialNumTickets = 2;
     auto holder = makeImmediateResizeHolder(initialNumTickets);
 
-    // Here's the approach: We need to have a SemaphoreTicketHolder of size >1 in order to meet the
+    // Here's the approach: We need to have a TicketHolder of size >1 in order to meet the
     // condition that we possibly have a non-zero number of tickets when returning a ticket to the
     // pool. Initially acquire two tickets, and spin up two waiters which will queue. A third
     // waiting thread waits for the initial waiters to queue before enqueueing itself. Back on the
@@ -381,7 +556,7 @@ TEST_F(SemaphoreTicketHolderTest, ReleaseToPoolWakesWaiters) {
         Future<Ticket> ticketFuture =
             spawn([holder = holder.get(), opCtx = admission->opCtx.get(), admCtx = admCtx]() {
                 Timer t;
-                // TODO(SERVER-89297): SemaphoreTicketHolder currently does timed waits in the 500ms
+                // TODO(SERVER-89297): TicketHolder currently does timed waits in the 500ms
                 // range, which prevents deadlock with the bug this test is meant to test. Remove
                 // this assertion when we switch to the NotifyableParkingLot. Choose a value of 400
                 // because the timed waiters introduce jitter for each wait using a base value of

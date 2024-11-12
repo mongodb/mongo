@@ -52,11 +52,9 @@ mongo_cc_library(
 mongo_cc_library(
     name = "ticketholder",
     srcs = [
-        "semaphore_ticketholder.cpp",
         "ticketholder.cpp",
     ],
     hdrs = [
-        "semaphore_ticketholder.h",
         "ticketholder.h",
     ],
     deps = [

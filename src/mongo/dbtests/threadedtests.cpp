@@ -45,7 +45,6 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/str.h"
@@ -322,7 +321,7 @@ public:
         add<IsAtomicWordAtomic<AtomicWord<unsigned long long>>>();
         add<ThreadPoolTest>();
 
-        add<TicketHolderWaits<SemaphoreTicketHolder>>();
+        add<TicketHolderWaits<TicketHolder>>();
     }
 };
 
