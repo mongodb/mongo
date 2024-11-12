@@ -62,9 +62,10 @@ void estimateQsnCost(const QuerySolutionNode* node, EstimateMap& estimateMap) {
 }  // namespace
 
 void estimatePlanCost(const QuerySolution& plan,
-                      CardinalityEstimate collectionCard,
+                      QueryPlanRankerModeEnum mode,
+                      const stats::CollectionStatistics& collStats,
                       EstimateMap& estimateMap) {
-    CardinalityEstimator cardEstimator(collectionCard, estimateMap);
+    CardinalityEstimator cardEstimator(collStats, estimateMap, mode);
     cardEstimator.estimatePlan(plan);
     estimateQsnCost(plan.root(), estimateMap);
 }

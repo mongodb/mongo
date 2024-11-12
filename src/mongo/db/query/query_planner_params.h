@@ -42,6 +42,7 @@
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/stats/collection_statistics.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/shard_targeting_helpers.h"
 
@@ -69,6 +70,12 @@ struct PlannerCollectionInfo {
  * $lookup) useful for query planning.
  */
 struct CollectionInfo {
+    CollectionInfo() = default;
+    CollectionInfo(const CollectionInfo&) = delete;
+    CollectionInfo& operator=(const CollectionInfo&) = delete;
+    CollectionInfo(CollectionInfo&& other) noexcept = default;
+    CollectionInfo& operator=(CollectionInfo&&) noexcept = default;
+
     // See QueryPlannerParams::Options.
     // For secondary collections, this is currently unused (but may still be populated).
     size_t options{0 /* DEFAULT */};
@@ -86,6 +93,9 @@ struct CollectionInfo {
     // hints, this does not force the planner to prefer collection scans over other candidate
     // solutions. This is currently used for applying query settings '$natural' hints.
     boost::optional<NaturalOrderHint::Direction> collscanDirection = boost::none;
+
+    // Histogram-based statistics for fields in the collection.
+    std::unique_ptr<stats::CollectionStatistics> collStats{nullptr};
 };
 
 

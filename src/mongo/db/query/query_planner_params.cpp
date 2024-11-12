@@ -41,6 +41,7 @@
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/db/query/stats/collection_statistics_impl.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -446,7 +447,8 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
     }
     auto fillOutSecondaryInfo = [&](const NamespaceString& nss,
                                     const CollectionPtr& secondaryColl) {
-        auto secondaryInfo = CollectionInfo{.options = providedOptions};
+        CollectionInfo secondaryInfo;
+        secondaryInfo.options = providedOptions;
         if (secondaryColl) {
             fillOutIndexEntries(opCtx, canonicalQuery, secondaryColl, secondaryInfo.indexes);
             fillOutPlannerCollectionInfo(
@@ -531,12 +533,13 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     applyQuerySettingsOrIndexFiltersForMainCollection(canonicalQuery, collections);
 
     fillOutPlannerCollectionInfo(
-        opCtx,
-        mainColl,
-        &mainCollectionInfo.stats,
-        // Include collection statistics if cost-based ranker is enabled
-        canonicalQuery.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode() !=
-            QueryPlanRankerModeEnum::kMultiPlanning /* includeSizeStats */);
+        opCtx, mainColl, &mainCollectionInfo.stats, false /* includeSizeStats */);
+
+    if (canonicalQuery.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode() !=
+        QueryPlanRankerModeEnum::kMultiPlanning) {
+        mainCollectionInfo.collStats = std::make_unique<stats::CollectionStatisticsImpl>(
+            static_cast<double>(mainColl->getRecordStore()->numRecords()), canonicalQuery.nss());
+    }
 }
 
 void QueryPlannerParams::setTargetSbeStageBuilder(OperationContext* opCtx,

@@ -1628,12 +1628,12 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
     // This is a temporary stub implementation of CBR which arbitrarily picks the last of the
     // enumerated plans.
 
-    CardinalityEstimate collCard{
-        CardinalityType{static_cast<double>(params.mainCollectionInfo.stats.noOfRecords)},
-        EstimationSource::Metadata};
     EstimateMap estimates;
     for (auto&& soln : statusWithMultiPlanSolns.getValue()) {
-        estimatePlanCost(*soln, collCard, estimates);
+        estimatePlanCost(*soln,
+                         query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
+                         *params.mainCollectionInfo.collStats,
+                         estimates);
     }
 
     std::vector<std::unique_ptr<QuerySolution>> acceptedSoln;

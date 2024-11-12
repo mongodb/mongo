@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/stats/ce_histogram.h"
+#include "mongo/db/exec/sbe/values/value.h"
 
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 

@@ -30,6 +30,7 @@
 #include <sstream>
 
 #include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
+#include "mongo/db/query/ce/histogram_estimation_impl.h"
 
 namespace mongo::ce {
 

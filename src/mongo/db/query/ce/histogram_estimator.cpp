@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/ce/histogram_estimator.h"
+#include "mongo/db/query/ce/histogram_estimation_impl.h"
 
 namespace mongo::ce {
 

@@ -50,6 +50,17 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "collection_statistics_interface",
+    srcs = [],
+    hdrs = [
+        "collection_statistics.h",
+    ],
+    deps = [
+        ":stats_histograms",
+    ],
+)
+
+mongo_cc_library(
     name = "stats",
     srcs = [
         "collection_statistics_impl.cpp",
@@ -58,7 +69,6 @@ mongo_cc_library(
         "stats_catalog.cpp",
     ],
     hdrs = [
-        "collection_statistics.h",
         "collection_statistics_impl.h",
         "stats_cache.h",
         "stats_cache_loader.h",
@@ -66,6 +76,7 @@ mongo_cc_library(
         "stats_catalog.h",
     ],
     deps = [
+        ":collection_statistics_interface",
         ":stats_histograms",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/util:caching",  # TODO(SERVER-93876): Remove.

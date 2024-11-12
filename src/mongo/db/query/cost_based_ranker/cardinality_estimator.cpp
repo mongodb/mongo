@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
 
+#include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
 #include "mongo/db/query/stage_types.h"
 
@@ -330,7 +331,22 @@ CardinalityEstimate CardinalityEstimator::estimate(const OrderedIntervalList* no
     // the sum of cardinalities of the intervals. Therefore interval selectivities are summed.
     CardinalityEstimate resultCard = minCE;
     for (const auto& interval : node->intervals) {
-        SelectivityEstimate sel = estimateInterval(interval, _inputCard);
+        SelectivityEstimate sel = [&] {
+            if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
+                _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+                auto histogram = _collStats.getHistogram(node->name);
+                if (histogram) {
+                    bool canEstimate =
+                        ce::HistogramEstimator::canEstimateInterval(*histogram, interval, true);
+                    if (canEstimate) {
+                        return ce::HistogramEstimator::estimateCardinality(
+                                   *histogram, _inputCard, interval, true) /
+                            _inputCard;
+                    }
+                }
+            }
+            return estimateInterval(interval, _inputCard);
+        }();
         resultCard += sel * _inputCard;
     }
     resultCard = std::min(resultCard, _inputCard);

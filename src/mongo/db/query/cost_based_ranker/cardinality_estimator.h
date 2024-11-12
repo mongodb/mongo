@@ -35,6 +35,7 @@
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stats/collection_statistics.h"
 
 namespace mongo::cost_based_ranker {
 
@@ -56,8 +57,14 @@ concept UnionType = std::same_as<T, OrNode> || std::same_as<T, MergeSortNode>;
  */
 class CardinalityEstimator {
 public:
-    CardinalityEstimator(CardinalityEstimate collCard, EstimateMap& qsnEstimates)
-        : _inputCard{collCard}, _qsnEstimates{qsnEstimates} {};
+    CardinalityEstimator(const stats::CollectionStatistics& collStats,
+                         EstimateMap& qsnEstimates,
+                         QueryPlanRankerModeEnum rankerMode)
+        : _inputCard{CardinalityEstimate{CardinalityType{collStats.getCardinality()},
+                                         EstimationSource::Metadata}},
+          _collStats(collStats),
+          _qsnEstimates{qsnEstimates},
+          _rankerMode(rankerMode) {}
 
     // Delete the copy and move constructors and assignment operator
     CardinalityEstimator(const CardinalityEstimator&) = delete;
@@ -132,10 +139,16 @@ private:
     // A subsequent conjunction will push again onto this stack.
     std::vector<SelectivityEstimate> _conjSels;
 
+    // Collection statistics contains cached histograms.
+    const stats::CollectionStatistics& _collStats;
+
     // A map from QSN to QSNEstimate that stores the final CE result for each QSN node.
     // Not owned by this class - it is passed by the user of this class, and is filled in with
     // entries during the estimation process.
     EstimateMap& _qsnEstimates;
+
+    // The cardinality estimate mode we are using for estimates.
+    QueryPlanRankerModeEnum _rankerMode;
 };
 
 }  // namespace mongo::cost_based_ranker

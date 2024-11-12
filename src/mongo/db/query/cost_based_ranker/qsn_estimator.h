@@ -32,6 +32,7 @@
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stats/collection_statistics.h"
 
 namespace mongo::cost_based_ranker {
 
@@ -40,7 +41,8 @@ namespace mongo::cost_based_ranker {
  * insert an entry into the EstimateMap out-param.
  */
 void estimatePlanCost(const QuerySolution& plan,
-                      CardinalityEstimate collectionCard,
+                      QueryPlanRankerModeEnum mode,
+                      const stats::CollectionStatistics& collStats,
                       EstimateMap& estimateMap);
 
 }  // namespace mongo::cost_based_ranker

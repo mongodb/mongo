@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/ce/histogram_estimation_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

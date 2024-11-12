@@ -57,6 +57,10 @@ using namespace mongo;
 
 class QueryPlannerPipelinePushdownTest : public QueryPlannerTest {
 protected:
+    QueryPlannerPipelinePushdownTest() : QueryPlannerTest() {
+        secondaryCollMap.emplace(kSecondaryNamespace, CollectionInfo());
+    }
+
     std::vector<boost::intrusive_ptr<DocumentSource>> makeInnerPipelineStages(
         const Pipeline& pipeline) {
         std::vector<boost::intrusive_ptr<DocumentSource>> stages;
@@ -77,8 +81,7 @@ protected:
 
     const NamespaceString kSecondaryNamespace =
         NamespaceString::createNamespaceString_forTest("test.other");
-    const std::map<NamespaceString, CollectionInfo> secondaryCollMap{
-        {kSecondaryNamespace, CollectionInfo()}};
+    std::map<NamespaceString, CollectionInfo> secondaryCollMap;
 };
 
 TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleGroup) {
