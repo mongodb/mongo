@@ -75,7 +75,7 @@ assert.commandWorked(sessionColl.insert({_id: "last in txn"}));
 
 jsTestLog("Confirm we cannot commit the transaction due to insufficient replication.");
 let res = session.commitTransaction_forTesting();
-assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
 jsTestLog("Find the start and commit optimes on the primary.");
 let txnTableEntry = getTxnTableEntry(primaryDB);

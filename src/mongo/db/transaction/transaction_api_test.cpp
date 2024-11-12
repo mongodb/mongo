@@ -99,7 +99,7 @@ const BSONObj kNoSuchTransactionResponse =
     BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction << kErrorLabelsFieldName
               << BSON_ARRAY(ErrorLabel::kTransientTransaction));
 
-const BSONObj kWriteConcernError = BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
+const BSONObj kWriteConcernError = BSON("code" << ErrorCodes::WriteConcernTimeout << "errmsg"
                                                << "mock");
 const BSONObj kResWithWriteConcernError =
     BSON("ok" << 1 << "writeConcernError" << kWriteConcernError);
@@ -1170,7 +1170,7 @@ TEST_F(TxnAPITest, DoesNotRetryOnNonTransientCommitErrorWithNonRetryableCommitWC
         });
     ASSERT(swResult.getStatus().isOK());
     ASSERT_EQ(swResult.getValue().cmdStatus, ErrorCodes::NoSuchTransaction);
-    ASSERT_EQ(swResult.getValue().wcError.toStatus(), ErrorCodes::WriteConcernFailed);
+    ASSERT_EQ(swResult.getValue().wcError.toStatus(), ErrorCodes::WriteConcernTimeout);
     ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::NoSuchTransaction);
 
     ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
@@ -1302,8 +1302,8 @@ TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
         });
     ASSERT(swResult.getStatus().isOK());
     ASSERT(swResult.getValue().cmdStatus.isOK());
-    ASSERT_EQ(swResult.getValue().wcError.toStatus(), ErrorCodes::WriteConcernFailed);
-    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::WriteConcernFailed);
+    ASSERT_EQ(swResult.getValue().wcError.toStatus(), ErrorCodes::WriteConcernTimeout);
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::WriteConcernTimeout);
 
     ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
     ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
@@ -1517,7 +1517,7 @@ TEST_F(TxnAPITest, RunThrowsOnCommitWCError) {
                                  return SemiFuture<void>::makeReady();
                              }),
         DBException,
-        ErrorCodes::WriteConcernFailed);
+        ErrorCodes::WriteConcernTimeout);
 }
 
 TEST_F(TxnAPITest, UnyieldsAfterBodyError) {

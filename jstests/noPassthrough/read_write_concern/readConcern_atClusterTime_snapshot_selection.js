@@ -73,7 +73,7 @@ primarySession.startTransaction({
 res = assert.commandWorked(primaryDB.runCommand({find: collName}));
 assert.eq(res.cursor.firstBatch.length, 2, printjson(res));
 assert.commandFailedWithCode(primarySession.commitTransaction_forTesting(),
-                             ErrorCodes.WriteConcernFailed);
+                             ErrorCodes.WriteConcernTimeout);
 
 // A read on the primary at the new cluster time succeeds.
 primarySession.startTransaction({

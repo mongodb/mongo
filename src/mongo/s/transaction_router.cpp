@@ -127,7 +127,7 @@ bool isCommitResultUnknown(const Status& commitStatus, const Status& commitWCSta
     if (!commitStatus.isOK()) {
         return isMongosRetriableError(commitStatus.code()) ||
             ErrorCodes::isExceededTimeLimitError(commitStatus) ||
-            commitStatus.code() == ErrorCodes::WriteConcernFailed ||
+            commitStatus.code() == ErrorCodes::WriteConcernTimeout ||
             commitStatus.code() == ErrorCodes::TransactionTooOld;
     }
 

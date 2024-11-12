@@ -320,7 +320,7 @@ var {
          */
         function isRetryableCode(code) {
             return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotPrimaryError(code) ||
-                ErrorCodes.isShutdownError(code) || ErrorCodes.WriteConcernFailed === code;
+                ErrorCodes.isShutdownError(code) || ErrorCodes.WriteConcernTimeout === code;
         }
 
         function runClientFunctionWithRetries(

@@ -172,7 +172,7 @@ const retryableErrs = [
     "NotPrimaryNoSecondaryOk",
     "NotPrimaryOrSecondary",
     "PrimarySteppedDown",
-    "WriteConcernFailed",
+    "WriteConcernTimeout",
     "WriteConcernLegacyOK",
     "UnknownReplWriteConcern",
     "UnsatisfiableWriteConcern",

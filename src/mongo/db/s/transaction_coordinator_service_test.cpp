@@ -76,7 +76,7 @@ namespace {
 
 const Date_t kCommitDeadline = Date_t::max();
 
-const BSONObj kDummyWriteConcernError = BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
+const BSONObj kDummyWriteConcernError = BSON("code" << ErrorCodes::WriteConcernTimeout << "errmsg"
                                                     << "dummy");
 
 const StatusWith<BSONObj> kNoSuchTransactionAndWriteConcernError =

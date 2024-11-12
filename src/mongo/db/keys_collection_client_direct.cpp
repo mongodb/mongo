@@ -69,7 +69,7 @@ bool isRetriableError(ErrorCodes::Error code, Shard::RetryPolicy options) {
     }
 
     if (options == Shard::RetryPolicy::kIdempotent) {
-        return code == ErrorCodes::WriteConcernFailed;
+        return code == ErrorCodes::WriteConcernTimeout;
     } else {
         invariant(options == Shard::RetryPolicy::kNotIdempotent);
         return false;

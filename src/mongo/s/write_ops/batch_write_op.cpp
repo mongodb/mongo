@@ -202,7 +202,6 @@ boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
     auto errCode = wcErrors.front().error.toStatus().code();
     if (wcErrors.size() != 1) {
         msg << "Multiple errors reported :: ";
-        errCode = ErrorCodes::WriteConcernFailed;
     }
 
     for (auto it = wcErrors.begin(); it != wcErrors.end(); ++it) {

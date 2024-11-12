@@ -3206,7 +3206,7 @@ protected:
 
     static const inline BSONObj kBulkWriteNoMatchResponseWithWCEMultipleWriteOps = [] {
         auto wce = WriteConcernErrorDetail();
-        wce.setStatus({ErrorCodes::WriteConcernFailed, "mock wc error"});
+        wce.setStatus({ErrorCodes::WriteConcernTimeout, "mock wc error"});
         return kBulkWriteNoMatchResponseMultipleWriteOps.addFields(
             BSON("writeConcernError" << wce.toBSON()));
     }();
@@ -3265,7 +3265,7 @@ protected:
 
     static const inline BSONObj kBulkWriteNoMatchResponseWithWCE = [] {
         auto wce = WriteConcernErrorDetail();
-        wce.setStatus({ErrorCodes::WriteConcernFailed, "mock wc error"});
+        wce.setStatus({ErrorCodes::WriteConcernTimeout, "mock wc error"});
         return kBulkWriteNoMatchResponse.addFields(BSON("writeConcernError" << wce.toBSON()));
     }();
 
@@ -3320,13 +3320,13 @@ protected:
 
     static const inline BSONObj kBulkWriteUpdateMatchResponseWithWCE = [] {
         auto wce = WriteConcernErrorDetail();
-        wce.setStatus({ErrorCodes::WriteConcernFailed, "mock wc error"});
+        wce.setStatus({ErrorCodes::WriteConcernTimeout, "mock wc error"});
         return kBulkWriteUpdateMatchResponse.addFields(BSON("writeConcernError" << wce.toBSON()));
     }();
 
     static const inline BSONObj kBulkWriteUpdateMatchResponseWithWCEMultipleWriteOps = [] {
         auto wce = WriteConcernErrorDetail();
-        wce.setStatus({ErrorCodes::WriteConcernFailed, "mock wc error"});
+        wce.setStatus({ErrorCodes::WriteConcernTimeout, "mock wc error"});
         return kBulkWriteUpdateMatchResponseMultipleWriteOps.addFields(
             BSON("writeConcernError" << wce.toBSON()));
     }();
@@ -6198,7 +6198,8 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
         ASSERT_OK(reply.replyItems[1].getStatus());
         ASSERT_EQUALS(reply.summaryFields.nErrors, 0);
         LOGV2(7695404, "WriteConcernError received", "wce"_attr = reply.wcErrors->getErrmsg());
-        ASSERT_EQUALS(reply.wcErrors->getCode(), ErrorCodes::WriteConcernFailed);
+        ASSERT_TRUE(reply.wcErrors->getCode() == ErrorCodes::WriteConcernTimeout ||
+                    reply.wcErrors->getCode() == ErrorCodes::UnsatisfiableWriteConcern);
     });
 
     // ShardA response.
@@ -6227,7 +6228,8 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
         ASSERT_OK(reply.replyItems[1].getStatus());
         ASSERT_EQUALS(reply.summaryFields.nErrors, 0);
         LOGV2(7695406, "WriteConcernError received", "wce"_attr = reply.wcErrors->getErrmsg());
-        ASSERT_EQUALS(reply.wcErrors->getCode(), ErrorCodes::WriteConcernFailed);
+        ASSERT_TRUE(reply.wcErrors->getCode() == ErrorCodes::WriteConcernTimeout ||
+                    reply.wcErrors->getCode() == ErrorCodes::UnsatisfiableWriteConcern);
     });
 
     // In the unordered case it isn't clear which of these is triggered for which shard request, but

@@ -25,7 +25,7 @@ export function killSession(db, collName) {
             } else {
                 assert.commandFailedWithCode(
                     res,
-                    [ErrorCodes.DuplicateKey, ErrorCodes.WriteConcernFailed],
+                    [ErrorCodes.DuplicateKey, ErrorCodes.WriteConcernTimeout],
                     'unexpected error code: ' + res.code + ': ' + res.message);
             }
 

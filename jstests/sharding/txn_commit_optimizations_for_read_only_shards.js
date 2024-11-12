@@ -316,8 +316,8 @@ const failureModes = {
                     // Router returns whatever error the first failed read commit failed with as a
                     // command error, even if it was a write concern error, since nothing durable
                     // could be written. This particular error isn't considered transient since
-                    // WriteWriteConcernFailed is not a transient code.
-                    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+                    // WriteWriteConcernTimeout is not a transient code.
+                    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
                     assert(!res.writeConcernError, res);
                     assert.eq(null, res.errorLabels);
 

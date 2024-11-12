@@ -68,7 +68,7 @@ const std::vector<ShardType> kShards{{"s1", "s1:123"}, {"s2", "s2:123"}};
 const Status kMockStatus = {ErrorCodes::InternalError, "test"};
 const BSONObj kMockErrorRes = BSON("ok" << 0 << "code" << kMockStatus.code());
 
-const BSONObj kMockWriteConcernError = BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
+const BSONObj kMockWriteConcernError = BSON("code" << ErrorCodes::WriteConcernTimeout << "errmsg"
                                                    << "Mock");
 const BSONObj kMockResWithWriteConcernError =
     BSON("ok" << 1 << "writeConcernError" << kMockWriteConcernError);
@@ -132,7 +132,7 @@ TEST_F(ShardingRefresherTest, refresherTwoShardsSecondErrors) {
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kMockStatus.code());
 }
 
-TEST_F(ShardingRefresherTest, refresherTwoShardsWriteConcernFailed) {
+TEST_F(ShardingRefresherTest, refresherTwoShardsWriteConcernTimeout) {
     auto opCtx = operationContext();
     auto nss = NamespaceString::createNamespaceString_forTest("mydb", "mycoll");
     auto future = launchAsync([&] {
@@ -143,7 +143,7 @@ TEST_F(ShardingRefresherTest, refresherTwoShardsWriteConcernFailed) {
         return kMockResWithWriteConcernError;
     });
 
-    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::WriteConcernFailed);
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::WriteConcernTimeout);
 }
 
 }  // namespace

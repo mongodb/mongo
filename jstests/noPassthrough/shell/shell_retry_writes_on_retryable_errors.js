@@ -77,7 +77,7 @@ testCommandIsRetried(
         try {
             enableCapture();
             const res = db[collName].insert({}, {writeConcern: {w: 2, wtimeout: 1000}});
-            assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+            assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
             disableCapture();
         } finally {
             // We disable the failpoint in a finally block to prevent issues arising from shutting

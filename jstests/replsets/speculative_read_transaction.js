@@ -61,7 +61,7 @@ function runTest(sessionOptions) {
         {readConcern: {level: "snapshot"}, writeConcern: {w: "majority", wtimeout: 5000}});
     assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 1});
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernFailed);
+                                 ErrorCodes.WriteConcernTimeout);
 
     // Allow the majority commit point to advance to allow the failed write concern to clear.
     restartServerReplication(secondary);
@@ -80,7 +80,7 @@ function runTest(sessionOptions) {
         {readConcern: {level: "local"}, writeConcern: {w: "majority", wtimeout: 5000}});
     assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 2});
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernFailed);
+                                 ErrorCodes.WriteConcernTimeout);
 
     // Allow the majority commit point to advance to allow the failed write concern to clear.
     restartServerReplication(secondary);
@@ -97,7 +97,7 @@ function runTest(sessionOptions) {
         {readConcern: {level: "majority"}, writeConcern: {w: "majority", wtimeout: 5000}});
     assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 3});
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernFailed);
+                                 ErrorCodes.WriteConcernTimeout);
 
     // Restart server replication to allow majority commit point to advance.
     restartServerReplication(secondary);

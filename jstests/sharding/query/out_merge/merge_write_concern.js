@@ -61,7 +61,7 @@ function testWriteConcernError(rs) {
         // $merge writeConcern errors are handled differently from normal writeConcern
         // errors. Rather than returing ok:1 and a WriteConcernError, the entire operation
         // fails.
-        assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+        assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
         assert.commandWorked(target.remove({}));
     });
 

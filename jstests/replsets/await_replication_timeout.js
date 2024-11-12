@@ -31,8 +31,8 @@ replTest.stop(2);
 // Test wtimeout
 var res = testDB.runCommand(
     {insert: collName, documents: [{a: 1}], writeConcern: {w: 3, wtimeout: 1000}});
-assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
-assert.eq(ErrorCodes.WriteConcernFailed, res.writeConcernError.code);
+assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
+assert.eq(ErrorCodes.WriteConcernTimeout, res.writeConcernError.code);
 
 // Test maxTimeMS timeout
 res = testDB.runCommand(
@@ -46,8 +46,8 @@ res = testDB.runCommand({
     writeConcern: {w: 3, wtimeout: 1000},
     maxTimeMS: 10 * 1000
 });
-assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
-assert.eq(ErrorCodes.WriteConcernFailed, res.writeConcernError.code);
+assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
+assert.eq(ErrorCodes.WriteConcernTimeout, res.writeConcernError.code);
 
 // Test with wtimeout > maxTimeMS
 res = testDB.runCommand({
@@ -60,8 +60,8 @@ assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
 
 // dropDatabase respects the 'w' field when it is stronger than the default of majority.
 res = testDB.runCommand({dropDatabase: 1, writeConcern: {w: 3, wtimeout: 1000}});
-assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
-assert.eq(ErrorCodes.WriteConcernFailed, res.writeConcernError.code);
+assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
+assert.eq(ErrorCodes.WriteConcernTimeout, res.writeConcernError.code);
 
 resetCollection(2);
 
@@ -75,7 +75,7 @@ stopServerReplication(secondary);
 // dropDatabase defaults to 'majority' when a weaker 'w' field is provided, but respects
 // 'wtimeout'.
 res = testDB.runCommand({dropDatabase: 1, writeConcern: {w: 1, wtimeout: 1000}});
-assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
 restartServerReplication(secondary);
 replTest.stopSet();

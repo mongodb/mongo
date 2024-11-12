@@ -70,7 +70,7 @@ assert.commandWorked(sessionDB.getCollection(collName).insert({_id: "last in txn
 
 jsTestLog("Committing transaction but fail on replication");
 let res = session.commitTransaction_forTesting();
-assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
 // Remember the start and commit OpTimes on primary.
 let txnTableEntry = getTxnTableEntry(testDB);

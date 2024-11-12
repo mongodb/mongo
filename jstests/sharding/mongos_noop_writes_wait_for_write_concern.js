@@ -44,8 +44,8 @@ function testCommandWithWriteConcern(cmd) {
     }
 
     if ("create" in cmd.req) {
-        // TODO SERVER-80103: create returns WriteConcernFailed as an ordinary error code instead of
-        // using the writeConcernError field.
+        // TODO SERVER-80103: create returns WriteConcernTimeout as an ordinary error code instead
+        // of using the writeConcernError field.
         return;
     }
 

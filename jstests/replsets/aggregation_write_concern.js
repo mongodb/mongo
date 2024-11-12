@@ -42,7 +42,7 @@ assert.commandFailedWithCode(testDB.runCommand({
     cursor: {},
     writeConcern: {w: "majority", wtimeout: 1000}
 }),
-                             ErrorCodes.WriteConcernFailed);
+                             ErrorCodes.WriteConcernTimeout);
 
 restartReplicationOnSecondaries(replTest);
 replTest.awaitLastOpCommitted();

@@ -2673,8 +2673,8 @@ TEST_F(BatchWriteExecTest, BatchedUpdateOneWithIdWithoutShardKeyWriteConcernErro
         BatchedCommandResponse response;
         WriteConcernErrorDetail wce;
         std::string msg = "wce error";
-        wce.setStatus(Status(ErrorCodes::WriteConcernFailed, msg));
-        wce.parseBSON(BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg" << msg), &msg);
+        wce.setStatus(Status(ErrorCodes::WriteConcernTimeout, msg));
+        wce.parseBSON(BSON("code" << ErrorCodes::WriteConcernTimeout << "errmsg" << msg), &msg);
         response.setWriteConcernError(new WriteConcernErrorDetail(wce));
         response.setStatus(Status::OK());
         return response.toBSON();
@@ -2693,7 +2693,7 @@ TEST_F(BatchWriteExecTest, BatchedUpdateOneWithIdWithoutShardKeyWriteConcernErro
     ASSERT_OK(response.getTopLevelStatus());
     ASSERT_NOT_EQUALS(response.getWriteConcernError(), nullptr);
     ASSERT_EQUALS(response.getWriteConcernError()->toStatus().code(),
-                  ErrorCodes::WriteConcernFailed);
+                  ErrorCodes::WriteConcernTimeout);
     ASSERT_EQ(0, response.getN());
 }
 
@@ -2798,8 +2798,8 @@ TEST_F(BatchWriteExecTest,
         BatchedCommandResponse response;
         WriteConcernErrorDetail wce;
         std::string msg = "wce error";
-        wce.setStatus(Status(ErrorCodes::WriteConcernFailed, msg));
-        wce.parseBSON(BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg" << msg), &msg);
+        wce.setStatus(Status(ErrorCodes::WriteConcernTimeout, msg));
+        wce.parseBSON(BSON("code" << ErrorCodes::WriteConcernTimeout << "errmsg" << msg), &msg);
         response.setWriteConcernError(new WriteConcernErrorDetail(wce));
         response.setStatus(Status::OK());
         return response.toBSON();

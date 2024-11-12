@@ -34,7 +34,7 @@ function assertWriteReplicates() {
 function assertWriteFailsToReplicate() {
     assert.commandFailedWithCode(
         primaryColl.update({_id: 0}, {$inc: {counter: 1}}, {writeConcern: {w: 2, wtimeout: 1000}}),
-        ErrorCodes.WriteConcernFailed);
+        ErrorCodes.WriteConcernTimeout);
 }
 
 // By default, the primary should be connected to the secondary. Replicating a write should

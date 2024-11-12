@@ -111,7 +111,7 @@ bool Shard::localIsRetriableError(ErrorCodes::Error code, RetryPolicy options) {
         } break;
 
         case Shard::RetryPolicy::kIdempotent: {
-            return code == ErrorCodes::WriteConcernFailed;
+            return code == ErrorCodes::WriteConcernTimeout;
         } break;
 
         case Shard::RetryPolicy::kIdempotentOrCursorInvalidated: {

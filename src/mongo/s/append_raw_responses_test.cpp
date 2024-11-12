@@ -90,7 +90,7 @@ const Status kShardNotFoundStatus{ErrorCodes::ShardNotFound, "dummy"};
 const Status kError1Status{ErrorCodes::HostUnreachable, "dummy"};
 const Status kError2Status{ErrorCodes::HostUnreachable, "dummy"};
 
-const Status kWriteConcernError1Status{ErrorCodes::WriteConcernFailed, "dummy"};
+const Status kWriteConcernError1Status{ErrorCodes::WriteConcernTimeout, "dummy"};
 const Status kWriteConcernError2Status{ErrorCodes::UnsatisfiableWriteConcern, "dummy"};
 
 executor::RemoteCommandResponse kOkResponse =

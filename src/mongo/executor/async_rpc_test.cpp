@@ -540,7 +540,7 @@ TEST_F(AsyncRPCTestFixture, WriteConcernError) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    const BSONObj writeConcernError = BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
+    const BSONObj writeConcernError = BSON("code" << ErrorCodes::WriteConcernTimeout << "errmsg"
                                                   << "mock");
     BSONObj resWithWriteConcernError = BSON("ok" << 1 << "writeConcernError" << writeConcernError);
 
@@ -565,7 +565,7 @@ TEST_F(AsyncRPCTestFixture, WriteConcernError) {
     ASSERT(extraInfo->isRemote());
     auto remoteError = extraInfo->asRemote();
     ASSERT_EQ(remoteError.getRemoteCommandWriteConcernError(),
-              Status(ErrorCodes::WriteConcernFailed, "mock"));
+              Status(ErrorCodes::WriteConcernTimeout, "mock"));
 
     // No top-level command or write errors expected
     ASSERT_EQ(remoteError.getRemoteCommandFirstWriteError(), Status::OK());

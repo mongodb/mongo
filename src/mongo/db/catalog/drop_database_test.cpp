@@ -321,7 +321,7 @@ void _testDropDatabaseResetsDropPendingStateIfAwaitReplicationFails(OperationCon
 
     ASSERT_TRUE(AutoGetDb(opCtx, nss.dbName(), MODE_X).getDb());
 
-    ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, dropDatabaseForApplyOps(opCtx, nss.dbName()));
+    ASSERT_EQUALS(ErrorCodes::WriteConcernTimeout, dropDatabaseForApplyOps(opCtx, nss.dbName()));
 
     AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
     auto db = autoDb.getDb();
@@ -338,7 +338,7 @@ TEST_F(DropDatabaseTest,
     // Update ReplicationCoordinatorMock so that awaitReplication() fails.
     _replCoord->setAwaitReplicationReturnValueFunction([](OperationContext*, const repl::OpTime&) {
         return repl::ReplicationCoordinator::StatusAndDuration(
-            Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
+            Status(ErrorCodes::WriteConcernTimeout, ""), Milliseconds(0));
     });
 
     _testDropDatabaseResetsDropPendingStateIfAwaitReplicationFails(_opCtx.get(), _nss, true);
@@ -351,7 +351,7 @@ TEST_F(DropDatabaseTest,
         [this](OperationContext*, const repl::OpTime&) {
             _removeDatabaseFromCatalog(_opCtx.get(), _nss.db_forTest());
             return repl::ReplicationCoordinator::StatusAndDuration(
-                Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
+                Status(ErrorCodes::WriteConcernTimeout, ""), Milliseconds(0));
         });
 
     _testDropDatabaseResetsDropPendingStateIfAwaitReplicationFails(_opCtx.get(), _nss, false);

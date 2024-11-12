@@ -522,7 +522,7 @@ function testInvalidWriteConcern(cmd) {
     // a writeConcernError object to exceed maximum BSON size.
     if (cmd.req.aggregate || cmd.req.mapReduce) {
         assert.commandFailedWithCode(
-            res, [ErrorCodes.WriteConcernFailed, ErrorCodes.UnknownReplWriteConcern]);
+            res, [ErrorCodes.WriteConcernTimeout, ErrorCodes.UnknownReplWriteConcern]);
 
         cmd.confirmFunc(cmd.isExpectedToWriteOnWriteConcernFailure);
     } else if (cmd.req.renameCollection) {

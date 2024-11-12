@@ -140,7 +140,7 @@ void addError(int code, const std::string& message, int index, BatchedCommandRes
 
 void addWCError(BatchedCommandResponse* response) {
     std::unique_ptr<WriteConcernErrorDetail> error(new WriteConcernErrorDetail);
-    error->setStatus({ErrorCodes::WriteConcernFailed, "mock wc error"});
+    error->setStatus({ErrorCodes::WriteConcernTimeout, "mock wc error"});
 
     response->setWriteConcernError(error.release());
 }

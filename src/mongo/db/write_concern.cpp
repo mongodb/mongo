@@ -387,7 +387,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
     // Replica set stepdowns and gle mode changes are thrown as errors
     repl::ReplicationCoordinator::StatusAndDuration replStatus =
         replCoord->awaitReplication(opCtx, replOpTime, writeConcernWithPopulatedSyncMode);
-    if (replStatus.status == ErrorCodes::WriteConcernFailed) {
+    if (replStatus.status == ErrorCodes::WriteConcernTimeout) {
         gleWtimeouts.increment();
         if (!writeConcern.getProvenance().isClientSupplied()) {
             gleDefaultWtimeouts.increment();

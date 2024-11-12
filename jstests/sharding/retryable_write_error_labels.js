@@ -335,7 +335,7 @@ const retryableCodes = [
     ErrorCodes.NetworkTimeout,
     ErrorCodes.SocketException,
     ErrorCodes.ExceededTimeLimit,
-    ErrorCodes.WriteConcernFailed
+    ErrorCodes.WriteConcernTimeout
 ];
 
 // mongos should never attach RetryableWriteError labels to retryable errors from shards.

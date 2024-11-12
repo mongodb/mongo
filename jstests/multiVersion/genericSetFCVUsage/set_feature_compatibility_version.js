@@ -271,7 +271,7 @@ function runReplicaSetTest(downgradeVersion) {
     res = primary.adminCommand(
         {setFeatureCompatibilityVersion: latestFCV, confirm: true, writeConcern: {wtimeout: 1000}});
     assert.eq(0, res.ok);
-    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
     restartServerReplication(secondary);
 
     // Downgrading the FCV should fail if a previous upgrade has not yet completed.
@@ -305,7 +305,7 @@ function runReplicaSetTest(downgradeVersion) {
         writeConcern: {wtimeout: 1000}
     });
     assert.eq(0, res.ok);
-    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
     restartServerReplication(secondary);
 
     if (lastContinuousFCV !== lastLTSFCV) {
@@ -332,7 +332,7 @@ function runReplicaSetTest(downgradeVersion) {
             writeConcern: {wtimeout: 1000}
         });
         assert.eq(0, res.ok);
-        assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+        assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
         restartServerReplication(secondary);
 
         // Upgrading the FCV to latest should fail if a previous upgrade to lastContinuous has not

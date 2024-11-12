@@ -14,8 +14,8 @@ const sampleWriteConcernError = {
     n: 1,
     ok: 1,
     writeConcernError: {
-        code: ErrorCodes.WriteConcernFailed,
-        codeName: "WriteConcernFailed",
+        code: ErrorCodes.WriteConcernTimeout,
+        codeName: "WriteConcernTimeout",
         errmsg: "waiting for replication timed out",
         errInfo: {
             wtimeout: true,
@@ -278,7 +278,7 @@ tests.push(function writeConcernErrorCausesCommandFailedToPass() {
 
     assert.doesNotThrow(() => {
         assert.commandFailed(result);
-        assert.commandFailedWithCode(result, ErrorCodes.WriteConcernFailed);
+        assert.commandFailedWithCode(result, ErrorCodes.WriteConcernTimeout);
     });
 });
 
@@ -340,8 +340,8 @@ tests.push(function assertCallsHangAnalyzer() {
         n: 1,
         ok: 1,
         writeConcernError: {
-            code: ErrorCodes.WriteConcernFailed,
-            codeName: "WriteConcernFailed",
+            code: ErrorCodes.WriteConcernTimeout,
+            codeName: "WriteConcernTimeout",
             errmsg: "foo",
         },
     };
@@ -372,7 +372,7 @@ tests.push(function assertCallsHangAnalyzer() {
         () => assert.commandFailedWithCode(nonTimeOutWriteConcernError, ErrorCodes.DuplicateKey),
         false);
     runAssertTest(
-        () => assert.commandFailedWithCode(sampleWriteConcernError, ErrorCodes.WriteConcernFailed),
+        () => assert.commandFailedWithCode(sampleWriteConcernError, ErrorCodes.WriteConcernTimeout),
         false);
 
     runAssertTest(() => assert.commandWorkedIgnoringWriteConcernErrors(sampleWriteConcernError),

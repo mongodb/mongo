@@ -595,7 +595,7 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
     repl::OpTime lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     auto awaitReplResult = replCoord->awaitReplication(opCtx, lastOpApplied, wc);
 
-    if (awaitReplResult.status == ErrorCodes::WriteConcernFailed) {
+    if (awaitReplResult.status == ErrorCodes::WriteConcernTimeout) {
         return Status(ErrorCodes::LinearizableReadConcernError,
                       "Failed to confirm that read was linearizable.");
     }

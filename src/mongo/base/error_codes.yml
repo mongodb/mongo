@@ -106,7 +106,7 @@ error_codes:
   - {code: 61, name: ShardKeyNotFound}
   - {code: 62, name: OplogOperationUnsupported}
   - {code: 63, name: OBSOLETE_StaleShardVersion}
-  - {code: 64, name: WriteConcernFailed, categories: [WriteConcernError]}
+  - {code: 64, name: WriteConcernTimeout, categories: [WriteConcernError]}
   - {code: 65, name: MultipleErrorsOccurred, extra: MultipleErrorsOccurredInfo}
   - {code: 66, name: ImmutableField}
   - {code: 67, name: CannotCreateIndex}

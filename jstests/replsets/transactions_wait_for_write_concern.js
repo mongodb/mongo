@@ -108,19 +108,19 @@ function runTest(readConcernLevel) {
 
     jsTestLog("Prepared Abort Test");
     assert.commandFailedWithCode(session2.abortTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernFailed);
+                                 ErrorCodes.WriteConcernTimeout);
 
     jsTestLog("Prepare Test");
     assert.commandFailedWithCode(
         session3.getDatabase('admin').adminCommand(
             {prepareTransaction: 1, writeConcern: {w: "majority", wtimeout: failTimeoutMS}}),
-        ErrorCodes.WriteConcernFailed);
+        ErrorCodes.WriteConcernTimeout);
     assert.commandFailedWithCode(session3.abortTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernFailed);
+                                 ErrorCodes.WriteConcernTimeout);
 
     jsTestLog("Unprepared Commit Test");
     assert.commandFailedWithCode(session4.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernFailed);
+                                 ErrorCodes.WriteConcernTimeout);
 
     jsTestLog("Prepared Commit Test");
     assert.commandFailedWithCode(session5.getDatabase('admin').adminCommand({
@@ -128,10 +128,10 @@ function runTest(readConcernLevel) {
         commitTimestamp: prepareTS5,
         writeConcern: {w: "majority", wtimeout: failTimeoutMS}
     }),
-                                 ErrorCodes.WriteConcernFailed);
+                                 ErrorCodes.WriteConcernTimeout);
     // Send commit with the shell helper to reset the shell's state.
     assert.commandFailedWithCode(session5.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernFailed);
+                                 ErrorCodes.WriteConcernTimeout);
 
     jsTestLog("Restart replication");
     restartReplicationOnSecondaries(rst);

@@ -42,7 +42,7 @@ try {
 
         const getMoreResponse = assert.commandFailedWithCode(
             testDB.runCommand({getMore: response.cursor.id, collection: source.getName()}),
-            ErrorCodes.WriteConcernFailed);
+            ErrorCodes.WriteConcernTimeout);
 
         // Test the same thing but using the shell helpers.
         let error = assert.throws(

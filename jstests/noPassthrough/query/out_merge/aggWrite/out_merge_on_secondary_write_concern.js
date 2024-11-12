@@ -58,7 +58,7 @@ function testWriteConcern(pipeline, comment) {
         comment: comment + "_fail",
         cursor: {}
     });
-    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
     assert(!res.hasOwnProperty("writeErrors"));
     assert(!res.hasOwnProperty("writeConcernError"));
 

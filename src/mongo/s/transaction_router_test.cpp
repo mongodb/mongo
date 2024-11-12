@@ -164,7 +164,7 @@ protected:
         BSON("ok" << 0 << "code" << kDummyRetryableStatus.code());
 
     const BSONObj kDummyWriteConcernError =
-        BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
+        BSON("code" << ErrorCodes::WriteConcernTimeout << "errmsg"
                     << "dummy");
 
     const BSONObj kDummyResWithWriteConcernError =

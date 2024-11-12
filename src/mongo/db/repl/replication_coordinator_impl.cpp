@@ -2460,9 +2460,9 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
 
     // If we get a timeout error and the opCtx deadline is >= the writeConcern wtimeout, then we
     // know the timeout was due to wtimeout (not opCtx deadline) and thus we return
-    // ErrorCodes::WriteConcernFailed.
+    // ErrorCodes::WriteConcernTimeout.
     if (status.code() == timeoutError && opCtxDeadline >= wTimeoutDate) {
-        status = Status{ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
+        status = Status{ErrorCodes::WriteConcernTimeout, "waiting for replication timed out"};
     }
 
     if (TestingProctor::instance().isEnabled() && !status.isOK()) {

@@ -43,6 +43,6 @@ rst.stop(2);
 jsTestLog("Issuing a w:3 write and confirming that it times out");
 
 assert.commandFailedWithCode(testColl.insert({"b": 2}, {writeConcern: {w: 3, wtimeout: 5 * 1000}}),
-                             ErrorCodes.WriteConcernFailed);
+                             ErrorCodes.WriteConcernTimeout);
 
 rst.stopSet();

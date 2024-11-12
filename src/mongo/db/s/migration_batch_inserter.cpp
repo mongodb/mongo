@@ -217,7 +217,7 @@ void MigrationBatchInserter::run(Status status) const try {
                             opCtx,
                             repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
                             _writeConcern);
-                    if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
+                    if (replStatus.status.code() == ErrorCodes::WriteConcernTimeout) {
                         LOGV2_WARNING(22011,
                                       "secondaryThrottle on, but doc insert timed out; continuing",
                                       "migrationId"_attr = _migrationId.toBSON(),
