@@ -40,6 +40,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_index_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
@@ -313,24 +314,48 @@ bool DistinctScan::isEOF() {
 }
 
 void DistinctScan::doSaveStateRequiresIndex() {
-    // We always seek, so we don't care where the cursor is.
-    if (_cursor)
+    if (_cursor && !_needsSequentialScan) {
+        // Unless we are 1) shard filtering, 2) not using an orphan chunk skipper, and 3) scanning
+        // past orphans, we always seek, so we don't care where the cursor is.
         _cursor->saveUnpositioned();
+    } else if (_cursor) {
+        // We are scanning past orphans; save the cursor position.
+        _cursor->save();
+    }
+
+    if (_fetchCursor) {
+        _fetchCursor->saveUnpositioned();
+    }
 }
 
 void DistinctScan::doRestoreStateRequiresIndex() {
-    if (_cursor)
+    if (_cursor) {
         _cursor->restore();
+    }
+
+    if (_fetchCursor) {
+        uassert(9623400,
+                "Could not restore collection cursor for fetching DISTINCT_SCAN",
+                _fetchCursor->restore());
+    }
 }
 
 void DistinctScan::doDetachFromOperationContext() {
-    if (_cursor)
+    if (_cursor) {
         _cursor->detachFromOperationContext();
+    }
+    if (_fetchCursor) {
+        _fetchCursor->detachFromOperationContext();
+    }
 }
 
 void DistinctScan::doReattachToOperationContext() {
-    if (_cursor)
+    if (_cursor) {
         _cursor->reattachToOperationContext(opCtx());
+    }
+    if (_fetchCursor) {
+        _fetchCursor->reattachToOperationContext(opCtx());
+    }
 }
 
 unique_ptr<PlanStageStats> DistinctScan::getStats() {

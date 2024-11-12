@@ -35,11 +35,13 @@ coll.createIndex({shardKey: 1});
 coll.createIndex({shardKey: 1, notShardKey: 1});
 
 const docs = [];
+let _id = 0;  // We don't want non-deterministic _ids in $$ROOT tests.
 for (const chunk of allChunks) {
     for (let i = 0; i < 3; i++) {
-        docs.push({shardKey: `${chunk}_${i}`, notShardKey: `1notShardKey_${chunk}_${i}`},
-                  {shardKey: `${chunk}_${i}`, notShardKey: `2notShardKey_${chunk}_${i}`},
-                  {shardKey: `${chunk}_${i}`, notShardKey: `3notShardKey_${chunk}_${i}`});
+        docs.push(
+            {_id: _id++, shardKey: `${chunk}_${i}`, notShardKey: `1notShardKey_${chunk}_${i}`},
+            {_id: _id++, shardKey: `${chunk}_${i}`, notShardKey: `2notShardKey_${chunk}_${i}`},
+            {_id: _id++, shardKey: `${chunk}_${i}`, notShardKey: `3notShardKey_${chunk}_${i}`});
     }
 }
 coll.insertMany(docs);
@@ -201,16 +203,16 @@ outputAggregationPlanAndResults(coll,
 outputAggregationPlanAndResults(coll,
                                 [{$group: {_id: "$shardKey", accum: {$last: "$notShardKey"}}}]);
 
-// TODO SERVER-96234: Uncomment these tests.
-// outputAggregationPlanAndResults(coll, [
-//     {$sort: {shardKey: 1, notShardKey: 1}},
-//     {$match: {shardKey: {$gt: "chunk1_s0"}}},
-//     {$group: {_id: "$shardKey", r: {$first: "$$ROOT"}}}
-// ]);
-// outputAggregationPlanAndResults(coll, [
-//     {$sort: {shardKey: 1, notShardKey: 1}},
-//     {$match: {shardKey: {$gt: "chunk1_s0"}}},
-//     {$group: {_id: "$shardKey", r: {$last: "$$ROOT"}}}
-// ]);
+subSection("with preceding $sort and intervening $match, output non-shard key field");
+outputAggregationPlanAndResults(coll, [
+    {$sort: {shardKey: 1, notShardKey: 1}},
+    {$match: {shardKey: {$gt: "chunk1_s0"}}},
+    {$group: {_id: "$shardKey", r: {$first: "$$ROOT"}}}
+]);
+outputAggregationPlanAndResults(coll, [
+    {$sort: {shardKey: 1, notShardKey: 1}},
+    {$match: {shardKey: {$gt: "chunk1_s0"}}},
+    {$group: {_id: "$shardKey", r: {$last: "$$ROOT"}}}
+]);
 
 shardingTest.stop();

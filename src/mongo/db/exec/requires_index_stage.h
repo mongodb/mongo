@@ -72,9 +72,9 @@ protected:
      */
     virtual void doRestoreStateRequiresIndex() = 0;
 
-    void doSaveStateRequiresCollection() final;
+    void doSaveStateRequiresCollection() override;
 
-    void doRestoreStateRequiresCollection() final;
+    void doRestoreStateRequiresCollection() override;
 
     const IndexDescriptor* indexDescriptor() const {
         return _entry ? _entry->descriptor() : nullptr;

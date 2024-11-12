@@ -9,8 +9,6 @@
  *   expects_explicit_underscore_id_index,
  *   # Index filter commands do not support causal consistency.
  *   does_not_support_causal_consistency,
- *   # TODO SERVER-95934: Remove tsan_incompatible.
- *   tsan_incompatible,
  * ]
  */
 
