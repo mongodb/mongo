@@ -117,6 +117,8 @@ MONGO_FAIL_POINT_DEFINE(pauseInHandleHeartbeatResponse);
 using executor::RemoteCommandRequest;
 
 auto& heartBeatHandleQueueSize = *MetricBuilder<Counter64>("repl.heartBeat.handleQueueSize");
+auto& heartBeatHandleMaxSeenQueueSize =
+    *MetricBuilder<Atomic64Metric>("repl.heartBeat.maxSeenHandleQueueSize");
 
 
 long long ReplicationCoordinatorImpl::_getElectionOffsetUpperBound(WithLock lk) {
@@ -212,6 +214,7 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
 
         // Pretend we sent a request so that _untrackHeartbeatHandle succeeds.
         _trackHeartbeatHandle(lk, handle, HeartbeatState::kSent, request.target);
+        invariant(_heartbeatHandles.contains(handle));
         replSetNameString = replSetName.toString();
     }
 
@@ -222,6 +225,10 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
     hangAfterTrackingNewHandleInHandleHeartbeatResponseForTest.pauseWhileSet();
 
     _handleHeartbeatResponse(cbData, replSetNameString);
+    {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        invariant(!_heartbeatHandles.contains(handle));
+    }
 }
 
 void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
@@ -1089,25 +1096,26 @@ void ReplicationCoordinatorImpl::_trackHeartbeatHandle(
     // reconfig. On reconfig, all current heartbeats get cancelled and new requests are sent out, so
     // there should not be a situation where the target node's HostAndPort changes but this
     // heartbeat handle remains active.
-    _heartbeatHandles.push_back({handle.getValue(), hbState, target});
+    _heartbeatHandles.insert({handle.getValue(), {hbState, target}});
+    if (_maxSeenHeartbeatQSize < _heartbeatHandles.size()) {
+        _maxSeenHeartbeatQSize = _heartbeatHandles.size();
+        heartBeatHandleMaxSeenQueueSize.set(_maxSeenHeartbeatQSize);
+    }
     heartBeatHandleQueueSize.increment();
 }
 
 void ReplicationCoordinatorImpl::_untrackHeartbeatHandle(
     WithLock, const executor::TaskExecutor::CallbackHandle& handle) {
-    const auto newEnd = std::remove_if(_heartbeatHandles.begin(),
-                                       _heartbeatHandles.end(),
-                                       [&](auto& hbHandle) { return hbHandle.handle == handle; });
-    invariant(newEnd != _heartbeatHandles.end());
-    heartBeatHandleQueueSize.decrement(std::distance(newEnd, _heartbeatHandles.end()));
-    _heartbeatHandles.erase(newEnd, _heartbeatHandles.end());
+    auto erased = _heartbeatHandles.erase(handle);
+    invariant(erased == 1);
+    heartBeatHandleQueueSize.decrement(erased);
 }
 
 void ReplicationCoordinatorImpl::_cancelHeartbeats(WithLock) {
     LOGV2_FOR_HEARTBEATS(4615630, 2, "Cancelling all heartbeats");
 
-    for (const auto& hbHandle : _heartbeatHandles) {
-        _replExecutor->cancel(hbHandle.handle);
+    for (const auto& [handle, mdata] : _heartbeatHandles) {
+        _replExecutor->cancel(handle);
     }
     // Heartbeat callbacks will remove themselves from _heartbeatHandles when they execute with
     // CallbackCanceled status, so it's better to leave the handles in the list, for now.
@@ -1128,17 +1136,17 @@ void ReplicationCoordinatorImpl::_restartScheduledHeartbeats(WithLock lk,
     const Date_t now = _replExecutor->now();
     stdx::unordered_set<HostAndPort> restartedTargets;
 
-    for (auto& hbHandle : _heartbeatHandles) {
+    for (auto& [handle, mdata] : _heartbeatHandles) {
         // Only cancel heartbeats that are scheduled. If a heartbeat request has already been
         // sent, we should wait for the response instead.
-        if (hbHandle.hbState != HeartbeatState::kScheduled) {
+        if (mdata.hbState != HeartbeatState::kScheduled) {
             continue;
         }
 
-        _replExecutor->cancel(hbHandle.handle);
+        _replExecutor->cancel(handle);
 
         // Track the members that we have cancelled heartbeats.
-        restartedTargets.insert(hbHandle.target);
+        restartedTargets.insert(mdata.target);
     }
 
     for (const auto& target : restartedTargets) {

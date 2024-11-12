@@ -957,8 +957,7 @@ private:
     };
 
     enum class HeartbeatState { kScheduled = 0, kSent = 1 };
-    struct HeartbeatHandle {
-        executor::TaskExecutor::CallbackHandle handle;
+    struct HeartbeatHandleMetadata {
         HeartbeatState hbState;
         HostAndPort target;
     };
@@ -1880,7 +1879,11 @@ private:
     mutable stdx::mutex _mutex;  // (S)
 
     // Handles to actively queued heartbeats.
-    std::vector<HeartbeatHandle> _heartbeatHandles;  // (M)
+    size_t _maxSeenHeartbeatQSize = 0;
+    stdx::unordered_map<executor::TaskExecutor::CallbackHandle,
+                        HeartbeatHandleMetadata,
+                        absl::Hash<executor::TaskExecutor::CallbackHandle>>
+        _heartbeatHandles;
 
     // When this node does not know itself to be a member of a config, it adds
     // every host that sends it a heartbeat request to this set, and also starts
