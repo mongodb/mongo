@@ -18,9 +18,6 @@ OWNERS.yml @10gen/server-root-ownership @svc-auto-approve-bot
 .mypy.ini @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 .prettierignore @10gen/devprod-correctness @svc-auto-approve-bot
 .prettierrc @10gen/devprod-correctness @svc-auto-approve-bot
-.pydocstyle @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
-.pylintrc @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
-.style.yapf @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 BUILD.bazel @10gen/devprod-build @svc-auto-approve-bot
 copy.bara.sky @IamXander @smcclure15 @svc-auto-approve-bot
 copy.bara.staging.sky @10gen/devprod-correctness @svc-auto-approve-bot

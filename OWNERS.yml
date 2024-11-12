@@ -37,18 +37,6 @@ filters:
   - ".prettierrc":
     approvers:
       - 10gen/devprod-correctness
-  - ".pydocstyle":
-    approvers:
-      - 10gen/devprod-correctness
-      - 10gen/devprod-build
-  - ".pylintrc":
-    approvers:
-      - 10gen/devprod-correctness
-      - 10gen/devprod-build
-  - ".style.yapf":
-    approvers:
-      - 10gen/devprod-correctness
-      - 10gen/devprod-build
   - "BUILD.bazel":
     approvers:
       - 10gen/devprod-build
