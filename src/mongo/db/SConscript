@@ -244,6 +244,33 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="service_context_d_test_fixture",
+    source=[
+        "service_context_d_test_fixture.cpp",
+    ],
+    LIBDEPS=[
+        "service_context_test_fixture",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/index_builds/index_builds_coordinator_mongod",
+        "$BUILD_DIR/mongo/db/repl/replmocks",
+        "$BUILD_DIR/mongo/util/clock_source_mock",
+        "$BUILD_DIR/mongo/util/periodic_runner_factory",
+        "auth/auth_impl_internal",
+        "auth/authserver",
+        "catalog/catalog_impl",
+        "commands/mongod",
+        "op_observer/op_observer",
+        "s/sharding_runtime_d",
+        "service_context_d",
+        "storage/devnull/storage_devnull",
+        "storage/storage_control",
+        "storage/storage_options",
+        "storage/wiredtiger/storage_wiredtiger",
+    ],
+)
+
 asioEnv = env.Clone()
 asioEnv.InjectThirdParty("asio")
 

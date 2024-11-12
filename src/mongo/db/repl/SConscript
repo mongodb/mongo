@@ -148,6 +148,31 @@ env.Library(
 )
 
 env.Library(
+    target="replmocks",
+    source=[
+        "replication_consistency_markers_mock.cpp",
+        "replication_coordinator_external_state_mock.cpp",
+        "replication_coordinator_mock.cpp",
+        "storage_interface_mock.cpp",
+        "oplog_fetcher_mock.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/executor/network_interface_mock",
+        "isself",
+        "oplog",
+        "oplog_buffer_blocking_queue",
+        "oplog_fetcher",
+        "repl_coordinator_interface",
+        "repl_settings",
+        "replica_set_aware_service",
+        "replica_set_messages",
+        "storage_interface",
+    ],
+)
+
+env.Library(
     target="sync_source_selector_mock",
     source=[
         "sync_source_selector_mock.cpp",
