@@ -400,18 +400,38 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
             "$_internalOwningShard is currently not supported on mongos",
             !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
+    auto expCtx = getExpressionContext();
+
     Value input = _children[0]->evaluate(root, variables);
     if (input.nullish()) {
         return Value(BSONNULL);
     }
 
+    uassert(9567000,
+            str::stream() << opName << " supports an object as its argument",
+            input.getType() == BSONType::Object);
+
     // Retrieve the values from the incoming document.
-    auto expCtx = getExpressionContext();
+    Value nsUnchecked = input["ns"_sd];
+    Value shardVersionUnchecked = input["shardVersion"_sd];
+    Value shardKeyValUnchecked = input["shardKeyVal"_sd];
+
+    uassert(9567001,
+            str::stream() << opName << " requires 'ns' argument to be an string",
+            nsUnchecked.getType() == BSONType::String);
     NamespaceString ns(NamespaceStringUtil::deserialize(
-        expCtx->ns.tenantId(), input["ns"_sd].getStringData(), expCtx->serializationCtxt));
-    const auto shardVersionObj = input["shardVersion"_sd].getDocument().toBson();
+        expCtx->ns.tenantId(), nsUnchecked.getStringData(), expCtx->serializationCtxt));
+
+    uassert(9567002,
+            str::stream() << opName << " requires 'shardVersion' argument to be an object",
+            shardVersionUnchecked.getType() == BSONType::Object);
+    const auto shardVersionObj = shardVersionUnchecked.getDocument().toBson();
     const auto shardVersion = ShardVersion::parse(BSON("" << shardVersionObj).firstElement());
-    const auto shardKeyVal = input["shardKeyVal"_sd].getDocument().toBson();
+
+    uassert(9567003,
+            str::stream() << opName << " requires 'shardKeyVal' argument to be an object",
+            shardKeyValUnchecked.getType() == BSONType::Object);
+    const auto shardKeyVal = shardKeyValUnchecked.getDocument().toBson();
 
     // Get the 'chunkManager' from the catalog cache.
     auto opCtx = expCtx->opCtx;
