@@ -76,6 +76,17 @@ public:
         return PartitionAccessor(_iter.get(), PartitionAccessor::Policy::kEndpoints);
     }
 
+    // Same as above, but include a sort order.
+    auto makeEndpointAccessor(
+        boost::intrusive_ptr<DocumentSourceMock> mock,
+        SortPattern sortPattern,
+        boost::optional<boost::intrusive_ptr<Expression>> partExpr = boost::none) {
+        if (!_iter)
+            _iter = std::make_unique<PartitionIterator>(
+                getExpCtx().get(), mock.get(), &_tracker, partExpr, sortPattern);
+        return PartitionAccessor(_iter.get(), PartitionAccessor::Policy::kEndpoints);
+    }
+
     auto makeManualAccessor(
         boost::intrusive_ptr<DocumentSourceMock> mock,
         boost::optional<boost::intrusive_ptr<Expression>> partExpr = boost::none) {
@@ -564,6 +575,58 @@ TEST_F(PartitionIteratorTest, ManualPolicy) {
     advance();
     ASSERT_EQ(_iter->getApproximateSize(), initialDocSize);
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[3].getDocument());
+}
+
+TEST_F(PartitionIteratorTest, RangeEndpointsRetrievedCorrectly) {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{Document{{"a", 0}},
+                                                                Document{{"a", 1}},
+                                                                Document{{"a", 2}},
+                                                                Document{{"a", 2}},
+                                                                Document{{"a", 2}},
+                                                                Document{{"a", 3}},
+                                                                Document{{"a", 4}}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    const auto sortPattern = SortPattern(BSON("a" << 1), getExpCtx());
+    auto accessor = makeEndpointAccessor(mock, sortPattern, boost::none);
+    // Mock a window with range -1/+1.
+    auto windowObj = BSON("window" << BSON("range" << BSON_ARRAY(-1 << 1)));
+    auto bounds = WindowBounds::parse(windowObj.firstElement(), sortPattern, getExpCtx().get());
+
+    // a = 0.
+    auto endpoints = accessor.getEndpoints(bounds);
+    ASSERT_EQ(endpoints->first, 0);
+    ASSERT_EQ(endpoints->second, 1);
+    advance();
+    // a = 1.
+    endpoints = accessor.getEndpoints(bounds);
+    ASSERT_EQ(endpoints->first, -1);
+    ASSERT_EQ(endpoints->second, 3);
+    advance();
+    // a = 2.
+    endpoints = accessor.getEndpoints(bounds);
+    ASSERT_EQ(endpoints->first, -1);
+    ASSERT_EQ(endpoints->second, 3);
+    advance();
+    // a = 2.
+    endpoints = accessor.getEndpoints(bounds);
+    ASSERT_EQ(endpoints->first, -2);
+    ASSERT_EQ(endpoints->second, 2);
+    advance();
+    // a = 2.
+    endpoints = accessor.getEndpoints(bounds);
+    ASSERT_EQ(endpoints->first, -3);
+    ASSERT_EQ(endpoints->second, 1);
+    advance();
+    // a = 3.
+    endpoints = accessor.getEndpoints(bounds);
+    ASSERT_EQ(endpoints->first, -3);
+    ASSERT_EQ(endpoints->second, 1);
+    advance();
+    // a = 4.
+    endpoints = accessor.getEndpoints(bounds);
+    ASSERT_EQ(endpoints->first, -1);
+    ASSERT_EQ(endpoints->second, 0);
+    // End of window.
 }
 
 }  // namespace
