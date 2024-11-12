@@ -117,6 +117,14 @@ public:
      */
     void fulfillPromisesBeforePersistingStateDoc();
 
+    /**
+     * Indicates that the ReshardingCoordinator::run method has been called.
+     */
+    void reshardingCoordinatorRunCalled() {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _reshardingCoordinatorRunCalled = true;
+    }
+
 private:
     /**
      * Does work necessary for both recoverable errors (failover/stepdown) and unrecoverable errors
@@ -151,6 +159,9 @@ private:
     SharedPromise<ReshardingCoordinatorDocument> _allRecipientsDone;
 
     SharedPromise<ReshardingCoordinatorDocument> _allDonorsDone;
+
+    // Tracks whether the ReshardingCoordinator::run method has been called.
+    bool _reshardingCoordinatorRunCalled = false;
 };
 
 }  // namespace mongo
