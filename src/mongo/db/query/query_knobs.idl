@@ -847,6 +847,16 @@ server_parameters:
     default: true
     redact: false
 
+  enableUnionWithVectorSearch:
+    description: "Enables $vectorSearch inside a $unionWith and changes where the
+    internalSearchIdLookup is added: it's moved from createFromBSON to a new desugar function,
+    which is called in prepareSearchPipelineLegacyExecutor."
+    set_at: [startup, runtime ]
+    cpp_varname: "enableUnionWithVectorSearch"
+    cpp_vartype: AtomicWord<bool>
+    default: true
+    redact: false
+
   enableTimeoutOfInactiveSessionCursors:
     description: "If true, cursors opened within sessions are eligible for inactive cursor timeout."
     set_at: [ startup, runtime ]

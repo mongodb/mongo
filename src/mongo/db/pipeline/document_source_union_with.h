@@ -104,9 +104,7 @@ public:
         : DocumentSource(kStageName, newExpCtx),
           _pipeline(original._pipeline->clone()),
           _userNss(original._userNss),
-          _userPipeline(original._userPipeline) {
-        _pipeline->getContext()->inUnionWith = true;
-    }
+          _userPipeline(original._userPipeline) {}
 
     ~DocumentSourceUnionWith() override;
 

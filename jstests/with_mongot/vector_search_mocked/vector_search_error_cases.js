@@ -50,8 +50,6 @@ assert.commandFailedWithCode(
 
 // $vectorSearch is not allowed in a sub-pipeline.
 assert.commandFailedWithCode(
-    runPipeline([{$unionWith: {coll: collName, pipeline: [makeVectorSearchStage()]}}]), 31441);
-assert.commandFailedWithCode(
     runPipeline([{$lookup: {from: collName, pipeline: [makeVectorSearchStage()], as: "lookup1"}}]),
     51047);
 assert.commandFailedWithCode(runPipeline([{$facet: {originalPipeline: [makeVectorSearchStage()]}}]),

@@ -91,11 +91,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     opts.optimize = !resolvedNs.pipeline.empty();
     opts.validator = validatorCallback;
 
+    auto newExpCtx = expCtx->copyForSubPipeline(expCtx->ns, resolvedNs.uuid);
+    newExpCtx->inUnionWith = true;
     return Pipeline::makePipelineFromViewDefinition(
-        expCtx->copyForSubPipeline(expCtx->ns, resolvedNs.uuid),
-        resolvedNs,
-        std::move(currentPipeline),
-        opts);
+        newExpCtx, resolvedNs, std::move(currentPipeline), opts);
 }
 
 }  // namespace
@@ -107,7 +106,6 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     if (!_pipeline->getContext()->ns.isOnInternalDb()) {
         globalOpCounters.gotNestedAggregate();
     }
-    _pipeline->getContext()->inUnionWith = true;
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(

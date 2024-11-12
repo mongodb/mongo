@@ -174,15 +174,35 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
         make_intrusive<DocumentSourceVectorSearch>(
             expCtx, executor::getMongotTaskExecutor(serviceContext), elem.embeddedObject())};
 
-    // Only add an idLookup stage once, when we reach the mongod that will execute the pipeline.
-    // Ignore the case where we have a stub 'mongoProcessInterface' because this only occurs during
-    // validation/analysis, e.g. for QE and pipeline-style updates.
-    if ((expCtx->mongoProcessInterface->isExpectedToExecuteQueries() &&
-         !expCtx->mongoProcessInterface->inShardedEnvironment(expCtx->opCtx)) ||
-        OperationShardingState::isComingFromRouter(expCtx->opCtx)) {
-        desugaredPipeline.insert(std::next(desugaredPipeline.begin()),
-                                 make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx));
+    // TODO: SERVER-85426 Remove this block of code (it's the original location id lookup
+    // was added to $vectorSearch, but that needed to be changed to support sharded
+    // $unionWith $vectorSearch)
+    if (!enableUnionWithVectorSearch.load()) {
+        // Only add an idLookup stage once, when we reach the mongod that will execute the pipeline.
+        // Ignore the case where we have a stub 'mongoProcessInterface' because this only occurs
+        // during validation/analysis, e.g. for QE and pipeline-style updates.
+        if ((expCtx->mongoProcessInterface->isExpectedToExecuteQueries() &&
+             !expCtx->mongoProcessInterface->inShardedEnvironment(expCtx->opCtx)) ||
+            OperationShardingState::isComingFromRouter(expCtx->opCtx)) {
+            desugaredPipeline.insert(std::next(desugaredPipeline.begin()),
+                                     make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx));
+        }
     }
+
+    return desugaredPipeline;
+}
+
+
+std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
+    auto executor = executor::getMongotTaskExecutor(pExpCtx->opCtx->getServiceContext());
+
+    std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
+        make_intrusive<DocumentSourceVectorSearch>(pExpCtx, executor, _originalSpec.getOwned())};
+
+    auto idLookupStage =
+        make_intrusive<DocumentSourceInternalSearchIdLookUp>(pExpCtx, _limit.value_or(0));
+    desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
+
     return desugaredPipeline;
 }
 

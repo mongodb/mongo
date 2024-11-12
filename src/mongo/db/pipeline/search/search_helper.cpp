@@ -66,6 +66,18 @@ void prepareSearchPipelineLegacyExecutor(Pipeline* pipeline, bool applyShardFilt
         Pipeline::stitch(&sources);
     }
 
+    // TODO: SERVER-85426 Take the below code out of the if statement--i.e., it should always
+    // happen.
+    if (enableUnionWithVectorSearch.load()) {
+        auto vectorSearchStage = pipeline->popFrontWithName(DocumentSourceVectorSearch::kStageName);
+        if (vectorSearchStage) {
+            auto desugaredPipeline =
+                dynamic_cast<DocumentSourceVectorSearch*>(vectorSearchStage.get())->desugar();
+            sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
+            Pipeline::stitch(&sources);
+        }
+    }
+
     auto internalSearchLookupIt = sources.begin();
     // Bail early if the pipeline is not $_internalSearchMongotRemote stage or doesn't need to apply
     // shardFilter.
