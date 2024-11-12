@@ -52,7 +52,11 @@ selector:
     - jstests/core/timeseries/timeseries_update_multi.js
     - jstests/core/query/distinct/distinct_semantics.js
     - jstests/core/timeseries/timeseries_union_with.js
+    - jstests/core/index/express_id_eq.js
+    - jstests/core/timeseries/bucket_granularity.js
     - jstests/core/timeseries/bucket_unpacking_with_match_fixed_buckets.js
+    - jstests/core/timeseries/timeseries_homogeneous_top_bottom.js
+    - jstests/core/timeseries/timeseries_filter_extended_range.js
     - jstests/core/timeseries/timeseries_findAndModify_deletes_hints.js
     - jstests/core/timeseries/timeseries_findAndModify_updates_hints.js
     - jstests/core/timeseries/timeseries_index_partial.js

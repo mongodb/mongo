@@ -1,8 +1,9 @@
+import {anyEq} from "jstests/aggregation/extras/utils.js";
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {getCollectionName, isTimeSeriesCollection} from "jstests/libs/cmd_object_utils.js";
 import {
     everyWinningPlan,
-    flattenQueryPlanTree,
+    formatQueryPlanner,
     getAggPlanStages,
     getEngine,
     getPlanStages,
@@ -438,10 +439,10 @@ export class QuerySettingsIndexHintsTests {
     assertQuerySettingsFallback(querySettingsQuery, ns) {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
-        const getWinningStages = (explain) =>
-            getQueryPlanners(explain)
-                .flatMap(queryPlan => getWinningPlanFromExplain(queryPlan, false))
-                .flatMap(flattenQueryPlanTree);
+        const getAllQueryPlans = (explain) => getQueryPlanners(explain).flatMap(queryPlanner => {
+            const {winningPlan, rejectedPlans} = formatQueryPlanner(queryPlanner);
+            return rejectedPlans.concat([winningPlan]);
+        });
 
         // It's not guaranteed for all the queries to preserve the order of the stages when
         // replanning (namely in the case of subplanning with $or statements). Flatten the plan tree
@@ -451,17 +452,16 @@ export class QuerySettingsIndexHintsTests {
         const explainWithoutQuerySettings = assert.commandWorked(
             this._db.runCommand(explainCmd),
             `Failed running ${tojson(explainCmd)} before setting query settings`);
-        const winningStagesWithoutQuerySettings = getWinningStages(explainWithoutQuerySettings);
+        const queryPlansWithoutQuerySettings = getAllQueryPlans(explainWithoutQuerySettings);
         this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
             const explainWithQuerySettings = assert.commandWorked(
                 this._db.runCommand(explainCmd),
-                `Failed running ${tojson(explainCmd)} after settings query settings`);
-            const winningStagesWithQuerySettings = getWinningStages(explainWithQuerySettings);
-            assert.sameMembers(
-                winningStagesWithQuerySettings,
-                winningStagesWithoutQuerySettings,
-                "Expected the query without query settings and the one with settings to have " +
-                    "identical plan stages.");
+                `Failed running ${tojson(explainCmd)} after setting query settings`);
+            const queryPlansWithQuerySettings = getAllQueryPlans(explainWithQuerySettings);
+            assert(anyEq(queryPlansWithoutQuerySettings, queryPlansWithQuerySettings),
+                   "Expected the query without query settings and the one with query settings to " +
+                       "have identical plans: " + tojson(queryPlansWithoutQuerySettings) +
+                       " != " + tojson(queryPlansWithQuerySettings));
             assert.eq(
                 explainWithQuerySettings.pipeline,
                 explainWithoutQuerySettings.pipeline,

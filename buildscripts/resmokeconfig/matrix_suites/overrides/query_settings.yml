@@ -6,7 +6,11 @@
       # SERVER-95208 Fix timeseries query failing in explain, but passing when running.
       - jstests/core/timeseries/timeseries_union_with.js
       # TODO SERVER-95456: Make CLUSTERED_IXSCANs obey query settings allowed indexes.
+      - jstests/core/index/express_id_eq.js
+      - jstests/core/timeseries/bucket_granularity.js
       - jstests/core/timeseries/bucket_unpacking_with_match_fixed_buckets.js
+      - jstests/core/timeseries/timeseries_homogeneous_top_bottom.js
+      - jstests/core/timeseries/timeseries_filter_extended_range.js
       - jstests/core/timeseries/timeseries_findAndModify_deletes_hints.js
       - jstests/core/timeseries/timeseries_findAndModify_updates_hints.js
       - jstests/core/timeseries/timeseries_index_partial.js
@@ -82,6 +86,8 @@
 - name: fallback_core_excludes
   value:
     exclude_files:
+      # TODO SERVER-96805 Investigate why wildcard index candidate plans are non-deterministic.
+      - jstests/core/index/wildcard/*.js
       # TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
       # queries.
       - jstests/core/query/find_with_resume_after_param.js
