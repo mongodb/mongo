@@ -890,8 +890,18 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     pipeline->validateCommon(alreadyOptimized);
 
     if (opts.attachCursorSource) {
+        // Creating AggregateCommandRequest in order to pass all necessary 'opts' to the
+        // preparePipelineForExecution().
+        AggregateCommandRequest aggRequest(expCtx->getNamespaceString(),
+                                           pipeline->serializeToBson());
         pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
-            pipeline.release(), opts.shardTargetingPolicy, std::move(opts.readConcern));
+            expCtx,
+            aggRequest,
+            pipeline.release(),
+            boost::none /* shardCursorsSortSpec */,
+            opts.shardTargetingPolicy,
+            std::move(opts.readConcern),
+            opts.useCollectionDefaultCollator);
     }
 
     return pipeline;
@@ -926,12 +936,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     aggRequest.setPipeline(pipeline->serializeToBson());
 
     return expCtx->getMongoProcessInterface()->preparePipelineForExecution(
+        expCtx,
         aggRequest,
         pipeline.release(),
-        expCtx,
         shardCursorsSortSpec,
         opts.shardTargetingPolicy,
-        std::move(readConcern));
+        std::move(readConcern),
+        opts.useCollectionDefaultCollator);
 }
 
 Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(

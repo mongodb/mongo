@@ -158,12 +158,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::preparePipeli
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::preparePipelineForExecution(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
-    boost::optional<BSONObj> readConcern) {
+    boost::optional<BSONObj> readConcern,
+    bool shouldUseCollectionDefaultCollator) {
     // On mongos we can't have local cursors.
     tassert(7393502,
             "shardTargetingPolicy cannot be kNotAllowed on mongos",
@@ -193,7 +194,7 @@ BSONObj MongosProcessInterface::preparePipelineAndExplain(Pipeline* ownedPipelin
 boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
-    UUID collectionUUID,
+    boost::optional<UUID> collectionUUID,
     const Document& filter,
     boost::optional<BSONObj> readConcern) {
     auto foreignExpCtx = expCtx->copyWith(nss, collectionUUID);

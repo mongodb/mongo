@@ -50,7 +50,9 @@ namespace mongo {
 
 std::unique_ptr<Pipeline, PipelineDeleter>
 StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRead(
-    Pipeline* ownedPipeline, boost::optional<const AggregateCommandRequest&> aggRequest) {
+    Pipeline* ownedPipeline,
+    boost::optional<const AggregateCommandRequest&> aggRequest,
+    bool shouldUseCollectionDefaultCollator) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
         ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
     pipeline->addInitialSource(
@@ -68,21 +70,21 @@ StubLookupSingleDocumentProcessInterface::preparePipelineForExecution(
 
 std::unique_ptr<Pipeline, PipelineDeleter>
 StubLookupSingleDocumentProcessInterface::preparePipelineForExecution(
+    const boost::intrusive_ptr<mongo::ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
-    boost::optional<BSONObj> readConcern) {
-    // Implement this method should any cases require setting aggregate command options via
-    // 'aggRequest'.
-    MONGO_UNREACHABLE;
+    boost::optional<BSONObj> readConcern,
+    bool shouldUseCollectionDefaultCollator) {
+    return attachCursorSourceToPipelineForLocalRead(
+        pipeline, aggRequest, shouldUseCollectionDefaultCollator);
 }
 
 boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
-    UUID collectionUUID,
+    boost::optional<UUID> collectionUUID,
     const Document& documentKey,
     boost::optional<BSONObj> readConcern) {
     // The namespace 'nss' may be different than the namespace on the ExpressionContext in the
