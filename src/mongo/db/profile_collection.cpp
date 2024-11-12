@@ -87,15 +87,20 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     BSONObjBuilder b(profileBufBuilder);
 
     {
+        auto curOp = CurOp::get(opCtx);
+
         Locker::LockerInfo lockerInfo;
-        shard_role_details::getLocker(opCtx)->getLockerInfo(&lockerInfo,
-                                                            CurOp::get(opCtx)->getLockStatsBase());
-        CurOp::get(opCtx)->debug().append(
-            opCtx,
-            lockerInfo.stats,
-            shard_role_details::getLocker(opCtx)->getFlowControlStats(),
-            false /*omitCommand*/,
-            b);
+        shard_role_details::getLocker(opCtx)->getLockerInfo(&lockerInfo, curOp->getLockStatsBase());
+
+        auto storageMetrics = curOp->getOperationStorageMetrics(
+            shard_role_details::getRecoveryUnit(opCtx)->getStorageMetrics());
+
+        curOp->debug().append(opCtx,
+                              lockerInfo.stats,
+                              shard_role_details::getLocker(opCtx)->getFlowControlStats(),
+                              storageMetrics,
+                              false /*omitCommand*/,
+                              b);
     }
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
@@ -223,7 +228,7 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
 
         CollectionOptions collectionOptions;
         collectionOptions.capped = true;
-        collectionOptions.cappedSize = 1024 * 1024;
+        collectionOptions.cappedSize = 1024ll * 1024;
 
         WriteUnitOfWork wunit(opCtx);
         repl::UnreplicatedWritesBlock uwb(opCtx);

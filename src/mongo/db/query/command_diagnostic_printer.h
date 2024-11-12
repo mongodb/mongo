@@ -68,7 +68,12 @@ private:
         // 'opDescription' and 'originatingCommand' are logged separately to avoid having to
         // truncate them due to the BSON size limit.
         const bool omitCommand = true;
-        curOp.debug().append(opCtx, {} /*lockStats*/, {} /*flowControlStats*/, omitCommand, bob);
+        curOp.debug().append(opCtx,
+                             {} /*lockStats*/,
+                             {} /*flowControlStats*/,
+                             {} /*storageMetrics*/,
+                             omitCommand,
+                             bob);
         return bob.obj();
     }
 };

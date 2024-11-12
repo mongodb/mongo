@@ -31,9 +31,12 @@ mongo_cc_library(
     name = "recovery_unit_base",
     srcs = [
         "recovery_unit.cpp",
-        "recovery_unit.h",
         "recovery_unit_noop.cpp",
+    ],
+    hdrs = [
+        "recovery_unit.h",
         "recovery_unit_noop.h",
+        "//src/mongo/db/storage:storage_metrics.h",
     ],
     deps = [
         "//src/mongo:base",

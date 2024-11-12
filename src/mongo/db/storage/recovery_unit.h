@@ -42,6 +42,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/storage_metrics.h"
 #include "mongo/db/storage/storage_stats.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -440,6 +441,13 @@ public:
      */
     virtual std::unique_ptr<StorageStats> computeOperationStatisticsSinceLastCall() {
         return (nullptr);
+    }
+
+    /**
+     * Retrieve metrics from the storage layer.
+     */
+    AtomicStorageMetrics& getStorageMetrics() {
+        return _storageMetrics;
     }
 
     /**
@@ -946,6 +954,7 @@ private:
     // Is constructed lazily when accessed or when an underlying storage snapshot is opened.
     boost::optional<Snapshot> _snapshot;
     State _state = State::kInactive;
+    AtomicStorageMetrics _storageMetrics;
     OperationContext* _opCtx = nullptr;
     bool _readOnly = false;
     bool _blockingAllowed = true;

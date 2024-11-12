@@ -187,12 +187,15 @@ void TransactionMetricsObserver::onAbort(OperationContext* opCtx,
     }
 }
 
-void TransactionMetricsObserver::onTransactionOperation(OperationContext* opCtx,
-                                                        OpDebug::AdditiveMetrics additiveMetrics,
-                                                        bool isPrepared) {
-    // Add the latest operation stats to the aggregate OpDebug::AdditiveMetrics object stored in the
-    // SingleTransactionStats instance on the TransactionMetricsObserver.
+void TransactionMetricsObserver::onTransactionOperation(
+    OperationContext* opCtx,
+    OpDebug::AdditiveMetrics additiveMetrics,
+    const SingleThreadedStorageMetrics& storageMetrics,
+    bool isPrepared) {
+    // Add the latest operation stats to the aggregate OpDebug::AdditiveMetrics and StorageMetrics
+    // objects stored in the SingleTransactionStats instance on the TransactionMetricsObserver.
     _singleTransactionStats.getOpDebug()->additiveMetrics.add(additiveMetrics);
+    _singleTransactionStats.getTransactionStorageMetrics() += storageMetrics;
 
     // If there are valid storage statistics for this operation, put those in the
     // SingleTransactionStats instance either by creating a new storageStats instance or by adding

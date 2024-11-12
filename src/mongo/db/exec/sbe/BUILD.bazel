@@ -211,6 +211,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:recovery_unit.h",
         "//src/mongo/db/storage:snapshot.h",
         "//src/mongo/db/storage:storage_engine.h",
+        "//src/mongo/db/storage:storage_metrics.h",
         "//src/mongo/db/storage:storage_stats.h",
         "//src/mongo/db/storage:temporary_record_store.h",
         "//src/mongo/db/storage:write_unit_of_work.h",

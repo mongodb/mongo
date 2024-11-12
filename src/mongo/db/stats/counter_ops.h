@@ -58,6 +58,10 @@ static void set(AtomicWord<long long>& counter, int64_t value) {
     counter.store(value);
 }
 
+static void set(AtomicWord<long long>& counter, const AtomicWord<long long>& value) {
+    counter.store(value.load());
+}
+
 static void add(int64_t& counter, int64_t value) {
     counter += value;
 }
@@ -70,5 +74,9 @@ static void add(AtomicWord<long long>& counter, int64_t value) {
     counter.addAndFetch(value);
 }
 
-}  // namespace counter_ops
+static void add(AtomicWord<long long>& counter, const AtomicWord<long long>& value) {
+    counter.addAndFetch(value.load());
+}
+
+};  // namespace counter_ops
 }  // namespace mongo
