@@ -2,9 +2,7 @@
  * Test that query stats are collected from data bearing nodes in specific sharding-specific
  * situations (e.g., a $unionWith targeting multiple sharded collections).
  *
- * @tags: [
- * featureFlagQueryStatsDataBearingNodes,
- * ]
+ * @tags: [requires_fcv_80]
  */
 
 import {
