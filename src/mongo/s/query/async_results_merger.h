@@ -125,6 +125,11 @@ public:
     ~AsyncResultsMerger();
 
     /**
+     * Returns a const reference to the parameters.
+     */
+    const AsyncResultsMergerParams& params() const;
+
+    /**
      * Returns true if all of the remote cursors are exhausted.
      */
     bool remotesExhausted() const;
@@ -538,7 +543,7 @@ private:
 
     OperationContext* _opCtx;
     std::shared_ptr<executor::TaskExecutor> _executor;
-    AsyncResultsMergerParams _params;
+    const AsyncResultsMergerParams _params;
     TailableModeEnum _tailableMode;
 
     // Must be acquired before accessing any data members (other than _params, which is read-only).

@@ -33,6 +33,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <utility>
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -43,7 +44,6 @@
 #include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/resource_yielders.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -67,10 +67,10 @@ DocumentSourceMergeCursors::DocumentSourceMergeCursors(
 }
 
 std::size_t DocumentSourceMergeCursors::getNumRemotes() const {
-    if (_armParams) {
-        return _armParams->getRemotes().size();
+    if (_blockingResultsMerger) {
+        return _blockingResultsMerger->getNumRemotes();
     }
-    return _blockingResultsMerger->getNumRemotes();
+    return _armParams->getRemotes().size();
 }
 
 BSONObj DocumentSourceMergeCursors::getHighWaterMark() {
@@ -81,16 +81,34 @@ BSONObj DocumentSourceMergeCursors::getHighWaterMark() {
 }
 
 bool DocumentSourceMergeCursors::remotesExhausted() const {
-    if (_armParams) {
+    if (!_blockingResultsMerger) {
         // We haven't started iteration yet.
         return false;
     }
     return _blockingResultsMerger->remotesExhausted();
 }
 
+Status DocumentSourceMergeCursors::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    if (!_blockingResultsMerger) {
+        // In cases where a cursor was established with a batchSize of 0, the first getMore
+        // might specify a custom maxTimeMS (AKA await data timeout). In these cases we will not
+        // have iterated the cursor yet so will not have populated the merger, but need to
+        // remember/track the custom await data timeout. We will soon iterate the cursor, so we
+        // just populate the merger now and let it track the await data timeout itself.
+        populateMerger();
+    }
+    return _blockingResultsMerger->setAwaitDataTimeout(awaitDataTimeout);
+}
+
+void DocumentSourceMergeCursors::addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
+    tassert(9535000, "_blockingResultsMerger must be set", _blockingResultsMerger);
+    recordRemoteCursorShardIds(newCursors);
+    _blockingResultsMerger->addNewShardCursors(std::move(newCursors));
+}
+
 void DocumentSourceMergeCursors::populateMerger() {
-    invariant(!_blockingResultsMerger);
-    invariant(_armParams);
+    tassert(9535001, "_blockingResultsMerger must not yet be set", !_blockingResultsMerger);
+    tassert(9535002, "_armParams must be set", _armParams);
 
     _blockingResultsMerger.emplace(
         pExpCtx->opCtx,
@@ -107,7 +125,7 @@ void DocumentSourceMergeCursors::populateMerger() {
 }
 
 std::unique_ptr<RouterStageMerge> DocumentSourceMergeCursors::convertToRouterStage() {
-    invariant(!_blockingResultsMerger, "Expected conversion to happen before execution");
+    tassert(9535003, "Expected conversion to happen before execution", !_blockingResultsMerger);
     return std::make_unique<RouterStageMerge>(
         pExpCtx->opCtx, pExpCtx->mongoProcessInterface->taskExecutor, std::move(*_armParams));
 }
@@ -126,8 +144,11 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
 }
 
 Value DocumentSourceMergeCursors::serialize(const SerializationOptions& opts) const {
-    invariant(!_blockingResultsMerger);
-    invariant(_armParams);
+    if (_blockingResultsMerger) {
+        return Value(Document{
+            {kStageName, _blockingResultsMerger->asyncResultsMergerParams().toBSON(opts)}});
+    }
+    tassert(9535004, "_armParams must be set", _armParams);
     return Value(Document{{kStageName, _armParams->toBSON(opts)}});
 }
 
@@ -166,7 +187,7 @@ void DocumentSourceMergeCursors::reattachToOperationContext(OperationContext* op
 
 void DocumentSourceMergeCursors::doDispose() {
     if (_blockingResultsMerger) {
-        invariant(!_ownCursors);
+        tassert(9535005, "_ownCursors must not be set", !_ownCursors);
         _blockingResultsMerger->kill(pExpCtx->opCtx);
     } else if (_ownCursors) {
         populateMerger();
@@ -174,13 +195,20 @@ void DocumentSourceMergeCursors::doDispose() {
     }
 }
 
-
 void DocumentSourceMergeCursors::recordRemoteCursorShardIds(
     const std::vector<RemoteCursor>& remoteCursors) {
     for (const auto& remoteCursor : remoteCursors) {
         tassert(5549103, "Encountered invalid shard ID", !remoteCursor.getShardId().empty());
         _shardsWithCursors.emplace(remoteCursor.getShardId().toString());
     }
+}
+
+boost::optional<NamespaceString> DocumentSourceMergeCursors::getAsyncResultMergerParamsNss_forTest()
+    const {
+    if (_armParams) {
+        return _armParams->getNss();
+    }
+    return boost::none;
 }
 
 }  // namespace mongo
