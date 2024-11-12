@@ -29,6 +29,7 @@
 import os, wiredtiger
 from wtscenario import make_scenarios
 from wtbackup import backup_base
+from wiredtiger import stat
 
 # test_import10.py
 #    Run import/export while backup cursor is open.
@@ -41,6 +42,12 @@ class test_import10(backup_base):
         ('import_with_metadata', dict(repair=False)),
         ('import_repair', dict(repair=True)),
     ])
+
+    def get_stat(self, stat):
+        stat_cursor = self.session.open_cursor('statistics:')
+        val = stat_cursor[stat][2]
+        stat_cursor.close()
+        return val
 
     def test_import_with_open_backup_cursor(self):
         # Create and populate the table.
@@ -71,11 +78,19 @@ class test_import10(backup_base):
         # First construct the config string for the default or repair import scenario,
         # then call create to import the table.
         if self.repair:
+            repair_expect = 1
             import_config = 'import=(enabled,repair=true)'
         else:
+            repair_expect = 0
             import_config = '{},import=(enabled,repair=false,file_metadata=({}))'.format(
                 original_db_table_config, original_db_file_config)
         self.session.create(table_uri, import_config)
+
+        imported = self.get_stat(stat.conn.session_table_create_import_success)
+        self.assertTrue(imported == 1)
+        # Check the number of repaired imports.
+        repair_stat = self.get_stat(stat.conn.session_table_create_import_repair)
+        self.assertTrue(repair_stat == repair_expect)
 
         # Verify object.
         self.verifyUntilSuccess(self.session, table_uri)

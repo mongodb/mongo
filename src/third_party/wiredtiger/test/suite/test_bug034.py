@@ -56,7 +56,7 @@ class test_bug34(wttest.WiredTigerTestCase):
         evict_cursor.close()
 
     def test_non_ts(self):
-        uri = 'table:test_bug033'
+        uri = 'table:test_bug034'
         create_params = 'key_format=S,value_format=S'
         self.session.create(uri, create_params)
         value1 = 'a' * 500
@@ -91,7 +91,7 @@ class test_bug34(wttest.WiredTigerTestCase):
 
             cursor.set_key(str(i))
             mods = [wiredtiger.Modify("b", 0, 1)]
-            self.assertEquals(cursor.modify(mods), 0)
+            self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction()
 
         # Apply update again to make sure that the update, modify and tombstome all go
@@ -114,7 +114,7 @@ class test_bug34(wttest.WiredTigerTestCase):
         session2.commit_transaction()
 
     def test_ts(self):
-        uri = 'table:test_bug033'
+        uri = 'table:test_bug034'
         create_params = 'key_format=S,value_format=S'
         self.session.create(uri, create_params)
         value1 = 'a' * 500
@@ -147,7 +147,7 @@ class test_bug34(wttest.WiredTigerTestCase):
 
             cursor.set_key(str(i))
             mods = [wiredtiger.Modify("b", 0, 1)]
-            self.assertEquals(cursor.modify(mods), 0)
+            self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(8))
 
         # Apply update again to make sure that the update, modify and tombstome all go

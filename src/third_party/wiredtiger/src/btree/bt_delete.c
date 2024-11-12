@@ -194,11 +194,21 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      */
     WT_ERR(__wt_page_parent_modify_set(session, ref, false));
 
-    WT_ERR(__wt_calloc_one(session, &ref->page_del));
-
-    /* History store truncation is non-transactional. */
-    if (!WT_IS_HS(session->dhandle))
+    /*
+     * Allocate and initialize `page_del` for pages, excluding those in the history store.
+     *
+     * A `null` `page_del` means that a fast-truncated page is globally visible. Since truncation in
+     * the history store is non-transactional and applies only to globally visible pages, ensure
+     * that `page_del` remains null for history store pages.
+     *
+     * An exception is selective backup, which can truncate non-globally visible history store
+     * pages. However, since this data is intended for permanent discard, it can also be treated as
+     * globally visible without causing issues.
+     */
+    if (!WT_IS_HS(session->dhandle)) {
+        WT_ERR(__wt_calloc_one(session, &ref->page_del));
         WT_ERR(__wt_txn_modify_page_delete(session, ref));
+    }
 
     *skipp = true;
     WT_STAT_CONN_DSRC_INCR(session, rec_page_delete_fast);

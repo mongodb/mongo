@@ -1032,6 +1032,7 @@ struct __wt_connection_stats {
     int64_t session_table_create_fail;
     int64_t session_table_create_success;
     int64_t session_table_create_import_fail;
+    int64_t session_table_create_import_repair;
     int64_t session_table_create_import_success;
     int64_t session_table_drop_fail;
     int64_t session_table_drop_success;

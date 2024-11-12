@@ -3,6 +3,7 @@ from layercparse import Module
 extraFiles = ["src/include/wiredtiger.in"]
 
 modules = [
+    # Modules in subdirectories of src/
     Module("block"),
     Module("block_cache", fileAliases=["block_chunkcache"], sourceAliases = ["blkcache", "bm"]),
     Module("bloom"),
@@ -30,6 +31,7 @@ modules = [
     Module("txn", sourceAliases=["truncate"]),
     # Module("utilities"),
 
+    # Directory-less modules
     Module("bitstring"),
     Module("cell"),
     Module("checkpoint", sourceAliases=["ckpt"]),

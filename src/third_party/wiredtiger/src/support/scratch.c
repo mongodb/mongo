@@ -274,6 +274,15 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
     size_t allocated;
     u_int i;
 
+    /*
+     * To prevent concurrent access to the scratch buffer, a lock should be acquired for internal
+     * sessions, which are shared across multiple threads. This is necessary to avoid situations
+     * where multiple threads attempt to access the same scratch buffer slot simultaneously,
+     * potentially leading to race condition.
+     */
+    if (F_ISSET(session, WT_SESSION_INTERNAL))
+        __wt_spin_lock(session, &session->scratch_lock);
+
     /* Don't risk the caller not catching the error. */
     *scratchp = NULL;
 
@@ -349,9 +358,15 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
 #endif
 
     *scratchp = *best;
+    if (F_ISSET(session, WT_SESSION_INTERNAL))
+        __wt_spin_unlock(session, &session->scratch_lock);
+
     return (0);
 
 err:
+    if (F_ISSET(session, WT_SESSION_INTERNAL))
+        __wt_spin_unlock(session, &session->scratch_lock);
+
     WT_RET_MSG(session, ret, "session unable to allocate a scratch buffer");
 }
 

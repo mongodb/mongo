@@ -706,6 +706,7 @@ conn_stats = [
     SessionOpStat('session_table_compact_timeout', 'table compact timeout', 'no_clear,no_scale'),
     SessionOpStat('session_table_create_fail', 'table create failed calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_create_import_fail', 'table create with import failed calls', 'no_clear,no_scale'),
+    SessionOpStat('session_table_create_import_repair', 'table create with import repair calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_create_import_success', 'table create with import successful calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_create_success', 'table create successful calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_drop_fail', 'table drop failed calls', 'no_clear,no_scale'),

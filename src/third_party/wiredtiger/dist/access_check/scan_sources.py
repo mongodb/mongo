@@ -23,7 +23,7 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, BrokenPipeError):
         print("\nInterrupted")
         sys.exit(1)
     except OSError as e:
