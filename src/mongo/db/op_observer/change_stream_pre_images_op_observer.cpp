@@ -33,7 +33,6 @@
 
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
-#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/transaction_resources.h"
 
 namespace mongo {
@@ -50,10 +49,6 @@ void writeChangeStreamPreImageEntry(
     // for writes during the oplog catchup phase are handled in the oplog application code.
     boost::optional<TenantId> tenantId,
     const ChangeStreamPreImage& preImage) {
-    if (repl::tenantMigrationInfo(opCtx)) {
-        return;
-    }
-
     ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(opCtx, tenantId, preImage);
 }
 

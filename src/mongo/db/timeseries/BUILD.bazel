@@ -199,7 +199,6 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/query/write_ops:delete_request_idl",
         "//src/mongo/db/query/write_ops:write_ops_exec_util",
-        "//src/mongo/db/repl:tenant_migration_decoration",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/db/update:update_common",

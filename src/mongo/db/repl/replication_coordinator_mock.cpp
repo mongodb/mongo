@@ -47,7 +47,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/write_concern_options.h"
@@ -243,7 +242,7 @@ Status ReplicationCoordinatorMock::checkCanServeReadsFor_UNSAFE(OperationContext
 
 bool ReplicationCoordinatorMock::shouldRelaxIndexConstraints(OperationContext* opCtx,
                                                              const NamespaceString& ns) {
-    return (!canAcceptWritesFor(opCtx, ns) || tenantMigrationInfo(opCtx));
+    return (!canAcceptWritesFor(opCtx, ns));
 }
 
 void ReplicationCoordinatorMock::setMyHeartbeatMessage(const std::string& msg) {

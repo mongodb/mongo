@@ -67,7 +67,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -466,8 +465,6 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     }
 
     write_ops::UpdateModification::DiffOptions options;
-    options.mustCheckExistenceForInsertOperations =
-        static_cast<bool>(repl::tenantMigrationInfo(opCtx));
     write_ops::UpdateModification u(
         updateBuilder.obj(), write_ops::UpdateModification::DeltaTag{}, options);
     u.verifierFunction = std::move(verifierFunction);
@@ -534,8 +531,6 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
         }
     }
     write_ops::UpdateModification::DiffOptions options;
-    options.mustCheckExistenceForInsertOperations =
-        static_cast<bool>(repl::tenantMigrationInfo(opCtx));
     write_ops::UpdateModification u(
         updateBuilder.obj(), write_ops::UpdateModification::DeltaTag{}, options);
     auto oid = batch->bucketId.oid;
@@ -573,10 +568,8 @@ void updateTimeseriesDocument(OperationContext* opCtx,
         collection_internal::kUpdateAllIndexes;  // Assume all indexes are affected.
     if (update.getU().type() == write_ops::UpdateModification::Type::kDelta) {
         diffFromUpdate = update.getU().getDiff();
-        updated = doc_diff::applyDiff(original.value(),
-                                      diffFromUpdate,
-                                      static_cast<bool>(repl::tenantMigrationInfo(opCtx)),
-                                      update.getU().verifierFunction);
+        updated = doc_diff::applyDiff(
+            original.value(), diffFromUpdate, false, update.getU().verifierFunction);
         diffOnIndexes = &diffFromUpdate;
         args.update = update_oplog_entry::makeDeltaOplogEntry(diffFromUpdate);
     } else if (update.getU().type() == write_ops::UpdateModification::Type::kTransform) {

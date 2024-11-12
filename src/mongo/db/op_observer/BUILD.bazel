@@ -212,7 +212,6 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/pipeline:change_stream_preimage",
         "//src/mongo/db/repl:optime",
-        "//src/mongo/db/repl:tenant_migration_decoration",
         "//src/mongo/db/transaction:transaction_operations",
     ],
 )
