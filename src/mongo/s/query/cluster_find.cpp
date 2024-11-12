@@ -681,7 +681,8 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                const ReadPreferenceSetting& readPref,
                                std::vector<BSONObj>* results,
                                bool* partialResultsReturned) {
-    CurOp::get(opCtx)->debug().queryHash = canonical_query_encoder::computeHash(query.encodeKey());
+    CurOp::get(opCtx)->debug().planCacheShapeHash =
+        canonical_query_encoder::computeHash(query.encodeKey());
 
     // If the user supplied a 'partialResultsReturned' out-parameter, default it to false here.
     if (partialResultsReturned) {

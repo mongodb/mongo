@@ -47,20 +47,20 @@ void logInactiveCacheEntry(const std::string& key) {
 }
 
 void logCreateInactiveCacheEntry(std::string&& query,
-                                 std::string&& queryHash,
+                                 std::string&& planCacheShapeHash,
                                  std::string&& planCacheKey,
                                  size_t newWorks) {
     LOGV2_DEBUG(20937,
                 1,
                 "Creating inactive cache entry for query",
                 "query"_attr = redact(query),
-                "queryHash"_attr = queryHash,
+                "planCacheShapeHash"_attr = planCacheShapeHash,
                 "planCacheKey"_attr = planCacheKey,
                 "newWorks"_attr = newWorks);
 }
 
 void logReplaceActiveCacheEntry(std::string&& query,
-                                std::string&& queryHash,
+                                std::string&& planCacheShapeHash,
                                 std::string&& planCacheKey,
                                 size_t works,
                                 size_t newWorks) {
@@ -68,14 +68,14 @@ void logReplaceActiveCacheEntry(std::string&& query,
                 1,
                 "Replacing active cache entry for query",
                 "query"_attr = redact(query),
-                "queryHash"_attr = queryHash,
+                "planCacheShapeHash"_attr = planCacheShapeHash,
                 "planCacheKey"_attr = planCacheKey,
                 "oldWorks"_attr = works,
                 "newWorks"_attr = newWorks);
 }
 
 void logNoop(std::string&& query,
-             std::string&& queryHash,
+             std::string&& planCacheShapeHash,
              std::string&& planCacheKey,
              size_t works,
              size_t newWorks) {
@@ -84,14 +84,14 @@ void logNoop(std::string&& query,
                 "Attempt to write to the planCache resulted in a noop, since there's already "
                 "an active cache entry with a lower works value",
                 "query"_attr = redact(query),
-                "queryHash"_attr = queryHash,
+                "planCacheShapeHash"_attr = planCacheShapeHash,
                 "planCacheKey"_attr = planCacheKey,
                 "oldWorks"_attr = works,
                 "newWorks"_attr = newWorks);
 }
 
 void logIncreasingWorkValue(std::string&& query,
-                            std::string&& queryHash,
+                            std::string&& planCacheShapeHash,
                             std::string&& planCacheKey,
                             size_t works,
                             size_t increasedWorks) {
@@ -99,14 +99,14 @@ void logIncreasingWorkValue(std::string&& query,
                 1,
                 "Increasing work value associated with cache entry",
                 "query"_attr = redact(query),
-                "queryHash"_attr = queryHash,
+                "planCacheShapeHash"_attr = planCacheShapeHash,
                 "planCacheKey"_attr = planCacheKey,
                 "oldWorks"_attr = works,
                 "increasedWorks"_attr = increasedWorks);
 }
 
 void logPromoteCacheEntry(std::string&& query,
-                          std::string&& queryHash,
+                          std::string&& planCacheShapeHash,
                           std::string&& planCacheKey,
                           size_t works,
                           size_t newWorks) {
@@ -114,14 +114,14 @@ void logPromoteCacheEntry(std::string&& query,
                 1,
                 "Inactive cache entry for query is being promoted to active entry",
                 "query"_attr = redact(query),
-                "queryHash"_attr = queryHash,
+                "planCacheShapeHash"_attr = planCacheShapeHash,
                 "planCacheKey"_attr = planCacheKey,
                 "oldWorks"_attr = works,
                 "newWorks"_attr = newWorks);
 }
 
 void logUnexpectedPinnedCacheEntry(std::string&& query,
-                                   std::string&& queryHash,
+                                   std::string&& planCacheShapeHash,
                                    std::string&& planCacheKey,
                                    std::string&& oldEntry,
                                    std::string&& newEntry,
@@ -131,7 +131,7 @@ void logUnexpectedPinnedCacheEntry(std::string&& query,
     LOGV2(8983103,
           "Found unexpected pinned plan cache entry",
           "query"_attr = redact(query),
-          "queryHash"_attr = queryHash,
+          "planCacheShapeHash"_attr = planCacheShapeHash,
           "planCacheKey"_attr = planCacheKey,
           "oldEntry"_attr = oldEntry,
           "newEntry"_attr = newEntry,

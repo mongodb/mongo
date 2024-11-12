@@ -1,5 +1,5 @@
 /**
- * Confirms that profiled find queries and corresponding logs have matching queryHashes.
+ * Confirms that profiled find queries and corresponding logs have matching 'planCacheShapeHash'es.
  * Same as log_and_profile_query_hash.js, but runs on a collection with no indexes to test the
  * Bonsai plan cache on M2-eligible queries.
  *
@@ -61,13 +61,16 @@ function runTestsAndGetHashes(db, {comment, test}) {
     print(tojson(logLine));
     assert.neq(logLine, null);
 
-    assert(profileEntry.hasOwnProperty("queryHash"), profileEntry);
+    assert(profileEntry.hasOwnProperty("planCacheShapeHash"), profileEntry);
     assert(profileEntry.hasOwnProperty("planCacheKey"), profileEntry);
-    assert(logLine.indexOf(profileEntry["queryHash"]) >= 0,
+    assert(logLine.indexOf(profileEntry["planCacheShapeHash"]) >= 0,
            `entry=${tojson(profileEntry)}, logLine=${tojson(logLine)}`);
     assert(logLine.indexOf(profileEntry["planCacheKey"]) >= 0,
            `entry=${tojson(profileEntry)}, logLine=${tojson(logLine)}`);
-    return {queryHash: profileEntry["queryHash"], planCacheKey: profileEntry["planCacheKey"]};
+    return {
+        planCacheShapeHash: profileEntry["planCacheShapeHash"],
+        planCacheKey: profileEntry["planCacheKey"]
+    };
 }
 
 // Add data.

@@ -123,7 +123,7 @@ public:
 
     void setLastUseDate(Date_t now) final;
 
-    boost::optional<uint32_t> getQueryHash() const final;
+    boost::optional<uint32_t> getPlanCacheShapeHash() const final;
 
     boost::optional<std::size_t> getQueryStatsKeyHash() const final;
 

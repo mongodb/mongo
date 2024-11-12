@@ -106,7 +106,7 @@ void ClusterClientCursorMock::setLastUseDate(Date_t now) {
     _lastUseDate = std::move(now);
 }
 
-boost::optional<uint32_t> ClusterClientCursorMock::getQueryHash() const {
+boost::optional<uint32_t> ClusterClientCursorMock::getPlanCacheShapeHash() const {
     return boost::none;
 }
 

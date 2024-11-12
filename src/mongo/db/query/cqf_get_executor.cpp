@@ -1076,7 +1076,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 
     if (planCacheKey) {
         OpDebug& opDebug = CurOp::get(opCtx)->debug();
-        opDebug.queryHash = planCacheKey.get().queryHash();
+        opDebug.planCacheShapeHash = planCacheKey.get().planCacheShapeHash();
         opDebug.planCacheKey = planCacheKey.get().planCacheKeyHash();
     }
 

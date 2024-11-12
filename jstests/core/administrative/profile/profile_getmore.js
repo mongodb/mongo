@@ -9,6 +9,7 @@
 //   requires_profiling,
 // ]
 
+import {getPlanCacheShapeHashFromObject} from "jstests/libs/analyze_plan.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
@@ -65,7 +66,7 @@ assert(profileObj.locks.hasOwnProperty("Global"), profileObj);
 assert(profileObj.hasOwnProperty("millis"), profileObj);
 assert(!profileObj.hasOwnProperty("cursorExhausted"), profileObj);
 assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
-assert(profileObj.hasOwnProperty("queryHash"), profileObj);
+assert(getPlanCacheShapeHashFromObject(profileObj), profileObj);
 
 //
 // Confirm hasSortStage on getMore with a not-exhausted cursor and in-memory sort.

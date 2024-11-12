@@ -399,8 +399,9 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = f
         const cmdObj = originatingCommands[cmdName];
         const cmdRes = assert.commandWorked(db.runCommand(cmdObj));
         const expectedCountOfDocuments = 14;
-        // Make sure queryHash field is present of getMore logs following a find command.
-        const extra = cmdName === "find" ? {queryHash: ""} : {};
+        // Make sure 'planCacheShapeHash' field is present of "getMore" logs following a find
+        // command.
+        const extra = cmdName === "find" ? {planCacheShapeHash: ""} : {};
 
         testList.push({
             test: function(db) {

@@ -52,7 +52,7 @@ let logLine = [
     '"msg":"Slow query","attr":{"type":"command",',
     '"isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
     '"command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
-    '"queryHash":'
+    '"planCacheShapeHash":'
 ];
 
 // Check the logs to verify that find appears as above.
@@ -78,7 +78,7 @@ logLine = [
     `"msg":"Slow query","attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell","command":{"getMore":${
         cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
     '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
-    '"queryHash":'
+    '"planCacheShapeHash":'
 ];
 
 assertLogLineContains(conn, logLine);

@@ -376,7 +376,7 @@ public:
     // indexes are present.
     boost::optional<uint32_t> planCacheKey;
     // The hash of the query's "stable" key. This represents the query's shape.
-    boost::optional<uint32_t> queryHash;
+    boost::optional<uint32_t> planCacheShapeHash;
 
     /* The QueryStatsInfo struct was created to bundle all the queryStats related fields of CurOp &
      * OpDebug together (SERVER-83280).

@@ -14,6 +14,7 @@
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
 // ]
+import {getPlanCacheShapeHashFromObject} from "jstests/libs/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 if (checkSbeFullyEnabled(db)) {
@@ -57,8 +58,8 @@ assert.eq(1, coll.find({a: 1, b: 1}).itcount());
 shapes = dumpPlanCacheState();
 assert.eq(2, shapes.length, shapes);
 
-// Check that each shape has a unique queryHash.
-assert.neq(shapes[0]["queryHash"], shapes[1]["queryHash"]);
+// Check that each shape has a unique 'planCacheShapeHash'.
+assert.neq(getPlanCacheShapeHashFromObject(shapes[0]), getPlanCacheShapeHashFromObject(shapes[1]));
 
 // Check that queries with different regex options have distinct shapes.
 

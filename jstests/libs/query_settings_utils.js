@@ -87,7 +87,7 @@ export class QuerySettingsUtils {
     }
 
     /**
-     * Return query settings for the current tenant without query hashes.
+     * Return query settings for the current tenant without query shape hashes.
      */
     getQuerySettings({showDebugQueryShape = false,
                       showQueryShapeHash = false,
@@ -104,7 +104,7 @@ export class QuerySettingsUtils {
     }
 
     /**
-     * Return queryShapeHash for a given query from querySettings.
+     * Return 'queryShapeHash' for a given query from 'querySettings'.
      */
     getQueryHashFromQuerySettings(representativeQuery) {
         const settings =
@@ -151,17 +151,18 @@ export class QuerySettingsUtils {
                 ", expected query settings = " + tojson(rewrittenExpectedQueryShapeConfigurations));
 
         if (shouldRunExplain) {
-            for (const {representativeQuery,
-                        settings} of rewrittenExpectedQueryShapeConfigurations) {
-                this.assertExplainQuerySettings(representativeQuery, settings);
+            const settingsArray = this.getQuerySettings({showQueryShapeHash: true});
+            for (const {representativeQuery, settings, queryShapeHash} of settingsArray) {
+                this.assertExplainQuerySettings(representativeQuery, settings, queryShapeHash);
             }
         }
     }
 
     /**
-     * Asserts that the explain output for 'query' contains 'expectedQuerySettings'.
+     * Asserts that the explain output for 'query' contains 'expectedQuerySettings' and
+     * 'expectedQueryShapeHash'.
      */
-    assertExplainQuerySettings(query, expectedQuerySettings) {
+    assertExplainQuerySettings(query, expectedQuerySettings, expectedQueryShapeHash = undefined) {
         // Pass query without the $db field to explain command, because it injects the $db field
         // inside the query before processing.
         const explainCmd = getExplainCommand(this.withoutDollarDB(query));
@@ -171,6 +172,11 @@ export class QuerySettingsUtils {
                 this.assertEqualSettings(
                     expectedQuerySettings, queryPlanner.querySettings, queryPlanner);
             });
+
+            if (expectedQueryShapeHash) {
+                const {queryShapeHash} = explain;
+                assert.eq(queryShapeHash, expectedQueryShapeHash);
+            }
         }
     }
 

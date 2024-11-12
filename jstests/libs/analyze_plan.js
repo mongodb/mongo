@@ -973,44 +973,34 @@ export function assertStagesForExplainOfCommand({coll, cmdObj, expectedStages, s
 }
 
 /**
- * Utility to obtain a value from 'explainRes' using 'getValueCallback'.
- *
- * This helper function can be used for any optimizer.
+ * Get the 'planCacheKey' from 'explain'.
  */
-export function getFieldValueFromExplain(explainRes, getValueCallback) {
-    assert(explainRes.hasOwnProperty("queryPlanner"), explainRes);
-    const plannerOutput = explainRes.queryPlanner;
-    const fieldValue = getValueCallback(plannerOutput);
-    assert.eq(typeof fieldValue, "string");
-    return fieldValue;
+export function getPlanCacheKeyFromExplain(explain) {
+    return getQueryPlanners(explain)
+        .map(qp => {
+            assert(qp.hasOwnProperty("planCacheKey"));
+            return qp.planCacheKey;
+        })
+        .at(0);
 }
 
 /**
- * Get the 'planCacheKey' from 'explainRes'.
- *
- * This helper function can be used for any optimizer.
+ * Get the 'planCacheShapeHash' from 'object'.
  */
-export function getPlanCacheKeyFromExplain(explainRes) {
-    explainRes = getSingleNodeExplain(explainRes);
-    return getFieldValueFromExplain(explainRes, function(plannerOutput) {
-        return (plannerOutput.hasOwnProperty("winningPlan") &&
-                plannerOutput.winningPlan.hasOwnProperty("shards"))
-            ? plannerOutput.winningPlan.shards[0].planCacheKey
-            : plannerOutput.planCacheKey;
-    });
+export function getPlanCacheShapeHashFromObject(object) {
+    // TODO SERVER 93305: Remove deprecated 'queryHash' usages.
+    const planCacheShapeHash = object.planCacheShapeHash || object.queryHash;
+    assert.neq(planCacheShapeHash, undefined);
+    return planCacheShapeHash;
 }
 
 /**
- * Get the 'queryHash' from 'explainRes'.
- *
- * This helper function can be used for any optimizer.
+ * Get the 'planCacheShapeHash' from 'explain'.
  */
-export function getQueryHashFromExplain(explainRes) {
-    return getFieldValueFromExplain(explainRes, function(plannerOutput) {
-        return (plannerOutput.hasOwnProperty("winningPlan") &&
-                plannerOutput.winningPlan.hasOwnProperty("shards"))
-            ? plannerOutput.winningPlan.shards[0].queryHash
-            : plannerOutput.queryHash;
+export function getPlanCacheShapeHashFromExplain(explain) {
+    return getQueryPlanners(explain).map(getPlanCacheShapeHashFromObject).reduce((hash0, hash1) => {
+        assert.eq(hash0, hash1);
+        return hash0;
     });
 }
 
@@ -1168,8 +1158,8 @@ export function getNumberOfIndexScans(explain) {
  * This helper function can be used for any optimizer.
  */
 export function getNumberOfColumnScans(explain) {
-    // SERVER-77719: Update regarding the expected behavior of the CQF optimizer (what is the stage
-    // name for CQF for a column scan).
+    // SERVER-77719: Update regarding the expected behavior of the CQF optimizer (what is the
+    // stage name for CQF for a column scan).
     let stages = {"classic": "COLUMN_SCAN"};
     let optimizer = getOptimizer(explain);
     if (optimizer == "CQF") {

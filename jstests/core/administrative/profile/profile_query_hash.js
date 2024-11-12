@@ -1,4 +1,4 @@
-// Confirms that profile entries for find commands contain the appropriate query hash.
+// Confirms that profile entries for find commands contain the appropriate 'planCacheShapeHash'.
 //
 // @tags: [
 //   # The test runs commands that are not allowed with security token: setProfilingLevel.
@@ -9,15 +9,16 @@
 //   requires_profiling,
 // ]
 
+import {getPlanCacheShapeHashFromExplain} from "jstests/libs/analyze_plan.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
-const testDB = db.getSiblingDB("query_hash");
+const testDB = db.getSiblingDB("plan_cache_shape_hash");
 assert.commandWorked(testDB.dropDatabase());
 
 const coll = testDB.test;
 
 // Utility function to list query shapes in cache. The length of the list of query shapes
-// returned is used to validate the number of query hashes accumulated.
+// returned is used to validate the number of 'planCacheShapeHash' accumulated.
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.commandWorked(coll.insert({a: 1, b: 2}));
 assert.commandWorked(coll.insert({a: 1, b: 2}));
@@ -90,11 +91,11 @@ assert.neq(explainQuery2.queryPlanner.planCacheKey, profileObj0.planCacheKey, ex
 assert.eq(explainQuery2.queryPlanner.planCacheKey, profileObj2.planCacheKey, explainQuery2);
 
 // Now drop an index. This should change the 'planCacheKey' value for queries, but not the
-// 'queryHash'.
+// 'planCacheShapeHash'.
 assert.commandWorked(coll.dropIndex({a: 1}));
 const explainQuery2PostCatalogChange = assert.commandWorked(
     coll.find({a: 12000, b: 1}).comment("Query2 find command").explain("queryPlanner"));
-assert.eq(explainQuery2.queryPlanner.queryHash,
-          explainQuery2PostCatalogChange.queryPlanner.queryHash);
+assert.eq(getPlanCacheShapeHashFromExplain(explainQuery2),
+          getPlanCacheShapeHashFromExplain(explainQuery2PostCatalogChange));
 assert.neq(explainQuery2.queryPlanner.planCacheKey,
            explainQuery2PostCatalogChange.queryPlanner.planCacheKey);

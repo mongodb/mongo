@@ -2,8 +2,12 @@
  * Utility methods for reading planCache counters
  */
 
-import {getCachedPlan, getPlanStage} from "jstests/libs/analyze_plan.js";
-import {getEngine} from "jstests/libs/analyze_plan.js";
+import {
+    getCachedPlan,
+    getEngine,
+    getPlanCacheShapeHashFromObject,
+    getPlanStage
+} from "jstests/libs/analyze_plan.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 export function getPlanCacheSize(db) {
@@ -49,11 +53,11 @@ export function assertCacheUsage({
 
     const profileObj = getLatestProfilerEntry(
         queryColl.getDB(), {op: {$in: ["command", "getmore"]}, ns: queryColl.getFullName()});
-    const queryHash = profileObj.queryHash;
+    const planCacheShapeHash = getPlanCacheShapeHashFromObject(profileObj);
     const planCacheKey = profileObj.planCacheKey;
     assert.eq(fromMultiPlanning, !!profileObj.fromMultiPlanner, profileObj);
 
-    const entry = getPlansForCacheEntry(planCacheColl, {queryHash: queryHash});
+    const entry = getPlansForCacheEntry(planCacheColl, {planCacheShapeHash: planCacheShapeHash});
     assert.eq(cacheEntryVersion, entry.version, entry);
     assert.eq(cacheEntryIsActive, entry.isActive, entry);
 

@@ -28,7 +28,9 @@
  */
 
 #include "mongo/db/query/explain_common.h"
+
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/server_options.h"
@@ -73,6 +75,12 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
     out->append("internalQueryFrameworkControl", QueryFrameworkControl_serializer(queryControl));
     out->appendNumber("internalQueryPlannerIgnoreIndexWithCollationForRegex",
                       internalQueryPlannerIgnoreIndexWithCollationForRegex.load());
+}
+
+void generateQueryShapeHash(const OperationContext* opCtx, BSONObjBuilder* out) {
+    if (auto queryShapeHash = mongo::CurOp::get(opCtx)->getQueryShapeHash()) {
+        out->append("queryShapeHash", queryShapeHash->toHexString());
+    }
 }
 
 bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {

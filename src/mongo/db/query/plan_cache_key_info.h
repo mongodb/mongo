@@ -62,7 +62,7 @@ public:
     bool operator==(const PlanCacheKeyInfo& other) const = default;
     bool operator!=(const PlanCacheKeyInfo& other) const = default;
 
-    uint32_t queryHash() const {
+    uint32_t planCacheShapeHash() const {
         return canonical_query_encoder::computeHash(getQueryShapeStringData());
     }
 

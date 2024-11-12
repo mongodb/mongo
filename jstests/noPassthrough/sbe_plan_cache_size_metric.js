@@ -12,21 +12,21 @@
  * ]
  */
 
-import {getQueryHashFromExplain} from "jstests/libs/analyze_plan.js";
+import {getPlanCacheShapeHashFromExplain} from "jstests/libs/analyze_plan.js";
 import {getPlanCacheNumEntries, getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("sbe_plan_cache_size_metric");
 
-function getCacheEntriesByQueryHashKey(coll, queryHash) {
-    return coll.aggregate([{$planCacheStats: {}}, {$match: {queryHash}}]).toArray();
+function getCacheEntriesByQueryHashKey(coll, planCacheShapeHash) {
+    return coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheShapeHash}}]).toArray();
 }
 
 function assertQueryInPlanCache(coll, query) {
     const explainResult = assert.commandWorked(coll.explain().find(query).finish());
-    const queryHash = getQueryHashFromExplain(explainResult);
-    const planCacheEntries = getCacheEntriesByQueryHashKey(coll, queryHash);
+    const planCacheShapeHash = getPlanCacheShapeHashFromExplain(explainResult);
+    const planCacheEntries = getCacheEntriesByQueryHashKey(coll, planCacheShapeHash);
     assert.eq(1, planCacheEntries.length, planCacheEntries);
 }
 

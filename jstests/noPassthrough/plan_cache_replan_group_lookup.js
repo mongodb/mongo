@@ -582,8 +582,8 @@ testReplanningAndCacheInvalidationOnForeignCollSizeIncrease(false /* singleSolut
     if (sbePlanCacheEnabled) {
         runLookupQuery();
         const profileObj = getLatestProfilerEntry(db, {op: "command", ns: coll.getFullName()});
-        const matchingCacheEntries =
-            coll.getPlanCache().list([{$match: {queryHash: profileObj.queryHash}}]);
+        const matchingCacheEntries = coll.getPlanCache().list(
+            [{$match: {planCacheShapeHash: profileObj.planCacheShapeHash}}]);
         assert.eq(1, matchingCacheEntries.length);
     } else if (lookupUsedSbeByDefault && engineAfterDisableLookupPushdown == "classic") {
         // If the lookup used SBE by default, then we cannot re-use the cache entry when we re-run
@@ -708,7 +708,7 @@ if (sbePlanCacheEnabled) {
     runGroupQuery();
     const profileObj = getLatestProfilerEntry(db, {op: "command", ns: coll.getFullName()});
     const matchingCacheEntries =
-        coll.getPlanCache().list([{$match: {queryHash: profileObj.queryHash}}]);
+        coll.getPlanCache().list([{$match: {planCacheShapeHash: profileObj.planCacheShapeHash}}]);
     assert.eq(1, matchingCacheEntries.length);
 } else if (groupUsedSbeByDefault && engineUsedAfterGroupPushdownDisabled === "classic") {
     // In other cases, we will NOT be able to re-use the same cache entry, since the group query

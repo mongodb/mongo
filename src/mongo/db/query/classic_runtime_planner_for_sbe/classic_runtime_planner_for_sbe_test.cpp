@@ -857,7 +857,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbeCachedPlannerReplansOnHittingMaxNumRe
         auto mockCacheEntry =
             PlanCacheEntryBase<sbe::CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>::create(
                 entry->cachedPlan->clone(),
-                entry->queryHash,
+                entry->planCacheShapeHash,
                 entry->planCacheKey,
                 entry->planCacheCommandKey,
                 entry->timeOfCreation,

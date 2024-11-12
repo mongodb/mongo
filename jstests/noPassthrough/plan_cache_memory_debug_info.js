@@ -37,7 +37,7 @@ function getPlanCacheEntryForFilter(coll, filter) {
 function assertExistenceOfRequiredCacheEntryFields(entry) {
     assert(entry.hasOwnProperty("version"), entry);
     assert.eq(entry["version"], "1", entry);
-    assert(entry.hasOwnProperty("queryHash"), entry);
+    assert(entry.hasOwnProperty("planCacheShapeHash"), entry);
     assert(entry.hasOwnProperty("planCacheKey"), entry);
     assert(entry.hasOwnProperty("isActive"), entry);
     assert(entry.hasOwnProperty("works"), entry);

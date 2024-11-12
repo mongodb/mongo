@@ -146,7 +146,7 @@ if __name__ == "__main__":
             }
         ]
         },
-        "queryHash": "971E822A",
+        "planCacheShapeHash": "971E822A",
         "planCacheKey": "AA772AA3",
         "optimizationTimeMillis": 0,
         "maxIndexedOrSolutionsReached": false,

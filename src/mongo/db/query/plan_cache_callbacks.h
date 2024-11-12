@@ -51,31 +51,31 @@ namespace log_detail {
 void logInactiveCacheEntry(const std::string& key);
 void logCacheEviction(NamespaceString nss, std::string&& evictedEntry);
 void logCreateInactiveCacheEntry(std::string&& query,
-                                 std::string&& queryHash,
+                                 std::string&& planCacheShapeHash,
                                  std::string&& planCacheKey,
                                  size_t newWorks);
 void logReplaceActiveCacheEntry(std::string&& query,
-                                std::string&& queryHash,
+                                std::string&& planCacheShapeHash,
                                 std::string&& planCacheKey,
                                 size_t works,
                                 size_t newWorks);
 void logNoop(std::string&& query,
-             std::string&& queryHash,
+             std::string&& planCacheShapeHash,
              std::string&& planCacheKey,
              size_t works,
              size_t newWorks);
 void logIncreasingWorkValue(std::string&& query,
-                            std::string&& queryHash,
+                            std::string&& planCacheShapeHash,
                             std::string&& planCacheKey,
                             size_t works,
                             size_t increasedWorks);
 void logPromoteCacheEntry(std::string&& query,
-                          std::string&& queryHash,
+                          std::string&& planCacheShapeHash,
                           std::string&& planCacheKey,
                           size_t works,
                           size_t newWorks);
 void logUnexpectedPinnedCacheEntry(std::string&& query,
-                                   std::string&& queryHash,
+                                   std::string&& planCacheShapeHash,
                                    std::string&& planCacheKey,
                                    std::string&& oldEntry,
                                    std::string&& newEntry,
@@ -146,9 +146,9 @@ public:
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
         size_t newWorks) const final {
-        auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
+        auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logCreateInactiveCacheEntry(
-            _cq.toStringShort(), std::move(queryHash), std::move(planCacheKey), newWorks);
+            _cq.toStringShort(), std::move(planCacheShapeHash), std::move(planCacheKey), newWorks);
     }
 
     void onReplaceActiveCacheEntry(
@@ -157,9 +157,9 @@ public:
         size_t newWorks) const final {
         invariant(oldEntry);
         invariant(oldEntry->readsOrWorks);
-        auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
+        auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logReplaceActiveCacheEntry(_cq.toStringShort(),
-                                               std::move(queryHash),
+                                               std::move(planCacheShapeHash),
                                                std::move(planCacheKey),
                                                oldEntry->readsOrWorks->rawValue(),
                                                newWorks);
@@ -170,9 +170,9 @@ public:
                                 size_t newWorks) const final {
         invariant(oldEntry);
         invariant(oldEntry->readsOrWorks);
-        auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
+        auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logNoop(_cq.toStringShort(),
-                            std::move(queryHash),
+                            std::move(planCacheShapeHash),
                             std::move(planCacheKey),
                             oldEntry->readsOrWorks->rawValue(),
                             newWorks);
@@ -183,9 +183,9 @@ public:
                                size_t newWorks) const final {
         invariant(oldEntry);
         invariant(oldEntry->readsOrWorks);
-        auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
+        auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logIncreasingWorkValue(_cq.toStringShort(),
-                                           std::move(queryHash),
+                                           std::move(planCacheShapeHash),
                                            std::move(planCacheKey),
                                            oldEntry->readsOrWorks->rawValue(),
                                            newWorks);
@@ -196,9 +196,9 @@ public:
                              size_t newWorks) const final {
         invariant(oldEntry);
         invariant(oldEntry->readsOrWorks);
-        auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
+        auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logPromoteCacheEntry(_cq.toStringShort(),
-                                         std::move(queryHash),
+                                         std::move(planCacheShapeHash),
                                          std::move(planCacheKey),
                                          oldEntry->readsOrWorks->rawValue(),
                                          newWorks);
@@ -211,10 +211,10 @@ public:
         size_t newWorks) const final {
         tassert(8983101, "Expected oldEntry to not be null", oldEntry);
         tassert(8983102, "Expected oldEntry to be pinned", !oldEntry->readsOrWorks);
-        auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
+        auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
         auto newEntryDebugInfo = buildDebugInfo();
         log_detail::logUnexpectedPinnedCacheEntry(_cq.toStringShort(),
-                                                  std::move(queryHash),
+                                                  std::move(planCacheShapeHash),
                                                   std::move(planCacheKey),
                                                   oldEntry->debugString(),
                                                   newEntryDebugInfo.debugString(),
@@ -240,10 +240,10 @@ private:
     auto hashes(const KeyType& key,
                 const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry) const {
         // Avoid recomputing the hashes if we've got an old entry to grab them from.
-        return oldEntry
-            ? std::make_pair(zeroPaddedHex(oldEntry->queryHash),
-                             zeroPaddedHex(oldEntry->planCacheKey))
-            : std::make_pair(zeroPaddedHex(key.queryHash()), zeroPaddedHex(key.planCacheKeyHash()));
+        return oldEntry ? std::make_pair(zeroPaddedHex(oldEntry->planCacheShapeHash),
+                                         zeroPaddedHex(oldEntry->planCacheKey))
+                        : std::make_pair(zeroPaddedHex(key.planCacheShapeHash()),
+                                         zeroPaddedHex(key.planCacheKeyHash()));
     }
 
     const CanonicalQuery& _cq;

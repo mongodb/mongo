@@ -1253,8 +1253,8 @@ void OpDebug::report(OperationContext* opCtx,
     pAttrs->add("numYields", curop.numYields());
     OPDEBUG_TOATTR_HELP_OPTIONAL("nreturned", additiveMetrics.nreturned);
 
-    if (queryHash) {
-        pAttrs->addDeepCopy("queryHash", zeroPaddedHex(*queryHash));
+    if (planCacheShapeHash) {
+        pAttrs->addDeepCopy("planCacheShapeHash", zeroPaddedHex(*planCacheShapeHash));
     }
     if (planCacheKey) {
         pAttrs->addDeepCopy("planCacheKey", zeroPaddedHex(*planCacheKey));
@@ -1488,8 +1488,8 @@ void OpDebug::append(OperationContext* opCtx,
     b.appendNumber("numYield", curop.numYields());
     OPDEBUG_APPEND_OPTIONAL(b, "nreturned", additiveMetrics.nreturned);
 
-    if (queryHash) {
-        b.append("queryHash", zeroPaddedHex(*queryHash));
+    if (planCacheShapeHash) {
+        b.append("planCacheShapeHash", zeroPaddedHex(*planCacheShapeHash));
     }
     if (planCacheKey) {
         b.append("planCacheKey", zeroPaddedHex(*planCacheKey));
@@ -1795,9 +1795,9 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
         OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nreturned);
     });
 
-    addIfNeeded("queryHash", [](auto field, auto args, auto& b) {
-        if (args.op.queryHash) {
-            b.append(field, zeroPaddedHex(*args.op.queryHash));
+    addIfNeeded("planCacheShapeHash", [](auto field, auto args, auto& b) {
+        if (args.op.planCacheShapeHash) {
+            b.append(field, zeroPaddedHex(*args.op.planCacheShapeHash));
         }
     });
     addIfNeeded("planCacheKey", [](auto field, auto args, auto& b) {
