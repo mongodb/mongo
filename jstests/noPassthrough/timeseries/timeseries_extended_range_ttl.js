@@ -66,8 +66,4 @@ assert.commandWorked(coll().insert({[timeFieldName]: normalTime, doc: 6}));
 TTLUtil.waitForPass(db());
 assert.eq(coll().find().itcount(), 0);
 
-// As of SERVER-86451, time-series inconsistencies detected during validation
-// will error in testing, instead of being warnings. In this case,
-// validation on shutdown would fail, whereas before only a warning would be thrown.
-// TODO SERVER-87065: Look into re-enabling validation on shutdown.
-replTest.stopSet(null, false, {skipValidation: true});
+replTest.stopSet();

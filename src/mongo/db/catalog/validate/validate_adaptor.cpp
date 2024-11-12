@@ -76,6 +76,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
@@ -193,26 +194,28 @@ Status _validateTimeseriesCount(const BSONObj& control,
 }
 
 // Checks if the embedded timestamp in the bucket id field matches that in the 'control.min' field.
-Status _validateTimeSeriesIdTimestamp(const CollectionPtr& collection, const BSONObj& recordBson) {
-    // Compares both timestamps measured in seconds.
-    int64_t minTimestamp = recordBson.getField(timeseries::kBucketControlFieldName)
-                               .Obj()
-                               .getField(timeseries::kBucketControlMinFieldName)
-                               .Obj()
-                               .getField(collection->getTimeseriesOptions()->getTimeField())
-                               .timestamp()
-                               .asInt64() /
-        1000;
-    int64_t oidEmbeddedTimestamp =
-        recordBson.getField(timeseries::kBucketIdFieldName).OID().getTimestamp();
-    // TODO SERVER-87065: Re-enable this check in testing.
-    if (minTimestamp != oidEmbeddedTimestamp && !TestingProctor::instance().isEnabled()) {
-        return Status(
-            ErrorCodes::InvalidIdField,
-            fmt::format("Mismatch between the embedded timestamp {} in the time-series "
-                        "bucket '_id' field and the timestamp {} in 'control.min' field.",
-                        Date_t::fromMillisSinceEpoch(oidEmbeddedTimestamp * 1000).toString(),
-                        Date_t::fromMillisSinceEpoch(minTimestamp * 1000).toString()));
+Status _validateTimeSeriesIdTimestamp(OperationContext* opCtx,
+                                      const CollectionPtr& collection,
+                                      const BSONObj& recordBson) {
+    // Compares both timestamps as Dates.
+    auto minTimestamp = recordBson.getField(timeseries::kBucketControlFieldName)
+                            .Obj()
+                            .getField(timeseries::kBucketControlMinFieldName)
+                            .Obj()
+                            .getField(collection->getTimeseriesOptions()->getTimeField())
+                            .Date();
+
+    auto oidEmbeddedTimestamp = recordBson.getField(timeseries::kBucketIdFieldName).OID().asDateT();
+
+    // If this collection has extended-range measurements, we cannot assert that the
+    // minTimestamp matches the embedded timestamp.
+    if (minTimestamp != oidEmbeddedTimestamp &&
+        !timeseries::dateOutsideStandardRange(minTimestamp)) {
+        return Status(ErrorCodes::InvalidIdField,
+                      fmt::format("Mismatch between the embedded timestamp {} in the time-series "
+                                  "bucket '_id' field and the timestamp {} in 'control.min' field.",
+                                  oidEmbeddedTimestamp.toString(),
+                                  minTimestamp.toString()));
     }
     return Status::OK();
 }
@@ -336,22 +339,40 @@ Status _validateTimeSeriesMinMax(const CollectionPtr& coll,
     auto checkMinAndMaxMatch = [&]() {
         const auto options = coll->getTimeseriesOptions().value();
         if (fieldName == options.getTimeField()) {
-            // We only check that the max exactly matches the measurements, because with
-            // measurement-level deletes it is possible that the earliest measurements got deleted.
-            // Since we keep the bucket's minTime unchanged in that case, we cannot rely on the
-            // minTime always corresponding with what the actual minimum measurement time is. We
-            // can, however, rely on the fact that the rounded time of the earliest measurement is
-            // at greater than or equal to the control.min time-field.
+            // With measurement-level deletes (deletes with non-metafield filters) it is possible
+            // that the earliest measurements got deleted. Since we keep the bucket's minTime
+            // unchanged in that case, we cannot rely on the minTime always corresponding with what
+            // the actual minimum measurement time is. We can, however, rely on the fact that the
+            // rounded time of the earliest measurement is at greater than or equal to the
+            // control.min time-field.
             // TODO (SERVER-94872): Reinstate the strict equality check.
-            return timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(),
-                                                           options) >= controlMin.Date() &&
-                controlMax.Date() == max.getField(fieldName).Date();
+            auto minTimestampsMatch =
+                timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(), options) >=
+                timeseries::roundTimestampToGranularity(controlMin.Date(), options);
+            // For the maximum check, if we had measurements that were pre-1970 (the lower end of
+            // the extended range check), it is possible that the control.max value gets rounded up
+            // to the epoch and is greater than the observed maximum timestamp. In the case where
+            // the control.max is earlier than the epoch, we should relax the check.
+            auto maxTimestampsMatch = (max.getField(fieldName).Date() < Date_t())
+                ? controlMax.Date() >= max.getField(fieldName).Date()
+                : controlMax.Date() == max.getField(fieldName).Date();
+
+            return minTimestampsMatch && maxTimestampsMatch;
         } else {
-            return controlMin.wrap().woCompare(min) == 0 && controlMax.wrap().woCompare(max) == 0;
+            // We cannot guarantee that the field order of the BSON objects will be the same.
+            return controlMin.wrap().woCompare(min,
+                                               /*ordering=*/BSONObj(),
+                                               BSONObj::ComparisonRules::kConsiderFieldName |
+                                                   BSONObj::ComparisonRules::kIgnoreFieldOrder) ==
+                0 &&
+                controlMax.wrap().woCompare(max,
+                                            /*ordering=*/BSONObj(),
+                                            BSONObj::ComparisonRules::kConsiderFieldName |
+                                                BSONObj::ComparisonRules::kIgnoreFieldOrder) == 0;
         }
     };
-    // TODO SERVER-87065: re-enable in testing.
-    if (!checkMinAndMaxMatch() && !TestingProctor::instance().isEnabled()) {
+
+    if (!checkMinAndMaxMatch()) {
         return Status(
             ErrorCodes::BadValue,
             fmt::format(
@@ -648,7 +669,8 @@ Status _validateTimeSeriesDataFields(const CollectionPtr& coll,
 /**
  * Validates the consistency of a time-series bucket.
  */
-Status _validateTimeSeriesBucketRecord(const CollectionPtr& collection,
+Status _validateTimeSeriesBucketRecord(OperationContext* opCtx,
+                                       const CollectionPtr& collection,
                                        const BSONObj& recordBson,
                                        ValidateResults* results,
                                        bool shouldDecompressBSON) {
@@ -656,7 +678,8 @@ Status _validateTimeSeriesBucketRecord(const CollectionPtr& collection,
                             .Obj()
                             .getIntField(timeseries::kBucketControlVersionFieldName);
 
-    if (Status status = _validateTimeSeriesIdTimestamp(collection, recordBson); !status.isOK()) {
+    if (Status status = _validateTimeSeriesIdTimestamp(opCtx, collection, recordBson);
+        !status.isOK()) {
         return status;
     }
 
@@ -863,8 +886,12 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 _enforceTimeseriesBucketsAreAlwaysCompressed(recordBson, results);
 
                 // Checks for time-series collection consistency.
-                Status bucketStatus = _validateTimeSeriesBucketRecord(
-                    coll, recordBson, results, _validateState->isBSONConformanceValidation());
+                Status bucketStatus =
+                    _validateTimeSeriesBucketRecord(opCtx,
+                                                    coll,
+                                                    recordBson,
+                                                    results,
+                                                    _validateState->isBSONConformanceValidation());
                 // This log id should be kept in sync with the associated warning messages that are
                 // returned to the client.
                 if (!bucketStatus.isOK()) {

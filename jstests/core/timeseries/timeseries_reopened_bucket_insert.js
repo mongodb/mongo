@@ -59,11 +59,11 @@ const checkIfBucketReopened = function(
     resetCollection();
 
     const measurement1 = {
-        [timeField]: ISODate("2022-08-26T19:17:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Bucket1",
     };
     const measurement2 = {
-        [timeField]: ISODate("2022-08-26T19:18:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Bucket1",
     };
 
@@ -80,56 +80,51 @@ const checkIfBucketReopened = function(
     resetCollection();
 
     const measurement1 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "ReopenedBucket1",
     };
     const measurement2 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "ReopenedBucket1",
     };
     const measurement3 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "ReopenedBucket2",
     };
 
     const bucketDoc = {
-        "_id": ObjectId("01091c2c050b7495eaef4580"),
+        "_id": ObjectId("66ffbfe83d997f237a6b2009"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
         "meta": "ReopenedBucket1",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
     const missingClosedFlagBucketDoc = {
-        "_id": ObjectId("02091c2c050b7495eaef4581"),
+        "_id": ObjectId("66ffbfe83d997f237a6b200b"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("6700012b1561e0bf72d3880f"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("6700012b1561e0bf72d3880f"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
         },
         "meta": "ReopenedBucket2",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
 
     // Insert closed bucket into the system.buckets collection.
@@ -153,30 +148,28 @@ const checkIfBucketReopened = function(
     resetCollection();
 
     const measurement1 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: {b: 1, a: 1},
     };
-    const measurement2 = {[timeField]: ISODate("2022-08-26T19:19:00Z"), [metaField]: {b: 2, a: 2}};
+    const measurement2 = {[timeField]: ISODate("2024-10-04T10:14:00Z"), [metaField]: {b: 2, a: 2}};
 
     const bucketDoc = {
-        "_id": ObjectId("03091c2c050b7495eaef4580"),
+        "_id": ObjectId("66ffbfe83d997f237a6b2009"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
         "meta": {a: 1, b: 1},
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
 
     // Insert closed bucket into the system.buckets collection.
@@ -195,15 +188,15 @@ const checkIfBucketReopened = function(
     resetCollection();
 
     const measurement1 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Meta1",
     };
     const measurement2 = {
-        [timeField]: ISODate("2022-08-26T21:19:00Z"),
+        [timeField]: ISODate("2024-12-04T10:14:00Z"),
         [metaField]: "Meta1",
     };
     const measurement3 = {
-        [timeField]: ISODate("2022-08-26T19:20:00Z"),
+        [timeField]: ISODate("2024-10-04T10:15:00Z"),
         [metaField]: "Meta1",
     };
 
@@ -225,7 +218,7 @@ const checkIfBucketReopened = function(
     resetCollection();
 
     let initialMeasurements = [];
-    const timestamp = ISODate("2022-08-26T19:19:00Z");
+    const timestamp = ISODate("2024-10-04T10:14:00Z");
     for (let i = 0; i < 5; ++i) {
         initialMeasurements.push({
             [timeField]: timestamp,
@@ -233,7 +226,7 @@ const checkIfBucketReopened = function(
         });
     }
     const forward = {
-        [timeField]: ISODate("2022-08-27T19:19:00Z"),
+        [timeField]: ISODate("2024-10-05T10:14:00Z"),
         [metaField]: "ReopenedBucket1",
     };
     const backward = {
@@ -263,116 +256,85 @@ const checkIfBucketReopened = function(
     resetCollection();
 
     const measurement1 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "NonSuitableBucket1",
     };
     const measurement2 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "NonSuitableBucket2",
     };
     const measurement3 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
-        [metaField]: "NonSuitableBucket3",
-    };
-    const measurement4 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Meta",
     };
 
     const closedBucketDoc = {
-        "_id": ObjectId("04091c2c050b7495eaef4582"),
+        "_id": ObjectId("66ffbfe83d997f237a6b2009"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
+            "count": 1,
             "closed": true
         },
         "meta": "NonSuitableBucket1",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
-    const closedAndCompressedBucketDoc = {
-        "_id": ObjectId("06091c2c050b7495eaef4584"),
+    const year2000BucketDoc = {
+        "_id": ObjectId("39a818243d997f237a6b200a"),
+        "control": {
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
+            "min": {
+                "_id": ObjectId("66ffffe825f5121ebf23dbcd"),
+                "time": ISODate("2000-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("66ffffe825f5121ebf23dbcd"),
+                "time": ISODate("2000-08-26T19:19:30Z")
+            },
+            "count": 1,
+            "closed": false
+        },
+        "meta": "NonSuitableBucket2",
+        "data": {"_id": BinData(7, "BwBm///oJfUSHr8j280A"), "time": BinData(7, "CQDQwZ444QAAAAA=")}
+    };
+    const metaMismatchFieldBucketDoc = {
+        "_id": ObjectId("66ffbfe83d997f237a6b200b"),
         "control": {
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
                 "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
-            "closed": true
-        },
-        "meta": "NonSuitableBucket2",
-        "data": {"_id": BinData(7, "BwBjCRwwE46SYf1wqQMA"), "time": BinData(7, "CQDQVZjbggEAAAA=")}
-    };
-    const year2000BucketDoc = {
-        "_id": ObjectId("07091c2c050b7495eaef4585"),
-        "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
-            "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2000-08-26T19:19:00Z")
-            },
-            "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2000-08-26T19:19:30Z")
-            },
-            "closed": false
-        },
-        "meta": "NonSuitableBucket3",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
-    };
-    const metaMismatchFieldBucketDoc = {
-        "_id": ObjectId("08091c2c050b7495eaef4586"),
-        "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
-            "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
-            },
-            "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
-            },
+            "count": 1,
             "closed": false
         },
         "meta": "MetaMismatch",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
 
     assert.commandWorked(bucketsColl.insert(closedBucketDoc));
     // If an otherwise suitable bucket has the closed flag set, we expect to open a new bucket.
     checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
-    assert.commandWorked(bucketsColl.insert(closedAndCompressedBucketDoc));
-    // If an otherwise suitable bucket is compressed and closed, we expect to open a new bucket.
-    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
-
     assert.commandWorked(bucketsColl.insert(year2000BucketDoc));
     // If an otherwise suitable bucket has an incompatible time range with the measurement, we
     // expect to open a new bucket.
-    checkIfBucketReopened(measurement3, /* willCreateBucket */ true, /* willReopenBucket */ false);
+    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     assert.commandWorked(bucketsColl.insert(metaMismatchFieldBucketDoc));
     // If an otherwise suitable bucket has a mismatching meta field, we expect to open a new bucket.
-    checkIfBucketReopened(measurement4, /* willCreateBucket */ true, /* willReopenBucket */ false);
+    checkIfBucketReopened(measurement3, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     jsTestLog("Exiting failToReopenNonSuitableBuckets.");
 })();
@@ -382,77 +344,71 @@ const checkIfBucketReopened = function(
     resetCollection();
 
     const measurement1 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Suitable1",
     };
     const measurement2 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Suitable2",
     };
     const measurement3 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Suitable3",
     };
 
     const closedBucketDoc1 = {
-        "_id": ObjectId("09091c2c050b7495eaef4581"),
+        "_id": ObjectId("66ffbfe83d997f237a6b2009"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
         "meta": "Suitable1",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
     const closedBucketDoc2 = {
-        "_id": ObjectId("10091c2c050b7495eaef4582"),
+        "_id": ObjectId("66ffbfe83d997f237a6b200b"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("6700012b1561e0bf72d3880f"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("6700012b1561e0bf72d3880f"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
         "meta": "Suitable2",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
     const closedBucketDoc3 = {
-        "_id": ObjectId("11091c2c050b7495eaef4583"),
+        "_id": ObjectId("66ffbfe83d997f237a6b200c"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("6700012d1561e0bf72d38811"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("6700012d1561e0bf72d38811"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
         "meta": "Suitable3",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBnAAEtFWHgv3LTiBEA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
 
     let metaTimeIndex = coll.getIndexes().filter(function(index) {
@@ -493,101 +449,94 @@ const checkIfBucketReopened = function(
     resetCollection();
 
     const measurement1 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Suitable1",
     };
     const measurement2 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Suitable2",
     };
     const measurement3 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Suitable3",
     };
     const measurement4 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
+        [timeField]: ISODate("2024-10-04T10:14:00Z"),
         [metaField]: "Suitable4",
     };
 
     const closedBucketDoc1 = {
-        "_id": ObjectId("12091c2c050b7495eaef4584"),
+        "_id": ObjectId("66ffbfe83d997f237a6b2009"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("66ffffe825f5121ebf23dbcd"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("66ffffe825f5121ebf23dbcd"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
         "meta": "Suitable1",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBm///oJfUSHr8j280A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
     const closedBucketDoc2 = {
-        "_id": ObjectId("13091c2c050b7495eaef4585"),
+        "_id": ObjectId("66ffbfe83d997f237a6b200b"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
         "meta": "Suitable2",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
     const closedBucketDoc3 = {
-        "_id": ObjectId("14091c2c050b7495eaef4586"),
+        "_id": ObjectId("66ffbfe83d997f237a6b200c"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("6700012b1561e0bf72d3880f"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("6700012b1561e0bf72d3880f"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
-            "closed": false
+            "count": 1,
+            "closed": false,
+
         },
         "meta": "Suitable3",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
     const closedBucketDoc4 = {
-        "_id": ObjectId("15091c2c050b7495eaef4587"),
+        "_id": ObjectId("66ffbfe83d997f237a6b200d"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("6700012d1561e0bf72d38811"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("6700012d1561e0bf72d38811"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
         "meta": "Suitable4",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBnAAEtFWHgv3LTiBEA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
 
     // Drop the meta time index.
@@ -642,66 +591,60 @@ const checkIfBucketReopened = function(
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField}}));
 
-    const measurement1 = {[timeField]: ISODate("2022-09-26T19:19:00Z")};
-    const measurement2 = {[timeField]: ISODate("2022-08-26T19:19:00Z")};
-    const measurement3 = {[timeField]: ISODate("2022-07-26T19:19:00Z")};
+    const measurement1 = {[timeField]: ISODate("2024-11-04T10:14:00Z")};
+    const measurement2 = {[timeField]: ISODate("2024-10-04T10:14:00Z")};
+    const measurement3 = {[timeField]: ISODate("2024-09-04T10:14:00Z")};
 
     const closedBucketDoc1 = {
-        "_id": ObjectId("16091c2c050b7495eaef4584"),
+        "_id": ObjectId("67289e68b6fd311bf10f7f5e"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-09-26T19:19:00Z")
+                "_id": ObjectId("67000a6d0d365e9edde2f6d5"),
+                "time": ISODate("2024-11-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-09-26T19:19:30Z")
+                "_id": ObjectId("67000a6d0d365e9edde2f6d5"),
+                "time": ISODate("2024-11-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-09-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBnAAptDTZent3i9tUA"), "time": BinData(7, "CQBAxqr2kgEAAAA=")}
     };
     const closedBucketDoc2 = {
-        "_id": ObjectId("17091c2c050b7495eaef4585"),
+        "_id": ObjectId("66ffbfe83d997f237a6b200b"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
+                "_id": ObjectId("6700012b1561e0bf72d3880f"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
+                "_id": ObjectId("6700012b1561e0bf72d3880f"),
+                "time": ISODate("2024-10-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
     const closedBucketDoc3 = {
-        "_id": ObjectId("18091c2c050b7495eaef4586"),
+        "_id": ObjectId("66d832e8b6fd311bf10f7f5d"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kUncompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-07-26T19:19:00Z")
+                "_id": ObjectId("670008af0d365e9edde2f6d3"),
+                "time": ISODate("2024-09-04T10:14:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-07-26T19:19:30Z")
+                "_id": ObjectId("670008af0d365e9edde2f6d3"),
+                "time": ISODate("2024-09-04T10:14:00Z")
             },
+            "count": 1,
             "closed": false
         },
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-07-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBnAAivDTZent3i9tMA"), "time": BinData(7, "CQBA2oa8kQEAAAA=")}
     };
 
     // Since the collection was created without a meta field, the index on meta and time shouldn't
