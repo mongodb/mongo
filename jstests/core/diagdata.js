@@ -7,6 +7,8 @@
  *   not_allowed_with_signed_security_token,
  *   # getDiagnosticData is not supported on mongos
  *   assumes_against_mongod_not_mongos,
+ *   # The config fuzzer may try to disable FTDC, and that would cause this test to fail.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 
