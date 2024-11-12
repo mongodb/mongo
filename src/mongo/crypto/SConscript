@@ -10,59 +10,17 @@ Import(
 )
 
 env = env.Clone()
-env.InjectThirdParty(libraries=["bson"])
 env.CppUnitTest(
     target="crypto_test",
-    source=[
-        "aead_encryption_test.cpp",
-        "encryption_fields_util_test.cpp",
-        "encryption_fields_validation_test.cpp",
-        "jwt_test.cpp" if ssl_provider == "openssl" else [],
-        "fle_crypto_test.cpp",
-        "fle_crypto_test_vectors.cpp",
-        "fle_stats_test.cpp",
-        "mechanism_scram_test.cpp",
-        "mongocryptbuffer_test.cpp",
-        "sha1_block_test.cpp",
-        "sha256_block_test.cpp",
-        "sha512_block_test.cpp",
-        "symmetric_crypto_test.cpp",
-        "libbsonvalue_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/base/secure_allocator",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/shell/kms_idl",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "$BUILD_DIR/mongo/util/net/http_client_impl",
-        "$BUILD_DIR/mongo/util/net/openssl_init" if ssl_provider == "openssl" else [],
-        "$BUILD_DIR/mongo/util/testing_options",
-        "aead_encryption",
-        "encrypted_field_config",
-        "fle_crypto",
-        "jwt",
-        "mongocryptutil",
-        "sha_block",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 if ssl_provider == "openssl":
     env.CppUnitTest(
         target="jws_validator_test",
-        source=[
-            "jws_validator_test.cpp",
-            "jws_validated_token_test.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/base",
-            "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-            "$BUILD_DIR/mongo/db/server_base",
-            "$BUILD_DIR/mongo/util/clock_source_mock",
-            "$BUILD_DIR/mongo/util/net/openssl_init",
-            "jwt",
-        ],
+        source=[],
+        LIBDEPS=[],
     )
 
 env.Benchmark(

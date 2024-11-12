@@ -53,6 +53,21 @@ mongo_cc_library(
     }),
 )
 
+mongo_cc_library(
+    name = "transport_layer_mock",
+    srcs = ["transport_layer_mock.cpp"],
+    hdrs = [
+        "mock_session.h",
+        "session_manager_noop.h",
+        "transport_layer_mock.h",
+    ],
+    deps = [
+        ":session_util",
+        ":transport_layer_common",
+        "//src/mongo/util/net:network",
+    ],
+)
+
 idl_generator(
     name = "transport_options_gen",
     src = "transport_options.idl",

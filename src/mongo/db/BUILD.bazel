@@ -3392,6 +3392,35 @@ mongo_cc_binary(
     ],
 )
 
+mongo_cc_library(
+    name = "service_context_d_test_fixture",
+    srcs = [
+        "service_context_d_test_fixture.cpp",
+    ],
+    hdrs = [
+        "service_context_d_test_fixture.h",
+    ],
+    deps = [
+        ":service_context_d",
+        ":service_context_test_fixture",
+        "//src/mongo/db/auth:auth_impl_internal",
+        "//src/mongo/db/auth:authserver",
+        "//src/mongo/db/catalog:catalog_impl",
+        "//src/mongo/db/commands:mongod",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/devnull:storage_devnull",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:periodic_runner_factory",
+        "//src/mongo/util:tick_source_mock",
+    ],
+)
+
 # TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:baton.h to //src/mongo/db:service_context
 filegroup(
     name = "baton_hdrs",

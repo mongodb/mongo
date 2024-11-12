@@ -16,26 +16,6 @@ env.Library(
 )
 
 env.Library(
-    target="network_interface_mock",
-    source=[
-        "mock_network_fixture.cpp",
-        "network_interface_mock.cpp",
-        "thread_pool_mock.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/rpc/metadata",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "$BUILD_DIR/mongo/util/net/network",
-        "network_interface",
-        "task_executor_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query_expressions",
-    ],
-)
-
-env.Library(
     target="network_test_env",
     source=[
         "network_test_env.cpp",

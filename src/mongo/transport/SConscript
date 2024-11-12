@@ -20,20 +20,6 @@ if shouldBuildGRPC(env):
         ],
     )
 
-env.Library(
-    target="transport_layer_mock",
-    source=[
-        "transport_layer_mock.cpp",
-    ],
-    LIBDEPS=[
-        "session_util",
-        "transport_layer_common",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/util/net/network",
-    ],
-)
-
 tlEnv = env.Clone()
 tlEnv.InjectThirdParty(libraries=["asio"])
 

@@ -2078,6 +2078,40 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "replmocks",
+    srcs = [
+        "oplog_fetcher_mock.cpp",
+        "replication_consistency_markers_mock.cpp",
+        "replication_coordinator_external_state_mock.cpp",
+        "replication_coordinator_mock.cpp",
+        "storage_interface_mock.cpp",
+    ],
+    hdrs = [
+        "oplog_fetcher_mock.h",
+        "replication_consistency_markers_mock.h",
+        "replication_coordinator_external_state_mock.h",
+        "replication_coordinator_mock.h",
+        "storage_interface_mock.h",
+        "//src/mongo/db/storage:snapshot_manager.h",
+    ],
+    deps = [
+        ":data_replicator_external_state_impl",
+        ":isself",
+        ":oplog",
+        ":oplog_buffer_blocking_queue",
+        ":oplog_fetcher",
+        ":repl_coordinator_interface",
+        ":repl_settings",
+        ":replica_set_aware_service",
+        ":replica_set_messages",
+        ":storage_interface",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/executor:network_interface_mock",
+    ],
+)
+
 # TODO(SERVER-96856): Remove cycle created by moving //src/mongo/db/repl:optime.h to //src/mongo/db/repl:optime
 filegroup(
     name = "optime_hdrs",
