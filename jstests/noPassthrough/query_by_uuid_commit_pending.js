@@ -30,25 +30,42 @@ const nDocs = 5;
 // This ensures the database exists before performing any commands against it.
 assert.commandWorked(db.createCollection(dummyCollName));
 
-function runTestCase(dbName, collName, parallelShellCommand, getUUIDBeforeCommand, fpName) {
+function listCollectionsEntryWithFilter(db, collName) {
+    return assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}))
+        .cursor.firstBatch[0];
+}
+
+function listCollectionsEntryWithoutFilter(db, collName) {
+    let listCollectionsCursor = assert.commandWorked(db.runCommand({listCollections: 1}));
+    let collections = new DBCommandCursor(db, listCollectionsCursor).toArray();
+    return collections.find((coll) => coll.name == collName);
+}
+
+const listCollectionVariants = [listCollectionsEntryWithFilter, listCollectionsEntryWithoutFilter];
+
+function runTestCase(dbName,
+                     collName,
+                     parallelShellCommand,
+                     getUUIDBeforeCommand,
+                     fpName,
+                     getListCollectionsEntryFn) {
+    jsTest.log(`Test case with: ${getListCollectionsEntryFn.name}`);
+
     let uuid;
     if (getUUIDBeforeCommand) {
-        uuid = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}))
-                   .cursor.firstBatch[0]
-                   .info.uuid;
+        uuid = getListCollectionsEntryFn(db, collName).info.uuid;
     }
 
-    // Pause before committing any catalog changes in the collection catalog (but after durably
-    // committed).
+    // Pause before committing any catalog changes in the collection catalog (but after
+    // durably committed).
     const failPoint = configureFailPoint(primary, fpName, {collectionNS: dbName + '.' + collName});
     const awaitResult = startParallelShell(parallelShellCommand, primary.port);
     failPoint.wait();
 
     if (!getUUIDBeforeCommand) {
-        let res =
-            assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
-        if (res.cursor.firstBatch[0] && res.cursor.firstBatch[0].info) {
-            uuid = res.cursor.firstBatch[0].info.uuid;
+        let res = getListCollectionsEntryFn(db, collName);
+        if (res && res.info) {
+            uuid = res.info.uuid;
         }
     }
 
@@ -63,14 +80,16 @@ jsTest.log(
     "While a collection is commit pending for creation, we should return an empty version " +
     "of the collection. If done inside a transaction, we still return an empty version of the " +
     "collection since it's present in the transaction's WT snapshot.");
-{
+
+function testDurableCommitPendingCreate(getListCollectionsEntryFn) {
     setupCreateTest();
     let res =
         runTestCase(dbName,
                     createCollName,
                     `{db.getSiblingDB('${dbName}').runCommand({create: '${createCollName}'});}`,
                     false,
-                    afterWTCommitFP);
+                    afterWTCommitFP,
+                    getListCollectionsEntryFn);
 
     let nssRes = assert.commandWorked(db.runCommand({find: createCollName}));
     let nssDocCount = new DBCommandCursor(db, nssRes).itcount();
@@ -94,16 +113,18 @@ jsTest.log(
     res.fp.off();
     res.awaitResult();
 }
+listCollectionVariants.forEach(testDurableCommitPendingCreate);
 
 jsTest.log("Ensure that we cannot see the UUID and thus cannot find by UUID.");
-{
+function testNonDurableCommitPendingCreate(getListCollectionsEntryFn) {
     setupCreateTest();
     let res =
         runTestCase(dbName,
                     createCollName,
                     `{db.getSiblingDB('${dbName}').runCommand({create: '${createCollName}'});}`,
                     false,
-                    beforeWTCommitFP);
+                    beforeWTCommitFP,
+                    getListCollectionsEntryFn);
 
     let nssRes = assert.commandWorked(db.runCommand({find: createCollName}));
     let nssDocCount = new DBCommandCursor(db, nssRes).itcount();
@@ -113,6 +134,7 @@ jsTest.log("Ensure that we cannot see the UUID and thus cannot find by UUID.");
     res.fp.off();
     res.awaitResult();
 }
+listCollectionVariants.forEach(testNonDurableCommitPendingCreate);
 
 function setupDropTest() {
     db[dropCollName].drop();
@@ -136,13 +158,14 @@ function setupRenameTest() {
 
 jsTest.log("Ensure that having a drop with a commit pending entry AFTER it has been made durable " +
            "makes the find fail with NamespaceNotFound.");
-{
+function testDurableCommitPendingDrop(getListCollectionsEntryFn) {
     setupDropTest();
     let res = runTestCase(dbName,
                           dropCollName,
                           `{db.getSiblingDB('${dbName}').runCommand({drop: '${dropCollName}'});}`,
                           true,
-                          afterWTCommitFP);
+                          afterWTCommitFP,
+                          getListCollectionsEntryFn);
 
     // Check that the results of queries are as expected.
     let nssRes = assert.commandWorked(db.runCommand({find: dropCollName}));
@@ -153,18 +176,20 @@ jsTest.log("Ensure that having a drop with a commit pending entry AFTER it has b
     res.fp.off();
     res.awaitResult();
 }
+listCollectionVariants.forEach(testDurableCommitPendingDrop);
 
 jsTest.log(
     "Check that having a commit pending entry BEFORE it has been made durable doesn't affect find " +
     "command when finding by UUID as it's still in a timeline before the drop has been made. That " +
     "is, it should see the collection before the drop.");
-{
+function testNonDurableCommitPendingDrop(getListCollectionsEntryFn) {
     setupDropTest();
     let res = runTestCase(dbName,
                           dropCollName,
                           `{db.getSiblingDB('${dbName}').runCommand({drop: '${dropCollName}'});}`,
                           true,
-                          beforeWTCommitFP);
+                          beforeWTCommitFP,
+                          getListCollectionsEntryFn);
 
     // Check that the results of queries are as expected.
     let nssRes = assert.commandWorked(db.runCommand({find: dropCollName}));
@@ -175,12 +200,13 @@ jsTest.log(
     res.fp.off();
     res.awaitResult();
 }
+listCollectionVariants.forEach(testNonDurableCommitPendingDrop);
 
 jsTest.log(
     "While a collection is commit pending for rename and it's been made durable, we should " +
     "find the new namespace (and the old one should be handled as a drop). By uuid, we should " +
     "find the new collection.");
-{
+function testDurableCommitPendingRename(getListCollectionsEntryFn) {
     setupRenameTest();
     let res =
         runTestCase(dbName,
@@ -188,7 +214,8 @@ jsTest.log(
                     `{db.adminCommand({renameCollection: '${dbName}.${
                         renameSourceCollName}', to: '${dbName}.${renameDestinationCollName}'});}`,
                     true,
-                    afterWTCommitFP);
+                    afterWTCommitFP,
+                    getListCollectionsEntryFn);
 
     // Check that the results of queries are as expected.
     let sourceNssRes = assert.commandWorked(db.runCommand({find: renameSourceCollName}));
@@ -204,12 +231,13 @@ jsTest.log(
     res.fp.off();
     res.awaitResult();
 }
+listCollectionVariants.forEach(testDurableCommitPendingRename);
 
 jsTest.log(
     "Ensure that a rename operation that's published changes that are not yet durable doesn't make " +
     "them visible to a snapshot taken before WT has committed the changes. Find should access the " +
     "old collection rather than the new one by UUID.");
-{
+function testNonDurableCommitPendingRename(getListCollectionsEntryFn) {
     setupRenameTest();
     let res =
         runTestCase(dbName,
@@ -217,7 +245,8 @@ jsTest.log(
                     `{db.adminCommand({renameCollection: '${dbName}.${
                         renameSourceCollName}', to: '${dbName}.${renameDestinationCollName}'});}`,
                     true,
-                    beforeWTCommitFP);
+                    beforeWTCommitFP,
+                    getListCollectionsEntryFn);
 
     // Check that the results of queries are as expected as the snapshot should be from before
     // they've been made durable to WT.
@@ -234,5 +263,6 @@ jsTest.log(
     res.fp.off();
     res.awaitResult();
 }
+listCollectionVariants.forEach(testNonDurableCommitPendingRename);
 
 replTest.stopSet();
