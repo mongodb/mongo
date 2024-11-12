@@ -92,18 +92,34 @@ export function prepareShardedCollectionWithOrphans(st) {
     assert.commandWorked(
         st.s.adminCommand({moveChunk: coll.getFullName(), find: {a: 2}, to: otherShard}));
 
-    // Insert orphans to both shards.
+    // Insert orphans to both shards. Both shards must include multikey values in order to not break
+    // sharded passthrough tests which rely on the assumption that multikey indexes are indeed
+    // multikey on both shards.
     const primaryShardOrphanDocs = [
-        {a: 2.1, b: "orphan", c: "orphan"},
-        {a: 2.2, b: "orphan", c: "orphan"},
-        {a: 2.3, b: "orphan", c: "orphan"},
-        {a: 999.1, b: "orphan", c: "orphan"},
+        {
+            a: 2.1,
+            b: "orphan",
+            c: "orphan",
+            mkA: ["orphan"],
+            mkB: ["orphan"],
+            mkFoo: [{a: "orphan"}]
+        },
+        {a: 2.2, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
+        {a: 2.3, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
+        {a: 999.1, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
     ];
     const otherShardOrphanDocs = [
-        {a: 0.1, b: "orphan", c: "orphan"},
-        {a: 1.1, b: "orphan", c: "orphan"},
-        {a: 1.2, b: "orphan", c: "orphan"},
-        {a: 1.3, b: "orphan", c: "orphan"},
+        {
+            a: 0.1,
+            b: "orphan",
+            c: "orphan",
+            mkA: ["orphan"],
+            mkB: ["orphan"],
+            mkFoo: [{a: "orphan"}]
+        },
+        {a: 1.1, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
+        {a: 1.2, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
+        {a: 1.3, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
     ];
     assert.commandWorked(
         st.shard0.getCollection(coll.getFullName()).insert(primaryShardOrphanDocs));

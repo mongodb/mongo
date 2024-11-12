@@ -22,9 +22,8 @@ import {
 } from "jstests/libs/query/group_to_distinct_scan_utils.js";
 
 export function runGroupConversionToDistinctScanTests(database, isSharded = false) {
-    // $group on a non-shard key field with $first and $last is currently not eligible for a
-    // DISTINCT_SCAN.
-    // TODO SERVER-96134: Investigate if this is the desired behavior.
+    // When not grouping or filtering on the shard key field, the $group part of the query will be
+    // executed on mongos so the DISTINCT_SCAN optimization is not applicable.
     const assertPlanUsesDistinctScanOnlyOnStandalone = isSharded
         ? assertPlanDoesNotUseDistinctScan
         : (explain, keyPattern) => assertPlanUsesDistinctScan(database, explain, keyPattern);
@@ -247,33 +246,25 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             assertPlanUsesDistinctScan(database, explain, keyPattern),
     });
 
-    // TODO SERVER-96134: We shouldn't use DISTINCT_SCAN here.
-    //
     // Verify that we _do not_ attempt to use a DISTINCT_SCAN on a multikey field.
-    if (!isSharded) {
-        assertPipelineResultsAndExplain({
-            pipeline: [{$group: {_id: "$mkA"}}],
-            expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: [2, 3, 4]}],
-            validateExplain: assertPlanDoesNotUseDistinctScan,
-        });
-    }
+    assertPipelineResultsAndExplain({
+        pipeline: [{$group: {_id: "$mkA"}}],
+        expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: [2, 3, 4]}],
+        validateExplain: assertPlanDoesNotUseDistinctScan,
+    });
 
-    // TODO SERVER-96134: We shouldn't use DISTINCT_SCAN here.
-    //
     // Verify that we may not use a DISTINCT_SCAN on a dotted field when the last component
     // is not multikey, but an intermediate component is.
-    if (!isSharded) {
-        assertPipelineResultsAndExplain({
-            pipeline: [{$group: {_id: "$mkFoo.a"}}],
-            expectedOutput: [
-                {_id: null},
-                {_id: 1},
-                {_id: 2},
-                {_id: [3, 4]},
-            ],
-            validateExplain: assertPlanDoesNotUseDistinctScan,
-        });
-    }
+    assertPipelineResultsAndExplain({
+        pipeline: [{$group: {_id: "$mkFoo.a"}}],
+        expectedOutput: [
+            {_id: null},
+            {_id: 1},
+            {_id: 2},
+            {_id: [3, 4]},
+        ],
+        validateExplain: assertPlanDoesNotUseDistinctScan,
+    });
 
     //
     // Verify that we _do not_ attempt to use a DISTINCT_SCAN on a multikey dotted-path field when
@@ -470,15 +461,12 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     removeIndex({"foo.a": 1, "foo.b": 1});
 
-    // TODO SERVER-96134: Why is the IXSCAN not turned into a DISTINCT_SCAN here.
-    if (!isSharded) {
-        assertPipelineResultsAndExplain({
-            pipeline: [{$sort: {"foo.a": 1}}, {$group: {_id: "$foo.a"}}],
-            expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}],
-            validateExplain: (explain) =>
-                assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "mkFoo.b": 1}),
-        });
-    }
+    assertPipelineResultsAndExplain({
+        pipeline: [{$sort: {"foo.a": 1}}, {$group: {_id: "$foo.a"}}],
+        expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}],
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {"foo.a": 1, "mkFoo.b": 1})
+    });
 
     //
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN even when there is a $first
@@ -495,14 +483,12 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when there is a $last
     // accumulator that accesses a multikey field, provided that field is not part of the index.
     //
-    if (!isSharded) {
-        assertPipelineResultsAndExplain({
-            pipeline: [{$sort: {aa: 1, bb: 1}}, {$group: {_id: "$aa", accum: {$last: "$mkB"}}}],
-            expectedOutput: [{_id: 1, accum: 2}, {_id: 2, accum: []}, {_id: null, accum: null}],
-            validateExplain: (explain) =>
-                assertPlanUsesDistinctScanOnlyOnStandalone(explain, {aa: 1, bb: 1, c: 1}),
-        });
-    }
+    assertPipelineResultsAndExplain({
+        pipeline: [{$sort: {aa: 1, bb: 1}}, {$group: {_id: "$aa", accum: {$last: "$mkB"}}}],
+        expectedOutput: [{_id: 1, accum: 2}, {_id: 2, accum: []}, {_id: null, accum: null}],
+        validateExplain: (explain) =>
+            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {aa: 1, bb: 1, c: 1}),
+    });
 
     //
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN even when there is a $first

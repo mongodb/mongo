@@ -80,8 +80,8 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
     // This fails with an error of "cannot sort with keys that are parallel arrays". So, do not run
     // this test case on the classic engine.
     //
-    // TODO SERVER-96134: Investigate why we incorrectly get a DISTINCT_SCAN plan when the
-    // collection is sharded.
+    // $top requires sort key metadata for merging the results, so this query is SBE-ineligible when
+    // the collection is sharded.
     if (!isSharded && !checkSbeCompletelyDisabled(database)) {
         assertPipelineResultsAndExplain({
             pipeline: [{
@@ -122,16 +122,12 @@ export function runGroupWithTopBottomToDistinctScanTests(database, isSharded = f
         }
     });
 
-    // TODO SERVER-96134: Why does one shard pick COLLSCAN and the other DISTINCT_SCAN.
-    if (!isSharded) {
-        assertPipelineResultsAndExplain({
-            pipeline: [{
-                $group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: -1, mkB: -1}, output: "$mkB"}}}
-            }],
-            expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: []}],
-            validateExplain: assertPlanDoesNotUseDistinctScan
-        });
-    }
+    assertPipelineResultsAndExplain({
+        pipeline:
+            [{$group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: -1, mkB: -1}, output: "$mkB"}}}}],
+        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: []}],
+        validateExplain: assertPlanDoesNotUseDistinctScan
+    });
 
     //
     // Verifies that with dotted paths we use a DISTINCT_SCAN to satisfy a sort on a multikey field
