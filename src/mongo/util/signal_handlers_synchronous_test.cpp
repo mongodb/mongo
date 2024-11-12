@@ -135,16 +135,17 @@ DEATH_TEST(FatalTerminateTest,
 class MallocFreeOStreamGuardTest : public unittest::Test {
 public:
     /**
-     * We use a constexpr id and late-bind that to a consistent unused signal
-     * number.
+     * We use a constexpr id and late-bind that to a consistent signal number,
+     * which lets the test logicaly organize the signal numbers it uses.
      *
-     * This abstraction works around SIGRTMIN being a non-constexpr function,
-     * but also lets the test logicaly organize the signal numbers it uses.
+     * The two signals were arbitrarily chosen. We only need two because
+     * the deadlock mitigation we are testing against triggers upon entering
+     * the scope of two guards.
      */
     template <size_t id>
     struct SignalIndex {
         explicit(false) operator int() const {
-            return SIGRTMIN + id;
+            return std::array<int, 2>{SIGUSR1, SIGUSR2}[id];
         }
     };
     template <size_t i>
