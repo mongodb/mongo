@@ -386,7 +386,7 @@ def perform_non_tty_bazel_build(bazel_cmd: str) -> None:
         raise subprocess.CalledProcessError(bazel_proc.returncode, bazel_cmd, stdout, stderr)
 
 
-def run_bazel_command(env, bazel_cmd):
+def run_bazel_command(env, bazel_cmd, tries_so_far=0):
     try:
         tty_import_fail = False
         try:
@@ -410,6 +410,13 @@ def run_bazel_command(env, bazel_cmd):
                 exceptions=(subprocess.CalledProcessError,),
             )
     except subprocess.CalledProcessError as ex:
+        if platform.system() == "Windows" and tries_so_far == 0:
+            print(
+                "Build failed, retrying with --jobs=1 in case linking failed due to hitting concurrency limits..."
+            )
+            run_bazel_command(env, bazel_cmd + ["--jobs", "1"], tries_so_far=1)
+            return
+
         print("ERROR: Bazel build failed:")
 
         if Globals.bazel_thread_terminal_output is not None:
