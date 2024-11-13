@@ -9,8 +9,15 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="util_net_test",
-    source=[],
-    LIBDEPS=[],
+    source=[
+        "cidr_test.cpp",
+        "hostandport_test.cpp",
+        "http_client_test.cpp",
+    ],
+    LIBDEPS=[
+        "http_client",
+        "network",
+    ],
 )
 
 env.CppLibfuzzerTest(
@@ -29,8 +36,23 @@ env.CppLibfuzzerTest(
 if get_option("ssl") == "on":
     env.CppUnitTest(
         target="util_net_ssl_test",
-        source=[],
-        LIBDEPS=[],
+        source=[
+            "ssl_manager_test.cpp",
+            "ssl_options_test.cpp",
+            "sock_test.cpp",
+            "sock_test_utils.cpp",
+        ],
+        LIBDEPS=[
+            "$BUILD_DIR/mongo/client/connection_string",
+            "$BUILD_DIR/mongo/db/server_options_servers",
+            "$BUILD_DIR/mongo/transport/transport_layer",
+            "$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils",
+            "$BUILD_DIR/mongo/util/fail_point",
+            "network",
+            "ssl_manager",
+            "ssl_options_server",
+            "ssl_types",
+        ],
     )
 
 if get_option("ssl") == "on":

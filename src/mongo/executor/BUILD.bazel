@@ -444,26 +444,3 @@ mongo_cc_library(
         "//src/mongo/rpc:command_status",
     ],
 )
-
-mongo_cc_library(
-    name = "network_interface_mock",
-    srcs = [
-        "mock_network_fixture.cpp",
-        "network_interface_mock.cpp",
-        "thread_pool_mock.cpp",
-    ],
-    hdrs = [
-        "mock_network_fixture.h",
-        "network_interface_mock.h",
-        "thread_pool_mock.h",
-    ],
-    deps = [
-        ":network_interface",
-        ":task_executor_interface",
-        "//src/mongo:base",
-        "//src/mongo/db:query_expressions",
-        "//src/mongo/rpc:metadata",
-        "//src/mongo/util:clock_source_mock",
-        "//src/mongo/util/net:network",
-    ],
-)

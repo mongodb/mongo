@@ -121,7 +121,7 @@ struct EdgeCalcTestVector {
 
 TEST(EdgeCalcTest, Int32_TestVectors) {
     std::vector<EdgeCalcTestVector<int32_t>> testVectors = {
-#include "test_vectors/edges_int32.cstruct.h"  // IWYU pragma: keep
+#include "test_vectors/edges_int32.cstruct"  // IWYU pragma: keep
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate());
@@ -130,7 +130,7 @@ TEST(EdgeCalcTest, Int32_TestVectors) {
 
 TEST(EdgeCalcTest, Int64_TestVectors) {
     std::vector<EdgeCalcTestVector<int64_t>> testVectors = {
-#include "test_vectors/edges_int64.cstruct.h"  // IWYU pragma: keep
+#include "test_vectors/edges_int64.cstruct"  // IWYU pragma: keep
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate());
@@ -148,7 +148,7 @@ std::unique_ptr<Edges> getEdgesDoubleForTest(double value,
 
 TEST(EdgeCalcTest, Double_TestVectors) {
     std::vector<EdgeCalcTestVector<double>> testVectors = {
-#include "test_vectors/edges_double.cstruct.h"  // IWYU pragma: keep
+#include "test_vectors/edges_double.cstruct"  // IWYU pragma: keep
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate());
@@ -169,7 +169,7 @@ std::unique_ptr<Edges> getEdgesDecimal128ForTest(Decimal128 value,
 
 TEST(EdgeCalcTest, Decimal128_TestVectors) {
     std::vector<EdgeCalcTestVector<Decimal128>> testVectors = {
-#include "test_vectors/edges_decimal128.cstruct.h"  // IWYU pragma: keep
+#include "test_vectors/edges_decimal128.cstruct"  // IWYU pragma: keep
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate());
@@ -217,7 +217,7 @@ struct MinCoverTestVector {
 
 TEST(MinCoverCalcTest, Int32_TestVectors) {
     const MinCoverTestVector<int32_t> testVectors[] = {
-#include "test_vectors/mincover_int32.cstruct.h"  // IWYU pragma: keep
+#include "test_vectors/mincover_int32.cstruct"  // IWYU pragma: keep
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate(minCoverInt32));
@@ -226,7 +226,7 @@ TEST(MinCoverCalcTest, Int32_TestVectors) {
 
 TEST(MinCoverCalcTest, Int64_TestVectors) {
     const MinCoverTestVector<int64_t> testVectors[] = {
-#include "test_vectors/mincover_int64.cstruct.h"  // IWYU pragma: keep
+#include "test_vectors/mincover_int64.cstruct"  // IWYU pragma: keep
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate(minCoverInt64));
@@ -255,7 +255,7 @@ std::vector<std::string> minCoverDoubleForTest(double lowerBound,
 
 TEST(MinCoverCalcTest, Double_TestVectors) {
     MinCoverTestVector<double> testVectors[] = {
-#include "test_vectors/mincover_double.cstruct.h"  // IWYU pragma: keep
+#include "test_vectors/mincover_double.cstruct"  // IWYU pragma: keep
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate(minCoverDoubleForTest));
@@ -286,7 +286,7 @@ std::vector<std::string> minCoverDecimal128ForTest(Decimal128 lowerBound,
 
 TEST(MinCoverCalcTest, Decimal128_TestVectors) {
     MinCoverTestVector<Decimal128> testVectors[] = {
-#include "test_vectors/mincover_decimal128.cstruct.h"  // IWYU pragma: keep
+#include "test_vectors/mincover_decimal128.cstruct"  // IWYU pragma: keep
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate(minCoverDecimal128ForTest));
@@ -336,7 +336,7 @@ struct MinCoverTestVectorPrecision {
 
 TEST(MinCoverCalcPrecisionTest, Double_TestVectors) {
     MinCoverTestVectorPrecision<double> testVectors[] = {
-#include "test_vectors/mincover_double_precision.cstruct.h"  // IWYU pragma: keep
+#include "test_vectors/mincover_double_precision.cstruct"  // IWYU pragma: keep
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate(minCoverDouble));
@@ -345,7 +345,7 @@ TEST(MinCoverCalcPrecisionTest, Double_TestVectors) {
 
 TEST(MinCoverCalcPrecisionTest, Decimal128_TestVectors) {
     MinCoverTestVectorPrecision<Decimal128> testVectors[] = {
-#include "test_vectors/mincover_decimal128_precision.cstruct.h"  // IWYU pragma: keep
+#include "test_vectors/mincover_decimal128_precision.cstruct"  // IWYU pragma: keep
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate(minCoverDecimal128));

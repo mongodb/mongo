@@ -685,7 +685,6 @@ EXTRA_GLOBAL_LIBS_LINKFLAGS = select({
     "@platforms//os:linux": [
         "-lm",
         "-lresolv",
-        "-latomic",
     ],
     "@platforms//os:macos": [
         "-lresolv",
