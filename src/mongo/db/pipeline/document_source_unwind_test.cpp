@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -742,6 +743,81 @@ TEST_F(UnwindStageTest, UnwindIncludesIndexPathWhenIncludingIndex) {
     ASSERT_EQUALS(1U, modifiedPaths.paths.count("arrIndex"));
 }
 
+TEST_F(UnwindStageTest, Redaction) {
+    auto spec = fromjson(R"({
+        $unwind: {
+            path: "$foo.bar",
+            includeArrayIndex: "foo.baz",
+            preserveNullAndEmptyArrays: true
+        }
+    })");
+    auto docSource = DocumentSourceUnwind::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$unwind": {
+                "path": "$HASH<foo>.HASH<bar>",
+                "preserveNullAndEmptyArrays": "?bool",
+                "includeArrayIndex": "HASH<foo>.HASH<baz>"
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(UnwindStageTest, UnwindIndexPathIsSamePathAsArrayPath) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("array");
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
+    auto source = DocumentSourceMock::createForTest(
+        {Document{{"array", vector<Value>{Value(10), Value(20)}}},
+         Document{{"array", vector<Value>{Value(30), Value(40)}}}},
+        getExpCtx());
+
+    unwind->setSource(source.get());
+
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(0));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(1));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(0));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(1));
+}
+
+TEST_F(UnwindStageTest, UnwindIndexPathIsParentOfArrayPath) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("obj");
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "obj.array", includeNullIfEmptyOrMissing, includeArrayIndex);
+    auto source = DocumentSourceMock::createForTest(
+        {Document{{"obj", Document{{"array", vector<Value>{Value(10), Value(20)}}}}},
+         Document{{"obj", Document{{"array", vector<Value>{Value(30), Value(40)}}}}}},
+        getExpCtx());
+
+    unwind->setSource(source.get());
+
+    Document res;
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(0));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(1));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(0));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["obj"], Value(1));
+}
+
+TEST_F(UnwindStageTest, UnwindIndexPathIsChildOfArrayPath) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("array.index");
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
+    auto source = DocumentSourceMock::createForTest(
+        {Document{{"array", vector<Value>{Value(10), Value(20)}}},
+         Document{{"array", vector<Value>{Value(30), Value(40)}}}},
+        getExpCtx());
+
+    unwind->setSource(source.get());
+
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 0)));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 1)));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 0)));
+    ASSERT_VALUE_EQ(unwind->getNext().getDocument()["array"], Value(BSON("index" << 1)));
+}
+
 //
 // Error cases.
 //
@@ -822,26 +898,6 @@ TEST_F(UnwindStageTest, ShouldRejectUnrecognizedOption) {
                                                            << "foo" << 3))),
                        AssertionException,
                        28811);
-}
-
-TEST_F(UnwindStageTest, Redaction) {
-    auto spec = fromjson(R"({
-        $unwind: {
-            path: "$foo.bar",
-            includeArrayIndex: "foo.baz",
-            preserveNullAndEmptyArrays: true
-        }
-    })");
-    auto docSource = DocumentSourceUnwind::createFromBson(spec.firstElement(), getExpCtx());
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$unwind": {
-                "path": "$HASH<foo>.HASH<bar>",
-                "preserveNullAndEmptyArrays": "?bool",
-                "includeArrayIndex": "HASH<foo>.HASH<baz>"
-            }
-        })",
-        redact(*docSource));
 }
 
 class All : public unittest::OldStyleSuiteSpecification {

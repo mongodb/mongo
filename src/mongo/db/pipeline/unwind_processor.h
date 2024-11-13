@@ -93,6 +93,10 @@ private:
 
     // Index into the _inputArray to return next.
     size_t _index{0};
+
+    // True if we are including the array index and it's path is a parent of the unwind path. If
+    // this is true, we will just return the array indices and ignore the array values.
+    const bool _conflictingPaths;
 };
 
 }  // namespace mongo
