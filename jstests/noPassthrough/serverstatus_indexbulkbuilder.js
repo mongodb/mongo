@@ -11,12 +11,28 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {IndexBuildTest, ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const maxMemUsageMegabytes = 50;
+// 10% (maxIteratorsMemoryUsagePercentage) and up to 1MB of maxMemUsageMegabytes is used to store
+// the file iterators used during external sorting.
+const maxDataMemUsageMegabytes = maxMemUsageMegabytes - Math.min(maxMemUsageMegabytes * 0.1, 1);
 const numDocs = 10;
 const fieldSize = 10 * 1024 * 1024;
 const approxMemoryUsage = numDocs * fieldSize;
+// memPool allocates memory that is the first power of two greater than what is needed. It decides
+// whether to spill using this amount of memory.
+const memPoolMemoryUsage = (1 << 32 - Math.clz32(fieldSize));
 // Due to some overhead in the sorter's memory usage while spilling, add a small padding.
 const spillOverhead = numDocs * 16;
-let expectedSpilledRanges = approxMemoryUsage / (maxMemUsageMegabytes * 1024 * 1024);
+
+// Number of memory allocations that will cause a spill. Due to fragmentation in the memory pool one
+// allocation corresponds to one document.
+let memAllocNum = Math.trunc((maxDataMemUsageMegabytes * 1024 * 1024 + memPoolMemoryUsage - 1) /
+                             memPoolMemoryUsage);
+let expectedSpilledRanges = Math.trunc((numDocs + memAllocNum - 1) / memAllocNum);
+
+const documentBsonSize = Object.bsonsize({
+    _id: 0,
+    a: 'a'.repeat(fieldSize),
+});
 
 const replSet = new ReplSetTest({
     nodes: 1,
@@ -144,10 +160,16 @@ assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBul
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
 // We try building two indexes for the test collection so the memory usage limit for each index
 // build during initial sync is the maxIndexBuildMemoryUsageMegabytes divided by the number of index
-// builds. We end up with half of the in-memory memory so we double the amount of spills expected.
-expectedSpilledRanges *= 2;
-// Due to fragmentation in the allocator, which is counted towards mem usage, we can spill earlier
-// than we would expect.
+// builds. We end up with half of the in-memory memory so we double the amount of the memory
+// reserved for the file iterators in sort.
+let maxMemUsagePerIndexBytes = maxMemUsageMegabytes * 1024 * 1024 / 2;
+let maxDataMemUsagePerIndexBytes = maxMemUsagePerIndexBytes - 1024 * 1024;
+memAllocNum =
+    Math.trunc((maxDataMemUsagePerIndexBytes + memPoolMemoryUsage - 1) / memPoolMemoryUsage);
+expectedSpilledRanges = Math.trunc((numDocs + memAllocNum - 1) / memAllocNum);
+
+// Due to fragmentation in the allocator, which is counted towards mem usage, we can spill
+// earlier than we would expect.
 assert.between(expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
                1 + expectedSpilledRanges,
@@ -193,6 +215,17 @@ assert.eq(indexBulkBuilderSection.resumed, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 2, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 2, tojson(indexBulkBuilderSection));
 expectedSpilledRanges += 1;
+
+// The memory is shared among 3 indexes but only the compound index will spill.
+maxMemUsagePerIndexBytes = maxMemUsageMegabytes * 1024 * 1024 / 3;
+maxDataMemUsagePerIndexBytes =
+    maxMemUsagePerIndexBytes - 1024 * 1024;  // There is enough memory to reserve 1MB for the file
+                                             // iterators needed for each index.
+
+memAllocNum =
+    Math.trunc((maxDataMemUsagePerIndexBytes + memPoolMemoryUsage - 1) / memPoolMemoryUsage);
+expectedSpilledRanges = Math.trunc((numDocs + memAllocNum - 1) / memAllocNum);
+
 assert.between(expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
                1 + expectedSpilledRanges,

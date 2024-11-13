@@ -314,6 +314,7 @@ public:
         invariant(!_startOfNewData);
         if (!_done)
             _fillBufferIfNeeded();  // may change _done
+
         return !_done;
     }
 
@@ -682,58 +683,64 @@ private:
 template <typename Key, typename Value, typename Comparator>
 class MergeableSorter : public Sorter<Key, Value> {
 public:
+    static constexpr std::size_t kFileIteratorSize = sizeof(FileIterator<Key, Value>);
+
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
     typedef SortIteratorInterface<Key, Value> Iterator;
 
     MergeableSorter(const SortOptions& opts, const Comparator& comp, const Settings& settings)
-        : Sorter<Key, Value>(opts), _comp(comp), _settings(settings) {}
+        : Sorter<Key, Value>(opts), _comp(comp), _settings(settings) {
+        setMaxMemoryUsageBytes();
+    }
 
     MergeableSorter(const SortOptions& opts,
                     const std::string& fileName,
                     const Comparator& comp,
                     const Settings& settings)
-        : Sorter<Key, Value>(opts, fileName), _comp(comp), _settings(settings) {}
+        : Sorter<Key, Value>(opts, fileName), _comp(comp), _settings(settings) {
+        setMaxMemoryUsageBytes();
+    }
 
 protected:
     /**
-     * Merge the spills in order to approximately respect memory usage. This method will calculate
-     * the number of spills that can be merged simultaneously in order to respect memory limits and
-     * reduce the spills to that number if necessary by merging them iteratively.
+     * The maximum number of spills that can be merged simultaneously in order to respect memory
+     * limits. While merging, a chuck of 64KB from each spill is loaded to memory. The total size of
+     * chunks loaded to memory should not exceed the available memory.
      */
-    void _mergeSpillsToRespectMemoryLimits() {
-        auto numTargetedSpills = std::max(this->_opts.maxMemoryUsageBytes / kSortedFileBufferSize,
-                                          static_cast<std::size_t>(2));
-        if (this->_iters.size() > numTargetedSpills) {
-            this->_mergeSpills(numTargetedSpills);
-        }
-    }
+    size_t _spillsNumToRespectMemoryLimits = std::max(
+        this->_opts.maxMemoryUsageBytes / kSortedFileBufferSize, static_cast<std::size_t>(2));
 
     /**
      * An implementation of a k-way merge sort.
      *
-     * This method will take a target number of sorted spills to merge and will proceed to merge the
-     * set of them in batches of at most numTargetedSpills until it reaches the target.
+     * This method will take a target number of sorted spills (numTargetedSpills) to merge and will
+     * proceed to merge the set of them in batches of at most numParallelSpills until it reaches the
+     * target.
      *
-     * To give an example, if we have 5 spills and a target number of 2 the algorithm will do the
-     * following:
+     * To give an example, if we have 7 spills, a target number of 2 and 3 spills can be merged in
+     * parallel the algorithm will do the following:
      *
-     * {1, 2, 3, 4, 5}
-     * {12, 34, 5}
-     * {1234, 5}
+     * {1, 2, 3, 4, 5, 6, 7}
+     * {123, 456, 7}
+     * {1234567}
      */
-    void _mergeSpills(std::size_t numTargetedSpills) {
+    void _mergeSpills(std::size_t numTargetedSpills, std::size_t numParallelSpills) {
         using File = typename Sorter<Key, Value>::File;
+
+        if (numTargetedSpills == 0) {
+            numTargetedSpills = 1;
+        }
 
         std::shared_ptr<File> file = std::move(this->_file);
         std::vector<std::shared_ptr<Iterator>> iterators = std::move(this->_iters);
 
-        LOGV2_INFO(6033104,
-                   "Number of spills exceeds maximum spills to merge at a time, proceeding to "
-                   "merge them to reduce the number",
+        LOGV2_INFO(8203700,
+                   "Merging spills",
                    "currentNumSpills"_attr = iterators.size(),
-                   "maxNumSpills"_attr = numTargetedSpills);
+                   "targetNumSpills"_attr = numTargetedSpills,
+                   "parallelNumSpills"_attr = numParallelSpills);
 
         while (iterators.size() > numTargetedSpills) {
             std::shared_ptr<File> newSpillsFile = std::make_shared<File>(
@@ -745,9 +752,9 @@ protected:
                         "path"_attr = newSpillsFile->path().string());
 
             std::vector<std::shared_ptr<Iterator>> mergedIterators;
-            for (std::size_t i = 0; i < iterators.size(); i += numTargetedSpills) {
+            for (std::size_t i = 0; i < iterators.size(); i += numParallelSpills) {
                 std::vector<std::shared_ptr<Iterator>> spillsToMerge;
-                auto endIndex = std::min(i + numTargetedSpills, iterators.size());
+                auto endIndex = std::min(i + numParallelSpills, iterators.size());
                 std::move(iterators.begin() + i,
                           iterators.begin() + endIndex,
                           std::back_inserter(spillsToMerge));
@@ -776,7 +783,7 @@ protected:
                         1,
                         "Merged spills",
                         "currentNumSpills"_attr = mergedIterators.size(),
-                        "targetSpills"_attr = numTargetedSpills);
+                        "targetNumSpills"_attr = numTargetedSpills);
 
             iterators = std::move(mergedIterators);
             file = std::move(newSpillsFile);
@@ -787,8 +794,37 @@ protected:
         LOGV2_INFO(6033100, "Finished merging spills");
     }
 
+    void _mergeSpills(std::size_t numTargetedSpills) {
+        // The number of target spills and the number of parallel spills are equal.
+        _mergeSpills(numTargetedSpills, numTargetedSpills);
+    }
+
     const Comparator _comp;
     const Settings _settings;
+
+private:
+    // Update the maxMemoryUsageBytes subtracting the memory reserved for the file iterators. File
+    // iterators can use up to maxIteratorsMemoryUsagePercentage of the maxMemoryUsageBytes with
+    // lower bound fileIteratorsMaxBytesSize and upper bound 1MB.
+    void setMaxMemoryUsageBytes() {
+        double percRequested = maxIteratorsMemoryUsagePercentage.load();
+        auto iteratorMemBytesRequested =
+            static_cast<size_t>(this->_opts.maxMemoryUsageBytes * percRequested);
+        if (iteratorMemBytesRequested < this->fileIteratorsMaxBytesSize) {
+            this->fileIteratorsMaxBytesSize =
+                std::max(kFileIteratorSize, iteratorMemBytesRequested);
+        }
+        this->fileIteratorsMaxNum =
+            static_cast<size_t>(this->fileIteratorsMaxBytesSize / kFileIteratorSize);
+        this->fileIteratorsMaxBytesSize = kFileIteratorSize * this->fileIteratorsMaxNum;
+
+        if (this->fileIteratorsMaxBytesSize >= this->_opts.maxMemoryUsageBytes) {
+            this->_opts.MaxMemoryUsageBytes(0);
+        } else {
+            this->_opts.MaxMemoryUsageBytes(this->_opts.maxMemoryUsageBytes -
+                                            this->fileIteratorsMaxBytesSize);
+        }
+    }
 };
 
 template <typename Key, typename Value, typename Comparator>
@@ -881,7 +917,7 @@ public:
         }
 
         spill();
-        this->_mergeSpillsToRespectMemoryLimits();
+        this->_mergeSpills(this->_spillsNumToRespectMemoryLimits);
 
         return Iterator::merge(this->_iters, this->_opts, this->_comp);
     }
@@ -930,8 +966,9 @@ private:
     }
 
     void spill() override {
-        if (_data.empty())
+        if (_data.empty()) {
             return;
+        }
 
         if (!this->_opts.extSortAllowed) {
             // This error message only applies to sorts from user queries made through the find or
@@ -940,7 +977,8 @@ private:
             // appropriate error.
             uasserted(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                       str::stream()
-                          << "Sort exceeded memory limit of " << this->_opts.maxMemoryUsageBytes
+                          << "Sort exceeded memory limit of "
+                          << (this->_opts.maxMemoryUsageBytes + this->fileIteratorsMaxBytesSize)
                           << " bytes, but did not opt in to external sorting.");
         }
 
@@ -969,6 +1007,11 @@ private:
         }
 
         this->_stats.incrementSpilledRanges();
+
+        // Merge spills to remain below the `fileIteratorsMaxBytesSize` threshold.
+        if (this->_iters.size() >= this->fileIteratorsMaxNum) {
+            this->_mergeSpills(this->_iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
+        }
     }
 
     bool _done = false;
@@ -1155,7 +1198,7 @@ public:
         }
 
         spill();
-        this->_mergeSpillsToRespectMemoryLimits();
+        this->_mergeSpills(this->_spillsNumToRespectMemoryLimits);
 
         Iterator* iterator = Iterator::merge(this->_iters, this->_opts, this->_comp);
         _done = true;
@@ -1293,7 +1336,8 @@ private:
             // external sorting or by catching and throwing a more appropriate error.
             uasserted(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                       str::stream()
-                          << "Sort exceeded memory limit of " << this->_opts.maxMemoryUsageBytes
+                          << "Sort exceeded memory limit of "
+                          << (this->_opts.maxMemoryUsageBytes + this->fileIteratorsMaxBytesSize)
                           << " bytes, but did not opt in to external sorting. Aborting operation."
                           << " Pass allowDiskUse:true to opt in.");
         }
@@ -1316,6 +1360,12 @@ private:
 
         this->_stats.resetMemUsage();
         this->_stats.incrementSpilledRanges();
+
+        // Merge spills to remain below the `fileIteratorsMaxBytesSize` threshold.
+        if (this->_iters.size() >= this->fileIteratorsMaxNum) {
+            this->_mergeSpills(this->_iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
+            this->_stats.setSpilledRanges(this->_iters.size());
+        }
     }
 
     bool _done = false;

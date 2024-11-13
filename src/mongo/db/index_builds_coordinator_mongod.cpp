@@ -374,7 +374,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     });
 
     if (indexBuildOptions.applicationMode == ApplicationMode::kStartupRepair) {
-        // Two phase index build recovery goes though a different set-up procedure because we will
+        // Two phase index build recovery goes through a different set-up procedure because we will
         // either resume the index build or the original index will be dropped first.
         invariant(protocol == IndexBuildProtocol::kTwoPhase);
         auto status = Status::OK();

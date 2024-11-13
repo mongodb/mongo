@@ -29,3 +29,19 @@ structs:
                 description: "The version of checksum that dictates what hash was used to calculate it."
                 type: SorterChecksumVersion
                 optional: true
+
+
+server_parameters:
+  maxIteratorsMemoryUsagePercentage:
+    description: "Limits the amount of memory the sorter can use to store file iterators to spilled chunks of sorted data
+                  with maximum 1MB and minimum enough to store one file iterator."
+    set_at:
+      - runtime
+      - startup
+    cpp_varname: maxIteratorsMemoryUsagePercentage
+    cpp_vartype: AtomicWord<double>
+    default: 0.1
+    validator:
+      gte: 0.0
+      lte: 1.0
+    redact: false

@@ -87,6 +87,29 @@ TEST(SorterStatsTest, SingleSorterMemUsage) {
     ASSERT_EQ(sorterTracker.memUsage.load(), 1);
 }
 
+TEST(SorterStatsTest, SingleSorterSpilledRanges) {
+    SorterTracker sorterTracker;
+    SorterStats sorterStats(&sorterTracker);
+
+    sorterStats.incrementSpilledRanges();
+    sorterStats.incrementSpilledRanges();
+    ASSERT_EQ(sorterStats.spilledRanges(), 2);
+    ASSERT_EQ(sorterTracker.spilledRanges.load(), 2);
+
+    // Simulate increasing spilled ragnes.
+    sorterStats.setSpilledRanges(3);
+    ASSERT_EQ(sorterStats.spilledRanges(), 3);
+    ASSERT_EQ(sorterTracker.spilledRanges.load(), 3);
+
+    // Simulate decreasing spilled ranges.
+    sorterStats.setSpilledRanges(1);
+    ASSERT_EQ(sorterStats.spilledRanges(), 1);
+    ASSERT_EQ(sorterTracker.spilledRanges.load(), 1);
+
+    sorterStats.incrementSpilledRanges();
+    ASSERT_EQ(sorterStats.spilledRanges(), 2);
+    ASSERT_EQ(sorterTracker.spilledRanges.load(), 2);
+}
 
 TEST(SorterStatsTest, MultipleSortersSpilledRanges) {
     SorterTracker sorterTracker;
@@ -175,14 +198,5 @@ TEST(SorterStatsTest, MultipleSortersMemUsage) {
     ASSERT_EQ(sorterTracker.memUsage.load(), 4);
 }
 
-DEATH_TEST(SorterStatsTest, SetNonZeroNumSpilledRanges, "invariant") {
-    SorterTracker sorterTracker;
-    SorterStats sorterStats(&sorterTracker);
-
-    sorterStats.incrementSpilledRanges();
-    ASSERT_EQ(sorterTracker.spilledRanges.load(), 1);
-
-    sorterStats.setSpilledRanges(10);
-}
 }  // namespace
 }  // namespace mongo

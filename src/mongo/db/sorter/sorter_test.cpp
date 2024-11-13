@@ -893,8 +893,15 @@ public:
 
     SortOptions adjustSortOptions(SortOptions opts) override {
         // Make sure we use a reasonable number of files when we spill
-        MONGO_STATIC_ASSERT((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 50);
-        MONGO_STATIC_ASSERT((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500);
+        MONGO_STATIC_ASSERT((NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT > 50);
+        // Each iterator is kFileIteratorSize bytes and we do not want to exceed the maximum number
+        // of iterators that we can store in the reserved memory (MEM_LIMIT - DATA_MEM_LIMIT).
+        MONGO_STATIC_ASSERT(
+            (NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT <
+            std::max(static_cast<std::size_t>(
+                         (MEM_LIMIT - DATA_MEM_LIMIT) /
+                         MergeableSorter<IntWrapper, IntWrapper, IWComparator>::kFileIteratorSize),
+                     static_cast<std::size_t>(1)));
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed();
     }
@@ -916,31 +923,41 @@ public:
     }
 
     size_t correctNumRanges() const override {
-        return std::max(static_cast<std::size_t>(MEM_LIMIT / kSortedFileBufferSize),
+        return std::max(static_cast<std::size_t>(DATA_MEM_LIMIT / kSortedFileBufferSize),
                         static_cast<std::size_t>(2));
     }
 
+    std::pair<size_t, size_t> correctMergedSpills(size_t spillsToMergeNum,
+                                                  size_t targetSpillsNum,
+                                                  size_t parallelSpillsNum) const {
+        size_t newSpillsDone = 0l;
+        while (spillsToMergeNum > targetSpillsNum) {
+            auto newSpills = (spillsToMergeNum + parallelSpillsNum - 1) / parallelSpillsNum;
+            newSpillsDone += newSpills;
+            spillsToMergeNum = newSpills;
+        }
+
+        return {spillsToMergeNum, newSpillsDone};
+    }
+
     size_t correctSpilledRanges() const override {
-        // We add 1 to the calculation since the call to persistDataForShutdown() spills the
-        // remaining in-memory Sorter data to disk, adding one extra range.
-        std::size_t spillsToMerge = NUM_ITEMS * sizeof(IWPair) / MEM_LIMIT + 1;
+        // It spills when the data in memory is more than the maximum allowed memory.
+        std::size_t recordsPerRange = DATA_MEM_LIMIT / sizeof(IWPair) + 1;
+        std::size_t spillsToMerge = (NUM_ITEMS + recordsPerRange - 1) / recordsPerRange;
+
         // As the spills may get merged we'll account for the intermediate spills that happen.
         std::size_t spillsDone = spillsToMerge;
         std::size_t targetRanges = correctNumRanges();
-        while (spillsToMerge > targetRanges) {
-            auto newSpills = spillsToMerge / targetRanges;
-            spillsDone += newSpills;
-            if ((spillsToMerge % targetRanges) > 0) {
-                spillsDone++;
-            }
-            spillsToMerge = newSpills;
-        }
+        auto spillsRes = correctMergedSpills(spillsToMerge, targetRanges, targetRanges);
+        spillsDone += spillsRes.second;
         return spillsDone;
     }
 
     enum Constants {
-        NUM_ITEMS = 500 * 1000,
-        MEM_LIMIT = 64 * 1024,
+        NUM_ITEMS = 800 * 1000,
+        MEM_LIMIT = 128 * 1024,  // The total memory limit.
+        // The memory limit after subtracting the memory reserved for the file iterators.
+        DATA_MEM_LIMIT = MEM_LIMIT - static_cast<int>(MEM_LIMIT / 10),
     };
     std::unique_ptr<int[]> _array;
     PseudoRandom _random;
@@ -952,13 +969,13 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
     typedef LotsOfDataLittleMemory<Random> Parent;
     SortOptions adjustSortOptions(SortOptions opts) override {
         // Make sure our tests will spill or not as desired
-        MONGO_STATIC_ASSERT(MEM_LIMIT / 2 > (100 * sizeof(IWPair)));
-        MONGO_STATIC_ASSERT(MEM_LIMIT < (5000 * sizeof(IWPair)));
-        MONGO_STATIC_ASSERT(MEM_LIMIT * 2 > (5000 * sizeof(IWPair)));
+        MONGO_STATIC_ASSERT(DATA_MEM_LIMIT / 2 > (100 * sizeof(IWPair)));
+        MONGO_STATIC_ASSERT(DATA_MEM_LIMIT < (5000 * sizeof(IWPair)));
+        MONGO_STATIC_ASSERT(DATA_MEM_LIMIT * 2 > (5000 * sizeof(IWPair)));
 
         // Make sure we use a reasonable number of files when we spill
-        MONGO_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 100);
-        MONGO_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500);
+        MONGO_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT > 100);
+        MONGO_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT < 500);
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed().Limit(Limit);
     }
@@ -973,7 +990,69 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
         // being sorted.
         return 0;
     }
-    enum { MEM_LIMIT = 32 * 1024 };
+
+    enum {
+        MEM_LIMIT = 32 * 1024,  // The total memory limit.
+        // The memory limit after subtracting the memory reserved for the file iterators.
+        DATA_MEM_LIMIT = MEM_LIMIT - static_cast<int>(MEM_LIMIT / 10),
+    };
+};
+
+template <bool Random = true>
+class LotsOfSpillsLittleMemory : public LotsOfDataLittleMemory<Random> {
+    typedef LotsOfDataLittleMemory<Random> Parent;
+    SortOptions adjustSortOptions(SortOptions opts) override {
+        // Make sure we create a lot of spills
+        MONGO_STATIC_ASSERT(
+            (Parent::NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT >
+            std::max(static_cast<std::size_t>(
+                         (MEM_LIMIT - DATA_MEM_LIMIT) /
+                         MergeableSorter<IntWrapper, IntWrapper, IWComparator>::kFileIteratorSize),
+                     static_cast<std::size_t>(1)));
+
+        return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed();
+    }
+
+    size_t correctSpilledRanges() const override {
+        std::size_t maximumNumberOfIterators =
+            std::max(static_cast<std::size_t>(
+                         (MEM_LIMIT - DATA_MEM_LIMIT) /
+                         MergeableSorter<IntWrapper, IntWrapper, IWComparator>::kFileIteratorSize),
+                     static_cast<std::size_t>(1));
+        // It spills when the data in memory is more than the maximum allowed memory.
+        std::size_t recordsPerRange = DATA_MEM_LIMIT / sizeof(IWPair) + 1;
+        std::size_t documentsToAdd = Parent::NUM_ITEMS;
+        std::size_t spillsInParallel = Parent::correctNumRanges();
+        std::size_t spillsDone = 0;
+        std::size_t spillsToMerge = 0;
+        while (documentsToAdd > recordsPerRange) {
+            documentsToAdd -= recordsPerRange;
+            ++spillsToMerge;
+            ++spillsDone;
+            // merge iterators when the maximum iterators limit has been reached.
+            if (spillsToMerge >= maximumNumberOfIterators) {
+                auto spillsRes = Parent::correctMergedSpills(
+                    spillsToMerge, maximumNumberOfIterators / 2, spillsInParallel);
+                spillsToMerge = spillsRes.first;
+                spillsDone += spillsRes.second;
+            }
+        }
+        spillsToMerge += (documentsToAdd > 0 ? 1 : 0);
+        spillsDone += (documentsToAdd > 0 ? 1 : 0);
+
+        // Merge spills to satisfy the maximum number of chunks to fit in memory constraint.
+        auto spillsRes =
+            Parent::correctMergedSpills(spillsToMerge, spillsInParallel, spillsInParallel);
+        spillsDone += spillsRes.second;
+
+        return spillsDone;
+    }
+
+    enum {
+        MEM_LIMIT = 16 * 1024,  // The total memory limit.
+        // The memory limit after subtracting the memory reserved for the file iterators.
+        DATA_MEM_LIMIT = MEM_LIMIT - static_cast<int>(MEM_LIMIT / 10),
+    };
 };
 }  // namespace SorterTests
 
@@ -993,6 +1072,8 @@ public:
         add<SorterTests::Dupes>();
         add<SorterTests::LotsOfDataLittleMemory</*random=*/false>>();
         add<SorterTests::LotsOfDataLittleMemory</*random=*/true>>();
+        add<SorterTests::LotsOfSpillsLittleMemory</*random=*/false>>();
+        add<SorterTests::LotsOfSpillsLittleMemory</*random=*/true>>();
         add<SorterTests::LotsOfDataWithLimit<1, /*random=*/false>>();     // limit=1 is special case
         add<SorterTests::LotsOfDataWithLimit<1, /*random=*/true>>();      // limit=1 is special case
         add<SorterTests::LotsOfDataWithLimit<100, /*random=*/false>>();   // fits in mem
@@ -1139,7 +1220,9 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
     auto opts = SortOptions()
                     .ExtSortAllowed()
                     .TempDir(tempDir.path())
-                    .MaxMemoryUsageBytes(sizeof(IWSorter::Data))
+                    .MaxMemoryUsageBytes(
+                        sizeof(IWSorter::Data) +
+                        MergeableSorter<IntWrapper, IntWrapper, IWComparator>::kFileIteratorSize)
                     .Tracker(&sorterTracker);
 
     IWPair pairInsertedBeforeShutdown(1, 100);
