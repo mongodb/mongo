@@ -698,20 +698,6 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
         /* Assert we never dirty a checkpoint handle. */
         WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
 
-        /*
-         * We should never set a btree dirty when checkpoint is triggered by RTS, recovery or when
-         * closing the connection. Those specific scenarios should always leave the database clean.
-         * The only exception is related to the metadata file: it is expected to be marked as dirty
-         * whenever a btree is checkpointed.
-         */
-        if (WT_SESSION_BTREE_SYNC(session) && !WT_IS_METADATA(session->dhandle) &&
-          !FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE)) {
-            WT_ASSERT_ALWAYS(session, !F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE), "%s",
-              "A btree is marked dirty during RTS");
-            WT_ASSERT_ALWAYS(session,
-              !F_ISSET(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT), "%s",
-              "A btree is marked dirty during recovery or shutdown");
-        }
         S2BT(session)->modified = true;
         WT_FULL_BARRIER();
 

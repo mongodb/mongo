@@ -22,36 +22,30 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 
     WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
 
+    mod = ref->page->modify;
+    txn = session->txn;
+
     /*
-     * Don't skip checkpoint if at least one of the following conditions is met:
+     * We can skip some dirty pages during a checkpoint. The requirements:
      *
-     *  - This checkpoint happens during RTS, recovery or shutdown. Those scenarios should not leave
-     * anything dirty behind.
-     *  - This is the history store btree. As part of the checkpointing the data store, we will move
-     * the older values into the history store without using any transactions. This led to
-     * representation of all the modifications on the history store page with a transaction that is
-     * maximum than the checkpoint snapshot. But these modifications are done by the checkpoint
-     * itself, so we shouldn't ignore them for consistency.
-     * - If we got to this point and we are dealing with an internal page, this means at least one
-     * of its leaf pages has been reconciled and we need to process the internal page as well.
-     * - There is no snapshot transaction active. Usually, there is one in ordinary application
-     * checkpoints but not all internal cases. Furthermore, this guarantees the metadata file is
-     * never skipped.
-     * - the checkpoint's snapshot includes the first dirty update on the page.
-     * - Not every disk block involved has a disk address.
+     * 1. Not a history btree. As part of the checkpointing the data store, we will move the older
+     *    values into the history store without using any transactions. This led to representation
+     *    of all the modifications on the history store page with a transaction that is maximum than
+     *    the checkpoint snapshot. But these modifications are done by the checkpoint itself, so we
+     *    shouldn't ignore them for consistency.
+     * 2. they must be leaf pages,
+     * 3. there is a snapshot transaction active (which is the case in ordinary application
+     *    checkpoints but not all internal cases),
+     * 4. the first dirty update on the page is sufficiently recent the checkpoint transaction would
+     *     skip them,
+     * 5. there's already an address for every disk block involved.
      */
-    if (F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE))
-        return (false);
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING) | WT_CONN_CLOSING_CHECKPOINT)
-        return (false);
     if (WT_IS_HS(session->dhandle))
         return (false);
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
         return (false);
-    txn = session->txn;
     if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
         return (false);
-    mod = ref->page->modify;
     if (!WT_TXNID_LT(txn->snapshot_data.snap_max, mod->first_dirty_txn))
         return (false);
 

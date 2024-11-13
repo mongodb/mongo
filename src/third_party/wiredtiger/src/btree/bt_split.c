@@ -695,7 +695,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
      * sync.
      */
     deleted_entries = 0;
-    if (!WT_BTREE_SYNCING(btree) || WT_SESSION_BTREE_SYNC(session))
+    if (!__wt_btree_syncing_by_other_session(session))
         for (i = 0; i < parent_entries; ++i) {
             next_ref = pindex->index[i];
             WT_ASSERT(session, WT_REF_GET_STATE(next_ref) != WT_REF_SPLIT);

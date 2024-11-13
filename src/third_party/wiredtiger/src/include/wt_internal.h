@@ -542,7 +542,7 @@ typedef uint64_t wt_timestamp_t;
 #include "meta.h" /* required by block.h */
 #include "optrack.h"
 #include "os.h"
-#include "reconcile.h"
+#include "../reconcile/reconcile.h"
 #include "rollback_to_stable.h"
 #include "schema.h"
 #include "tiered.h"

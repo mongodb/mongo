@@ -1193,6 +1193,7 @@ rc
 rdlock
 rdtsc
 rduppo
+readdir
 readgen
 readlock
 readonly

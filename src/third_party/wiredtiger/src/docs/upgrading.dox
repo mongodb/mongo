@@ -1,5 +1,41 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_1130 Upgrading to Version 11.3.0
+<dl>
+
+<dt>Per-file configuration "huffman_value"</dt>
+<dd>
+Huffman encoding is no longer supported for values or keys (support for keys was removed
+in a previous release).
+</dd>
+
+<dt>Connection configuration "checkpoint_cleanup"</dt>
+<dd>
+The checkpoint_cleanup configuration now uses a sub-configuration "method" to control
+how aggressively obsolete content is removed when creating checkpoints:
+"checkpoint_cleanup=[method=[none|reclaim_space]]"
+</dd>
+
+<dt>Connection configuration "verbose"</dt>
+<dd>
+Three eviction-related verbose config values ('evict', 'evict_stuck', and 'evictserver')
+have been merged into the 'eviction' config.
+</dd>
+
+<dt>WT_SESSION.verify configuration "dump_app_data"</dt>
+<dd>
+The 'dump_app_data' configuration of the WT_SESSION.verify command has been renamed to
+'dump_all_data'.
+</dd>
+
+<dt>WT_SESSION.set_timestamp configuration "oldest_timestamp" and "stable_timestamp"</dt>
+<dd>
+An invalid oldest_timestamp or stable_timestamp value is no longer silently ignored, and now
+returns an error. The stable timestamp should always be greater than the oldest timestamp and
+neither can be set to a value older than the current one.
+</dd>
+
+</dl> <hr>
 @section version_1120 Upgrading to Version 11.2.0
 <dl>
 
