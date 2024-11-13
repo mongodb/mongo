@@ -32,7 +32,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection.h"
@@ -50,9 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util_core.h"

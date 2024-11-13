@@ -28,14 +28,8 @@
  */
 
 
-#include <algorithm>
 #include <cstdint>
 #include <fmt/format.h>
-#include <memory>
-#include <mutex>
-#include <new>
-#include <numeric>
-#include <type_traits>
 
 #include <absl/container/node_hash_map.h>
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
@@ -72,7 +66,6 @@
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -80,7 +73,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"

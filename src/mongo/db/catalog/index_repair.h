@@ -33,7 +33,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/validate/validate_results.h"
-#include "mongo/db/catalog/validate/validate_state.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"

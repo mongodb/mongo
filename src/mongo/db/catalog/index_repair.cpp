@@ -32,9 +32,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstdint>
-#include <memory>
 #include <string>
-#include <vector>
 
 #include <boost/none.hpp>
 

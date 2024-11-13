@@ -31,7 +31,6 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
-#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -55,7 +54,6 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -67,7 +65,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"

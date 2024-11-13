@@ -29,8 +29,6 @@
 
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
-#include <mutex>
-#include <string>
 
 #include <boost/optional/optional.hpp>
 
@@ -42,7 +40,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_data.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"

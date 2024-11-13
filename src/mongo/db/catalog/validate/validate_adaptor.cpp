@@ -29,18 +29,14 @@
 
 
 #include <absl/container/flat_hash_map.h>
-#include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <climits>
 #include <fmt/format.h>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
 #include <string>
-#include <utility>
-#include <vector>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"

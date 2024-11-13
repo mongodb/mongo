@@ -30,16 +30,9 @@
 
 #include <algorithm>
 #include <boost/optional.hpp>
-#include <cstdint>
 #include <fmt/format.h>
-#include <iterator>
-#include <map>
-#include <memory>
-#include <set>
 #include <string>
-#include <type_traits>
 #include <utility>
-#include <vector>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/container/flat_set.hpp>
@@ -75,7 +68,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
@@ -90,9 +82,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/uuid.h"
 

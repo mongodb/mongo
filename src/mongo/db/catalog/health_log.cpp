@@ -30,7 +30,6 @@
 #include "mongo/db/catalog/health_log.h"
 
 #include <cstdint>
-#include <string>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"

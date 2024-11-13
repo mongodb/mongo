@@ -31,16 +31,12 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
 #include <cstdint>
-#include <functional>
 #include <initializer_list>
 #include <limits>
-#include <memory>
 #include <ostream>
 #include <string>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include "mongo/base/status_with.h"
@@ -63,21 +59,16 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"

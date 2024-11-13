@@ -30,7 +30,6 @@
 #pragma once
 
 #include <cstdint>
-#include <iterator>
 #include <map>
 #include <string>
 #include <vector>
