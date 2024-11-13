@@ -544,11 +544,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // - We have a valid routing table.
         // - We know the collection's collation.
         // - We have a change stream or need to do a FLE rewrite.
+        // - It's a collectionless aggregation, and so a collection default collation cannot exist.
         // This is because the results of optimization may depend on knowing the collation.
         // TODO SERVER-81991: Determine whether this is necessary once all unsharded collections are
         // tracked as unsplittable collections in the sharding catalog.
         if ((cri && cri->cm.hasRoutingTable()) || requiresCollationForParsingUnshardedAggregate ||
-            hasChangeStream || shouldDoFLERewrite) {
+            hasChangeStream || shouldDoFLERewrite || expCtx->ns.isCollectionlessAggregateNS()) {
             pipeline->optimizePipeline();
 
             // Validate the pipeline post-optimization.
