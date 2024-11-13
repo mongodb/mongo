@@ -55,28 +55,79 @@ bool nearlyEqual(double a, double b, double epsilon) {
  */
 
 void EstimateBase::mergeSources(const EstimateBase& other) {
-    // It is illegal to perform operations on estimates with unknown source
-    tassert(
-        9274204, "This estimate has unknown source", this->_source != EstimationSource::Unknown);
-    tassert(
-        9274203, "Other estimate has unknown source", other._source != EstimationSource::Unknown);
+    EstimationSource s1 = this->_source;
+    EstimationSource s2 = other._source;
 
-    // Merging with a code based estimate does not modify the estimate type
-    if (other._source == EstimationSource::Code) {
-        return;
-    } else if (_source == EstimationSource::Code) {
-        _source = other._source;
-        return;
+    // It is illegal to perform operations on estimates with unknown source
+    tassert(9274204, "This estimate has unknown source", s1 != EstimationSource::Unknown);
+    tassert(9274203, "Other estimate has unknown source", s2 != EstimationSource::Unknown);
+
+    if (s1 == s2) {
+        return;  // This covers the diagonal of the state matrix in the header comment
     }
-    // Merging with a metadata based estimate does not modify the estimate type
-    if (other._source == EstimationSource::Metadata) {
-        return;
-    } else if (_source == EstimationSource::Metadata) {
-        _source = other._source;
-        return;
-    }
-    // Different types result in Mixed, otherwise keep it unchanged.
-    _source = (_source == other._source) ? _source : EstimationSource::Mixed;
+
+    // Define the rules of source merging as a state transition table.
+    auto getSource = [](EstimationSource a, EstimationSource b) -> EstimationSource {
+        if (a > b) {
+            std::swap(a, b);  // Ensure a <= b to handle symmetric cases
+        }
+        switch (a) {
+            case EstimationSource::Histogram:
+                switch (b) {
+                    case EstimationSource::Sampling:
+                    case EstimationSource::Heuristics:
+                    case EstimationSource::Mixed:
+                        return EstimationSource::Mixed;
+                    case EstimationSource::Metadata:
+                    case EstimationSource::Code:
+                        return EstimationSource::Histogram;
+                    default:
+                        MONGO_UNREACHABLE_TASSERT(9695207);
+                }
+            case EstimationSource::Sampling:
+                switch (b) {
+                    case EstimationSource::Mixed:
+                    case EstimationSource::Heuristics:
+                        return EstimationSource::Mixed;
+                        return EstimationSource::Mixed;
+                    case EstimationSource::Metadata:
+                    case EstimationSource::Code:
+                        return EstimationSource::Sampling;
+                    default:
+                        MONGO_UNREACHABLE_TASSERT(9695206);
+                }
+            case EstimationSource::Heuristics:
+                switch (b) {
+                    case EstimationSource::Mixed:
+                        return EstimationSource::Mixed;
+                    case EstimationSource::Metadata:
+                    case EstimationSource::Code:
+                        return EstimationSource::Heuristics;
+                    default:
+                        MONGO_UNREACHABLE_TASSERT(9695205);
+                }
+            case EstimationSource::Mixed:
+                switch (b) {
+                    case EstimationSource::Metadata:
+                    case EstimationSource::Code:
+                        return EstimationSource::Mixed;
+                    default:
+                        MONGO_UNREACHABLE_TASSERT(9695204);
+                }
+            case EstimationSource::Metadata:
+                switch (b) {
+                    case EstimationSource::Code:
+                        return EstimationSource::Metadata;
+                    default:
+                        MONGO_UNREACHABLE_TASSERT(9695203);
+                }
+            default:
+                MONGO_UNREACHABLE_TASSERT(9695201);
+        }
+        MONGO_UNREACHABLE_TASSERT(9695200);
+    };
+
+    _source = getSource(s1, s2);
 }
 
 /**

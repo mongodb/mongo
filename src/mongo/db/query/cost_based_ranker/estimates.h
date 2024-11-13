@@ -75,13 +75,13 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(EstimationUnit, ESTIMATION_UNITS_NAMES);
  *         Most often used for internal testing.
  */
 #define ESTIMATION_SOURCE_NAMES(F) \
-    F(Unknown)                     \
     F(Histogram)                   \
     F(Sampling)                    \
     F(Heuristics)                  \
     F(Mixed)                       \
     F(Metadata)                    \
-    F(Code)
+    F(Code)                        \
+    F(Unknown)
 QUERY_UTIL_NAMED_ENUM_DEFINE(EstimationSource, ESTIMATION_SOURCE_NAMES);
 #undef ESTIMATION_SOURCE_NAMES
 
@@ -269,6 +269,23 @@ public:
     /**
      * Merge this estimate with another one - used in operators that combine two estimates.
      * The source of this estimate is adjusted depending on the 'other' estimate.
+     * Merging follows the following general rules:
+     * - Source pairs are symmetric.
+     * - Any type of source merged with itself results in the same type of source.
+     * - Merging Code with any other type of source results in the other type.
+     * - Merging Metadata with any other type of source except Code results in the other type.
+     * - The combination of any other two different types of sources results in the Mixed type.
+     *
+     * These rules result in the following state table:
+     * --------------------------------------------------------------------
+     *            | Histogram  Sampling Heuristics Mixed  Metadata   Code
+     * --------------------------------------------------------------------
+     * Histogram  | Histogram  Mixed    Mixed      Mixed  Histogram  Histogram
+     * Sampling   |            Sampling Mixed      Mixed  Sampling   Sampling
+     * Heuristics |                     Heuristics Mixed  Heuristics Heuristics
+     * Mixed      |                                Mixed  Mixed      Mixed
+     * Metadata   |                                       Metadata   Metadata
+     * Code       |                                                  Code
      */
     void mergeSources(const EstimateBase& other);
 
@@ -412,7 +429,7 @@ public:
 
     // Multiplication is undefined for two CEs - this operation has no meaning - the unit of the
     // result would be documents^2. However, it is common to multiply CE by some unitless factor,
-    // or multiply cost with CE to get the cost of a node's output.
+    // or multiply a cost coefficient with CE to get the cost of a node's output.
     friend CardinalityEstimate operator*(const CardinalityEstimate& ce, double factor);
     friend CardinalityEstimate operator*(double factor, const CardinalityEstimate& ce);
 

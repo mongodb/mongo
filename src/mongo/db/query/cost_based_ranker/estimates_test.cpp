@@ -167,33 +167,80 @@ TEST(EstimatesFramework, PrintEstimates) {
 }
 
 TEST(EstimatesFramework, SourceMerge) {
-    CostCoefficient cc1(CostCoefficientType{0.00042});
-    CardinalityEstimate ce1(CardinalityType{314298.78}, EstimationSource::Histogram);
-    auto cst1 = cc1 * ce1;
-    // Combining kSource with any other source leaves that source
-    ASSERT_EQUALS(cst1.source(), EstimationSource::Histogram);
+    CostCoefficient cc(CostCoefficientType{0.0042});  // Always of type Code
+    CardinalityEstimate ce_hi(CardinalityType{1142.8}, EstimationSource::Histogram);
+    CardinalityEstimate ce_sa(CardinalityType{2142.7}, EstimationSource::Sampling);
+    CardinalityEstimate ce_he(CardinalityType{3142.3}, EstimationSource::Heuristics);
+    CardinalityEstimate ce_mi(CardinalityType{4142.2}, EstimationSource::Mixed);
+    CardinalityEstimate ce_me(CardinalityType{5142.1}, EstimationSource::Metadata);
+    CardinalityEstimate ce_co(CardinalityType{5142.1}, EstimationSource::Code);
 
-    // Combining any other two source types results in a mixed source
-    CostEstimate cst2(CostType{123.213}, EstimationSource::Heuristics);
-    auto cst3 = cst2 + cst1;
-    ASSERT_EQUALS(cst3.source(), EstimationSource::Mixed);
+    // Test all combinations systematically
 
-    CardinalityEstimate ce2(CardinalityType{914598.1}, EstimationSource::Histogram);
-    auto ce3 = ce1 + ce2;
-    ASSERT_EQUALS(ce3.source(), ce1.source());
-    ASSERT_EQUALS(ce3.source(), ce2.source());
+    // Code x Any = Any
+    ASSERT_EQUALS((cc * ce_hi).source(), EstimationSource::Histogram);
+    ASSERT_EQUALS((cc * ce_sa).source(), EstimationSource::Sampling);
+    ASSERT_EQUALS((cc * ce_he).source(), EstimationSource::Heuristics);
+    ASSERT_EQUALS((cc * ce_mi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((cc * ce_me).source(), EstimationSource::Metadata);
+    ASSERT_EQUALS((cc * ce_co).source(), EstimationSource::Code);
 
-    // Combining selectivities with Code should leave it unchanged and be symmetric.
-    SelectivityEstimate s1{SelectivityType{0}, EstimationSource::Code};
-    SelectivityEstimate s2{SelectivityType{0}, EstimationSource::Heuristics};
-    ASSERT_EQ((s1 + s2).source(), EstimationSource::Heuristics);
-    ASSERT_EQ((s2 + s1).source(), EstimationSource::Heuristics);
+    // Histogram x Any
+    ASSERT_EQUALS((ce_hi + ce_hi).source(), EstimationSource::Histogram);
+    ASSERT_EQUALS((ce_hi + ce_sa).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_hi + ce_he).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_hi + ce_mi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_hi + ce_me).source(), EstimationSource::Histogram);
+    ASSERT_EQUALS((ce_hi + ce_co).source(), EstimationSource::Histogram);
+
+    // Sampling x Any
+    ASSERT_EQUALS((ce_sa + ce_hi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_sa + ce_sa).source(), EstimationSource::Sampling);
+    ASSERT_EQUALS((ce_sa + ce_he).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_sa + ce_mi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_sa + ce_me).source(), EstimationSource::Sampling);
+    ASSERT_EQUALS((ce_sa + ce_co).source(), EstimationSource::Sampling);
+
+    // Heuristics
+    ASSERT_EQUALS((ce_he + ce_hi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_he + ce_sa).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_he + ce_he).source(), EstimationSource::Heuristics);
+    ASSERT_EQUALS((ce_he + ce_mi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_he + ce_me).source(), EstimationSource::Heuristics);
+    ASSERT_EQUALS((ce_he + ce_co).source(), EstimationSource::Heuristics);
+
+    // Mixed
+    ASSERT_EQUALS((ce_mi + ce_hi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_mi + ce_sa).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_mi + ce_he).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_mi + ce_mi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_mi + ce_me).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_mi + ce_co).source(), EstimationSource::Mixed);
+
+    // Metadata
+    ASSERT_EQUALS((ce_me + ce_hi).source(), EstimationSource::Histogram);
+    ASSERT_EQUALS((ce_me + ce_sa).source(), EstimationSource::Sampling);
+    ASSERT_EQUALS((ce_me + ce_he).source(), EstimationSource::Heuristics);
+    ASSERT_EQUALS((ce_me + ce_mi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_me + ce_me).source(), EstimationSource::Metadata);
+    ASSERT_EQUALS((ce_me + ce_co).source(), EstimationSource::Metadata);
+
+    // Test source merging across few different types of estimates and operations
+
+    // Combining different source types results in a mixed source
+    SelectivityEstimate s_he(SelectivityType{0.123}, EstimationSource::Heuristics);
+    ASSERT_EQUALS((s_he * ce_hi).source(), EstimationSource::Mixed);
+
+    // Combining Heuristics with Code should leave it unchanged and be symmetric.
+    SelectivityEstimate s_co{SelectivityType{0.1}, EstimationSource::Code};
+    ASSERT_EQ((s_co * ce_he).source(), EstimationSource::Heuristics);
+    ASSERT_EQ((ce_he * s_co).source(), EstimationSource::Heuristics);
 
     // Combining selectivities with Metadata should leave it unchanged and be symmetric.
-    SelectivityEstimate s3{SelectivityType{0}, EstimationSource::Metadata};
-    SelectivityEstimate s4{SelectivityType{0}, EstimationSource::Heuristics};
-    ASSERT_EQ((s1 + s2).source(), EstimationSource::Heuristics);
-    ASSERT_EQ((s2 + s1).source(), EstimationSource::Heuristics);
+    SelectivityEstimate s1_me{SelectivityType{0}, EstimationSource::Metadata};
+    SelectivityEstimate s2_me{SelectivityType{0}, EstimationSource::Heuristics};
+    ASSERT_EQ((s1_me + s2_me).source(), EstimationSource::Heuristics);
+    ASSERT_EQ((s2_me + s1_me).source(), EstimationSource::Heuristics);
 }
 
 }  // unnamed namespace
