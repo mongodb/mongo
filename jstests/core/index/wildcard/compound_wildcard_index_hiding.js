@@ -7,6 +7,8 @@
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_fcv_70,
+ *   # TODO (SERVER-91380): Remove the 'assumes_balancer_off' tag.
+ *   assumes_balancer_off,
  * ]
  */
 
