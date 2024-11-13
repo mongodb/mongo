@@ -1705,6 +1705,12 @@ def _mongo_cc_binary_and_program(
             "//bazel/config:build_enterprise_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
         })
+
+        if "modules/enterprise/src/fle" not in native.package_name():
+            target_compatible_with += select({
+                "//bazel/config:ssl_enabled": [],
+                "//conditions:default": ["@platforms//:incompatible"],
+            })
     else:
         enterprise_compatible = []
 
