@@ -242,10 +242,9 @@ void printStackTraceNoRecursion() {
 }
 
 // must hold MallocFreeOStreamGuard to call
-void printSignalAndBacktrace(int signalNum) {
+void printSignal(int signalNum) {
     mallocFreeOStream << "Got signal: " << signalNum << " (" << strsignal(signalNum) << ").";
     writeMallocFreeStreamToLog();
-    printStackTraceNoRecursion();
 }
 
 void dumpScopedDebugInfo(std::ostream& os) {
@@ -261,6 +260,14 @@ void dumpScopedDebugInfo(std::ostream& os) {
     os << "]\n";
 }
 
+// must hold MallocFreeOStreamGuard to call
+void printErrorBlock() {
+    printStackTraceNoRecursion();
+    writeMallocFreeStreamToLog();
+    dumpScopedDebugInfo(mallocFreeOStream);
+    writeMallocFreeStreamToLog();
+}
+
 // this will be called in certain c++ error cases, for example if there are two active
 // exceptions
 void myTerminate() {
@@ -274,9 +281,7 @@ void myTerminate() {
         mallocFreeOStream << " No exception is active";
     }
     writeMallocFreeStreamToLog();
-    dumpScopedDebugInfo(mallocFreeOStream);
-    writeMallocFreeStreamToLog();
-    printStackTraceNoRecursion();
+    printErrorBlock();
     breakpoint();
     endProcessWithSignal(SIGABRT);
 }
@@ -284,9 +289,8 @@ void myTerminate() {
 extern "C" void abruptQuit(int signalNum);
 extern "C" void abruptQuit(int signalNum) {
     MallocFreeOStreamGuard lk(signalNum);
-    dumpScopedDebugInfo(mallocFreeOStream);
-    writeMallocFreeStreamToLog();
-    printSignalAndBacktrace(signalNum);
+    printSignal(signalNum);
+    printErrorBlock();
     breakpoint();
     endProcessWithSignal(signalNum);
 }
@@ -346,8 +350,9 @@ extern "C" void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void
     writeMallocFreeStreamToLog();
 
     printSigInfo(siginfo);
+    printSignal(signalNum);
+    printErrorBlock();
 
-    printSignalAndBacktrace(signalNum);
     breakpoint();
     endProcessWithSignal(signalNum);
 }
