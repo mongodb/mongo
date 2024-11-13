@@ -241,11 +241,12 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
                       str::stream() << "Invalid system namespace: " << ns.toStringForErrorMsg());
     }
 
-    if (ns.isNormalCollection() && ns.size() > NamespaceString::MaxNsCollectionLen) {
+    auto maxNsLen = ns.isOnInternalDb() ? NamespaceString::MaxInternalNsCollectionLen
+                                        : NamespaceString::MaxUserNsCollectionLen;
+    if (ns.isNormalCollection() && ns.size() > maxNsLen) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "Fully qualified namespace is too long. Namespace: "
-                                    << ns.toStringForErrorMsg()
-                                    << " Max: " << NamespaceString::MaxNsCollectionLen);
+                                    << ns.toStringForErrorMsg() << " Max: " << maxNsLen);
     }
 
     if (ns.coll().find(".system.") != std::string::npos) {

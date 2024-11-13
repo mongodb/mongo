@@ -248,13 +248,14 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsAreMet) {
 
     // No exception is thrown if the TO collection does not exist and has no associated tags
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, kToNss, boost::none /*toColl*/, false /* dropTarget */);
+        opCtx, kToNss, boost::none /*toColl*/, false /*isSourceUnsharded*/, false /* dropTarget */);
 
     // Initialize the sharded TO collection
     const auto toColl = setupShardedCollection(kToNss);
 
     // No exception is thrown if the TO collection exists and dropTarget is `true`
-    sharding_ddl_util::checkRenamePreconditions(opCtx, kToNss, toColl, true /* dropTarget */);
+    sharding_ddl_util::checkRenamePreconditions(
+        opCtx, kToNss, toColl, false /*isSourceUnsharded*/, true /* dropTarget */);
 }
 
 TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
@@ -268,17 +269,43 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
     // Check that no exception is thrown if the namespace of the target collection is long enough
     const NamespaceString longEnoughNss = NamespaceString::createNamespaceString_forTest(
         dbName + "." +
-        std::string(NamespaceString::MaxNsShardedCollectionLen - dbName.length() - 1, 'x'));
+        std::string(NamespaceString::MaxUserNsShardedCollectionLen - dbName.length() - 1, 'x'));
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, longEnoughNss, boost::none, false /* dropTarget */);
+        opCtx, longEnoughNss, boost::none, false /*isSourceUnsharded*/, false /* dropTarget */);
 
     // Check that an exception is thrown if the namespace of the target collection is too long
     const NamespaceString tooLongNss =
         NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
-    ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
-                           opCtx, tooLongNss, boost::none, false /* dropTarget */),
-                       AssertionException,
-                       ErrorCodes::InvalidNamespace);
+    ASSERT_THROWS_CODE(
+        sharding_ddl_util::checkRenamePreconditions(
+            opCtx, tooLongNss, boost::none, false /*isSourceUnsharded*/, false /* dropTarget */),
+        AssertionException,
+        ErrorCodes::InvalidNamespace);
+}
+
+TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLongUnsplittable) {
+    auto opCtx{operationContext()};
+
+    const std::string dbName{"test"};
+
+    // Initialize the sharded FROM collection
+    const auto fromColl = setupShardedCollection(kFromNss);
+
+    // Check that no exception is thrown if the namespace of the target collection is long enough
+    const NamespaceString longEnoughNss = NamespaceString::createNamespaceString_forTest(
+        dbName + "." +
+        std::string(NamespaceString::MaxUserNsCollectionLen - dbName.length() - 1, 'x'));
+    sharding_ddl_util::checkRenamePreconditions(
+        opCtx, longEnoughNss, boost::none, true /*isSourceUnsharded*/, false /* dropTarget */);
+
+    // Check that an exception is thrown if the namespace of the target collection is too long
+    const NamespaceString tooLongNss =
+        NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
+    ASSERT_THROWS_CODE(
+        sharding_ddl_util::checkRenamePreconditions(
+            opCtx, tooLongNss, boost::none, true /*isSourceUnsharded*/, false /* dropTarget */),
+        AssertionException,
+        ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetCollectionExists) {
@@ -292,7 +319,8 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetCollectionExists) {
 
     // Check that an exception is thrown if the target collection exists and dropTarget is not set
     ASSERT_THROWS_CODE(
-        sharding_ddl_util::checkRenamePreconditions(opCtx, kToNss, toColl, false /* dropTarget */),
+        sharding_ddl_util::checkRenamePreconditions(
+            opCtx, kToNss, toColl, false /*isSourceUnsharded*/, false /* dropTarget */),
         AssertionException,
         ErrorCodes::NamespaceExists);
 }
@@ -316,9 +344,47 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionTargetCollectionHasTags) {
 
     // Check that an exception is thrown if some tag is associated to the target collection
     ASSERT_THROWS_CODE(
-        sharding_ddl_util::checkRenamePreconditions(opCtx, kToNss, toColl, true /* dropTarget */),
+        sharding_ddl_util::checkRenamePreconditions(
+            opCtx, kToNss, toColl, false /*isSourceUnsharded*/, true /* dropTarget */),
         AssertionException,
         ErrorCodes::CommandFailed);
+}
+
+TEST_F(ShardingDDLUtilTest, NamespaceTooLong) {
+    auto generateNss = [](int len) {
+        std::string dbName = "test";
+        auto collName = std::string(len - dbName.size() - 1, 'x');
+        return NamespaceString::createNamespaceString_forTest(dbName, collName);
+    };
+
+    NamespaceString validNss = generateNss(NamespaceString::MaxUserNsShardedCollectionLen);
+    NamespaceString invalidShardedNss =
+        generateNss(NamespaceString::MaxUserNsShardedCollectionLen + 1);
+    NamespaceString invalidNss = generateNss(NamespaceString::MaxUserNsCollectionLen + 1);
+
+    // Always valid.
+    ASSERT_DOES_NOT_THROW(
+        sharding_ddl_util::assertNamespaceLengthLimit(validNss, true /*isUnsharded*/));
+    ASSERT_DOES_NOT_THROW(
+        sharding_ddl_util::assertNamespaceLengthLimit(validNss, false /*isUnsharded*/));
+
+    // Only valid if the collection is unsharded.
+    ASSERT_THROWS_CODE(
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidShardedNss, false /*isUnsharded*/),
+        DBException,
+        ErrorCodes::InvalidNamespace);
+    ASSERT_DOES_NOT_THROW(
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidShardedNss, true /*isUnsharded*/));
+
+    // Never valid.
+    ASSERT_THROWS_CODE(
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidNss, true /*isUnsharded*/),
+        DBException,
+        ErrorCodes::InvalidNamespace);
+    ASSERT_THROWS_CODE(
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidNss, false /*isUnsharded*/),
+        DBException,
+        ErrorCodes::InvalidNamespace);
 }
 
 }  // namespace

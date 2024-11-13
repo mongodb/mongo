@@ -673,6 +673,5 @@ TEST_F(NamespaceStringTest, CheckFormatNamespaceEmptyCollMultitenancy) {
     ASSERT_EQ(nssEmptyColl.toString_forTest(), "dbTest");
 }
 
-
 }  // namespace
 }  // namespace mongo

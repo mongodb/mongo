@@ -18,6 +18,14 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({mongos: 1, shards: 2});
 
+// TODO (SERVER-96071): Delete this helper once the namespace length extension for tracked
+// collections is backported to v8.0.
+function is80orBelow(mongos) {
+    const res =
+        mongos.getDB("admin").system.version.find({_id: "featureCompatibilityVersion"}).toArray();
+    return MongoRunner.compareBinVersions(res[0].version, "8.1") < 0;
+}
+
 const dbName = 'db';
 const collName = 'foo';
 const ns = dbName + '.' + collName;
@@ -86,5 +94,11 @@ assert.eq(1, unshardedChunk.length);
 assert.eq(0, st.rs1.getPrimary().getCollection(unsplittableCollNs).countDocuments({}));
 assert.eq(50, st.rs0.getPrimary().getCollection(unsplittableCollNs).countDocuments({}));
 
+// Successfully move a collection with a long namespace below 255.
+const collLength = is80orBelow(mongos) ? 200 : 250;
+const longCollName = 'a'.repeat(collLength);
+const longNs = dbName + "." + longCollName;
+assert.commandWorked(mongos.getDB(dbName).createCollection(longCollName));
+assert.commandWorked(mongos.adminCommand({moveCollection: longNs, toShard: shard1}));
 st.stop();
 })();

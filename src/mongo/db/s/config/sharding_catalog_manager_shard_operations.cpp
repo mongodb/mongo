@@ -865,11 +865,6 @@ StatusWith<std::vector<CollectionType>> ShardingCatalogManager::_getCollListFrom
                         continue;
                     }
 
-                    uassert(ErrorCodes::InvalidNamespace,
-                            str::stream()
-                                << "Namespace too long. Namespace: " << nss.toStringForErrorMsg()
-                                << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
-                            nss.size() <= NamespaceString::MaxNsShardedCollectionLen);
                     auto coll = CollectionType(nss,
                                                OID::gen(),
                                                Timestamp(Date_t::now()),

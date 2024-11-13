@@ -101,7 +101,7 @@ template <typename T>
 NamespaceString makeNamespace(const T& t, const std::string& suffix = "") {
     return NamespaceString::createNamespaceString_forTest(
         std::string("local." + t.getSuiteName() + "_" + t.getTestName())
-            .substr(0, NamespaceString::MaxNsCollectionLen - suffix.length()) +
+            .substr(0, NamespaceString::MaxUserNsCollectionLen - suffix.length()) +
         suffix);
 }
 
