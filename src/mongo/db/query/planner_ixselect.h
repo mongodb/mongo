@@ -127,11 +127,15 @@ public:
      * If an index is compound but not prefixed by a predicate's path, it's only useful if
      * there exists another predicate that 1. will use that index and 2. is related to the
      * original predicate by having an AND as a parent.
+     *
+     * 'nodeIsNotChild' passes information if a node is an indirect child of a '$not' node. Some
+     * types of nodes can use index by themselves, but cannot use it if they are under a $not.
      */
     static void rateIndices(MatchExpression* node,
                             std::string prefix,
                             const std::vector<IndexEntry>& indices,
-                            const QueryContext& queryContex);
+                            const QueryContext& queryContext,
+                            bool nodeIsNotChild = false);
 
     /**
      * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
@@ -234,7 +238,8 @@ private:
                             std::size_t keyPatternIndex,
                             MatchExpression* node,
                             StringData fullPathToNode,
-                            const QueryContext& queryContex);
+                            const QueryContext& queryContext,
+                            bool nodeIsNotChild);
 
     /**
      * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove

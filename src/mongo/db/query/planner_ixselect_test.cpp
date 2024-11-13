@@ -82,13 +82,17 @@ using std::unique_ptr;
 using std::vector;
 
 /**
- * Utility function to create MatchExpression
+ * Utility function to create MatchExpression.
  */
-unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
+unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj, bool shouldNormalize = false) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression status = MatchExpressionParser::parse(obj, std::move(expCtx));
     ASSERT_TRUE(status.isOK());
-    return std::move(status.getValue());
+    auto expr = std::move(status.getValue());
+    if (shouldNormalize) {
+        expr = MatchExpression::normalize(std::move(expr));
+    }
+    return expr;
 }
 
 using FieldIter = RelevantFieldIndexMap::iterator;
@@ -270,11 +274,12 @@ void testRateIndices(const char* query,
                      const vector<IndexEntry>& indices,
                      const char* expectedPathsStr,
                      const std::set<size_t>& expectedIndices,
-                     bool mustUseIndexedPlan = false) {
+                     bool mustUseIndexedPlan = false,
+                     bool shouldNormalize = false) {
     // Parse and rate query. Some of the nodes in the rated tree
     // will be tagged after the rating process.
     BSONObj obj = fromjson(query);
-    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj, shouldNormalize));
 
     QueryPlannerIXSelect::QueryContext queryContext;
     queryContext.collator = collator;
@@ -1073,6 +1078,29 @@ TEST(QueryPlannerIXSelectTest, NoStringComparisonMod) {
     testRateIndices("{a: {$mod: [2, 0]}}", "", &collator, indices, "a", expectedIndices);
 }
 
+TEST(QueryPlannerIXSelectTest, ModUnderNotCannotUseIndex) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto index = buildSimpleIndexEntry(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    // In unnormalized expression the operator chain is $not - $and - $mod. We create a tag for
+    // $mod, but no index is tagged as compatible.
+    testRateIndices("{a: {$not: {$mod: [2, 0]}}}", "", &collator, indices, "a", expectedIndices);
+
+    // Repeat with normalized expression where $and is optimized away. Both $not and $mod nodes are
+    // tagged, but no index is tagged as compatible.
+    testRateIndices("{a: {$not: {$mod: [2, 0]}}}",
+                    "",
+                    &collator,
+                    indices,
+                    "a,a",
+                    expectedIndices,
+                    false /* mustUseIndexedPlan */,
+                    true /* shouldNormalize */);
+}
+
 /**
  * If no string comparison is done in a query containing $exists, unequal collators are allowed.
  */
@@ -1103,6 +1131,30 @@ TEST(QueryPlannerIXSelectTest, NoStringComparisonType) {
     for (const auto& pattern : testPatterns) {
         testRateIndices(pattern.c_str(), "", &collator, indices, "a", expectedIndices);
     }
+}
+
+/**
+ * If $type is under $not it cannot use index.
+ */
+TEST(QueryPlannerIXSelectTest, TypeUnderNotCannotUseIndex) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto index = buildSimpleIndexEntry(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$not: {$type: 'string'}}}", "", &collator, indices, "a", expectedIndices);
+
+    // Repeat the test with normalized expression. Both $not and $type are tagged, but no index is
+    // added to the tag as compatible.
+    testRateIndices("{a: {$not: {$type: 'string'}}}",
+                    "",
+                    &collator,
+                    indices,
+                    "a,a",
+                    expectedIndices,
+                    false /* mustUseIndexedPlan */,
+                    true /* shouldNormalize */);
 }
 
 // Helper which constructs an IndexEntry and returns it along with an owned ProjectionExecutor,
@@ -1451,19 +1503,15 @@ TEST(QueryPlannerIXSelectTest, GeoPredicateCanOnlyUse2dsphereIndex) {
                     expectedIndices);
 }
 
-TEST(QueryPlannerIXSelectTest, GeoPredicateWithNotCanOnlyUse2dsphereIndex) {
+TEST(QueryPlannerIXSelectTest, GeoPredicateUnderNotCannotUse2dsphereIndex) {
     std::vector<IndexEntry> indices;
     auto btreeEntry = buildSimpleIndexEntry(BSON("loc" << 1));
     auto twodSphereEntry = buildSimpleIndexEntry(BSON("loc"
                                                       << "2dsphere"));
     indices.push_back(btreeEntry);
     indices.push_back(twodSphereEntry);
-    // This query gets parsed to {$not: {$and: {$geoWithin: <>}}} and then tags
-    // the 2dsphere index as relevant. If the $and is optimized away ({$not: {$geoWithin: <>}}),
-    // that tagging is skipped.
-    // TODO SERVER-92427: The tagging behavior should be made consistent so that this query has no
-    // expectedIndices.
-    std::set<size_t> expectedIndices = {1};
+    // There are no expectedIndices. The $geoWithin under $not cannot use the 2dsphere index.
+    std::set<size_t> expectedIndices;
     testRateIndices(R"({loc: {$not: {$geoWithin: {$geometry: {type: 'Polygon',
                       coordinates: [[[0,0],[0,1],[1,0],[0,0]]]}}}}})",
                     "",
@@ -1471,6 +1519,18 @@ TEST(QueryPlannerIXSelectTest, GeoPredicateWithNotCanOnlyUse2dsphereIndex) {
                     indices,
                     "loc",
                     expectedIndices);
+
+    // Repeat the test with normalized expression. Normalization removes the $and operator above
+    // $geoWithin added by query parsing.
+    testRateIndices(R"({loc: {$not: {$geoWithin: {$geometry: {type: 'Polygon',
+                      coordinates: [[[0,0],[0,1],[1,0],[0,0]]]}}}}})",
+                    "",
+                    kSimpleCollator,
+                    indices,
+                    "loc,loc",
+                    expectedIndices,
+                    false /* mustUseIndexedPlan */,
+                    true /* shouldNormalize */);
 }
 
 /*

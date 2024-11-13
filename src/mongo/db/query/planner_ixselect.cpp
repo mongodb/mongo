@@ -379,11 +379,16 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                                        std::size_t keyPatternIdx,
                                        MatchExpression* node,
                                        StringData fullPathToNode,
-                                       const QueryContext& queryContext) {
+                                       const QueryContext& queryContext,
+                                       bool nodeIsNotChild) {
     if ((boundsGeneratingNodeContainsComparisonToType(node, BSONType::String) ||
          boundsGeneratingNodeContainsComparisonToType(node, BSONType::Array) ||
          boundsGeneratingNodeContainsComparisonToType(node, BSONType::Object)) &&
         !CollatorInterface::collatorsMatch(queryContext.collator, index.collator)) {
+        return false;
+    }
+
+    if (nodeIsNotChild && Indexability::nodeCannotUseIndexUnderNot(node)) {
         return false;
     }
 
@@ -472,15 +477,9 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             invariant(index.sparse || index.type != INDEX_WILDCARD);
 
             const auto* child = node->getChild(0);
-            const MatchExpression::MatchType childtype = child->matchType();
 
-            // Can't index negations of MOD, REGEX, TYPE_OPERATOR, or ELEM_MATCH_VALUE; and, as
-            // above, we can't use a btree-indexed field for geo expressions (or their negations).
-            if (MatchExpression::REGEX == childtype || MatchExpression::MOD == childtype ||
-                MatchExpression::TYPE_OPERATOR == childtype ||
-                MatchExpression::ELEM_MATCH_VALUE == childtype ||
-                MatchExpression::GEO == childtype || MatchExpression::GEO_NEAR == childtype ||
-                MatchExpression::INTERNAL_BUCKET_GEO_WITHIN == childtype) {
+            // Exclude nodes that cannot use index under negation.
+            if (Indexability::nodeCannotUseIndexUnderNot(child)) {
                 return false;
             }
 
@@ -500,7 +499,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             }
 
             // If it's a negated $in, it can't have any REGEX's inside.
-            if (MatchExpression::MATCH_IN == childtype) {
+            if (MatchExpression::MATCH_IN == child->matchType()) {
                 InMatchExpression* ime = static_cast<InMatchExpression*>(node->getChild(0));
 
                 if (canUseIndexForNin(ime)) {
@@ -550,8 +549,13 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             auto&& children = node->getChildVector();
             if (!std::all_of(children->begin(), children->end(), [&](auto&& child) {
                     const auto newPath = fullPathToNode.toString() + child->path();
-                    return _compatible(
-                        keyPatternElt, index, keyPatternIdx, child.get(), newPath, newContext);
+                    return _compatible(keyPatternElt,
+                                       index,
+                                       keyPatternIdx,
+                                       child.get(),
+                                       newPath,
+                                       newContext,
+                                       nodeIsNotChild);
                 })) {
                 return false;
             }
@@ -784,7 +788,8 @@ bool QueryPlannerIXSelect::nodeIsSupportedByHashedIndex(const MatchExpression* q
 void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
                                        string prefix,
                                        const vector<IndexEntry>& indices,
-                                       const QueryContext& queryContext) {
+                                       const QueryContext& queryContext,
+                                       bool nodeIsNotChild) {
     // Do not traverse tree beyond logical NOR node
     MatchExpression::MatchType exprtype = node->matchType();
     if (exprtype == MatchExpression::NOR) {
@@ -810,8 +815,13 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
             std::size_t keyPatternIndex = 0;
             for (auto&& keyPatternElt : index.keyPattern) {
                 if (keyPatternElt.fieldNameStringData() == fullPath &&
-                    _compatible(
-                        keyPatternElt, index, keyPatternIndex, node, fullPath, queryContext)) {
+                    _compatible(keyPatternElt,
+                                index,
+                                keyPatternIndex,
+                                node,
+                                fullPath,
+                                queryContext,
+                                nodeIsNotChild)) {
                     if (keyPatternIndex == 0) {
                         rt->first.push_back(i);
                     } else {
@@ -847,11 +857,10 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
         for (size_t i = 0; i < node->numChildren(); ++i) {
             rateIndices(node->getChild(i), prefix, indices, newContext);
         }
-    } else if (node->getCategory() ==
-               MatchExpression::MatchCategory::kLogical) {  // Por aqui deberia entrar en IN, no por
-                                                            // boundsGenerating arriba
+    } else if (node->getCategory() == MatchExpression::MatchCategory::kLogical) {
+        bool isNotChild = nodeIsNotChild || MatchExpression::NOT == node->matchType();
         for (size_t i = 0; i < node->numChildren(); ++i) {
-            rateIndices(node->getChild(i), prefix, indices, queryContext);
+            rateIndices(node->getChild(i), prefix, indices, queryContext, isNotChild);
         }
     }
 }

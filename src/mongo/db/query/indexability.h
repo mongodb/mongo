@@ -75,6 +75,25 @@ public:
     }
 
     /**
+     * Some node types, such as MOD, REGEX, TYPE_OPERATOR, or ELEM_MATCH_VALUE, cannot use index if
+     * they are under negation.
+     */
+    static bool nodeCannotUseIndexUnderNot(const MatchExpression* me) {
+        switch (me->matchType()) {
+            case MatchExpression::REGEX:
+            case MatchExpression::MOD:
+            case MatchExpression::TYPE_OPERATOR:
+            case MatchExpression::ELEM_MATCH_VALUE:
+            case MatchExpression::GEO:
+            case MatchExpression::GEO_NEAR:
+            case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * This array operator doesn't have any children with fields and can use an index.
      *
      * Example: a: {$elemMatch: {$gte: 1, $lte: 1}}.
