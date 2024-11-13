@@ -7,7 +7,7 @@
  * @tags: [requires_replication]
  */
 
-import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -30,20 +30,13 @@ function performUpsert() {
 assert.commandWorked(testColl.createIndex({x: 1}, {unique: true}));
 
 // Will hang upsert operations just prior to performing an insert.
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "hangBeforeUpsertPerformsInsert", mode: "alwaysOn"}));
-
+const failPoint = configureFailPoint(testDB, "hangBeforeUpsertPerformsInsert");
 const awaitUpdate1 = startParallelShell(performUpsert, rst.ports[0]);
 const awaitUpdate2 = startParallelShell(performUpsert, rst.ports[0]);
 
 // Query current operations until 2 matching operations are found.
-assert.soon(() => {
-    const curOps = waitForCurOpByFailPointNoNS(adminDB, "hangBeforeUpsertPerformsInsert");
-    return curOps.length === 2;
-});
-
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "hangBeforeUpsertPerformsInsert", mode: "off"}));
+failPoint.wait({timesEntered: 2});
+failPoint.off();
 
 awaitUpdate1();
 awaitUpdate2();
