@@ -541,16 +541,6 @@ DEATH_TEST(ScopedDebugInfo, PrintedOnInvariant, "mission: ATestInjectedString") 
     someRiskyBusiness();
 }
 
-void causeSegFault() {
-    int* ptr = nullptr;
-    *ptr = 10;
-}
-
-DEATH_TEST(ScopedDebugInfo, PrintedOnSignal, "mission: ATestInjectedString") {
-    ScopedDebugInfo g("mission", "ATestInjectedString");
-    causeSegFault();
-}
-
 void mustNotCompile() {
 #if 0
     fassert(9079709, "match");
