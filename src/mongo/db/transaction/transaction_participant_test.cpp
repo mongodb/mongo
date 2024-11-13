@@ -40,6 +40,8 @@
 #include <functional>
 #include <future>
 #include <iterator>
+#include <system_error>
+#include <type_traits>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -88,6 +90,7 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/record_data.h"
@@ -3503,6 +3506,10 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponS
     CurOp::get(opCtx())->debug().additiveMetrics.keysInserted = 1;
     txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysDeleted = 0;
     CurOp::get(opCtx())->debug().additiveMetrics.keysDeleted = 0;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->additiveMetrics.prepareReadConflicts.store(5);
+    CurOp::get(opCtx())->debug().additiveMetrics.prepareReadConflicts.store(4);
 
     auto additiveMetricsToCompare =
         txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics;
@@ -3537,6 +3544,10 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponC
     txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysInserted =
         1;
     CurOp::get(opCtx())->debug().additiveMetrics.keysInserted = 1;
+    txnParticipant.getSingleTransactionStatsForTest()
+        .getOpDebug()
+        ->additiveMetrics.prepareReadConflicts.store(0);
+    CurOp::get(opCtx())->debug().additiveMetrics.prepareReadConflicts.store(0);
     txnParticipant.getSingleTransactionStatsForTest()
         .getOpDebug()
         ->additiveMetrics.writeConflicts.store(6);
@@ -3591,84 +3602,6 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponA
 
     ASSERT(txnParticipant.getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.equals(
         additiveMetricsToCompare));
-}
-
-TEST_F(TransactionsMetricsTest, StorageMetricsObjectsShouldBeAddedTogetherUponStash) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    // Initialize field values for both StorageMetrics objects.
-    txnParticipant.getSingleTransactionStatsForTest()
-        .getTransactionStorageMetrics()
-        .incrementPrepareReadConflicts(1);
-    shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(
-        2);
-
-    auto storageMetricsToCompare =
-        txnParticipant.getSingleTransactionStatsForTest().getTransactionStorageMetrics();
-    storageMetricsToCompare += shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
-
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    // The transaction machinery cannot store an empty locker.
-    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
-    txnParticipant.stashTransactionResources(opCtx());
-
-    ASSERT_EQ(txnParticipant.getSingleTransactionStatsForTest()
-                  .getTransactionStorageMetrics()
-                  .prepareReadConflicts.load(),
-              storageMetricsToCompare.prepareReadConflicts.load());
-}
-
-TEST_F(TransactionsMetricsTest, StorageMetricsObjectsShouldBeAddedTogetherUponCommit) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    // Initialize field values for both StorageMetrics objects.
-    txnParticipant.getSingleTransactionStatsForTest()
-        .getTransactionStorageMetrics()
-        .incrementPrepareReadConflicts(1);
-    shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(
-        2);
-
-    auto storageMetricsToCompare =
-        txnParticipant.getSingleTransactionStatsForTest().getTransactionStorageMetrics();
-    storageMetricsToCompare += shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
-
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    // The transaction machinery cannot store an empty locker.
-    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
-    txnParticipant.commitUnpreparedTransaction(opCtx());
-
-    ASSERT_EQ(txnParticipant.getSingleTransactionStatsForTest()
-                  .getTransactionStorageMetrics()
-                  .prepareReadConflicts.load(),
-              storageMetricsToCompare.prepareReadConflicts.load());
-}
-
-TEST_F(TransactionsMetricsTest, StorageMetricsObjectsShouldBeAddedTogetherUponAbort) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    // Initialize field values for both StorageMetrics objects.
-    txnParticipant.getSingleTransactionStatsForTest()
-        .getTransactionStorageMetrics()
-        .incrementPrepareReadConflicts(1);
-    shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics().incrementPrepareReadConflicts(
-        2);
-
-    auto storageMetricsToCompare =
-        txnParticipant.getSingleTransactionStatsForTest().getTransactionStorageMetrics();
-    storageMetricsToCompare += shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
-
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    // The transaction machinery cannot store an empty locker.
-    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
-    txnParticipant.abortTransaction(opCtx());
-
-    ASSERT_EQ(txnParticipant.getSingleTransactionStatsForTest()
-                  .getTransactionStorageMetrics()
-                  .prepareReadConflicts.load(),
-              storageMetricsToCompare.prepareReadConflicts.load());
 }
 
 TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndStash) {
@@ -4127,19 +4060,8 @@ void setupAdditiveMetrics(const int metricValue, OperationContext* opCtx) {
     CurOp::get(opCtx)->debug().additiveMetrics.ndeleted = metricValue;
     CurOp::get(opCtx)->debug().additiveMetrics.keysInserted = metricValue;
     CurOp::get(opCtx)->debug().additiveMetrics.keysDeleted = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.prepareReadConflicts.store(metricValue);
     CurOp::get(opCtx)->debug().additiveMetrics.writeConflicts.store(metricValue);
-}
-
-/*
- * Sets up the storage metrics for Transactions Metrics test.
- */
-void setupStorageMetrics(const int metricValue, RecoveryUnit* ru) {
-    ru->getStorageMetrics().prepareReadConflicts.store(metricValue);
-}
-
-void setupMetrics(const int metricValue, OperationContext* opCtx) {
-    setupAdditiveMetrics(metricValue, opCtx);
-    setupStorageMetrics(metricValue, shard_role_details::getRecoveryUnit(opCtx));
 }
 
 /*
@@ -4175,7 +4097,7 @@ void buildSingleTransactionStatsString(StringBuilder* sb, const int metricValue)
           << " nMatched:" << metricValue << " nModified:" << metricValue
           << " ninserted:" << metricValue << " ndeleted:" << metricValue
           << " keysInserted:" << metricValue << " keysDeleted:" << metricValue
-          << " writeConflicts:" << metricValue << " prepareReadConflicts:" << metricValue;
+          << " prepareReadConflicts:" << metricValue << " writeConflicts:" << metricValue;
 }
 
 /*
@@ -4268,7 +4190,7 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
     // E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855) }, txnNumber: 1,
     // autocommit: false }, readTimestamp:Timestamp(0, 0), keysExamined:1 docsExamined:1 nMatched:1
     // nModified:1 ninserted:1 ndeleted:1 keysInserted:1 keysDeleted:1
-    // writeConflicts:1 prepareReadConflicts:1 terminationCause:committed timeActiveMicros:3
+    // prepareReadConflicts:1 writeConflicts:1 terminationCause:committed timeActiveMicros:3
     // timeInactiveMicros:2 numYields:0 locks:{ Global: { acquireCount: { r: 6, w: 4 } }, Database:
     // { acquireCount: { r: 1, w: 1, W: 2 } }, Collection: { acquireCount: { R: 1 } }, oplog: {
     // acquireCount: { W: 1 } } } wasPrepared:1 totalPreparedDurationMicros:10
@@ -4335,8 +4257,8 @@ void buildSingleTransactionStatsBSON(BSONObjBuilder* builder, const int metricVa
     builder->append("ndeleted", metricValue);
     builder->append("keysInserted", metricValue);
     builder->append("keysDeleted", metricValue);
-    builder->append("writeConflicts", metricValue);
     builder->append("prepareReadConflicts", metricValue);
+    builder->append("writeConflicts", metricValue);
 }
 
 /*
@@ -4450,7 +4372,7 @@ BSONObj buildTransactionInfoBSON(OperationContext* opCtx,
 TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
-    setupMetrics(metricValue, opCtx());
+    setupAdditiveMetrics(metricValue, opCtx());
 
     auto sessionCheckout = checkOutSession();
 
@@ -4495,7 +4417,7 @@ TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterCommit) {
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
-    setupMetrics(metricValue, opCtx());
+    setupAdditiveMetrics(metricValue, opCtx());
 
     auto sessionCheckout = checkOutSession();
 
@@ -4542,7 +4464,7 @@ TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterCommit) {
 TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
-    setupMetrics(metricValue, opCtx());
+    setupAdditiveMetrics(metricValue, opCtx());
 
     auto sessionCheckout = checkOutSession();
 
@@ -4588,7 +4510,7 @@ TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterAbort) {
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
-    setupMetrics(metricValue, opCtx());
+    setupAdditiveMetrics(metricValue, opCtx());
 
     auto sessionCheckout = checkOutSession();
 
@@ -4683,7 +4605,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
-    setupMetrics(metricValue, opCtx());
+    setupAdditiveMetrics(metricValue, opCtx());
 
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
     auto operation = repl::DurableOplogEntry::makeInsertOperation(
@@ -4739,7 +4661,7 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowCommit) {
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
-    setupMetrics(metricValue, opCtx());
+    setupAdditiveMetrics(metricValue, opCtx());
 
     const auto originalSlowMS = serverGlobalParams.slowMS.load();
     const auto originalSampleRate = serverGlobalParams.sampleRate.load();
@@ -4786,7 +4708,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
-    setupMetrics(metricValue, opCtx());
+    setupAdditiveMetrics(metricValue, opCtx());
 
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
 
@@ -4843,7 +4765,7 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
-    setupMetrics(metricValue, opCtx());
+    setupAdditiveMetrics(metricValue, opCtx());
 
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
     txnParticipant.prepareTransaction(opCtx(), {});
@@ -4903,7 +4825,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
-    setupMetrics(metricValue, opCtx());
+    setupAdditiveMetrics(metricValue, opCtx());
 
     txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -4965,7 +4887,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
-    setupMetrics(metricValue, opCtx());
+    setupAdditiveMetrics(metricValue, opCtx());
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 

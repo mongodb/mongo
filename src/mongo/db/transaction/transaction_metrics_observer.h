@@ -103,7 +103,6 @@ public:
      */
     void onTransactionOperation(OperationContext* opCtx,
                                 OpDebug::AdditiveMetrics additiveMetrics,
-                                const SingleThreadedStorageMetrics& storageMetrics,
                                 bool isPrepared);
 
     /**

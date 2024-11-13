@@ -195,6 +195,11 @@ public:
         void incrementNUpserted(long long n);
 
         /**
+         * Increments prepareReadConflicts by n.
+         */
+        void incrementPrepareReadConflicts(long long n);
+
+        /**
          * Increments executionTime by n.
          */
         void incrementExecutionTime(Microseconds n);
@@ -235,6 +240,8 @@ public:
         // these metrics are tracked over the course of a transaction by SingleTransactionStats,
         // which is built on OpDebug.
 
+        // Number of read conflicts caused by a prepared transaction.
+        AtomicWord<long long> prepareReadConflicts{0};
         AtomicWord<long long> writeConflicts{0};
         AtomicWord<long long> temporarilyUnavailableErrors{0};
 
@@ -271,7 +278,6 @@ public:
     void report(OperationContext* opCtx,
                 const SingleThreadedLockStats* lockStats,
                 const ResourceConsumption::OperationMetrics* operationMetrics,
-                const SingleThreadedStorageMetrics& storageMetrics,
                 logv2::DynamicAttributes* pAttrs) const;
 
     void reportStorageStats(logv2::DynamicAttributes* pAttrs) const;
@@ -285,7 +291,6 @@ public:
     void append(OperationContext* opCtx,
                 const SingleThreadedLockStats& lockStats,
                 FlowControlTicketholder::CurOp flowControlStats,
-                const SingleThreadedStorageMetrics& storageMetrics,
                 bool omitCommand,
                 BSONObjBuilder& builder) const;
 
@@ -1032,12 +1037,6 @@ public:
      */
     void updateStatsOnTransactionStash();
 
-    /**
-     * Captures metrics from the recovery unit that happened during this CurOp instance before a new
-     * recovery unit is set to the operation.
-     */
-    void updateStorageMetricsOnRecoveryUnitChange(const AtomicStorageMetrics& storageMetrics);
-
     /*
      * Gets the message for FailPoints used.
      */
@@ -1119,29 +1118,22 @@ public:
         _queryShapeHash = hash;
     }
 
-    /**
-     * Returns storage metrics for the current operation by accounting for metrics accrued outside
-     * of this operation.
-     */
-    SingleThreadedStorageMetrics getOperationStorageMetrics(
-        const AtomicStorageMetrics& storageMetrics) const;
-
 private:
     class CurOpStack;
 
     /**
-     * A set of additive resource stats that CurOp tracks during it's lifecycle.
+     * A set of additive locker stats that CurOp tracks during it's lifecycle.
      */
     struct AdditiveResourceStats {
         /**
-         * Add stats that have accrued before unstashing the Locker and Recovery Unit for a
-         * transaction. Does not add timeQueuedForTickets, which is handled separately.
+         * Add stats that have accrued before unstashing the Locker for a transaction.
+         * Does not add timeQueuedForTickets, which is handled separately.
          */
         void addForUnstash(const AdditiveResourceStats& other);
 
         /**
-         * Subtract stats that have accrued on this transaction's Locker and Recovery Unit since
-         * unstashing. Does not subtract timeQueuedForTickets, which is handled separately.
+         * Subtract stats that have accrued on this transaction's Locker since unstashing.
+         * Does not subtract timeQueuedForTickets, which is handled separately.
          */
         void subtractForStash(const AdditiveResourceStats& other);
 
@@ -1149,11 +1141,6 @@ private:
          * Snapshot of locker lock stats.
          */
         SingleThreadedLockStats lockStats;
-
-        /**
-         * Snapshot of storage metrics.
-         */
-        SingleThreadedStorageMetrics storageMetrics;
 
         /**
          * Total time spent waiting on locks.
@@ -1182,12 +1169,10 @@ private:
                                          TickSource::Tick endTime) const;
 
     /**
-     * Collects and returns additive resource stats
+     * Collects and returns additive lockers stats
      */
     static AdditiveResourceStats getAdditiveResourceStats(
-        const Locker* locker,
-        const AtomicStorageMetrics& storageMetrics,
-        const boost::optional<ExecutionAdmissionContext>& admCtx);
+        const Locker* locker, const boost::optional<ExecutionAdmissionContext>& admCtx);
 
     /**
      * Returns the time operation spends blocked waiting for locks and tickets.
@@ -1261,19 +1246,15 @@ private:
 
     std::string _planSummary;
 
-    // The resource stats reported from the locker, recovery unit, and admission context that:
-    // 1. accrued outside of this operation (as positive)
-    // 2. accrued on this operation but is no longer reported by the resource (as negative)
-    //
-    // This includes:
-    // * the snapshot of lock, recovery unit, and admission stats taken when this CurOp instance is
-    //   pushed to a CurOpStack (as positive)
-    // * the snapshot of lock stats and storage metrics taken when transaction resources are
-    //   unstashed to this operation context (as positive)
+    // The resource stats being reported on the locker and admission context that accrued outside of
+    // this operation. This includes:
+    // * the snapshot of lock and admission stats taken when this CurOp instance is pushed to
+    // a CurOpStack
+    // * the snapshot of lock stats taken when transaction resources are unstashed to this
+    // operation context (as positive)
     // * the snapshot of lock stats taken when transactions resources are stashed (as negative).
     //   This captures the locker activity that happened on this operation before the locker is
     //   released back to transaction resources.
-    // * the snapshot of storage metrics taken when the recovery unit is swapped off (as negative)
     boost::optional<AdditiveResourceStats> _resourceStatsBase;
 
     SharedUserAcquisitionStats _userAcquisitionStats{std::make_shared<UserAcquisitionStats>()};

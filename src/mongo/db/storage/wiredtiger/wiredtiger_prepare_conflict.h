@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <wiredtiger.h>
 
 #include "mongo/db/operation_context.h"

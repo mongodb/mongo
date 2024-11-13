@@ -53,14 +53,16 @@ TEST(CurOpTest, CopyConstructors) {
     OpDebug::AdditiveMetrics a, b;
     a.keysExamined = 1;
     b.keysExamined = 2;
-
+    a.prepareReadConflicts.store(1);
+    b.prepareReadConflicts.store(2);
     // Test copy constructor.
     OpDebug::AdditiveMetrics c = a;
     ASSERT_EQ(a.keysExamined, c.keysExamined);
-
+    ASSERT_EQ(a.prepareReadConflicts.load(), c.prepareReadConflicts.load());
     // Test copy assignment.
     a = b;
     ASSERT_EQ(a.keysExamined, b.keysExamined);
+    ASSERT_EQ(a.prepareReadConflicts.load(), b.prepareReadConflicts.load());
 }
 
 TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
@@ -92,6 +94,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.keysDeleted = 2;
     currentAdditiveMetrics.executionTime = Microseconds{200};
     additiveMetricsToAdd.executionTime = Microseconds{80};
+    currentAdditiveMetrics.prepareReadConflicts.store(1);
+    additiveMetricsToAdd.prepareReadConflicts.store(5);
     currentAdditiveMetrics.writeConflicts.store(7);
     additiveMetricsToAdd.writeConflicts.store(0);
 
@@ -125,6 +129,9 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
               *additiveMetricsBeforeAdd.keysDeleted + *additiveMetricsToAdd.keysDeleted);
     ASSERT_EQ(*currentAdditiveMetrics.executionTime,
               *additiveMetricsBeforeAdd.executionTime + *additiveMetricsToAdd.executionTime);
+    ASSERT_EQ(currentAdditiveMetrics.prepareReadConflicts.load(),
+              additiveMetricsBeforeAdd.prepareReadConflicts.load() +
+                  additiveMetricsToAdd.prepareReadConflicts.load());
     ASSERT_EQ(currentAdditiveMetrics.writeConflicts.load(),
               additiveMetricsBeforeAdd.writeConflicts.load() +
                   additiveMetricsToAdd.writeConflicts.load());
@@ -145,6 +152,8 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     additiveMetricsToAdd.keysInserted = 5;
     currentAdditiveMetrics.keysDeleted = 4;
     additiveMetricsToAdd.keysDeleted = 2;
+    currentAdditiveMetrics.prepareReadConflicts.store(1);
+    additiveMetricsToAdd.prepareReadConflicts.store(5);
     currentAdditiveMetrics.writeConflicts.store(7);
     additiveMetricsToAdd.writeConflicts.store(0);
 
@@ -187,6 +196,9 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
               *additiveMetricsBeforeAdd.keysInserted + *additiveMetricsToAdd.keysInserted);
     ASSERT_EQ(*currentAdditiveMetrics.keysDeleted,
               *additiveMetricsBeforeAdd.keysDeleted + *additiveMetricsToAdd.keysDeleted);
+    ASSERT_EQ(currentAdditiveMetrics.prepareReadConflicts.load(),
+              additiveMetricsBeforeAdd.prepareReadConflicts.load() +
+                  additiveMetricsToAdd.prepareReadConflicts.load());
     ASSERT_EQ(currentAdditiveMetrics.writeConflicts.load(),
               additiveMetricsBeforeAdd.writeConflicts.load() +
                   additiveMetricsToAdd.writeConflicts.load());
@@ -198,6 +210,7 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     // Initialize field values.
     additiveMetrics.writeConflicts.store(1);
     additiveMetrics.keysInserted = 2;
+    additiveMetrics.prepareReadConflicts.store(6);
     additiveMetrics.nreturned = 3;
     additiveMetrics.executionTime = Microseconds{160};
 
@@ -207,6 +220,7 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     additiveMetrics.incrementKeysDeleted(0);
     additiveMetrics.incrementNinserted(3);
     additiveMetrics.incrementNUpserted(6);
+    additiveMetrics.incrementPrepareReadConflicts(2);
     additiveMetrics.incrementNreturned(2);
     additiveMetrics.incrementNBatches();
     additiveMetrics.incrementExecutionTime(Microseconds{120});
@@ -216,6 +230,7 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     ASSERT_EQ(*additiveMetrics.keysDeleted, 0);
     ASSERT_EQ(*additiveMetrics.ninserted, 3);
     ASSERT_EQ(*additiveMetrics.nUpserted, 6);
+    ASSERT_EQ(additiveMetrics.prepareReadConflicts.load(), 8);
     ASSERT_EQ(*additiveMetrics.nreturned, 5);
     ASSERT_EQ(*additiveMetrics.nBatches, 1);
     ASSERT_EQ(*additiveMetrics.executionTime, Microseconds{280});
@@ -386,7 +401,7 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     }
 
     BSONObjBuilder builder;
-    od.append(opCtx.get(), ls, {}, {}, false /*omitCommand*/, builder);
+    od.append(opCtx.get(), ls, {}, false /*omitCommand*/, builder);
     auto bs = builder.done();
 
     // Append should always include these basic fields.

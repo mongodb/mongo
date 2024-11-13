@@ -37,6 +37,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
