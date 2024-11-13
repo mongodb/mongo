@@ -281,16 +281,16 @@ buildvariants:
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
         --excludeWithAnyTags=resource_intensive
     tasks: &query-alias-task-list
-      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks
-      - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks
+      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
           - amazon2-arm64-atlas-latest-large
-      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks
-      - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks
+      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
           - amazon2-arm64-atlas-latest-large
-      - name: .assigned_to_jira_team_server_query_integration !.requires_large_host !.benchmarks
-      - name: .assigned_to_jira_team_server_query_integration .requires_large_host !.benchmarks
+      - name: .assigned_to_jira_team_server_query_integration !.requires_large_host !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_integration .requires_large_host !.benchmarks !.blocked_in_query_alias
         distros:
           - amazon2-arm64-atlas-latest-large
       - name: burn_in_tests_gen
@@ -306,6 +306,10 @@ buildvariants:
       - name: replica_sets_jscore_passthrough_gen
       - name: sharding_jscore_passthrough_gen
       - name: sharded_collections_jscore_passthrough_gen
+      - name: noPassthrough_gen
+      - name: noPassthroughWithMongod_gen
+      - name: initial_sync_fuzzer_sanity_patch
+      - name: rollback_fuzzer_sanity_patch
 
   - <<: *amazon_linux2_arm64_static_compile_variant_dependency
     name: &amazon_linux2_arm64_static-try-sbe-engine-query-patch-only amazon_linux2_arm64_static-try-sbe-engine-query-patch-only

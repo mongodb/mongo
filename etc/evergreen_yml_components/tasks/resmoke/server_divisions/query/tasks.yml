@@ -281,6 +281,7 @@ tasks:
           num_tasks: 4
           npm_command: agg-fuzzer
           suite: aggregation_multiversion_fuzzer
+          use_large_distro: "true"
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
           run_no_feature_flag_tests: "true"
@@ -438,6 +439,7 @@ tasks:
           num_tasks: 4
           npm_command: agg-fuzzer
           suite: generational_fuzzer
+          use_large_distro: "true"
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000 --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
 
@@ -1480,6 +1482,7 @@ tasks:
           num_tasks: 4
           npm_command: update-fuzzer
           suite: update_fuzzer_replication
+          use_large_distro: "true"
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
           run_no_feature_flag_tests: "true"
@@ -1608,6 +1611,7 @@ tasks:
           num_tasks: 4
           npm_command: agg-fuzzer
           suite: generational_fuzzer
+          use_large_distro: "true"
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           jstestfuzz_vars: --diffTestingMode optimization --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
 
@@ -1858,6 +1862,7 @@ tasks:
       [
         "assigned_to_jira_team_server_query_execution",
         "development_critical_single_variant",
+        "blocked_in_query_alias",
       ]
     commands:
       - func: "do setup"
