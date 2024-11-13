@@ -300,19 +300,6 @@ auth::SaslPayload generateSaslPayload(const boost::optional<StringData>& user,
     return auth::SaslPayload(payloadStr);
 }
 
-std::string getNameFromPeerInfo(Client* client) {
-#ifdef MONGO_CONFIG_SSL
-    auto& sslPeerInfo = SSLPeerInfo::forSession(client->session());
-    auto& clientName = sslPeerInfo.subjectName();
-
-    // If clientName is empty, that means that there is no certificate for
-    // the user and they won't be able to use MONGODB-X509 anyways.
-    return clientName.toString();
-#else
-    uasserted(ErrorCodes::BadValue, "MONGODB-X509 is unsupported on no-ssl builds");
-#endif
-}
-
 /**
  * The steps of authCommand (sans feature flag) are below.
  *

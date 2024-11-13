@@ -28,11 +28,8 @@
  */
 #include "mongo/db/service_entry_point_shard_role.h"
 
-#include <memory>
-#include <mutex>
-#include <string>
-
 #include <boost/move/utility_core.hpp>
+#include <memory>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -53,7 +50,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -66,19 +62,13 @@
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/rpc/check_allowed_op_query_cmd.h"
-#include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/gossiped_routing_cache_gen.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
@@ -89,11 +79,10 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
 namespace mongo {
 namespace service_entry_point_shard_role_helpers {
 
-BSONObj getRedactedCopyForLogging(const Command* command, const BSONObj& cmdObj) {
+inline BSONObj getRedactedCopyForLogging(const Command* command, const BSONObj& cmdObj) {
     mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
     command->snipForLogging(&cmdToLog);
     BSONObjBuilder bob;
@@ -101,12 +90,12 @@ BSONObj getRedactedCopyForLogging(const Command* command, const BSONObj& cmdObj)
     return bob.obj();
 }
 
-bool lockedForWriting() {
+inline bool lockedForWriting() {
     return mongo::lockedForWriting();
 }
 
-void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
-                                              const CommandInvocation* invocation) {
+inline void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
+                                                     const CommandInvocation* invocation) {
     // Some read commands can safely ignore prepare conflicts by default because they do not
     // require snapshot isolation and do not conflict with concurrent writes. We also give these
     // operations permission to write, as this may be required for queries that spill using the
@@ -119,9 +108,9 @@ void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
         opCtx, repl::ReadConcernArgs::get(opCtx), prepareConflictBehavior);
 }
 
-void waitForReadConcern(OperationContext* opCtx,
-                        const CommandInvocation* invocation,
-                        const OpMsgRequest& request) {
+inline void waitForReadConcern(OperationContext* opCtx,
+                               const CommandInvocation* invocation,
+                               const OpMsgRequest& request) {
     Status rcStatus = mongo::waitForReadConcern(opCtx,
                                                 repl::ReadConcernArgs::get(opCtx),
                                                 invocation->ns().dbName(),
@@ -144,7 +133,7 @@ void waitForReadConcern(OperationContext* opCtx,
     }
 }
 
-void waitForSpeculativeMajorityReadConcern(OperationContext* opCtx) {
+inline void waitForSpeculativeMajorityReadConcern(OperationContext* opCtx) {
     auto speculativeReadInfo = repl::SpeculativeMajorityReadInfo::get(opCtx);
     if (!speculativeReadInfo.isSpeculativeRead()) {
         return;
@@ -153,10 +142,10 @@ void waitForSpeculativeMajorityReadConcern(OperationContext* opCtx) {
 }
 
 
-void waitForWriteConcern(OperationContext* opCtx,
-                         const CommandInvocation* invocation,
-                         const repl::OpTime& lastOpBeforeRun,
-                         BSONObjBuilder& commandResponseBuilder) {
+inline void waitForWriteConcern(OperationContext* opCtx,
+                                const CommandInvocation* invocation,
+                                const repl::OpTime& lastOpBeforeRun,
+                                BSONObjBuilder& commandResponseBuilder) {
 
     // Prevent waiting for writeConcern if the command is changing only unreplicated namespaces.
     invariant(invocation);
@@ -231,7 +220,7 @@ void waitForWriteConcern(OperationContext* opCtx,
     // operation then we skip waiting for writeConcern.
 }
 
-void waitForLinearizableReadConcern(OperationContext* opCtx) {
+inline void waitForLinearizableReadConcern(OperationContext* opCtx) {
     // When a linearizable read command is passed in, check to make sure we're reading from the
     // primary.
     if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
@@ -240,19 +229,19 @@ void waitForLinearizableReadConcern(OperationContext* opCtx) {
     }
 }
 
-void uassertCommandDoesNotSpecifyWriteConcern(const GenericArguments& requestArgs) {
+inline void uassertCommandDoesNotSpecifyWriteConcern(const GenericArguments& requestArgs) {
     uassert(ErrorCodes::InvalidOptions,
             "Command does not support writeConcern",
             !commandSpecifiesWriteConcern(requestArgs));
 }
 
-void attachCurOpErrInfo(OperationContext* opCtx, const Status status) {
+inline void attachCurOpErrInfo(OperationContext* opCtx, const Status status) {
     CurOp::get(opCtx)->debug().errInfo = std::move(status);
 }
 
-void appendReplyMetadata(OperationContext* opCtx,
-                         const GenericArguments& requestArgs,
-                         BSONObjBuilder* metadataBob) {
+inline void appendReplyMetadata(OperationContext* opCtx,
+                                const GenericArguments& requestArgs,
+                                BSONObjBuilder* metadataBob) {
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool isReplSet = replCoord->getSettings().isReplSet();
 
@@ -289,26 +278,26 @@ void appendReplyMetadata(OperationContext* opCtx,
     }
 }
 
-Status refreshDatabase(OperationContext* opCtx, const StaleDbRoutingVersion& se) noexcept {
+inline Status refreshDatabase(OperationContext* opCtx, const StaleDbRoutingVersion& se) noexcept {
     return FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
         opCtx, se.getDb(), se.getVersionReceived());
 }
 
-Status refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) noexcept {
+inline Status refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) noexcept {
     return FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
         opCtx, se.getNss(), se.getVersionReceived().placementVersion());
 }
 
-Status refreshCatalogCache(OperationContext* opCtx,
-                           const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) noexcept {
+inline Status refreshCatalogCache(
+    OperationContext* opCtx, const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) noexcept {
     return Grid::get(opCtx)
         ->catalogCache()
         ->getCollectionRoutingInfo(opCtx, refreshInfo.getNss())
         .getStatus();
 }
 
-void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
-                                            const StaleConfigInfo& se) noexcept {
+inline void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
+                                                   const StaleConfigInfo& se) noexcept {
     resharding_metrics::onCriticalSectionError(opCtx, se);
 }
 
@@ -317,16 +306,16 @@ void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
 // lock.  This will cause mongod to perhaps erroneously check for write concern when no writes
 // were done, or unnecessarily kill a read operation.  If we re-use the opCtx to retry command
 // execution, we must reset the locker state.
-void resetLockerState(OperationContext* opCtx) noexcept {
+inline void resetLockerState(OperationContext* opCtx) noexcept {
     // It is necessary to lock the client to change the Locker on the OperationContext.
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     shard_role_details::swapLocker(opCtx, std::make_unique<Locker>(opCtx->getServiceContext()), lk);
 }
 
-void createTransactionCoordinator(OperationContext* opCtx,
-                                  TxnNumber clientTxnNumber,
-                                  boost::optional<TxnRetryCounter> clientTxnRetryCounter) {
+inline void createTransactionCoordinator(OperationContext* opCtx,
+                                         TxnNumber clientTxnNumber,
+                                         boost::optional<TxnRetryCounter> clientTxnRetryCounter) {
     auto clientLsid = opCtx->getLogicalSessionId().value();
     auto clockSource = opCtx->getServiceContext()->getFastClockSource();
 

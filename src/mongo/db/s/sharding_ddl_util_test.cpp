@@ -128,21 +128,6 @@ public:
 const NamespaceString kFromNss = NamespaceString::createNamespaceString_forTest("test.from");
 const NamespaceString kToNss = NamespaceString::createNamespaceString_forTest("test.to");
 
-// Query 'limit' objects from the database into an array.
-void findN(DBClientBase& client,
-           FindCommandRequest findRequest,
-           int limit,
-           std::vector<BSONObj>& out) {
-    out.reserve(limit);
-    findRequest.setLimit(limit);
-    std::unique_ptr<DBClientCursor> c = client.find(std::move(findRequest));
-    ASSERT(c.get());
-
-    while (c->more()) {
-        out.push_back(c->nextSafe());
-    }
-}
-
 TEST_F(ShardingDDLUtilTest, SerializeDeserializeErrorStatusWithoutExtraInfo) {
     const Status sample{ErrorCodes::ForTestingOptionalErrorExtraInfo, "Dummy reason"};
 

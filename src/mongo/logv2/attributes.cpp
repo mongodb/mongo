@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/log/attributes/attribute_name.hpp>
+#include "mongo/logv2/attributes.h"
 
 namespace mongo::logv2::attributes {
 

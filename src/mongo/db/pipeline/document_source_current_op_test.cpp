@@ -53,7 +53,6 @@ namespace mongo {
 
 namespace {
 
-const auto kQueryPlanner = ExplainOptions::Verbosity::kQueryPlanner;
 const std::string kMockShardName = "testshard";
 
 /**

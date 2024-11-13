@@ -108,21 +108,6 @@ BSONObj buildEmptyCommand() {
     return obj;
 }
 
-BSONObj buildCommand() {
-    BSONObjBuilder commandReplyBob{};
-    commandReplyBob.append("ok", 1.0);
-    BSONObjBuilder cursorBuilder;
-    BSONArrayBuilder a(cursorBuilder.subarrayStart("firstBatch"));
-    a.append(BSON("Foo"
-                  << "Bar"));
-    a.done();
-
-    cursorBuilder.appendNumber("id", 1);
-    cursorBuilder.append("ns", "test.$cmd.blah");
-    commandReplyBob.append("cursor", cursorBuilder.done());
-    return commandReplyBob.obj();
-}
-
 BSONObj buildErrReply(const Status status, const BSONObj& extraInfo = {}) {
     BSONObjBuilder bob;
     bob.appendElements(extraInfo);

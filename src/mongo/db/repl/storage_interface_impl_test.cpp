@@ -193,13 +193,6 @@ int64_t getIndexKeyCount(OperationContext* opCtx,
     return cat->getEntry(desc)->accessMethod()->numKeys(opCtx);
 }
 
-std::vector<InsertStatement> transformInserts(std::vector<BSONObj> docs) {
-    std::vector<InsertStatement> inserts(docs.size());
-    std::transform(docs.cbegin(), docs.cend(), inserts.begin(), [](const BSONObj& doc) {
-        return InsertStatement(doc);
-    });
-    return inserts;
-}
 std::vector<InsertStatement> transformInserts(std::vector<TimestampedBSONObj> docs) {
     std::vector<InsertStatement> inserts(docs.size());
     std::transform(docs.cbegin(), docs.cend(), inserts.begin(), [](const TimestampedBSONObj& doc) {

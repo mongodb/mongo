@@ -381,13 +381,6 @@ TEST_F(ProjectStageTest, CannotAddNestedDocumentExceedingDepthLimit) {
                        ErrorCodes::Overflow);
 }
 
-/**
- * A default redaction strategy that generates easy to check results for testing purposes.
- */
-std::string transformIdentifiersForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
-
 TEST_F(ProjectStageTest, ShapifyAndRedact) {
     auto inclusionProject = DocumentSourceProject::create(
         fromjson("{a: true, x: '$b', y: {$and: ['$c','$d']}, z: {$meta: 'textScore'}}"),

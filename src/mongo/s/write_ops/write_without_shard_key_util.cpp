@@ -139,6 +139,7 @@ std::pair<BSONObj, BSONObj> generateUpsertDocument(
     return {upsertBucketObj, upsertDoc};
 }
 
+namespace {
 BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
                                 const BSONObj& targetDoc,
                                 StringData commandName,
@@ -198,6 +199,7 @@ BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
 
     return bob.obj();
 }
+}  // namespace
 
 bool useTwoPhaseProtocol(OperationContext* opCtx,
                          NamespaceString nss,

@@ -61,6 +61,7 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamOplogMatch,
                                   true);
 
 namespace change_stream_filter {
+namespace {
 /**
  * Produce the MatchExpression representing the filter for the $match stage to filter oplog entries
  * to only those relevant for this $changeStream stage.
@@ -113,6 +114,7 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
     // TODO SERVER-81846: Enable the Boolean Expression Simplifier in change streams.
     return MatchExpression::optimize(std::move(oplogFilter), /* enableSimplification */ false);
 }
+}  // namespace
 }  // namespace change_stream_filter
 
 DocumentSourceChangeStreamOplogMatch::DocumentSourceChangeStreamOplogMatch(

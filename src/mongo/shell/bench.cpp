@@ -295,8 +295,6 @@ int runQueryWithReadCommands(DBClientBase* conn,
     return count;
 }
 
-void doNothing(const BSONObj&) {}
-
 /**
  * Queries the oplog for the latest cluster time / timestamp and returns it.
  */
@@ -394,6 +392,7 @@ BenchRunConfig* BenchRunConfig::createFromBson(const BSONObj& args) {
     return config.release();
 }
 
+namespace {
 BenchRunOp opFromBson(const BSONObj& op) {
     BenchRunOp myOp;
     myOp.myBsonOp = op.getOwned();  // save an owned copy of the BSON obj
@@ -687,6 +686,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
 
     return myOp;
 }
+}  // namespace
 
 void BenchRunConfig::initializeFromBson(const BSONObj& args) {
     initializeToDefaults();

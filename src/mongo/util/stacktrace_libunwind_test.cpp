@@ -43,7 +43,6 @@
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>  // IWYU pragma: keep
 
-#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -55,15 +54,13 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-
 namespace mongo {
-
-// Must be a named namespace so the functions we want to unwind through have external linkage.
-// Without that, the compiler optimizes them away.
-namespace unwind_test_detail {
-
+namespace {
 using namespace fmt::literals;
 
+// This needs to not be inlined into callNext<0>() or there'll be a missing call frame in the stack
+// trace.
+MONGO_COMPILER_NOINLINE
 std::string trace() {
     std::string out;
     unw_cursor_t cursor;
@@ -106,12 +103,7 @@ void assertAndRemovePrefix(std::string_view& v, std::string_view prefix) {
     ASSERT(pos != v.npos) << "expected to find '{}' in '{}'"_format(prefix, v);
     v.remove_prefix(pos + prefix.size());
 }
-
-void assertAndRemoveSuffix(std::string_view& v, std::string_view suffix) {
-    auto pos = v.rfind(suffix);
-    ASSERT(pos != v.npos) << "expected to find '{}' in '{}'"_format(suffix, v);
-    v.remove_suffix(v.size() - pos);
-}
+}  // namespace
 
 TEST(Unwind, Demangled) {
     std::string stacktrace;
@@ -136,6 +128,8 @@ TEST(Unwind, Demangled) {
 }
 
 TEST(Unwind, Linkage) {
+    using namespace unwind_test_detail;
+
     // From backtrace_visibility_test.h. Calls a chain of functions and stores the backtrace at the
     // bottom in the "stacktrace" argument.
     std::ostringstream os;
@@ -179,6 +173,4 @@ TEST(Unwind, Linkage) {
         remainder.remove_prefix(pos);
     }
 }
-
-}  // namespace unwind_test_detail
 }  // namespace mongo

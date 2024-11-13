@@ -31,6 +31,7 @@
 #include <benchmark/benchmark.h>
 
 namespace mongo::boolean_simplification {
+namespace {
 /**
  * Best case: create a maxterm with a single minterm.
  */
@@ -76,4 +77,5 @@ void bitsetAlgebra_createMaxterm(benchmark::State& state) {
 BENCHMARK(bitsetAlgebra_createAndMaxterm);
 BENCHMARK(bitsetAlgebra_createOrMaxterm)->RangeMultiplier(10)->Range(10, 10000);
 BENCHMARK(bitsetAlgebra_createMaxterm)->Args({3})->Args({7})->Args({10})->Args({13});
+}  // namespace
 }  // namespace mongo::boolean_simplification

@@ -65,18 +65,6 @@ using namespace fmt::literals;
 namespace mongo {
 namespace {
 
-std::string rangeString(const BSONObj& min, const BSONObj& max) {
-    return "{min: " + min.toString() + " , max" + max.toString() + " }";
-}
-
-std::string shardSetString(const std::set<ShardId>& shardIds) {
-    std::string result = "[";
-    for (auto& shardid : shardIds) {
-        result += shardid + ", ";
-    }
-    return result += "]";
-}
-
 class SplitVectorCmd : public BasicCommand {
 public:
     SplitVectorCmd() : BasicCommand("splitVector") {}

@@ -63,8 +63,13 @@ if env.ToolchainIs("gcc"):
     # With GCC, use the implicit fallthrough flag variant that doesn't
     # care about your feeble attempts to use comments to explain yourself.
     env.AddToCCFLAGSIfSupported("-Wimplicit-fallthrough=5")
+    env.AddToCCFLAGSIfSupported("-Wmissing-declarations")
 elif env.ToolchainIs("clang"):
     env.AddToCCFLAGSIfSupported("-Wimplicit-fallthrough")
+    # Clang's -Wmissing-prototypes is equivalent to GCC's
+    # -Wmissing-declarations, while Clang's -Wmissing-declarations checks
+    # something different.
+    env.AddToCCFLAGSIfSupported("-Wmissing-prototypes")
 
 # Run the core mongodb SConscript.
 env.SConscript("mongo/SConscript", must_exist=1, exports=["env"])

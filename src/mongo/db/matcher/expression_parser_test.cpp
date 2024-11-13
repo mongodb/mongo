@@ -91,6 +91,7 @@ TEST(MatchExpressionParserTest, MinDistanceWithoutNearFailsToParse) {
     ASSERT_FALSE(result.isOK());
 }
 
+namespace {
 StatusWith<int> fib(int n) {
     if (n < 0)
         return StatusWith<int>(ErrorCodes::BadValue, "paramter to fib has to be >= 0");
@@ -104,6 +105,7 @@ StatusWith<int> fib(int n) {
         return b;
     return StatusWith<int>(a.getValue() + b.getValue());
 }
+}  // namespace
 
 TEST(StatusWithTest, Fib1) {
     StatusWith<int> x = fib(-2);

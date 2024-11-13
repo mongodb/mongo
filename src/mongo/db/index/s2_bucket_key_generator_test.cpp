@@ -71,62 +71,6 @@ using namespace mongo;
 
 namespace {
 
-std::string dumpKeyset(const KeyStringSet& keyStrings) {
-    std::stringstream ss;
-    ss << "[ ";
-    for (auto& keyString : keyStrings) {
-        auto key = key_string::toBson(keyString, Ordering::make(BSONObj()));
-        ss << key.toString() << " ";
-    }
-    ss << "]";
-
-    return ss.str();
-}
-
-std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
-    std::stringstream ss;
-
-    ss << "[ ";
-    for (const auto& multikeyComponents : multikeyPaths) {
-        ss << "[ ";
-        for (const auto& multikeyComponent : multikeyComponents) {
-            ss << multikeyComponent << " ";
-        }
-        ss << "] ";
-    }
-    ss << "]";
-
-    return ss.str();
-}
-
-bool areKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& actualKeys) {
-    if (expectedKeys.size() != actualKeys.size()) {
-        LOGV2(206931,
-              "Expected: {dumpKeyset_expectedKeys}, Actual: {dumpKeyset_actualKeys}",
-              "dumpKeyset_expectedKeys"_attr = dumpKeyset(expectedKeys),
-              "dumpKeyset_actualKeys"_attr = dumpKeyset(actualKeys));
-        return false;
-    }
-
-    if (!std::equal(expectedKeys.begin(), expectedKeys.end(), actualKeys.begin())) {
-        LOGV2(206941,
-              "Expected: {dumpKeyset_expectedKeys}, Actual: {dumpKeyset_actualKeys}",
-              "dumpKeyset_expectedKeys"_attr = dumpKeyset(expectedKeys),
-              "dumpKeyset_actualKeys"_attr = dumpKeyset(actualKeys));
-        return false;
-    }
-
-    return true;
-}
-
-void assertMultikeyPathsEqual(const MultikeyPaths& expectedMultikeyPaths,
-                              const MultikeyPaths& actualMultikeyPaths) {
-    if (expectedMultikeyPaths != actualMultikeyPaths) {
-        FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
-                           << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths));
-    }
-}
-
 struct S2BucketKeyGeneratorTest : public unittest::Test {
     using PointSet = std::set<std::pair<long, long>>;
     SharedBufferFragmentBuilder allocator{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};

@@ -327,6 +327,7 @@ TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOp
     }
 }
 
+namespace {
 // Test exhaust cursor is cleaned up on client disconnect. By default, the test client disconnects
 // while the exhaust getMore is running. If disconnectAfterGetMoreBatch is set to true, the test
 // client disconnects after the exhaust getMore is run but before the server sends out the response.
@@ -405,6 +406,7 @@ void testClientDisconnect(bool disconnectAfterGetMoreBatch) {
     // output.
     ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch, expectEmptyResult));
 }
+}  // namespace
 
 TEST(CurrentOpExhaustCursorTest, InterruptExhaustCursorPseudoGetMoreOnClientDisconnect) {
     // Test that an exhaust getMore is interrupted on client disconnect.

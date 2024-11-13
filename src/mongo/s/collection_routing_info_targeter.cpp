@@ -451,9 +451,11 @@ bool CollectionRoutingInfoTargeter::isUpdateOneWithIdWithoutShardKeyEnabled() co
     return _isUpdateOneWithIdWithoutShardKeyEnabled;
 }
 
+namespace {
 bool isRetryableWrite(OperationContext* opCtx) {
     return opCtx->getTxnNumber() && !opCtx->inMultiDocumentTransaction();
 }
+}  // namespace
 
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     OperationContext* opCtx,

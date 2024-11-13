@@ -74,6 +74,7 @@
 
 namespace mongo {
 
+namespace {
 BSONObj makeCollectionAndIndexesAggregationResponse(const CollectionType& coll,
                                                     const std::vector<BSONObj>& indexes) {
     BSONObj obj = coll.toBSON();
@@ -83,6 +84,7 @@ BSONObj makeCollectionAndIndexesAggregationResponse(const CollectionType& coll,
     return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {newObj})
         .toBSON(CursorResponse::ResponseType::InitialResponse);
 }
+}  // namespace
 
 void CoreCatalogCacheTestFixture::setUp() {
     ShardingTestFixture::setUp();

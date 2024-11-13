@@ -41,12 +41,12 @@
 
 namespace mongo::stats {
 
+namespace {
 using DoubleLimits = std::numeric_limits<double>;
 double numberMin = -DoubleLimits::max();
 double numberMax = DoubleLimits::max();
 double negativeInfinity = -DoubleLimits::infinity();
 double positiveInfinity = DoubleLimits::infinity();
-double NaN = DoubleLimits::quiet_NaN();
 
 class ValueUtilsTest : public unittest::Test {
 public:
@@ -73,6 +73,7 @@ void assertSameTypeBracketedInterval(const Interval& interval) {
 
     ASSERT(sameTypeBracketInterval(startTag, interval.endInclusive, endTag, endVal));
 }
+}  // namespace
 
 TEST_F(ValueUtilsTest, SameTypeBracketedIntervalEqual) {
     BSONObj obj = BSON("a" << 4);

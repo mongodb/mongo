@@ -75,7 +75,6 @@ constexpr StringData kNumSchemaChanges = "numBucketsClosedDueToSchemaChange"_sd;
 constexpr StringData kNumBucketsReopened = "numBucketsReopened"_sd;
 constexpr StringData kNumArchivedDueToMemoryThreshold = "numBucketsArchivedDueToMemoryThreshold"_sd;
 constexpr StringData kNumClosedDueToReopening = "numBucketsClosedDueToReopening"_sd;
-constexpr StringData kNumClosedDueToTimeForward = "numBucketsClosedDueToTimeForward"_sd;
 constexpr StringData kNumClosedDueToMemoryThreshold = "numBucketsClosedDueToMemoryThreshold"_sd;
 
 static constexpr uint64_t kStorageCacheSize = 1024 * 1024 * 1024;

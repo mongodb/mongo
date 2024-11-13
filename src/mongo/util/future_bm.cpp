@@ -40,6 +40,7 @@
 #include "mongo/util/future_impl.h"
 
 namespace mongo {
+namespace {
 
 MONGO_COMPILER_NOINLINE int makeReadyInt() {
     benchmark::ClobberMemory();
@@ -203,7 +204,7 @@ void BM_futureInt4xDeferredThenChained(benchmark::State& state) {
         benchmark::DoNotOptimize(std::move(fut).get());
     }
 }
-
+}  // namespace
 
 BENCHMARK(BM_plainIntReady);
 BENCHMARK(BM_futureIntReady);

@@ -212,15 +212,6 @@ size_t skipOverString(const std::string& code, size_t start, char quote) {
     return pos;
 }
 
-bool isOpSymbol(char c) {
-    static std::string OpSymbols = "~!%^&*-+=|:,<>/?.";
-
-    for (size_t i = 0; i < OpSymbols.size(); i++)
-        if (OpSymbols[i] == c)
-            return true;
-    return false;
-}
-
 }  // namespace
 
 namespace shell_utils {
@@ -310,11 +301,13 @@ void RecordMyLocation(const char* _argv0) {
 
 // helpers
 
+namespace {
 BSONObj makeUndefined() {
     BSONObjBuilder b;
     b.appendUndefined("");
     return b.obj();
 }
+}  // namespace
 const BSONObj undefinedReturn = makeUndefined();
 
 BSONElement singleArg(const BSONObj& args) {
@@ -324,6 +317,7 @@ BSONElement singleArg(const BSONObj& args) {
 
 // real methods
 
+namespace {
 BSONObj JSGetMemInfo(const BSONObj& args, void* data) {
     ProcessInfo pi;
     uassert(10258, "processinfo not supported", pi.supported());
@@ -613,7 +607,6 @@ BSONObj numberDecimalsAlmostEqual(const BSONObj& input, void*) {
     return BSON("" << isErrorAcceptable);
 }
 
-
 class GoldenTestContextShell : public unittest::GoldenTestContextBase {
 public:
     explicit GoldenTestContextShell(const unittest::GoldenTestConfig* config,
@@ -635,6 +628,7 @@ protected:
             message, getActualOutputPath().string(), getExpectedOutputPath().string()};
     }
 };
+}  // namespace
 
 std::string GoldenTestContextShellFailure::toString() const {
     return "Test output verification failed: {}\n"
@@ -651,8 +645,10 @@ void GoldenTestContextShellFailure::diff() const {
     (void)status;
 }
 
+namespace {
 unittest::GoldenTestConfig goldenTestConfig{"jstests/expected_output"};
 boost::optional<GoldenTestContextShell> goldenTestContext;
+}  // namespace
 
 void closeGoldenTestContext() {
     if (goldenTestContext) {
@@ -661,6 +657,7 @@ void closeGoldenTestContext() {
     }
 }
 
+namespace {
 BSONObj _openGoldenData(const BSONObj& input, void*) {
     uassert(6741513,
             str::stream() << "_openGoldenData expects 2 arguments: 'testPath' and 'config'.",
@@ -980,6 +977,7 @@ BSONObj removeNullAndUndefined(const BSONObj& input) {
     removeNullAndUndefinedElementsHelper(input, bob);
     return bob.obj();
 }
+}  // namespace
 
 BSONObj normalizeBSONObj(const BSONObj& input, NormalizationOptsSet opts) {
     BSONObj result = input;
@@ -995,6 +993,7 @@ BSONObj normalizeBSONObj(const BSONObj& input, NormalizationOptsSet opts) {
     return result;
 }
 
+namespace {
 /*
  * Takes two arrays of documents, and returns whether they contain the same set of BSON Objects. The
  * BSON do not need to be in the same order for this to return true. Has no special logic for
@@ -1087,6 +1086,7 @@ BSONObj _compareStringsWithCollation(const BSONObj& input, void*) {
     int cmp = collator->compare(left.valueStringData(), right.valueStringData());
     return BSON("" << cmp);
 }
+}  // namespace
 
 void installShellUtils(Scope& scope) {
     scope.injectNative("getMemInfo", JSGetMemInfo);
@@ -1121,11 +1121,13 @@ void setEnterpriseShellCallback(EnterpriseShellCallback* callback) {
     enterpriseCallback = callback;
 }
 
+namespace {
 void initializeEnterpriseScope(Scope& scope) {
     if (enterpriseCallback != nullptr) {
         enterpriseCallback(scope);
     }
 }
+}  // namespace
 
 void initScope(Scope& scope) {
     // Need to define this method before JSFiles::utils is executed.

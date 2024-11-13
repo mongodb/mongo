@@ -183,9 +183,11 @@ void IDLParserContext::throwMissingField(StringData fieldName) const {
               str::stream() << "BSON field '" << path << "' is missing but a required field");
 }
 
+namespace {
 bool isMongocryptdArgument(StringData arg) {
     return arg == "jsonSchema"_sd;
 }
+}  // namespace
 
 void IDLParserContext::throwUnknownField(StringData fieldName) const {
     std::string path = getElementPath(fieldName);

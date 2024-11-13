@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
 
 namespace mongo {
+namespace {
 using std::vector;
 
 // We'd like to test with "realistic" data so that tdigest has to do sorting and merging on a
@@ -60,6 +61,7 @@ vector<double> generateNormal(size_t n, bool presorted) {
     }
     return inputs;
 }
+}  // namespace
 
 void PercentileAlgoBenchmarkFixture::tdigest_normalData(benchmark::State& state,
                                                         TDigest::ScalingFunction k_limit,

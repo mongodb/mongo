@@ -392,25 +392,6 @@ std::pair<SbStage, PlanStageData> buildSearchMetadataExecutorSBE(OperationContex
 }
 
 namespace {
-void getAllNodesByTypeHelper(const QuerySolutionNode* root,
-                             StageType type,
-                             std::vector<const QuerySolutionNode*>& results) {
-    if (root->getType() == type) {
-        results.push_back(root);
-    }
-
-    for (auto&& child : root->children) {
-        getAllNodesByTypeHelper(child.get(), type, results);
-    }
-}
-
-std::vector<const QuerySolutionNode*> getAllNodesByType(const QuerySolutionNode* root,
-                                                        StageType type) {
-    std::vector<const QuerySolutionNode*> results;
-    getAllNodesByTypeHelper(root, type, results);
-    return results;
-}
-
 std::unique_ptr<fts::FTSMatcher> makeFtsMatcher(OperationContext* opCtx,
                                                 const CollectionPtr& collection,
                                                 const std::string& indexName,
@@ -544,22 +525,6 @@ bool prefixIsInSet(StringData str, const SetT& s) {
 void addPrefixesToSet(StringData str, StringDataSet& s) {
     for (;;) {
         auto [_, inserted] = s.insert(str);
-        if (!inserted) {
-            break;
-        }
-
-        size_t pos = str.rfind('.');
-        if (pos == std::string::npos) {
-            break;
-        }
-
-        str = str.substr(0, pos);
-    }
-};
-
-void addPrefixesToSet(StringData str, StringSet& s) {
-    for (;;) {
-        auto [_, inserted] = s.insert(str.toString());
         if (!inserted) {
             break;
         }
@@ -4775,6 +4740,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildWindow(const Quer
     return {std::move(stage), std::move(outputs)};
 }  // buildWindow
 
+namespace {
 std::pair<SbStage, PlanStageSlots> buildSearchMeta(const SearchNode* root,
                                                    StageBuilderState& state,
                                                    const CanonicalQuery& cq,
@@ -4807,6 +4773,7 @@ std::pair<SbStage, PlanStageSlots> buildSearchMeta(const SearchNode* root,
 
     return {std::move(stage), std::move(outputs)};
 }
+}  // namespace
 
 std::pair<std::vector<std::string>, sbe::value::SlotVector>
 SlotBasedStageBuilder::buildSearchMetadataSlots() {

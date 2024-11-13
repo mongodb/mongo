@@ -33,6 +33,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingInMemory);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingDiskState);
 MONGO_FAIL_POINT_DEFINE(hangBeforeBlockingMigrations);
@@ -63,6 +64,7 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
         sp.emplaceValue();
     }
 }
+}  // namespace
 
 std::shared_ptr<MigrationBlockingOperationCoordinator>
 MigrationBlockingOperationCoordinator::getOrCreate(OperationContext* opCtx,

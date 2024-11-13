@@ -29,6 +29,7 @@
 
 #include <cstdint>
 
+#include "mongo/db/timeseries/timeseries_global_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/processinfo.h"
 

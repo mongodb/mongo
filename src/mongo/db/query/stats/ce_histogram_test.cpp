@@ -332,6 +332,7 @@ TEST(CEHistograms, LargeNumberOfArraysHistogram) {
     ASSERT_EQ(100, ceHist->getArrayMax().getBuckets().size());
 }
 
+namespace {
 std::vector<SBEValue> generateValuesVector(std::vector<int> vals) {
     std::vector<SBEValue> ret;
     ret.reserve(vals.size());
@@ -349,6 +350,7 @@ void assertBounds(const std::vector<int>& expectedBounds, const ScalarHistogram&
     }
     ASSERT_EQ(expectedBounds, gotBounds);
 }
+}  // namespace
 
 TEST(CEHistograms, MaxDiffIntegerBounds) {
     auto values = generateValuesVector({3, 6, 9});

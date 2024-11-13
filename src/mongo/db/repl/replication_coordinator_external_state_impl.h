@@ -251,11 +251,6 @@ private:
     std::unique_ptr<OplogApplier> _oplogApplier;
     Future<void> _oplogApplierShutdownFuture;
 
-    // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
-    stdx::mutex _nextThreadIdMutex;
-    // Number used to uniquely name threads.
-    long long _nextThreadId = 0;
-
     // Task executor used to run replication tasks.
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
 

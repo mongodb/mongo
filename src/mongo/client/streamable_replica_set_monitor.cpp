@@ -93,10 +93,6 @@ bool maxWireCompare(const ServerDescriptionPtr& a, const ServerDescriptionPtr& b
     return a->getMaxWireVersion() < b->getMaxWireVersion();
 }
 
-bool secondaryPredicate(const ServerDescriptionPtr& server) {
-    return server->getType() == ServerType::kRSSecondary;
-}
-
 bool primaryOrSecondaryPredicate(const ServerDescriptionPtr& server) {
     const auto serverType = server->getType();
     return serverType == ServerType::kRSPrimary || serverType == ServerType::kRSSecondary;

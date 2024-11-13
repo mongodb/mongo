@@ -72,6 +72,7 @@ TEST(ExpressionGeoTest, GeoNear1) {
     ASSERT_EQUALS(gne.getData().maxDistance, 100);
 }
 
+namespace {
 std::unique_ptr<GeoMatchExpression> makeGeoMatchExpression(const BSONObj& locQuery) {
     std::unique_ptr<GeoExpression> gq(new GeoExpression);
     ASSERT_OK(gq->parseFrom(locQuery));
@@ -96,6 +97,7 @@ void assertGeoNearParseReturnsError(const BSONObj& locQuery) {
     std::unique_ptr<GeoNearExpression> nq(new GeoNearExpression);
     ASSERT_EQUALS(ErrorCodes::BadValue, nq->parseFrom(locQuery));
 }
+}  // namespace
 
 /**
  * A bunch of cases in which a geo expression is equivalent() to both itself or to another
@@ -410,6 +412,7 @@ TEST(ExpressionGeoTest, SerializeWithCRSIFSpecifiedWithChangedOptions) {
         serialized);
 }
 
+namespace {
 template <typename CreateFn>
 void assertRepresentativeShapeIsStable(BSONObj inputExpr,
                                        BSONObj expectedRepresentativeExpr,
@@ -438,6 +441,7 @@ void assertRepresentativeGeoNearShapeIsStable(BSONObj inputExpr,
             return makeGeoNearMatchExpression(input);
         });
 }
+}  // namespace
 
 TEST(ExpressionGeoTest, RoundTripSerializeGeoExpressions) {
     assertRepresentativeGeoShapeIsStable(fromjson("{$within: {$box: [{x: 4, y: 4}, [6, 6]]}}"),

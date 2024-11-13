@@ -282,6 +282,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     _fieldMatchPipelineIdx = _resolvedPipeline.size() - 1;
 }
 
+namespace {
 std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
     if (!pipeline.empty() &&
         (pipeline[0].hasField(DocumentSourceDocuments::kStageName) ||
@@ -291,6 +292,7 @@ std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
     }
     return {};
 }
+}  // namespace
 
 void DocumentSourceLookUp::resolvedPipelineHelper(
     NamespaceString fromNs,
@@ -419,6 +421,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::clone(
     return make_intrusive<DocumentSourceLookUp>(*this, newExpCtx);
 }
 
+namespace {
 void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline) {
     uassert(ErrorCodes::FailedToParse,
             "$lookup stage without explicit collection must have a pipeline with $documents as "
@@ -434,6 +437,7 @@ void validateLookupCollectionlessPipeline(const BSONElement& pipeline) {
     auto parsedPipeline = parsePipelineFromBSON(pipeline);
     validateLookupCollectionlessPipeline(parsedPipeline);
 }
+}  // namespace
 
 std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
@@ -839,6 +843,7 @@ template PipelinePtr DocumentSourceLookUp::buildPipeline<false /*isStreamsEngine
 template PipelinePtr DocumentSourceLookUp::buildPipeline<true /*isStreamsEngine*/>(
     const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc);
 
+namespace {
 /**
  * Method that looks for a DocumentSourceSequentialDocumentCache stage and calls optimizeAt() on
  * it if it has yet to be optimized.
@@ -856,6 +861,7 @@ void findAndOptimizeSequentialDocumentCache(Pipeline& pipeline) {
         itr = std::next(itr);
     }
 }
+}  // namespace
 
 void DocumentSourceLookUp::addCacheStageAndOptimize(Pipeline& pipeline) {
     // Adds the cache to the end of the pipeline and calls optimizeContainer which will ensure the

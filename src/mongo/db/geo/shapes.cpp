@@ -798,6 +798,7 @@ bool circleInteriorIntersectsWithBox(const Circle& circle, const Box& box) {
     return circleIntersectsWithBoxInternal(circle, box, false);
 }
 
+namespace {
 bool lineIntersectsWithBox(const Point& a, const Point& b, const Box& box) {
     Point upperLeft(box._min.x, box._max.y);
     Point lowerRight(box._max.x, box._min.y);
@@ -806,6 +807,7 @@ bool lineIntersectsWithBox(const Point& a, const Point& b, const Box& box) {
         linesIntersect(a, b, box._min, lowerRight) || linesIntersect(a, b, lowerRight, box._max) ||
         linesIntersect(a, b, box._max, upperLeft);
 }
+}  // namespace
 
 // Doc: The last point specified is always implicitly connected to the first.
 // [[ 0 , 0 ], [ 3 , 6 ], [ 6 , 0 ]]

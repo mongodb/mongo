@@ -107,23 +107,6 @@ Status setupCwd() {
     return Status::OK();
 }
 
-Status setArgvArray(const std::vector<std::string>& argv) {
-    BSONArrayBuilder b;
-    std::vector<std::string> censoredArgv = argv;
-    cmdline_utils::censorArgsVector(&censoredArgv);
-    for (size_t i = 0; i < censoredArgv.size(); i++) {
-        b << censoredArgv[i];
-    }
-    serverGlobalParams.argvArray = b.arr();
-    return Status::OK();
-}
-
-Status setParsedOpts(const moe::Environment& params) {
-    serverGlobalParams.parsedOpts = params.toBSON();
-    cmdline_utils::censorBSONObj(&serverGlobalParams.parsedOpts);
-    return Status::OK();
-}
-
 bool shouldFork(const moe::Environment& params) {
     auto paramYes = [](const moe::Environment& params, const std::string& key) {
         return params.count(key) && params[key].as<bool>();

@@ -49,6 +49,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo::sysprofile {
+namespace {
 void runProfiler(StringData profile_name, PerfMode mode, StringData parentPid) {
     const std::string perfBinary = "/usr/bin/perf";
     const std::string perfName = perfBinary.substr(perfBinary.find_last_of('/') + 1);
@@ -89,6 +90,7 @@ void runProfiler(StringData profile_name, PerfMode mode, StringData parentPid) {
         } break;
     }
 }
+}  // namespace
 
 pid_t spawn(StringData filename, PerfMode mode) {
     std::stringstream pidStream;

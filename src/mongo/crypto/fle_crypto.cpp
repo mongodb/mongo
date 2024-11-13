@@ -387,13 +387,6 @@ void toEncryptedBinData(StringData field,
     builder->appendBinData(field, buf.size(), BinDataType::Encrypt, buf.data());
 }
 
-std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const BSONElement element) {
-    uassert(
-        6672414, "Expected binData with subtype Encrypt", element.isBinData(BinDataType::Encrypt));
-
-    return fromEncryptedConstDataRange(binDataToCDR(element));
-}
-
 template <FLETokenType TokenT>
 FLEToken<TokenT> FLETokenFromCDR(ConstDataRange cdr) {
     auto block = PrfBlockfromCDR(cdr);
@@ -430,14 +423,6 @@ StatusWith<std::vector<uint8_t>> encryptData(ConstDataRange key, ConstDataRange 
     }
 
     return {out};
-}
-
-StatusWith<std::vector<uint8_t>> encryptData(ConstDataRange key, uint64_t value) {
-
-    std::array<char, sizeof(uint64_t)> bufValue;
-    DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
-
-    return encryptData(key, bufValue);
 }
 
 StatusWith<std::vector<uint8_t>> decryptDataWithAssociatedData(ConstDataRange key,
@@ -1464,21 +1449,6 @@ void collectIndexedFields(std::vector<EDCIndexedFields>* pFields,
         encryptedTypeBinding == EncryptedBinDataType::kFLE2RangeIndexedValueV2) {
         pFields->push_back({cdr, fieldPath.toString()});
     }
-}
-
-void collectFieldValidationInfo(stdx::unordered_map<std::string, ConstDataRange>* pFields,
-                                ConstDataRange cdr,
-                                StringData fieldPath) {
-    pFields->insert({fieldPath.toString(), cdr});
-}
-
-stdx::unordered_map<std::string, EncryptedField> toFieldMap(const EncryptedFieldConfig& efc) {
-    stdx::unordered_map<std::string, EncryptedField> fields;
-    for (const auto& field : efc.getFields()) {
-        fields.insert({field.getPath().toString(), field});
-    }
-
-    return fields;
 }
 
 uint64_t generateRandomContention(uint64_t cm) {
@@ -4201,6 +4171,7 @@ std::size_t Edges::size() const {
     return (_trimFactor == 0 ? 1 : 0) + edges;
 }
 
+namespace {
 template <typename T>
 std::unique_ptr<Edges> getEdgesT(
     T value, T min, T max, int sparsity, const boost::optional<int>& trimFactor) {
@@ -4216,6 +4187,7 @@ std::unique_ptr<Edges> getEdgesT(
     std::string valueBinTrimmed = valueBin.substr(bits - maxlen, maxlen);
     return std::make_unique<Edges>(valueBinTrimmed, sparsity, trimFactor);
 }
+}  // namespace
 
 std::unique_ptr<Edges> getEdgesInt32(int32_t value,
                                      boost::optional<int32_t> min,
@@ -4302,6 +4274,7 @@ std::uint64_t getEdgesLength(BSONType fieldType, StringData fieldPath, QueryType
     MONGO_UNREACHABLE;
 }
 
+namespace {
 template <typename T>
 class MinCoverGenerator {
 public:
@@ -4434,6 +4407,7 @@ void adjustBounds(T& lowerBound, bool includeLowerBound, T& upperBound, bool inc
         upperBound.value -= 1;
     }
 }
+}  // namespace
 
 std::vector<std::string> minCoverInt32(int32_t lowerBound,
                                        bool includeLowerBound,

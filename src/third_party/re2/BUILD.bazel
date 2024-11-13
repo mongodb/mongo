@@ -69,6 +69,9 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+    features = [
+        "-missing_prototypes_warning",
+    ],
     includes = [
         "dist",
     ],

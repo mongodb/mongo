@@ -1162,6 +1162,7 @@ ReshardingCoordinatorExternalState::getCatalogIndexVersionForCommit(OperationCon
     return boost::none;
 }
 
+namespace {
 std::vector<DonorShardEntry> constructDonorShardEntries(const std::set<ShardId>& donorShardIds) {
     std::vector<DonorShardEntry> donorShards;
     std::transform(donorShardIds.begin(),
@@ -1188,6 +1189,7 @@ std::vector<RecipientShardEntry> constructRecipientShardEntries(
                    });
     return recipientShards;
 }
+}  // namespace
 
 ReshardingCoordinatorExternalState::ParticipantShardsAndChunks
 ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
@@ -1535,6 +1537,7 @@ void ReshardingCoordinator::installCoordinatorDoc(
                                            kMajorityWriteConcern);
 }
 
+namespace {
 void markCompleted(const Status& status, ReshardingMetrics* metrics) {
     if (status.isOK()) {
         metrics->onSuccess();
@@ -1571,6 +1574,7 @@ createShardsvrCommitReshardCollectionOptions(const NamespaceString& nss,
         exec, token, cmd);
     return opts;
 }
+}  // namespace
 
 ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarted(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -2327,6 +2331,7 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
         opCtx.get(), _ctHolder->getAbortToken());
 }
 
+namespace {
 ReshardingApproxCopySize computeApproxCopySize(OperationContext* opCtx,
                                                ReshardingCoordinatorDocument& coordinatorDoc) {
     const auto cm =
@@ -2355,6 +2360,7 @@ ReshardingApproxCopySize computeApproxCopySize(OperationContext* opCtx,
     approxCopySize.setApproxDocumentsToCopy(aggDocumentsToCopy / numRecipientsToCopy);
     return approxCopySize;
 }
+}  // namespace
 
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {

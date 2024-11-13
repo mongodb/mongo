@@ -1058,11 +1058,6 @@ const Decimal128 Decimal128::kPi("3.14159265358979323846264338327950288419716939
 const Decimal128 Decimal128::kPiOver180(Decimal128::kPi.divide(Decimal128("180")));
 const Decimal128 Decimal128::k180OverPi(Decimal128("180").divide(Decimal128::kPi));
 
-
-std::ostream& operator<<(std::ostream& stream, const Decimal128& value) {
-    return stream << value.toString();
-}
-
 void DataType::Handler<Decimal128>::unsafeLoad(Decimal128* valueOut,
                                                const char* ptr,
                                                size_t* advanced) {

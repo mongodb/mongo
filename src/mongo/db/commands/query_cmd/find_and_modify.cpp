@@ -204,16 +204,6 @@ write_ops::FindAndModifyCommandReply buildResponse(
     return result;
 }
 
-void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {
-    uassert(ErrorCodes::NotWritablePrimary,
-            str::stream() << "Not primary while running findAndModify command on collection "
-                          << nss.toStringForErrorMsg(),
-            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
-
-    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
-        ->checkShardVersionOrThrow(opCtx);
-}
-
 void recordStatsForTopCommand(OperationContext* opCtx) {
     auto curOp = CurOp::get(opCtx);
     Top::get(opCtx->getClient()->getServiceContext())
@@ -224,17 +214,6 @@ void recordStatsForTopCommand(OperationContext* opCtx) {
                 durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
                 curOp->isCommand(),
                 curOp->getReadWriteType());
-}
-
-void checkIfTransactionOnCappedColl(const CollectionPtr& coll, bool inTransaction) {
-    if (coll && coll->isCapped()) {
-        uassert(
-            ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Collection '" << coll->ns().toStringForErrorMsg()
-                          << "' is a capped collection. Writes in transactions are not allowed on "
-                             "capped collections.",
-            !inTransaction);
-    }
 }
 
 class CmdFindAndModify : public write_ops::FindAndModifyCmdVersion1Gen<CmdFindAndModify> {

@@ -50,14 +50,6 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-namespace {
-
-ServerParameter* getServerParameter(const std::string& name) {
-    return ServerParameterSet::getNodeParameterSet()->get(name);
-}
-
-}  // namespace
-
 class ResourceConsumptionMetricsTest : public ServiceContextTest {
 public:
     void setUp() override {

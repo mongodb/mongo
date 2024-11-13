@@ -36,14 +36,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <set>
 #include <string>
 #include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -64,16 +62,12 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_type.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
-#include "mongo/db/exec/projection.h"
-#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -91,7 +85,6 @@
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
@@ -104,29 +97,22 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
-#include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/find_key.h"
-#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
-#include "mongo/db/query/query_utils.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -136,18 +122,13 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
-#include "mongo/s/sharding_state.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -157,8 +138,6 @@ namespace {
 Rarely _samplerFunctionJs, _samplerWhereClause;
 
 MONGO_FAIL_POINT_DEFINE(allowExternalReadsForReverseOplogScanRule);
-
-const auto kTermField = "term"_sd;
 
 /**
  * Fills out the CurOp for "opCtx" with information about this query.
@@ -518,7 +497,6 @@ public:
             numResults = exec->getNextBatch(
                 batchSize,
                 FindCommon::BSONObjCursorAppender{true /* alwaysAcceptFirstDoc */,
-                                                  exec,
                                                   &firstBatch,
                                                   &docUnitsReturned,
                                                   pbrt,

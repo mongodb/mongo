@@ -420,6 +420,7 @@ OplogEntry makeAbortTransactionOplogEntry(int t, const DatabaseName& dbName) {
                               boost::none)};               // needsRetryImage
 }
 
+namespace {
 /**
  * Creates oplog entries that are meant to be all parts of a mocked large transaction. This function
  * does the following:
@@ -531,6 +532,7 @@ OplogEntry makeLargeRetryableWriteOplogEntries(int t,
         BSON(OplogEntry::kMultiOpTypeFieldName << MultiOplogEntryType::kApplyOpsAppliedSeparately)
             .firstElement())));
 }
+}  // namespace
 
 /**
  * Generates a mock large-transaction which has more than one oplog entry.

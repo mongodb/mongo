@@ -34,7 +34,7 @@
 #include "mongo/unittest/assert.h"
 
 namespace mongo {
-
+namespace {
 BSONObj makeBSONObjWithSize(const Timestamp& opTime, int size, char fill = 'x') {
     BSONObj objTemplate = BSON("ts" << opTime << "str"
                                     << "");
@@ -63,6 +63,7 @@ StatusWith<RecordId> insertBSONWithSize(
     }
     return res;
 }
+}  // namespace
 
 /**
  * Insert records into an oplog and verify the number of truncate markers that are created.

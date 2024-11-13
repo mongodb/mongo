@@ -993,8 +993,6 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
     const std::string dbStringWithTid = str::stream() << tenantId.toString() << "_" << dbString;
     auto const body = fromjson("{ping: 1}");
 
-    using Prefix = SerializationContext::Prefix;
-
     auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
         UserName("user", "admin", tenantId),
         "secret"_sd,
@@ -1118,8 +1116,6 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
     const std::string dbStringWithTid = str::stream() << tenantId.toString() << "_" << dbString;
     auto const body = fromjson("{ping: 1}");
 
-    using Prefix = SerializationContext::Prefix;
-
     auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
         UserName("user", "admin", tenantId),
         "secret"_sd,
@@ -1143,8 +1139,6 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
     const StringData dbString = "testDb";
     const std::string dbStringWithTid = str::stream() << tenantId.toString() << "_" << dbString;
     auto const body = fromjson("{ping: 1}");
-
-    using Prefix = SerializationContext::Prefix;
 
     auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
         UserName("user", "admin", tenantId),

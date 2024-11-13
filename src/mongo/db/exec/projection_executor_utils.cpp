@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/projection_executor_utils.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <string>

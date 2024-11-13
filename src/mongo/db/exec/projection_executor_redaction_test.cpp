@@ -60,17 +60,6 @@ std::unique_ptr<projection_executor::ProjectionExecutor> compileProjection(BSONO
     return projection_executor::buildProjectionExecutor(
         expCtx, &ast, policies, projection_executor::kDefaultBuilderParams);
 }
-std::unique_ptr<projection_executor::ProjectionExecutor> compileProjection(BSONObj proj,
-                                                                           BSONObj query) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
-    auto match = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-    auto policies = ProjectionPolicies::findProjectionPolicies();
-    auto ast = projection_ast::parseAndAnalyze(expCtx, proj, match.get(), query, policies);
-    auto exec = projection_executor::buildProjectionExecutor(
-        expCtx, &ast, policies, projection_executor::kDefaultBuilderParams);
-    return exec;
-}
-
 TEST(Redaction, ProjectionTest) {
     SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto redactProj = [&](std::string obj) {

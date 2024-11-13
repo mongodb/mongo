@@ -61,7 +61,6 @@ BSONObj createOplogEntryWithNStatementIds(int numStmtIds) {
     }
     return bob.obj();
 }
-}  // namespace
 
 void BM_ParseOplogEntryWithNStatementIds(benchmark::State& state) {
     auto numStmtIds = state.range();
@@ -187,6 +186,7 @@ void BM_NonApplyOpsParse(benchmark::State& state) {
         }
     }
 }
+}  // namespace
 
 BENCHMARK(BM_ParseOplogEntryWithNStatementIds)->Arg(0)->Range(1, 1024);
 BENCHMARK(BM_AccessStatementIdsForOplogEntry)->Arg(0)->Range(1, 1024);

@@ -39,7 +39,6 @@
 namespace mongo {
 namespace {
 auto nonzeroStart = std::numeric_limits<uint32_t>::max() / 2;
-}  // namespace
 
 void BM_decimalCounterPreInc(benchmark::State& state) {
     uint64_t items = 0;
@@ -92,6 +91,7 @@ void BM_ToStringCounter(benchmark::State& state) {
     }
     state.SetItemsProcessed(items);
 }
+}  // namespace
 
 BENCHMARK(BM_decimalCounterPreInc)->Args({10000, 0})->Args({{10, nonzeroStart}});
 BENCHMARK(BM_decimalCounterPostInc)->Args({10000, 0})->Args({{10, nonzeroStart}});

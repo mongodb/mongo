@@ -60,7 +60,6 @@ namespace {
 
 static const NamespaceString testns =
     NamespaceString::createNamespaceString_forTest("testdb.testcoll");
-static const bool isExplain = true;
 
 class CanonicalDistinctTest : public mongo::unittest::Test {
 public:

@@ -206,20 +206,6 @@ std::string commitTypeToString(TransactionRouter::CommitType state) {
     MONGO_UNREACHABLE;
 }
 
-std::string actionTypeToString(TransactionRouter::TransactionActions action) {
-    switch (action) {
-        case TransactionRouter::TransactionActions::kStart:
-            return "start";
-        case TransactionRouter::TransactionActions::kStartOrContinue:
-            return "startOrContinue";
-        case TransactionRouter::TransactionActions::kContinue:
-            return "continue";
-        case TransactionRouter::TransactionActions::kCommit:
-            return "commit";
-    }
-    MONGO_UNREACHABLE;
-}
-
 /**
  * - If the 'readConcernArgs' specifies an 'atClusterTime', sets the 'txnAtClusterTime' to
  *   that 'atClusterTime'.
@@ -1616,6 +1602,7 @@ BSONObj TransactionRouter::Router::_commitTransaction(
     return _handOffCommitToCoordinator(opCtx);
 }
 
+namespace {
 // Returns if the opCtx has yielded its session and failed to unyield it, which may happen during
 // methods that send network requests at global shutdown when running on a mongod.
 bool failedToUnyieldSessionAtShutdown(OperationContext* opCtx) {
@@ -1625,6 +1612,7 @@ bool failedToUnyieldSessionAtShutdown(OperationContext* opCtx) {
     }
     return false;
 }
+}  // namespace
 
 BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
     invariant(isInitialized());

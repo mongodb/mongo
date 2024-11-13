@@ -47,16 +47,16 @@ template <typename Op>
 Value applyExpressionOp(const Value& a, const Value& b) {
     return uassertStatusOK(Op::apply(a, b));
 }
-Value operator+(const Value& a, const Value& b) {
+inline Value operator+(const Value& a, const Value& b) {
     return applyExpressionOp<ExpressionAdd>(a, b);
 }
-Value operator-(const Value& a, const Value& b) {
+inline Value operator-(const Value& a, const Value& b) {
     return applyExpressionOp<ExpressionSubtract>(a, b);
 }
-Value operator*(const Value& a, const Value& b) {
+inline Value operator*(const Value& a, const Value& b) {
     return applyExpressionOp<ExpressionMultiply>(a, b);
 }
-Value operator/(const Value& a, const Value& b) {
+inline Value operator/(const Value& a, const Value& b) {
     return applyExpressionOp<ExpressionDivide>(a, b);
 }
 }  // namespace value_arithmetic_operators

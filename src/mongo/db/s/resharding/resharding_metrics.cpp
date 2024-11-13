@@ -84,7 +84,6 @@ inline ReshardingMetrics::State getDefaultState(ReshardingMetrics::Role role) {
 BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj shardKey) {
 
     using Doc = Document;
-    using Arr = std::vector<Value>;
     using V = Value;
 
     return Doc{

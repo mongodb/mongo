@@ -254,6 +254,7 @@ double valueToDouble(value::TypeTags tag, value::Value val) {
     return result;
 }
 
+namespace {
 void addSbeValueToBSONBuilder(const SBEValue& sbeValue,
                               const std::string& fieldName,
                               BSONObjBuilder& builder) {
@@ -289,6 +290,7 @@ void addSbeValueToBSONBuilder(const SBEValue& sbeValue,
             break;
     }
 }
+}  // namespace
 
 BSONObj sbeValueToBSON(const SBEValue& sbeValue, const std::string& fieldName) {
     BSONObjBuilder builder;

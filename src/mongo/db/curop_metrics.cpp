@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/db/curop_metrics.h"
 
 #include <boost/optional/optional.hpp>
+#include <memory>
 
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -152,8 +153,8 @@ struct InRouter : InBoth {
     InRouter() : InBoth{ClusterRole::RouterServer} {}
 };
 
-static InShard shardStats{};
-static InRouter routerStats{};
+InShard shardStats{};
+InRouter routerStats{};
 
 }  // namespace
 

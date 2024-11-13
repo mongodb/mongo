@@ -154,6 +154,9 @@ mongo_cc_library(
     ],
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
+    features = [
+        "-missing_prototypes_warning",
+    ],
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
@@ -275,6 +278,9 @@ mongo_cc_library(
     ],
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
+    features = [
+        "-missing_prototypes_warning",
+    ],
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
@@ -442,6 +448,9 @@ mongo_cc_library(
     ],
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
+    features = [
+        "-missing_prototypes_warning",
+    ],
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
@@ -478,6 +487,9 @@ mongo_cc_library(
     ],
     hdrs = TCMALLOC_HEADERS,
     copts = COPTS,
+    features = [
+        "-missing_prototypes_warning",
+    ],
     includes = INCLUDES,
     local_defines = TCMALLOC_DEFINES,
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,

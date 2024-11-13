@@ -457,7 +457,7 @@ TEST(FailPoint, ExecuteIfBasicTest) {
 }  // namespace mongo_test
 
 namespace mongo {
-
+namespace {
 /**
  * Runs the given function with an operation context that has a deadline and asserts that
  * the function is interruptible.
@@ -479,6 +479,7 @@ void assertFunctionInterruptible(std::function<void(Interruptible* interruptible
     mockClock->advance(Milliseconds{1000});
     th.join();
 }
+}  // namespace
 
 TEST(FailPoint, PauseWhileSetInterruptibility) {
     FailPoint failPoint("testFP");

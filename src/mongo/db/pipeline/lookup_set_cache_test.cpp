@@ -43,7 +43,7 @@
 #include "mongo/unittest/framework.h"
 
 namespace mongo {
-
+namespace {
 bool vectorContains(const std::vector<Document>* vector, const Document& expectedDoc) {
     ASSERT_TRUE(vector);
     DocumentComparator comparator;
@@ -58,6 +58,7 @@ Document intToDoc(int value) {
 }
 
 const ValueComparator defaultComparator{nullptr};
+}  // namespace
 
 TEST(LookupSetCacheTest, InsertAndRetrieveWorksCorrectly) {
     LookupSetCache cache(defaultComparator);

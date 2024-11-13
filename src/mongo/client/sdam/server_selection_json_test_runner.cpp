@@ -105,7 +105,7 @@ using namespace mongo::sdam;
 
 namespace mongo::sdam {
 
-std::ostream& operator<<(std::ostream& os, const std::vector<HostAndPort>& input) {
+static std::ostream& operator<<(std::ostream& os, const std::vector<HostAndPort>& input) {
     for (auto const& i : input) {
         os << i.toString() << " ";
     }

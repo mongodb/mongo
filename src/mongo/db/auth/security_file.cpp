@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/auth/security_file.h"
 
 #include <algorithm>
 #include <cerrno>

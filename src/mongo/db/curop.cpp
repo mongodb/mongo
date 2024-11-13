@@ -611,6 +611,7 @@ void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
 
 static constexpr size_t appendMaxElementSize = 50ull * 1024;
 
+namespace {
 bool shouldOmitDiagnosticInformation(CurOp* curop) {
     do {
         if (curop->getShouldOmitDiagnosticInformation()) {
@@ -622,6 +623,7 @@ bool shouldOmitDiagnosticInformation(CurOp* curop) {
 
     return false;
 }
+}  // namespace
 
 bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
                                     std::shared_ptr<const ProfileFilter> filter,

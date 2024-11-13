@@ -464,6 +464,7 @@ size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
     return static_cast<size_t>(cacheSizeMB);
 }
 
+namespace {
 logv2::LogSeverity getWTLOGV2SeverityLevel(const BSONObj& obj) {
     const std::string field = "verbose_level_id";
 
@@ -544,8 +545,6 @@ logv2::LogComponent getWTLOGV2Component(const BSONObj& obj) {
             return logv2::LogComponent::kWiredTiger;
     }
 }
-
-namespace {
 
 void logWTErrorMessage(int id, int errorCode, const std::string& message) {
     logv2::LogComponent component = logv2::LogComponent::kWiredTiger;

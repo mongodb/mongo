@@ -530,31 +530,6 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
     return lock;
 }
 
-namespace {
-/**
- * This callback is purely for logging and has no effect on any other operations
- */
-void remoteStepdownCallback(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-    const Status status = cbData.response.status;
-    if (status == ErrorCodes::CallbackCanceled) {
-        return;
-    }
-
-    if (status.isOK()) {
-        LOGV2_DEBUG(21477,
-                    1,
-                    "Stepdown of primary succeeded",
-                    "primary"_attr = cbData.request.target,
-                    "response"_attr = cbData.response.data);
-    } else {
-        LOGV2_WARNING(21486,
-                      "Stepdown of primary failed",
-                      "primary"_attr = cbData.request.target,
-                      "error"_attr = cbData.response.status);
-    }
-}
-}  // namespace
-
 executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart() {
     auto finishEvent = _makeEvent();
     if (!finishEvent) {

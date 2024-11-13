@@ -324,6 +324,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
     }
 }
 
+namespace {
 // Returns a MigrateInfo for a moveCollection of an unsharded collection from one of the given
 // donors to one of the given recipients. Returns boost::none if there are no eligible collections
 // to move or no eligibile recipients. Handles overlaps in the given donors and recipients.
@@ -393,6 +394,7 @@ boost::optional<MigrateInfo> selectUnsplittableCollectionToMove(
     return MigrateInfo(
         *destinationShardId, collectionToMove, chunkToMove, ForceJumbo::kDoNotForce, boost::none);
 }
+}  // namespace
 
 MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
     OperationContext* opCtx,

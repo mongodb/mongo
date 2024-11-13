@@ -131,10 +131,6 @@ struct OpTimeWithTermOne {
     Timestamp timestamp;
 };
 
-OpTimeAndWallTime makeOpTimeAndWallTime(OpTime opTime, Date_t wallTime = Date_t()) {
-    return {opTime, wallTime};
-}
-
 /**
  * Helper that kills an operation, taking the necessary locks.
  */
@@ -1014,7 +1010,6 @@ class ReplicationAwaiter {
 public:
     ReplicationAwaiter(ReplicationCoordinatorImpl* replCoord, ServiceContext* service)
         : _replCoord(replCoord),
-          _service(service),
           _client(service->getService()->makeClient("replAwaiter")),
           _opCtx(_client->makeOperationContext()),
           _finished(false),
@@ -1057,7 +1052,6 @@ private:
     }
 
     ReplicationCoordinatorImpl* _replCoord;
-    ServiceContext* _service;
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
     bool _finished;

@@ -276,8 +276,6 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
     return boost::none;
 }
 
-bool _haveArrayAlongBucketDataPath(const BSONObj& obj, StringData path, BSONDepthIndex depth);
-
 bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
                                                    StringData path,
                                                    BSONDepthIndex depth);
@@ -317,6 +315,7 @@ bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
     return _handleTerminalElementForHaveArrayAlongBucketDataPath(obj.getField(path));
 }
 
+namespace {
 bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
                                    StringData path,
                                    bool isCompressed,
@@ -409,6 +408,7 @@ bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
         }
     }
 }
+}  // namespace
 
 std::pair<BSONElement, BSONElement> _getLiteralFields(const BSONObj& min,
                                                       const BSONObj& max,

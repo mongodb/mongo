@@ -389,18 +389,6 @@ OplogEntry _makeUpdateOplogEntry(int t,
 }
 
 /**
- * Creates collection options suitable for oplog.
- */
-CollectionOptions _createOplogCollectionOptions() {
-    CollectionOptions options;
-    options.capped = true;
-    options.cappedSize = 64 * 1024 * 1024LL;
-    options.autoIndexId = CollectionOptions::NO;
-    options.uuid = UUID::gen();
-    return options;
-}
-
-/**
  * Creates an oplog with insert entries at the given timestamps, which must be in increasing order.
  */
 void _setUpOplog(OperationContext* opCtx, StorageInterface* storage, std::vector<int> timestamps) {

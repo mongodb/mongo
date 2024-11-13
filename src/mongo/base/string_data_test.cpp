@@ -296,16 +296,6 @@ TEST(Rfind, Char1) {
     }
 }
 
-// this is to verify we match std::string
-void SUBSTR_TEST_HELP(StringData big, StringData small, size_t start, size_t len) {
-    ASSERT_EQUALS(small.toString(), big.toString().substr(start, len));
-    ASSERT_EQUALS(small, StringData(big).substr(start, len));
-}
-void SUBSTR_TEST_HELP(StringData big, StringData small, size_t start) {
-    ASSERT_EQUALS(small.toString(), big.toString().substr(start));
-    ASSERT_EQUALS(small, StringData(big).substr(start));
-}
-
 // [12] is number of args to substr
 #define SUBSTR_1_TEST_HELP(big, small, start)                                              \
     ASSERT_EQUALS(StringData(small).toString(), StringData(big).toString().substr(start)); \

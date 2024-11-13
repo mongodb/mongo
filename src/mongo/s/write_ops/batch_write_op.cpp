@@ -258,6 +258,7 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
     }
 }
 
+namespace {
 bool shouldCoordinateMultiUpdate(OperationContext* opCtx,
                                  PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations,
                                  bool isMultiWrite,
@@ -290,6 +291,7 @@ bool shouldCoordinateMultiUpdate(OperationContext* opCtx,
 
     return true;
 }
+}  // namespace
 
 // 'baseCommandSizeBytes' specifies the base size of a batch command request prior to adding any
 // individual operations to it. This function will ensure that 'baseCommandSizeBytes' plus the

@@ -97,6 +97,7 @@ std::vector<RoleName> resolveRoleNames(const std::vector<RoleNameOrString>& poss
     return std::vector<RoleName>(roles.cbegin(), roles.cend());
 }
 
+namespace {
 Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
                                    const std::vector<RoleName>& roles) {
     for (size_t i = 0; i < roles.size(); ++i) {
@@ -198,6 +199,7 @@ bool isAuthorizedToChangeOwnCustomDataAsUser(AuthorizationSession* authzSession,
                                              const UserName& userName) {
     return authzSession->isAuthorizedToChangeAsUser(userName, ActionType::changeOwnCustomData);
 }
+}  // namespace
 
 void checkAuthForTypedCommand(OperationContext* opCtx, const CreateUserCommand& request) {
     const auto& dbname = request.getDbName();

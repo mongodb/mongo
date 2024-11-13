@@ -600,6 +600,7 @@ boost::optional<EncryptedFieldConfig> EncryptedDBClientBase::getEncryptedFieldCo
     return EncryptedFieldConfig::parse(IDLParserContext("encryptedFields"), efc.Obj());
 }
 
+namespace {
 std::tuple<NamespaceString, BSONObj> validateStructuredEncryptionParams(JSContext* cx,
                                                                         JS::CallArgs args,
                                                                         StringData cmdName) {
@@ -626,6 +627,7 @@ std::tuple<NamespaceString, BSONObj> validateStructuredEncryptionParams(JSContex
 
     return std::tuple(nss, extra);
 }
+}  // namespace
 
 void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
     auto [nss, extra] = validateStructuredEncryptionParams(cx, args, compactCmdName);

@@ -213,14 +213,6 @@ bool hasPositionalOperator(StringData path) {
     return path.endsWith(".$");
 }
 
-bool isPrefixOf(StringData first, StringData second) {
-    if (first.size() >= second.size()) {
-        return false;
-    }
-
-    return second.startsWith(first) && second[first.size()] == '.';
-}
-
 struct ParseContext {
     const boost::intrusive_ptr<ExpressionContext> expCtx;
 

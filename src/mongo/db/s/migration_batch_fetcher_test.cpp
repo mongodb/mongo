@@ -151,10 +151,6 @@ protected:
     }
 
 private:
-    OperationContext* _opCtx;
-    ServiceContext* _svcCtx;
-    executor::NetworkInterfaceMock* _net;
-
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
         class StaticCatalogClient final : public ShardingCatalogClientMock {
         public:

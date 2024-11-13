@@ -36,6 +36,7 @@
 #include <cstring>
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/secure_zero_memory.h"
 
 namespace mongo {
 

@@ -107,63 +107,6 @@ RoutingTableHistory makeUpdatedRoutingTable(const RoutingTableHistory& rt,
                           {std::move(chunks)});
 }
 
-
-RoutingTableHistory splitChunk(const RoutingTableHistory& rt,
-                               const std::vector<BSONObj>& newChunkBoundaryPoints) {
-
-    invariant(newChunkBoundaryPoints.size() > 1);
-
-    // Convert the boundary points into chunk range objects, e.g. {0, 1, 2} ->
-    // {{ChunkRange{0, 1}, ChunkRange{1, 2}}
-    std::vector<ChunkRange> newChunkRanges;
-    for (size_t i = 0; i < newChunkBoundaryPoints.size() - 1; ++i) {
-        newChunkRanges.emplace_back(newChunkBoundaryPoints[i], newChunkBoundaryPoints[i + 1]);
-    }
-
-    std::vector<ChunkType> newChunks;
-    auto curVersion = rt.getVersion();
-
-    for (const auto& range : newChunkRanges) {
-        // Chunks must be inserted ordered by version
-        curVersion.incMajor();
-        newChunks.emplace_back(rt.getUUID(), range, curVersion, kThisShard);
-    }
-
-    return makeUpdatedRoutingTable(rt, std::move(newChunks));
-}
-
-/**
- * Gets a set of raw pointers to ChunkInfo objects in the specified range,
- */
-std::set<ChunkInfo*> getChunksInRange(const RoutingTableHistory& rt,
-                                      const BSONObj& min,
-                                      const BSONObj& max) {
-    std::set<ChunkInfo*> chunksFromSplit;
-
-    rt.forEachOverlappingChunk(min, max, false, [&](auto& chunk) {
-        chunksFromSplit.insert(chunk.get());
-        return true;
-    });
-
-    return chunksFromSplit;
-}
-
-/**
- * Looks up a chunk that corresponds to or contains the range [min, max). There should only be one
- * such chunk in the input RoutingTableHistory object.
- */
-ChunkInfo* getChunkToSplit(const RoutingTableHistory& rt, const BSONObj& min, const BSONObj& max) {
-    std::shared_ptr<ChunkInfo> firstOverlappingChunk;
-
-    rt.forEachOverlappingChunk(min, max, false, [&](auto& chunkInfo) {
-        firstOverlappingChunk = chunkInfo;
-        return false;  // only need first chunk
-    });
-
-    invariant(firstOverlappingChunk);
-    return firstOverlappingChunk.get();
-}
-
 class RoutingTableHistoryTest : public unittest::Test {
 public:
     const KeyPattern& getShardKeyPattern() const {

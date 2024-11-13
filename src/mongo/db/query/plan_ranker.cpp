@@ -31,12 +31,12 @@
 #include <queue>
 #include <vector>
 
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/plan_ranker_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"

@@ -37,7 +37,7 @@
 
 namespace mongo::memory_util {
 
-bool operator==(const MemorySize& lhs, const MemorySize& rhs) {
+static bool operator==(const MemorySize& lhs, const MemorySize& rhs) {
     constexpr double kEpsilon = 1e-10;
     return std::abs(lhs.size - rhs.size) < kEpsilon && lhs.units == rhs.units;
 }

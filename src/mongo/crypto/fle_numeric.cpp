@@ -68,8 +68,6 @@ uint32_t ceil_log2(T t) {
     return clz;
 }
 
-}  // namespace
-
 boost::multiprecision::int128_t exp10(int x) {
     return pow(k10, x);
 }
@@ -99,6 +97,8 @@ uint32_t encodeInt32(int32_t v) {
 
     return v + (1U << 31);
 }
+
+}  // namespace
 
 
 OSTType_Int32 getTypeInfo32(int32_t value,
@@ -145,6 +145,7 @@ OSTType_Int32 getTypeInfo32(int32_t value,
     }
 }
 
+namespace {
 /**
  * Encode a signed 64-bit integer as an unsigned 64-bit integer
  */
@@ -162,6 +163,7 @@ uint64_t encodeInt64(int64_t v) {
 
     return v + (1ULL << 63);
 }
+}  // namespace
 
 OSTType_Int64 getTypeInfo64(int64_t value,
                             boost::optional<int64_t> min,
@@ -336,6 +338,7 @@ boost::multiprecision::uint128_t toUInt128FromDecimal128(Decimal128 dec) {
     return ret;
 }
 
+namespace {
 boost::multiprecision::int128_t toInt128FromDecimal128(Decimal128 dec) {
     uassert(9178814,
             "Unable to convert Decimal128 to Int128, out of bounds",
@@ -353,6 +356,7 @@ boost::multiprecision::int128_t toInt128FromDecimal128(Decimal128 dec) {
     }
     return int_dec;
 }
+}  // namespace
 
 // For full algorithm see SERVER-68542
 OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,

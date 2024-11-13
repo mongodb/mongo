@@ -47,12 +47,6 @@ namespace mongo {
 namespace {
 using DocumentSourceInternalAllCollectionStatsTest = AggregationContextFixture;
 
-auto representativeShape(const DocumentSourceInternalAllCollectionStats& allCollStatsStage) {
-    SerializationOptions opts{.literalPolicy =
-                                  LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    return allCollStatsStage.serialize(opts).getDocument().toBson();
-}
-
 TEST_F(DocumentSourceInternalAllCollectionStatsTest, QueryShape) {
     auto innerSpec = DocumentSourceCollStatsSpec();
     auto spec = DocumentSourceInternalAllCollectionStatsSpec();

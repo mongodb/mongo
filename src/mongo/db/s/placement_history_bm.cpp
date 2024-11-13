@@ -196,8 +196,6 @@ private:
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
-}  // namespace
-
 void BM_initPlacementHistory(benchmark::State& state) {
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
@@ -221,6 +219,8 @@ void BM_initPlacementHistory(benchmark::State& state) {
         ShardingCatalogManager::get(fixture.opCxt())->initializePlacementHistory(fixture.opCxt());
     }
 };
+
+}  // namespace
 
 // nChunksPerCollection, nCollections, nShards
 BENCHMARK(BM_initPlacementHistory)

@@ -56,24 +56,7 @@ namespace auth {
 
 using std::vector;
 
-Status _checkNoExtraFields(const BSONObj& cmdObj,
-                           StringData cmdName,
-                           const stdx::unordered_set<std::string>& validFieldNames) {
-    // Iterate through all fields in command object and make sure there are no unexpected
-    // ones.
-    for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
-        StringData fieldName = (*iter).fieldNameStringData();
-        if (!isGenericArgument(fieldName) && !validFieldNames.count(fieldName.toString())) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "\"" << fieldName
-                                        << "\" is not "
-                                           "a valid argument to "
-                                        << cmdName);
-        }
-    }
-    return Status::OK();
-}
-
+namespace {
 // Extracts a UserName or RoleName object from a BSONElement.
 template <typename Name>
 Status _parseNameFromBSONElement(const BSONElement& element,
@@ -124,6 +107,7 @@ Status _parseNamesFromBSONArray(const BSONArray& array,
     }
     return Status::OK();
 }
+}  // namespace
 
 Status parseUserNamesFromBSONArray(const BSONArray& usersArray,
                                    StringData dbname,

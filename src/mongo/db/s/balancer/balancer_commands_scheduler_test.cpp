@@ -91,7 +91,6 @@ public:
     const UUID kUuid = UUID::gen();
 
     static constexpr int64_t kDefaultMaxChunkSizeBytes = 128;
-    static constexpr int64_t kCustomizedMaxChunkSizeBytes = 256;
 
     ChunkType makeChunk(long long min, const ShardId& shardId) {
         ChunkType chunk;

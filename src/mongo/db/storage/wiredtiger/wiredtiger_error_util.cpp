@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+namespace {
 /**
  * Configured WT cache is deemed insufficient for a transaction when its dirty bytes in cache
  * exceed a certain threshold on the proportion of total cache which is used by transaction.
@@ -64,6 +65,7 @@ bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold) {
     return txnExceededCacheThreshold(
         txnDirtyBytes.getValue(), cacheDirtyBytes.getValue(), threshold);
 }
+}  // namespace
 
 bool txnExceededCacheThreshold(int64_t txnDirtyBytes, int64_t cacheDirtyBytes, double threshold) {
     double txnBytesDirtyOverCacheBytesDirty = static_cast<double>(txnDirtyBytes) / cacheDirtyBytes;
@@ -79,6 +81,7 @@ bool txnExceededCacheThreshold(int64_t txnDirtyBytes, int64_t cacheDirtyBytes, d
     return txnBytesDirtyOverCacheBytesDirty > threshold;
 }
 
+namespace {
 str::stream generateContextStrStream(StringData prefix, StringData reason, int retCode) {
     str::stream contextStrStream;
     if (!prefix.empty())
@@ -87,6 +90,7 @@ str::stream generateContextStrStream(StringData prefix, StringData reason, int r
 
     return contextStrStream;
 };
+}  // namespace
 
 bool rollbackReasonWasCachePressure(const char* reason) {
     return reason &&

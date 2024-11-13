@@ -1205,8 +1205,6 @@ private:
  */
 class MatchExpressionInVisitor final : public MatchExpressionConstVisitor {
 public:
-    MatchExpressionInVisitor(MatchExpressionVisitorContext* context) : _context(context) {}
-
     void visit(const AlwaysFalseMatchExpression* expr) final {}
     void visit(const AlwaysTrueMatchExpression* expr) final {}
     void visit(const AndMatchExpression* expr) final {}
@@ -1265,9 +1263,6 @@ public:
     void visit(const TypeMatchExpression* expr) final {}
     void visit(const WhereMatchExpression* expr) final {}
     void visit(const WhereNoOpMatchExpression* expr) final {}
-
-private:
-    MatchExpressionVisitorContext* _context;
 };
 }  // namespace
 
@@ -1285,7 +1280,7 @@ SbExpr generateFilter(StageBuilderState& state,
     MatchExpressionVisitorContext context{state, rootSlot, root, &slots, isFilterOverIxscan};
 
     MatchExpressionPreVisitor preVisitor{&context};
-    MatchExpressionInVisitor inVisitor{&context};
+    MatchExpressionInVisitor inVisitor;
     MatchExpressionPostVisitor postVisitor{&context};
 
     MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};

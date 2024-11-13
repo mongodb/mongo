@@ -119,15 +119,6 @@ void processAdditionalTransactionParticipantFromResponse(
             opCtx, shardId, originalResponse);
     }
 }
-
-void processAdditionalTransactionParticipantFromResponse(OperationContext* opCtx,
-                                                         const ShardId& shardId,
-                                                         const BSONObj& originalResponse) {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    processAdditionalTransactionParticipantFromResponse(
-        opCtx, shardId, originalResponse, fcvSnapshot);
-}
-
 }  // namespace
 
 AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,

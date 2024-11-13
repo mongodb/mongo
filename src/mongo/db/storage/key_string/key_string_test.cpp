@@ -66,10 +66,10 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-
 using std::string;
 using namespace mongo;
 
+namespace {
 BSONObj toBson(const key_string::Builder& ks, Ordering ord) {
     return key_string::toBson(ks.getBuffer(), ks.getSize(), ord, ks.getTypeBits());
 }
@@ -144,6 +144,7 @@ void checkSizeWhileAppendingTypeBits(int numOfBitsUsedForType, T&& appendBitsFun
         ASSERT_EQ(typeBits.getSize(), currentSize);
     }
 }
+}  // namespace
 
 // This test is derived from a fuzzer suite and triggers interesting code paths and recursion
 // patterns, so including it here specifically.
@@ -1118,6 +1119,7 @@ TEST_F(KeyStringBuilderTest, SerializeDeserialize) {
     }
 }
 
+namespace {
 const std::vector<BSONObj>& getInterestingElements(key_string::Version version) {
     static std::vector<BSONObj> elements;
     elements.clear();
@@ -1419,7 +1421,6 @@ void testPermutation(key_string::Version version,
     }
 }
 
-namespace {
 std::random_device rd;
 std::mt19937_64 seedGen(rd());
 
@@ -1446,9 +1447,7 @@ std::vector<BSONObj> thinElements(std::vector<BSONObj> elements,
     elements.resize(maxElements);
     return elements;
 }
-}  // namespace
 
-namespace {
 RecordId ridFromOid(const OID& oid) {
     key_string::Builder builder(key_string::Version::kLatestVersion);
     builder.appendOID(oid);
@@ -1714,6 +1713,7 @@ TEST_F(KeyStringBuilderTest, AllPerm2Compare) {
 
 #define COMPARE_HELPER(LHS, RHS) (((LHS) < (RHS)) ? -1 : (((LHS) == (RHS)) ? 0 : 1))
 
+namespace {
 int compareLongToDouble(long long lhs, double rhs) {
     if (rhs >= static_cast<double>(std::numeric_limits<long long>::max()))
         return -1;
@@ -1743,6 +1743,7 @@ int compareNumbers(const BSONElement& lhs, const BSONElement& rhs) {
         return -compareLongToDouble(rhs.numberLong(), lhs.Double());
     }
 }
+}  // namespace
 
 TEST_F(KeyStringBuilderTest, NaNs) {
     // TODO use hex floats to force distinct NaNs
@@ -1873,6 +1874,7 @@ TEST_F(KeyStringBuilderTest, KeyWithLotsOfTypeBits) {
     ROUNDTRIP(version, obj);
 }
 
+namespace {
 BSONObj buildKeyWhichWillHaveNByteOfTypeBits(size_t n, bool allZeros) {
     int numItems = n * 8 / 2 /* kInt/kDouble needs two bits */;
 
@@ -1914,6 +1916,7 @@ void checkKeyWithNByteOfTypeBits(key_string::Version version, size_t n, bool all
     ASSERT_EQ(hexblob::encode(newTypeBits.getBuffer(), newTypeBits.getSize()),
               hexblob::encode(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize()));
 }
+}  // namespace
 
 TEST_F(KeyStringBuilderTest, KeysWithNBytesTypeBits) {
     checkKeyWithNByteOfTypeBits(version, 0, false);

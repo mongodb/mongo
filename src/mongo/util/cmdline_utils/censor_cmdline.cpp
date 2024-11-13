@@ -142,7 +142,6 @@ void _redact(char* arg) {
         *arg = 'x';
     }
 }
-}  // namespace
 
 void censorBSONObjRecursive(const BSONObj& params,          // Object we are censoring
                             const std::string& parentPath,  // Set if this is a sub object
@@ -173,6 +172,7 @@ void censorBSONObjRecursive(const BSONObj& params,          // Object we are cen
         }
     }
 }
+}  // namespace
 
 void censorBSONObj(BSONObj* params) {
     invariant(gGatherOptionsDone);

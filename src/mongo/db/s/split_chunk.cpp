@@ -95,36 +95,6 @@ ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
                                      boost::optional<CollectionIndexes>(boost::none));
 }
 
-bool checkIfSingleDoc(OperationContext* opCtx,
-                      const CollectionPtr& collection,
-                      const ShardKeyIndex& idx,
-                      const ChunkType* chunk) {
-    KeyPattern kp(idx.keyPattern());
-    BSONObj newmin = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMin(), false));
-    BSONObj newmax = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMax(), true));
-
-    auto exec = InternalPlanner::shardKeyIndexScan(opCtx,
-                                                   &collection,
-                                                   idx,
-                                                   newmin,
-                                                   newmax,
-                                                   BoundInclusion::kIncludeStartKeyOnly,
-                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-    // check if exactly one document found
-    PlanExecutor::ExecState state;
-    BSONObj obj;
-    if (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
-        if (PlanExecutor::IS_EOF == (state = exec->getNext(&obj, nullptr))) {
-            return true;
-        }
-    }
-
-    // Non-yielding collection scans from InternalPlanner will never error.
-    invariant(PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF == state);
-
-    return false;
-}
-
 /**
  * Checks the collection's metadata for a successful split on the specified chunkRange using the
  * specified split points. Returns false if the metadata's chunks don't match the new chunk

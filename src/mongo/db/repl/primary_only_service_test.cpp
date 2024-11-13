@@ -337,7 +337,7 @@ private:
 };
 
 // Make ASSERT_EQ work with State enums.
-std::ostream& operator<<(std::ostream& os, const TestService::State& state) {
+static std::ostream& operator<<(std::ostream& os, const TestService::State& state) {
     os << static_cast<int>(state);
     return os;
 }

@@ -136,6 +136,7 @@ TEST_F(FTDCFileManagerTest, TestFull) {
     ASSERT_GREATER_THAN_OR_EQUALS(sum, c.maxDirectorySizeBytes * 0.90);
 }
 
+namespace {
 void ValidateInterimFileHasData(const boost::filesystem::path& dir, bool hasData) {
     char buf[sizeof(std::int32_t)];
 
@@ -154,6 +155,7 @@ void ValidateInterimFileHasData(const boost::filesystem::path& dir, bool hasData
 
     ASSERT_EQUALS(static_cast<bool>(bsonLength), hasData);
 }
+}  // namespace
 
 // Test a normal restart
 TEST_F(FTDCFileManagerTest, TestNormalRestart) {

@@ -34,6 +34,7 @@
 #include <boost/dynamic_bitset.hpp>
 
 namespace mongo::boolean_simplification {
+namespace {
 
 /**
  * The benchmark compares operations of different implementation of bitsets:
@@ -464,4 +465,5 @@ BENCHMARK_TEMPLATE(implBoostBitset_CountNumberOfEmptySetBits, 256);
 
 BENCHMARK(implMongoBitset_Any);
 BENCHMARK(implMongoBitset_All);
+}  // namespace
 }  // namespace mongo::boolean_simplification

@@ -133,9 +133,7 @@ MultiUpdateCoordinatorService::MultiUpdateCoordinatorService(ServiceContext* ser
 MultiUpdateCoordinatorService::MultiUpdateCoordinatorService(
     ServiceContext* serviceContext,
     std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> factory)
-    : PrimaryOnlyService{serviceContext},
-      _serviceContext{serviceContext},
-      _externalStateFactory{std::move(factory)} {}
+    : PrimaryOnlyService{serviceContext}, _externalStateFactory{std::move(factory)} {}
 
 StringData MultiUpdateCoordinatorService::getServiceName() const {
     return kServiceName;

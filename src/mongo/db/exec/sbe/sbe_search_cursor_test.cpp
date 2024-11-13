@@ -62,6 +62,7 @@ namespace mongo::sbe {
 
 using SearchCursorStageTest = PlanStageTestFixture;
 
+namespace {
 const BSONArray resultArray = BSON_ARRAY(fromjson(R"(
 {
     "_id" : 0,
@@ -164,6 +165,7 @@ std::unique_ptr<PlanStage> makeSearchCursorStage(value::SlotId idSlot,
                                                       nullptr /* yieldPolicy */,
                                                       kEmptyPlanNodeId);
 }
+}  // namespace
 
 TEST_F(SearchCursorStageTest, SearchTestOutputs) {
     auto env = std::make_unique<RuntimeEnvironment>();

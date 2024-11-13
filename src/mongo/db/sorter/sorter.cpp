@@ -103,7 +103,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
-
 namespace {
 
 void checkNoExternalSortOnMongos(const SortOptions& opts) {
@@ -133,8 +132,6 @@ EncryptionHooks* getEncryptionHooksIfEnabled() {
 }
 
 constexpr std::size_t kSortedFileBufferSize = 64 * 1024;
-
-}  // namespace
 
 namespace sorter {
 
@@ -1402,10 +1399,8 @@ private:
     Data _lastMedian;     // Median of a batch. Reset when _medianCount >= _opts.limit.
     size_t _medianCount;  // Number of docs better or equal to _lastMedian kept so far.
 };
-
 }  // namespace sorter
 
-namespace {
 SharedBufferFragmentBuilder makeMemPool() {
     return SharedBufferFragmentBuilder(
         gOperationMemoryPoolBlockInitialSizeKB.loadRelaxed() * static_cast<size_t>(1024),

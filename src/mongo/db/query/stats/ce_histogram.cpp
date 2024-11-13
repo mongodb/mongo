@@ -501,6 +501,7 @@ bool CEHistogram::isArray() const {
     return _arrayUnique && _arrayMin && _arrayMax && _arrayTypeCounts;
 }
 
+namespace {
 std::string typeCountsToString(const TypeCounts& typeCounts) {
     std::ostringstream os;
     os << "{";
@@ -514,6 +515,7 @@ std::string typeCountsToString(const TypeCounts& typeCounts) {
     os << "}";
     return os.str();
 }
+}  // namespace
 
 std::string CEHistogram::toString() const {
     std::ostringstream os;

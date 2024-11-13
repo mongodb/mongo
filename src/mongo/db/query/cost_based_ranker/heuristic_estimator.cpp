@@ -37,7 +37,7 @@
 #include "mongo/db/query/cost_based_ranker/ce_utils.h"
 
 namespace mongo::cost_based_ranker {
-
+namespace {
 const CardinalityEstimate kSmallLimit{CardinalityType{20.0}, EstimationSource::Heuristics};
 const CardinalityEstimate kMediumLimit{CardinalityType{100.0}, EstimationSource::Heuristics};
 
@@ -81,6 +81,7 @@ SelectivityEstimate heuristicPointIntervalSel(CardinalityEstimate inputCard) {
     return SelectivityEstimate{SelectivityType{1 / std::sqrt(inputCard.toDouble())},
                                EstimationSource::Heuristics};
 }
+}  // namespace
 
 SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
                                                 CardinalityEstimate inputCard) {
@@ -168,6 +169,7 @@ SelectivityEstimate estimateInterval(const Interval& interval, CardinalityEstima
     return heuristicClosedRangeSel(inputCard);
 }
 
+namespace {
 SelectivityEstimate estimateOil(const OrderedIntervalList& oil, CardinalityEstimate inputCard) {
     std::vector<SelectivityEstimate> sels;
     for (size_t j = 0; j < oil.intervals.size(); ++j) {
@@ -175,6 +177,7 @@ SelectivityEstimate estimateOil(const OrderedIntervalList& oil, CardinalityEstim
     }
     return disjExponentialBackoff(sels);
 }
+}  // namespace
 
 SelectivityEstimate estimateIndexBounds(const IndexBounds& bounds, CardinalityEstimate inputCard) {
     if (bounds.isSimpleRange) {

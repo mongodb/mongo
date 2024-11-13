@@ -994,9 +994,11 @@ void TimelibRelTimeDeleter::operator()(timelib_rel_time* relTime) {
     timelib_rel_time_dtor(relTime);
 }
 
+namespace {
 std::unique_ptr<_timelib_rel_time, TimelibRelTimeDeleter> createTimelibRelTime() {
     return std::unique_ptr<_timelib_rel_time, TimelibRelTimeDeleter>(timelib_rel_time_ctor());
 }
+}  // namespace
 
 std::unique_ptr<timelib_rel_time, TimelibRelTimeDeleter> getTimelibRelTime(TimeUnit unit,
                                                                            long long amount) {

@@ -168,18 +168,6 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
     return Status::OK();
 }
 
-/**
- * Returns true if we are running retryable write or retryable internal multi-document transaction.
- */
-bool isRetryableWrite(OperationContext* opCtx) {
-    if (!opCtx->writesAreReplicated() || !opCtx->isRetryableWrite()) {
-        return false;
-    }
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    return txnParticipant &&
-        (!opCtx->inMultiDocumentTransaction() || txnParticipant.transactionIsOpen());
-}
-
 bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
     return accessMethod == IndexNames::BTREE || accessMethod == IndexNames::GEO_2DSPHERE;
 }
@@ -262,22 +250,20 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
             str::stream() << "Index ident " << ident << " is being dropped or is already dropped."};
 }
 
-namespace internal {
 bool collUsesCappedSnapshots(const CollectionOptions& options) {
     // This behavior relies on RecordIds being allocated in increasing order. For clustered
     // collections, users define their RecordIds and are not constrained to creating them in
     // increasing order.
     return options.capped && !options.clusteredIndex;
 }
-}  // namespace internal
 
 bool collUsesCappedSnapshots(const NamespaceString& nss, const CollectionOptions& options) {
-    return Collection::everUsesCappedSnapshots(nss) && internal::collUsesCappedSnapshots(options);
+    return Collection::everUsesCappedSnapshots(nss) && collUsesCappedSnapshots(options);
 }
 
 bool collUsesCappedSnapshots(const CollectionImpl& coll) {
     return Collection::everUsesCappedSnapshots(coll.ns()) &&
-        internal::collUsesCappedSnapshots(coll.getCollectionOptions());
+        collUsesCappedSnapshots(coll.getCollectionOptions());
 }
 }  // namespace
 

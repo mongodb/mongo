@@ -166,11 +166,6 @@ ReadPreferenceSetting getConfigReadPreference(OperationContext* opCtx) {
                                      : kConfigNearestReadPreference;
 }
 
-void toBatchError(const Status& status, BatchedCommandResponse* response) {
-    response->clear();
-    response->setStatus(status);
-}
-
 AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opCtx,
                                                            const NamespaceString& nss,
                                                            const ChunkVersion& sinceVersion) {

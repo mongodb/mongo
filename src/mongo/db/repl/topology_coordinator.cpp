@@ -1027,9 +1027,11 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHear
     return std::make_pair(hbArgs, timeout);
 }
 
+namespace {
 bool isUnrecoverableHeartbeatFailure(Status status) {
     return status.code() == ErrorCodes::InconsistentReplicaSetNames;
 }
+}  // namespace
 
 HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     Date_t now,

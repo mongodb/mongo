@@ -128,7 +128,7 @@ namespace repl {
 /**
  * Insertion operator for InitialSyncer::State. Formats initial syncer state for output stream.
  */
-std::ostream& operator<<(std::ostream& os, const InitialSyncer::State& state) {
+static std::ostream& operator<<(std::ostream& os, const InitialSyncer::State& state) {
     switch (state) {
         case InitialSyncer::State::kPreStart:
             return os << "PreStart";

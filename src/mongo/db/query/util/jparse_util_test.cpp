@@ -35,6 +35,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 void parseFuzzerJsonAndAssertEq(const char* jsonStr, BSONObj expected) {
     auto bob = fromFuzzerJson(jsonStr);
     ASSERT_TRUE(validateBSON(bob).isOK());
@@ -49,6 +50,7 @@ Status tryParseFuzzerJsonAndAssertFail(const char* jsonStr) {
         return e.toStatus();
     }
 }
+}  // namespace
 
 TEST(JParseUtilTest, TrailingCommasInObject) {
     auto jsonStr = "{$match: {$and: [{a: 1}, {b: 2}]},}";

@@ -35,6 +35,7 @@
 #include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
+namespace {
 
 void BM_stdNotifyOne(benchmark::State& state) {
     std::condition_variable cv;  // NOLINT
@@ -77,6 +78,7 @@ void BM_stdxWaitWithTruePredicate(benchmark::State& state) {
         cv.wait(lk, [&] { return alwaysTrue; });
     }
 }
+}  // namespace
 
 BENCHMARK(BM_stdNotifyOne);
 BENCHMARK(BM_stdWaitWithTruePredicate);

@@ -114,7 +114,6 @@ AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* o
                       .build();
 
     using Doc = Document;
-    using Arr = std::vector<Value>;
 
     Pipeline::SourceContainer stages;
 

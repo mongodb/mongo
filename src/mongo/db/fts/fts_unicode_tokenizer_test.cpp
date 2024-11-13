@@ -39,6 +39,7 @@
 namespace mongo {
 namespace fts {
 
+namespace {
 std::vector<std::string> tokenizeString(const char* str,
                                         const char* language,
                                         FTSTokenizer::Options options) {
@@ -54,6 +55,7 @@ std::vector<std::string> tokenizeString(const char* str,
 
     return terms;
 }
+}  // namespace
 
 // Ensure punctuation is filtered out of the indexed document and the 's is not separated
 TEST(FtsUnicodeTokenizer, English) {

@@ -85,6 +85,7 @@ namespace Document {
 
 using mongo::Document;
 
+namespace {
 BSONObj toBson(const Document& document) {
     return document.toBson();
 }
@@ -100,6 +101,7 @@ void assertRoundTrips(const Document& document1) {
     ASSERT_BSONOBJ_EQ(obj1, obj2);
     ASSERT_DOCUMENT_EQ(document1, document2);
 }
+}  // namespace
 
 TEST(DocumentConstruction, Default) {
     Document document;
@@ -159,6 +161,7 @@ TEST(DocumentConstruction, FromBsonReset) {
     ASSERT_BSONOBJ_EQ(bson, toBson(newDocument));
 }
 
+namespace {
 /**
  * Appends to 'builder' an object nested 'depth' levels deep.
  */
@@ -171,6 +174,7 @@ void appendNestedObject(size_t depth, BSONObjBuilder* builder) {
         subobj.doneFast();
     }
 }
+}  // namespace
 
 TEST(DocumentSerialization, CanSerializeDocumentExactlyAtDepthLimit) {
     BSONObjBuilder builder;
@@ -1285,6 +1289,7 @@ namespace Value {
 
 using mongo::Value;
 
+namespace {
 BSONObj toBson(const Value& value) {
     if (value.missing())
         return BSONObj();  // EOO
@@ -2555,6 +2560,7 @@ const double kDoubleMax = std::numeric_limits<double>::max();
 const double kDoubleMin = std::numeric_limits<double>::lowest();
 const Decimal128 kDoubleMaxAsDecimal = Decimal128(kDoubleMin);
 const Decimal128 kDoubleMinAsDecimal = Decimal128(kDoubleMin);
+}  // namespace
 
 TEST(ValueIntegral, CorrectlyIdentifiesValidIntegralValues) {
     ASSERT_TRUE(Value(kIntMax).integral());

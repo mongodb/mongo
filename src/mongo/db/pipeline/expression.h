@@ -4839,8 +4839,4 @@ private:
     static constexpr size_t _kCollation = 1;
 };
 
-static boost::intrusive_ptr<Expression> parseParenthesisExprObj(ExpressionContext* expCtx,
-                                                                BSONElement expr,
-                                                                const VariablesParseState& vpsIn);
-
 }  // namespace mongo

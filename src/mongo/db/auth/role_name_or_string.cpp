@@ -36,6 +36,7 @@
 
 namespace mongo {
 
+namespace {
 /**
  * macOS 10.14 does not support get<T>(std::variant<T,...>)
  * because it lacks an implementation of std::bad_variant_access::what()
@@ -49,6 +50,7 @@ const T& variant_get(const U* variant) {
     dassert(value != nullptr);
     return *value;
 }
+}  // namespace
 
 RoleName RoleNameOrString::getRoleName(const DatabaseName& dbname) const {
     if (holds_alternative<RoleName>(_roleName)) {

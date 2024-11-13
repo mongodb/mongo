@@ -3457,20 +3457,6 @@ bool ReplicationCoordinatorImpl::canAcceptNonLocalWrites() const {
     return _readWriteAbility->canAcceptNonLocalWrites(lk);
 }
 
-namespace {
-bool isSystemDotProfile(OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) {
-    if (nsOrUUID.isNamespaceString()) {
-        return nsOrUUID.nss().isSystemDotProfile();
-    }
-
-    if (auto ns = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, nsOrUUID.uuid())) {
-        return ns->isSystemDotProfile();
-    }
-
-    return false;
-}
-}  // namespace
-
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceStringOrUUID& nsOrUUID) {
     // Writes on unreplicated collections are always permitted.

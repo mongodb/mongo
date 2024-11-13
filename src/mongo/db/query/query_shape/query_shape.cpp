@@ -66,16 +66,6 @@ MONGO_FAIL_POINT_DEFINE(queryShapeCreationException);
 
 namespace mongo::query_shape {
 
-namespace {
-void appendCmdNs(BSONObjBuilder& bob,
-                 const NamespaceString& nss,
-                 const SerializationOptions& opts) {
-    BSONObjBuilder nsObj = bob.subobjStart("cmdNs");
-    shape_helpers::appendNamespaceShape(nsObj, nss, opts);
-    nsObj.doneFast();
-}
-}  // namespace
-
 Shape::Shape(NamespaceStringOrUUID nssOrUUID_, BSONObj collation_)
     : nssOrUUID(nssOrUUID_), collation(std::move(collation_)) {
     if (MONGO_unlikely(queryShapeCreationException.shouldFail())) {

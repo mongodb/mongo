@@ -40,6 +40,9 @@ mongo_cc_library(
             "-Wno-stringop-truncation",
         ],
     }),
+    features = [
+        "-missing_prototypes_warning",
+    ],
     includes = [
         "dist/include",
     ],

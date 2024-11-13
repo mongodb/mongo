@@ -466,8 +466,7 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
     : OplogApplier(executor, oplogBuffer, observer, options),
       _replCoord(replCoord),
       _workerPool(workerPool),
-      _storageInterface(storageInterface),
-      _consistencyMarkers(consistencyMarkers) {
+      _storageInterface(storageInterface) {
 
     // Change collections are always written as part of oplog application, even though
     // in steady state mode where a separate OplogWriter thread is responsible for

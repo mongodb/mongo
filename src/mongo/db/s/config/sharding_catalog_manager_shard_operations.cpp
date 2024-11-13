@@ -1330,6 +1330,7 @@ void ShardingCatalogManager::addConfigShard(OperationContext* opCtx) {
     uassertStatusOK(addShard(opCtx, &shardName, configConnString, true));
 }
 
+namespace {
 boost::optional<RemoveShardProgress> checkCollectionsAreEmpty(
     OperationContext* opCtx, const std::vector<NamespaceString>& collections) {
     for (const auto& nss : collections) {
@@ -1349,6 +1350,7 @@ boost::optional<RemoveShardProgress> checkCollectionsAreEmpty(
 
     return boost::none;
 }
+}  // namespace
 
 RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                         const ShardId& shardId) {

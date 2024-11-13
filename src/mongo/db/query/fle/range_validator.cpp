@@ -63,20 +63,6 @@ bool hasRangeTypeToValidate(const T& value) {
     return isPayloadOfType(typeToValidate, value);
 }
 
-MatchExpression::MatchType rangeOpToMatchType(Fle2RangeOperator op) {
-    switch (op) {
-        case Fle2RangeOperator::kGt:
-            return MatchExpression::GT;
-        case Fle2RangeOperator::kGte:
-            return MatchExpression::GTE;
-        case Fle2RangeOperator::kLt:
-            return MatchExpression::LT;
-        case Fle2RangeOperator::kLte:
-            return MatchExpression::LTE;
-    }
-    MONGO_UNREACHABLE_TASSERT(7030720);
-}
-
 Fle2RangeOperator matchTypeToRangeOp(MatchExpression::MatchType ty) {
     switch (ty) {
         case MatchExpression::GT:

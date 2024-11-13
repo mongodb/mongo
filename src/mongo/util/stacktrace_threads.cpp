@@ -661,6 +661,7 @@ void State::action(siginfo_t* si) {
 }
 
 State* stateSingleton = new State{};
+extern "C" void stateSingletonAction(int, siginfo_t* si, void*);
 extern "C" void stateSingletonAction(int, siginfo_t* si, void*) {
     stateSingleton->action(si);
 }
@@ -700,13 +701,6 @@ void printAllThreadStacks(StackTraceSink& sink) {
 }
 
 /*
- * This function should not be called from outside the SignalHandler thread.
- */
-void printAllThreadStacks() {
-    stack_trace_detail::stateSingleton->printStacks();
-}
-
-/*
  * This function is intended for usage of printing stacktraces when the caller is not the
  * SignalHandler. This function is currently prone to deadlocks and should not be used. For more
  * information, refer to SERVER-90775.
@@ -715,6 +709,13 @@ void printAllThreadStacks() {
  */
 void printAllThreadStacksBlocking_UNSAFE() {
     stack_trace_detail::stateSingleton->printAllThreadStacksBlocking_UNSAFE();
+}
+
+/*
+ * This function should not be called from outside the SignalHandler thread.
+ */
+void printAllThreadStacks() {
+    stack_trace_detail::stateSingleton->printStacks();
 }
 
 void setupStackTraceSignalAction(int signal) {

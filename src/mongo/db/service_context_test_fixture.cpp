@@ -40,7 +40,7 @@
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
-
+namespace {
 ServiceContext::UniqueServiceContext makeServiceContext() {
     {
         // Reset the global clock source
@@ -50,6 +50,7 @@ ServiceContext::UniqueServiceContext makeServiceContext() {
 
     return ServiceContext::make();
 }
+}  // namespace
 
 ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest()
     : ScopedGlobalServiceContextForTest(makeServiceContext()) {}

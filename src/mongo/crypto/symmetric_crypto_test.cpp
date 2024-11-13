@@ -60,6 +60,7 @@
 namespace mongo {
 namespace crypto {
 
+namespace {
 std::vector<uint8_t> generateByteSequence(uint8_t start, uint8_t count) {
     std::vector<uint8_t> result;
     for (uint8_t i = start; i < count; i++) {
@@ -98,6 +99,7 @@ private:
     size_t index = 0;
     std::queue<uint8_t> _invokations;
 };
+}  // namespace
 
 // Test that a Packer with no input has no leftover bytes
 TEST(BlockPacker, NoInput) {
@@ -461,6 +463,7 @@ TEST(SymmetricEncryptor, PaddingLogic) {
     }
 }
 
+namespace {
 SymmetricKey aesGeneratePredictableKey256(StringData stringKey, StringData keyId) {
     const size_t keySize = crypto::sym256KeySize;
     ASSERT_EQ(keySize, stringKey.size());
@@ -545,6 +548,7 @@ void GCMAdditionalAuthenticatedDataHelper(bool succeed) {
 
     ASSERT_EQ(StringData(asChar(plainText.data()), plainLen), kPlaintextMessage);
 }
+}  // namespace
 
 TEST(AES, GCMAdditionalAuthenticatedData) {
     GCMAdditionalAuthenticatedDataHelper(true);

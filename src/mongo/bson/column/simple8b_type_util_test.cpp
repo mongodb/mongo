@@ -43,6 +43,7 @@
 
 using namespace mongo;
 
+namespace {
 uint8_t scaleIndexForMultiplier(double multiplier) {
     auto iterIdx = std::find(Simple8bTypeUtil::kScaleMultiplier.begin(),
                              Simple8bTypeUtil::kScaleMultiplier.end(),
@@ -84,6 +85,7 @@ void assertStringEqual(StringData val, int128_t expected) {
     ASSERT_EQUALS(val.size(), decodeResult.size);
     ASSERT_EQUALS(std::memcmp(val.rawData(), decodeResult.str.data(), val.size()), 0);
 }
+}  // namespace
 
 TEST(Simple8bTypeUtil, EncodeAndDecodePositiveSignedInt) {
     int64_t signedVal = 1;

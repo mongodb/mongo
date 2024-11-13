@@ -202,13 +202,6 @@ void _assertOplogDocAndTimestampEquals(
     ASSERT_EQUALS(expectedTimestamp, std::get<1>(actualDocTimestampTuple));
 }
 
-void _assertDocAndTimestampEquals(const Timestamp& expectedTimestamp,
-                                  const std::tuple<BSONObj, Timestamp>& actualDocTimestampTuple) {
-    auto expectedDoc = BSON("_id" << BSON("ts" << expectedTimestamp));
-    ASSERT_BSONOBJ_EQ(expectedDoc, std::get<0>(actualDocTimestampTuple));
-    ASSERT_EQUALS(expectedTimestamp, std::get<1>(actualDocTimestampTuple));
-}
-
 TEST_F(OplogBufferCollectionTest, addIdToDocumentChangesTimestampToId) {
     const BSONObj originalOp = makeOplogEntry(1);
     _assertOplogDocAndTimestampEquals(originalOp,

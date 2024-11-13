@@ -117,6 +117,7 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
     }
 }
 
+namespace {
 std::size_t estimateImpersonatedUserMetadataSize(const boost::optional<UserName>& userName,
                                                  RoleNameIterator roleNames) {
     // If there are no users/roles being impersonated just exit
@@ -149,6 +150,7 @@ std::size_t estimateImpersonatedUserMetadataSize(const boost::optional<UserName>
 
     return ret;
 }
+}  // namespace
 
 std::size_t estimateImpersonatedUserMetadataSize(OperationContext* opCtx) {
     if (!opCtx) {

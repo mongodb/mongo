@@ -109,6 +109,7 @@ using Arr = BSONArrayBuilder;
 // Tests of the BSONObj::jsonString member function.
 namespace JsonStringTests {
 
+namespace {
 void checkJsonStringEach(const std::vector<std::pair<BSONObj, std::string>>& pairs) {
     for (const auto& pair : pairs) {
         ASSERT_JSON_EQUALS(pair.first.jsonString(ExtendedCanonicalV2_0_0), pair.second);
@@ -120,6 +121,7 @@ void checkJsonStringEach(const std::vector<std::pair<BSONObj, std::string>>& pai
         ASSERT_EQUALS(pair.first.jsonString(LegacyStrict), pair.second);
     }
 }
+}  // namespace
 
 TEST(JsonStringTest, BasicTest) {
     checkJsonStringEach({
@@ -641,7 +643,7 @@ TEST(JsonStringTest, AllTypesTest) {
 }  // namespace JsonStringTests
 
 namespace FromJsonTests {
-
+namespace {
 void assertEquals(const std::string& json,
                   const BSONObj& expected,
                   const BSONObj& actual,
@@ -688,6 +690,7 @@ void checkRejectionEach(const std::vector<std::string>& sequence) {
         checkRejection(json);
     }
 }
+}  // namespace
 
 TEST(FromJsonTest, Parsing) {
     checkEquivalenceEach({
@@ -1069,11 +1072,13 @@ TEST(FromJsonTest, UUIDObjectTest) {
     });
 }
 
+namespace {
 BSONObj re(const std::string& name, const std::string& re, const std::string& options) {
     BSONObjBuilder b;
     b.appendRegex(name, re, options);
     return b.obj();
 }
+}  // namespace
 
 TEST(FromJsonTest, Regex) {
     checkEquivalenceEach({
@@ -1281,6 +1286,7 @@ TEST(FromJsonTest, MinMaxKey) {
     });
 }
 
+namespace {
 /**
  * Asserts 'inputjson' fails to parse, and that each of the 'expectedContextChars' are shown in a
  * little snippet of the area we encountered the first parsing error.
@@ -1313,6 +1319,7 @@ void assertErrorWithContext(std::string inputjson,
             << "Expected to find the indicator character in the message: " << reason;
     }
 }
+}  // namespace
 
 TEST(FromJsonTest, GivesErrorContext) {
 

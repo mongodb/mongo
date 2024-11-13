@@ -825,7 +825,8 @@ void BlockStagesTest::testBlockToBitmap(
     iterateBlockAndAssert(true);
 }
 
-std::unique_ptr<value::ValueBlock> makeBlock(std::vector<int> ints) {
+namespace {
+std::unique_ptr<value::ValueBlock> makeBlock(const std::vector<int>& ints) {
     auto out = std::make_unique<value::HeterogeneousBlock>();
     for (auto i : ints) {
         out->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
@@ -834,14 +835,14 @@ std::unique_ptr<value::ValueBlock> makeBlock(std::vector<int> ints) {
     return std::unique_ptr<value::ValueBlock>(out.release());
 }
 
-value::Array makeIntArray(std::vector<int> ints) {
-
+value::Array makeIntArray(const std::vector<int>& ints) {
     value::Array out;
     for (auto i : ints) {
         out.push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
     }
     return out;
 }
+}  // namespace
 
 TEST_F(BlockStagesTest, BlockToRowRespectsZerosBitmap) {
     std::vector<std::unique_ptr<value::ValueBlock>> blocks;

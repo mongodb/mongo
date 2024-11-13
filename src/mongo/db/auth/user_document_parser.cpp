@@ -300,22 +300,6 @@ Status V2UserDocumentParser::initializeUserCredentialsFromUserDocument(
     return Status::OK();
 }
 
-static Status _extractRoleDocumentElements(const BSONObj& roleObject,
-                                           BSONElement* roleNameElement,
-                                           BSONElement* roleSourceElement) {
-    *roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
-    *roleSourceElement = roleObject[ROLE_DB_FIELD_NAME];
-
-    if (roleNameElement->type() != String || roleNameElement->valueStringData().empty()) {
-        return Status(ErrorCodes::UnsupportedFormat, "Role names must be non-empty strings");
-    }
-    if (roleSourceElement->type() != String || roleSourceElement->valueStringData().empty()) {
-        return Status(ErrorCodes::UnsupportedFormat, "Role db must be non-empty strings");
-    }
-
-    return Status::OK();
-}
-
 Status V2UserDocumentParser::initializeAuthenticationRestrictionsFromUserDocument(
     const BSONObj& privDoc, User* user) const {
 

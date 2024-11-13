@@ -49,6 +49,7 @@ namespace mongo {
         }                                 \
     } while (0)
 
+namespace {
 const Date_t kDate = Date_t::now();
 const std::vector<BSONObj> kField1Elements = {BSON("logLevel" << 2),
                                               BSON("auditSomething" << false),
@@ -132,6 +133,7 @@ void alterOneFieldValueAndAddSample(
     ASSERT_BSONOBJ_EQ(result.value(), deltaDocExpected);
     ASSERT_EQ(compressor.getDeltaCount(), deltaCountExpected);
 }
+}  // namespace
 
 // Tests addSample returns just the delta document on non-schema breaking changes.
 TEST(FTDCMetadataCompressorTest, TestAddSample_BasicDeltas) {

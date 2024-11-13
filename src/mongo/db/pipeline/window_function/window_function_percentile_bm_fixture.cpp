@@ -47,6 +47,7 @@
 
 namespace mongo {
 using std::vector;
+namespace {
 vector<double> generateNormalData(size_t n) {
     std::mt19937 generator(curTimeMillis64());
     boost::random::normal_distribution<double> dist(0.0 /* mean */, 1.0 /* sigma */);
@@ -59,6 +60,7 @@ vector<double> generateNormalData(size_t n) {
 
     return inputs;
 }
+}  // namespace
 
 // This benchmark is mimicking the behavior of computing $percentile for a [0, unbounded]
 // window. In a [0, unbounded] window the first window will add all of the inputs in the window

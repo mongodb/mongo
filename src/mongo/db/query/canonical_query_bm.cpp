@@ -37,6 +37,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace {
 
 const NamespaceString kNss =
     NamespaceString::createNamespaceString_forTest("canonical_query_init_test.bm");
@@ -682,4 +683,5 @@ BENCHMARK(BM_CreateCanonicalQuery)
             /*sizeOfInArray*/ 0,                         // plays no role here.
             /*numOfNestings*/ 3});                       // needs to be > 0
 
+}  // namespace
 }  // namespace mongo

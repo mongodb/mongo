@@ -55,7 +55,6 @@ std::unique_ptr<MatchExpression> buildAndOfOrs(int startValue,
 
 struct EnableSimplifier {};
 struct DisableSimplifier {};
-}  // namespace
 
 /**
  * 1 Minterm of size N
@@ -319,4 +318,5 @@ void matchExpressionOptimize_overComplex(benchmark::State& state) {
 
 BENCHMARK_TEMPLATE(matchExpressionOptimize_overComplex, DisableSimplifier);
 BENCHMARK_TEMPLATE(matchExpressionOptimize_overComplex, EnableSimplifier);
+}  // namespace
 }  // namespace mongo::boolean_simplification

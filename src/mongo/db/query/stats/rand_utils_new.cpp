@@ -253,6 +253,7 @@ ObjectIdDistribution::ObjectIdDistribution(MixedDistributionDescriptor distrDesc
                                            double nullsRatio)
     : DataTypeDistrNew(distrDescriptor, value::TypeTags::ObjectId, weight, ndv, nullsRatio) {}
 
+namespace {
 /**
  * Helper to construct a 12-byte ObjectId from three 4-byte integers.
  */
@@ -272,6 +273,7 @@ sbe::value::ObjectIdType createObjectId(uint32_t a, uint32_t b, uint32_t c) {
         static_cast<uint8_t>(c & 0xff),
     };
 }
+}  // namespace
 
 void ObjectIdDistribution::init(DatasetDescriptorNew*, std::mt19937_64& gen) {
     // An ObjectId is an array of 12 one byte integers.

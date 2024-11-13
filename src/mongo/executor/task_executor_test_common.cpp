@@ -267,7 +267,7 @@ class EventChainAndWaitingTest {
     EventChainAndWaitingTest& operator=(const EventChainAndWaitingTest&) = delete;
 
 public:
-    EventChainAndWaitingTest(TaskExecutor* exec, NetworkInterfaceMock* network);
+    EventChainAndWaitingTest(TaskExecutor* exec);
     ~EventChainAndWaitingTest();
 
     void run();
@@ -277,7 +277,6 @@ private:
     void onGo(const TaskExecutor::CallbackArgs& cbData);
     void onGoAfterTriggered(const TaskExecutor::CallbackArgs& cbData);
 
-    NetworkInterfaceMock* net;
     TaskExecutor* executor;
     const TaskExecutor::EventHandle goEvent;
     const TaskExecutor::EventHandle event2;
@@ -295,16 +294,14 @@ private:
 
 COMMON_EXECUTOR_TEST(EventChainAndWaiting) {
     launchExecutorThread();
-    EventChainAndWaitingTest theTest(&getExecutor(), getNet());
+    EventChainAndWaitingTest theTest(&getExecutor());
     theTest.run();
     joinExecutorThread();
     theTest.assertSuccess();
 }
 
-EventChainAndWaitingTest::EventChainAndWaitingTest(TaskExecutor* exec,
-                                                   NetworkInterfaceMock* network)
-    : net(network),
-      executor(exec),
+EventChainAndWaitingTest::EventChainAndWaitingTest(TaskExecutor* exec)
+    : executor(exec),
       goEvent(unittest::assertGet(executor->makeEvent())),
       event2(unittest::assertGet(executor->makeEvent())),
       event3(unittest::assertGet(executor->makeEvent())),

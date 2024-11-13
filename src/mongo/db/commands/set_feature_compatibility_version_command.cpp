@@ -227,14 +227,6 @@ void _setShardedClusterCardinalityParameter(
     }
 }
 
-void uassertStatusOKIgnoreNSNotFound(Status status) {
-    if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
-        return;
-    }
-
-    uassertStatusOK(status);
-}
-
 /*
  * Automatically modifies data on downgrade for testing. This is because in some cases,
  * the server expects the user to modify data themselves. In testing, as there may not

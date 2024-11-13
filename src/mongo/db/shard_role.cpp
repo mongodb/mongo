@@ -1031,6 +1031,7 @@ SnapshotAttempt::~SnapshotAttempt() {
     CurOp::get(_opCtx)->yielded();
 }
 
+namespace {
 ResolvedNamespaceOrViewAcquisitionRequests generateSortedAcquisitionRequests(
     OperationContext* opCtx,
     const CollectionCatalog& catalog,
@@ -1127,6 +1128,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
         throw;
     }
 }
+}  // namespace
 }  // namespace shard_role_details
 
 CollectionOrViewAcquisitions acquireCollectionsOrViews(

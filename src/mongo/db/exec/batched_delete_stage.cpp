@@ -103,7 +103,6 @@ void incrementSSSMetricNoOverflow(AtomicWord<long long>& metric, long long value
         metric.fetchAndAdd(value);
     }
 }
-}  // namespace
 
 /**
  * Reports globally-aggregated batch stats.
@@ -148,6 +147,7 @@ bool ensureStillMatchesAndUpdateStats(const CollectionPtr& collection,
     }
     return write_stage_common::ensureStillMatches(collection, opCtx, ws, id, cq);
 }
+}  // namespace
 
 BatchedDeleteStage::BatchedDeleteStage(
     ExpressionContext* expCtx,

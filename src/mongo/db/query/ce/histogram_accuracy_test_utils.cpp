@@ -36,6 +36,7 @@ namespace mongo::ce {
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
+namespace {
 /**
  * Compute the 50th, 90th, 95th, and 99th percentile values of a given vector.
  * This function creates a copy of the given vector which it sorts and over which it calculates the
@@ -50,6 +51,7 @@ std::tuple<double, double, double, double> percentiles(std::vector<double> arr) 
             arr[(size_t)(arr.size() * 0.95)],
             arr[(size_t)(arr.size() * 0.99)]};
 }
+}  // namespace
 
 size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
                                           sbe::value::TypeTags type,
@@ -113,8 +115,8 @@ static size_t calculateFrequencyFromDataVectorRange(const std::vector<stats::SBE
     return actualCard;
 }
 
-static std::pair<boost::optional<double>, boost::optional<double>> computeErrors(
-    size_t actualCard, double estimatedCard) {
+std::pair<boost::optional<double>, boost::optional<double>> computeErrors(size_t actualCard,
+                                                                          double estimatedCard) {
     double error = estimatedCard - actualCard;
     boost::optional<double> relError = (actualCard == 0)
         ? (estimatedCard == 0 ? boost::optional<double>(0.0) : boost::none)
@@ -213,7 +215,7 @@ void printResult(const DataDistributionEnum dataDistribution,
     LOGV2(8871202, "Accuracy experiment", ""_attr = ss.str());
 }
 
-
+namespace {
 void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                                                    const std::pair<size_t, size_t>& interval,
                                                    const TypeCombination& typeCombination,
@@ -271,6 +273,7 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
         }
     }
 }
+}  // namespace
 
 void generateDataUniform(size_t size,
                          const std::pair<size_t, size_t>& interval,

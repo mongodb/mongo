@@ -182,6 +182,7 @@ TEST_F(SbeValueTest, CompareTwoArraySets) {
     arraySetInequalityComparisonTestGenFn(addMultipleDecimalFn, addObjectFn);
 }
 
+namespace {
 void insertIntoMapType(value::ValueMapType<size_t>* map,
                        value::TypeTags keyTag,
                        value::Value keyVal,
@@ -199,6 +200,7 @@ void releaseMapType(const value::ValueMapType<size_t>& map) {
         value::releaseValue(subTag, subVal);
     }
 }
+}  // namespace
 
 TEST_F(SbeValueTest, CompareTwoValueMapTypes) {
     using MapType = value::ValueMapType<size_t>;

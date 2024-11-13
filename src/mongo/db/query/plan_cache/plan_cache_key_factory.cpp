@@ -52,7 +52,7 @@
 
 namespace mongo {
 namespace plan_cache_detail {
-
+namespace {
 void encodeIndexabilityForDiscriminators(const MatchExpression* tree,
                                          const IndexToDiscriminatorMap& discriminators,
                                          StringBuilder* keyBuilder) {
@@ -112,6 +112,7 @@ void encodeIndexabilityRecursive(const MatchExpression* tree,
         encodeIndexabilityRecursive(tree->getChild(i), indexabilityState, keyBuilder, path);
     }
 }
+}  // namespace
 
 void encodeIndexability(const MatchExpression* tree,
                         const PlanCacheIndexabilityState& indexabilityState,
@@ -131,6 +132,7 @@ void encodeIndexability(const MatchExpression* tree,
     encodeIndexabilityRecursive(tree, indexabilityState, keyBuilder);
 }
 
+namespace {
 PlanCacheKeyInfo makePlanCacheKeyInfo(CanonicalQuery::QueryShapeString&& shapeString,
                                       const MatchExpression* root,
                                       const CollectionPtr& collection,
@@ -145,7 +147,6 @@ PlanCacheKeyInfo makePlanCacheKeyInfo(CanonicalQuery::QueryShapeString&& shapeSt
     return PlanCacheKeyInfo(std::move(shapeString), indexabilityKeyBuilder.str(), querySettings);
 }
 
-namespace {
 // TODO: SERVER-77571 use acquisitions APIs for retrieving the shardVersion.
 sbe::PlanCacheKeyCollectionState computeCollectionState(OperationContext* opCtx,
                                                         const CollectionPtr& collection,
@@ -190,6 +191,7 @@ sbe::PlanCacheKey make(const CanonicalQuery& query,
 
 namespace plan_cache_key_factory {
 
+namespace {
 std::tuple<sbe::PlanCacheKeyCollectionState, std::vector<sbe::PlanCacheKeyCollectionState>>
 getCollectionState(OperationContext* opCtx, const MultipleCollectionAccessor& collections) {
     auto mainCollectionState = plan_cache_detail::computeCollectionState(
@@ -207,6 +209,7 @@ getCollectionState(OperationContext* opCtx, const MultipleCollectionAccessor& co
     secondaryCollectionStates.shrink_to_fit();
     return {mainCollectionState, secondaryCollectionStates};
 }
+}  // namespace
 
 sbe::PlanCacheKey make(const CanonicalQuery& query,
                        const MultipleCollectionAccessor& collections,

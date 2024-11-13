@@ -105,7 +105,7 @@ namespace mongo {
 
 /**
  * Register 'visit()' functions for all mongod DocumentSources for the visitor specified as the
- * template parameter in the DocumentSource visitor regsitry in the given ServiceContext. Using this
+ * template parameter in the DocumentSource visitor registry in the given ServiceContext. Using this
  * function helps provide compile-time safety that ensures visitor implementors have provided an
  * implementation for all DocumentSoures. This function is intended to be used in the following
  * manner:

@@ -91,8 +91,6 @@ Pipeline::SourceContainer::iterator eraseAndStich(Pipeline::SourceContainer::ite
     return itr;
 }
 
-}  // namespace
-
 /**
  * If there are any $limit stages that could be logically swapped forward to the position of the
  * pipeline pointed to by 'itr' without changing the meaning of the query, removes these $limit
@@ -142,6 +140,8 @@ boost::optional<long long> extractLimitForPushdownHelper(Pipeline::SourceContain
 
     return minLimit;
 }
+
+}  // namespace
 
 boost::optional<long long> extractLimitForPushdown(Pipeline::SourceContainer::iterator itr,
                                                    Pipeline::SourceContainer* container) {

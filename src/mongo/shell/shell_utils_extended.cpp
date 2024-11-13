@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/shell/shell_utils_extended.h"
+
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/exception.hpp>
 #include <boost/filesystem/file_status.hpp>

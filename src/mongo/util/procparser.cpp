@@ -215,6 +215,7 @@ namespace procparser {
 
 using StringSplitIterator = boost::split_iterator<StringData::const_iterator>;
 
+namespace {
 /**
  * This function is a generic function that passes in logic to parse a proc file. It looks for
  * keys within the data param and captures the corresponding values. If no keys were found
@@ -256,6 +257,7 @@ Status parseGenericStats(const std::vector<StringData>& keys,
     return foundKeys ? Status::OK()
                      : Status(ErrorCodes::NoSuchKey, "Failed to find any keys in string");
 }
+}  // namespace
 
 
 // Here is an example of the type of string it supports.
@@ -743,12 +745,14 @@ Status parseProcSelfMountStatsImpl(
     return Status::OK();
 }
 
+namespace {
 Status parseProcSelfMountStats(StringData data, BSONObjBuilder* builder) {
     auto bfsSpace = [](auto&&... args) {
         return boost::filesystem::space(args...);
     };
     return parseProcSelfMountStatsImpl(data, builder, bfsSpace);
 }
+}  // namespace
 
 Status parseProcSelfMountStatsFile(StringData filename, BSONObjBuilder* builder) {
     auto swString = readFileAsString(filename);

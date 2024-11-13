@@ -1725,8 +1725,6 @@ StatusWith<std::vector<std::string>> transformImplicitOptions(
     return {args};
 }
 
-}  // namespace
-
 StatusWith<ConfigExpand> parseConfigExpand(const Environment& cli) {
     ConfigExpand ret;
 
@@ -1777,6 +1775,8 @@ StatusWith<ConfigExpand> parseConfigExpand(const Environment& cli) {
     }
     return ret;
 }
+
+}  // namespace
 
 /**
  * Run the OptionsParser

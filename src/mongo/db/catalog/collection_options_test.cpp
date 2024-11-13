@@ -54,10 +54,12 @@ namespace mongo {
 using namespace fmt::literals;
 using unittest::assertGet;
 
+namespace {
 void checkRoundTrip(const CollectionOptions& options) {
     CollectionOptions parsedOptions = assertGet(CollectionOptions::parse(options.toBSON()));
     ASSERT_BSONOBJ_EQ(options.toBSON(), parsedOptions.toBSON());
 }
+}  // namespace
 
 TEST(CollectionOptions, SimpleRoundTrip) {
     CollectionOptions options;

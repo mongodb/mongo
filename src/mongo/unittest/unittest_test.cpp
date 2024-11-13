@@ -70,10 +70,6 @@
 namespace {
 namespace mus = mongo::unittest::stringify;
 
-bool containsPattern(const std::string& pattern, const std::string& value) {
-    return value.find(pattern) != std::string::npos;
-}
-
 #define ASSERT_TEST_FAILS(TEST_STMT) \
     ASSERT_THROWS(                   \
         [&] {                        \

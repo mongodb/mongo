@@ -77,6 +77,7 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamUnwindTransaction,
                                   true);
 
 namespace change_stream_filter {
+namespace {
 /**
  * Build a filter, similar to the optimized oplog filter, designed to reject individual transaction
  * entries that we know would eventually get rejected by the 'userMatch' filter if they continued
@@ -130,6 +131,7 @@ std::unique_ptr<MatchExpression> buildEndOfTransactionFilter(
     return std::make_unique<RegexMatchExpression>(
         "o2.endOfTransaction"_sd, nsRegex, "" /*options*/);
 }
+}  // namespace
 }  // namespace change_stream_filter
 
 boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction>

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
@@ -39,7 +38,6 @@
 #include <memory>
 #include <set>
 #include <utility>
-#include <variant>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/builder.h"
@@ -733,6 +731,7 @@ std::string PlanExplainerImpl::getPlanSummary() const {
     return sb.str();
 }
 
+namespace {
 /**
  * Returns a pointer to a MultiPlanStage under 'root', or null if this plan has no such stage.
  */
@@ -774,6 +773,7 @@ boost::optional<double> getWinningPlanScore(PlanStage* root) {
     }
     return {};
 }
+}  // namespace
 
 void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
     invariant(statsOut);

@@ -178,10 +178,6 @@ std::ostream& operator<<(std::ostream& s, const UserDefinedKey& k) {
     return s << k.toString();
 }
 
-std::ostream& operator<<(std::ostream& s, const Incomparable& k) {
-    return s << k.toString();
-}
-
 template <typename T, typename U>
 std::ostream& operator<<(std::ostream& s, const std::pair<T, U> pair) {
     return s << "(" << pair.first << "," << pair.second << ")";

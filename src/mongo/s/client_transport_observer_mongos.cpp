@@ -46,6 +46,7 @@
 
 namespace mongo {
 
+namespace {
 void killOpenCursors(OperationContext& opCtx) {
     Client* client = opCtx.getClient();
     auto ccm = Grid::get(client->getServiceContext())->getCursorManager();
@@ -84,6 +85,7 @@ void killInProgressTransactions(OperationContext& opCtx) {
              "aborting in-progress transaction because client disconnected"});
     }
 }
+}  // namespace
 
 void ClientTransportObserverMongos::onClientDisconnect(Client* client) try {
     auto session = client->session();

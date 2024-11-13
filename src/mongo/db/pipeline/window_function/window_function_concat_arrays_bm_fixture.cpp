@@ -32,12 +32,12 @@
 #include "mongo/db/pipeline/window_function/window_function_concat_arrays.h"
 
 namespace mongo {
-
+namespace {
 std::vector<std::vector<Value>> generateData(size_t n_arrays, size_t n_values_per_array) {
-
     return std::vector<std::vector<Value>>(
         n_arrays, std::vector<Value>(n_values_per_array, Value(123'456'789)));
 }
+}  // namespace
 
 // This benchmark is mimicking the behavior of computing $concatArrays for a [unbounded, unbounded]
 // window. In this window, all of the inputs will be added, and nothing will be removed.

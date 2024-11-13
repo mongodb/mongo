@@ -282,6 +282,7 @@ bool QuorumChecker::hasReceivedSufficientResponses() const {
     return false;
 }
 
+namespace {
 Status checkQuorumGeneral(executor::TaskExecutor* executor,
                           const ReplSetConfig& rsConfig,
                           const int myIndex,
@@ -296,6 +297,7 @@ Status checkQuorumGeneral(executor::TaskExecutor* executor,
 
     return checker->getFinalStatus();
 }
+}  // namespace
 
 Status checkQuorumForInitiate(executor::TaskExecutor* executor,
                               const ReplSetConfig& rsConfig,

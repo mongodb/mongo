@@ -79,8 +79,6 @@ BSONObj generateSkewedBsonObj(size_t numberOfLeaves) {
     return result;
 }
 
-}  // namespace
-
 /**
  * Benchmarks document's serialization to BSON. The chosen method 'toBson(BSONObjBuilder*, size_t)'
  * by-passes trivial serialization (when document's storage is already in BSON format) and is called
@@ -110,5 +108,5 @@ void BM_FieldNameHasher(benchmark::State& state) {
 
 BENCHMARK(BM_FieldNameHasher)->RangeMultiplier(2)->Range(1, 1 << 8);
 
-
+}  // namespace
 }  // namespace mongo

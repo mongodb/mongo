@@ -296,7 +296,6 @@ std::string compactStr(const std::string& input) {
     }
     return input;
 }
-}  // namespace
 void validateExtraFields(const DatabaseName& dbName,
                          const BSONObj& body,
                          const BSONObj& extraFields) {
@@ -318,6 +317,7 @@ void validateExtraFields(const DatabaseName& dbName,
             "extraFields"_attr = compactStr(extraFields.toString()));
     };
 }
+}  // namespace
 
 OpMsgRequest OpMsgRequestBuilder::create(
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,

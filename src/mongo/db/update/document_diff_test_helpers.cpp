@@ -51,6 +51,7 @@ BSONObj createObjWithLargePrefix(const std::string& suffix) {
     return largeObj.addFields(fromjson(suffix));
 }
 
+namespace {
 std::string getFieldName(int level, int fieldNum) {
     return str::stream() << "f" << level << fieldNum;
 }
@@ -81,6 +82,7 @@ Value getScalarFieldValue(PseudoRandom* rng) {
             MONGO_UNREACHABLE;
     }
 }
+}  // namespace
 
 BSONObj generateDoc(PseudoRandom* rng, MutableDocument* doc, int depthLevel) {
     // Append a large field at each level so that the likelihood of generating a sub-diff is high.

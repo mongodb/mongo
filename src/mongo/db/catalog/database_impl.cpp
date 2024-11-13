@@ -122,7 +122,7 @@ MONGO_FAIL_POINT_DEFINE(overrideRecordIdsReplicatedDefault);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 MONGO_FAIL_POINT_DEFINE(openCreateCollectionWindowFp);
 
-
+#ifdef _WIN32
 Status validateDBNameForWindows(StringData dbname) {
     const std::vector<std::string> windowsReservedNames = {
         "con",  "prn",  "aux",  "nul",  "com1", "com2", "com3", "com4", "com5", "com6", "com7",
@@ -137,6 +137,7 @@ Status validateDBNameForWindows(StringData dbname) {
                       str::stream() << "db name \"" << dbname << "\" is a reserved name");
     return Status::OK();
 }
+#endif
 
 void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
     const auto scopedDss =

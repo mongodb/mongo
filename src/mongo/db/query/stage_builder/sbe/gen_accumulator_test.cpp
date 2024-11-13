@@ -94,6 +94,7 @@
 
 namespace mongo {
 
+namespace {
 class SbeStageBuilderGroupTest : public SbeStageBuilderTestFixture {
 protected:
     boost::intrusive_ptr<DocumentSource> createDocumentSourceGroup(
@@ -334,6 +335,7 @@ double computeStdDev(const std::vector<double>& vec, bool isSamp) {
     }
     return sqrt(accum / vec.size());
 }
+}  // namespace
 
 TEST_F(SbeStageBuilderGroupTest, TestIdEmptyObject) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
@@ -1281,6 +1283,7 @@ TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationWithCollation) {
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual));
 }
 
+namespace {
 /**
  * This helper allows the manual registration of the $setUnion and $concatArrays accumulators to add
  * them to the parserMap without guarding them behind a feature flag (note the boost::none argument
@@ -1339,6 +1342,7 @@ public:
         registerArrayAccumulators();
     }
 };
+}  // namespace
 
 TEST_F(ArrayAccumSbeStageBuilderGroupTest, SetUnionAccumulatorTranslationSingleDoc) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: [1, 2, 3], b: 1}"))};

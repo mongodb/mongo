@@ -141,7 +141,6 @@ private:
 
 namespace {
 CountDownLatchHolder globalCountDownLatchHolder;
-}  // namespace
 
 /**
  * The argument for _new is a count value. We restrict it to be a 32 bit integer.
@@ -170,6 +169,7 @@ auto uassertGet(JS::CallArgs args, unsigned int i) {
 
     return int32Arg.toInt32();
 }
+}  // namespace
 
 void CountDownLatchInfo::Functions::_new::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setInt32(globalCountDownLatchHolder.make(uassertGet(args, 0)));

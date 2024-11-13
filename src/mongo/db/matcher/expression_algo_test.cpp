@@ -65,17 +65,6 @@ namespace mongo {
 using std::unique_ptr;
 using namespace std::string_literals;
 
-
-void assertMatchesEqual(const ParsedMatchExpressionForTest& expected,
-                        const std::unique_ptr<MatchExpression>& actual) {
-    if (expected.get() == nullptr) {
-        ASSERT(actual == nullptr);
-        return;
-    }
-    ASSERT(actual != nullptr);
-    ASSERT_EQ(expected.get()->toString(), actual.get()->toString());
-}
-
 TEST(ExpressionAlgoIsSubsetOf, NullAndOmittedField) {
     // Verify that the ComparisonMatchExpression constructor prohibits creating a match expression
     // with an Undefined type.
@@ -2205,6 +2194,7 @@ struct RemoveImprecisePredicateTestCase {
     std::variant<AssertTriviallyTrue, AssertTriviallyFalse, AssertPredicateRewritten> expected;
 };
 
+namespace {
 void testRemoveImprecisePredicates(const RemoveImprecisePredicateTestCase& testCase) {
     ParsedMatchExpressionForTest predicate(testCase.initialPredicateStr);
     auto newExpr = expression::assumeImpreciseInternalExprNodesReturnTrue(predicate.release());
@@ -2226,6 +2216,7 @@ void testRemoveImprecisePredicates(const RemoveImprecisePredicateTestCase& testC
           },
           testCase.expected);
 }
+}  // namespace
 
 TEST(RemoveImprecisePredicates, ImprecisePredicateInTopLevelOrBecomesAlwaysTrue) {
     RemoveImprecisePredicateTestCase t{

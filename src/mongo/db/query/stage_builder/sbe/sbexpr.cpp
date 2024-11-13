@@ -36,6 +36,7 @@
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
+#include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/type_checker.h"
 #include "mongo/db/query/stage_builder/sbe/value_lifetime.h"
 
@@ -118,9 +119,11 @@ optimizer::ABT makeABTVariable(sbe::value::SlotId slotId) {
     return makeABTVariable(SbSlot{slotId});
 }
 
+namespace {
 optimizer::ABT makeABTLocalVariable(FrameId frameId, SlotId slotId) {
     return optimizer::make<optimizer::Variable>(getABTLocalVariableName(frameId, slotId));
 }
+}  // namespace
 
 optimizer::ABT makeVariable(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::Variable>(std::move(var));

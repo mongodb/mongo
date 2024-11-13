@@ -184,7 +184,6 @@ public:
     static void setNow(Date_t now);
 
 private:
-    ConnectionPool* _pool = nullptr;
     std::shared_ptr<OutOfLineExecutor> _executor;
 
     static boost::optional<Date_t> _now;

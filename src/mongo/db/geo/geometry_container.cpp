@@ -432,6 +432,7 @@ bool GeometryContainer::contains(const GeometryContainer& otherContainer) const 
     return false;
 }
 
+namespace {
 bool containsPoint(const S2Polygon& poly, const S2Cell& otherCell, const S2Point& otherPoint) {
     // This is much faster for actual containment checking.
     if (poly.Contains(otherPoint)) {
@@ -440,6 +441,7 @@ bool containsPoint(const S2Polygon& poly, const S2Cell& otherCell, const S2Point
     // This is slower but contains edges/vertices.
     return poly.MayIntersect(otherCell);
 }
+}  // namespace
 
 bool GeometryContainer::contains(const S2Cell& otherCell, const S2Point& otherPoint) const {
     if (nullptr != _polygon && (nullptr != _polygon->s2Polygon)) {
@@ -483,6 +485,7 @@ bool GeometryContainer::contains(const S2Cell& otherCell, const S2Point& otherPo
     return false;
 }
 
+namespace {
 bool containsLine(const S2Polygon& poly, const S2Polyline& otherLine) {
     // Kind of a mess.  We get a function for clipping the line to the
     // polygon.  We do this and make sure the line is the same as the
@@ -502,6 +505,7 @@ bool containsLine(const S2Polygon& poly, const S2Polyline& otherLine) {
 
     return ret;
 }
+}  // namespace
 
 bool GeometryContainer::contains(const S2Polyline& otherLine) const {
     if (nullptr != _polygon && nullptr != _polygon->s2Polygon) {
@@ -550,9 +554,11 @@ bool GeometryContainer::contains(const S2Polyline& otherLine) const {
     return false;
 }
 
+namespace {
 bool containsPolygon(const S2Polygon& poly, const S2Polygon& otherPoly) {
     return poly.Contains(&otherPoly);
 }
+}  // namespace
 
 bool GeometryContainer::contains(const S2Polygon& otherPolygon) const {
     if (nullptr != _polygon && nullptr != _polygon->s2Polygon) {
@@ -769,6 +775,7 @@ bool GeometryContainer::intersects(const S2Cell& otherPoint) const {
     return false;
 }
 
+namespace {
 bool polygonLineIntersection(const S2Polyline& line, const S2Polygon& poly) {
     // TODO(hk): modify s2 library to just let us know if it intersected
     // rather than returning all this.
@@ -779,6 +786,7 @@ bool polygonLineIntersection(const S2Polyline& line, const S2Polygon& poly) {
         delete clipped[i];
     return ret;
 }
+}  // namespace
 
 bool GeometryContainer::intersects(const S2Polyline& otherLine) const {
     if (nullptr != _point) {

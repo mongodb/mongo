@@ -60,7 +60,6 @@ public:
         boost::optional<std::string> keyPath = boost::none) {
         // 'defaultValue' is an internal functionality of $first needed for $shift desugaring.
         using optExp = boost::optional<boost::intrusive_ptr<Expression>>;
-        using optVal = boost::optional<Value>;
         _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
         auto expCtx = getExpCtx().get();
         auto vps = expCtx->variablesParseState;

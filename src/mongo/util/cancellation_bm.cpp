@@ -38,7 +38,7 @@
 #include "mongo/util/future.h"
 
 namespace mongo {
-
+namespace {
 
 void BM_CreateSingleTokenFromSource(benchmark::State& state) {
     CancellationSource source;
@@ -111,6 +111,7 @@ void BM_RangedDepthCancellationHierarchy(benchmark::State& state) {
         root.cancel();
     }
 }
+}  // namespace
 
 BENCHMARK(BM_CreateSingleTokenFromSource);
 BENCHMARK(BM_UncancelableTokenCtor);

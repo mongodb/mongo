@@ -106,12 +106,8 @@ private:
     std::shared_ptr<MetadataManager::CollectionMetadataTracker> _metadataTracker;
 };
 
-MetadataManager::MetadataManager(ServiceContext* serviceContext,
-                                 NamespaceString nss,
-                                 CollectionMetadata initialMetadata)
-    : _serviceContext(serviceContext),
-      _nss(std::move(nss)),
-      _collectionUuid(initialMetadata.getChunkManager()->getUUID()) {
+MetadataManager::MetadataManager(NamespaceString nss, CollectionMetadata initialMetadata)
+    : _nss(std::move(nss)), _collectionUuid(initialMetadata.getChunkManager()->getUUID()) {
     _metadata.emplace_back(std::make_shared<CollectionMetadataTracker>(std::move(initialMetadata)));
 }
 

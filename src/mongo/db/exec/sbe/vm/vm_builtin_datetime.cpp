@@ -49,7 +49,6 @@ namespace {
 const size_t kTimezoneDBStackPosDefault = 0u;
 const size_t kTimezoneDBStackPosBlock = 2u;
 const size_t kStackPosOffsetBlock = 1u;
-}  // namespace
 
 /**
  * A helper for the builtinDate method. The formal parameters yearOrWeekYear and monthOrWeek carry
@@ -104,6 +103,7 @@ FastTuple<bool, value::TypeTags, value::Value> builtinDateHelper(
                       value::numericCast<int64_t>(typeTagMillis, valueMillis));
     return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(date.asInt64())};
 }
+}  // namespace
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDate(ArityType arity) {
     auto timeZoneDBTuple = getFromStack(0);

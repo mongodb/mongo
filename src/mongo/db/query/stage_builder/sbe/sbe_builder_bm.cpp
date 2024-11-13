@@ -35,7 +35,7 @@
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 
 namespace mongo {
-
+namespace {
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.collection");
 const double kIndexUpperBound = 0.0101;
 
@@ -161,6 +161,7 @@ void BM_Simple(benchmark::State& state) {
             opCtx, collections, *cq, *solution, yieldPolicy.get());
     }
 }
+}  // namespace
 
 BENCHMARK(BM_Simple)->Arg(4)->Arg(16)->Arg(64);
 

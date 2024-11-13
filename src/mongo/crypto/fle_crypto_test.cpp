@@ -86,6 +86,7 @@
 
 namespace mongo {
 
+namespace {
 template <FLETokenType tt>
 bool operator==(const FLEToken<tt>& left, const FLEToken<tt>& right) {
     return std::make_tuple(left.type, left.data) == std::make_tuple(right.type, right.data);
@@ -93,16 +94,7 @@ bool operator==(const FLEToken<tt>& left, const FLEToken<tt>& right) {
 
 template <typename T>
 std::string hexdump(const std::vector<T>& buf) {
-    return hexdump(buf.data(), buf.size());
-}
-
-std::string hexdump(const PrfBlock& buf) {
-    return hexdump(buf.data(), buf.size());
-}
-
-std::vector<char> decode(StringData sd) {
-    auto s = hexblob::decode(sd);
-    return std::vector<char>(s.data(), s.data() + s.length());
+    return mongo::hexdump(buf.data(), buf.size());
 }
 
 PrfBlock blockToArray(StringData block) {
@@ -117,15 +109,6 @@ PrfBlock blockToArray(StringData block) {
 PrfBlock decodePrf(StringData sd) {
     auto s = hexblob::decode(sd);
     return blockToArray(s);
-}
-
-std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const std::vector<char>& right) {
-    return os << hexdump(right);
-}
-
-std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os,
-                                     const std::vector<uint8_t>& right) {
-    return os << hexdump(right);
 }
 
 template <FLETokenType tt>
@@ -242,6 +225,7 @@ BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
 
     return makeKeyStoreRecord(uuid, ciphertext).toBSON();
 }
+}  // namespace
 
 TEST(FLETokens, TestVectors) {
     std::vector<uint8_t> sampleValue = {0xc0, 0x7c, 0x0d, 0xf5, 0x12, 0x57, 0x94, 0x8e,
@@ -1124,6 +1108,7 @@ TEST(FLE_ESC, EmuBinary_NullRecord) {
 
 enum class Operation { kFind, kInsert };
 
+namespace {
 std::vector<char> generatePlaceholder(
     BSONElement value,
     Operation operation,
@@ -1311,11 +1296,6 @@ void roundTripTest(BSONObj doc, BSONType type, Operation opType, Fle2AlgorithmIn
     }
 }
 
-void roundTripTest(BSONObj doc, BSONType type, Operation opType) {
-    roundTripTest(doc, type, opType, Fle2AlgorithmInt::kEquality);
-    roundTripTest(doc, type, opType, Fle2AlgorithmInt::kUnindexed);
-}
-
 void roundTripMultiencrypted(BSONObj doc1,
                              BSONObj doc2,
                              Operation operation1,
@@ -1348,6 +1328,7 @@ void roundTripMultiencrypted(BSONObj doc1,
     assertPayload(finalDoc["encrypted1"], operation1);
     assertPayload(finalDoc["encrypted2"], operation2);
 }
+}  // namespace
 
 // Used to generate the test data for the ExpressionFLETest in expression_test.cpp
 TEST(FLE_EDC, PrintTest) {
@@ -1462,6 +1443,7 @@ TEST(FLE_EDC, Range_Allowed_Types) {
     };
 }
 
+namespace {
 void illegalBSONType(BSONObj doc, BSONType type, Fle2AlgorithmInt algorithm, int expectCode) {
     auto element = doc.firstElement();
     ASSERT_EQ(element.type(), type);
@@ -1482,6 +1464,7 @@ void illegalBSONType(BSONObj doc, BSONType type, Fle2AlgorithmInt algorithm) {
     const int expectCode = algorithm == Fle2AlgorithmInt::kEquality ? 6338602 : 6379102;
     illegalBSONType(doc, type, algorithm, expectCode);
 }
+}  // namespace
 
 TEST(FLE_EDC, Disallowed_Types) {
     illegalBSONType(BSON("sample" << 123.456), NumberDouble, Fle2AlgorithmInt::kEquality);
@@ -1508,9 +1491,11 @@ TEST(FLE_EDC, Disallowed_Types) {
     illegalBSONType(BSON("sample" << MAXKEY), MaxKey, Fle2AlgorithmInt::kUnindexed);
 }
 
+namespace {
 void illegalRangeBSONType(BSONObj doc, BSONType type) {
     illegalBSONType(doc, type, Fle2AlgorithmInt::kRange, ErrorCodes::TypeMismatch);
 }
+}  // namespace
 
 TEST(FLE_EDC, Range_Disallowed_Types) {
 
@@ -1555,6 +1540,7 @@ TEST(FLE_EDC, Range_Disallowed_Types) {
                     ErrorCodes::IDLFailedToParse);
 }
 
+namespace {
 BSONObj transformBSON(
     const BSONObj& object,
     const std::function<void(ConstDataRange, BSONObjBuilder*, StringData)>& doTransform) {
@@ -1669,6 +1655,7 @@ void disallowedEqualityPayloadType(BSONType type) {
     // Start Server Side
     ASSERT_THROWS_CODE(EDCServerCollection::getEncryptedFieldInfo(result), DBException, 6373504);
 }
+}  // namespace
 
 TEST(FLE_EDC, Disallowed_Types_FLE2InsertUpdatePayload) {
     disallowedEqualityPayloadType(NumberDouble);
@@ -2158,6 +2145,7 @@ TEST(FLE_EDC, DuplicateSafeContent_IncompatibleType) {
     ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault), DBException, 6373510);
 }
 
+namespace {
 std::vector<char> generateRangeIntPlaceholder(BSONElement value,
                                               Operation operation,
                                               double indexMin,
@@ -2232,6 +2220,7 @@ std::vector<char> generateRangeIntPlaceholder(BSONElement value,
     std::copy(obj.objdata(), obj.objdata() + obj.objsize(), v.begin() + 1);
     return v;
 }
+}  // namespace
 
 TEST(FLE_EDC, RangeParamtersFlow_Insert) {
 
@@ -2315,6 +2304,7 @@ TEST(FLE_ECOC, EncryptedTokensRoundTrip) {
     }
 }
 
+namespace {
 template <typename T, typename Func>
 bool vectorContains(const std::vector<T>& vec, Func func) {
     return std::find_if(vec.begin(), vec.end(), func) != vec.end();
@@ -2359,6 +2349,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig() {
 
     return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
 }
+}  // namespace
 
 TEST(EncryptionInformation, RoundTrip) {
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
@@ -2662,6 +2653,7 @@ TEST(FLE1, EncryptAlreadyEncryptedDataLegacy) {
         6409402);
 }
 
+namespace {
 BSONObj encryptUpdateDocument(BSONObj obj, FLEKeyVault* keyVault) {
     auto result = FLEClientCrypto::transformPlaceholders(obj, keyVault);
 
@@ -2680,6 +2672,7 @@ BSONObj encryptUpdateDocument(BSONObj obj, FLEKeyVault* keyVault) {
 
     return EDCServerCollection::finalizeForUpdate(result, serverPayload);
 }
+}  // namespace
 
 // Test update with no $push
 TEST(FLE_Update, Basic) {
@@ -2985,16 +2978,6 @@ TEST(CompactionHelpersTest, validateCompactionTokensTest) {
     CompactionHelpers::validateCompactionTokens(efc, builder.obj());
 }
 
-std::vector<ECCDocument> pairsToECCDocuments(
-    const std::vector<std::pair<uint64_t, uint64_t>>& pairs) {
-    std::vector<ECCDocument> output;
-    std::transform(pairs.begin(), pairs.end(), std::back_inserter(output), [](auto& pair) {
-        return ECCDocument{ECCValueType::kNormal, pair.first, pair.second};
-    });
-    return output;
-}
-
-
 TEST(EDCServerCollectionTest, GenerateEDCTokens) {
 
     auto doc = BSON("sample" << 123456);
@@ -3059,11 +3042,12 @@ TEST(RangeTest, Int32_NoBounds) {
 #undef ASSERT_EI
 }
 
-bool operator==(const OSTType_Int32& lhs, const OSTType_Int32& rhs) {
+static bool operator==(const OSTType_Int32& lhs, const OSTType_Int32& rhs) {
     return std::tie(lhs.value, lhs.min, lhs.max) == std::tie(rhs.value, rhs.min, rhs.max);
 }
 
-std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const OSTType_Int32& lhs) {
+static std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os,
+                                            const OSTType_Int32& lhs) {
     return os << "(" << lhs.value << ", " << lhs.min << ", " << lhs.max << ")";
 }
 
@@ -3124,11 +3108,12 @@ TEST(RangeTest, Int64_NoBounds) {
 #undef ASSERT_EI
 }
 
-bool operator==(const OSTType_Int64& lhs, const OSTType_Int64& rhs) {
+static bool operator==(const OSTType_Int64& lhs, const OSTType_Int64& rhs) {
     return std::tie(lhs.value, lhs.min, lhs.max) == std::tie(rhs.value, rhs.min, rhs.max);
 }
 
-std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const OSTType_Int64& lhs) {
+static std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os,
+                                            const OSTType_Int64& lhs) {
     return os << "(" << lhs.value << ", " << lhs.min << ", " << lhs.max << ")";
 }
 
@@ -3342,6 +3327,7 @@ TEST(EdgeCalcTest, TrimFactorConstraints) {
     ASSERT_THROWS_CODE(getEdgesDouble(1.0, 0.0, 5.0, 1, 1, 6), AssertionException, 8574105);
 }
 
+namespace {
 void doEdgeCalcTestIdentifyLeaf(std::unique_ptr<Edges> edges, StringData expectLeaf) {
     ASSERT_EQ(edges->getLeaf(), expectLeaf);
     auto edgeSet = edges->get();
@@ -3352,6 +3338,7 @@ void doEdgeCalcTestIdentifyLeaf(std::unique_ptr<Edges> edges, StringData expectL
                             [expectLeaf](const auto& leaf) { return leaf == expectLeaf; }),
               1);
 }
+}  // namespace
 
 TEST(EdgeCalcTest, IdentifyLeaf) {
     constexpr auto k42Leaf64 =
@@ -3655,6 +3642,7 @@ TEST(RangeTest, Decimal128_Bounds_Precision_Errors) {
                        9125501);
 }
 
+namespace {
 void roundTripDecimal128_Int128(std::string dec_str) {
     Decimal128 dec(dec_str);
 
@@ -3663,6 +3651,7 @@ void roundTripDecimal128_Int128(std::string dec_str) {
     Decimal128 roundTrip(ret.str());
     ASSERT(roundTrip == dec);
 }
+}  // namespace
 
 TEST(RangeTest, Decimal128_to_Int128) {
     roundTripDecimal128_Int128("0");

@@ -726,12 +726,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggLast(value::TypeTags
     return {true, tag, val};
 }
 
-
-bool hasSeparatorAt(size_t idx, StringData input, StringData separator) {
-    return (idx + separator.size() <= input.size()) &&
-        input.substr(idx, separator.size()) == separator;
-}
-
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::addToSetCappedImpl(
     value::TypeTags tagNewElem,
     value::Value valNewElem,

@@ -121,7 +121,8 @@ Status GeoParser::parseLegacyPoint(const BSONElement& elem,
     return parseFlatPoint(elem, &out->oldPoint, allowAddlFields);
 }
 
-static Status coordToPoint(double lng, double lat, S2Point* out) {
+namespace {
+Status coordToPoint(double lng, double lat, S2Point* out) {
     // We don't rely on drem to clean up non-sane points.  We just don't let them become
     // spherical.
     if (!isValidLngLat(lng, lat))
@@ -138,7 +139,7 @@ static Status coordToPoint(double lng, double lat, S2Point* out) {
     return Status::OK();
 }
 
-static Status parseGeoJSONCoordinate(const BSONElement& elem, S2Point* out) {
+Status parseGeoJSONCoordinate(const BSONElement& elem, S2Point* out) {
     if (Array != elem.type()) {
         return BAD_VALUE("GeoJSON coordinates must be an array, instead got type "
                          << typeName(elem.type()));
@@ -154,7 +155,7 @@ static Status parseGeoJSONCoordinate(const BSONElement& elem, S2Point* out) {
 }
 
 // "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
-static Status parseArrayOfCoordinates(const BSONElement& elem, vector<S2Point>* out) {
+Status parseArrayOfCoordinates(const BSONElement& elem, vector<S2Point>* out) {
     if (Array != elem.type()) {
         return BAD_VALUE("GeoJSON coordinates must be an array of coordinates, instead got type "
                          << typeName(elem.type()));
@@ -171,7 +172,7 @@ static Status parseArrayOfCoordinates(const BSONElement& elem, vector<S2Point>* 
     return Status::OK();
 }
 
-static void eraseDuplicatePoints(vector<S2Point>* vertices) {
+void eraseDuplicatePoints(vector<S2Point>* vertices) {
     // Duplicates can't exist in a vector of 0 or 1 elements, and we want to be careful about
     // possible underflow of size - 1 in the next block.
     if (vertices->size() < 2) {
@@ -190,7 +191,7 @@ static void eraseDuplicatePoints(vector<S2Point>* vertices) {
     }
 }
 
-static Status isLoopClosed(const vector<S2Point>& loop, const BSONElement loopElt) {
+Status isLoopClosed(const vector<S2Point>& loop, const BSONElement loopElt) {
     if (loop.empty()) {
         return BAD_VALUE("Loop has no vertices: " << loopElt.toString(false));
     }
@@ -203,9 +204,9 @@ static Status isLoopClosed(const vector<S2Point>& loop, const BSONElement loopEl
     return Status::OK();
 }
 
-static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
-                                             bool skipValidation,
-                                             S2Polygon* out) {
+Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
+                                      bool skipValidation,
+                                      S2Polygon* out) {
     if (Array != elem.type()) {
         return BAD_VALUE("Polygon coordinates must be an array, instead got type "
                          << typeName(elem.type()));
@@ -318,7 +319,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
     return Status::OK();
 }
 
-static Status parseBigSimplePolygonCoordinates(const BSONElement& elem, BigSimplePolygon* out) {
+Status parseBigSimplePolygonCoordinates(const BSONElement& elem, BigSimplePolygon* out) {
     if (Array != elem.type()) {
         return BAD_VALUE("Coordinates of polygon must be an array, instead got type "
                          << typeName(elem.type()));
@@ -374,7 +375,7 @@ static Status parseBigSimplePolygonCoordinates(const BSONElement& elem, BigSimpl
 //     "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
 //    }
 // }
-static Status parseGeoJSONCRS(const BSONObj& obj, CRS* crs, bool allowStrictSphere = false) {
+Status parseGeoJSONCRS(const BSONObj& obj, CRS* crs, bool allowStrictSphere = false) {
     *crs = SPHERE;
 
     BSONElement crsElt = obj[kCrsField];
@@ -422,9 +423,7 @@ static Status parseGeoJSONCRS(const BSONObj& obj, CRS* crs, bool allowStrictSphe
 // Parse "coordinates" field of GeoJSON LineString
 // e.g. "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
 // Or a line in "coordinates" field of GeoJSON MultiLineString
-static Status parseGeoJSONLineCoordinates(const BSONElement& elem,
-                                          bool skipValidation,
-                                          S2Polyline* out) {
+Status parseGeoJSONLineCoordinates(const BSONElement& elem, bool skipValidation, S2Polyline* out) {
     vector<S2Point> vertices;
     Status status = parseArrayOfCoordinates(elem, &vertices);
     if (!status.isOK())
@@ -462,6 +461,7 @@ Status parsePoint(const BSONElement& elem, PointWithCRS* out, bool allowAddlFiel
     // GeoJSON point. location: { type: "Point", coordinates: [1, 2] }
     return GeoParser::parseGeoJSONPoint(obj, out);
 }
+}  // namespace
 
 /** exported **/
 Status GeoParser::parseStoredPoint(const BSONElement& elem, PointWithCRS* out) {

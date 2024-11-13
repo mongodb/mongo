@@ -58,10 +58,6 @@ public:
 
 private:
     std::vector<ShardStatistics> _clusterStats;
-
-    bool _forceErrorOnGetStats{false};
-
-    bool _forceErrorOnGetCollStats{false};
 };
 
 }  // namespace mongo

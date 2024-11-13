@@ -312,6 +312,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     return response;
 }
 
+namespace {
 Milliseconds getExhaustiveFindOnConfigMaxTimeMS(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
@@ -324,6 +325,7 @@ Milliseconds getExhaustiveFindOnConfigMaxTimeMS(OperationContext* opCtx,
                         ? Milliseconds(gFindChunksOnConfigTimeoutMS.load())
                         : Milliseconds(defaultConfigCommandTimeoutMS.load()));
 }
+}  // namespace
 
 StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     OperationContext* opCtx,

@@ -31,6 +31,7 @@
 #include "mongo/db/query/boolean_simplification/petrick.h"
 
 namespace mongo::boolean_simplification {
+namespace {
 /**
  * The classic example from Petrick's method papers. No essential terms, the number of terms
  * is reduced by half.
@@ -87,4 +88,5 @@ void petrick_essentialWithSimplications(benchmark::State& state) {
 }
 
 BENCHMARK(petrick_essentialWithSimplications);
+}  // namespace
 }  // namespace mongo::boolean_simplification

@@ -1167,6 +1167,7 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
     return true;
 }
 
+namespace {
 // This function is used to check if the given index pattern and direction in the traversal
 // preference can be used to satisfy the given sort pattern (specifically for time series
 // collections).
@@ -1195,6 +1196,7 @@ bool sortMatchesTraversalPreference(const TraversalPreference& traversalPreferen
     }
     return true;
 }
+}  // namespace
 
 bool QueryPlannerAnalysis::analyzeNonBlockingSort(const QueryPlannerParams& params,
                                                   const BSONObj& sortObj,

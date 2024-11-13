@@ -212,6 +212,7 @@ list<intrusive_ptr<DocumentSource>> createFromBson(BSONElement elem,
     return createFromBsonInternal(elem, expCtx, kStageName, false);
 }
 
+namespace {
 SortPattern getSortPatternForDensify(RangeStatement rangeStatement,
                                      list<FieldPath> partitions,
                                      FieldPath field) {
@@ -238,6 +239,7 @@ SortPattern getSortPatternForDensify(RangeStatement rangeStatement,
     }
     return SortPattern{std::move(sortParts)};
 }
+}  // namespace
 
 list<intrusive_ptr<DocumentSource>> create(const intrusive_ptr<ExpressionContext>& expCtx,
                                            list<FieldPath> partitions,

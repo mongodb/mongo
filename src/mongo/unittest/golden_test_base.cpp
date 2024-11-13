@@ -69,6 +69,7 @@ namespace po = ::boost::program_options;
 
 using namespace fmt::literals;
 
+namespace {
 std::string readFile(const fs::path& path) {
     uassert(6741506,
             str::stream() << "path '" << path.string() << "' must not be a directory",
@@ -87,6 +88,7 @@ void writeFile(const fs::path& path, const std::string& contents) {
     fs::ofstream ofs(path);
     ofs << contents;
 }
+}  // namespace
 
 GoldenTestConfig GoldenTestConfig::parseFromBson(const BSONObj& obj) {
     boost::optional<std::string> relativePath;

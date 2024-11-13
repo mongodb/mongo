@@ -423,6 +423,7 @@ const SerializationOptions SerializationOptions::kDebugShapeAndMarkIdentifiers_F
                          .transformIdentifiers = true,
                          .transformIdentifiersCallback = applyHmacForTest};
 
+namespace {
 // Overloads for BSONElem and Value.
 StringData debugTypeString(BSONElement e) {
     return debugTypeString<BSONElement>(e, getBSONElementType, getSubTypeFromBSONElemArray);
@@ -438,6 +439,7 @@ ImplicitValue defaultLiteralOfType(const Value& v) {
 ImplicitValue defaultLiteralOfType(BSONElement e) {
     return defaultLiteralOfType<BSONElement>(e, getBSONElementType, getSubTypeFromBSONElemArray);
 }
+}  // namespace
 
 void SerializationOptions::appendLiteral(BSONObjBuilder* bob, const BSONElement& e) const {
     appendLiteral(bob, e.fieldNameStringData(), e);

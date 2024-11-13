@@ -336,6 +336,7 @@ BSONObj Variables::toBSON(const VariablesParseState& vps, const BSONObj& varsToS
     return result.obj();
 }
 
+namespace {
 mongo::Timestamp generateClusterTimestamp(OperationContext* opCtx) {
     // On a standalone, the clock may not be running and $$CLUSTER_TIME is unavailable. If the
     // logical clock is available, return it. Otherwise, return a null Timestamp.
@@ -349,6 +350,7 @@ mongo::Timestamp generateClusterTimestamp(OperationContext* opCtx) {
     }
     return Timestamp();
 }
+}  // namespace
 
 LegacyRuntimeConstants Variables::generateRuntimeConstants(OperationContext* opCtx) {
     return {Date_t::now(), generateClusterTimestamp(opCtx)};

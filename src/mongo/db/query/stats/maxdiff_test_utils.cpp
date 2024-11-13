@@ -53,8 +53,9 @@
 #include "mongo/unittest/temp_dir.h"
 
 namespace mongo::stats {
+namespace {
 
-static std::vector<BSONObj> convertToBSON(const std::vector<SBEValue>& input) {
+std::vector<BSONObj> convertToBSON(const std::vector<SBEValue>& input) {
     std::vector<BSONObj> result;
 
     for (size_t i = 0; i < input.size(); i++) {
@@ -137,6 +138,7 @@ std::vector<BSONObj> runPipeline(OperationContext* opCtx,
 
     return results;
 }
+}  // namespace
 
 size_t getActualCard(OperationContext* opCtx,
                      const std::vector<SBEValue>& input,

@@ -35,11 +35,11 @@
 
 namespace mongo::cost_based_ranker {
 
-const SelectivityEstimate kRegexSel{SelectivityType{0.1}, EstimationSource::Heuristics};
-const SelectivityEstimate kExistsSel{SelectivityType{0.99}, EstimationSource::Heuristics};
-const SelectivityEstimate kBitsSel{SelectivityType{0.1}, EstimationSource::Heuristics};
-const SelectivityEstimate oneSelHeuristic{SelectivityType{1}, EstimationSource::Heuristics};
-const SelectivityEstimate zeroSelHeuristic{SelectivityType{0}, EstimationSource::Heuristics};
+inline const SelectivityEstimate kRegexSel{SelectivityType{0.1}, EstimationSource::Heuristics};
+inline const SelectivityEstimate kExistsSel{SelectivityType{0.99}, EstimationSource::Heuristics};
+inline const SelectivityEstimate kBitsSel{SelectivityType{0.1}, EstimationSource::Heuristics};
+inline const SelectivityEstimate oneSelHeuristic{SelectivityType{1}, EstimationSource::Heuristics};
+inline const SelectivityEstimate zeroSelHeuristic{SelectivityType{0}, EstimationSource::Heuristics};
 
 /**
  * Estimate the selectivity of the given 'MatchExpression'. The expression must be a leaf, that is

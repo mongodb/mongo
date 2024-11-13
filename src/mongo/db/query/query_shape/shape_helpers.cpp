@@ -30,11 +30,11 @@
 #include "mongo/db/query/query_shape/shape_helpers.h"
 
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_shape/query_shape_gen.h"
 
 namespace mongo::shape_helpers {
 
-static constexpr StringData hintSpecialField = "$hint"_sd;
+namespace {
+constexpr StringData hintSpecialField = "$hint"_sd;
 // A "Flat" object is one with only top-level fields. We won't descend recursively to shapify any
 // sub-objects.
 BSONObj shapifyFlatObj(BSONObj obj, const SerializationOptions& opts, bool valuesAreLiterals) {
@@ -72,6 +72,7 @@ BSONObj shapifyFlatObj(BSONObj obj, const SerializationOptions& opts, bool value
     }
     return bob.obj();
 }
+}  // namespace
 
 BSONObj extractHintShape(BSONObj hintObj, const SerializationOptions& opts) {
     return shapifyFlatObj(hintObj, opts, /* valuesAreLiterals = */ false);

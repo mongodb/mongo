@@ -102,7 +102,6 @@ TEST(BSONObjCursorAppenderTest, FailsToAppendWhenPBRTDoesNotFit) {
 
     bool failedToAppend = false;
     FindCommon::BSONObjCursorAppender appenderFn{false /* alwaysAcceptFirstDoc */,
-                                                 nullptr /* PlanExecutor instance */,
                                                  &nextBatch,
                                                  &docUnitsReturned,
                                                  resumeToken,

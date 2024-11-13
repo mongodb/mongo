@@ -856,17 +856,6 @@ TEST_F(BucketUnpackerTest, DetermineIncludeFieldExcludeMode) {
                                       excludeUnpacker.fieldsToIncludeExcludeDuringUnpack()));
 }
 
-/**
- * Manually computes the timestamp object size for n timestamps.
- */
-auto expectedTimestampObjSize(int32_t rowKeyOffset, int32_t n) {
-    BSONObjBuilder bob;
-    for (auto i = 0; i < n; ++i) {
-        bob.appendDate(std::to_string(i + rowKeyOffset), Date_t::now());
-    }
-    return bob.done().objsize();
-}
-
 TEST_F(BucketUnpackerTest, ExtractSingleMeasurement) {
     std::set<std::string> fields{
         "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};

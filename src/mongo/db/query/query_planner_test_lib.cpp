@@ -155,49 +155,6 @@ Status nodeHasMatchingFilter(const BSONObj& testFilter,
     return filterMatches(testFilter, trueFilterNode->filter.get(), std::move(testCollator));
 }
 
-Status columnIxScanFiltersByPathMatch(
-    BSONObj expectedFiltersByPath,
-    const StringMap<std::unique_ptr<MatchExpression>>& actualFiltersByPath) {
-
-    for (auto&& expectedElem : expectedFiltersByPath) {
-        const auto expectedPath = expectedElem.fieldNameStringData();
-        if (expectedElem.type() != BSONType::Object)
-            return {ErrorCodes::Error{6412405},
-                    str::stream() << "invalid filter for path '" << expectedPath
-                                  << "' given to 'filtersByPath' argument to 'column_scan' "
-                                     "stage. Please specify an object. Found: "
-                                  << expectedElem};
-
-        const auto expectedFilter = expectedElem.Obj();
-        if (actualFiltersByPath.contains(expectedPath)) {
-            auto filterMatchStatus =
-                filterMatches(expectedFilter, actualFiltersByPath.at(expectedPath).get(), nullptr);
-            if (!filterMatchStatus.isOK()) {
-                return filterMatchStatus.withContext(
-                    str::stream() << "mismatching filter for path '" << expectedPath
-                                  << "' in 'column_scan's 'filtersByPath'");
-            }
-        } else {
-            return {ErrorCodes::Error{6412406},
-                    str::stream() << "did not find an expected filter for path '" << expectedPath
-                                  << "' in 'column_scan' stage. Actual filters: "
-                                  << expression::filterMapToString(actualFiltersByPath)};
-        }
-    }
-    for (auto&& [actualPath, actualFilter] : actualFiltersByPath) {
-        // We already checked equality above, so just check that they were all specified.
-        if (!expectedFiltersByPath.hasField(actualPath)) {
-            return {ErrorCodes::Error{6412407},
-                    str::stream() << "Found an unexpected filter for path '" << actualPath
-                                  << "' in 'column_scan' stage. Actual filters: "
-                                  << expression::filterMapToString(actualFiltersByPath)
-                                  << ", expected filters: " << expectedFiltersByPath
-                                  << "stage. Please specify an object."};
-        }
-    }
-    return Status::OK();
-}
-
 Status indexNamesMatch(BSONElement expectedIndexName, std::string actualIndexName) {
     if (expectedIndexName.type() != BSONType::String) {
         return {ErrorCodes::Error{5619234},

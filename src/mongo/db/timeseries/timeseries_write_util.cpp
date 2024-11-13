@@ -933,6 +933,7 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
     return bucketDoc.uncompressedBucket;
 }
 
+namespace {
 std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
     const OID& bucketId,
     const CollectionPtr& coll,
@@ -978,6 +979,7 @@ std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> m
     write_ops::UpdateCommandRequest op(coll->ns(), {updateEntry});
     return op;
 }
+}  // namespace
 
 write_ops::UpdateOpEntry makeTimeseriesTransformationOpEntry(
     OperationContext* opCtx,
@@ -1202,6 +1204,7 @@ void makeWriteRequest(OperationContext* opCtx,
     }
 }
 
+namespace {
 TimeseriesBatches insertIntoBucketCatalogForUpdate(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
@@ -1229,6 +1232,7 @@ TimeseriesBatches insertIntoBucketCatalogForUpdate(
 
     return batches;
 }
+}  // namespace
 
 void performAtomicWrites(
     OperationContext* opCtx,
@@ -1304,6 +1308,7 @@ void performAtomicWrites(
     lastOpFixer.finishedOpSuccessfully();
 }
 
+namespace {
 void commitTimeseriesBucketsAtomically(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& sideBucketCatalog,
@@ -1377,6 +1382,7 @@ void commitTimeseriesBucketsAtomically(
 
     batchGuard.dismiss();
 }
+}  // namespace
 
 void performAtomicWritesForDelete(OperationContext* opCtx,
                                   const CollectionPtr& coll,

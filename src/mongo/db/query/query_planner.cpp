@@ -222,42 +222,6 @@ bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clust
         hintObj, clusteredIndexSpec.getName().value(), clusteredIndexSpec.getKey());
 }
 
-/**
- * Returns the dependencies for the CanonicalQuery, split by those needed to answer the filter,
- * and those needed for "everything else", e.g. project, sort and shard filter.
- */
-std::pair<DepsTracker /* filter */, DepsTracker /* other */> computeDeps(
-    const QueryPlannerParams& params, const CanonicalQuery& query) {
-    DepsTracker filterDeps;
-    match_expression::addDependencies(query.getPrimaryMatchExpression(), &filterDeps);
-    DepsTracker outputDeps;
-    if ((!query.getProj() || query.getProj()->requiresDocument()) && !query.isCountLike()) {
-        outputDeps.needWholeDocument = true;
-        return {std::move(filterDeps), std::move(outputDeps)};
-    }
-    if (params.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        for (auto&& field : params.shardKey) {
-            outputDeps.fields.emplace(field.fieldNameStringData());
-        }
-    }
-    if (query.isCountLike()) {
-        // If this is a count, we won't have required projections, but may still need to output the
-        // shard filter.
-        return {std::move(filterDeps), std::move(outputDeps)};
-    }
-
-    const auto& reqFields = query.getProj()->getRequiredFields();
-    outputDeps.fields.insert(reqFields.begin(), reqFields.end());
-
-    if (auto sortPattern = query.getSortPattern()) {
-        sortPattern->addDependencies(&outputDeps);
-    }
-    // There's no known way a sort would depend on the whole document, and we already verified
-    // that the projection doesn't depend on the whole document.
-    tassert(6430503, "Unexpectedly required entire object", !outputDeps.needWholeDocument);
-    return {std::move(filterDeps), std::move(outputDeps)};
-}
-
 bool isSolutionBoundedCollscan(const QuerySolution* querySoln) {
     auto [node, count] = querySoln->getFirstNodeByType(StageType::STAGE_COLLSCAN);
     if (node) {
@@ -335,23 +299,11 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
         return status;
     }
 }
-}  // namespace
 
 using std::unique_ptr;
 
 // Copied verbatim from db/index.h
-static bool isIdIndex(const BSONObj& pattern) {
-    BSONObjIterator i(pattern);
-    BSONElement e = i.next();
-    //_id index must have form exactly {_id : 1} or {_id : -1}.
-    // Allows an index of form {_id : "hashed"} to exist but
-    // do not consider it to be the primary _id index
-    if (!(strcmp(e.fieldName(), "_id") == 0 && (e.numberInt() == 1 || e.numberInt() == -1)))
-        return false;
-    return i.next().eoo();
-}
-
-static bool is2DIndex(const BSONObj& pattern) {
+bool is2DIndex(const BSONObj& pattern) {
     BSONObjIterator it(pattern);
     while (it.more()) {
         BSONElement e = it.next();
@@ -429,14 +381,10 @@ string optionString(size_t options) {
     return ss;
 }
 
-static BSONObj getKeyFromQuery(const BSONObj& keyPattern, const BSONObj& query) {
-    return query.extractFieldsUndotted(keyPattern);
-}
-
-static bool indexCompatibleMaxMin(const BSONObj& obj,
-                                  const CollatorInterface* queryCollator,
-                                  const CollatorInterface* indexCollator,
-                                  const BSONObj& keyPattern) {
+bool indexCompatibleMaxMin(const BSONObj& obj,
+                           const CollatorInterface* queryCollator,
+                           const CollatorInterface* indexCollator,
+                           const BSONObj& keyPattern) {
     BSONObjIterator kpIt(keyPattern);
     BSONObjIterator objIt(obj);
 
@@ -468,9 +416,9 @@ static bool indexCompatibleMaxMin(const BSONObj& obj,
     }
 }
 
-static bool indexCompatibleMaxMin(const BSONObj& obj,
-                                  const CollatorInterface* queryCollator,
-                                  const IndexEntry& indexEntry) {
+bool indexCompatibleMaxMin(const BSONObj& obj,
+                           const CollatorInterface* queryCollator,
+                           const IndexEntry& indexEntry) {
     // Wildcard indexes should have been filtered out by the time this is called.
     if (indexEntry.type == IndexType::INDEX_WILDCARD) {
         return false;
@@ -478,8 +426,7 @@ static bool indexCompatibleMaxMin(const BSONObj& obj,
     return indexCompatibleMaxMin(obj, queryCollator, indexEntry.collator, indexEntry.keyPattern);
 }
 
-static BSONObj stripFieldNamesAndApplyCollation(const BSONObj& obj,
-                                                const CollatorInterface* collator) {
+BSONObj stripFieldNamesAndApplyCollation(const BSONObj& obj, const CollatorInterface* collator) {
     BSONObjBuilder bob;
     for (BSONElement elt : obj) {
         CollationIndexKey::collationAwareIndexKeyAppend(elt, collator, &bob);
@@ -512,9 +459,7 @@ static BSONObj stripFieldNamesAndApplyCollation(const BSONObj& obj,
  * If 'minObj' is non-empty, then all we do is strip its field names (because index keys always
  * have empty field names).
  */
-static BSONObj finishMinObj(const IndexEntry& indexEntry,
-                            const BSONObj& minObj,
-                            const BSONObj& maxObj) {
+BSONObj finishMinObj(const IndexEntry& indexEntry, const BSONObj& minObj, const BSONObj& maxObj) {
     if (minObj.isEmpty()) {
         BSONObjBuilder ret;
         for (auto key : indexEntry.keyPattern) {
@@ -537,9 +482,7 @@ static BSONObj finishMinObj(const IndexEntry& indexEntry,
  *
  * See comment for finishMinObj() for why we need both 'minObj' and 'maxObj'.
  */
-static BSONObj finishMaxObj(const IndexEntry& indexEntry,
-                            const BSONObj& minObj,
-                            const BSONObj& maxObj) {
+BSONObj finishMaxObj(const IndexEntry& indexEntry, const BSONObj& minObj, const BSONObj& maxObj) {
     if (maxObj.isEmpty()) {
         BSONObjBuilder ret;
         for (auto key : indexEntry.keyPattern) {
@@ -630,6 +573,7 @@ std::unique_ptr<QuerySolution> buildWholeIXSoln(
         QueryPlannerAccess::scanWholeIndex(index, query, direction.value_or(1)));
     return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
 }
+}  // namespace
 
 StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTaggedTree(
     const MatchExpression* const taggedTree, const vector<IndexEntry>& relevantIndices) {
@@ -880,6 +824,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     return {std::move(soln)};
 }
 
+namespace {
 /**
  * For some reason this type is hard to construct inline and keep the compiler happy. Convenience
  * helper to do so since we do it a couple times.
@@ -998,6 +943,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> handleClusteredScanHint(
     }
     return attemptCollectionScan(query, isTailable, params);
 }
+}  // namespace
 
 
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(

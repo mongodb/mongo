@@ -92,9 +92,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kBridge
 
-
 namespace mongo {
-
 namespace {
 
 boost::optional<HostAndPort> extractHostInfo(const OpMsgRequest& request) {
@@ -126,8 +124,6 @@ private:
     stdx::mutex _mutex;
     PseudoRandom _rand;
 };
-
-}  // namespace
 
 class BridgeContext {
 public:
@@ -548,6 +544,7 @@ int bridgeMain(int argc, char** argv) {
     return static_cast<int>(waitForShutdown());
 }
 
+}  // namespace
 }  // namespace mongo
 
 #if defined(_WIN32)

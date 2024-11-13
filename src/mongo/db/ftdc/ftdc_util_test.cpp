@@ -40,10 +40,12 @@
 
 namespace mongo {
 
+namespace {
 void checkTime(int expected, int now_time, int period) {
     ASSERT_TRUE(Date_t::fromMillisSinceEpoch(expected) ==
                 FTDCUtil::roundTime(Date_t::fromMillisSinceEpoch(now_time), Milliseconds(period)));
 }
+}  // namespace
 
 // Validate time rounding
 TEST(FTDCUtilTest, TestRoundTime) {

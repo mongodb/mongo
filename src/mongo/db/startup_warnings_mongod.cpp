@@ -357,6 +357,7 @@ THPDefragWarningLogCase getDefragWarningCase(bool usingGoogleTCMallocAllocator,
     return THPDefragWarningLogCase::kNone;
 }
 
+namespace {
 void warnForTHPEnablementCases(
     THPEnablementWarningLogCase warningCase,
     const StatusWith<std::string>& thpEnabled,
@@ -515,6 +516,7 @@ void logLinuxMongodWarnings(const StorageGlobalParams& storageParams,
         }
     }
 }
+}  // namespace
 
 }  // namespace startup_warning_detail
 

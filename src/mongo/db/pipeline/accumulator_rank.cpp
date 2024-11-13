@@ -58,6 +58,7 @@ REGISTER_STABLE_WINDOW_FUNCTION(
 
 const char* kTempSortKeyField = "sortKey";
 
+namespace {
 // Define sort-order compliant comparison function which uses fast pass logic for null and missing
 // and full sort key logic for arrays.
 bool isSameValue(const ValueComparator& valueComparator,
@@ -79,6 +80,7 @@ bool isSameValue(const ValueComparator& valueComparator,
     }
     return valueComparator.compare(a, b) == 0;
 }
+}  // namespace
 
 void AccumulatorRank::processInternal(const Value& input, bool merging) {
     tassert(5417001, "$rank can't be merged", !merging);

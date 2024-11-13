@@ -1994,6 +1994,7 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
 };
 
+namespace {
 std::string getOpNameForAccStmt(const AccumulationStatement& accStmt) {
     std::string opName = accStmt.expr.name.toString();
 
@@ -2009,6 +2010,7 @@ std::string getOpNameForAccStmt(const AccumulationStatement& accStmt) {
 
     return opName;
 }
+}  // namespace
 
 AccumOp::AccumOp(std::string opName) : _opName(std::move(opName)), _opInfo(lookupOpInfo(_opName)) {}
 

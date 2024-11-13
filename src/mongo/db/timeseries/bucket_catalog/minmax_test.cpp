@@ -56,33 +56,6 @@ std::string concatFieldNames(const MinMaxStore::Obj& obj) {
         });
 }
 
-int64_t getElementSize(std::string fieldName,
-                       boost::optional<BSONElement> minElem,
-                       boost::optional<BSONElement> maxElem) {
-    size_t minDataSize = minElem
-        ? sizeof(BSONElementValueBuffer) + minElem->size() - fieldName.size()
-        : sizeof(BSONElementValueBuffer);
-    size_t maxDataSize = maxElem
-        ? sizeof(BSONElementValueBuffer) + maxElem->size() - fieldName.size()
-        : sizeof(BSONElementValueBuffer);
-    return fieldName.capacity() + minDataSize + maxDataSize;
-}
-
-int64_t getEntrySize(std::string fieldName,
-                     boost::optional<BSONElement> minElem,
-                     boost::optional<BSONElement> maxElem) {
-    return sizeof(Entry) + getElementSize(fieldName, minElem, maxElem);
-}
-
-int64_t emptyStoreSize() {
-    static const std::string emptyFieldName;
-    return getEntrySize(emptyFieldName, boost::none, boost::none);
-}
-
-int64_t emptyMinMaxSize() {
-    return sizeof(FlatBSONStore<MinMaxElement, BSONElementValueBuffer>) + emptyStoreSize();
-}
-
 TEST(MinMax, Insert) {
     TrackingContext trackingContext;
     MinMaxStore minmax{trackingContext};

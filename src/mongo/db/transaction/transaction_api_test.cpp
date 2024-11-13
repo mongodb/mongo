@@ -308,7 +308,6 @@ private:
     mutable StatusWith<BSONObj> _lastResponse{BSONObj()};
     mutable std::queue<StatusWith<BSONObj>> _responses;
     mutable std::vector<BSONObj> _sentRequests;
-    bool _runningLocalTransaction{false};
 
     mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _hangNextCommitOrAbortCommandCV;

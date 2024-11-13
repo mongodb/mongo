@@ -66,7 +66,6 @@ bool isAuthorizedForInternalClusterAction(OperationContext* opCtx,
     }
     return *cachedResult;
 }
-}  // namespace
 
 /**
  * A client is internal if the connection is a self connection, a connection from a mongos or
@@ -76,6 +75,7 @@ bool isInternalClient(OperationContext* opCtx) {
     return !opCtx->getClient()->session() || opCtx->getClient()->isInternalClient() ||
         opCtx->getClient()->isInDirectClient();
 }
+}  // namespace
 
 OperationSessionInfoFromClient initializeOperationSessionInfo(
     OperationContext* opCtx,

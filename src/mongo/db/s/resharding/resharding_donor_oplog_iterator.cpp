@@ -30,7 +30,6 @@
 
 #include <boost/smart_ptr.hpp>
 #include <cstddef>
-#include <tuple>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -43,7 +42,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -54,14 +52,12 @@
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
@@ -69,11 +65,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
-
 namespace mongo {
 
 using namespace fmt::literals;
-
 namespace {
 
 /**
@@ -97,10 +91,6 @@ ReshardingDonorOplogIterator::ReshardingDonorOplogIterator(
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePipeline(
     OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface) {
-    using Doc = Document;
-    using Arr = std::vector<Value>;
-    using V = Value;
-
     StringMap<ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[_oplogBufferNss.coll()] = {_oplogBufferNss, std::vector<BSONObj>{}};
     auto expCtx = ExpressionContextBuilder{}

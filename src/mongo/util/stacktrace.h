@@ -407,8 +407,9 @@ void markAsStackTraceProcessingThread();
 void printAllThreadStacks();
 void printAllThreadStacks(StackTraceSink& sink);
 
-/** Calls `printAllThreadStacks` and blocks until it is completed. */
-void printAllThreadStacksBlocking();
+/** Calls `printAllThreadStacks` and blocks until it is completed. This function is currently prone
+ * to deadlocks and should not be used. For more information, refer to SERVER-90775. */
+void printAllThreadStacksBlocking_UNSAFE();
 
 #endif  // defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 

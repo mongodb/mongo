@@ -129,7 +129,6 @@ std::deque<boost::optional<DbCheckCollectionInfo>> _dbChecksInProgress;
 // This is waited upon if there is found to already be a dbcheck command running, as
 // _dbchecksInProgress would indicate. This is signaled when a dbcheck command finishes.
 stdx::condition_variable _dbCheckNotifier;
-}  // namespace
 
 // The optional `tenantIdForStartStop` is used for dbCheckStart/dbCheckStop oplog entries so that
 // the namespace is still the admin command namespace but the tenantId will be set using the
@@ -200,6 +199,7 @@ WriteConcernOptions _getBatchWriteConcern(
 
     return batchWriteConcern;
 }
+}  // namespace
 
 BSONObj DbCheckCollectionInfo::toBSON() const {
     BSONObjBuilder builder;
@@ -1765,7 +1765,7 @@ bool DbChecker::_shouldRetryDataConsistencyCheck(OperationContext* opCtx,
 }
 
 // The initial amount of time to sleep between retries.
-const int64_t initialSleepMillis = 100;
+constexpr int64_t initialSleepMillis = 100;
 
 void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
     const std::string curOpMessage = "Scanning namespace " +

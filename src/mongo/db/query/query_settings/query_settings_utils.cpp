@@ -159,7 +159,6 @@ void setQueryShapeHash(OperationContext* opCtx, const QueryShapeHash& hash) {
 bool requestComesFromMongosOrSentDirectlyToShard(Client* client) {
     return client->isInternalClient() || client->isInDirectClient();
 }
-}  // namespace
 
 /*
  * Creates the corresponding RepresentativeQueryInfo for Find query representatives.
@@ -309,6 +308,7 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
         .systemStage = getStageExemptedFromRejection(*pipeline),
     };
 }
+}  // namespace
 
 RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
                                                  const BSONObj& cmd,
@@ -592,6 +592,7 @@ void validateQuerySettingsIndexHints(const auto& indexHints) {
     }
 }
 
+namespace {
 /**
  * Validates that QueryShapeConfiguration is not specified for queries with queryable encryption.
  */
@@ -610,6 +611,7 @@ void validateQuerySettingsEncryptionInformation(
             "setQuerySettings command is not allowed on queryable encryption state collections",
             !containsFLE2StateCollection);
 }
+}  // namespace
 
 void validateRepresentativeQuery(const RepresentativeQueryInfo& representativeQueryInfo) {
     if (MONGO_unlikely(allowAllSetQuerySettings.shouldFail())) {

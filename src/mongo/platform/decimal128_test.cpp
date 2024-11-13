@@ -1210,6 +1210,7 @@ TEST(Decimal128Test, TestDecimal128Quantize) {
     }
 }
 
+namespace {
 struct RoundingModeInfo {
     Decimal128::RoundingMode mode;
     StringData name;
@@ -1238,6 +1239,7 @@ void assertRoundingTestCase(const Decimal128& actual,
                            << fmt::format("0x{:016X}", actualVal.high64) << "}");
     }
 }
+}  // namespace
 
 TEST(Decimal128Test, TestDecimal128RoundingFractionalValues) {
     auto d = [](auto x) {
@@ -1579,6 +1581,7 @@ TEST(Decimal128Test, TestDecimal128GetLargestNegativeExponentZero) {
     ASSERT_EQUALS(d.getValue().low64, largestNegativeExponentZeroLow64);
 }
 
+namespace {
 /**
  * Test data was generated using 64 bit versions of these functions, so we must test
  * approximate results.
@@ -1596,6 +1599,7 @@ void assertDecimal128ExactlyEqual(Decimal128 x, Decimal128 y) {
     ASSERT_EQUALS(x.getValue().high64, y.getValue().high64);
     ASSERT_EQUALS(x.getValue().low64, y.getValue().low64);
 }
+}  // namespace
 
 TEST(Decimal128Test, TestExp) {
     assertDecimal128ApproxEqual(Decimal128("-1").exponential(),

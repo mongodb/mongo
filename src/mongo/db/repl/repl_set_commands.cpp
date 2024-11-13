@@ -753,33 +753,6 @@ public:
 };
 MONGO_REGISTER_COMMAND(CmdReplSetUpdatePosition).forShard();
 
-namespace {
-/**
- * Returns true if there is no data on this server. Useful when starting replication.
- * The "local" database does NOT count except for "rs.oplog" collection.
- * Used to set the hasData field on replset heartbeat command response.
- */
-bool replHasDatabases(OperationContext* opCtx) {
-    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
-    std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
-
-    if (dbNames.size() >= 2)
-        return true;
-    if (dbNames.size() == 1) {
-        if (!dbNames[0].isLocalDB())
-            return true;
-
-        // we have a local database.  return true if oplog isn't empty
-        BSONObj o;
-        if (Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace, o)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-}  // namespace
-
 /* { replSetHeartbeat : <setname> } */
 class CmdReplSetHeartbeat : public ReplSetCommand {
 public:

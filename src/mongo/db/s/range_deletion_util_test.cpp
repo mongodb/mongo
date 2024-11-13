@@ -189,56 +189,6 @@ public:
     }
 };
 
-// Helper function to count number of documents in config.rangeDeletions.
-int countDocsInConfigRangeDeletions(PersistentTaskStore<RangeDeletionTask>& store,
-                                    OperationContext* opCtx) {
-    auto numDocsInRangeDeletionsCollection = 0;
-    store.forEach(opCtx, BSONObj(), [&](const RangeDeletionTask&) {
-        ++numDocsInRangeDeletionsCollection;
-        return true;
-    });
-    return numDocsInRangeDeletionsCollection;
-};
-
-// The 'pending' field must not be set in order for a range deletion task to succeed, but the
-// ShardServerOpObserver will submit the task for deletion upon seeing an insert without the
-// 'pending' field. The tests call removeDocumentsFromRange directly, so we want to avoid having
-// the op observer also submit the task. The ShardServerOpObserver will ignore replacement
-//  updates on the range deletions namespace though, so we can get around the issue by inserting
-// the task with the 'pending' field set, and then remove the field using a replacement update
-// after.
-RangeDeletionTask insertRangeDeletionTask(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const UUID& uuid,
-                                          const ChunkRange& range,
-                                          int64_t numOrphans) {
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    auto migrationId = UUID::gen();
-    RangeDeletionTask t(migrationId, nss, uuid, ShardId("donor"), range, CleanWhenEnum::kDelayed);
-    t.setPending(true);
-    t.setNumOrphanDocs(numOrphans);
-    const auto currentTime = VectorClock::get(opCtx)->getTime();
-    t.setTimestamp(currentTime.clusterTime().asTimestamp());
-    store.add(opCtx, t);
-
-    // Document should be in the store.
-    ASSERT_GTE(countDocsInConfigRangeDeletions(store, opCtx), 1);
-
-    auto query = BSON(RangeDeletionTask::kIdFieldName << migrationId);
-    t.setPending(boost::none);
-    auto update = t.toBSON();
-    store.update(opCtx, query, update);
-
-    return t;
-}
-
-RangeDeletionTask insertRangeDeletionTask(OperationContext* opCtx,
-                                          const UUID& uuid,
-                                          const ChunkRange& range,
-                                          int64_t numOrphans = 0) {
-    return insertRangeDeletionTask(opCtx, kNss, uuid, range, numOrphans);
-}
-
 template <typename ShardKey>
 RangeDeletionTask createDeletionTask(OperationContext* opCtx,
                                      const NamespaceString& nss,
