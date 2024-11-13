@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include <cstddef>
 #include <string>
 
 #include <absl/container/flat_hash_map.h>
+#include <boost/none.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -41,6 +43,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -59,14 +62,16 @@ class DDLLockManager {
                           const NamespaceString& nss,
                           StringData reason,
                           LockMode mode,
-                          bool waitForRecovery);
+                          bool waitForRecovery,
+                          boost::optional<Milliseconds> timeout = boost::none);
 
         ScopedBaseDDLLock(OperationContext* opCtx,
                           Locker* locker,
                           const DatabaseName& db,
                           StringData reason,
                           LockMode mode,
-                          bool waitForRecovery);
+                          bool waitForRecovery,
+                          boost::optional<Milliseconds> timeout = boost::none);
 
         virtual ~ScopedBaseDDLLock();
 
@@ -89,7 +94,8 @@ class DDLLockManager {
                           const ResourceId& resId,
                           StringData reason,
                           LockMode mode,
-                          bool waitForRecovery);
+                          bool waitForRecovery,
+                          Milliseconds timeout);
 
         static const Minutes kDefaultLockTimeout;
         static Milliseconds _getTimeout();
@@ -121,6 +127,98 @@ public:
     // should be made to wait for it to become free.
     static const Milliseconds kSingleLockAttemptTimeout;
 
+    // Backoff strategy for tryLock functions
+    class BackoffStrategy {
+    public:
+        virtual ~BackoffStrategy() = default;
+
+        /**
+         * Executes the backoff strategy
+         *
+         * @fn The function to execute in the strategy
+         *
+         * Returns true on successful execution of the fn function
+         */
+        virtual bool execute(const std::function<bool()>& fn,
+                             const std::function<void(Milliseconds)>& sleepFn) const = 0;
+    };
+
+private:
+    template <size_t RetryCount,
+              size_t BaseWaitTimeMs,
+              size_t WaitExponentialFactor,
+              unsigned int MaxWaitTimeMs>
+    class BackoffStrategyImpl : public BackoffStrategy {
+    public:
+        BackoffStrategyImpl() : _retries(0), _sleepTime(BaseWaitTimeMs) {
+            static_assert(RetryCount > 0);
+            static_assert(WaitExponentialFactor > 0);
+            static_assert(BaseWaitTimeMs <= MaxWaitTimeMs);
+        }
+
+        bool execute(const std::function<bool()>& fn,
+                     const std::function<void(Milliseconds)>& sleepFn) const override {
+            while (_retries < RetryCount) {
+                _retries++;
+
+                if (fn()) {
+                    return true;
+                }
+
+                if (_retries == RetryCount) {
+                    break;
+                }
+
+                // Half-jitter implementation.
+                // Half of the sleep time is random, so the sleep will be [sleepTime / 2, sleepTime]
+                const auto sleepHalf = _sleepTime / 2;
+                std::uniform_int_distribution<> distrib(0, sleepHalf);
+                const auto jitter = static_cast<unsigned int>(distrib(_gen));
+
+                sleepFn(Milliseconds(sleepHalf + jitter));
+                _sleepTime *= WaitExponentialFactor;
+                _sleepTime = std::min(_sleepTime, MaxWaitTimeMs);
+            }
+            return false;
+        }
+
+    private:
+        mutable size_t _retries;
+        mutable unsigned int _sleepTime;
+
+        mutable SecureUrbg _rd;
+        mutable std::mt19937 _gen{_rd()};
+    };
+
+public:
+    /**
+     * SingleTryBackoffStrategy
+     *
+     * Executes the callback function only once.
+     * No retry on fail.
+     */
+    using SingleTryBackoffStrategy = BackoffStrategyImpl<1, 0, 1, 0>;
+
+    /**
+     * ConstantBackoffStrategy
+     *
+     * Executes the callback function up to `RetryCount` times if it fails.
+     * Waits `BaseWaitTimeMs` milliseconds between retries.
+     */
+    template <size_t RetryCount, size_t BaseWaitTimeMs>
+    using ConstantBackoffStrategy =
+        BackoffStrategyImpl<RetryCount, BaseWaitTimeMs, 1, BaseWaitTimeMs>;
+
+    /**
+     * TruncatedExponentialBackoffStrategy
+     *
+     * Executes the callback function up to `RetryCount` times if it fails.
+     * Waits `min(MaxWaitTimeMs, BaseWaitTimeMs * (2 ^ retryCount))` milliseconds between retries.
+     */
+    template <size_t RetryCount, size_t BaseWaitTimeMs, size_t MaxWaitTimeMs>
+    using TruncatedExponentialBackoffStrategy =
+        BackoffStrategyImpl<RetryCount, BaseWaitTimeMs, 2, MaxWaitTimeMs>;
+
     // RAII-style class to acquire a DDL lock on the given database
     class ScopedDatabaseDDLLock {
     public:
@@ -141,13 +239,27 @@ public:
          * It's caller's responsibility to ensure this lock is acquired only on primary node of
          * replica set and released on step-down.
          */
-        ScopedDatabaseDDLLock(OperationContext* opCtx,
-                              const DatabaseName& db,
-                              StringData reason,
-                              LockMode mode);
+        ScopedDatabaseDDLLock(
+            OperationContext* opCtx,
+            const DatabaseName& db,
+            StringData reason,
+            LockMode mode,
+            boost::optional<const BackoffStrategy&> backoffStrategy = boost::none);
 
     private:
-        ScopedBaseDDLLock _dbLock;
+        bool _tryLock(OperationContext* opCtx,
+                      const DatabaseName& db,
+                      StringData reason,
+                      LockMode mode,
+                      const BackoffStrategy& backoffStrategy);
+
+        void _lock(OperationContext* opCtx,
+                   const DatabaseName& db,
+                   StringData reason,
+                   LockMode mode,
+                   boost::optional<Milliseconds> timeout);
+
+        boost::optional<ScopedBaseDDLLock> _dbLock;
     };
 
     // RAII-style class to acquire a DDL lock on the given collection. The database DDL lock will
@@ -171,12 +283,26 @@ public:
          * It's caller's responsibility to ensure this lock is acquired only on primary node of
          * replica set and released on step-down.
          */
-        ScopedCollectionDDLLock(OperationContext* opCtx,
-                                const NamespaceString& ns,
-                                StringData reason,
-                                LockMode mode);
+        ScopedCollectionDDLLock(
+            OperationContext* opCtx,
+            const NamespaceString& ns,
+            StringData reason,
+            LockMode mode,
+            boost::optional<const BackoffStrategy&> backoffStrategy = boost::none);
 
     private:
+        bool _tryLock(OperationContext* opCtx,
+                      const NamespaceString& ns,
+                      StringData reason,
+                      LockMode mode,
+                      const BackoffStrategy& backoffStrategy);
+
+        void _lock(OperationContext* opCtx,
+                   const NamespaceString& ns,
+                   StringData reason,
+                   LockMode mode,
+                   boost::optional<Milliseconds> timeout);
+
         // Make sure _dbLock is instantiated before _collLock to don't break the hierarchy locking
         // acquisition order
         boost::optional<ScopedBaseDDLLock> _dbLock;
