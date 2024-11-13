@@ -229,7 +229,7 @@ export function assertExpectedResults(results,
                                       expectedDocsReturnedMin,
                                       expectedDocsReturnedSumOfSq,
                                       getMores) {
-    const {key, keyHash, metrics, asOf} = results;
+    const {key, keyHash, queryShapeHash, metrics, asOf} = results;
     confirmAllExpectedFieldsPresent(expectedQueryStatsKey, key);
     assert.eq(expectedExecCount, metrics.execCount);
     assert.docEq({
@@ -256,6 +256,7 @@ export function assertExpectedResults(results,
     assert.neq(latestSeenTimestamp.getTime(), 0);
     assert.neq(asOf.getTime(), 0);
     assert.neq(keyHash.length, 0);
+    assert.neq(queryShapeHash.length, 0);
 
     const distributionFields = ['sum', 'max', 'min', 'sumOfSquares'];
     for (const field of distributionFields) {
@@ -482,23 +483,43 @@ export function runCommandAndValidateQueryStats(
 }
 
 /**
- * Helper function to verify that each of the query stats entries has a unique hash and returns a
- * list of the hashes.
+ * Helper function that verifies each query stats entry has a hash, filters out the unique hashes
+ * and returns a list of them.
+ * @param {list} entries - List of entries returned from $queryStats.
+ * @returns {list} list of unique hashes corresponding to the entries.
+ */
+function getUniqueValuesByName(entries, fieldName) {
+    const hashes = new Set();
+    for (const entry of entries) {
+        assert(entry[fieldName] && entry[fieldName] !== "",
+               `Entry does not have a '${fieldName}' field: ${tojson(entry)}`);
+        hashes.add(entry[fieldName]);
+    }
+    return Array.from(hashes);
+}
+
+/**
+ * Helper function that verifies that we have as many key hashes as query stats entries and
+ * returns a list of said hashes.
  * @param {list} entries - List of entries returned from $queryStats.
  * @returns {list} list of unique hashes corresponding to the entries.
  */
 export function getQueryStatsKeyHashes(entries) {
-    const keyHashes = {};
-    for (const entry of entries) {
-        assert(entry.keyHash && entry.keyHash !== "",
-               `Entry does not have a 'keyHash' field: ${tojson(entry)}`);
-        keyHashes[entry.keyHash] = entry;
-    }
+    const keyHashArray = getUniqueValuesByName(entries, 'keyHash');
     // We expect all keys and hashes to be unique, so assert that we have as many unique hashes as
     // entries.
-    const keyHashArray = Object.keys(keyHashes);
     assert.eq(keyHashArray.length, entries.length, tojson(entries));
     return keyHashArray;
+}
+
+/**
+ * Helper function that filters out the unique query shape hashes from the query stats entries and
+ * returns a list of said hashes.
+ * @param {list} entries - List of entries returned from $queryStats.
+ * @returns {list} list of unique hashes corresponding to the shapes in the entries.
+ */
+export function getQueryStatsShapeHashes(entries) {
+    return getUniqueValuesByName(entries, 'queryShapeHash');
 }
 
 /**
@@ -691,27 +712,38 @@ export function exhaustCursorAndGetQueryStats(conn, coll, cmd, key, expectedDocs
 }
 
 /**
+ * The options passed to server deployments sometimes get modified. Instead of having a single
+ * constant that we pass around (risking modification), we return the defaults from a function.
+ */
+export function getQueryStatsServerParameters() {
+    return {setParameter: {internalQueryStatsRateLimit: -1}};
+}
+
+/**
  * Run the given callback for each of the deployment scenarios we want to test query stats against
  * (standalone, replset, sharded cluster). Callback must accept two arguments: the connection and
  * the test object (ReplSetTest or ShardingTest). For the standalone case, the test is null.
  */
 export function runForEachDeployment(callbackFn) {
-    // The options passed to runMongod sometimes get modified. Instead of having a single constant
-    // that we pass around (risking modification), we return the defaults from a function.
-    function options() {
-        return {setParameter: {internalQueryStatsRateLimit: -1}};
-    }
-
     {
-        const conn = MongoRunner.runMongod(options());
+        const conn = MongoRunner.runMongod(getQueryStatsServerParameters());
 
         callbackFn(conn, null);
 
         MongoRunner.stopMongod(conn);
     }
 
+    runOnReplsetAndShardedCluster(callbackFn);
+}
+
+/**
+ * Run the given callback against replset, sharded cluster deployments. This is especially useful
+ * for tests involving query settings since PQS does not work in standalone. Callback must accept
+ * two arguments: the connection and the test object (ReplSetTest or ShardingTest).
+ */
+export function runOnReplsetAndShardedCluster(callbackFn) {
     {
-        const rst = new ReplSetTest({nodes: 3, nodeOptions: options()});
+        const rst = new ReplSetTest({nodes: 3, nodeOptions: getQueryStatsServerParameters()});
         rst.startSet();
         rst.initiate();
 
@@ -721,7 +753,8 @@ export function runForEachDeployment(callbackFn) {
     }
 
     {
-        const st = new ShardingTest(Object.assign({shards: 2, other: {mongosOptions: options()}}));
+        const st = new ShardingTest(
+            Object.assign({shards: 2, other: {mongosOptions: getQueryStatsServerParameters()}}));
 
         const testDB = st.s.getDB("test");
         // Enable sharding separate from per-test setup to avoid calling enableSharding repeatedly.
