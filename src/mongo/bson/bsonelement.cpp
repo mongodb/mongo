@@ -636,22 +636,17 @@ BSONElement BSONElement::operator[](StringData field) const {
     return o[field];
 }
 
-namespace {
-
-MONGO_COMPILER_NOINLINE void msgAssertedBadType [[noreturn]] (int8_t type) {
-    msgasserted(10320, str::stream() << "BSONElement: bad type " << (int)type);
-}
-
-}  // namespace
-
 int BSONElement::computeRegexSize(const char* elem, int fieldNameSize) {
     int8_t type = *elem;
     // The following code handles all special cases: MinKey, MaxKey, RegEx and invalid types.
     if (type == MaxKey || type == MinKey)
         return fieldNameSize + 1;
 
-    if (type != BSONType::RegEx)
-        msgAssertedBadType(type);
+    if (type != BSONType::RegEx) {
+        int err = 10320;  // work around linter
+        LOGV2_ERROR(err, "BSONElement: bad type", "type"_attr = zeroPaddedHex(type));
+        uasserted(err, "BSONElement: bad type");
+    }
 
     // RegEx is two c-strings back-to-back.
     const char* p = elem + fieldNameSize + 1;
