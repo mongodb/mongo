@@ -9,8 +9,8 @@
  */
 
 let testCount = 0;
-const collNamePrefix = "validate_timeseries_id_timestamp";
-const bucketNamePrefix = "system.buckets.validate_timeseries_id_timestamp";
+const collNamePrefix = jsTestName();
+const bucketNamePrefix = "system.buckets." + jsTestName();
 let collName = collNamePrefix + testCount;
 let bucketName = bucketNamePrefix + testCount;
 let coll = null;

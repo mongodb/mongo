@@ -12,7 +12,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 TimeseriesTest.run((insert) => {
-    const collName = "timeseries_metric_index_ascending_descending";
+    const collName = jsTestName();
 
     const timeFieldName = "tm";
     const metaFieldName = "mm";

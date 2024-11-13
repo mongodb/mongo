@@ -7,7 +7,7 @@
  * @tags: [requires_persistence]
  */
 
-const baseDir = "jstests_directoryperdb";
+const baseDir = jsTestName();
 const dbpath = MongoRunner.dataPath + baseDir + "/";
 const dbname = "foo";
 

@@ -14,7 +14,7 @@
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 import {SecondaryReadsTest} from "jstests/replsets/libs/secondary_reads_test.js";
 
-const dbName = "drop_indexes_aborts_in_progress_index_builds_simple_name";
+const dbName = jsTestName();
 
 const secondaryReadsTest = new SecondaryReadsTest(dbName);
 

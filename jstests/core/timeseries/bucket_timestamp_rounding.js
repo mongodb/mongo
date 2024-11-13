@@ -11,7 +11,7 @@
  */
 
 (function testSeconds() {
-    let coll = db.bucket_timestamp_rounding_granularitySeconds;
+    let coll = db[jsTestName() + '_granularitySeconds'];
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -42,7 +42,7 @@
 })();
 
 (function testMinutes() {
-    let coll = db.bucket_timestamp_rounding_granularityMinutes;
+    let coll = db[jsTestName() + '_granularityMinutes'];
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -73,7 +73,7 @@
 })();
 
 (function testHours() {
-    let coll = db.bucket_timestamp_rounding_granularityHours;
+    let coll = db[jsTestName() + '_granularityHours'];
     coll.drop();
 
     assert.commandWorked(
@@ -105,7 +105,7 @@
 })();
 
 (function testSecondsToMinutes() {
-    let coll = db.bucket_timestamp_rounding_granularitySecondsToMinutes;
+    let coll = db[jsTestName() + '_granularitySecondsToMinutes'];
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -155,7 +155,7 @@
 })();
 
 (function testMinutesToHours() {
-    let coll = db.bucket_timestamp_rounding_granularityMinutesToHours;
+    let coll = db[jsTestName() + '_granularityMinutesToHours'];
     coll.drop();
 
     assert.commandWorked(db.createCollection(

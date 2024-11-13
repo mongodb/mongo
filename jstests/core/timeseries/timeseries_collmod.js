@@ -16,7 +16,7 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-const collName = "timeseries_collmod";
+const collName = jsTestName();
 const coll = db.getCollection(collName);
 const bucketMaxSpanSecondsHours = 60 * 60 * 24 * 30;
 const bucketRoundingSecondsHours = 60 * 60 * 24;

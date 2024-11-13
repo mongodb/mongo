@@ -9,7 +9,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = 'test';
-const collName = 'absent_ns';
+const collName = jsTestName();
 
 let replSet = new ReplSetTest({name: 'absentNsField', nodes: 2});
 replSet.startSet();

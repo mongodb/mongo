@@ -8,10 +8,10 @@
  *   directly_against_shardsvrs_incompatible,
  * ]
  */
-import {getAggPlanStages, getEngine, getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const coll = db.timeseries_match_pushdown_with_project;
+const coll = db[jsTestName()];
 const timeField = 'time';
 const metaField = 'm';
 const aTime = ISODate('2022-01-01T00:00:00');

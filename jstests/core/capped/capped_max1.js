@@ -17,7 +17,7 @@
  * ]
  */
 
-var t = db.capped_max1;
+var t = db[jsTestName()];
 t.drop();
 
 var max = 10;

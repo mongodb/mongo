@@ -21,8 +21,8 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getEngine, getPlanStage, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
-const coll = db.timeseries_lastpoint_common_sort_key;
-const bucketsColl = db.system.buckets.timeseries_lastpoint_common_sort_key;
+const coll = db[jsTestName()];
+const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 // The lastpoint optimization attempt to pick a bucket that would contain the event with max time
 // and then only unpack that bucket. This function creates a collection with three buckets that

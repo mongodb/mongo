@@ -13,7 +13,7 @@
  */
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
-const coll = db.timeseries_internal_bounded_sort_overflow;
+const coll = db[jsTestName()];
 const buckets = db['system.buckets.' + coll.getName()];
 coll.drop();
 assert.commandWorked(

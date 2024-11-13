@@ -26,7 +26,7 @@ replSet.startSet();
 replSet.initiate();
 
 const testDB = replSet.getPrimary().getDB('test');
-const coll = testDB.twoPhaseIndexBuild;
+const coll = testDB[jsTestName()];
 const cmdNs = testDB.getName() + ".$cmd";
 
 coll.insert({a: 1});

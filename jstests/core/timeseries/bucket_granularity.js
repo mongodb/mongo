@@ -33,7 +33,7 @@ function getDateOutsideBucketRange(coll, spanMS) {
 const dayInMS = 1000 * 60 * 60 * 24;
 
 (function testSeconds() {
-    let coll = db.bucket_granularity_granularitySeconds;
+    let coll = db[jsTestName() + "_granularitySeconds"];
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
@@ -62,7 +62,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
 })();
 
 (function testMinutes() {
-    let coll = db.bucket_granularity_granularityMinutes;
+    let coll = db[jsTestName() + "_granularityMinutes"];
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
@@ -87,7 +87,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
 })();
 
 (function testHours() {
-    let coll = db.bucket_granularity_granularityHours;
+    let coll = db[jsTestName() + "_granularityHours"];
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
@@ -112,7 +112,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
 })();
 
 (function testIncreasingSecondsToMinutes() {
-    let coll = db.bucket_granularity_granularitySecondsToMinutes;
+    let coll = db[jsTestName() + "_granularitySecondsToMinutes"];
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
@@ -167,7 +167,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
 })();
 
 (function testIncreasingSecondsToHours() {
-    let coll = db.bucket_granularity_granularitySecondsToHours;
+    let coll = db[jsTestName() + "_granularitySecondsToHours"];
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
@@ -217,7 +217,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
 })();
 
 (function testIncreasingMinutesToHours() {
-    let coll = db.bucket_granularity_granularityMinutesToHours;
+    let coll = db[jsTestName() + "_granularityMinutesToHours"];
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
@@ -267,7 +267,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
 })();
 
 (function testReducingGranularityFails() {
-    let coll = db.bucket_granularity_reducingGranularityFails;
+    let coll = db[jsTestName() + "_reducingGranularityFails"];
     coll.drop();
 
     assert.commandWorked(db.createCollection(

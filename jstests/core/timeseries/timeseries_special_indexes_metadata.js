@@ -19,8 +19,8 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
-    const testdb = db.getSiblingDB("timeseries_special_indexes_db");
-    const timeseriescoll = testdb.getCollection("timeseries_special_indexes_coll");
+    const testdb = db.getSiblingDB(jsTestName());
+    const timeseriescoll = testdb.getCollection(jsTestName() + "_coll");
     const bucketscoll = testdb.getCollection('system.buckets.' + timeseriescoll.getName());
 
     const timeFieldName = 'tm';

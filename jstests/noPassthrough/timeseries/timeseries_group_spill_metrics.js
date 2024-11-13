@@ -21,7 +21,7 @@ if (db.adminCommand('buildInfo').debug ||
     quit();
 }
 
-const coll = db.timeseries_group_spill_metrics;
+const coll = db[jsTestName()];
 coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), {

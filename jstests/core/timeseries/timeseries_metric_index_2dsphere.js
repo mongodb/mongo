@@ -20,8 +20,8 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
-    const testdb = db.getSiblingDB("timeseries_metric_index_2dsphere_db");
-    const timeseriescoll = testdb.getCollection("timeseries_metric_index_2dsphere_coll");
+    const testdb = db.getSiblingDB(jsTestName() + '_db');
+    const timeseriescoll = testdb.getCollection(jsTestName() + '_coll');
     const bucketscoll = testdb.getCollection('system.buckets.' + timeseriescoll.getName());
 
     const timeFieldName = 'tm';

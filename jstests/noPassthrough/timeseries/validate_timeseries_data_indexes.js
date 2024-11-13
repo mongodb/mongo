@@ -6,8 +6,8 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-const collPrefix = "validate_timeseries_data_indexes";
-const bucketPrefix = "system.buckets.validate_timeseries_data_indexes";
+const collPrefix = jsTestName();
+const bucketPrefix = "system.buckets." + jsTestName();
 let collName = collPrefix;
 let bucketName = bucketPrefix;
 let testCount = 0;

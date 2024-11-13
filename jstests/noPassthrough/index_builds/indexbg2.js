@@ -5,7 +5,7 @@ const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
 
 let db = conn.getDB("test");
-let baseName = "jstests_index12";
+let baseName = jsTestName();
 
 let parallel = function() {
     return db[baseName + "_parallelStatus"];

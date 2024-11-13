@@ -24,7 +24,7 @@
  */
 import {aggPlanHasStage} from "jstests/libs/query/analyze_plan.js";
 
-const coll = db.timeseries_nondefault_collation;
+const coll = db[jsTestName()];
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 const numericOrdering = {

@@ -8,8 +8,8 @@ var conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 
 var testDB = conn.getDB("test");
-assert.commandWorked(testDB.runCommand({create: "index_version_autoupgrade"}));
-var allIndexes = testDB.index_version_autoupgrade.getIndexes();
+assert.commandWorked(testDB.runCommand({create: jsTestName()}));
+var allIndexes = testDB[jsTestName()].getIndexes();
 var spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "Index with key pattern {_id: 1} not found: " + tojson(allIndexes));
 var defaultIndexVersion = spec.v;
@@ -30,11 +30,11 @@ assert.lte(2, defaultIndexVersion, "Expected the defaultIndexVersion to be at le
  */
 function testIndexVersionAutoUpgrades(commandFn, doesAutoUpgrade) {
     testDB.dropDatabase();
-    var coll = testDB.index_version_autoupgrade;
+    var coll = testDB[jsTestName()];
 
     // Create a v=1 _id index.
-    assert.commandWorked(testDB.createCollection("index_version_autoupgrade",
-                                                 {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
+    assert.commandWorked(
+        testDB.createCollection(jsTestName(), {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
     var allIndexes = coll.getIndexes();
     var spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
     assert.neq(null, spec, "Index with key pattern {_id: 1} not found: " + tojson(allIndexes));

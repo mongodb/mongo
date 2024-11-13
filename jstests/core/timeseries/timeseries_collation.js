@@ -16,7 +16,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 TimeseriesTest.run((insert) => {
-    const coll = db.timeseries_collation;
+    const coll = db[jsTestName()];
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'time';

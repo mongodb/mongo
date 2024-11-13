@@ -7,7 +7,7 @@
  *     assumes_unsharded_collection,
  * ]
  */
-const coll = db.capped_upsert;
+const coll = db[jsTestName()];
 coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), {capped: true, size: 100000, max: 1}));

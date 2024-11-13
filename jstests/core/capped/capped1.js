@@ -6,10 +6,10 @@
  * ]
  */
 
-let t = db.capped1;
+let t = db[jsTestName()];
 t.drop();
 
-db.createCollection("capped1", {capped: true, size: 1024});
+db.createCollection(jsTestName(), {capped: true, size: 1024});
 let v = t.validate();
 assert(v.valid, "A : " + tojson(v));  // SERVER-485
 

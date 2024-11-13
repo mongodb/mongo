@@ -7,7 +7,7 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-const coll = db.timeseries_insert;
+const coll = db[jsTestName()];
 coll.drop();
 
 assert.commandWorked(db.createCollection(

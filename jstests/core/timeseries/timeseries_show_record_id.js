@@ -11,7 +11,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 TimeseriesTest.run((insert) => {
     const timeFieldName = "time";
 
-    const coll = db.timeseries_show_record_id;
+    const coll = db[jsTestName()];
     coll.drop();
 
     assert.commandWorked(

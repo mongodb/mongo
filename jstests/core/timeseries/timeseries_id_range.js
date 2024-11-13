@@ -41,7 +41,7 @@ TimeseriesTest.run((insert) => {
         ISODate("2021-04-10T00:00:00.002Z"),
     ];
 
-    const coll = db.timeseries_id_range;
+    const coll = db[jsTestName()];
     const timeFieldName = "time";
 
     function init() {
@@ -60,7 +60,7 @@ TimeseriesTest.run((insert) => {
 
         let expl = assert.commandWorked(db.runCommand({
             explain: {
-                update: "system.buckets.timeseries_id_range",
+                update: "system.buckets." + coll.getName(),
                 updates: [{q: {"_id": dates[5]}, u: {$set: {a: 1}}}]
             }
         }));

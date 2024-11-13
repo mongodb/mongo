@@ -5,7 +5,7 @@
  */
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB("test");
-const coll = db.getCollection(jsTest.name());
+const coll = db.getCollection(jsTestName());
 
 for (let i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({x: i}));

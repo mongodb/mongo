@@ -5,13 +5,13 @@
  *
  * @tags: [ requires_timeseries, requires_getmore ]
  */
-
-db.timeseries_cursor_batches.drop();
-assert.commandWorked(db.createCollection(
-    'timeseries_cursor_batches', {"timeseries": {"timeField": "time", "metaField": "tag"}}));
+let coll = db[jsTestName()];
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {"timeseries": {"timeField": "time", "metaField": "tag"}}));
 
 // All of these documents will go in the same bucket.
-assert.commandWorked(db.timeseries_cursor_batches.insertMany([
+assert.commandWorked(coll.insertMany([
     {_id: 0, time: new Date("2023-11-03T12:35:19.033Z"), "tag": {t: 1}, "str": "abcdefghijklmnop"},
     {_id: 1, time: new Date("2023-11-03T12:35:19.033Z"), "tag": {t: 1}, "str": ""},
     {_id: 2, time: new Date("2023-11-03T12:35:19.033Z"), "tag": {t: 1}, "str": ""},
@@ -22,8 +22,7 @@ assert.commandWorked(db.timeseries_cursor_batches.insertMany([
 // The 'batchSize' setting ensures we will hit this point after the first document is processed and
 // a getNext is issued.
 const res =
-    db.timeseries_cursor_batches
-        .aggregate([{$match: {"str": {$ne: "hello"}, _id: {$lt: 5}}}, {$project: {_id: 1, str: 1}}],
+    coll.aggregate([{$match: {"str": {$ne: "hello"}, _id: {$lt: 5}}}, {$project: {_id: 1, str: 1}}],
                    {cursor: {batchSize: 1}})
         .toArray();
 assert.eq(res.length, 3, tojson(res));

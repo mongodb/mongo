@@ -17,7 +17,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 TimeseriesTest.run(() => {
-    const collName = "timeseries_index_spec";
+    const collName = jsTestName();
 
     const timeFieldName = "tm";
     const metaFieldName = "mm";

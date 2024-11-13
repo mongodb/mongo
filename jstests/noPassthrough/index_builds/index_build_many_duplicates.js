@@ -20,7 +20,7 @@ replSet.initiate();
 
 const primary = replSet.getPrimary();
 const testDB = primary.getDB('test');
-const coll = testDB.index_build_large_array;
+const coll = testDB[jsTestName()];
 
 // Create documents with many large, duplicated keys.
 const docs = 10 * 1000;

@@ -17,8 +17,8 @@ assert.neq(null, bpConn, "bpConn mongod was unable to start up");
 const classicDb = classicConn.getDB(jsTestName());
 const bpDb = bpConn.getDB(jsTestName());
 
-const classicColl = classicDb.timeseries_group_aggregations;
-const bpColl = bpDb.timeseries_group_aggregations;
+const classicColl = classicDb[jsTestName()];
+const bpColl = bpDb[jsTestName()];
 
 classicColl.drop();
 bpColl.drop();

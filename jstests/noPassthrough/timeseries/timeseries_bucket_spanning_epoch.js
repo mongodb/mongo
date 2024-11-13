@@ -19,7 +19,7 @@ const db = conn.getDB(dbName);
 
 // Test that measurements spanning the Unix Epoch end up in the same bucket.
 (function testUnixEpoch() {
-    let coll = db.timeseries_bucket_spanning_epoch;
+    let coll = db[jsTestName()];
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
@@ -34,7 +34,7 @@ const db = conn.getDB(dbName);
 
 // Test that measurements spanning multiples of the Unix Epoch width end up in the different buckets
 (function testUnixEpoch() {
-    let coll = db.timeseries_bucket_spanning_epoch;
+    let coll = db[jsTestName()];
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
@@ -58,7 +58,7 @@ const db = conn.getDB(dbName);
 
 // Test that measurements with timestamps equivalent modulo 2^32 end up in the same bucket.
 (function testUnixEpochPlus32BitsOverflow() {
-    let coll = db.timeseries_bucket_spanning_epoch;
+    let coll = db[jsTestName()];
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
@@ -74,7 +74,7 @@ const db = conn.getDB(dbName);
 // Test that measurements with a difference of more than the maximum time span expressible in 32-bit
 // precision seconds-count cannot overflow to end up in the same bucket.
 (function testUnixEpochPlus32BitsAndSomeOverflow() {
-    let coll = db.timeseries_bucket_spanning_epoch;
+    let coll = db[jsTestName()];
     let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 

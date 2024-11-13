@@ -34,7 +34,7 @@ function runCmdAndRetryOnNoProgressMade(cmd) {
 export const $config = (function() {
     const initData = {
         getCollectionName: function(collName) {
-            return "timeseries_mixed_operations_" + collName;
+            return jsTestName() + '_' + collName;
         },
 
         getCollection: function(db, collName) {

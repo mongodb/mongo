@@ -16,7 +16,7 @@
 import {exhaustFindCursorAndReturnResults} from "jstests/libs/find_cmd_util.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
-const coll = db.timeseries_hint;
+const coll = db[jsTestName()];
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {
     timeseries: {timeField: 't', metaField: 'm'},

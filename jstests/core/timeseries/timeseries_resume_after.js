@@ -19,7 +19,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 TimeseriesTest.run((insert) => {
     const timeFieldName = "time";
 
-    const coll = db.timeseries_resume_after;
+    const coll = db[jsTestName()];
     coll.drop();
 
     assert.commandWorked(

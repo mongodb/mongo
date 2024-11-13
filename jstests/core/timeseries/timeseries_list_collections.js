@@ -13,7 +13,7 @@ const testDB = db.getSiblingDB(jsTestName());
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
-const collNamePrefix = 'timeseries_list_collections_';
+const collNamePrefix = jsTestName() + '_';
 let collCount = 0;
 
 const bucketMaxSpanSecondsFromMinutes =

@@ -8,10 +8,10 @@
  * ]
  */
 
-const coll = db.capped9;
+const coll = db[jsTestName()];
 coll.drop();
 
-assert.commandWorked(db.createCollection("capped9", {capped: true, size: 1024 * 50}));
+assert.commandWorked(db.createCollection(jsTestName(), {capped: true, size: 1024 * 50}));
 
 assert.commandWorked(coll.insert({_id: 1, x: 2, y: 3}));
 

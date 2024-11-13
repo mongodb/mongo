@@ -609,7 +609,7 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
 // 1. Test a normal collection with a 2dsphere index.
 //    This is our baseline that ensures runExamples() is making correct assertions.
 {
-    const coll = db.getCollection("timeseries_geonear_measurements_baseline");
+    const coll = db.getCollection(jsTestName() + "_baseline");
     coll.drop();
     assert.commandWorked(coll.createIndex({loc: '2dsphere'}));
 
@@ -624,7 +624,7 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
 //    This ensures that the rewrite of $geoNear to $geoWithin + $sort is correct.
 //    But it's a naive / unrealistic query plan.
 {
-    const coll = db.getCollection("timeseries_geonear_measurements_noindex");
+    const coll = db.getCollection(jsTestName() + "_noindex");
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 'time'}}));
 
@@ -635,7 +635,7 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
 // 3. Test a timeseries collection, with a 2dsphere index on measurements.
 //    This should work if $geoWithin is indexed correctly.
 {
-    const coll = db.getCollection("timeseries_geonear_measurements_indexed");
+    const coll = db.getCollection(jsTestName() + "_indexed");
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 'time'}}));
     assert.commandWorked(coll.createIndex({loc: '2dsphere'}));
