@@ -156,6 +156,16 @@ public:
         _cache->finalize();
     }
 
+    /**
+     * Optimizes the partition expression if one exists. If the partition expression references a
+     * let variable it would not have been optimized when initialized.
+     */
+    void optimizePartition() {
+        if (_partitionExpr) {
+            _partitionExpr = _partitionExpr->get()->optimize();
+        }
+    }
+
 private:
     friend class PartitionAccessor;
 

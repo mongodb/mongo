@@ -212,11 +212,21 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
         // Catch any failures that may surface during optimizing the partitionBy expression and add
         // context. This allows for the testing infrastructure to detect when parsing fails due to
         // a new optimization, which passed on an earlier version without the optimization.
-        try {
-            partitionBy = (*partitionBy)->optimize();
-        } catch (DBException& ex) {
-            ex.addContext("Failed to optimize partitionBy expression");
-            throw;
+        //
+        // We can only safely call 'optimize' before 'doOptimizeAt' if there are no user defined
+        // variables.
+        // TODO SERVER-84113: we should be able to call optimize here or move the call to optimize
+        // inside 'doOptimizeAt'.
+        std::set<Variables::Id> refs;
+        expression::addVariableRefs((*partitionBy).get(), &refs);
+        if (!Variables::hasVariableReferenceTo(
+                refs, expCtx->variablesParseState.getDefinedVariableIDs())) {
+            try {
+                partitionBy = (*partitionBy)->optimize();
+            } catch (DBException& ex) {
+                ex.addContext("Failed to optimize partitionBy expression");
+                throw;
+            }
         }
         if (auto exprConst = dynamic_cast<ExpressionConstant*>(partitionBy->get())) {
             uassert(ErrorCodes::TypeMismatch,
@@ -299,10 +309,15 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() {
-    // The _partitionBy is already optimized in create(), along with _iterator which initializes
-    // with it. The _executableOutputs will be constructed using the expressions from the
-    // '_outputFields' on the first call to doGetNext(). As a result, only expressions in the
-    // '_outputFields' are optimized here.
+    // '_partitionBy' might have not been optimized in create(). Therefore we must call optimize
+    // just in case for '_partitionBy' and '_partitionExpr' in '_iterator'. The '_executableOutputs'
+    // will be constructed using the expressions from the'_outputFields' on the first call to
+    // doGetNext(). As a result, '_outputFields' are optimized here.
+    if (_partitionBy) {
+        _partitionBy = _partitionBy->get()->optimize();
+    }
+    _iterator.optimizePartition();
+
     if (_outputFields.size() > 0) {
         // Calculate the new expression SBE compatibility after optimization without overwriting
         // the previous SBE compatibility value. See the optimize() function for $group for a more

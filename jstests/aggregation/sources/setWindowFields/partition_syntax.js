@@ -1,5 +1,5 @@
 /*
- * Test partitioning inside $setWindowFields.
+ * Test partitioning inside $setWindowFields parses as expected.
  *
  * @tags: [
  *   # We assume the pipeline is not split into a shardsPart and mergerPart.
@@ -8,10 +8,10 @@
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */
-import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
+const collName = coll.getName();
 coll.drop();
 assert.commandWorked(coll.insert({int_field: 0, arr: [1, 2]}));
 
@@ -23,6 +23,27 @@ assert.commandFailedWithCode(coll.runCommand({
             partitionBy: "$arr",
             sortBy: {_id: 1},
             output: {a: {$sum: "$int_field", window: {documents: ["unbounded", "current"]}}}
+        }
+    }],
+    cursor: {}
+}),
+                             ErrorCodes.TypeMismatch);
+
+// The same test as above, but 'partitionBy' references a $let variable.
+assert.commandFailedWithCode(coll.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [{
+        $lookup: {
+            from: collName, 
+            let: {v: "$arr"},
+            pipeline: [{
+                $fill: {
+                    partitionBy: {$concatArrays: ["$$v", "$$v"]},
+                    sortBy: {int_field: -1},
+                    output: {str: {method: 'locf'}}
+                }
+            }],
+            as: "o",
         }
     }],
     cursor: {}
@@ -43,46 +64,3 @@ constantPartitionExprs.forEach(function(partitionExpr) {
     assert(explain.stages[1].$_internalInhibitOptimization, explain);
     assert.eq({$_internalSetWindowFields: {output: {}}}, explain.stages[2], explain);
 });
-
-coll.drop();
-assert.commandWorked(coll.insertMany([
-    {int_field: 0},
-    {int_field: null, other_field: null},
-    {other_field: 0},
-    {int_field: null},
-    {other_field: null},
-    {int_field: null, other_field: null}
-]));
-
-// Test that missing and null field are in the same partition.
-let res = coll.aggregate([
-    {$setWindowFields: {partitionBy: "$int_field", output: {count: {$sum: 1}}}},
-    {$project: {_id: 0}}
-]);
-assert(resultsEq(res.toArray(), [
-    {int_field: null, other_field: null, count: 5},
-    {other_field: 0, count: 5},
-    {int_field: null, count: 5},
-    {other_field: null, count: 5},
-    {int_field: null, other_field: null, count: 5},
-    {int_field: 0, count: 1}
-]));
-
-// Test that the compound key with the mix of missing and null field works correctly.
-res = coll.aggregate([
-    {
-        $setWindowFields: {
-            partitionBy: {int_field: "$int_field", other_field: "$other_field"},
-            output: {count: {$sum: 1}}
-        }
-    },
-    {$project: {_id: 0}}
-]);
-assert(resultsEq(res.toArray(), [
-    {int_field: null, count: 1},
-    {int_field: null, other_field: null, count: 2},
-    {int_field: null, other_field: null, count: 2},
-    {other_field: null, count: 1},
-    {int_field: 0, count: 1},
-    {other_field: 0, count: 1}
-]));
