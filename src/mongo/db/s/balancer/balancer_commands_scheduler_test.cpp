@@ -95,8 +95,7 @@ public:
 
     ChunkType makeChunk(long long min, const ShardId& shardId) {
         ChunkType chunk;
-        chunk.setMin(BSON("x" << min));
-        chunk.setMax(BSON("x" << min + 10));
+        chunk.setRange({BSON("x" << min), BSON("x" << min + 10)});
         chunk.setJumbo(false);
         chunk.setShard(shardId);
         chunk.setVersion(ChunkVersion({OID::gen(), Timestamp(10)}, {1, 1}));

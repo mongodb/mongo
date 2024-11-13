@@ -82,8 +82,7 @@ ChunkType generateChunkType(const NamespaceString& nss,
     chunkType.setCollectionUUID(collUuid);
     chunkType.setVersion(chunkVersion);
     chunkType.setShard(shardId);
-    chunkType.setMin(minKey);
-    chunkType.setMax(maxKey);
+    chunkType.setRange({minKey, maxKey});
     chunkType.setOnCurrentShardSince(Timestamp(100, 0));
     chunkType.setHistory({ChunkHistory(*chunkType.getOnCurrentShardSince(), shardId)});
     return chunkType;
@@ -145,7 +144,7 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingMinKeyFoundRetu
 
     ChunkType existingChunkType = requestedChunkType;
     // Min key is different.
-    existingChunkType.setMin(BSON("a" << -1));
+    existingChunkType.setRange({BSON("a" << -1), existingChunkType.getMax()});
     setupCollection(_nss, _keyPattern, {existingChunkType});
 
     ShardingCatalogManager::get(operationContext())
@@ -174,7 +173,7 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingMaxKeyFoundRetu
 
     ChunkType existingChunkType = requestedChunkType;
     // Max key is different.
-    existingChunkType.setMax(BSON("a" << 20));
+    existingChunkType.setRange({existingChunkType.getMin(), BSON("a" << 20)});
     setupCollection(_nss, _keyPattern, {existingChunkType});
 
     ShardingCatalogManager::get(operationContext())

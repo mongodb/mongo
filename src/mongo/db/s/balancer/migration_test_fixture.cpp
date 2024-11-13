@@ -88,8 +88,7 @@ ChunkType MigrationTestFixture::setUpChunk(const UUID& collUUID,
     ChunkType chunk;
     chunk.setCollectionUUID(collUUID);
 
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkMax);
+    chunk.setRange({chunkMin, chunkMax});
     chunk.setShard(shardId);
     chunk.setVersion(version);
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),

@@ -773,6 +773,8 @@ mongo_cc_library(
         "//src/mongo/s:type_collection_common_types_gen",
         "//src/mongo/s/catalog:type_chunk.h",
         "//src/mongo/s/catalog:type_chunk_base_gen",
+        "//src/mongo/s/catalog:type_chunk_range.h",
+        "//src/mongo/s/catalog:type_chunk_range_base_gen",
         "//src/mongo/s/catalog:type_database_gen",
         "//src/mongo/s/catalog:type_index_catalog.h",
         "//src/mongo/s/catalog:type_index_catalog_gen",

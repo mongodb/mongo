@@ -90,8 +90,7 @@ namespace {
 ChunkType toChunkType(const MigratedChunkType& migratedChunk) {
 
     ChunkType chunk;
-    chunk.setMin(migratedChunk.getMin());
-    chunk.setMax(migratedChunk.getMax());
+    chunk.setRange({migratedChunk.getMin(), migratedChunk.getMax()});
     chunk.setVersion(migratedChunk.getLastmod());
     return chunk;
 }

@@ -337,10 +337,10 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkGapFail) {
         calculateIntermediateShardKey(shrinkedChunk.getMin(), shrinkedChunk.getMax());
     if (_random.nextInt64(2)) {
         // Shrink right bound
-        shrinkedChunk.setMax(intermediateKey);
+        shrinkedChunk.setRange({shrinkedChunk.getMin(), intermediateKey});
     } else {
         // Shrink left bound
-        shrinkedChunk.setMin(intermediateKey);
+        shrinkedChunk.setRange({intermediateKey, shrinkedChunk.getMax()});
     }
 
     // Create a new routing table from the randomly generated chunks
@@ -362,10 +362,10 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkGapFail) {
         calculateIntermediateShardKey(shrinkedChunk.getMin(), shrinkedChunk.getMax());
     if (_random.nextInt64(2)) {
         // Shrink right bound
-        shrinkedChunk.setMax(intermediateKey);
+        shrinkedChunk.setRange({shrinkedChunk.getMin(), intermediateKey});
     } else {
         // Shrink left bound
-        shrinkedChunk.setMin(intermediateKey);
+        shrinkedChunk.setRange({intermediateKey, shrinkedChunk.getMax()});
     }
 
     // Bump chunk version
@@ -390,11 +390,12 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
         !canExtendLeft || ((chunkToExtendIt < std::prev(chunks.end())) && _random.nextInt64(2));
     const auto extendLeft = !extendRight;
     if (extendRight) {
+        auto newMax = calculateIntermediateShardKey(chunkToExtendIt->getMax(),
+                                                    std::next(chunkToExtendIt)->getMax(),
+                                                    0.0 /* minKeyProb */,
+                                                    0.1 /* maxKeyProb */);
         // extend right bound
-        chunkToExtendIt->setMax(calculateIntermediateShardKey(chunkToExtendIt->getMax(),
-                                                              std::next(chunkToExtendIt)->getMax(),
-                                                              0.0 /* minKeyProb */,
-                                                              0.1 /* maxKeyProb */));
+        chunkToExtendIt->setRange({chunkToExtendIt->getMin(), newMax});
         auto newVersion = chunkToExtendIt->getVersion();
         newVersion.incMajor();
         std::next(chunkToExtendIt)->setVersion(newVersion);
@@ -402,11 +403,13 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
 
     if (extendLeft) {
         invariant(canExtendLeft);
+        auto newMin = calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
+                                                    chunkToExtendIt->getMin(),
+                                                    0.1 /* minKeyProb */,
+                                                    0.0 /* maxKeyProb */);
+
         // extend left bound
-        chunkToExtendIt->setMin(calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
-                                                              chunkToExtendIt->getMin(),
-                                                              0.1 /* minKeyProb */,
-                                                              0.0 /* maxKeyProb */));
+        chunkToExtendIt->setRange({newMin, chunkToExtendIt->getMax()});
         auto newVersion = chunkToExtendIt->getVersion();
         newVersion.incMajor();
         std::prev(chunkToExtendIt)->setVersion(newVersion);
@@ -433,16 +436,18 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkOverlapFail) {
         !canExtendLeft || (chunkToExtendIt < std::prev(chunks.end()) && _random.nextInt64(2));
     const auto extendLeft = !extendRight;
     if (extendRight) {
+        auto newMax = calculateIntermediateShardKey(chunkToExtendIt->getMax(),
+                                                    std::next(chunkToExtendIt)->getMax());
         // extend right bound
-        chunkToExtendIt->setMax(calculateIntermediateShardKey(
-            chunkToExtendIt->getMax(), std::next(chunkToExtendIt)->getMax()));
+        chunkToExtendIt->setRange({chunkToExtendIt->getMin(), newMax});
     }
 
     if (extendLeft) {
         invariant(canExtendLeft);
+        auto newMin = calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
+                                                    chunkToExtendIt->getMin());
         // extend left bound
-        chunkToExtendIt->setMin(calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
-                                                              chunkToExtendIt->getMin()));
+        chunkToExtendIt->setRange({newMin, chunkToExtendIt->getMax()});
     }
 
     // Bump chunk version
@@ -460,7 +465,8 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkOverlapFail) {
 TEST_F(RoutingTableHistoryTest, RandomCreateWrongMinFail) {
     auto chunks = genRandomChunkVector();
 
-    chunks.begin()->setMin(BSON("a" << std::numeric_limits<int64_t>::min()));
+    chunks.begin()->setRange(
+        {BSON("a" << std::numeric_limits<int64_t>::min()), chunks.begin()->getMax()});
 
     // Create a new routing table from the randomly generated chunks
     ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
@@ -472,7 +478,8 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWrongMinFail) {
 TEST_F(RoutingTableHistoryTest, RandomCreateWrongMaxFail) {
     auto chunks = genRandomChunkVector();
 
-    chunks.begin()->setMax(BSON("a" << std::numeric_limits<int64_t>::max()));
+    chunks.begin()->setRange(
+        {chunks.begin()->getMin(), BSON("a" << std::numeric_limits<int64_t>::max())});
 
     // Create a new routing table from the randomly generated chunks
     ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);

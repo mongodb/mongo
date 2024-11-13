@@ -137,8 +137,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
         migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
         migratedChunk.setHistory(
             {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
-        migratedChunk.setMin(BSON("a" << 1));
-        migratedChunk.setMax(BSON("a" << 10));
+        migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
         origVersion.incMinor();
 
@@ -149,8 +148,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
         controlChunk.setOnCurrentShardSince(Timestamp(50, 0));
         controlChunk.setHistory(
             {ChunkHistory(*controlChunk.getOnCurrentShardSince(), shard0.getName())});
-        controlChunk.setMin(BSON("a" << 10));
-        controlChunk.setMax(BSON("a" << 20));
+        controlChunk.setRange({BSON("a" << 10), BSON("a" << 20)});
         controlChunk.setJumbo(true);
     }
 
@@ -232,9 +230,8 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
 
     // apportion
     auto chunkMin = BSON("a" << 1);
-    chunk0.setMin(chunkMin);
     auto chunkMax = BSON("a" << 10);
-    chunk0.setMax(chunkMax);
+    chunk0.setRange({chunkMin, chunkMax});
 
     setupCollection(kNamespace, kKeyPattern, {chunk0});
     const auto currentTime = VectorClock::get(getServiceContext())->getTime();
@@ -299,9 +296,8 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
 
     // apportion
     auto chunkMin = BSON("a" << 1);
-    chunk0.setMin(chunkMin);
     auto chunkMax = BSON("a" << 10);
-    chunk0.setMax(chunkMax);
+    chunk0.setRange({chunkMin, chunkMax});
 
     setupCollection(kNamespace, kKeyPattern, {chunk0});
 
@@ -365,9 +361,8 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
 
     // apportion
     auto chunkMin = BSON("a" << 1);
-    chunk0.setMin(chunkMin);
     auto chunkMax = BSON("a" << 10);
-    chunk0.setMax(chunkMax);
+    chunk0.setRange({chunkMin, chunkMax});
 
     setupCollection(kNamespace, kKeyPattern, {chunk0});
 
@@ -412,9 +407,8 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 
     // apportion
     auto chunkMin = BSON("a" << 1);
-    chunk0.setMin(chunkMin);
     auto chunkMax = BSON("a" << 10);
-    chunk0.setMax(chunkMax);
+    chunk0.setRange({chunkMin, chunkMax});
 
     ChunkType chunk1;
     chunk1.setName(OID::gen());
@@ -422,9 +416,8 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     chunk1.setVersion(origVersion);
     chunk1.setShard(shard0.getName());
 
-    chunk1.setMin(chunkMax);
     auto chunkMaxax = BSON("a" << 20);
-    chunk1.setMax(chunkMaxax);
+    chunk1.setRange({chunkMax, chunkMaxax});
 
     setupCollection(kNamespace, kKeyPattern, {chunk0, chunk1});
 
@@ -466,9 +459,8 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
 
     // apportion
     auto chunkMin = BSON("a" << 1);
-    chunk0.setMin(chunkMin);
     auto chunkMax = BSON("a" << 10);
-    chunk0.setMax(chunkMax);
+    chunk0.setRange({chunkMin, chunkMax});
 
     ChunkType chunk1;
     chunk1.setName(OID::gen());
@@ -476,9 +468,8 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     chunk1.setVersion(otherVersion);
     chunk1.setShard(shard0.getName());
 
-    chunk1.setMin(chunkMax);
     auto chunkMaxax = BSON("a" << 20);
-    chunk1.setMax(chunkMaxax);
+    chunk1.setRange({chunkMax, chunkMaxax});
 
     // get version from the control chunk this time
     setupCollection(kNamespace, kKeyPattern, {chunk1, chunk0});
@@ -524,9 +515,8 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
 
     // apportion
     auto chunkMin = BSON("a" << 1);
-    chunk0.setMin(chunkMin);
     auto chunkMax = BSON("a" << 10);
-    chunk0.setMax(chunkMax);
+    chunk0.setRange({chunkMin, chunkMax});
 
     ChunkType chunk1;
     chunk1.setName(OID::gen());
@@ -534,9 +524,8 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     chunk1.setVersion(origVersion);
     chunk1.setShard(shard1.getName());
 
-    chunk1.setMin(chunkMax);
     auto chunkMaxax = BSON("a" << 20);
-    chunk1.setMax(chunkMaxax);
+    chunk1.setRange({chunkMax, chunkMaxax});
 
     Timestamp ctrlChunkValidAfter = Timestamp(50, 0);
     chunk1.setOnCurrentShardSince(ctrlChunkValidAfter);
@@ -609,8 +598,7 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
     migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
     migratedChunk.setHistory(
         {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
-    migratedChunk.setMin(BSON("a" << 1));
-    migratedChunk.setMax(BSON("a" << 10));
+    migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     ChunkType currentChunk;
     currentChunk.setName(OID::gen());
@@ -620,8 +608,7 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
     currentChunk.setOnCurrentShardSince(Timestamp(100, 0));
     currentChunk.setHistory(
         {ChunkHistory(*currentChunk.getOnCurrentShardSince(), shard0.getName())});
-    currentChunk.setMin(BSON("a" << 1));
-    currentChunk.setMax(BSON("a" << 10));
+    currentChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     setupCollection(kNamespace, kKeyPattern, {currentChunk});
 
@@ -661,8 +648,7 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
     migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
     migratedChunk.setHistory(
         {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
-    migratedChunk.setMin(BSON("a" << 1));
-    migratedChunk.setMax(BSON("a" << 10));
+    migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     ChunkVersion currentChunkVersion({epoch, Timestamp(42)}, {14, 7});
 
@@ -674,8 +660,7 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
     currentChunk.setOnCurrentShardSince(Timestamp(100, 0));
     currentChunk.setHistory(
         {ChunkHistory(*currentChunk.getOnCurrentShardSince(), shard0.getName())});
-    currentChunk.setMin(BSON("a" << 1));
-    currentChunk.setMax(BSON("a" << 10));
+    currentChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     setupCollection(kNamespace, kKeyPattern, {currentChunk});
 
@@ -715,8 +700,7 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
     migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
     migratedChunk.setHistory(
         {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
-    migratedChunk.setMin(BSON("a" << 1));
-    migratedChunk.setMax(BSON("a" << 10));
+    migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     ChunkVersion currentChunkVersion({OID::gen(), Timestamp(42)}, {12, 7});
 
@@ -728,8 +712,7 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
     currentChunk.setOnCurrentShardSince(Timestamp(100, 0));
     currentChunk.setHistory(
         {ChunkHistory(*currentChunk.getOnCurrentShardSince(), shard0.getName())});
-    currentChunk.setMin(BSON("a" << 1));
-    currentChunk.setMax(BSON("a" << 10));
+    currentChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     setupCollection(kNamespace, kKeyPattern, {currentChunk});
 
@@ -765,8 +748,7 @@ public:
         chunk.setHistory(history);
         if (!history.empty())
             chunk.setOnCurrentShardSince(history.front().getValidAfter());
-        chunk.setMin(min);
-        chunk.setMax(max);
+        chunk.setRange({min, max});
 
         return chunk;
     }
@@ -972,7 +954,7 @@ TEST_F(CommitMoveRangeTest, MoveRangeSplitChunkLeftSide) {
 
     const ChunkType origChunk = chunks.at(0);
     ChunkType migratedChunk = origChunk;
-    migratedChunk.setMin(BSON("x" << 10));
+    migratedChunk.setRange({BSON("x" << 10), migratedChunk.getMax()});
 
     runMoveRangeAndVerify(
         origChunk, migratedChunk, true /* expectLeftSplit */, false /* expectRightSplit */);
@@ -991,7 +973,7 @@ TEST_F(CommitMoveRangeTest, MoveRangeSplitChunkRightSide) {
 
     const ChunkType origChunk = chunks.at(0);
     ChunkType migratedChunk = origChunk;
-    migratedChunk.setMax(BSON("x" << 10));
+    migratedChunk.setRange({migratedChunk.getMin(), BSON("x" << 10)});
 
     runMoveRangeAndVerify(
         origChunk, migratedChunk, false /* expectLeftSplit */, true /* expectRightSplit */);
@@ -1010,8 +992,7 @@ TEST_F(CommitMoveRangeTest, MoveRangeSplitChunkLeftRightSide) {
 
     const ChunkType origChunk = chunks.at(0);
     ChunkType migratedChunk = origChunk;
-    migratedChunk.setMin(BSON("x" << 1));
-    migratedChunk.setMax(BSON("x" << 10));
+    migratedChunk.setRange({BSON("x" << 1), BSON("x" << 10)});
 
     runMoveRangeAndVerify(
         origChunk, migratedChunk, true /* expectLeftSplit */, true /* expectRightSplit */);
@@ -1031,7 +1012,7 @@ TEST_F(CommitMoveRangeTest, MoveRangeRandom) {
     bool expectLeftSplit = [&]() {
         if (origChunkIndex > 0 && random.nextInt32(2)) {
             const auto newMin = origChunk.getMin().getIntField("x") + 2;
-            migratedChunk.setMin(BSON("x" << newMin));
+            migratedChunk.setRange({BSON("x" << newMin), migratedChunk.getMax()});
             return true;
         }
         return false;
@@ -1040,7 +1021,7 @@ TEST_F(CommitMoveRangeTest, MoveRangeRandom) {
     bool expectRightSplit = [&]() {
         if (origChunkIndex < nChunks - 1 && random.nextInt32(2)) {
             const auto newMax = origChunk.getMax().getIntField("x") - 2;
-            migratedChunk.setMax(BSON("x" << newMax));
+            migratedChunk.setRange({migratedChunk.getMin(), BSON("x" << newMax)});
             return true;
         }
         return false;

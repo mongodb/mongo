@@ -58,10 +58,7 @@ const BSONField<BSONObj> TagsType::min("min");
 const BSONField<BSONObj> TagsType::max("max");
 
 TagsType::TagsType(NamespaceString nss, std::string tag, ChunkRange range)
-    : _ns(std::move(nss)),
-      _tag(std::move(tag)),
-      _minKey(range.getMin().getOwned()),
-      _maxKey(range.getMax().getOwned()) {}
+    : _ns(std::move(nss)), _tag(std::move(tag)), _range(std::move(range)) {}
 
 StatusWith<TagsType> TagsType::fromBSON(const BSONObj& source) {
     TagsType tags;
@@ -88,13 +85,11 @@ StatusWith<TagsType> TagsType::fromBSON(const BSONObj& source) {
     }
 
     {
-        auto tagRangeStatus = ChunkRange::fromBSON(source);
-        if (!tagRangeStatus.isOK())
-            return tagRangeStatus.getStatus();
-
-        const auto tagRange = std::move(tagRangeStatus.getValue());
-        tags._minKey = tagRange.getMin().getOwned();
-        tags._maxKey = tagRange.getMax().getOwned();
+        try {
+            tags._range = ChunkRange::fromBSON(source);
+        } catch (const DBException& e) {
+            return e.toStatus().withContext("Failed to parse chunk range");
+        }
     }
 
     return tags;
@@ -109,32 +104,13 @@ Status TagsType::validate() const {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << tag.name() << " field");
     }
 
-    if (!_minKey.has_value() || _minKey->isEmpty()) {
-        return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << min.name() << " field");
+    if (!_range.has_value()) {
+        return Status(ErrorCodes::NoSuchKey, str::stream() << "missing range field");
     }
 
-    if (!_maxKey.has_value() || _maxKey->isEmpty()) {
-        return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << max.name() << " field");
-    }
-
-    // 'min' and 'max' must share the same fields.
-    if (_minKey->nFields() != _maxKey->nFields()) {
-        return Status(ErrorCodes::BadValue, "min and max have a different number of keys");
-    }
-
-    BSONObjIterator minIt(_minKey.value());
-    BSONObjIterator maxIt(_maxKey.value());
-    while (minIt.more() && maxIt.more()) {
-        BSONElement minElem = minIt.next();
-        BSONElement maxElem = maxIt.next();
-        if (strcmp(minElem.fieldName(), maxElem.fieldName()) != 0) {
-            return Status(ErrorCodes::BadValue, "min and max have different set of keys");
-        }
-    }
-
-    // 'max' should be greater than 'min'.
-    if (_minKey->woCompare(_maxKey.value()) >= 0) {
-        return Status(ErrorCodes::BadValue, "max key must be greater than min key");
+    auto rangeValidationStatus = ChunkRange::validateStrict(*_range);
+    if (!rangeValidationStatus.isOK()) {
+        return rangeValidationStatus;
     }
 
     return Status::OK();
@@ -149,10 +125,9 @@ BSONObj TagsType::toBSON() const {
             NamespaceStringUtil::serialize(getNS(), SerializationContext::stateDefault()));
     if (_tag)
         builder.append(tag.name(), getTag());
-    if (_minKey)
-        builder.append(min.name(), getMinKey());
-    if (_maxKey)
-        builder.append(max.name(), getMaxKey());
+    if (_range) {
+        _range->serialize(&builder);
+    }
 
     return builder.obj();
 }
@@ -171,14 +146,8 @@ void TagsType::setTag(const std::string& tag) {
     _tag = tag;
 }
 
-void TagsType::setMinKey(const BSONObj& minKey) {
-    invariant(!minKey.isEmpty());
-    _minKey = minKey;
-}
-
-void TagsType::setMaxKey(const BSONObj& maxKey) {
-    invariant(!maxKey.isEmpty());
-    _maxKey = maxKey;
+void TagsType::setRange(const ChunkRange& range) {
+    _range = range;
 }
 
 }  // namespace mongo

@@ -118,8 +118,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldSucceedWhenNoChunks
     // Insert a chunk range document referring to a different zone
     TagsType tagDoc;
     tagDoc.setNS(NamespaceString::createNamespaceString_forTest("test.foo"));
-    tagDoc.setMinKey(BSON("x" << 0));
-    tagDoc.setMaxKey(BSON("x" << 10));
+    tagDoc.setRange({BSON("x" << 0), BSON("x" << 10)});
     tagDoc.setTag("y");
     insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON())
         .transitional_ignore();
@@ -158,8 +157,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldFailWhenAChunkRefer
 
     TagsType tagDoc;
     tagDoc.setNS(NamespaceString::createNamespaceString_forTest("test.foo"));
-    tagDoc.setMinKey(BSON("x" << 0));
-    tagDoc.setMaxKey(BSON("x" << 10));
+    tagDoc.setRange({BSON("x" << 0), BSON("x" << 10)});
     tagDoc.setTag("z");
     insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON())
         .transitional_ignore();

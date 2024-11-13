@@ -196,8 +196,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeFiveChunks(
 
         ChunkType chunk;
         chunk.setCollectionUUID(uuid);
-        chunk.setMin(mins[i]);
-        chunk.setMax(maxs[i]);
+        chunk.setRange({mins[i], maxs[i]});
         chunk.setShard(kShardId);
         chunk.setVersion(collPlacementVersion);
 
@@ -229,8 +228,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeFiveRefinedChunks(
 
         ChunkType chunk;
         chunk.setCollectionUUID(uuid);
-        chunk.setMin(mins[i]);
-        chunk.setMax(maxs[i]);
+        chunk.setRange({mins[i], maxs[i]});
         chunk.setShard(kShardId);
         chunk.setVersion(collPlacementVersion);
 
@@ -253,8 +251,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeThreeUpdatedChunksDiff(
     // persisted results without applying modifications.
     ChunkType oldChunk;
     oldChunk.setCollectionUUID(uuid);
-    oldChunk.setMin(BSON("a" << 200));
-    oldChunk.setMax(BSON("a" << MAXKEY));
+    oldChunk.setRange({BSON("a" << 200), BSON("a" << MAXKEY)});
     oldChunk.setShard(kShardId);
     oldChunk.setVersion(collPlacementVersion);
     chunks.push_back(oldChunk);
@@ -269,8 +266,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeThreeUpdatedChunksDiff(
 
         ChunkType chunk;
         chunk.setCollectionUUID(uuid);
-        chunk.setMin(mins[i]);
-        chunk.setMax(maxs[i]);
+        chunk.setRange({mins[i], maxs[i]});
         chunk.setShard(kShardId);
         chunk.setVersion(collPlacementVersion);
 

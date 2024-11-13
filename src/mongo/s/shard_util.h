@@ -43,7 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_chunk_range.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_key_pattern.h"
 

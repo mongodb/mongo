@@ -210,10 +210,11 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
 }
 
 BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {
-    return BSON(RangeDeletionTask::kCollectionUuidFieldName
-                << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
-                << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
-                << range.getMax());
+    return BSON(
+        RangeDeletionTask::kCollectionUuidFieldName
+        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
+        << range.getMax());
 }
 
 

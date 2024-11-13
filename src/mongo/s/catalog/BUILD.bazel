@@ -28,6 +28,14 @@ idl_generator(
 )
 
 idl_generator(
+    name = "type_chunk_range_base_gen",
+    src = "type_chunk_range_base.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "type_chunk_base_gen",
     src = "type_chunk_base.idl",
     deps = [

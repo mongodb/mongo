@@ -176,8 +176,7 @@ bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk
     if (!nextChunk)
         return false;
 
-    chunk->setMin(nextChunk->getMin());
-    chunk->setMax(nextChunk->getMax());
+    chunk->setRange(nextChunk->getRange());
 
     return true;
 }

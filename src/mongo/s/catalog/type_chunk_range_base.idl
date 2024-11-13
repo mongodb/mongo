@@ -1,4 +1,4 @@
-# Copyright (C) 2019-present MongoDB, Inc.
+# Copyright (C) 2024-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -26,25 +26,20 @@
 # it in the license file.
 #
 
-# IDL type for the ChunkRange class
-
 global:
     cpp_namespace: "mongo"
-    cpp_includes:
-        - "mongo/s/catalog/type_chunk_range.h"
 
 imports:
     - "mongo/db/basic_types.idl"
 
-types:
-    # Note that in order to use this type for a non-optional field, you must add the IDL struct as a
-    # friend class of ChunkRange so that it can access its default constructor.
-    chunk_range:
-        description: "Represents the bounds of a chunk range. See ChunkRange for the semantics of
-                      the bounds."
-        bson_serialization_type: object
-        cpp_type: "mongo::ChunkRange"
-        serializer: "mongo::ChunkRange::toBSON"
-        deserializer: "mongo::ChunkRange::fromBSON"
-        # Deserializer uses getOwned.
-        is_view: false
+structs:
+    ChunkRangeBase:
+         description: "Basic types that represents range bounds"
+         strict: false
+         fields:
+            min:
+                description: "Lower bound of the range"
+                type: object_owned
+            max:
+                description: "Upper bound of the range"
+                type: object_owned

@@ -36,7 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_chunk_range.h"
 
 namespace mongo {
 

@@ -84,7 +84,7 @@ TEST(TagsType, MissingMinKey) {
 
     StatusWith<TagsType> status = TagsType::fromBSON(obj);
     ASSERT_FALSE(status.isOK());
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, status.getStatus());
+    ASSERT_EQUALS(ErrorCodes::IDLFailedToParse, status.getStatus());
 }
 
 TEST(TagsType, MissingMaxKey) {
@@ -93,7 +93,7 @@ TEST(TagsType, MissingMaxKey) {
 
     StatusWith<TagsType> status = TagsType::fromBSON(obj);
     ASSERT_FALSE(status.isOK());
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, status.getStatus());
+    ASSERT_EQUALS(ErrorCodes::IDLFailedToParse, status.getStatus());
 }
 
 TEST(TagsType, KeysWithDifferentNumberOfColumns) {
@@ -122,7 +122,7 @@ TEST(TagsType, KeysNotAscending) {
                                   << TagsType::max(BSON("a" << 10)));
 
     StatusWith<TagsType> tagStatus = TagsType::fromBSON(obj);
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, tagStatus.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, tagStatus.getStatus());
 }
 
 TEST(TagsType, BadType) {

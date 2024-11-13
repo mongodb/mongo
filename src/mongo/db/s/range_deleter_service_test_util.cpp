@@ -216,9 +216,9 @@ void verifyRangeDeletionTasks(OperationContext* opCtx,
 
     // Check expectedChunkRanges are exactly the same as the returned ones
     for (size_t i = 0; i < expectedChunkRanges.size(); ++i) {
-        ASSERT(ChunkRange::fromBSONThrowing(chunkRanges[i].Obj()) == expectedChunkRanges[i])
-            << "Expected " << ChunkRange::fromBSONThrowing(chunkRanges[i].Obj()).toBSON()
-            << " == " << expectedChunkRanges[i].toBSON();
+        auto chunkRange = ChunkRange::fromBSON(chunkRanges[i].Obj());
+        ASSERT(chunkRange == expectedChunkRanges[i])
+            << "Expected " << chunkRange.toBSON() << " == " << expectedChunkRanges[i].toBSON();
     }
 }
 

@@ -153,7 +153,7 @@ public:
 
         auto cloneRequest = uassertStatusOK(StartChunkCloneRequest::createFromCommand(nss, cmdObj));
 
-        const auto chunkRange = uassertStatusOK(ChunkRange::fromBSON(cmdObj));
+        const auto chunkRange = ChunkRange::fromBSON(cmdObj);
 
         const auto writeConcern =
             uassertStatusOK(ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(

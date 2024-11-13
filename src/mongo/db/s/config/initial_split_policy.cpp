@@ -792,8 +792,8 @@ BSONObjSet SamplingBasedSplitPolicy::createFirstSplitPoints(OperationContext* op
                                                             const SplitPolicyParams& params) {
     if (_zones) {
         for (auto& zone : *_zones) {
-            zone.setMinKey(shardKey.getKeyPattern().extendRangeBound(zone.getMinKey(), false));
-            zone.setMaxKey(shardKey.getKeyPattern().extendRangeBound(zone.getMaxKey(), false));
+            zone.setRange({shardKey.getKeyPattern().extendRangeBound(zone.getMinKey(), false),
+                           shardKey.getKeyPattern().extendRangeBound(zone.getMaxKey(), false)});
         }
     }
 
@@ -986,8 +986,8 @@ InitialSplitPolicy::ShardCollectionConfig ShardDistributionSplitPolicy::createFi
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
     if (_zones) {
         for (auto& zone : *_zones) {
-            zone.setMinKey(keyPattern.extendRangeBound(zone.getMinKey(), false));
-            zone.setMaxKey(keyPattern.extendRangeBound(zone.getMaxKey(), false));
+            zone.setRange({keyPattern.extendRangeBound(zone.getMinKey(), false),
+                           keyPattern.extendRangeBound(zone.getMaxKey(), false)});
         }
     }
 

@@ -21,9 +21,9 @@ function testZoneOnShard(ns, testParameters) {
     var chunkMinBoundary = testParameters["min"];
     var chunkMaxBoundary = testParameters["max"];
     var zone = testParameters["zone"];
-    var returnCode = testParameters["returnCode"];
+    var errorCodes = testParameters["errorCodes"];
 
-    if (returnCode === 0) {
+    if (errorCodes.length === 0) {
         assert.commandWorked(st.s.adminCommand(
             {updateZoneKeyRange: ns, min: chunkMinBoundary, max: chunkMaxBoundary, zone: zone}));
         var tagDoc = configDB.tags.findOne();
@@ -41,7 +41,7 @@ function testZoneOnShard(ns, testParameters) {
         assert.commandFailedWithCode(
             st.s.adminCommand(
                 {updateZoneKeyRange: ns, min: chunkMinBoundary, max: chunkMaxBoundary, zone: zone}),
-            returnCode);
+            errorCodes);
 
         let tagDoc = configDB.tags.findOne();
         verifyChunkBounds(tagDoc, ns, currentMinBoundary, currentMaxBoundary, currentZone);
@@ -56,10 +56,16 @@ function verifyChunkBounds(tagDoc, ns, minKey, maxKey, tag) {
 }
 
 var basicIntegrationTestCases = [
-    {'min': {x: 0}, 'max': {x: 10}, 'zone': 'x', 'returnCode': 0},
-    {'min': {x: -10}, 'max': {x: 20}, 'zone': 'x', 'returnCode': ErrorCodes.RangeOverlapConflict},
-    {'min': {x: 10}, 'max': {x: 0}, 'zone': 'x', 'returnCode': ErrorCodes.FailedToParse},
-    {'min': {x: 0}, 'max': {x: 10}, 'zone': null, 'returnCode': 0}
+    {'min': {x: 0}, 'max': {x: 10}, 'zone': 'x', 'errorCodes': []},
+    {'min': {x: -10}, 'max': {x: 20}, 'zone': 'x', 'errorCodes': [ErrorCodes.RangeOverlapConflict]},
+    {
+        'min': {x: 10},
+        'max': {x: 0},
+        'zone': 'x',
+        // TODO SERVER-96757: remove FailedToParse error code once 9.0 becomes last LTS
+        'errorCodes': [ErrorCodes.BadValue, ErrorCodes.FailedToParse]
+    },
+    {'min': {x: 0}, 'max': {x: 10}, 'zone': null, 'errorCodes': []}
 ];
 
 /**
@@ -116,32 +122,36 @@ basicIntegrationTestCases.forEach(function(test) {
  */
 
 var compoundKeyTestCases = [
-    {'min': {_id: 0, x: 0}, 'max': {_id: 100, x: 10}, 'zone': 'x', 'returnCode': 0},
+    {'min': {_id: 0, x: 0}, 'max': {_id: 100, x: 10}, 'zone': 'x', 'errorCodes': []},
     {
         'min': {_id: 100, x: 10},
         'max': {_id: 100, x: 1},
         'zone': 'x',
-        'returnCode': ErrorCodes.FailedToParse
+        // TODO SERVER-96757: remove FailedToParse error code once 9.0 becomes last LTS
+        'errorCodes': [ErrorCodes.BadValue, ErrorCodes.FailedToParse]
     },
     {
         'min': {_id: 10, x: 1},
         'max': {_id: 1, x: 10},
         'zone': 'x',
-        'returnCode': ErrorCodes.FailedToParse
+        // TODO SERVER-96757: remove FailedToParse error code once 9.0 becomes last LTS
+        'errorCodes': [ErrorCodes.BadValue, ErrorCodes.FailedToParse]
     },
     {
         'min': {_id: 10, x: 10},
         'max': {_id: 1, x: 1},
         'zone': 'x',
-        'returnCode': ErrorCodes.FailedToParse
+        // TODO SERVER-96757: remove FailedToParse error code once 9.0 becomes last LTS
+        'errorCodes': [ErrorCodes.BadValue, ErrorCodes.FailedToParse]
     },
     {
         'min': {_id: 0, x: 0},
         'max': {_id: 0, x: 0},
         'zone': 'x',
-        'returnCode': ErrorCodes.FailedToParse
+        // TODO SERVER-96757: remove FailedToParse error code once 9.0 becomes last LTS
+        'errorCodes': [ErrorCodes.BadValue, ErrorCodes.FailedToParse]
     },
-    {'min': {_id: 0, x: 0}, 'max': {_id: 100, x: 10}, 'zone': null, 'returnCode': 0}
+    {'min': {_id: 0, x: 0}, 'max': {_id: 100, x: 10}, 'zone': null, 'errorCodes': []}
 ];
 
 assert.commandWorked(st.s.adminCommand({shardCollection: 'test.compound', key: {_id: 1, x: 1}}));

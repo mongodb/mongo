@@ -51,6 +51,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk_base_gen.h"
+#include "mongo/s/catalog/type_chunk_range.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/type_traits.h"
@@ -64,97 +65,6 @@ class BSONObjBuilder;
 class Status;
 template <typename T>
 class StatusWith;
-
-/**
- * Contains the minimum representation of a chunk - its bounds in the format [min, max) along with
- * utilities for parsing and persistence.
- */
-class ChunkRange {
-public:
-    static constexpr char kMinKey[] = "min";
-    static constexpr char kMaxKey[] = "max";
-
-    ChunkRange(BSONObj minKey, BSONObj maxKey);
-
-    /**
-     * Parses a chunk range using the format { min: <min bound>, max: <max bound> }.
-     */
-    static StatusWith<ChunkRange> fromBSON(const BSONObj& obj);
-
-    /**
-     * A throwing version of 'fromBSON'.
-     */
-    static ChunkRange fromBSONThrowing(const BSONObj& obj) {
-        return uassertStatusOK(fromBSON(obj));
-    }
-
-    const BSONObj& getMin() const {
-        return _minKey;
-    }
-
-    const BSONObj& getMax() const {
-        return _maxKey;
-    }
-
-    /**
-     * Checks whether the specified key is within the bounds of this chunk range.
-     */
-    bool containsKey(const BSONObj& key) const;
-
-    /**
-     * Writes the contents of this chunk range as { min: <min bound>, max: <max bound> }.
-     */
-    void append(BSONObjBuilder* builder) const;
-
-    BSONObj toBSON() const;
-
-    std::string toString() const;
-
-    /**
-     * Returns true if two chunk ranges match exactly in terms of the min and max keys (including
-     * element order within the keys).
-     */
-    bool operator==(const ChunkRange& other) const;
-    bool operator!=(const ChunkRange& other) const;
-
-    /**
-     * Returns true if either min is less than rhs min, or in the case that min == rhs min, true if
-     * max is less than rhs max. Otherwise returns false.
-     */
-    bool operator<(const ChunkRange& rhs) const;
-
-    /**
-     * Returns true iff the union of *this and the argument range is the same as *this.
-     */
-    bool covers(ChunkRange const& other) const;
-
-    /**
-     * Returns the range of overlap between *this and other, if any.
-     */
-    boost::optional<ChunkRange> overlapWith(ChunkRange const& other) const;
-
-    /**
-     * Returns true if there is any overlap between the two ranges.
-     */
-    bool overlaps(const ChunkRange& other) const;
-
-    /**
-     * Returns a range that includes *this and other. If the ranges do not overlap, it includes
-     * all the space between, as well.
-     */
-    ChunkRange unionWith(ChunkRange const& other) const;
-
-private:
-    /** Does not enforce the non-empty range invariant. */
-    ChunkRange() = default;
-
-    friend ChunkRange idlPreparsedValue(stdx::type_identity<ChunkRange>) {
-        return {};
-    }
-
-    BSONObj _minKey;
-    BSONObj _maxKey;
-};
 
 class ChunkHistory : public ChunkHistoryBase {
 public:
@@ -291,22 +201,22 @@ public:
     void setCollectionUUID(const UUID& uuid);
 
     const BSONObj& getMin() const {
-        return _min.get();
+        return _range->getMin();
     }
-    void setMin(const BSONObj& min);
 
     const BSONObj& getMax() const {
-        return _max.get();
+        return _range->getMax();
     }
-    void setMax(const BSONObj& max);
 
-    ChunkRange getRange() const {
-        return ChunkRange(getMin(), getMax());
+    const ChunkRange& getRange() const {
+        return _range.get();
     }
+    void setRange(const ChunkRange& chunkRange);
 
     bool isVersionSet() const {
         return _version.is_initialized();
     }
+
     const ChunkVersion& getVersion() const {
         return _version.get();
     }
@@ -370,10 +280,8 @@ private:
     boost::optional<OID> _id;
     // (O)(C)     uuid of the collection in the CollectionCatalog
     boost::optional<UUID> _collectionUUID;
-    // (M)(C)(S)  first key of the range, inclusive
-    boost::optional<BSONObj> _min;
-    // (M)(C)(S)  last key of the range, non-inclusive
-    boost::optional<BSONObj> _max;
+    // (M)(C)(S)  key range
+    boost::optional<ChunkRange> _range;
     // (M)(C)(S)  version of this chunk
     boost::optional<ChunkVersion> _version;
     // (M)(C)(S)  shard this chunk lives in

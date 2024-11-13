@@ -94,7 +94,14 @@ StatusWith<SplitChunkRequest> SplitChunkRequest::parseFromConfigCommand(const BS
         }
     }
 
-    auto chunkRangeStatus = ChunkRange::fromBSON(cmdObj);
+
+    auto chunkRangeStatus = [&]() -> StatusWith<ChunkRange> {
+        try {
+            return ChunkRange::fromBSON(cmdObj);
+        } catch (const DBException& e) {
+            return e.toStatus().withContext("Failed to parse chunk range");
+        }
+    }();
 
     if (!chunkRangeStatus.isOK()) {
         return chunkRangeStatus.getStatus();
@@ -151,7 +158,7 @@ void SplitChunkRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
     cmdBuilder->append(kConfigsvrSplitChunk,
                        NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
     cmdBuilder->append(kCollEpoch, _epoch);
-    _chunkRange.append(cmdBuilder);
+    _chunkRange.serialize(cmdBuilder);
     {
         BSONArrayBuilder splitPointsArray(cmdBuilder->subarrayStart(kSplitPoints));
         for (const auto& splitPoint : _splitPoints) {

@@ -115,8 +115,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
 
         auto chunkMin = BSON("a" << 1);
         auto chunkMax = BSON("a" << 10);
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
         chunk.setOnCurrentShardSince(Timestamp(100, 0));
         chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), ShardId(_shardName)),
                           ChunkHistory(Timestamp(90, 0), ShardId("shardY"))});
@@ -201,8 +200,7 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
 
         auto chunkMin = BSON("a" << 1);
         auto chunkMax = BSON("a" << 10);
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
         chunk.setOnCurrentShardSince(Timestamp(100, 0));
         chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), ShardId(_shardName)),
                           ChunkHistory(Timestamp(90, 0), ShardId("shardY"))});
@@ -297,8 +295,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
 
         auto chunkMin = BSON("a" << 1);
         auto chunkMax = BSON("a" << 10);
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
 
         std::vector<BSONObj> splitPoints;
         auto chunkSplitPoint = BSON("a" << 5);
@@ -308,8 +305,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
         auto competingVersion = ChunkVersion({collEpoch, collTimestamp}, {2, 1});
         chunk2.setVersion(competingVersion);
         chunk2.setShard(ShardId(_shardName));
-        chunk2.setMin(BSON("a" << 10));
-        chunk2.setMax(BSON("a" << 20));
+        chunk2.setRange({BSON("a" << 10), BSON("a" << 20)});
 
         setupCollection(nss, _keyPattern, {chunk, chunk2});
 
@@ -367,8 +363,7 @@ TEST_F(SplitChunkTest, Idempotency) {
         chunk.setVersion(origVersion);
         chunk.setShard(ShardId(_shardName));
 
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
 
         setupCollection(nss, _keyPattern, {chunk});
 
@@ -429,8 +424,7 @@ TEST_F(SplitChunkTest, PreConditionFailErrors) {
 
         auto chunkMin = BSON("a" << 1);
         auto chunkMax = BSON("a" << 10);
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
 
         std::vector<BSONObj> splitPoints;
         auto chunkSplitPoint = BSON("a" << 5);
@@ -466,8 +460,7 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
 
         auto chunkMin = BSON("a" << 1);
         auto chunkMax = BSON("a" << 10);
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
 
         std::vector<BSONObj> splitPoints{BSON("a" << 5)};
 
@@ -503,8 +496,7 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
 
         auto chunkMin = BSON("a" << 1);
         auto chunkMax = BSON("a" << 10);
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
 
         std::vector<BSONObj> splitPoints{BSON("a" << 5)};
 
@@ -538,8 +530,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
 
         auto chunkMin = BSON("a" << 1);
         auto chunkMax = BSON("a" << 10);
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
 
         std::vector<BSONObj> splitPoints{BSON("a" << 5), BSON("a" << 4)};
 
@@ -573,8 +564,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
 
         auto chunkMin = BSON("a" << 1);
         auto chunkMax = BSON("a" << 10);
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
 
         std::vector<BSONObj> splitPoints{BSON("a" << 0), BSON("a" << 5)};
 
@@ -609,8 +599,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
 
         auto chunkMin = BSON("a" << 1);
         auto chunkMax = BSON("a" << 10);
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
 
         std::vector<BSONObj> splitPoints{BSON("a" << 5), BSON("a" << 15)};
 
@@ -644,8 +633,7 @@ TEST_F(SplitChunkTest, SplitPointsWithDollarPrefixShouldFail) {
 
         auto chunkMin = BSON("a" << kMinBSONKey);
         auto chunkMax = BSON("a" << kMaxBSONKey);
-        chunk.setMin(chunkMin);
-        chunk.setMax(chunkMax);
+        chunk.setRange({chunkMin, chunkMax});
         setupCollection(nss, _keyPattern, {chunk});
 
         ASSERT_THROWS(ShardingCatalogManager::get(operationContext())
@@ -688,8 +676,7 @@ TEST_F(SplitChunkTest, SplitJumboChunkShouldUnsetJumboFlag) {
 
     auto chunkMin = BSON("a" << 1);
     auto chunkMax = BSON("a" << 10);
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkMax);
+    chunk.setRange({chunkMin, chunkMax});
 
     auto chunkSplitPoint = BSON("a" << 5);
     std::vector<BSONObj> splitPoints{chunkSplitPoint};

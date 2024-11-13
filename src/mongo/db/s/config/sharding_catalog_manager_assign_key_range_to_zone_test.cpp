@@ -734,8 +734,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeIsSuperSetOfExistingShouldFail
 TEST_F(AssignKeyRangeWithOneRangeFixture, AssignWithExistingOveralpShouldFail) {
     TagsType tagDoc;
     tagDoc.setNS(shardedNS());
-    tagDoc.setMinKey(BSON("x" << 0));
-    tagDoc.setMaxKey(BSON("x" << 2));
+    tagDoc.setRange({BSON("x" << 0), BSON("x" << 2)});
     tagDoc.setTag("z");
 
     ASSERT_OK(insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON()));

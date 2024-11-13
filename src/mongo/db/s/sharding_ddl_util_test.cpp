@@ -118,8 +118,7 @@ public:
         chunk.setShard(shard0.getName());
         chunk.setOnCurrentShardSince(Timestamp(1, 1));
         chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
-        chunk.setMin(kMinBSONKey);
-        chunk.setMax(kMaxBSONKey);
+        chunk.setRange({kMinBSONKey, kMaxBSONKey});
 
         // Initialize the sharded collection
         return setupCollection(nss, KeyPattern(BSON("x" << 1)), {chunk});
@@ -337,8 +336,7 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionTargetCollectionHasTags) {
     // Associate a tag to the target collection
     TagsType tagDoc;
     tagDoc.setNS(kToNss);
-    tagDoc.setMinKey(BSON("x" << 0));
-    tagDoc.setMaxKey(BSON("x" << 1));
+    tagDoc.setRange({BSON("x" << 0), BSON("x" << 1)});
     tagDoc.setTag("z");
     ASSERT_OK(insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON()));
 

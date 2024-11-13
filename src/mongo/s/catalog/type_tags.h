@@ -101,15 +101,16 @@ public:
     }
     void setTag(const std::string& tag);
 
+    void setRange(const ChunkRange& range);
+    const ChunkRange& getRange() const {
+        return _range.get();
+    }
     const BSONObj& getMinKey() const {
-        return _minKey.get();
+        return getRange().getMin();
     }
-    void setMinKey(const BSONObj& minKey);
-
     const BSONObj& getMaxKey() const {
-        return _maxKey.get();
+        return getRange().getMax();
     }
-    void setMaxKey(const BSONObj& maxKey);
 
 private:
     // Required namespace to which this tag belongs
@@ -118,11 +119,8 @@ private:
     // Required tag name
     boost::optional<std::string> _tag;
 
-    // Required first key of the tag (inclusive)
-    boost::optional<BSONObj> _minKey;
-
-    // Required last key of the tag (not-inclusive)
-    boost::optional<BSONObj> _maxKey;
+    // Required range
+    boost::optional<ChunkRange> _range;
 };
 
 }  // namespace mongo

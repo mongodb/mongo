@@ -74,8 +74,7 @@ ChunkType generateChunk(const UUID& collUuid,
     chunkType.setCollectionUUID(collUuid);
     chunkType.setVersion(ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}));
     chunkType.setShard(shardId);
-    chunkType.setMin(minKey);
-    chunkType.setMax(maxKey);
+    chunkType.setRange({minKey, maxKey});
     chunkType.setOnCurrentShardSince(Timestamp(1, 0));
     chunkType.setHistory(history);
     return chunkType;
@@ -85,8 +84,7 @@ TagsType generateZone(const NamespaceString& nss, const BSONObj& minKey, const B
     TagsType tagType;
     tagType.setTag(OID::gen().toString());
     tagType.setNS(nss);
-    tagType.setMinKey(minKey);
-    tagType.setMaxKey(maxKey);
+    tagType.setRange({minKey, maxKey});
     return tagType;
 }
 
@@ -620,25 +618,32 @@ TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeOverlapIn
     auto& chunk = chunks.at(chunkIdx);
 
     auto overlapMax = [&]() {
-        if (_random.nextInt64(10) == 0) {
-            // With 1/10 probability, set min to MinKey
-            chunk.setMax(_keyPattern.globalMax());
-        } else {
-            // Otherwise, set max to a random value bigger than actual
-            auto max = chunk.getMax()["x"].numberInt();
-            chunk.setMax(BSON("x" << max + _random.nextInt64(10) + 1));
-        }
+        auto newMax = [&] {
+            if (_random.nextInt64(10) == 0) {
+                // With 1/10 probability, set min to MinKey
+                return _keyPattern.globalMax();
+            } else {
+                // Otherwise, set max to a random value bigger than actual
+                auto max = chunk.getMax()["x"].numberInt();
+                return BSON("x" << max + _random.nextInt64(10) + 1);
+            }
+        }();
+
+        chunk.setRange({chunk.getMin(), newMax});
     };
 
     auto overlapMin = [&]() {
-        if (_random.nextInt64(10) == 0) {
-            // With 1/10 probability, set min to MinKey
-            chunk.setMin(_keyPattern.globalMin());
-        } else {
-            // Otherwise, set min to a random value smaller than actual
-            auto min = chunk.getMin()["x"].numberInt();
-            chunk.setMin(BSON("x" << min - _random.nextInt64(10) - 1));
-        }
+        auto newMin = [&] {
+            if (_random.nextInt64(10) == 0) {
+                // With 1/10 probability, set min to MinKey
+                return _keyPattern.globalMin();
+            } else {
+                // Otherwise, set min to a random value smaller than actual
+                auto min = chunk.getMin()["x"].numberInt();
+                return BSON("x" << min - _random.nextInt64(10) - 1);
+            }
+        }();
+        chunk.setRange({newMin, chunk.getMax()});
     };
 
     if (chunkIdx == 0) {

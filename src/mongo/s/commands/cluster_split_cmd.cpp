@@ -58,6 +58,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_chunk_range.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_manager.h"
@@ -94,7 +95,7 @@ BSONObj selectMedianKey(OperationContext* opCtx,
     cmd.append("splitVector",
                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     cmd.append("keyPattern", shardKeyPattern.toBSON());
-    chunkRange.append(&cmd);
+    chunkRange.serialize(&cmd);
     cmd.appendBool("force", true);
     cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, &cmd);
 
@@ -284,29 +285,24 @@ public:
         // middle of the chunk.
         const BSONObj splitPoint = !middle.isEmpty()
             ? middle
-            : selectMedianKey(opCtx,
-                              chunk->getShardId(),
-                              nss,
-                              cm.getShardKeyPattern(),
-                              cri,
-                              ChunkRange(chunk->getMin(), chunk->getMax()));
+            : selectMedianKey(
+                  opCtx, chunk->getShardId(), nss, cm.getShardKeyPattern(), cri, chunk->getRange());
 
         LOGV2(22758,
               "Splitting chunk",
-              "chunkRange"_attr = redact(ChunkRange(chunk->getMin(), chunk->getMax()).toString()),
+              "chunkRange"_attr = redact(chunk->getRange().toString()),
               "splitPoint"_attr = redact(splitPoint),
               logAttrs(nss),
               "shardId"_attr = chunk->getShardId());
 
-        uassertStatusOK(
-            shardutil::splitChunkAtMultiplePoints(opCtx,
-                                                  chunk->getShardId(),
-                                                  nss,
-                                                  cm.getShardKeyPattern(),
-                                                  cm.getVersion().epoch(),
-                                                  cm.getVersion().getTimestamp(),
-                                                  ChunkRange(chunk->getMin(), chunk->getMax()),
-                                                  {splitPoint}));
+        uassertStatusOK(shardutil::splitChunkAtMultiplePoints(opCtx,
+                                                              chunk->getShardId(),
+                                                              nss,
+                                                              cm.getShardKeyPattern(),
+                                                              cm.getVersion().epoch(),
+                                                              cm.getVersion().getTimestamp(),
+                                                              chunk->getRange(),
+                                                              {splitPoint}));
 
         Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(nss, boost::none);
 

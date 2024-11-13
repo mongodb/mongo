@@ -1144,8 +1144,10 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // The code above will only be executed after a stepdown happens, however the code below
         // needs to be executed also on startup, and the enabled check might fail in shards during
         // startup. Create uuid index on config.rangeDeletions if needed
-        auto minKeyFieldName = RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey;
-        auto maxKeyFieldName = RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey;
+        const auto minKeyFieldName =
+            RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName;
+        const auto maxKeyFieldName =
+            RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName;
         Status indexStatus = createIndexOnConfigCollection(
             opCtx,
             NamespaceString::kRangeDeletionNamespace,

@@ -80,8 +80,7 @@ private:
      */
     class RangeDeletion : public ChunkRange {
     public:
-        RangeDeletion(const RangeDeletionTask& task)
-            : ChunkRange(task.getRange().getMin(), task.getRange().getMax()) {}
+        RangeDeletion(const RangeDeletionTask& task) : ChunkRange(task.getRange()) {}
 
         ~RangeDeletion() {
             if (!_completionPromise.getFuture().isReady()) {

@@ -372,6 +372,8 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/s/catalog:type_changelog.cpp",
         "//src/mongo/s/catalog:type_chunk.cpp",
+        "//src/mongo/s/catalog:type_chunk_range.cpp",
+        "//src/mongo/s/catalog:type_chunk_range_base_gen",
         "//src/mongo/s/catalog:type_chunk_base_gen",
         "//src/mongo/s/catalog:type_collection.cpp",
         "//src/mongo/s/catalog:type_collection_gen",
@@ -489,6 +491,7 @@ mongo_cc_library(
         "//src/mongo/db/s:auto_split_vector.h",
         "//src/mongo/s/catalog:type_changelog.h",
         "//src/mongo/s/catalog:type_chunk.h",
+        "//src/mongo/s/catalog:type_chunk_range.h",
         "//src/mongo/s/catalog:type_collection.h",
         "//src/mongo/s/catalog:type_index_catalog.h",
         "//src/mongo/s/catalog:type_mongos.h",

@@ -144,7 +144,7 @@ TEST(UpdateZoneKeyRangeRequest, MissingMinErrors) {
             max: { x: 100 },
             zone: "z"
         })BSON"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+    ASSERT_EQ(ErrorCodes::IDLFailedToParse, request.getStatus());
 }
 
 TEST(UpdateZoneKeyRangeRequest, MissingMaxErrors) {
@@ -153,7 +153,7 @@ TEST(UpdateZoneKeyRangeRequest, MissingMaxErrors) {
             min: { x: 1 },
             zone: "z"
         })BSON"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+    ASSERT_EQ(ErrorCodes::IDLFailedToParse, request.getStatus());
 }
 
 TEST(UpdateZoneKeyRangeRequest, MissingZoneErrors) {
@@ -322,7 +322,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, MissingMinErrors) {
             max: { x: 100 },
             zone: "z"
         })BSON"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+    ASSERT_EQ(ErrorCodes::IDLFailedToParse, request.getStatus());
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, MissingMaxErrors) {
@@ -331,7 +331,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, MissingMaxErrors) {
             min: { x: 1 },
             zone: "z"
         })BSON"));
-    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+    ASSERT_EQ(ErrorCodes::IDLFailedToParse, request.getStatus());
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, MissingZoneErrors) {

@@ -487,7 +487,7 @@ void logMergeToChangelog(OperationContext* opCtx,
     prevPlacementVersion.serialize("prevPlacementVersion", &logDetail);
     mergedVersion.serialize("mergedVersion", &logDetail);
     logDetail.append("owningShard", owningShard);
-    chunkRange.append(&logDetail);
+    chunkRange.serialize(&logDetail);
     logDetail.append("numChunks", static_cast<int>(numChunks));
     auto what = isAutoMerge ? "autoMerge" : "merge";
 
@@ -642,8 +642,7 @@ auto doSplitChunk(const txn_api::TransactionClient& txnClient,
         ChunkType newChunk = origChunk;
         newChunk.setName(chunkID);
         newChunk.setVersion(currentMaxVersion);
-        newChunk.setMin(startKey);
-        newChunk.setMax(endKey);
+        newChunk.setRange({startKey, endKey});
         newChunk.setEstimatedSizeBytes(boost::none);
         newChunk.setJumbo(false);
 
@@ -990,7 +989,8 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
 
                         ChunkType mergedChunk(chunksToMerge->front());
                         entry.setQ(BSON(ChunkType::name(mergedChunk.getName())));
-                        mergedChunk.setMax(chunksToMerge->back().getMax());
+                        mergedChunk.setRange(
+                            {chunksToMerge->front().getMin(), chunksToMerge->back().getMax()});
 
                         // Fill in additional details for sending through transaction.
                         mergedChunk.setVersion(mergeVersion);
@@ -1580,8 +1580,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
     // will be 0.
     uint32_t minVersionIncrement = 0;
     ChunkType newMigratedChunk{currentChunk};
-    newMigratedChunk.setMin(migratedChunk.getMin());
-    newMigratedChunk.setMax(migratedChunk.getMax());
+    newMigratedChunk.setRange(migratedChunk.getRange());
     newMigratedChunk.setShard(toShard);
     newMigratedChunk.setVersion(ChunkVersion(
         {currentCollectionPlacementVersion.epoch(),
@@ -1642,7 +1641,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
             // the new moved range. Major version equal to the new chunk's one, min version bumped.
             ChunkType leftSplitChunk = currentChunk;
             leftSplitChunk.setName(OID::gen());
-            leftSplitChunk.setMax(movedChunkMin);
+            leftSplitChunk.setRange({leftSplitChunk.getMin(), movedChunkMin});
             leftSplitChunk.setVersion(
                 ChunkVersion({movedChunkVersion.epoch(), movedChunkVersion.getTimestamp()},
                              {movedChunkVersion.majorVersion(), minVersionIncrement++}));
@@ -1654,7 +1653,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
             // the original chunk. Major version equal to the new chunk's one, min version bumped.
             ChunkType rightSplitChunk = currentChunk;
             rightSplitChunk.setName(OID::gen());
-            rightSplitChunk.setMin(movedChunkMax);
+            rightSplitChunk.setRange({movedChunkMax, rightSplitChunk.getMax()});
             rightSplitChunk.setVersion(
                 ChunkVersion({movedChunkVersion.epoch(), movedChunkVersion.getTimestamp()},
                              {movedChunkVersion.majorVersion(), minVersionIncrement++}));
@@ -2212,14 +2211,14 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
         // to ErrorCodes::ChunkTooBig. In case there is a too frequent shard key, only select the
         // next key in order to split the range in jumbo chunk + remaining range.
         const int limit = 1;
-        auto splitPoints = uassertStatusOK(
-            shardutil::selectChunkSplitPoints(opCtx,
-                                              chunk.getShardId(),
-                                              nss,
-                                              cm.getShardKeyPattern(),
-                                              ChunkRange(chunk.getMin(), chunk.getMax()),
-                                              maxChunkSizeBytes,
-                                              limit));
+        auto splitPoints =
+            uassertStatusOK(shardutil::selectChunkSplitPoints(opCtx,
+                                                              chunk.getShardId(),
+                                                              nss,
+                                                              cm.getShardKeyPattern(),
+                                                              chunk.getRange(),
+                                                              maxChunkSizeBytes,
+                                                              limit));
 
         if (splitPoints.empty()) {
             LOGV2(21873, "Marking chunk as jumbo", "chunk"_attr = redact(chunk.toString()));
@@ -2270,15 +2269,14 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
         // Resize the vector because in multiversion scenarios the `autoSplitVector` command may end
         // up ignoring the `limit` parameter and returning the whole list of split points.
         splitPoints.resize(limit);
-        uassertStatusOK(
-            shardutil::splitChunkAtMultiplePoints(opCtx,
-                                                  chunk.getShardId(),
-                                                  nss,
-                                                  cm.getShardKeyPattern(),
-                                                  cm.getVersion().epoch(),
-                                                  cm.getVersion().getTimestamp(),
-                                                  ChunkRange(chunk.getMin(), chunk.getMax()),
-                                                  splitPoints));
+        uassertStatusOK(shardutil::splitChunkAtMultiplePoints(opCtx,
+                                                              chunk.getShardId(),
+                                                              nss,
+                                                              cm.getShardKeyPattern(),
+                                                              cm.getVersion().epoch(),
+                                                              cm.getVersion().getTimestamp(),
+                                                              chunk.getRange(),
+                                                              splitPoints));
     } catch (const DBException&) {
     }
 }

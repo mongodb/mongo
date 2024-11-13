@@ -67,7 +67,7 @@ StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::parseFromConfig
 void UpdateZoneKeyRangeRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
     cmdBuilder->append(kConfigsvrUpdateZoneKeyRange,
                        NamespaceStringUtil::serialize(_ns, SerializationContext::stateDefault()));
-    _range.append(cmdBuilder);
+    _range.serialize(cmdBuilder);
 
     if (_isRemove) {
         cmdBuilder->appendNull(kZoneName);
@@ -94,9 +94,16 @@ StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::_parseFromComma
                 str::stream() << rawNS << " is not a valid namespace"};
     }
 
-    auto parseRangeStatus = ChunkRange::fromBSON(cmdObj);
-    if (!parseRangeStatus.isOK()) {
-        return parseRangeStatus.getStatus();
+    auto swChunkRange = [&]() -> StatusWith<ChunkRange> {
+        try {
+            return ChunkRange::fromBSON(cmdObj);
+        } catch (const DBException& e) {
+            return e.toStatus().withContext("Failed to parse chunk range");
+        }
+    }();
+
+    if (!swChunkRange.isOK()) {
+        return swChunkRange.getStatus();
     }
 
     BSONElement zoneElem;
@@ -121,11 +128,11 @@ StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::_parseFromComma
     }
 
     if (isRemove) {
-        return UpdateZoneKeyRangeRequest(std::move(ns), std::move(parseRangeStatus.getValue()));
+        return UpdateZoneKeyRangeRequest(std::move(ns), std::move(swChunkRange.getValue()));
     }
 
     return UpdateZoneKeyRangeRequest(
-        std::move(ns), std::move(parseRangeStatus.getValue()), std::move(zoneName));
+        std::move(ns), std::move(swChunkRange.getValue()), std::move(zoneName));
 }
 
 const NamespaceString& UpdateZoneKeyRangeRequest::getNS() const {

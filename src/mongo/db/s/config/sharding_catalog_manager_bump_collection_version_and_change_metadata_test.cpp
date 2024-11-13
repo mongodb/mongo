@@ -112,8 +112,7 @@ protected:
         chunkType.setCollectionUUID(uuid);
         chunkType.setVersion(chunkVersion);
         chunkType.setShard(shardId);
-        chunkType.setMin(minKey);
-        chunkType.setMax(maxKey);
+        chunkType.setRange({minKey, maxKey});
         chunkType.setOnCurrentShardSince(Timestamp(100, 0));
         chunkType.setHistory({ChunkHistory(*chunkType.getOnCurrentShardSince(), shardId)});
         return chunkType;

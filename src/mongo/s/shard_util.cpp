@@ -71,12 +71,6 @@
 
 namespace mongo {
 namespace shardutil {
-namespace {
-
-const char kMinKey[] = "min";
-const char kMaxKey[] = "max";
-
-}  // namespace
 
 StatusWith<long long> retrieveTotalShardSize(OperationContext* opCtx, const ShardId& shardId) {
     auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
@@ -232,7 +226,7 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
     cmd.append("epoch", epoch);
     cmd.append("timestamp", timestamp);
 
-    chunkRange.append(&cmd);
+    chunkRange.serialize(&cmd);
     cmd.append("splitKeys", splitPointsBeginIt, splitPointsEndIt);
 
     BSONObj cmdObj = cmd.obj();

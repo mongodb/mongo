@@ -82,8 +82,7 @@ protected:
         chunk.setCollectionUUID(collUuid);
         chunk.setVersion(ChunkVersion({epoch, timestamp}, {12, 7}));
         chunk.setShard(_shardName);
-        chunk.setMin(jumboChunk().getMin());
-        chunk.setMax(jumboChunk().getMax());
+        chunk.setRange(jumboChunk());
         chunk.setJumbo(true);
 
         ChunkType otherChunk;
@@ -91,8 +90,7 @@ protected:
         otherChunk.setCollectionUUID(collUuid);
         otherChunk.setVersion(ChunkVersion({epoch, timestamp}, {14, 7}));
         otherChunk.setShard(_shardName);
-        otherChunk.setMin(nonJumboChunk().getMin());
-        otherChunk.setMax(nonJumboChunk().getMax());
+        otherChunk.setRange(nonJumboChunk());
 
         setupCollection(nss, kKeyPattern, {chunk, otherChunk});
     }

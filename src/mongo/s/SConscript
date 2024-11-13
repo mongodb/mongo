@@ -133,6 +133,7 @@ env.CppUnitTest(
         "catalog/sharding_catalog_client_test.cpp",
         "catalog/sharding_catalog_write_retry_test.cpp",
         "catalog/type_changelog_test.cpp",
+        "catalog/type_chunk_range_test.cpp",
         "catalog/type_chunk_test.cpp",
         "catalog/type_collection_test.cpp",
         "catalog/type_config_version_test.cpp",

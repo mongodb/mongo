@@ -748,8 +748,8 @@ public:
 private:
     // Internal representation of the chunk metadata required to generate a MoveAndMergeRequest
     struct ChunkRangeInfo {
-        ChunkRangeInfo(ChunkRange&& range, const ShardId& shard, long long estimatedSizeBytes)
-            : range(std::move(range)),
+        ChunkRangeInfo(const ChunkRange& range, const ShardId& shard, long long estimatedSizeBytes)
+            : range(range),
               shard(shard),
               estimatedSizeBytes(estimatedSizeBytes),
               busyInOperation(false) {}

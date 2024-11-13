@@ -237,11 +237,11 @@ void ensureRangeDeletionTaskStillExists(OperationContext* opCtx,
     // relies on the executor only having a single thread and that thread being solely responsible
     // for deleting the range deletion task document.
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    const auto query =
-        BSON(RangeDeletionTask::kCollectionUuidFieldName
-             << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
-             << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
-             << range.getMax() << RangeDeletionTask::kPendingFieldName << BSON("$exists" << false));
+    const auto query = BSON(
+        RangeDeletionTask::kCollectionUuidFieldName
+        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
+        << range.getMax() << RangeDeletionTask::kPendingFieldName << BSON("$exists" << false));
     auto count = store.count(opCtx, query);
 
     uassert(ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist,
@@ -258,11 +258,11 @@ void markRangeDeletionTaskAsProcessing(OperationContext* opCtx,
                                        const UUID& collectionUuid,
                                        const ChunkRange& range) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    const auto query =
-        BSON(RangeDeletionTask::kCollectionUuidFieldName
-             << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
-             << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
-             << range.getMax() << RangeDeletionTask::kPendingFieldName << BSON("$exists" << false));
+    const auto query = BSON(
+        RangeDeletionTask::kCollectionUuidFieldName
+        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
+        << range.getMax() << RangeDeletionTask::kPendingFieldName << BSON("$exists" << false));
 
     static const auto update =
         BSON("$set" << BSON(RangeDeletionTask::kProcessingFieldName
@@ -293,10 +293,11 @@ std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext*
 }
 
 BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {
-    return BSON(RangeDeletionTask::kCollectionUuidFieldName
-                << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
-                << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
-                << range.getMax());
+    return BSON(
+        RangeDeletionTask::kCollectionUuidFieldName
+        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
+        << range.getMax());
 }
 
 // Add `migrationId` to the query filter in order to be resilient to delayed network retries: only
@@ -453,8 +454,9 @@ void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const Namespace
         auto& range = deletionTask.getRange();
         auto upsertQuery =
             BSON(RangeDeletionTask::kCollectionUuidFieldName
-                 << uuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
-                 << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
+                 << uuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+                 << range.getMin()
+                 << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
                  << range.getMax());
         // Remove _id because it's an immutable field so it can't be part of an update.
         // But include it as part of the upsert because the _id field is expected to be a uuid
@@ -513,8 +515,9 @@ void removePersistentRangeDeletionTask(OperationContext* opCtx,
 
     auto overlappingRangeDeletionsQuery = BSON(
         RangeDeletionTask::kCollectionUuidFieldName
-        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey << GTE
-        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey << LTE
+        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+        << GTE << range.getMin()
+        << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName << LTE
         << range.getMax());
     store.remove(opCtx, overlappingRangeDeletionsQuery);
 }
@@ -542,9 +545,10 @@ void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUI
 
 BSONObj overlappingRangeDeletionsQuery(const ChunkRange& range, const UUID& uuid) {
     return BSON(RangeDeletionTask::kCollectionUuidFieldName
-                << uuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey << LT
-                << range.getMax() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
-                << GT << range.getMin());
+                << uuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+                << LT << range.getMax()
+                << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName << GT
+                << range.getMin());
 }
 
 size_t checkForConflictingDeletions(OperationContext* opCtx,
@@ -661,11 +665,11 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx,
                                          const UUID& collectionUuid,
                                          const ChunkRange& range) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    const auto query =
-        BSON(RangeDeletionTask::kCollectionUuidFieldName
-             << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
-             << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
-             << range.getMax());
+    const auto query = BSON(
+        RangeDeletionTask::kCollectionUuidFieldName
+        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
+        << range.getMax());
     auto update = BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""));
 
     hangInReadyRangeDeletionLocallyInterruptible.pauseWhileSet(opCtx);

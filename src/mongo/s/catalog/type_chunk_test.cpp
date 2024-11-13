@@ -36,6 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/logv2/log_debug.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -197,7 +198,7 @@ TEST(ChunkType, MinToMaxNotAscending) {
                                 << onCurrentShardSince << ChunkHistoryBase::kShardFieldName
                                 << "shard0001")));
     StatusWith<ChunkType> chunkRes = ChunkType::parseFromConfigBSON(obj, collEpoch, collTimestamp);
-    ASSERT_EQ(ErrorCodes::FailedToParse, chunkRes.getStatus());
+    ASSERT_EQ(ErrorCodes::BadValue, chunkRes.getStatus());
 }
 
 TEST(ChunkType, ToFromConfigBSON) {
@@ -241,30 +242,6 @@ TEST(ChunkType, BadType) {
     BSONObj obj = BSON(ChunkType::name() << 0);
     StatusWith<ChunkType> chunkRes = ChunkType::parseFromConfigBSON(obj, collEpoch, collTimestamp);
     ASSERT_FALSE(chunkRes.isOK());
-}
-
-TEST(ChunkType, BothNsAndUUID) {
-    const auto collUuid = UUID::gen();
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = Timestamp(1);
-
-    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
-    const auto onCurrentShardSince = Timestamp(2);
-
-    BSONObj objModNS =
-        BSON(ChunkType::name(OID::gen())
-             << ChunkType::collectionUUID() << collUuid << ChunkType::collectionUUID()
-             << mongo::UUID::gen() << ChunkType::min(BSON("a" << 10 << "b" << 10))
-             << ChunkType::max(BSON("a" << 20)) << "lastmod" << Timestamp(chunkVersion.toLong())
-             << "lastmodEpoch" << chunkVersion.epoch() << "lastmodTimestamp"
-             << chunkVersion.getTimestamp() << ChunkType::shard("shard0001")
-             << ChunkType::onCurrentShardSince() << onCurrentShardSince << ChunkType::history()
-             << BSON_ARRAY(BSON(ChunkHistoryBase::kValidAfterFieldName
-                                << onCurrentShardSince << ChunkHistoryBase::kShardFieldName
-                                << "shard0001")));
-    StatusWith<ChunkType> chunkRes =
-        ChunkType::parseFromConfigBSON(objModNS, collEpoch, collTimestamp);
-    ASSERT_TRUE(chunkRes.isOK());
 }
 
 TEST(ChunkType, UUIDPresentAndNsMissing) {
@@ -311,144 +288,6 @@ TEST(ChunkType, ParseFromNetworkRequest) {
 
     ASSERT_EQ("shard0001", chunk.getShard());
     ASSERT_EQ(chunkVersion, chunk.getVersion());
-}
-
-TEST(ChunkRange, BasicBSONParsing) {
-    auto parseStatus =
-        ChunkRange::fromBSON(BSON("min" << BSON("x" << 0) << "max" << BSON("x" << 10)));
-    ASSERT_OK(parseStatus.getStatus());
-
-    auto chunkRange = parseStatus.getValue();
-    ASSERT_BSONOBJ_EQ(BSON("x" << 0), chunkRange.getMin());
-    ASSERT_BSONOBJ_EQ(BSON("x" << 10), chunkRange.getMax());
-}
-
-TEST(ChunkRange, Covers) {
-    auto target = ChunkRange(BSON("x" << 5), BSON("x" << 10));
-    ASSERT(!target.covers(ChunkRange(BSON("x" << 0), BSON("x" << 5))));
-    ASSERT(!target.covers(ChunkRange(BSON("x" << 10), BSON("x" << 15))));
-    ASSERT(!target.covers(ChunkRange(BSON("x" << 0), BSON("x" << 7))));
-    ASSERT(!target.covers(ChunkRange(BSON("x" << 7), BSON("x" << 15))));
-    ASSERT(!target.covers(ChunkRange(BSON("x" << 0), BSON("x" << 15))));
-    ASSERT(!target.covers(ChunkRange(BSON("x" << 0), BSON("x" << 10))));
-    ASSERT(!target.covers(ChunkRange(BSON("x" << 5), BSON("x" << 15))));
-    ASSERT(target.covers(ChunkRange(BSON("x" << 5), BSON("x" << 10))));
-    ASSERT(target.covers(ChunkRange(BSON("x" << 6), BSON("x" << 10))));
-    ASSERT(target.covers(ChunkRange(BSON("x" << 5), BSON("x" << 9))));
-    ASSERT(target.covers(ChunkRange(BSON("x" << 6), BSON("x" << 9))));
-}
-
-TEST(ChunkRange, Overlap) {
-    auto target = ChunkRange(BSON("x" << 5), BSON("x" << 10));
-    ASSERT(!target.overlapWith(ChunkRange(BSON("x" << 0), BSON("x" << 5))));
-    ASSERT(!target.overlapWith(ChunkRange(BSON("x" << 0), BSON("x" << 4))));
-    ASSERT(!target.overlapWith(ChunkRange(BSON("x" << 10), BSON("x" << 15))));
-    ASSERT(!target.overlapWith(ChunkRange(BSON("x" << 11), BSON("x" << 15))));
-    ASSERT(ChunkRange(BSON("x" << 7), BSON("x" << 10)) ==
-           *target.overlapWith(ChunkRange(BSON("x" << 7), BSON("x" << 15))));
-    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 10)) ==
-           *target.overlapWith(ChunkRange(BSON("x" << 0), BSON("x" << 10))));
-    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 10)) ==
-           *target.overlapWith(ChunkRange(BSON("x" << 0), BSON("x" << 15))));
-    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 10)) ==
-           *target.overlapWith(ChunkRange(BSON("x" << 5), BSON("x" << 15))));
-    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 9)) ==
-           *target.overlapWith(ChunkRange(BSON("x" << 0), BSON("x" << 9))));
-    ASSERT(ChunkRange(BSON("x" << 9), BSON("x" << 10)) ==
-           *target.overlapWith(ChunkRange(BSON("x" << 9), BSON("x" << 15))));
-}
-
-TEST(ChunkRange, Union) {
-    auto target = ChunkRange(BSON("x" << 5), BSON("x" << 10));
-    ASSERT(ChunkRange(BSON("x" << 0), BSON("x" << 10)) ==
-           target.unionWith(ChunkRange(BSON("x" << 0), BSON("x" << 5))));
-    ASSERT(ChunkRange(BSON("x" << 0), BSON("x" << 10)) ==
-           target.unionWith(ChunkRange(BSON("x" << 0), BSON("x" << 4))));
-    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 15)) ==
-           target.unionWith(ChunkRange(BSON("x" << 10), BSON("x" << 15))));
-    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 15)) ==
-           target.unionWith(ChunkRange(BSON("x" << 11), BSON("x" << 15))));
-    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 15)) ==
-           target.unionWith(ChunkRange(BSON("x" << 7), BSON("x" << 15))));
-    ASSERT(ChunkRange(BSON("x" << 0), BSON("x" << 10)) ==
-           target.unionWith(ChunkRange(BSON("x" << 0), BSON("x" << 10))));
-    ASSERT(ChunkRange(BSON("x" << 0), BSON("x" << 14)) ==
-           target.unionWith(ChunkRange(BSON("x" << 0), BSON("x" << 14))));
-    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 15)) ==
-           target.unionWith(ChunkRange(BSON("x" << 5), BSON("x" << 15))));
-    ASSERT(ChunkRange(BSON("x" << 0), BSON("x" << 10)) ==
-           target.unionWith(ChunkRange(BSON("x" << 0), BSON("x" << 9))));
-    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 15)) ==
-           target.unionWith(ChunkRange(BSON("x" << 9), BSON("x" << 15))));
-}
-
-TEST(ChunkRange, ContainsKey) {
-    auto target = ChunkRange(BSON("x" << 5), BSON("x" << 10));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MINKEY)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 2)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 5)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 7)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 10)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 15)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY)));
-
-    target = ChunkRange(BSON("x" << MINKEY), BSON("x" << 5));
-    ASSERT_TRUE(target.containsKey(BSON("x" << MINKEY)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 2)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 5)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 10)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY)));
-
-    target = ChunkRange(BSON("x" << 5), BSON("x" << MAXKEY));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MINKEY)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 2)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 5)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 10)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << MAXKEY)));
-}
-
-TEST(ChunkRange, ContainsKeyCompound) {
-    auto target = ChunkRange(BSON("x" << 5 << "y" << 100), BSON("x" << 10 << "y" << 120));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MINKEY)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MINKEY << "y" << 110)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 2)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 2 << "y" << 110)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 5)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 5 << "y" << 0)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 5 << "y" << 120)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 5 << "y" << MAXKEY)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 5 << "y" << 100)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 5 << "y" << 110)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 7 << "y" << MINKEY)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 7 << "y" << 100)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 7 << "y" << 110)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 7 << "y" << 120)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 7 << "y" << MAXKEY)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 10)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 10 << "y" << 0)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 10 << "y" << 100)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 10 << "y" << 110)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 10 << "y" << 120)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 10 << "y" << MAXKEY)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 15)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY << "y" << 0)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY << "y" << 100)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY << "y" << 110)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY << "y" << 120)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY << "y" << MAXKEY)));
-
-    target = ChunkRange(BSON("x" << 5 << "y" << 5), BSON("x" << MAXKEY << "y" << MAXKEY));
-    ASSERT_FALSE(target.containsKey(BSON("x" << MINKEY << "y" << MAXKEY)));
-    ASSERT_FALSE(target.containsKey(BSON("x" << 2 << "y" << MAXKEY)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << 5 << "y" << MAXKEY)));
-    ASSERT_TRUE(target.containsKey(BSON("x" << MAXKEY << "y" << MAXKEY)));
-}
-
-TEST(ChunkRange, MinGreaterThanMaxShouldError) {
-    auto parseStatus =
-        ChunkRange::fromBSON(BSON("min" << BSON("x" << 10) << "max" << BSON("x" << 0)));
-    ASSERT_EQ(ErrorCodes::FailedToParse, parseStatus.getStatus());
 }
 
 }  // namespace

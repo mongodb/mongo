@@ -140,7 +140,7 @@ public:
             keyPatternObj = keyPatternElem.Obj();
         }
 
-        auto chunkRange = uassertStatusOK(ChunkRange::fromBSON(cmdObj));
+        auto chunkRange = ChunkRange::fromBSON(cmdObj);
 
         std::string shardName;
         auto parseShardNameStatus = bsonExtractStringField(cmdObj, "from", &shardName);

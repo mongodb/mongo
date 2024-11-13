@@ -143,11 +143,9 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     auto chunkBound = BSON("a" << 5);
     auto chunkMax = BSON("a" << 10);
     // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
+    chunk.setRange({chunkMin, chunkBound});
     // second chunk boundaries
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+    chunk2.setRange({chunkBound, chunkMax});
 
     setupCollection(_nss1, _keyPattern, {chunk, chunk2});
 
@@ -236,14 +234,11 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     auto chunkBound2 = BSON("a" << 7);
     auto chunkMax = BSON("a" << 10);
     // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
+    chunk.setRange({chunkMin, chunkBound});
     // second chunk boundaries
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkBound2);
+    chunk2.setRange({chunkBound, chunkBound2});
     // third chunk boundaries
-    chunk3.setMin(chunkBound2);
-    chunk3.setMax(chunkMax);
+    chunk3.setRange({chunkBound2, chunkMax});
 
     setupCollection(_nss1, _keyPattern, {chunk, chunk2, chunk3});
     ChunkRange rangeToBeMerged(chunk.getMin(), chunk3.getMax());
@@ -319,11 +314,9 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     auto chunkBound = BSON("a" << 5);
     auto chunkMax = BSON("a" << 10);
     // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
+    chunk.setRange({chunkMin, chunkBound});
     // second chunk boundaries
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+    chunk2.setRange({chunkBound, chunkMax});
 
     // Record chunk boundaries for passing into commitChunksMerge
     ChunkRange rangeToBeMerged(chunk.getMin(), chunk2.getMax());
@@ -332,8 +325,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     auto competingVersion = ChunkVersion({collEpoch, collTimestamp}, {2, 1});
     otherChunk.setVersion(competingVersion);
     otherChunk.setShard(_shardId);
-    otherChunk.setMin(BSON("a" << 10));
-    otherChunk.setMax(BSON("a" << 20));
+    otherChunk.setRange({BSON("a" << 10), BSON("a" << 20)});
 
     setupCollection(_nss1, _keyPattern, {chunk, chunk2, otherChunk});
 
@@ -407,11 +399,9 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     auto chunkBound = BSON("a" << 5);
     auto chunkMax = BSON("a" << 10);
     // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
+    chunk.setRange({chunkMin, chunkBound});
     // second chunk boundaries
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+    chunk2.setRange({chunkBound, chunkMax});
 
     // Record chunk boundaries for passing into commitChunksMerge
     ChunkRange rangeToBeMerged(chunk.getMin(), chunk2.getMax());
@@ -420,8 +410,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     // Set up unmerged chunk
     auto otherChunk(chunk);
     otherChunk.setName(OID::gen());
-    otherChunk.setMin(BSON("a" << 10));
-    otherChunk.setMax(BSON("a" << 20));
+    otherChunk.setRange({BSON("a" << 10), BSON("a" << 20)});
 
     setupCollection(_nss1, _keyPattern, {chunk, chunk2, otherChunk});
 
@@ -491,10 +480,8 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
     auto chunkBound = BSON("a" << 5);
     auto chunkMax = BSON("a" << 10);
     // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+    chunk.setRange({chunkMin, chunkBound});
+    chunk2.setRange({chunkBound, chunkMax});
 
     // Record chunk boundaries for passing into commitChunksMerge
     ChunkRange rangeToBeMerged(chunk.getMin(), chunk2.getMax());
@@ -538,10 +525,8 @@ TEST_F(MergeChunkTest, NonMatchingUUIDsOfChunkAndRequestErrors) {
     auto chunkBound = BSON("a" << 5);
     auto chunkMax = BSON("a" << 10);
     // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+    chunk.setRange({chunkMin, chunkBound});
+    chunk2.setRange({chunkBound, chunkMax});
 
     // Record chunk baoundaries for passing into commitChunksMerge
     ChunkRange rangeToBeMerged(chunk.getMin(), chunk2.getMax());
@@ -574,8 +559,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     mergedVersion.incMinor();
     ChunkType mergedChunk;
     mergedChunk.setVersion(mergedVersion);
-    mergedChunk.setMin(chunkMin);
-    mergedChunk.setMax(chunkMax);
+    mergedChunk.setRange({chunkMin, chunkMax});
     mergedChunk.setName(OID::gen());
     mergedChunk.setCollectionUUID(collUuid);
     mergedChunk.setShard(_shardId);
@@ -648,14 +632,11 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     chunk3.setHistory({ChunkHistory{*chunk3.getOnCurrentShardSince(), _shardId}});
 
     // first chunk boundaries
-    chunk1.setMin(chunkMin);
-    chunk1.setMax(chunkBound1);
+    chunk1.setRange({chunkMin, chunkBound1});
     // second chunk boundaries
-    chunk2.setMin(chunkBound1);
-    chunk2.setMax(chunkBound2);
+    chunk2.setRange({chunkBound1, chunkBound2});
     // third chunk boundaries
-    chunk3.setMin(chunkBound2);
-    chunk3.setMax(chunkMax);
+    chunk3.setRange({chunkBound2, chunkMax});
 
     setupCollection(_nss1, _keyPattern, {chunk1, chunk2, chunk3});
 
@@ -758,8 +739,7 @@ protected:
             chunk.setVersion(collPlacementVersion);
             collPlacementVersion.incMinor();
             chunk.setShard(shard.getName());
-            chunk.setMin(min);
-            chunk.setMax(max);
+            chunk.setRange({min, max});
 
             // When `onCurrentShardSince` is set to "Timestamp(0, 1)", the chunk is mergeable
             // because the snapshot window passed. When it is set to "max", the chunk is not

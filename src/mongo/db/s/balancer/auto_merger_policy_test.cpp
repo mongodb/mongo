@@ -135,8 +135,7 @@ protected:
                 collVersion.incMinor();
 
                 auto max = BSON("x" << i);
-                chunk.setMin(min);
-                chunk.setMax(max);
+                chunk.setRange({min, max});
                 min = max;
 
                 chunks.push_back(chunk);
@@ -168,8 +167,7 @@ protected:
                 collVersion.incMinor();
 
                 auto max = (i == 2 ? _keyPattern.globalMax() : BSON("x" << i));
-                chunk.setMin(min);
-                chunk.setMax(max);
+                chunk.setRange({min, max});
                 min = max;
 
                 chunks.push_back(chunk);
