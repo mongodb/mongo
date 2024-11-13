@@ -1861,9 +1861,10 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
-        "development_critical_single_variant",
+        "experimental",
         "blocked_in_query_alias",
       ]
+    patchable: false
     commands:
       - func: "do setup"
       - func: "run tests"

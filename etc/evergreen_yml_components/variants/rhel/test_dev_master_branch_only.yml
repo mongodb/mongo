@@ -320,6 +320,12 @@ buildvariants:
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
           - rhel8.8-medium
+
+  - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
+    name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags-experimental
+    display_name: "* Shared Library Enterprise RHEL 8 (all feature flags) Experimental"
+    tags: ["suggested"]
+    tasks:
       # TODO(SERVER-90936): Remove this once streams_kafka* tests can work with the "default" tag.
       - name: streams_kafka
       - name: streams_kafka_gwproxy
