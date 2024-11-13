@@ -239,13 +239,12 @@ public:
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
-        const boost::intrusive_ptr<mongo::ExpressionContext>& expCtx,
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
-        boost::optional<BSONObj> readConcern = boost::none,
-        bool shouldUseCollectionDefaultCollator = false) override {
+        boost::optional<BSONObj> readConcern = boost::none) override {
         MONGO_UNREACHABLE;
     }
 
@@ -256,8 +255,7 @@ public:
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,
-        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
-        bool shouldUseCollectionDefaultCollator = false) override {
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) override {
         MONGO_UNREACHABLE;
     }
 
@@ -294,7 +292,7 @@ public:
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        boost::optional<UUID> collectionUUID,
+        UUID collectionUUID,
         const Document& documentKey,
         boost::optional<BSONObj> readConcern) override {
         MONGO_UNREACHABLE;

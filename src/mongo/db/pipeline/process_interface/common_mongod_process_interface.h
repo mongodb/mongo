@@ -127,8 +127,7 @@ public:
                                                   const NamespaceString& nss) override;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,
-        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
-        bool shouldUseCollectionDefaultCollator = false) final;
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) final;
     std::string getShardName(OperationContext* opCtx) const final;
 
     boost::optional<ShardId> getShardId(OperationContext* opCtx) const final;
@@ -192,7 +191,7 @@ protected:
     boost::optional<Document> doLookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        boost::optional<UUID> collectionUUID,
+        UUID collectionUUID,
         const Document& documentKey,
         MakePipelineOptions opts);
 
@@ -238,6 +237,19 @@ protected:
                                                                      const NamespaceString& ns);
 
 private:
+    /**
+     * Looks up the collection default collator for the collection given by 'collectionUUID'. A
+     * collection's default collation is not allowed to change, so we cache the result to allow
+     * for quick lookups in the future. Looks up the collection by UUID, and returns 'nullptr'
+     * if the collection does not exist or if the collection's default collation is the simple
+     * collation.
+     */
+    std::unique_ptr<CollatorInterface> _getCollectionDefaultCollator(OperationContext* opCtx,
+                                                                     const DatabaseName& dbName,
+                                                                     UUID collectionUUID);
+
+    std::map<UUID, std::unique_ptr<const CollatorInterface>> _collatorCache;
+
     // Object which contains a JavaScript Scope, used for executing JS in pipeline stages and
     // expressions. Owned by the process interface so that there is one common scope for the
     // lifetime of a pipeline.

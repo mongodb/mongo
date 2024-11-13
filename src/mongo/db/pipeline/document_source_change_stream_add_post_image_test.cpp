@@ -348,7 +348,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNot
         std::make_unique<MockMongoInterface>(std::move(foreignCollection)));
 
     ASSERT_THROWS_CODE(
-        lookupChangeStage->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
+        lookupChangeStage->getNext(), AssertionException, ErrorCodes::TooManyMatchingDocuments);
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {

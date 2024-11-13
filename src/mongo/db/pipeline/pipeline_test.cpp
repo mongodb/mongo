@@ -155,8 +155,7 @@ class StubExplainInterface : public StubMongoProcessInterface {
     }
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* ownedPipeline,
-        boost::optional<const AggregateCommandRequest&> aggRequest,
-        bool shouldUseCollectionDefaultCollator) override {
+        boost::optional<const AggregateCommandRequest&> aggRequest) override {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
             ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
         return pipeline;

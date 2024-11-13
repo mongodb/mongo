@@ -51,7 +51,6 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
@@ -532,9 +531,7 @@ query_shape::CollectionType CommonMongodProcessInterface::getCollectionType(
 
 std::unique_ptr<Pipeline, PipelineDeleter>
 CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
-    Pipeline* ownedPipeline,
-    boost::optional<const AggregateCommandRequest&> aggRequest,
-    bool shouldUseCollectionDefaultCollator) {
+    Pipeline* ownedPipeline, boost::optional<const AggregateCommandRequest&> aggRequest) {
     auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
         ownedPipeline, PipelineDeleter(expCtx->getOperationContext()));
@@ -592,19 +589,12 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     tassert(8322002,
             "Should have initialized AutoGet* after calling 'initializeAutoGet'",
             autoColl.has_value());
-
-    const auto& collPtr = autoColl->getCollection();
-    if (aggRequest && aggRequest->getCollectionUUID() && collPtr) {
-        checkCollectionUUIDMismatch(
-            opCtx, expCtx->getNamespaceString(), collPtr, aggRequest->getCollectionUUID());
-    }
-
-    // Attach collection's default collator to the 'expCtx' if 'shouldUseCollectionDefaultCollator'
-    // is specified.
-    const bool canCloneCollectionDefaultCollator = collPtr && collPtr->getDefaultCollator();
-    if (shouldUseCollectionDefaultCollator && canCloneCollectionDefaultCollator) {
-        expCtx->setCollator(collPtr->getDefaultCollator()->clone());
-    }
+    uassert(
+        ErrorCodes::NamespaceNotFound,
+        fmt::format("collection '{}' does not match the expected uuid",
+                    expCtx->getNamespaceString().toStringForErrorMsg()),
+        !expCtx->getUUID() ||
+            (autoColl->getCollection() && autoColl->getCollection()->uuid() == expCtx->getUUID()));
 
     MultipleCollectionAccessor holder{expCtx->getOperationContext(),
                                       &autoColl->getCollection(),
@@ -648,43 +638,31 @@ std::vector<GenericCursor> CommonMongodProcessInterface::getIdleCursors(
 boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
-    boost::optional<UUID> collectionUUID,
+    UUID collectionUUID,
     const Document& documentKey,
     MakePipelineOptions opts) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     try {
-        // Pass empty collator in order avoid inheriting the collator from 'expCtx', which may be
-        // different from the collator of the corresponding collection.
+        // Be sure to do the lookup using the collection default collation
         auto foreignExpCtx =
-            expCtx->copyWith(nss, collectionUUID, std::unique_ptr<CollatorInterface>());
+            expCtx->copyWith(nss,
+                             collectionUUID,
+                             _getCollectionDefaultCollator(
+                                 expCtx->getOperationContext(), nss.dbName(), collectionUUID));
 
         // If we are here, we are either executing the pipeline normally or running in one of the
         // execution stat explain verbosities. In either case, we disable explain on the foreign
         // context so that we actually retrieve the document.
         foreignExpCtx->setExplain(boost::none);
-
-        AggregateCommandRequest aggRequest(nss, {BSON("$match" << documentKey)});
-        if (collectionUUID) {
-            aggRequest.setCollectionUUID(collectionUUID);
-        }
-        pipeline = Pipeline::makePipeline(
-            aggRequest, foreignExpCtx, boost::none /* shardCursorsSortSpec */, opts);
+        pipeline = Pipeline::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx, opts);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         LOGV2_DEBUG(6726700, 1, "Namespace not found while looking up document", "error"_attr = ex);
-        return boost::none;
-    } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
-        LOGV2_DEBUG(9597600,
-                    1,
-                    "Target collection UUID is different from the expected UUID",
-                    "error"_attr = ex);
         return boost::none;
     }
 
     auto lookedUpDocument = pipeline->getNext();
-
-    // Ensure that there are no two documents for the same 'documentKey'.
     if (auto next = pipeline->getNext()) {
-        uasserted(ErrorCodes::TooManyMatchingDocuments,
+        uasserted(ErrorCodes::ChangeStreamFatalError,
                   str::stream() << "found more than one document with document key "
                                 << documentKey.toString() << " [" << lookedUpDocument->toString()
                                 << ", " << next->toString() << "]");
@@ -885,6 +863,30 @@ void CommonMongodProcessInterface::_reportCurrentOpsForQueryAnalysis(
     if (analyze_shard_key::supportsPersistingSampledQueries(opCtx)) {
         analyze_shard_key::QueryAnalysisSampleTracker::get(opCtx).reportForCurrentOp(ops);
     }
+}
+
+std::unique_ptr<CollatorInterface> CommonMongodProcessInterface::_getCollectionDefaultCollator(
+    OperationContext* opCtx, const DatabaseName& dbName, UUID collectionUUID) {
+    auto it = _collatorCache.find(collectionUUID);
+    if (it == _collatorCache.end()) {
+        auto collator = [&]() -> std::unique_ptr<CollatorInterface> {
+            AutoGetCollection autoColl(opCtx, {dbName, collectionUUID}, MODE_IS);
+            if (!autoColl.getCollection()) {
+                // This collection doesn't exist, so assume a nullptr default collation
+                return nullptr;
+            } else {
+                auto defaultCollator = autoColl.getCollection()->getDefaultCollator();
+                // Clone the collator so that we can safely use the pointer if the collection
+                // disappears right after we release the lock.
+                return defaultCollator ? defaultCollator->clone() : nullptr;
+            }
+        }();
+
+        it = _collatorCache.emplace(collectionUUID, std::move(collator)).first;
+    }
+
+    auto& collator = it->second;
+    return collator ? collator->clone() : nullptr;
 }
 
 CommonMongodProcessInterface::DocumentKeyResolutionMetadata

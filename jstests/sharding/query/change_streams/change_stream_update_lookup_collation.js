@@ -100,8 +100,8 @@ for (let nextDocKey of [{shardKey: "abc", _id: "abc_1"}, {shardKey: "ABC", _id: 
     assert.eq(next.documentKey, nextDocKey, tojson(next));
     assert.docEq(Object.merge(nextDocKey, {updatedCount: 1}), next.fullDocument);
 }
-assert.eq(numIdIndexUsages(st.rs0.getPrimary()), idIndexUsagesPreIteration.shard0);
-assert.eq(numIdIndexUsages(st.rs1.getPrimary()), idIndexUsagesPreIteration.shard1);
+assert.eq(numIdIndexUsages(st.rs0.getPrimary()), idIndexUsagesPreIteration.shard0 + 1);
+assert.eq(numIdIndexUsages(st.rs1.getPrimary()), idIndexUsagesPreIteration.shard1 + 1);
 
 changeStream.close();
 
@@ -146,8 +146,8 @@ for (let nextDocKey of [{shardKey: "ABC", _id: "abc_1"}, {shardKey: "abc", _id: 
     assert.eq(next.documentKey, nextDocKey, tojson(next));
     assert.docEq(Object.merge(nextDocKey, {updatedCount: 2}), next.fullDocument);
 }
-assert.eq(numIdIndexUsages(st.rs0.getPrimary()), idIndexUsagesPreIteration.shard0);
-assert.eq(numIdIndexUsages(st.rs1.getPrimary()), idIndexUsagesPreIteration.shard1);
+assert.eq(numIdIndexUsages(st.rs0.getPrimary()), idIndexUsagesPreIteration.shard0 + 1);
+assert.eq(numIdIndexUsages(st.rs1.getPrimary()), idIndexUsagesPreIteration.shard1 + 1);
 
 strengthOneChangeStream.close();
 

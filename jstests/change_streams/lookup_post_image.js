@@ -205,13 +205,13 @@ assert.eq(latestChange.operationType, "insert");
 assert(latestChange.hasOwnProperty("fullDocument"));
 assert.eq(latestChange.fullDocument, {_id: "fullDocument is lookup 2"});
 
-// The next entry is the 'update' operation. Confirm that the next entry's post-image is not-null
-// even though the original collection has been dropped and the new incarnation of the collection
-// with the same name has a different UUID.
+// The next entry is the 'update' operation. Confirm that the next entry's post-image is null
+// because the original collection (i.e. the collection that the 'update' was applied to) has
+// been dropped and the new incarnation of the collection has a different UUID.
 latestChange = cst.getOneChange(cursor);
 assert.eq(latestChange.operationType, "update");
 assert(latestChange.hasOwnProperty("fullDocument"));
-assert.eq(latestChange.fullDocument, {"_id": "fullDocument is lookup 2"});
+assert.eq(latestChange.fullDocument, null);
 
 jsTestLog("Testing full document lookup with a real getMore");
 assert.commandWorked(coll.insert({_id: "getMoreEnabled"}));

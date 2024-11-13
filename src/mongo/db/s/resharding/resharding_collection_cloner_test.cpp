@@ -112,13 +112,12 @@ public:
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
-        boost::optional<BSONObj> readConcern = boost::none,
-        bool shouldUseCollectionDefaultCollator = false) final {
+        boost::optional<BSONObj> readConcern = boost::none) final {
         return preparePipelineForExecution(pipeline, shardTargetingPolicy, std::move(readConcern));
     }
 

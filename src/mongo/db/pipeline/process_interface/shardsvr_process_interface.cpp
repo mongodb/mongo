@@ -178,7 +178,7 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
 boost::optional<Document> ShardServerProcessInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
-    boost::optional<UUID> collectionUUID,
+    UUID collectionUUID,
     const Document& documentKey,
     boost::optional<BSONObj> readConcern) {
     // We only want to retrieve the one document that corresponds to 'documentKey', so we
@@ -187,12 +187,7 @@ boost::optional<Document> ShardServerProcessInterface::lookupSingleDocument(
     opts.shardTargetingPolicy = ShardTargetingPolicy::kForceTargetingWithSimpleCollation;
     opts.readConcern = std::move(readConcern);
 
-    // Do not inherit the collator from 'expCtx', but rather use the target collection default
-    // collator. This is relevant in case of attaching a cursor for local read.
-    opts.useCollectionDefaultCollator = true;
-
-    return doLookupSingleDocument(
-        expCtx, nss, std::move(collectionUUID), documentKey, std::move(opts));
+    return doLookupSingleDocument(expCtx, nss, collectionUUID, documentKey, std::move(opts));
 }
 
 Status ShardServerProcessInterface::insert(
@@ -654,13 +649,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::prepareP
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::preparePipelineForExecution(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
-    boost::optional<BSONObj> readConcern,
-    bool shouldUseCollectionDefaultCollator) {
+    boost::optional<BSONObj> readConcern) {
     std::unique_ptr<Pipeline, PipelineDeleter> targetPipeline(
         pipeline, PipelineDeleter(expCtx->getOperationContext()));
     return sharded_agg_helpers::targetShardsAndAddMergeCursors(
@@ -668,8 +662,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::prepareP
         std::make_pair(aggRequest, std::move(targetPipeline)),
         shardCursorsSortSpec,
         shardTargetingPolicy,
-        std::move(readConcern),
-        shouldUseCollectionDefaultCollator);
+        std::move(readConcern));
 }
 
 std::unique_ptr<MongoProcessInterface::ScopedExpectUnshardedCollection>
