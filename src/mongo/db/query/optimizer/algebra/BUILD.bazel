@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +7,15 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+mongo_cc_unit_test(
+    name = "algebra_test",
+    srcs = [
+        "algebra_test.cpp",
+        "operator.h",
+        "polyvalue.h",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [],
 )

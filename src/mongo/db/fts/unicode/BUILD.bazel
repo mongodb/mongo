@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
@@ -77,5 +77,18 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/shell:linenoise_utf8",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_fts_unicode_test",
+    srcs = [
+        "byte_vector_test.cpp",
+        "codepoints_test.cpp",
+        "string_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":unicode",
     ],
 )

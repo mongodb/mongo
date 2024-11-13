@@ -137,28 +137,10 @@ env.CppUnitTest(
     ],
 )
 
-# Lightweight test utils.
-env.Library(
-    target="abt_unit_test_utils",
-    source=[
-        "abt/abt_unit_test_utils.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_base",
-        "$BUILD_DIR/mongo/unittest/unittest",
-    ],
-)
-
 env.CppUnitTest(
     target="abt_unit_test_infra_test",
-    source=[
-        "abt/abt_unit_test_infra_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
-        "abt_unit_test_utils",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

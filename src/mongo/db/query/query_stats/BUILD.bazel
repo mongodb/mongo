@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -81,5 +81,34 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_query_query_stats_test",
+    srcs = [
+        "agg_key_test.cpp",
+        "count_key_test.cpp",
+        "distinct_key_test.cpp",
+        "find_key_test.cpp",
+        "key_test.cpp",
+        "query_stats_store_test.cpp",
+        "query_stats_test.cpp",
+        "rate_limiting_test.cpp",
+        "supplemental_metrics_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":query_stats",
+        ":rate_limiting",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/exec/sbe:abt_unit_test_utils",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_common",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/query_shape",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/util:version_impl",
     ],
 )

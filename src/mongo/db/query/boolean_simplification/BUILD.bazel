@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -28,5 +28,20 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:mongohasher",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "boolean_simplification_test",
+    srcs = [
+        "bitset_algebra_test.cpp",
+        "bitset_test_util.h",
+        "bitset_tree_test.cpp",
+        "petrick_test.cpp",
+        "quine_mccluskey_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":boolean_simplification",
     ],
 )

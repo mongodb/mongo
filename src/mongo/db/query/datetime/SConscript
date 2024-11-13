@@ -8,14 +8,8 @@ timeZoneEnv = env.Clone()
 timeZoneEnv.InjectThirdParty(libraries=["timelib"])
 timeZoneEnv.CppUnitTest(
     target="date_time_support_test",
-    source=[
-        "date_time_support_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "date_time_support",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 timeZoneEnv.CppLibfuzzerTest(

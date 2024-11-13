@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -529,6 +529,7 @@ mongo_cc_library(
         "//src/mongo/db/query/query_shape:agg_cmd_shape.h",
         "//src/mongo/db/query/query_stats:agg_key.h",
         "document_source.h",
+        "document_source_mock.h",
         "document_source_add_fields.h",
         "document_source_bucket.h",
         "document_source_bucket_auto.h",
@@ -1219,8 +1220,62 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "db_percentile_algo_test",
+    srcs = [
+        "percentile_algo_continuous_test.cpp",
+        "percentile_algo_discrete_test.cpp",
+        "percentile_algo_tdigest_distributed_test.cpp",
+        "percentile_algo_tdigest_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":accumulator",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "common_sort_key_optimization_test",
+    srcs = [
+        "common_sort_key_optimization_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":accumulator",
+        ":aggregation_context_fixture",
+        ":pipeline",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
 # TODO(SERVER-96860): Remove cycle created by moving //src/mongo/db/pipeline:field_path.h to //src/mongo/db/pipeline:field_path
 filegroup(
     name = "field_path_hdrs",
     srcs = [":field_path.h"],
+)
+
+mongo_cc_library(
+    name = "aggregation_context_fixture",
+    hdrs = [
+        "aggregation_context_fixture.h",
+        "document_source_mock_stages.h",
+    ],
+    deps = [
+        ":expression_context_for_test",
+        ":pipeline",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "group_with_acc_n_optimization_test",
+    srcs = [
+        "group_with_acc_n_optimization_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":accumulator",
+        ":aggregation_context_fixture",
+        ":pipeline",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
 )

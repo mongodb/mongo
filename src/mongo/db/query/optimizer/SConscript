@@ -16,13 +16,8 @@ env.SConscript(
 
 env.CppUnitTest(
     target="optimizer_test",
-    source=[
-        "reference_tracker_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/exec/sbe/abt_unit_test_utils",
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 optimizer_gdb_test_program = env.Program(

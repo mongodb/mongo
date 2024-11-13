@@ -6,13 +6,8 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="query_settings_serialization_test",
-    source=[
-        "index_hints_serialization_test.cpp",
-        "query_framework_serialization_test.cpp",
-    ],
-    LIBDEPS=[
-        "query_settings",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

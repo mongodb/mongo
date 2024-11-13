@@ -96,12 +96,8 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="profile_settings_test",
-    source=[
-        "profile_settings_test.cpp",
-    ],
-    LIBDEPS=[
-        "profile_settings",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Library(

@@ -3507,6 +3507,17 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "profile_settings_test",
+    srcs = [
+        "profile_settings_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        "profile_settings",
+    ],
+)
+
 mongo_cc_library(
     name = "read_write_concern_defaults_mock",
     srcs = [

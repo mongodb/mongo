@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
@@ -118,5 +118,31 @@ mongo_cc_library(
     deps = [
         ":base_fts",
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_fts_test",
+    srcs = [
+        "fts_basic_phrase_matcher_test.cpp",
+        "fts_basic_tokenizer_test.cpp",
+        "fts_element_iterator_test.cpp",
+        "fts_index_format_test.cpp",
+        "fts_language_test.cpp",
+        "fts_matcher_test.cpp",
+        "fts_query_impl_test.cpp",
+        "fts_query_noop_test.cpp",
+        "fts_spec_test.cpp",
+        "fts_unicode_phrase_matcher_test.cpp",
+        "fts_unicode_tokenizer_test.cpp",
+        "stemmer_test.cpp",
+        "stop_words_test.cpp",
+        "tokenizer_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":base_fts",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/fts:fts_query_noop",
     ],
 )

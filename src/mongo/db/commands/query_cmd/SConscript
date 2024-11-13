@@ -6,15 +6,6 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="map_reduce_agg_test",
-    source=[
-        "map_reduce_agg_test.cpp",
-        "map_reduce_parse_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/index_builds/two_phase_index_build_knobs_idl",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "map_reduce_agg",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

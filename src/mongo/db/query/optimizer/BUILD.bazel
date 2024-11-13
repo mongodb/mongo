@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -35,5 +35,17 @@ mongo_cc_library(
         # arithmetic for constant folding.
         "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",
         "//src/mongo/db:sbe_values",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "optimizer_test",
+    srcs = [
+        "reference_tracker_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        "//src/mongo/db/exec/sbe:abt_unit_test_utils",
+        "//src/mongo/db/exec/sbe:query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
     ],
 )

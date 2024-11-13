@@ -11,27 +11,8 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="db_query_query_stats_test",
-    source=[
-        "agg_key_test.cpp",
-        "count_key_test.cpp",
-        "distinct_key_test.cpp",
-        "find_key_test.cpp",
-        "key_test.cpp",
-        "query_stats_test.cpp",
-        "supplemental_metrics_test.cpp",
-        "query_stats_store_test.cpp",
-        "rate_limiting_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query/query_common",
-        "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "$BUILD_DIR/mongo/util/version_impl",
-        "query_stats",
-        "rate_limiting",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

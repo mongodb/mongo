@@ -4,15 +4,8 @@ Import("env")
 
 env.CppUnitTest(
     target="boolean_simplification_test",
-    source=[
-        "bitset_algebra_test.cpp",
-        "bitset_tree_test.cpp",
-        "petrick_test.cpp",
-        "quine_mccluskey_test.cpp",
-    ],
-    LIBDEPS=[
-        "boolean_simplification",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

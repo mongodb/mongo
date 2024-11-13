@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -43,5 +43,15 @@ mongo_cc_library(
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/scripting:scripting_server",
+    ],
+)
+
+mongo_cc_library(
+    name = "parsed_match_expression_for_test",
+    hdrs = [
+        "parsed_match_expression_for_test.h",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline:expression_context_for_test",
     ],
 )

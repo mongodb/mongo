@@ -6,17 +6,8 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="db_geo_test",
-    source=[
-        "hash_test.cpp",
-        "big_polygon_test.cpp",
-        "geoparser_test.cpp",
-        "r2_region_coverer_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/common",
-        "geometry",
-        "geoparser",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

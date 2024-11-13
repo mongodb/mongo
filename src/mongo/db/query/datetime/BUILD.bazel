@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -39,4 +39,17 @@ mongo_cc_library(
 filegroup(
     name = "date_time_support_hdrs",
     srcs = [":date_time_support.h"],
+)
+
+mongo_cc_unit_test(
+    name = "date_time_support_test",
+    srcs = [
+        "date_time_support_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":date_time_support",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/transport:transport_layer_common",
+    ],
 )

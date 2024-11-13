@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -243,5 +243,30 @@ mongo_cc_library(
     srcs = [],
     hdrs = [
         "counter_ops.h",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_stats_test",
+    srcs = [
+        "api_version_metrics_test.cpp",
+        "operation_latency_histogram_test.cpp",
+        "resource_consumption_metrics_test.cpp",
+        "timer_stats_test.cpp",
+        "top_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":api_version_metrics",
+        ":resource_consumption_metrics",
+        ":timer_stats",
+        ":top",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/util:clock_source_mock",
     ],
 )

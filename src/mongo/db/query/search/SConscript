@@ -34,12 +34,6 @@ env.CppIntegrationTest(
 
 env.CppUnitTest(
     target="auth_search_test",
-    source=[
-        "list_search_indexes_authorization_session_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/auth_checks",
-        "$BUILD_DIR/mongo/db/auth/authorization_session_test_fixture",
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

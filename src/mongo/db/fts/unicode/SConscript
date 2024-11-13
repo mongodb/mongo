@@ -7,12 +7,6 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="db_fts_unicode_test",
-    source=[
-        "byte_vector_test.cpp",
-        "codepoints_test.cpp",
-        "string_test.cpp",
-    ],
-    LIBDEPS=[
-        "unicode",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

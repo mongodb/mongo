@@ -6,11 +6,6 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="db_bson_test",
-    source=[
-        "dotted_path_support_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
-        "dotted_path_support",
-    ],
+    source=[],
+    LIBDEPS=[],
 )

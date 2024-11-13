@@ -248,15 +248,8 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target="db_percentile_algo_test",
-    source=[
-        "percentile_algo_continuous_test.cpp",
-        "percentile_algo_discrete_test.cpp",
-        "percentile_algo_tdigest_test.cpp",
-        "percentile_algo_tdigest_distributed_test.cpp",
-    ],
-    LIBDEPS=[
-        "accumulator",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(
@@ -272,26 +265,14 @@ env.Benchmark(
 
 env.CppUnitTest(
     target="common_sort_key_optimization_test",
-    source=[
-        "common_sort_key_optimization_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "accumulator",
-        "pipeline",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
     target="group_with_acc_n_optimization_test",
-    source=[
-        "group_with_acc_n_optimization_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "accumulator",
-        "pipeline",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
 
 env.Benchmark(

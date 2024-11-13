@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -187,5 +187,18 @@ mongo_cc_library(
         ":search_index_process_interface",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/s/catalog:sharding_catalog_client",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "auth_search_test",
+    srcs = [
+        "list_search_indexes_authorization_session_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        "//src/mongo/db/auth:auth_checks",
+        "//src/mongo/db/auth:authorization_session_test_fixture",
+        "//src/mongo/db/pipeline",
     ],
 )

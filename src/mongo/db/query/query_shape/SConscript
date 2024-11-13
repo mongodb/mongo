@@ -11,14 +11,6 @@ env = env.Clone()
 
 env.CppUnitTest(
     target="db_query_query_shape_test",
-    source=[
-        "query_shape_test.cpp",
-        "query_shape_test_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "query_shape",
-    ],
+    source=[],
+    LIBDEPS=[],
 )
