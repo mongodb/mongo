@@ -97,7 +97,6 @@ public:
     };
 
     ColumnScanStage(UUID collectionUuid,
-                    DatabaseName dbName,
                     StringData columnIndexName,
                     std::vector<std::string> paths,
                     bool densePathIncludedInScan,
@@ -260,7 +259,6 @@ private:
 
     // The columnar index this stage is scanning and the associated row store collection.
     const UUID _collUuid;
-    const DatabaseName _dbName;
     const std::string _columnIndexName;
     std::string _columnIndexIdent;
     CollectionRef _coll;

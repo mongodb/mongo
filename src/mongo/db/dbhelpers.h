@@ -189,11 +189,6 @@ struct Helpers {
      * Finds the doc and then runs a no-op update by running an update using the doc just read. Used
      * in order to force a conflict if a concurrent storage transaction writes to the doc we're
      * reading.
-     *
-     * This no-op update has no associated timestamp. This results in a mixed-mode update chain
-     * within WT that is problematic with durable history. Callers must not commit the
-     * `WriteUnitOfWork` when there are no other writes that set the timestamp.
-     *
      * Callers must hold the collection lock in MODE_IX.
      * Uasserts if no _id index.
      * Returns true if object found

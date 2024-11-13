@@ -66,17 +66,6 @@ const validateBucketReopening = function(metaFieldName = null) {
                   stats.timeseries['numBucketsReopened'],
                   "Timeseries stats: " + tojson(stats));
 
-        // We expect just one bucket to be open, so all others should get archived and closed.
-        assert.eq(stats.timeseries['numBucketsClosedDueToMemoryThreshold'],
-                  distinctMetaValues * numOfPasses - 1,
-                  "Timeseries stats: " + tojson(stats));
-        assert.eq(stats.timeseries['numBucketsArchivedDueToMemoryThreshold'],
-                  distinctMetaValues * numOfPasses - 1,
-                  "Timeseries stats: " + tojson(stats));
-        assert.eq(stats.timeseries['numBucketsQueried'], 990, "Timeseries stats: " + tojson(stats));
-        assert.eq(
-            stats.timeseries['numBucketQueriesFailed'], 10, "Timeseries stats: " + tojson(stats));
-
         // The number of bucket inserts should be less than the number of bucket updates.
         assert.lt(stats.timeseries['numBucketInserts'],
                   stats.timeseries['numBucketUpdates'],

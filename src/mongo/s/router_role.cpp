@@ -115,12 +115,8 @@ void DBPrimaryRouter::_onException(RouteContext* context, Status s) {
 }
 
 CollectionRouterCommon::CollectionRouterCommon(
-    ServiceContext* service,
-    const std::vector<NamespaceString>& targetedNamespaces,
-    bool retryOnStaleShard)
-    : RouterBase(service),
-      _targetedNamespaces(targetedNamespaces),
-      _retryOnStaleShard(retryOnStaleShard) {}
+    ServiceContext* service, const std::vector<NamespaceString>& targetedNamespaces)
+    : RouterBase(service), _targetedNamespaces(targetedNamespaces) {}
 
 void CollectionRouterCommon::_onException(RouteContext* context, Status s) {
     auto catalogCache = Grid::get(_service)->catalogCache();
@@ -140,26 +136,12 @@ void CollectionRouterCommon::_onException(RouteContext* context, Status s) {
     if (s == ErrorCodes::StaleDbVersion) {
         auto si = s.extraInfo<StaleDbRoutingVersion>();
         tassert(6375903, "StaleDbVersion must have extraInfo", si);
-
-        const bool isShardStale =
-            !si->getVersionWanted() || *si->getVersionWanted() < si->getVersionReceived();
-        if (isShardStale && !_retryOnStaleShard) {
-            uassertStatusOK(s);
-        }
-
         catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
     } else if (s == ErrorCodes::StaleConfig) {
         auto si = s.extraInfo<StaleConfigInfo>();
         tassert(6375904, "StaleConfig must have extraInfo", si);
 
         if (!isNssInvolvedInRouting(si->getNss())) {
-            uassertStatusOK(s);
-        }
-
-        const bool isShardStale = !si->getVersionWanted() ||
-            si->getVersionWanted()->placementVersion().isOlderThan(
-                si->getVersionReceived().placementVersion());
-        if (isShardStale && !_retryOnStaleShard) {
             uassertStatusOK(s);
         }
 
@@ -217,15 +199,12 @@ void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shar
     cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, builder);
 }
 
-CollectionRouter::CollectionRouter(ServiceContext* service,
-                                   NamespaceString nss,
-                                   bool retryOnStaleShard)
-    : CollectionRouterCommon(service, {std::move(nss)}, retryOnStaleShard) {}
+CollectionRouter::CollectionRouter(ServiceContext* service, NamespaceString nss)
+    : CollectionRouterCommon(service, {std::move(nss)}) {}
 
 MultiCollectionRouter::MultiCollectionRouter(ServiceContext* service,
-                                             const std::vector<NamespaceString>& nssList,
-                                             bool retryOnStaleShard)
-    : CollectionRouterCommon(service, nssList, retryOnStaleShard) {}
+                                             const std::vector<NamespaceString>& nssList)
+    : CollectionRouterCommon(service, nssList) {}
 
 bool MultiCollectionRouter::isAnyCollectionNotLocal(
     OperationContext* opCtx,

@@ -67,32 +67,30 @@ const runTest = function(ordered) {
     assert.eq(res.modifiedCount, 1);
 
     let stats = assert.commandWorked(coll.stats());
-    assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "bucketCount"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketInserts"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketUpdates"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsOpenedDueToMetadata"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToCount"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToSchemaChange"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToSize"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToTimeForward"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToMemoryThreshold"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numCommits"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numMeasurementsGroupCommitted"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numWaits"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numMeasurementsCommitted"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToReopening"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToTimeBackward"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFrozen"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
+    assert.eq(1, stats.timeseries["bucketCount"]);
+    assert.eq(0, stats.timeseries["numBucketInserts"]);
+    assert.eq(0, stats.timeseries["numBucketUpdates"]);
+    assert.eq(0, stats.timeseries["numBucketsOpenedDueToMetadata"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToCount"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToSchemaChange"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToSize"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToTimeForward"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToMemoryThreshold"]);
+    assert.eq(0, stats.timeseries["numCommits"]);
+    assert.eq(0, stats.timeseries["numMeasurementsGroupCommitted"]);
+    assert.eq(0, stats.timeseries["numWaits"]);
+    assert.eq(0, stats.timeseries["numMeasurementsCommitted"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToReopening"]);
+    assert.eq(0, stats.timeseries["numBucketsArchivedDueToTimeBackward"]);
+    assert.eq(0, stats.timeseries["numBucketsReopened"]);
+    assert.eq(0, stats.timeseries["numBucketsKeptOpenDueToLargeMeasurements"]);
+    assert.eq(0, stats.timeseries["numBucketsFrozen"]);
+    assert.eq(0, stats.timeseries["numCompressedBucketsConvertedToUnsorted"]);
+    assert.eq(0, stats.timeseries["numBucketsFetched"]);
+    assert.eq(0, stats.timeseries["numBucketsQueried"]);
+    assert.eq(0, stats.timeseries["numBucketQueriesFailed"]);
+    assert.eq(0, stats.timeseries["numBucketReopeningsFailed"]);
+    assert.eq(0, stats.timeseries["numDuplicateBucketsReopened"]);
 
     const insert = function(docs) {
         return db.runCommand({insert: coll.getName(), documents: docs, ordered: ordered});
@@ -116,32 +114,30 @@ const runTest = function(ordered) {
     stats = assert.commandWorked(coll.stats());
 
     // Bucket 0 (frozen) + Bucket 0 (new) + Bucket 1 + Bucket 2
-    assert.eq(4, TimeseriesTest.getStat(stats.timeseries, "bucketCount"));
-    assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numBucketInserts"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketUpdates"));
-    assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numBucketsOpenedDueToMetadata"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToCount"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToSchemaChange"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToSize"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToTimeForward"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToMemoryThreshold"));
-    assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numCommits"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numMeasurementsGroupCommitted"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numWaits"));
-    assert.eq(6, TimeseriesTest.getStat(stats.timeseries, "numMeasurementsCommitted"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToReopening"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToTimeBackward"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
-    assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsFrozen"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
-    assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
+    assert.eq(4, stats.timeseries["bucketCount"]);
+    assert.eq(3, stats.timeseries["numBucketInserts"]);
+    assert.eq(0, stats.timeseries["numBucketUpdates"]);
+    assert.eq(3, stats.timeseries["numBucketsOpenedDueToMetadata"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToCount"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToSchemaChange"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToSize"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToTimeForward"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToMemoryThreshold"]);
+    assert.eq(3, stats.timeseries["numCommits"]);
+    assert.eq(0, stats.timeseries["numMeasurementsGroupCommitted"]);
+    assert.eq(0, stats.timeseries["numWaits"]);
+    assert.eq(6, stats.timeseries["numMeasurementsCommitted"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToReopening"]);
+    assert.eq(0, stats.timeseries["numBucketsArchivedDueToTimeBackward"]);
+    assert.eq(0, stats.timeseries["numBucketsReopened"]);
+    assert.eq(0, stats.timeseries["numBucketsKeptOpenDueToLargeMeasurements"]);
+    assert.eq(1, stats.timeseries["numBucketsFrozen"]);
+    assert.eq(0, stats.timeseries["numCompressedBucketsConvertedToUnsorted"]);
+    assert.eq(0, stats.timeseries["numBucketsFetched"]);
+    assert.eq(0, stats.timeseries["numBucketsQueried"]);
+    assert.eq(2, stats.timeseries["numBucketQueriesFailed"]);
+    assert.eq(0, stats.timeseries["numBucketReopeningsFailed"]);
+    assert.eq(0, stats.timeseries["numDuplicateBucketsReopened"]);
     assert.eq(coll.find().itcount(), 8);
 
     res = assert.commandWorked(insert(docs.slice(1)));
@@ -149,32 +145,30 @@ const runTest = function(ordered) {
     assert(res["writeErrors"] === undefined);
 
     stats = assert.commandWorked(coll.stats());
-    assert.eq(4, TimeseriesTest.getStat(stats.timeseries, "bucketCount"));
-    assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numBucketInserts"));
-    assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numBucketUpdates"));
-    assert.eq(3, TimeseriesTest.getStat(stats.timeseries, "numBucketsOpenedDueToMetadata"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToCount"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToSchemaChange"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToSize"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToTimeForward"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToMemoryThreshold"));
-    assert.eq(6, TimeseriesTest.getStat(stats.timeseries, "numCommits"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numMeasurementsGroupCommitted"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numWaits"));
-    assert.eq(11, TimeseriesTest.getStat(stats.timeseries, "numMeasurementsCommitted"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToReopening"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToTimeBackward"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
-    assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsFrozen"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
-    assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
+    assert.eq(4, stats.timeseries["bucketCount"]);
+    assert.eq(3, stats.timeseries["numBucketInserts"]);
+    assert.eq(3, stats.timeseries["numBucketUpdates"]);
+    assert.eq(3, stats.timeseries["numBucketsOpenedDueToMetadata"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToCount"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToSchemaChange"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToSize"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToTimeForward"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToMemoryThreshold"]);
+    assert.eq(6, stats.timeseries["numCommits"]);
+    assert.eq(0, stats.timeseries["numMeasurementsGroupCommitted"]);
+    assert.eq(0, stats.timeseries["numWaits"]);
+    assert.eq(11, stats.timeseries["numMeasurementsCommitted"]);
+    assert.eq(0, stats.timeseries["numBucketsClosedDueToReopening"]);
+    assert.eq(0, stats.timeseries["numBucketsArchivedDueToTimeBackward"]);
+    assert.eq(0, stats.timeseries["numBucketsReopened"]);
+    assert.eq(0, stats.timeseries["numBucketsKeptOpenDueToLargeMeasurements"]);
+    assert.eq(1, stats.timeseries["numBucketsFrozen"]);
+    assert.eq(0, stats.timeseries["numCompressedBucketsConvertedToUnsorted"]);
+    assert.eq(0, stats.timeseries["numBucketsFetched"]);
+    assert.eq(0, stats.timeseries["numBucketsQueried"]);
+    assert.eq(2, stats.timeseries["numBucketQueriesFailed"]);
+    assert.eq(0, stats.timeseries["numBucketReopeningsFailed"]);
+    assert.eq(0, stats.timeseries["numDuplicateBucketsReopened"]);
 
     assert.eq(coll.find().itcount(), 13);
     assert.eq(coll.find({[metaFieldName]: 0}).itcount(), 6);

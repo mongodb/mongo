@@ -35,16 +35,6 @@
 
 namespace mongo::timeseries::bucket_catalog {
 
-void ExecutionStatsController::incNumActiveBuckets(long long increment) {
-    _collectionStats->numActiveBuckets.fetchAndAddRelaxed(increment);
-    _globalStats->numActiveBuckets.fetchAndAddRelaxed(increment);
-}
-
-void ExecutionStatsController::decNumActiveBuckets(long long decrement) {
-    _collectionStats->numActiveBuckets.fetchAndSubtractRelaxed(decrement);
-    _globalStats->numActiveBuckets.fetchAndSubtractRelaxed(decrement);
-}
-
 void ExecutionStatsController::incNumBucketInserts(long long increment) {
     _collectionStats->numBucketInserts.fetchAndAddRelaxed(increment);
     _globalStats->numBucketInserts.fetchAndAddRelaxed(increment);
@@ -206,7 +196,6 @@ void ExecutionStatsController::incNumFailedDecompressBuckets(long long increment
 }
 
 void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& builder) {
-    builder.appendNumber("numActiveBuckets", stats.numActiveBuckets.load());
     builder.appendNumber("numBucketInserts", stats.numBucketInserts.load());
     builder.appendNumber("numBucketUpdates", stats.numBucketUpdates.load());
     builder.appendNumber("numBucketsOpenedDueToMetadata",
@@ -266,8 +255,7 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     builder.appendNumber("numFailedDecompressBuckets", stats.numFailedDecompressBuckets.load());
 }
 
-void addCollectionExecutionCounters(ExecutionStatsController& stats,
-                                    const ExecutionStats& collStats) {
+void addCollectionExecutionStats(ExecutionStatsController& stats, const ExecutionStats& collStats) {
     stats.incNumBucketInserts(collStats.numBucketInserts.load());
     stats.incNumBucketUpdates(collStats.numBucketUpdates.load());
     stats.incNumBucketsOpenedDueToMetadata(collStats.numBucketsOpenedDueToMetadata.load());
@@ -308,14 +296,6 @@ void addCollectionExecutionCounters(ExecutionStatsController& stats,
     stats.incNumCompressedBuckets(collStats.numCompressedBuckets.load());
     stats.incNumUncompressedBuckets(collStats.numUncompressedBuckets.load());
     stats.incNumFailedDecompressBuckets(collStats.numFailedDecompressBuckets.load());
-}
-
-void addCollectionExecutionGauges(ExecutionStats& stats, const ExecutionStats& collStats) {
-    stats.numActiveBuckets.fetchAndAdd(collStats.numActiveBuckets.load());
-}
-
-void removeCollectionExecutionGauges(ExecutionStats& stats, const ExecutionStats& collStats) {
-    stats.numActiveBuckets.fetchAndSubtract(collStats.numActiveBuckets.load());
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

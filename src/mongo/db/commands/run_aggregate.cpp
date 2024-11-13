@@ -1021,16 +1021,11 @@ Status runAggregateOnView(OperationContext* opCtx,
         const ScopedStashShardRole scopedUnsetShardRole{opCtx, resolvedView.getNamespace()};
 
         sharding::router::CollectionRouter router(opCtx->getServiceContext(),
-                                                  resolvedView.getNamespace(),
-                                                  false  // retryOnStaleShard=false
-        );
+                                                  resolvedView.getNamespace());
         status = router.route(
             opCtx,
             "runAggregateOnView",
             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                // TODO: SERVER-77402 Use a ShardRoleLoop here and remove this usage of
-                // CollectionRouter's retryOnStaleShard=false.
-
                 // Setup the opCtx's OperationShardingState with the expected placement versions for
                 // the underlying collection. Use the same 'placementConflictTime' from the original
                 // request, if present.
@@ -1638,6 +1633,20 @@ Status _runAggregate(OperationContext* opCtx,
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
         if (ctx) {
+            // Due to yielding, the collection pointers saved in MultipleCollectionAccessor might
+            // have become invalid. We will need to refresh them here.
+
+            // Stash the old value of 'isAnySecondaryNamespaceAViewOrNotFullyLocal' before
+            // refreshing. This is ok because we expect that our view of the collection should not
+            // have changed while holding 'ctx'.
+            auto isAnySecondaryNamespaceAViewOrNotFullyLocal =
+                collections.isAnySecondaryNamespaceAViewOrNotFullyLocal();
+            collections = MultipleCollectionAccessor(opCtx,
+                                                     &ctx->getCollection(),
+                                                     ctx->getNss(),
+                                                     isAnySecondaryNamespaceAViewOrNotFullyLocal,
+                                                     secondaryExecNssList);
+
             auto exec =
                 maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
             const auto& planExplainer = exec->getPlanExplainer();

@@ -1129,7 +1129,7 @@ private:
      * plan over. If no current namespace is configured, a CollectionPtr referencing the main
      * collection tracked by '_collections' is returned.
      */
-    CollectionPtr getCurrentCollection(const PlanStageReqs& reqs) const;
+    const CollectionPtr& getCurrentCollection(const PlanStageReqs& reqs) const;
 
     std::pair<std::vector<std::string>, sbe::value::SlotVector> buildSearchMetadataSlots();
 

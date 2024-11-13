@@ -32,12 +32,9 @@
 #include <string>
 
 #include "mongo/crypto/mechanism_scram.h"
-#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo {
 
@@ -94,7 +91,6 @@ public:
         auto foundSecret = _hostToSecrets.find(target);
         if (foundSecret == _hostToSecrets.end()) {
             ++_stats.misses;
-            logCacheEvent("miss (secret not found)"_sd);
             return {};
         }
 
@@ -104,11 +100,9 @@ public:
         const auto& foundPresecrets = foundSecret->second.first;
         if (foundPresecrets == presecrets) {
             ++_stats.hits;
-            logCacheEvent("hit"_sd);
             return foundSecret->second.second;
         } else {
             ++_stats.misses;
-            logCacheEvent("miss (stale cached secret)"_sd);
             return {};
         }
     }
@@ -131,9 +125,6 @@ public:
         // We have fresher presecrets and secrets.
         if (!insertionSuccessful) {
             it->second = std::move(cacheRecord);
-            logCacheEvent("overwrite"_sd);
-        } else {
-            logCacheEvent("insertion"_sd);
         }
     }
 
@@ -148,22 +139,9 @@ public:
     }
 
 private:
-    void logCacheEvent(StringData event) const {
-        LOGV2_DEBUG(9542300,
-                    5,
-                    "Cache stats updated",
-                    "event"_attr = event,
-                    "addr"_attr = (std::size_t)this,
-                    "count"_attr = _hostToSecrets.size(),
-                    "hits"_attr = _stats.hits,
-                    "misses"_attr = _stats.misses);
-    }
-
     mutable Mutex _hostToSecretsMutex = MONGO_MAKE_LATCH("SCRAMClientCache::_hostToSecretsMutex");
     HostToSecretsMap _hostToSecrets;
     mutable Stats _stats;
 };
 
 }  // namespace mongo
-
-#undef MONGO_LOGV2_DEFAULT_COMPONENT

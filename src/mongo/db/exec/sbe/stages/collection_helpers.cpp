@@ -42,22 +42,12 @@
 
 namespace mongo::sbe {
 
-void CollectionRef::getConsistentCollection(OperationContext* opCtx,
-                                            const DatabaseName& dbName,
-                                            const UUID& collUuid) {
-    auto timestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
-    _collPtr.emplace(CollectionCatalog::get(opCtx)->establishConsistentCollection(
-        opCtx, NamespaceStringOrUUID{dbName, collUuid}, timestamp));
-}
-
-void CollectionRef::acquireCollection(OperationContext* opCtx,
-                                      const DatabaseName& dbName,
-                                      const UUID& collUuid) {
+void CollectionRef::acquireCollection(OperationContext* opCtx, const UUID& collUuid) {
     // The collection is either locked at a higher level or a snapshot of the catalog (consistent
     // with the storage engine snapshot from which we are reading) has been stashed on the
     // 'OperationContext'. Either way, this means that the UUID must still exist in our view of the
     // collection catalog.
-    getConsistentCollection(opCtx, dbName, collUuid);
+    _collPtr.emplace(CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collUuid));
     tassert(
         5071000, str::stream() << "Collection uuid " << collUuid << " does not exist", getPtr());
 
@@ -65,18 +55,15 @@ void CollectionRef::acquireCollection(OperationContext* opCtx,
     _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
 }
 
-void CollectionRef::restoreCollection(OperationContext* opCtx,
-                                      const DatabaseName& dbName,
-                                      const UUID& collUuid) {
+void CollectionRef::restoreCollection(OperationContext* opCtx, const UUID& collUuid) {
     tassert(5777401, "Collection name should be initialized", _collName);
     tassert(5777402, "Catalog epoch should be initialized", _catalogEpoch);
 
-    // Establish a consistent collection instance and restore the collection pointer. If the
-    // collection has been dropped, then this UUID lookup will result in a null pointer. If the
-    // collection has been renamed, then the resulting collection object should have a different
-    // name from the original '_collName'. In either scenario, we throw a 'QueryPlanKilled' error
-    // and terminate the query.
-    getConsistentCollection(opCtx, dbName, collUuid);
+    // Re-lookup the collection pointer, by UUID. If the collection has been dropped, then this UUID
+    // lookup will result in a null pointer. If the collection has been renamed, then the resulting
+    // collection object should have a different name from the original '_collName'. In either
+    // scenario, we throw a 'QueryPlanKilled' error and terminate the query.
+    _collPtr.emplace(CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collUuid));
     if (!getPtr()) {
         PlanYieldPolicy::throwCollectionDroppedError(collUuid);
     }

@@ -1,5 +1,9 @@
 /**
  * Tests basic functionality of read-only, non-materialized views.
+ *
+ * @tags: [
+ *   assumes_unsharded_collection,
+ * ]
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

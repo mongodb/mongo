@@ -70,7 +70,6 @@ namespace sbe {
  * Regular constructor. Initializes static '_state' managed by a shared_ptr.
  */
 ScanStage::ScanStage(UUID collUuid,
-                     DatabaseName dbName,
                      boost::optional<value::SlotId> recordSlot,
                      boost::optional<value::SlotId> recordIdSlot,
                      boost::optional<value::SlotId> snapshotIdSlot,
@@ -99,7 +98,6 @@ ScanStage::ScanStage(UUID collUuid,
                 participateInTrialRunTracking,
                 TrialRunTrackingType::TrackReads),
       _state(std::make_shared<ScanStageState>(collUuid,
-                                              dbName,
                                               recordSlot,
                                               recordIdSlot,
                                               snapshotIdSlot,
@@ -205,7 +203,7 @@ void ScanStage::prepare(CompileCtx& ctx) {
     }
 
     tassert(5709600, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    _coll.acquireCollection(_opCtx, _state->dbName, _state->collUuid);
+    _coll.acquireCollection(_opCtx, _state->collUuid);
 }
 
 value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -287,7 +285,7 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
         return;
     }
 
-    _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
+    _coll.restoreCollection(_opCtx, _state->collUuid);
 
     if (auto cursor = getActiveCursor(); cursor != nullptr) {
         if (relinquishCursor) {
@@ -430,7 +428,7 @@ void ScanStage::open(bool reOpen) {
 
     // We need to re-acquire '_coll' in this case and make some validity checks (the collection has
     // not been dropped, renamed, etc).
-    _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
+    _coll.restoreCollection(_opCtx, _state->collUuid);
 
     tassert(5959701, "restoreCollection() unexpectedly returned null in ScanStage", _coll);
 
@@ -816,7 +814,6 @@ size_t ScanStage::estimateCompileTimeSize() const {
 }
 
 ParallelScanStage::ParallelScanStage(UUID collUuid,
-                                     DatabaseName dbName,
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
                                      boost::optional<value::SlotId> snapshotIdSlot,
@@ -832,7 +829,6 @@ ParallelScanStage::ParallelScanStage(UUID collUuid,
     : PlanStage("pscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _state(std::make_shared<ParallelState>()),
       _collUuid(collUuid),
-      _dbName(dbName),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
       _snapshotIdSlot(snapshotIdSlot),
@@ -847,7 +843,6 @@ ParallelScanStage::ParallelScanStage(UUID collUuid,
 
 ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state,
                                      UUID collUuid,
-                                     DatabaseName dbName,
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
                                      boost::optional<value::SlotId> snapshotIdSlot,
@@ -863,7 +858,6 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
     : PlanStage("pscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _state(state),
       _collUuid(collUuid),
-      _dbName(dbName),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
       _snapshotIdSlot(snapshotIdSlot),
@@ -879,7 +873,6 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
 std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
     return std::make_unique<ParallelScanStage>(_state,
                                                _collUuid,
-                                               _dbName,
                                                _recordSlot,
                                                _recordIdSlot,
                                                _snapshotIdSlot,
@@ -923,7 +916,7 @@ void ParallelScanStage::prepare(CompileCtx& ctx) {
     }
 
     tassert(5709601, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    _coll.acquireCollection(_opCtx, _dbName, _collUuid);
+    _coll.acquireCollection(_opCtx, _collUuid);
 }
 
 value::SlotAccessor* ParallelScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -989,7 +982,7 @@ void ParallelScanStage::doRestoreState(bool relinquishCursor) {
         return;
     }
 
-    _coll.restoreCollection(_opCtx, _dbName, _collUuid);
+    _coll.restoreCollection(_opCtx, _collUuid);
 
     if (_cursor && relinquishCursor) {
         const bool couldRestore = _cursor->restore();
@@ -1039,7 +1032,7 @@ void ParallelScanStage::open(bool reOpen) {
         // we're being opened after 'close()'. we need to re-acquire '_coll' in this case and
         // make some validity checks (the collection has not been dropped, renamed, etc.).
         tassert(5071013, "ParallelScanStage is not open but have _cursor", !_cursor);
-        _coll.restoreCollection(_opCtx, _dbName, _collUuid);
+        _coll.restoreCollection(_opCtx, _collUuid);
     }
 
     {

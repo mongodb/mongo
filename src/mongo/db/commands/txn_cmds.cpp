@@ -157,20 +157,9 @@ public:
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",
                     txnParticipant.transactionIsOpen());
-            hangBeforeCommitingTxn.executeIf(
-                [&](const BSONObj& data) {
-                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                        &hangBeforeCommitingTxn, opCtx, "hangBeforeCommitingTxn");
-                },
-                [&](const BSONObj& data) {
-                    // Hang if we don't provide a txnNumber to the fail point. If we do, only hang
-                    // if the txnNumber matches the current running txnNumber.
-                    if (data.hasField("uuid")) {
-                        auto uuid = UUID::parse(data);
-                        return uuid == opCtx->getLogicalSessionId()->getId();
-                    }
-                    return true;
-                });
+
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBeforeCommitingTxn, opCtx, "hangBeforeCommitingTxn");
 
             auto optionalCommitTimestamp = request().getCommitTimestamp();
             if (optionalCommitTimestamp) {

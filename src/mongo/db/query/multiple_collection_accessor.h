@@ -37,12 +37,10 @@
 namespace mongo {
 
 /**
- * Class which is used to access pointers to multiple collections referenced in a query. This class
- * distinguishes between a 'main collection' and 'secondary collections'. While the former
- * represents the collection a given command is run against, the latter represents other collections
- * that the query execution engine may need to access. In case of secondary collections, we only
- * store the namespace strings and fetch 'collectionPtr' on demand, since they can become invalid
- * during query yields. The main collectionPtr is restored through yield so it can be stored.
+ * Class which holds a set of pointers to multiple collections. This class distinguishes between
+ * a 'main collection' and 'secondary collections'. While the former represents the collection a
+ * given command is run against, the latter represents other collections that the query execution
+ * engine may need to access.
  */
 class MultipleCollectionAccessor final {
 public:
@@ -54,20 +52,19 @@ public:
                                bool isAnySecondaryNamespaceAViewOrNotFullyLocal,
                                const std::vector<NamespaceStringOrUUID>& secondaryExecNssList)
         : _mainColl(mainColl),
-          _isAnySecondaryNamespaceAViewOrNotFullyLocal(isAnySecondaryNamespaceAViewOrNotFullyLocal),
-          _opCtx(opCtx) {
+          _isAnySecondaryNamespaceAViewOrNotFullyLocal(
+              isAnySecondaryNamespaceAViewOrNotFullyLocal) {
         auto catalog = CollectionCatalog::get(opCtx);
         for (const auto& secondaryNssOrUuid : secondaryExecNssList) {
-            auto readTimestamp =
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
-            // We ignore the collection pointer returned as we don't need it.
-            catalog->establishConsistentCollection(opCtx, secondaryNssOrUuid, readTimestamp);
             auto secondaryNss = catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUuid);
 
-            // Don't store secondaryNss if it is also the main nss.
+            // Don't store a CollectionPtr if the main nss is also a secondary one.
             if (secondaryNss != mainCollNss) {
-                _secondaryColls.emplace(secondaryNss,
-                                        catalog->lookupUUIDByNSS(opCtx, secondaryNss));
+                // Even if the collection corresponding to 'secondaryNss' doesn't exist, we
+                // still want to include it. It is the responsibility of consumers of this class
+                // to verify that a collection exists before accessing it.
+                auto collPtr = catalog->lookupCollectionByNamespace(opCtx, secondaryNss);
+                _secondaryColls.emplace(std::move(secondaryNss), std::move(collPtr));
             }
         }
     }
@@ -87,19 +84,8 @@ public:
         return _mainAcq ? _mainAcq->getCollectionPtr() : *_mainColl;
     }
 
-    std::map<NamespaceString, CollectionPtr> getSecondaryCollections() const {
-        std::map<NamespaceString, CollectionPtr> collMap;
-        for (const auto& [nss, uuid] : _secondaryColls) {
-            collMap.emplace(
-                nss,
-                uuid ? CollectionCatalog::get(_opCtx)->establishConsistentCollection(
-                           _opCtx,
-                           NamespaceStringOrUUID{nss.dbName(), *uuid},
-                           shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp(
-                               _opCtx))
-                     : nullptr);
-        }
-        return collMap;
+    const std::map<NamespaceString, CollectionPtr>& getSecondaryCollections() const {
+        return _secondaryColls;
     }
 
     bool isAnySecondaryNamespaceAViewOrNotFullyLocal() const {
@@ -119,19 +105,15 @@ public:
                                : VariantCollectionPtrOrAcquisition(_mainColl);
     }
 
-    CollectionPtr lookupCollection(const NamespaceString& nss) const {
+    const CollectionPtr& lookupCollection(const NamespaceString& nss) const {
         if (_mainColl && _mainColl->get() && nss == _mainColl->get()->ns()) {
-            return CollectionPtr{_mainColl->get()};
+            return *_mainColl;
         } else if (_mainAcq && nss == _mainAcq->getCollectionPtr()->ns()) {
-            return CollectionPtr{_mainAcq->getCollectionPtr().get()};
-        } else if (auto itr = _secondaryColls.find(nss);
-                   itr != _secondaryColls.end() && itr->second) {
-            auto timestamp =
-                shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp(_opCtx);
-            return CollectionPtr{CollectionCatalog::get(_opCtx)->establishConsistentCollection(
-                _opCtx, NamespaceStringOrUUID{nss.dbName(), *itr->second}, timestamp)};
+            return _mainAcq->getCollectionPtr();
+        } else if (auto itr = _secondaryColls.find(nss); itr != _secondaryColls.end()) {
+            return itr->second;
         }
-        return CollectionPtr{nullptr};
+        return CollectionPtr::null;
     }
 
     void clear() {
@@ -161,9 +143,7 @@ private:
     // or a  non-local collection is not currently supported by the execution subsystem.
     bool _isAnySecondaryNamespaceAViewOrNotFullyLocal = false;
 
-    // Map from namespace to corresponding UUID
-    stdx::unordered_map<NamespaceString, boost::optional<UUID>> _secondaryColls{};
-
-    OperationContext* _opCtx = nullptr;
+    // Map from namespace to a corresponding CollectionPtr.
+    std::map<NamespaceString, CollectionPtr> _secondaryColls{};
 };
 }  // namespace mongo

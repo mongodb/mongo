@@ -112,7 +112,7 @@ public:
                 "Unauthorized",
                 authorizationSession->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(authorizationSession->getUserTenantId()),
-                    ActionType::unlock));
+                    ActionType::fsyncUnlock));
         }
     };
 

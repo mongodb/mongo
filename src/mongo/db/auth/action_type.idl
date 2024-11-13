@@ -105,7 +105,7 @@ enums:
            flushRouterConfig :  "flushRouterConfig"
            forceUUID :  "forceUUID"
            fsync :  "fsync"
-           fsyncUnlock: "fsyncUnlock" # Deprecated in favor of unlock (refer to:SERVER-89642)
+           fsyncUnlock: "fsyncUnlock"
            getClusterParameter: "getClusterParameter"
            getDatabaseVersion :  "getDatabaseVersion"
            getDefaultRWConcern :  "getDefaultRWConcern"

@@ -89,13 +89,13 @@ const checkCollStats = function(empty = false) {
             // least one of those inserted buckets that we expect to have triggered an expiration
             // did in fact land in a shard with an existing idle bucket that it could expire.
             if (value > 33) {
-                assert.gte(TimeseriesTest.getStat(stats.timeseries, stat),
+                assert.gte(stats.timeseries[stat],
                            1,
                            "Invalid 'timeseries." + stat +
                                "' value in collStats: " + tojson(stats.timeseries));
             }
         } else {
-            assert.eq(TimeseriesTest.getStat(stats.timeseries, stat),
+            assert.eq(stats.timeseries[stat],
                       value,
                       "Invalid 'timeseries." + stat +
                           "' value in collStats: " + tojson(stats.timeseries));

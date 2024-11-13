@@ -49,8 +49,7 @@ ExecTreeGeneratorParams makeParams(const BSONObj& filter,
                                    const bool projExists,
                                    const bool projSupported) {
     const auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
-    return {
-        collUuid, DatabaseName(), nullptr, filter, std::move(fields), projExists, projSupported};
+    return {collUuid, nullptr, filter, std::move(fields), projExists, projSupported};
 }
 
 void verifySbePlan(unittest::GoldenTestContext& gctx,

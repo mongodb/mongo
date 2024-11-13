@@ -1280,7 +1280,6 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
         sbe::ScanCallbacks callbacks({}, {}, {});
         if (n.useParallelScan()) {
             return sbe::makeS<sbe::ParallelScanStage>(uuid,
-                                                      def.getDatabaseName(),
                                                       rootSlot,
                                                       scanRidSlot,
                                                       boost::none,
@@ -1308,7 +1307,6 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
         }();
         return sbe::makeS<sbe::ScanStage>(
             uuid,
-            def.getDatabaseName(),
             rootSlot,
             scanRidSlot,
             boost::none,
@@ -1439,7 +1437,6 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
     // Unused.
     boost::optional<sbe::value::SlotId> resultSlot;
     return sbe::makeS<sbe::SimpleIndexScanStage>(uuid,
-                                                 scanDef.getDatabaseName(),
                                                  indexDefName,
                                                  !reverse,
                                                  resultSlot,
@@ -1479,7 +1476,6 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
 
     sbe::ScanCallbacks callbacks({}, {}, {});
     return sbe::makeS<sbe::ScanStage>(uuid,
-                                      def.getDatabaseName(),
                                       rootSlot,
                                       seekRidSlot,
                                       boost::none,

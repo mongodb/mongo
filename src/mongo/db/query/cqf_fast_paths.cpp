@@ -401,7 +401,6 @@ public:
                                  sbe::value::SlotVector slotVector) {
             return sbe::makeS<sbe::ScanStage>(
                 params.collectionUuid,
-                params.dbName,
                 slotId,
                 boost::none /*scanRidSlot*/,
                 boost::none /*recordIdSlot*/,
@@ -563,7 +562,6 @@ public:
 
         auto scanStage = sbe::makeS<sbe::ScanStage>(
             params.collectionUuid,
-            params.dbName,
             staticData->resultSlot,
             boost::none /*scanRidSlot*/,
             boost::none,
@@ -776,7 +774,6 @@ boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
         PlanYieldPolicySBE::make(opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);
 
     ExecTreeGeneratorParams params{collections.getMainCollection()->uuid(),
-                                   collections.getMainCollection()->ns().dbName(),
                                    sbeYieldPolicy.get(),
                                    filter,
                                    projection,

@@ -38,20 +38,6 @@
 namespace mongo::timeseries::bucket_catalog {
 
 struct ExecutionStats {
-    /**
-     * Gauges. The values represent a state in the system. They can go up and down and are
-     * decremented from the global statistics when collections are dropped.
-     */
-
-    // Cardinality of opened and archived buckets. Used to estimate storage engine cache usage for
-    // the workload.
-    AtomicWord<long long> numActiveBuckets;
-
-    /**
-     * Counters. The values represent statistics of what has happened in the system for diagnostics.
-     * The values only increment and are not decremented from the global statistics when collections
-     * are dropped.
-     */
     AtomicWord<long long> numBucketInserts;
     AtomicWord<long long> numBucketUpdates;
     AtomicWord<long long> numBucketsOpenedDueToMetadata;
@@ -90,16 +76,12 @@ struct ExecutionStats {
 
 class ExecutionStatsController {
 public:
-    ExecutionStatsController() = default;
     ExecutionStatsController(const shared_tracked_ptr<ExecutionStats>& collectionStats,
                              ExecutionStats& globalStats)
         : _collectionStats(collectionStats), _globalStats(&globalStats) {}
 
-    // Gauges
-    void incNumActiveBuckets(long long increment = 1);
-    void decNumActiveBuckets(long long decrement = 1);
+    ExecutionStatsController() = delete;
 
-    // Counters
     void incNumBucketInserts(long long increment = 1);
     void incNumBucketUpdates(long long increment = 1);
     void incNumBucketsOpenedDueToMetadata(long long increment = 1);
@@ -141,20 +123,9 @@ private:
 void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& builder);
 
 /**
- * Adds the execution stats classified as counters of a collection to both the collection and global
- * stats of an execution stats controller.
+ * Adds the execution stats of a collection to both the collection and global stats of an execution
+ * stats controller.
  */
-void addCollectionExecutionCounters(ExecutionStatsController& stats,
-                                    const ExecutionStats& collStats);
-
-/**
- * Adds the execution stats classified as gauges of a collection from an ExecutionStats.
- */
-void addCollectionExecutionGauges(ExecutionStats& stats, const ExecutionStats& collStats);
-
-/**
- * Removes the execution stats classified as gauges from an ExecutionStats.
- */
-void removeCollectionExecutionGauges(ExecutionStats& stats, const ExecutionStats& collStats);
+void addCollectionExecutionStats(ExecutionStatsController& stats, const ExecutionStats& collStats);
 
 }  // namespace mongo::timeseries::bucket_catalog

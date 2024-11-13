@@ -88,7 +88,6 @@ struct ScanCallbacks {
 class ScanStageState {
 public:
     ScanStageState(UUID inCollUuid,
-                   DatabaseName dbName,
                    boost::optional<value::SlotId> inRecordSlot,
                    boost::optional<value::SlotId> inRecordIdSlot,
                    boost::optional<value::SlotId> inSnapshotIdSlot,
@@ -105,7 +104,6 @@ public:
                    ScanCallbacks inScanCallbacks,
                    bool inUseRandomCursor)
         : collUuid(inCollUuid),
-          dbName(dbName),
           recordSlot(inRecordSlot),
           recordIdSlot(inRecordIdSlot),
           snapshotIdSlot(inSnapshotIdSlot),
@@ -129,7 +127,6 @@ public:
     }
 
     const UUID collUuid;
-    const DatabaseName dbName;
 
     const boost::optional<value::SlotId> recordSlot;
     const boost::optional<value::SlotId> recordIdSlot;
@@ -204,7 +201,6 @@ public:
      * Regular constructor. Initializes static '_state' managed by a shared_ptr.
      */
     ScanStage(UUID collUuid,
-              DatabaseName dbName,
               boost::optional<value::SlotId> recordSlot,
               boost::optional<value::SlotId> recordIdSlot,
               boost::optional<value::SlotId> snapshotIdSlot,
@@ -386,7 +382,6 @@ class ParallelScanStage final : public PlanStage {
 
 public:
     ParallelScanStage(UUID collUuid,
-                      DatabaseName dbName,
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       boost::optional<value::SlotId> snapshotIdSlot,
@@ -403,7 +398,6 @@ public:
 
     ParallelScanStage(const std::shared_ptr<ParallelState>& state,
                       UUID collUuid,
-                      DatabaseName dbName,
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       boost::optional<value::SlotId> snapshotIdSlot,
@@ -451,7 +445,6 @@ private:
     const std::shared_ptr<ParallelState> _state;
 
     const UUID _collUuid;
-    const DatabaseName _dbName;
 
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;

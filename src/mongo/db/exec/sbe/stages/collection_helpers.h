@@ -97,38 +97,26 @@ public:
     }
 
     /**
-     * Given a collection UUID and dbName, establishes a consistent collection instance with respect
-     * to the snapshot and stores it into _collPtr. This method also stores the NamespaceString for
-     * the collection into _collName, and it stores the current catalog epoch into _catalogEpoch.
+     * Given a collection UUID, looks up the UUID in the catalog and stores a pointer to the
+     * collection into _collPtr. This method also stores the NamespaceString for the collection
+     * into _collName, and it stores the current catalog epoch into _catalogEpoch.
      *
      * This is intended for use during the preparation of an SBE plan. The caller must hold the
      * appropriate db_raii object in order to ensure that SBE plan preparation sees a consistent
      * view of the catalog.
      */
-    void acquireCollection(OperationContext* opCtx,
-                           const DatabaseName& dbName,
-                           const UUID& collUuid);
+    void acquireCollection(OperationContext* opCtx, const UUID& collUuid);
 
     /**
-     * Re-acquires a pointer to the collection, after establishing a collection instance consistent
-     * with the snashot, intended for use during SBE yield recovery or when a
+     * Re-acquires a pointer to the collection, intended for use during SBE yield recovery or when a
      * closed SBE plan is re-opened. In addition to acquiring the collection pointer, throws a
      * UserException if the collection has been dropped or renamed, or if the catalog has been
      * closed and re-opened. SBE query execution currently cannot survive such events if they occur
      * during a yield or between getMores.
      */
-    void restoreCollection(OperationContext* opCtx,
-                           const DatabaseName& dbName,
-                           const UUID& collUuid);
+    void restoreCollection(OperationContext* opCtx, const UUID& collUuid);
 
 private:
-    /*
-     * Establish a collection instance consistent with the opened storage snapshot by calling
-     * 'establishConsistentCollection' and store it into _collPtr
-     */
-    void getConsistentCollection(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const UUID& collUuid);
     boost::optional<CollectionPtr> _collPtr;
     boost::optional<NamespaceString> _collName;
     boost::optional<uint64_t> _catalogEpoch;

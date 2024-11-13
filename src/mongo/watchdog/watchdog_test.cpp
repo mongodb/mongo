@@ -346,21 +346,11 @@ TEST_F(WatchdogMonitorThreadTest, Basic) {
 class SleepyCheck : public WatchdogCheck {
 public:
     void run(OperationContext* opCtx) final {
-        stdx::unique_lock<Latch> lock(_mutex);
         ++_counter;
 
-        _condvar.notify_all();
-
         if (_counter >= 6) {
-            lock.unlock();
             sleepFor(Seconds(5));
         }
-    }
-
-    // Test only method to ensure SleepyCheck runs at least once.
-    void waitForRun() {
-        stdx::unique_lock<Latch> lock(_mutex);
-        _condvar.wait(lock, [this]() { return _counter > 0; });
     }
 
     std::string getDescriptionForLogging() final {
@@ -368,8 +358,6 @@ public:
     }
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("SleepyCheck::_mutex");
-    stdx::condition_variable _condvar;
     std::uint32_t _counter{0};
 };
 
@@ -382,7 +370,6 @@ TEST_F(WatchdogMonitorThreadTest, SleepyHungCheck) {
     };
 
     auto sleepyCheck = std::make_unique<SleepyCheck>();
-    auto sleepyCheckPtr = sleepyCheck.get();
 
     std::vector<std::unique_ptr<WatchdogCheck>> checks;
     checks.push_back(std::move(sleepyCheck));
@@ -396,8 +383,6 @@ TEST_F(WatchdogMonitorThreadTest, SleepyHungCheck) {
     ASSERT_EQ(monitorThread.getGeneration(), 0);
 
     checkThread.start();
-
-    sleepyCheckPtr->waitForRun();
 
     monitorThread.start();
 
@@ -442,7 +427,9 @@ TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
     deathEvent.wait();
 
     monitor.shutdown();
+    // Check generation should have run and be hung.
     // Monitor thread should have run at least once in order to call the deathCallback.
+    ASSERT_GTE(monitor.getCheckGeneration(), 1);
     ASSERT_GTE(monitor.getMonitorGeneration(), 1);
 }
 

@@ -357,7 +357,6 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
         : boost::none;
 
     auto stage = sbe::makeS<sbe::SimpleIndexScanStage>(collection->uuid(),
-                                                       collection->ns().dbName(),
                                                        indexName,
                                                        forward,
                                                        indexKeySlot,
@@ -447,7 +446,6 @@ generateGenericMultiIntervalIndexScan(StageBuilderState& state,
 
     std::unique_ptr<sbe::PlanStage> stage =
         std::make_unique<sbe::GenericIndexScanStage>(collection->uuid(),
-                                                     collection->ns().dbName(),
                                                      indexName,
                                                      std::move(params),
                                                      indexKeySlot,
@@ -655,7 +653,6 @@ std::tuple<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateSingleInterv
     // exclusive boundaries), and produce a single field recordIdSlot that can be used to
     // position into the collection.
     auto stage = sbe::makeS<sbe::SimpleIndexScanStage>(collection->uuid(),
-                                                       collection->ns().dbName(),
                                                        indexName,
                                                        forward,
                                                        indexKeySlot,

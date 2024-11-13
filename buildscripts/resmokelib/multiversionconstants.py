@@ -47,9 +47,8 @@ def get_releases_file_from_remote():
         with open(RELEASES_YAML, "wb") as file:
             response = requests.get(MASTER_RELEASES_REMOTE_FILE)
             if response.status_code != http.HTTPStatus.OK:
-                raise RuntimeError(
-                    f"Fetching releases.yml file returned unsuccessful status: {response.status_code}, "
-                    f"response body: {response.text}\n")
+                raise RuntimeError("Http response for releases yml file was not 200 but was " +
+                                   response.status_code)
             file.write(response.content)
         LOGGER.info(f"Got releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
     except Exception as exc:

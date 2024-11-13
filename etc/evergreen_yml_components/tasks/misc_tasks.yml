@@ -1067,7 +1067,7 @@ tasks:
 
 - name: powercycle_sentinel
   tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "incompatible_windows"]
-  exec_timeout_secs: 86400 # 24 hours
+  exec_timeout_secs: 604800 # 7 days
   commands:
   - func: "run powercycle sentinel"
     vars:
@@ -1099,8 +1099,8 @@ tasks:
       task_names: >-
         powercycle_smoke_skip_compile
       num_tasks: 20
-      exec_timeout_secs: 86400 # 24 hours
-      timeout_secs: 86400 # 24 hours
+      exec_timeout_secs: 604800 # 7 days
+      timeout_secs: 604800 # 7 days
       set_up_retry_count: 1800
       run_powercycle_args: --sshAccessRetryCount=1800
 
