@@ -249,7 +249,8 @@ size_t WriteOp::getNumTargeted() {
  * This is the core function which aggregates all the results of a write operation on multiple
  * shards and updates the write operation's state.
  */
-void WriteOp::_updateOpState(boost::optional<bool> markWriteWithoutShardKeyWithIdComplete) {
+void WriteOp::_updateOpState(OperationContext* opCtx,
+                             boost::optional<bool> markWriteWithoutShardKeyWithIdComplete) {
     std::vector<ChildWriteOp const*> childErrors;
     std::vector<BulkWriteReplyItem const*> childSuccesses;
     // Stores the result of a child update/delete that is in _Deferred state.
@@ -309,7 +310,7 @@ void WriteOp::_updateOpState(boost::optional<bool> markWriteWithoutShardKeyWithI
             _bulkWriteReplyItem = combineBulkWriteReplyItems(childSuccesses);
         }
         if (_writeType == WriteType::WithoutShardKeyWithId) {
-            _incWriteWithoutShardKeyWithIdMetrics();
+            _incWriteWithoutShardKeyWithIdMetrics(opCtx);
         }
         _state = WriteOpState_Ready;
         _childOps.clear();
@@ -364,6 +365,7 @@ void WriteOp::_updateOpState(boost::optional<bool> markWriteWithoutShardKeyWithI
 }
 
 void WriteOp::_noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite(
+    OperationContext* opCtx,
     const TargetedWrite& targetedWrite,
     int n,
     boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem) {
@@ -375,7 +377,7 @@ void WriteOp::_noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite(
         // need to retry them due to StaleConfig or StaleDBVersion.
         currentChildOp.state = WriteOpState_Deferred;
         currentChildOp.bulkWriteReplyItem = bulkWriteReplyItem;
-        _updateOpState();
+        _updateOpState(opCtx);
     } else {
         for (auto& childOp : _childOps) {
             dassert(childOp.parentOp->_writeType == WriteType::WithoutShardKeyWithId);
@@ -395,31 +397,31 @@ void WriteOp::_noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite(
                 childOp.error = boost::none;
             }
         }
-        noteWriteComplete(targetedWrite, bulkWriteReplyItem);
+        noteWriteComplete(opCtx, targetedWrite, bulkWriteReplyItem);
         if (MONGO_unlikely(hangAfterCompletingWriteWithoutShardKeyWithId.shouldFail())) {
             hangAfterCompletingWriteWithoutShardKeyWithId.pauseWhileSet();
         }
     }
 }
 
-void WriteOp::_incWriteWithoutShardKeyWithIdMetrics() {
+void WriteOp::_incWriteWithoutShardKeyWithIdMetrics(OperationContext* opCtx) {
     invariant(_writeType == WriteType::WithoutShardKeyWithId);
     if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Update) {
-        updateOneWithoutShardKeyWithIdRetryCount.increment(1);
+        getQueryCounters(opCtx).updateOneWithoutShardKeyWithIdRetryCount.increment(1);
     } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete) {
-        deleteOneWithoutShardKeyWithIdRetryCount.increment(1);
+        getQueryCounters(opCtx).deleteOneWithoutShardKeyWithIdRetryCount.increment(1);
     } else {
         MONGO_UNREACHABLE;
     }
 }
 
-void WriteOp::resetWriteToReady() {
+void WriteOp::resetWriteToReady(OperationContext* opCtx) {
     if (_writeType == WriteType::WithoutShardKeyWithId) {
         // It is possible that one of the child write op received a non-retryable error marking the
         // write op state as WriteOpState_Error. We reset it to ready if we find some other child
         // write op in the same batch returns a retryable error.
         invariant(_state < WriteOpState_Completed || _state == WriteOpState_Error);
-        _incWriteWithoutShardKeyWithIdMetrics();
+        _incWriteWithoutShardKeyWithIdMetrics(opCtx);
     } else {
         invariant(_state == WriteOpState_Pending || _state == WriteOpState_Ready);
     }
@@ -428,7 +430,8 @@ void WriteOp::resetWriteToReady() {
     _childOps.clear();
 }
 
-void WriteOp::noteWriteComplete(const TargetedWrite& targetedWrite,
+void WriteOp::noteWriteComplete(OperationContext* opCtx,
+                                const TargetedWrite& targetedWrite,
                                 boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem) {
     const WriteOpRef& ref = targetedWrite.writeOpRef;
     auto& childOp = _childOps[ref.second];
@@ -438,10 +441,11 @@ void WriteOp::noteWriteComplete(const TargetedWrite& targetedWrite,
     childOp.endpoint.reset(new ShardEndpoint(targetedWrite.endpoint));
     childOp.bulkWriteReplyItem = bulkWriteReplyItem;
     childOp.state = WriteOpState_Completed;
-    _updateOpState();
+    _updateOpState(opCtx);
 }
 
-void WriteOp::noteWriteError(const TargetedWrite& targetedWrite,
+void WriteOp::noteWriteError(OperationContext* opCtx,
+                             const TargetedWrite& targetedWrite,
                              const write_ops::WriteError& error) {
     const WriteOpRef& ref = targetedWrite.writeOpRef;
     auto& childOp = _childOps[ref.second];
@@ -452,10 +456,11 @@ void WriteOp::noteWriteError(const TargetedWrite& targetedWrite,
     dassert(ref.first == _itemRef.getItemIndex());
     childOp.error->setIndex(_itemRef.getItemIndex());
     childOp.state = WriteOpState_Error;
-    _updateOpState();
+    _updateOpState(opCtx);
 }
 
 void WriteOp::noteWriteWithoutShardKeyWithIdResponse(
+    OperationContext* opCtx,
     const TargetedWrite& targetedWrite,
     int n,
     int batchSize,
@@ -466,18 +471,18 @@ void WriteOp::noteWriteWithoutShardKeyWithIdResponse(
                 "BulkWriteReplyItem 'n' value does not match supplied 'n' value",
                 !bulkWriteReplyItem || bulkWriteReplyItem->getN() == n);
         _noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite(
-            targetedWrite, n, bulkWriteReplyItem);
+            opCtx, targetedWrite, n, bulkWriteReplyItem);
         return;
     }
     const WriteOpRef& ref = targetedWrite.writeOpRef;
     auto& currentChildOp = _childOps[ref.second];
     if (_state == WriteOpState::WriteOpState_Deferred ||
         _state == WriteOpState::WriteOpState_Completed) {
-        noteWriteComplete(targetedWrite, bulkWriteReplyItem);
+        noteWriteComplete(opCtx, targetedWrite, bulkWriteReplyItem);
     } else if (_state == WriteOpState::WriteOpState_Pending) {
         currentChildOp.state = WriteOpState_Deferred;
         currentChildOp.bulkWriteReplyItem = bulkWriteReplyItem;
-        _updateOpState(false);
+        _updateOpState(opCtx, false);
         return;
     } else {
         MONGO_UNREACHABLE;

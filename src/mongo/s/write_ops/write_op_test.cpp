@@ -217,7 +217,7 @@ TEST_F(WriteOpTest, TargetSingle) {
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
 
-    writeOp.noteWriteComplete(*targeted.front());
+    writeOp.noteWriteComplete(_opCtx, *targeted.front());
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Completed);
 }
 
@@ -261,7 +261,7 @@ TEST_F(WriteOpTest, TargetMultiOneShard) {
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpointA);
 
-    writeOp.noteWriteComplete(*targeted.front());
+    writeOp.noteWriteComplete(_opCtx, *targeted.front());
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Completed);
 }
@@ -315,9 +315,9 @@ TEST_F(WriteOpTest, TargetMultiAllShards) {
     ASSERT(
         ShardVersion::ShardVersion::isPlacementVersionIgnored(*targeted[2]->endpoint.shardVersion));
 
-    writeOp.noteWriteComplete(*targeted[0]);
-    writeOp.noteWriteComplete(*targeted[1]);
-    writeOp.noteWriteComplete(*targeted[2]);
+    writeOp.noteWriteComplete(_opCtx, *targeted[0]);
+    writeOp.noteWriteComplete(_opCtx, *targeted[1]);
+    writeOp.noteWriteComplete(_opCtx, *targeted[2]);
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Completed);
 }
@@ -329,12 +329,12 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp1) {
 
     // Simulate retryable error.
     write_ops::WriteError retryableError(0, getMockRetriableError(gen));
-    writeOp.noteWriteError(*targeted[0], retryableError);
+    writeOp.noteWriteError(_opCtx, *targeted[0], retryableError);
 
     // State should not change until we have result from all nodes.
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
 
-    writeOp.noteWriteComplete(*targeted[1]);
+    writeOp.noteWriteComplete(_opCtx, *targeted[1]);
 
     // State resets back to ready because of retryable error.
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
@@ -350,13 +350,13 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorMultipleChildOp2) {
     write_ops::WriteError nonRetryableError(1, getMockNonRetriableError(gen));
 
     // First, the retryable error is issued.
-    writeOp.noteWriteError(*targeted[0], retryableError);
+    writeOp.noteWriteError(_opCtx, *targeted[0], retryableError);
 
     // State should not change until we have result from all nodes.
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
 
     // Then, the non-retyrable error is issued.
-    writeOp.noteWriteError(*targeted[1], nonRetryableError);
+    writeOp.noteWriteError(_opCtx, *targeted[1], nonRetryableError);
 
     // State remains in error, because of non-retryable error.
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
@@ -373,13 +373,13 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorMultipleChildOp3) {
     write_ops::WriteError nonRetryableError(1, getMockNonRetriableError(gen));
 
     // First, the non-retryable error is issued.
-    writeOp.noteWriteError(*targeted[1], nonRetryableError);
+    writeOp.noteWriteError(_opCtx, *targeted[1], nonRetryableError);
 
     // State should not change until we have result from all nodes.
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
 
     // Then, the retyrable error is issued.
-    writeOp.noteWriteError(*targeted[0], retryableError);
+    writeOp.noteWriteError(_opCtx, *targeted[0], retryableError);
 
     // State remains in error, because of non-retryable error.
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
@@ -411,7 +411,7 @@ TEST_F(WriteOpTest, ErrorSingle) {
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
 
     write_ops::WriteError error(0, {ErrorCodes::UnknownError, "some message"});
-    writeOp.noteWriteError(*targeted.front(), error);
+    writeOp.noteWriteError(_opCtx, *targeted.front(), error);
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
     ASSERT_EQUALS(writeOp.getOpError().getStatus(), error.getStatus());
@@ -441,7 +441,7 @@ TEST_F(WriteOpTest, CancelSingle) {
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
 
-    writeOp.resetWriteToReady();
+    writeOp.resetWriteToReady(_opCtx);
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 }
@@ -545,7 +545,7 @@ TEST_F(WriteOpTest, RetrySingleOp) {
         {StaleConfigInfo(
              kNss, ShardVersionPlacementIgnoredNoIndexes(), boost::none, ShardId("shard")),
          "some message"});
-    writeOp.noteWriteError(*targeted.front(), error);
+    writeOp.noteWriteError(_opCtx, *targeted.front(), error);
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 }
@@ -601,10 +601,10 @@ TEST_F(WriteOpTransactionTest, TargetMultiDoesNotTargetAllShards) {
     assertEndpointsEqual(targeted.front()->endpoint, endpointA);
     assertEndpointsEqual(targeted.back()->endpoint, endpointB);
 
-    writeOp.noteWriteComplete(*targeted[0]);
+    writeOp.noteWriteComplete(_opCtx, *targeted[0]);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
 
-    writeOp.noteWriteComplete(*targeted[1]);
+    writeOp.noteWriteComplete(_opCtx, *targeted[1]);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Completed);
 }
 
@@ -615,7 +615,7 @@ TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp1) {
 
     // Simulate retryable error.
     write_ops::WriteError retryableError(0, getMockRetriableError(gen));
-    writeOp.noteWriteError(*targeted[0], retryableError);
+    writeOp.noteWriteError(_opCtx, *targeted[0], retryableError);
 
     // State should change to error right away even with retryable error when in a transaction.
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
@@ -629,7 +629,7 @@ TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp2) {
 
     // Simulate non-retryable error.
     write_ops::WriteError nonRetryableError(0, getMockRetriableError(gen));
-    writeOp.noteWriteError(*targeted[0], nonRetryableError);
+    writeOp.noteWriteError(_opCtx, *targeted[0], nonRetryableError);
 
     // State should change to error right away even with non-retryable error when in a transaction.
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);

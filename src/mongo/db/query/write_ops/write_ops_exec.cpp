@@ -1727,7 +1727,7 @@ WriteResult performUpdates(OperationContext* opCtx,
             lastOpFixer.finishedOpSuccessfully();
 
             if (singleOp.getMulti()) {
-                updateManyCount.increment(1);
+                getQueryCounters(opCtx).updateManyCount.increment(1);
                 collectMultiUpdateDeleteMetrics(timer->elapsed(), reply.getNModified());
             }
         } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
@@ -2006,7 +2006,7 @@ WriteResult performDeletes(OperationContext* opCtx,
             lastOpFixer.finishedOpSuccessfully();
 
             if (singleOp.getMulti()) {
-                deleteManyCount.increment(1);
+                getQueryCounters(opCtx).deleteManyCount.increment(1);
                 collectMultiUpdateDeleteMetrics(timer->elapsed(), reply.getN());
             }
         } catch (const DBException& ex) {

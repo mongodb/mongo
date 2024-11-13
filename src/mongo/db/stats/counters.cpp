@@ -353,29 +353,18 @@ OperatorCounters operatorCountersGroupAccumulatorExpressions{"operatorCounters.g
 OperatorCounters operatorCountersWindowAccumulatorExpressions{
     "operatorCounters.windowAccumulators."};
 
-#define DEFN_QUERY_COUNTER(var)                  \
-    Counter64& var = *MetricBuilder<Counter64> { \
-        std::string{"query."} + #var             \
-    }
-DEFN_QUERY_COUNTER(updateManyCount);
-DEFN_QUERY_COUNTER(deleteManyCount);
-DEFN_QUERY_COUNTER(updateOneTargetedShardedCount);
-DEFN_QUERY_COUNTER(deleteOneTargetedShardedCount);
-DEFN_QUERY_COUNTER(findAndModifyTargetedShardedCount);
-DEFN_QUERY_COUNTER(updateOneUnshardedCount);
-DEFN_QUERY_COUNTER(deleteOneUnshardedCount);
-DEFN_QUERY_COUNTER(findAndModifyUnshardedCount);
-DEFN_QUERY_COUNTER(updateOneNonTargetedShardedCount);
-DEFN_QUERY_COUNTER(deleteOneNonTargetedShardedCount);
-DEFN_QUERY_COUNTER(findAndModifyNonTargetedShardedCount);
-DEFN_QUERY_COUNTER(deleteOneWithoutShardKeyWithIdCount);
-DEFN_QUERY_COUNTER(nonRetryableDeleteOneWithoutShardKeyWithIdCount);
-DEFN_QUERY_COUNTER(updateOneWithoutShardKeyWithIdCount);
-DEFN_QUERY_COUNTER(nonRetryableUpdateOneWithoutShardKeyWithIdCount);
-DEFN_QUERY_COUNTER(updateOneWithoutShardKeyWithIdRetryCount);
-DEFN_QUERY_COUNTER(deleteOneWithoutShardKeyWithIdRetryCount);
-DEFN_QUERY_COUNTER(internalRetryableWriteCount);
-DEFN_QUERY_COUNTER(externalRetryableWriteCount);
-DEFN_QUERY_COUNTER(retryableInternalTransactionCount);
-#undef DEFN_QUERY_COUNTER
+namespace {
+template <ClusterRole::Value role>
+QueryCounters queryCounterSingleton{role};
+}  // namespace
+
+QueryCounters& getQueryCounters(OperationContext* opCtx) {
+    auto role = opCtx->getService()->role();
+    if (role.hasExclusively(ClusterRole::ShardServer))
+        return queryCounterSingleton<ClusterRole::ShardServer>;
+    if (role.hasExclusively(ClusterRole::RouterServer))
+        return queryCounterSingleton<ClusterRole::RouterServer>;
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

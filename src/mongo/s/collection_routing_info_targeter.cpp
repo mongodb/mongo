@@ -99,11 +99,6 @@ const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
 using UpdateType = write_ops::UpdateModification::Type;
 using shard_key_pattern_query_util::QueryTargetingInfo;
 
-// Tracks the number of {multi:false} updates with an exact match on _id that are broadcasted to
-// multiple shards.
-auto& updateOneOpStyleBroadcastWithExactIDCount =
-    *MetricBuilder<Counter64>("query.updateOneOpStyleBroadcastWithExactIDCount");
-
 /**
  * Update expressions are bucketed into one of two types for the purposes of shard targeting:
  *
@@ -481,12 +476,12 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     const bool isMulti = updateOp.getMulti();
 
     if (isMulti) {
-        updateManyCount.increment(1);
+        getQueryCounters(opCtx).updateManyCount.increment(1);
     }
 
     if (!_cri.cm.isSharded()) {
         if (!isMulti) {
-            updateOneUnshardedCount.increment(1);
+            getQueryCounters(opCtx).updateOneUnshardedCount.increment(1);
         }
 
         return {targetUnshardedCollection(_nss, _cri)};
@@ -581,7 +576,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                 *useTwoPhaseWriteProtocol = true;
             }
         }
-        updateOneTargetedShardedCount.increment(1);
+        getQueryCounters(opCtx).updateOneTargetedShardedCount.increment(1);
         return endPoints;
     }
 
@@ -603,18 +598,19 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         // single op-style update which we are broadcasting to multiple shards by exact _id. Record
         // this event in our serverStatus metrics. If the query requests an upsert, then we will use
         // the two phase write protocol anyway.
-        updateOneNonTargetedShardedCount.increment(1);
+        getQueryCounters(opCtx).updateOneNonTargetedShardedCount.increment(1);
         if (isExactId) {
-            updateOneOpStyleBroadcastWithExactIDCount.increment(1);
+            getQueryCounters(opCtx).updateOneOpStyleBroadcastWithExactIDCount.increment(1);
             if (isUpsert && useTwoPhaseWriteProtocol) {
                 *useTwoPhaseWriteProtocol = true;
             } else if (!isUpsert && isNonTargetedWriteWithoutShardKeyWithExactId &&
                        isUpdateOneWithIdWithoutShardKeyEnabled()) {
                 if (isRetryableWrite(opCtx)) {
-                    updateOneWithoutShardKeyWithIdCount.increment(1);
+                    getQueryCounters(opCtx).updateOneWithoutShardKeyWithIdCount.increment(1);
                     *isNonTargetedWriteWithoutShardKeyWithExactId = true;
                 } else {
-                    nonRetryableUpdateOneWithoutShardKeyWithIdCount.increment(1);
+                    getQueryCounters(opCtx)
+                        .nonRetryableUpdateOneWithoutShardKeyWithIdCount.increment(1);
                 }
             }
         } else {
@@ -639,12 +635,12 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     const auto collation = write_ops::collationOf(deleteOp);
 
     if (isMulti) {
-        deleteManyCount.increment(1);
+        getQueryCounters(opCtx).deleteManyCount.increment(1);
     }
 
     if (!_cri.cm.isSharded()) {
         if (!isMulti) {
-            deleteOneUnshardedCount.increment(1);
+            getQueryCounters(opCtx).deleteOneUnshardedCount.increment(1);
         }
         return {targetUnshardedCollection(_nss, _cri)};
     }
@@ -694,7 +690,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     auto endpoints = uassertStatusOK(_targetQuery(*cq, chunkRanges));
     if (endpoints.size() == 1) {
         if (!deleteOp.getMulti()) {
-            deleteOneTargetedShardedCount.increment(1);
+            getQueryCounters(opCtx).deleteOneTargetedShardedCount.increment(1);
         }
         return endpoints;
     }
@@ -702,15 +698,16 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     auto isExactId = _isExactIdQuery(*cq, _cri.cm) && !_isRequestOnTimeseriesViewNamespace;
 
     if (!isMulti) {
-        deleteOneNonTargetedShardedCount.increment(1);
+        getQueryCounters(opCtx).deleteOneNonTargetedShardedCount.increment(1);
         if (isExactId) {
             if (isNonTargetedWriteWithoutShardKeyWithExactId &&
                 isUpdateOneWithIdWithoutShardKeyEnabled()) {
                 if (isRetryableWrite(opCtx)) {
                     *isNonTargetedWriteWithoutShardKeyWithExactId = true;
-                    deleteOneWithoutShardKeyWithIdCount.increment(1);
+                    getQueryCounters(opCtx).deleteOneWithoutShardKeyWithIdCount.increment(1);
                 } else {
-                    nonRetryableDeleteOneWithoutShardKeyWithIdCount.increment(1);
+                    getQueryCounters(opCtx)
+                        .nonRetryableDeleteOneWithoutShardKeyWithIdCount.increment(1);
                 }
             }
         } else {

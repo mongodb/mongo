@@ -205,7 +205,7 @@ public:
      * Can only be called when state is _Pending, or is a no-op if called when the state
      * is still _Ready (and therefore no writes are pending).
      */
-    void resetWriteToReady();
+    void resetWriteToReady(OperationContext* opCtx);
 
     /**
      * Marks the targeted write as finished for this write op. Optionally, if this write is part of
@@ -214,7 +214,8 @@ public:
      * One of noteWriteComplete or noteWriteError should be called exactly once for every
      * TargetedWrite.
      */
-    void noteWriteComplete(const TargetedWrite& targetedWrite,
+    void noteWriteComplete(OperationContext* opCtx,
+                           const TargetedWrite& targetedWrite,
                            boost::optional<const BulkWriteReplyItem&> reply = boost::none);
 
     /**
@@ -223,7 +224,9 @@ public:
      * As above, one of noteWriteComplete or noteWriteError should be called exactly once for
      * every TargetedWrite.
      */
-    void noteWriteError(const TargetedWrite& targetedWrite, const write_ops::WriteError& error);
+    void noteWriteError(OperationContext* opCtx,
+                        const TargetedWrite& targetedWrite,
+                        const write_ops::WriteError& error);
 
     /**
      * When batchSize > 1, marks the write op complete if all child write ops have received
@@ -231,6 +234,7 @@ public:
      * 1 is handled differently in _noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite.
      */
     void noteWriteWithoutShardKeyWithIdResponse(
+        OperationContext* opCtx,
         const TargetedWrite& targetedWrite,
         int n,
         int batchSize,
@@ -270,7 +274,8 @@ private:
     /**
      * Updates the op state after new information is received.
      */
-    void _updateOpState(boost::optional<bool> markWriteWithoutShardKeyWithIdComplete = true);
+    void _updateOpState(OperationContext* opCtx,
+                        boost::optional<bool> markWriteWithoutShardKeyWithIdComplete = true);
 
     /**
      * Optimized version of noteWriteWithoutShardKeyWithIdResponse for single write in batch.
@@ -278,6 +283,7 @@ private:
      * WriteOpState::NoOp. If n is 0 then defers the state update of the child write op until later.
      */
     void _noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite(
+        OperationContext* opCtx,
         const TargetedWrite& targetedWrite,
         int n,
         boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem);
@@ -286,7 +292,7 @@ private:
      * Increments the retry counts for the writes of type WriteWithoutShardKeyWithId which are reset
      * to ready state when a stale config/db is encountered.
      */
-    void _incWriteWithoutShardKeyWithIdMetrics();
+    void _incWriteWithoutShardKeyWithIdMetrics(OperationContext* opCtx);
 
     // Owned elsewhere, reference to a batch with a write item
     const BatchItemRef _itemRef;

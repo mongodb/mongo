@@ -32,6 +32,7 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <cstdint>
+#include <fmt/format.h>
 #include <map>
 #include <memory>
 #include <string>
@@ -41,6 +42,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
@@ -692,50 +694,78 @@ extern OperatorCounters operatorCountersGroupAccumulatorExpressions;
 // Global counters for accumulator expressions apply to $setWindowFields.
 extern OperatorCounters operatorCountersWindowAccumulatorExpressions;
 
-// Track the number of {multi:true} updates.
-extern Counter64& updateManyCount;
-// Track the number of deleteMany calls.
-extern Counter64& deleteManyCount;
-// Track the number of targeted updateOne commands on sharded collections.
-extern Counter64& updateOneTargetedShardedCount;
-// Track the number of targeted deleteOne commands on sharded collections.
-extern Counter64& deleteOneTargetedShardedCount;
-// Track the number of targeted findAndModify commands on sharded collections.
-extern Counter64& findAndModifyTargetedShardedCount;
-// Track the number of updateOne commands on unsharded collections.
-extern Counter64& updateOneUnshardedCount;
-// Track the number of deleteOne commands on unsharded collections.
-extern Counter64& deleteOneUnshardedCount;
-// Track the number of findAndModify commands on unsharded collections.
-extern Counter64& findAndModifyUnshardedCount;
-// Track the number of non-targeted updateOne commands on sharded collections
-extern Counter64& updateOneNonTargetedShardedCount;
-// Track the number of non-targeted deleteOne commands on sharded collections
-extern Counter64& deleteOneNonTargetedShardedCount;
-// Track the number of non-targeted findAndModify commands on sharded collections
-extern Counter64& findAndModifyNonTargetedShardedCount;
-// Track the number of non-targeted retryable deleteOne commands (without shard key with _id) on
-// sharded collections.
-extern Counter64& deleteOneWithoutShardKeyWithIdCount;
-// Track the number of non-targeted non-retryable deleteOne commands (without shard key with _id) on
-// sharded collections.
-extern Counter64& nonRetryableDeleteOneWithoutShardKeyWithIdCount;
-// Track the number of non-targeted retryable updateOne commands (without shard key with _id) on
-// sharded collections.
-extern Counter64& updateOneWithoutShardKeyWithIdCount;
-// Track the number of non-targeted non-retryable updateOne commands (without shard key with _id) on
-// sharded collections.
-extern Counter64& nonRetryableUpdateOneWithoutShardKeyWithIdCount;
-// Track the number of retries for retryable non-targeted updateOne commands (without shard key with
-// _id) on sharded collections
-extern Counter64& updateOneWithoutShardKeyWithIdRetryCount;
-// Track the number of retries for retryable non-targeted deleteOne commands (without shard key with
-// _id) on sharded collections
-extern Counter64& deleteOneWithoutShardKeyWithIdRetryCount;
-// Track the number of internal retryable writes
-extern Counter64& internalRetryableWriteCount;
-// Track the number of external retryable writes
-extern Counter64& externalRetryableWriteCount;
-// Track the number of internal transactions for retryable writes
-extern Counter64& retryableInternalTransactionCount;
+struct QueryCounters {
+private:
+    static Counter64& _makeCounter(StringData name, ClusterRole role) {
+        return *MetricBuilder<Counter64>{format(FMT_STRING("query.{}"), name)}.setRole(role);
+    }
+
+    ClusterRole _role;
+
+public:
+    explicit QueryCounters(ClusterRole role) : _role{role} {}
+
+// Preprocessor ensures that metric name == member name.
+#define DCL_(name) Counter64& name{_makeCounter(#name, _role)};
+    // {multi:true} updates
+    DCL_(updateManyCount);
+    // deleteMany calls
+    DCL_(deleteManyCount);
+
+    // targeted updateOne commands (on sharded)
+    DCL_(updateOneTargetedShardedCount);
+    // targeted deleteOne commands (on sharded)
+    DCL_(deleteOneTargetedShardedCount);
+    // targeted findAndModify commands (on sharded)
+    DCL_(findAndModifyTargetedShardedCount);
+
+    // updateOne commands (on unsharded)
+    DCL_(updateOneUnshardedCount);
+    // deleteOne commands (on unsharded)
+    DCL_(deleteOneUnshardedCount);
+    // findAndModify commands (on unsharded)
+    DCL_(findAndModifyUnshardedCount);
+
+    // non-targeted updateOne commands on sharded collections
+    DCL_(updateOneNonTargetedShardedCount);
+    // non-targeted deleteOne commands on sharded collections
+    DCL_(deleteOneNonTargetedShardedCount);
+    // non-targeted findAndModify commands on sharded collections
+    DCL_(findAndModifyNonTargetedShardedCount);
+
+    // non-targeted retryable deleteOne commands
+    // without shard key, with _id
+    DCL_(deleteOneWithoutShardKeyWithIdCount);
+    // non-targeted non-retryable deleteOne commands
+    // without shard key, with _id
+    DCL_(nonRetryableDeleteOneWithoutShardKeyWithIdCount);
+    // non-targeted retryable updateOne commands
+    // without shard key, with _id
+    DCL_(updateOneWithoutShardKeyWithIdCount);
+    // non-targeted non-retryable updateOne commands
+    // without shard key, with _id
+    DCL_(nonRetryableUpdateOneWithoutShardKeyWithIdCount);
+    // retries of non-targeted updateOne commands
+    // without shard key, with _id
+    DCL_(updateOneWithoutShardKeyWithIdRetryCount);
+    // retries of non-targeted deleteOne commands
+    // without shard key, with _id
+    DCL_(deleteOneWithoutShardKeyWithIdRetryCount);
+
+    // internal retryable writes
+    DCL_(internalRetryableWriteCount);
+    // external retryable writes
+    DCL_(externalRetryableWriteCount);
+    // internal transactions for retryable writes
+    DCL_(retryableInternalTransactionCount);
+
+    // {multi:false} updates with an exact match on _id that
+    // are broadcasted to multiple shards.
+    DCL_(updateOneOpStyleBroadcastWithExactIDCount)
+#undef DCL_
+};
+
+/** Returns the appropriate QueryCounters instance for `opCtx`'s service. */
+QueryCounters& getQueryCounters(OperationContext* opCtx);
+
 }  // namespace mongo

@@ -807,7 +807,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                                                          letParams,
                                                          runtimeConstants,
                                                          isTimeseriesViewRequest)) {
-            findAndModifyNonTargetedShardedCount.increment(1);
+            getQueryCounters(opCtx).findAndModifyNonTargetedShardedCount.increment(1);
             auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
                 opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
 
@@ -834,9 +834,9 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
             }
         } else {
             if (cm.isSharded()) {
-                findAndModifyTargetedShardedCount.increment(1);
+                getQueryCounters(opCtx).findAndModifyTargetedShardedCount.increment(1);
             } else {
-                findAndModifyUnshardedCount.increment(1);
+                getQueryCounters(opCtx).findAndModifyUnshardedCount.increment(1);
             }
 
             ShardId shardId =
@@ -854,7 +854,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                         &result);
         }
     } else {
-        findAndModifyUnshardedCount.increment(1);
+        getQueryCounters(opCtx).findAndModifyUnshardedCount.increment(1);
         _runCommand(opCtx,
                     cm.dbPrimary(),
                     boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED()),
@@ -1136,12 +1136,12 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
                                                          getLet(cmdObj),
                                                          getLegacyRuntimeConstants(cmdObj),
                                                          isTimeseriesViewRequest)) {
-            findAndModifyNonTargetedShardedCount.increment(1);
+            getQueryCounters(opCtx).findAndModifyNonTargetedShardedCount.increment(1);
             _runCommandWithoutShardKey(
                 opCtx, nss, stripWriteConcern(cmdObj), isTimeseriesViewRequest, result);
 
         } else {
-            findAndModifyTargetedShardedCount.increment(1);
+            getQueryCounters(opCtx).findAndModifyTargetedShardedCount.increment(1);
             _runCommand(opCtx,
                         shardId,
                         shardVersion,
