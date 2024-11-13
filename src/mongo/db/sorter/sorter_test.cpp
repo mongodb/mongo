@@ -40,9 +40,7 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"

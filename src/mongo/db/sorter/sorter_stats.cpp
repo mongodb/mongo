@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/sorter/sorter_stats.h"
+#include <algorithm>
 
+#include "mongo/db/sorter/sorter_stats.h"
 
 #include "mongo/util/assert_util_core.h"
 

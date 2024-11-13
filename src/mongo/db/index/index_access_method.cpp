@@ -40,12 +40,7 @@
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 // IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
 #include <algorithm>
-#include <deque>
-#include <exception>
-#include <iterator>
-#include <new>
 #include <string>
-#include <system_error>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -96,8 +91,6 @@
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
-#include "mongo/util/database_name_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/stacktrace.h"

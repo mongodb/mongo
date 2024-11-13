@@ -29,8 +29,6 @@
 
 #include "mongo/db/op_observer/batched_write_context.h"
 
-#include <utility>
-
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/repl/oplog_entry.h"

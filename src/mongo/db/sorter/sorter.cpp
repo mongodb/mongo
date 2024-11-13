@@ -53,7 +53,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <deque>
 #include <exception>
 #include <functional>
 #include <istream>
@@ -73,7 +72,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"

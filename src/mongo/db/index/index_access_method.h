@@ -29,13 +29,11 @@
 
 #pragma once
 
-#include <atomic>
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <set>
 #include <utility>
 #include <vector>
 
@@ -43,15 +41,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/index_builds/resumable_index_builds_gen.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -60,7 +55,6 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/yieldable.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
