@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
-#include "query_settings_hash.h"
-
 #include <fmt/format.h>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/query_settings/query_settings_hash.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -50,6 +53,23 @@ TEST(QuerySettingsHashTest, QuerySettingsHashIncludesRejection) {
 
     ASSERT_EQ(hashA, hashB);
     ASSERT_NE(hashA, hashC);
+}
+
+TEST(QuerySettingsHashTest, QuerySettingsHashExcludesComment) {
+    // Change comment in query settings, verify that the hash does not differ.
+    QuerySettings settings;
+    settings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+    settings.setReject(true);
+
+    auto hashA = mongo::query_settings::hash(settings);
+
+    auto commentObj = BSON("reason for reject"
+                           << "don't want this query to be used on classic...");
+    auto comment = Comment::parseFromBSON(commentObj.firstElement());
+    settings.setComment(comment);
+    auto hashB = mongo::query_settings::hash(settings);
+
+    ASSERT_EQ(hashA, hashB);
 }
 
 TEST(QuerySettingsHashTest, QuerySettingsHashStability) {

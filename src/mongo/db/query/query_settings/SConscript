@@ -10,6 +10,7 @@ env.Library(
         'index_hints_serialization.cpp',
         'query_framework_serialization.cpp',
         'query_settings.idl',
+        'query_settings_comment.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/namespace_spec',

@@ -112,6 +112,10 @@ const nonExistentQueryShapeHash = "0".repeat(64);
     const query = qsutils.makeFindQueryInstance({filter: {a: 15}});
     assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 8727502);
 
+    // Ensure that inserting settings that only have the 'comment' field fails.
+    assert.commandFailedWithCode(
+        db.adminCommand({setQuerySettings: query, settings: {comment: "hello!"}}), 7746604);
+
     // Insert some settings.
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: {reject: true}}));
     qsutils.assertQueryShapeConfiguration(
@@ -124,6 +128,49 @@ const nonExistentQueryShapeHash = "0".repeat(64);
     assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 8727502);
     qsutils.assertQueryShapeConfiguration(
         [qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
+
+    // Ensure that updating settings that only have the 'comment' field fails.
+    // Note: if only the comment is changed, the command does not fail since 'reject' is set to
+    // true, which makes the settings valid. Therefore, 'reject' must be set to false, and then
+    // settings with only 'comment' set are not valid.
+    assert.commandFailedWithCode(
+        db.adminCommand(
+            {setQuerySettings: queryShapeHash, settings: {reject: false, comment: "hi!"}}),
+        7746604);
+    assert.commandFailedWithCode(
+        db.adminCommand({setQuerySettings: query, settings: {reject: false, comment: "hi!"}}),
+        7746604);
+    qsutils.assertQueryShapeConfiguration(
+        [qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
+
+    // Clean-up after the end of the test.
+    qsutils.removeAllQuerySettings();
+}
+
+{
+    // Ensure that 'setQuerySettings' command works for different types of the comment.
+    function testCommentField(comment) {
+        const query = qsutils.makeFindQueryInstance({filter: {a: 15}});
+        const querySettings = {
+            indexHints: {ns: {db: db.getName(), coll: collName}, allowedIndexes: [{a: 1}]},
+            reject: true,
+            comment: comment
+        };
+        assert.commandWorked(db.adminCommand({
+            setQuerySettings: query,
+            settings: querySettings,
+        }));
+        qsutils.assertQueryShapeConfiguration(
+            [qsutils.makeQueryShapeConfiguration(querySettings, query)]);
+    }
+
+    testCommentField("Modified by: Vlad");
+    testCommentField({message: "Hello!"});
+    testCommentField(true);
+    testCommentField(-1);
+    testCommentField(ISODate("2024-01-20T00:00:00Z"));
+    testCommentField(null);
+    testCommentField(undefined);
 
     // Clean-up after the end of the test.
     qsutils.removeAllQuerySettings();

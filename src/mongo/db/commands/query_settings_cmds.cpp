@@ -109,6 +109,11 @@ auto findQueryShapeConfigurationByQueryShapeHash(
  * with the existing attributes in 'rhs'.
  */
 QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& rhs) {
+    static_assert(
+        QuerySettings::fieldNames.size() == 5,
+        "A new field has been added to the QuerySettings structure, mergeQuerySettings() should be "
+        "updated appropriately.");
+
     QuerySettings querySettings = lhs;
 
     if (rhs.getQueryFramework()) {
@@ -122,6 +127,10 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
     // Note: update if reject has a value in the rhs, not just if that value is true.
     if (rhs.getReject().has_value()) {
         querySettings.setReject(rhs.getReject());
+    }
+
+    if (auto comment = rhs.getComment()) {
+        querySettings.setComment(comment);
     }
 
     return querySettings;
