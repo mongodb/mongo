@@ -185,3 +185,10 @@ feature_flags:
       default: true
       version: 8.1
       shouldBeFCVGated: true
+
+    featureFlagLookupEncryptionSchemasFLE:
+      description: "Feature flag to support multiple FLE schemas with $lookup"
+      cpp_varname: gFeatureFlagLookupEncryptionSchemasFLE
+      default: false
+      shouldBeFCVGated: false
+
