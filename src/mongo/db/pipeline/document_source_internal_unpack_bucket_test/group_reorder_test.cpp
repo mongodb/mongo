@@ -319,17 +319,56 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetaFieldsExpression) {
     }
 }
 
+/*
+ * We can rewrite a $group on $max to reference the bucket control.max.time if there is no extended
+ * range data, and we are on mongod. The flag `requiresTimeseriesExtendedRangeSupport` is not
+ * accurate on mongos.
+ */
 TEST_F(InternalUnpackBucketGroupReorder, MaxGroupRewriteTimeField) {
-    // Validate $max can be rewritten if on the timeField to use control.max.time, since
-    // control.max.time is not rounded, like control.min.time.
+    struct TestData {
+        bool inRouter = false;
+        bool extendedRange = false;
+        bool shouldRewrite = false;
+    };
+
+    // Iterate through every test case, with inRouter true/false, and extended range true/false.
+    std::vector<TestData> testCases = {
+        {.inRouter = false, .extendedRange = false, .shouldRewrite = true},
+        {.inRouter = false, .extendedRange = true, .shouldRewrite = false},
+        {.inRouter = true, .extendedRange = false, .shouldRewrite = false},
+        {.inRouter = true, .extendedRange = true, .shouldRewrite = false},
+    };
+
     auto groupSpecObj = fromjson("{$group: {_id:'$meta1.m1', accmax: {$max: '$t'}}}");
+    auto rewrittenGroupStage =
+        fromjson("{$group: {_id: '$meta.m1', accmax: {$max: '$control.max.t'}}}");
+    auto expectedUnpackStageNoExtendedRange = fromjson(
+        "{ $_internalUnpackBucket: { include: [ 't', 'meta1' ], timeField: 't', metaField: "
+        "'meta1', bucketMaxSpanSeconds: 3600 } }");
+    auto expectedUnpackStageExtendedRangeTrue = fromjson(
+        "{ $_internalUnpackBucket: { include: [ 't', 'meta1' ], timeField: 't', metaField: "
+        "'meta1', bucketMaxSpanSeconds: 3600, usesExtendedRange: true } }");
 
-    auto serialized = makeAndOptimizePipeline(
-        getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
-    ASSERT_EQ(1, serialized.size());
+    for (auto&& testData : testCases) {
+        setExpCtx({.inRouter = testData.inRouter,
+                   .requiresTimeseriesExtendedRangeSupport = testData.extendedRange});
+        auto serialized = makeAndOptimizePipeline(
+            getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
 
-    auto optimized = fromjson("{$group: {_id: '$meta.m1', accmax: {$max: '$control.max.t'}}}");
-    ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+        if (testData.shouldRewrite) {
+            // We should see the rewrite occur, since we are on mongod and do not have extended
+            // range data.
+            ASSERT_EQ(1, serialized.size());
+            ASSERT_BSONOBJ_EQ(rewrittenGroupStage, serialized[0]);
+        } else {
+            // No rewrite should occur since we are on mongos or have extended range data.
+            ASSERT_EQ(2, serialized.size());
+            ASSERT_BSONOBJ_EQ(testData.extendedRange ? expectedUnpackStageExtendedRangeTrue
+                                                     : expectedUnpackStageNoExtendedRange,
+                              serialized[0]);
+            ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+        }
+    }
 }
 
 // The following tests confirms the $group rewrite does not apply when some requirements are not

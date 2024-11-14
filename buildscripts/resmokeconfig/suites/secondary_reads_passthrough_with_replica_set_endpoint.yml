@@ -99,6 +99,8 @@ selector:
     # Test expects changes in metrics (rejected command count), but these are
     # per-ClusterRole. This suite changes which role's metrics are updated.
     - jstests/core/query/query_settings/query_settings_reject_application.js
+    # Some TS rewrites cannot be done on mongos.
+    - jstests/core/timeseries/bucket_unpacking_group_reorder_fixed_buckets.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

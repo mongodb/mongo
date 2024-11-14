@@ -178,17 +178,16 @@ public:
     }
 
     std::pair<TypeTags, Value> tryUpperBound() const override {
-        return tryMax();
-    }
-
-    std::pair<TypeTags, Value> tryMin() const override;
-
-    std::pair<TypeTags, Value> tryMax() const override {
+        // Similar to tryLowerBound(), the control can be rounded up. It is a valid upper bound but
+        // not a valid max.
         if (canUseControlValue(_controlMax.first)) {
             return _controlMax;
         }
         return std::pair{TypeTags::Nothing, Value{0u}};
     }
+
+    std::pair<TypeTags, Value> tryMin() const override;
+    std::pair<TypeTags, Value> tryMax() const override;
 
     boost::optional<bool> tryDense() const override {
         return _isTimeField;

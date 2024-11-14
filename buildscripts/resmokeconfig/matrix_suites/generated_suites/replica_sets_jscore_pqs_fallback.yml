@@ -101,6 +101,7 @@ selector:
     - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
     - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_collscan.js
     - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
+    - jstests/core/timeseries/timeseries_group_aggregations.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_profiling
